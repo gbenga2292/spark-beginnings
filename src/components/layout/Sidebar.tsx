@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import { cn, IS_LIMITED_WEB_WEB } from '@/src/lib/utils';
 import { prefetchRoute } from '@/src/lib/routePrefetch';
 import { useUserStore, UserPrivileges } from '@/src/store/userStore';
@@ -196,48 +196,22 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
   
   const [updateInfo, setUpdateInfo] = useState<{ version: string; url: string; notes: string } | null>(null);
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
-  const [downloadProgress, setDownloadProgress] = useState<number | null>(null);
+  const [isDownloading, setIsDownloading] = useState(false);
 
-  const startDownload = async (url: string) => {
+  const startDownload = (url: string) => {
     try {
-      setDownloadProgress(0);
-      
-      const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const contentLength = Number(response.headers.get('Content-Length'));
-      if (!contentLength) {
-        // If the server doesn't send Content-Length or CORS blocks it, fallback to direct open
-        window.open(url, '_blank');
-        setDownloadProgress(null);
-        return;
-      }
-
-      const reader = response.body?.getReader();
-      if (!reader) throw new Error('Could not start download');
-
-      let receivedLength = 0;
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        receivedLength += value.length;
-        setDownloadProgress(Math.round((receivedLength / contentLength) * 100));
-      }
-
-      setDownloadProgress(null);
-      setIsUpdateModalOpen(false);
-      
-      // Open the URL to trigger the actual Android file download/install intent
-      // We MUST use '_system' so it escapes the WebView and uses the native Android download manager
+      setIsDownloading(true);
+      // Hand off to Android's native Download Manager via the '_system' target.
+      // This bypasses WebView CORS entirely — the native downloader has no origin restrictions.
+      // Download progress is tracked in the Android notification bar.
       window.open(url, '_system');
-      toast.success('Download complete! Installing...');
+      setIsUpdateModalOpen(false);
+      toast.success('Download started! Track progress in your notification bar, then tap the APK to install.');
     } catch (err: any) {
       console.error('Download failed:', err);
-      // If it fails due to CORS, provide a clear fallback
-      toast.error(`Download failed: ${err.message}. Check CORS or URL.`);
-      setDownloadProgress(null);
+      toast.error(`Could not start download: ${err.message}`);
+    } finally {
+      setIsDownloading(false);
     }
   };
 
@@ -247,11 +221,16 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
 
     const checkForUpdates = async () => {
       try {
-        const response = await fetch(`${UPDATE_SERVER_URL}/version.json?t=${Date.now()}`);
-        if (!response.ok) return;
-        const data = await response.json();
-        
-        // Simple version comparison (e.g. "1.4.12" > "1.4.11")
+        // CapacitorHttp makes a true native HTTP request — it bypasses WebView CORS completely.
+        // fetch() from a WebView (origin: https://localhost) would be blocked by the server's
+        // missing Access-Control-Allow-Origin header. CapacitorHttp has no such restriction.
+        const response = await CapacitorHttp.get({
+          url: `${UPDATE_SERVER_URL}/version.json?t=${Date.now()}`,
+          headers: { 'Cache-Control': 'no-cache' },
+        });
+        if (response.status !== 200) return;
+        const data = response.data;
+
         if (data.version && data.version !== CURRENT_VERSION) {
           setUpdateInfo(data);
         }
@@ -579,7 +558,7 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
 
           {/* ── Android Update Modal (hidden in Web/Electron) ─────────────── */}
           {isAndroidNative && !isElectron && (
-            <Dialog open={isUpdateModalOpen} onOpenChange={(o) => { if (downloadProgress === null) setIsUpdateModalOpen(o); }}>
+            <Dialog open={isUpdateModalOpen} onOpenChange={setIsUpdateModalOpen}>
             <DialogContent
               className={cn(
                 "w-[calc(100vw-2rem)] max-w-sm rounded-2xl border-0 p-0 shadow-2xl overflow-hidden",
@@ -610,40 +589,21 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
 
               {/* Body */}
               <div className="px-6 py-5 space-y-4">
-                {downloadProgress !== null ? (
-                  /* ── Download Progress ── */
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className={cn("text-xs font-semibold", isDark ? "text-slate-300" : "text-slate-700")}>
-                        Downloading...
-                      </span>
-                      <span className={cn("text-xs font-bold tabular-nums", isDark ? "text-emerald-400" : "text-emerald-600")}>
-                        {downloadProgress}%
-                      </span>
-                    </div>
-                    {/* Track */}
-                    <div className={cn("h-1.5 w-full rounded-full overflow-hidden", isDark ? "bg-slate-700" : "bg-slate-100")}>
-                      <div
-                        className="h-full rounded-full bg-emerald-500 transition-[width] duration-300 ease-out"
-                        style={{ width: `${downloadProgress}%` }}
-                      />
-                    </div>
-                    <p className={cn("text-[10px] text-center", isDark ? "text-slate-500" : "text-slate-400")}>
-                      Keep the app open until the download completes.
-                    </p>
-                  </div>
-                ) : (
-                  /* ── Release Notes ── */
-                  <div className={cn(
-                    "rounded-xl px-4 py-3 text-xs leading-relaxed",
-                    isDark ? "bg-slate-800 text-slate-300" : "bg-slate-50 text-slate-600"
-                  )}>
-                    <p className={cn("text-[10px] font-semibold uppercase tracking-widest mb-1.5", isDark ? "text-slate-500" : "text-slate-400")}>
-                      What's New
-                    </p>
-                    {updateInfo?.notes || 'General improvements and bug fixes.'}
-                  </div>
-                )}
+                {/* Release Notes */}
+                <div className={cn(
+                  "rounded-xl px-4 py-3 text-xs leading-relaxed",
+                  isDark ? "bg-slate-800 text-slate-300" : "bg-slate-50 text-slate-600"
+                )}>
+                  <p className={cn("text-[10px] font-semibold uppercase tracking-widest mb-1.5", isDark ? "text-slate-500" : "text-slate-400")}>
+                    What's New
+                  </p>
+                  {updateInfo?.notes || 'General improvements and bug fixes.'}
+                </div>
+
+                {/* Download hint */}
+                <p className={cn("text-[10px] text-center", isDark ? "text-slate-600" : "text-slate-400")}>
+                  The APK will download via your notification bar. Tap the file to install once complete.
+                </p>
 
                 {/* Version row */}
                 <div className="flex items-center justify-between">
@@ -660,7 +620,7 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
               <div className={cn("flex gap-2 px-6 pb-6")}>
                 <button
                   onClick={() => setIsUpdateModalOpen(false)}
-                  disabled={downloadProgress !== null}
+                  disabled={isDownloading}
                   className={cn(
                     "flex-1 rounded-xl py-2.5 text-xs font-semibold transition-colors disabled:opacity-40",
                     isDark
@@ -672,20 +632,18 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
                 </button>
                 <button
                   onClick={() => { if (updateInfo?.url) startDownload(updateInfo.url); }}
-                  disabled={downloadProgress !== null}
+                  disabled={isDownloading}
                   className={cn(
                     "flex-[2] flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-bold text-white transition-all disabled:opacity-60",
-                    downloadProgress !== null
-                      ? "bg-emerald-600"
-                      : "bg-emerald-600 hover:bg-emerald-500 active:scale-[0.98]"
+                    "bg-emerald-600 hover:bg-emerald-500 active:scale-[0.98]"
                   )}
                 >
-                  {downloadProgress !== null ? (
+                  {isDownloading ? (
                     <RefreshCw className="h-3.5 w-3.5 animate-spin" />
                   ) : (
                     <DownloadCloud className="h-3.5 w-3.5" />
                   )}
-                  {downloadProgress !== null ? `Downloading ${downloadProgress}%` : 'Download & Install'}
+                  {isDownloading ? 'Opening Download...' : 'Download & Install'}
                 </button>
               </div>
             </DialogContent>

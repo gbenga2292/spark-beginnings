@@ -1,6 +1,6 @@
 import { formatDisplayDate } from '@/src/lib/dateUtils';
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import { Bell, Search, LogOut, Menu, X, User, Settings, ChevronRight, CalendarClock, Users, MapPin, Wallet, FileText, Landmark, Library, UserPlus, ShieldCheck, LayoutDashboard, Clock, AlertCircle, AtSign, ArrowLeft, ArrowUpCircle, RefreshCw, MoreVertical } from 'lucide-react';
 import { toast } from '@/src/components/ui/toast';
 import { StatusIndicator } from '@/src/components/offline/StatusIndicator';
@@ -228,7 +228,6 @@ export function Header({ onMenuClick }: HeaderProps) {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [mobileOverflowOpen, setMobileOverflowOpen] = useState(false);
   const [checkingUpdate, setCheckingUpdate] = useState(false);
-  const [downloadProgress, setDownloadProgress] = useState<number | null>(null);
 
   const CURRENT_VERSION = '1.4.14'; // Matches package.json
   const UPDATE_SERVER_URL = import.meta.env.VITE_UPDATE_SERVER_URL || 'https://dewaterconstruct.com/app-updates';
@@ -237,47 +236,32 @@ export function Header({ onMenuClick }: HeaderProps) {
   const isAndroidNative = Capacitor.getPlatform() === 'android';
   const isElectron = !!(window as any).electronAPI?.isElectron;
 
-  const startDownload = async (url: string) => {
+  const startDownload = (url: string) => {
     try {
-      setDownloadProgress(0);
-      const response = await fetch(url);
-      if (!response.ok) throw new Error('Download failed');
-
-      const contentLength = Number(response.headers.get('Content-Length'));
-      if (!contentLength) {
-        window.open(url, '_blank');
-        setDownloadProgress(null);
-        return;
-      }
-
-      const reader = response.body?.getReader();
-      if (!reader) throw new Error('Could not start download');
-
-      let receivedLength = 0;
-      while(true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        receivedLength += value.length;
-        setDownloadProgress(Math.round((receivedLength / contentLength) * 100));
-      }
-
-      setDownloadProgress(null);
-      window.open(url, '_blank');
-      toast.success('Download complete! Installing...');
+      // Hand off to Android's native Download Manager via the '_system' target.
+      // This bypasses the WebView's CORS restriction entirely — the native
+      // downloader has no origin rules. Progress is visible in the notification bar.
+      window.open(url, '_system');
+      toast.success('Download started! Check your notification bar, then tap the file to install.');
     } catch (err) {
       console.error('Download failed:', err);
       toast.error('Download failed. Please try again.');
-      setDownloadProgress(null);
     }
   };
 
   const handleManualUpdateCheck = async () => {
     setCheckingUpdate(true);
     try {
-      const response = await fetch(`${UPDATE_SERVER_URL}/version.json?t=${Date.now()}`);
-      if (!response.ok) throw new Error('Could not connect to update server');
-      
-      const data = await response.json();
+      // CapacitorHttp makes a native HTTP request — bypasses WebView CORS restrictions.
+      // Using fetch() here would fail: Capacitor WebView origin (https://localhost) is
+      // cross-origin vs dewaterconstruct.com which lacks CORS headers.
+      const response = await CapacitorHttp.get({
+        url: `${UPDATE_SERVER_URL}/version.json?t=${Date.now()}`,
+        headers: { 'Cache-Control': 'no-cache' },
+      });
+      if (response.status !== 200) throw new Error('Could not connect to update server');
+
+      const data = response.data;
       if (data.version && data.version !== CURRENT_VERSION) {
         toast.success(
           <div className="flex flex-col gap-0.5">
@@ -286,11 +270,7 @@ export function Header({ onMenuClick }: HeaderProps) {
           </div>,
           {
             label: 'Download Now',
-            onClick: () => {
-              // Open sidebar or just start download?
-              // For Header, we'll just trigger the download directly with progress
-              startDownload(data.url);
-            }
+            onClick: () => startDownload(data.url),
           }
         );
       } else {
@@ -690,17 +670,17 @@ export function Header({ onMenuClick }: HeaderProps) {
                 {isAndroidNative && !isElectron && (
                   <button
                     onClick={handleManualUpdateCheck}
-                    disabled={checkingUpdate || downloadProgress !== null}
+                    disabled={checkingUpdate}
                     className={`w-full flex items-center gap-3 px-4 py-2.5 text-xs transition-colors ${
                       isDark ? 'text-emerald-400 hover:bg-slate-700' : 'text-emerald-600 hover:bg-emerald-50'
                     }`}
                   >
-                    {checkingUpdate || downloadProgress !== null ? (
+                    {checkingUpdate ? (
                       <RefreshCw className="h-3.5 w-3.5 animate-spin" />
                     ) : (
                       <ArrowUpCircle className="h-3.5 w-3.5" />
                     )}
-                    {downloadProgress !== null ? `Downloading ${downloadProgress}%` : checkingUpdate ? 'Checking...' : 'Check for Update'}
+                    {checkingUpdate ? 'Checking...' : 'Check for Update'}
                   </button>
                 )}
               </div>
