@@ -17,9 +17,10 @@ interface LogMaintenanceFormProps {
   initialAssetId?: string | null;
   editSessionId?: string | null;
   onSuccess?: () => void;
+  onCancel?: () => void;
 }
 
-export function LogMaintenanceForm({ initialAssetId, editSessionId, onSuccess }: LogMaintenanceFormProps) {
+export function LogMaintenanceForm({ initialAssetId, editSessionId, onSuccess, onCancel }: LogMaintenanceFormProps) {
   const { logMaintenance, updateMaintenance, maintenanceSessions, maintenanceAssets, assets } = useOperations();
   const { isDark } = useTheme();
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
@@ -168,7 +169,7 @@ export function LogMaintenanceForm({ initialAssetId, editSessionId, onSuccess }:
         <CardContent className="p-5 sm:p-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-1.5">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Maintenance Date *</label>
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Maintenance Date *</label>
               <div className="relative">
                 <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <Input type="date" value={date} onChange={(e) => setDate(e.target.value)}
@@ -177,7 +178,7 @@ export function LogMaintenanceForm({ initialAssetId, editSessionId, onSuccess }:
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Maintenance Type *</label>
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Maintenance Type *</label>
               <select value={type} onChange={(e) => setType(e.target.value as any)} className={selectClass}>
                 <option value="scheduled">Scheduled / Preventive</option>
                 <option value="repair">Repair / Fix</option>
@@ -187,13 +188,13 @@ export function LogMaintenanceForm({ initialAssetId, editSessionId, onSuccess }:
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Technician *</label>
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Technician *</label>
               <Input placeholder="Select Technician" value={technician} onChange={(e) => setTechnician(e.target.value)}
                 className="h-11 rounded-xl bg-slate-50/50 dark:bg-slate-950 border-transparent font-medium text-sm" />
             </div>
 
             <div className="md:col-span-3 space-y-1.5">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">General Remark</label>
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">General Remark</label>
               <textarea placeholder="General notes for this session..." value={generalRemark} onChange={(e) => setGeneralRemark(e.target.value)}
                 className="w-full h-20 rounded-xl bg-slate-50/50 dark:bg-slate-950 border border-transparent p-4 font-medium text-sm text-slate-700 dark:text-slate-200 outline-none resize-none" />
             </div>
@@ -241,7 +242,7 @@ export function LogMaintenanceForm({ initialAssetId, editSessionId, onSuccess }:
                   {/* Form fields for this asset */}
                   <div className="space-y-6">
                      <div className="space-y-2">
-                       <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Maintenance Performed *</label>
+                       <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Maintenance Performed *</label>
                        <textarea 
                           placeholder="Describe the maintenance work done..." 
                           value={assetData[asset.id]?.workDone || ''}
@@ -252,7 +253,7 @@ export function LogMaintenanceForm({ initialAssetId, editSessionId, onSuccess }:
                      
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                        <div className="space-y-2">
-                          <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Location</label>
+                          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Location</label>
                           <select 
                             value={assetData[asset.id]?.location || ''}
                             onChange={(e) => updateAssetData(asset.id, 'location', e.target.value)}
@@ -280,7 +281,7 @@ export function LogMaintenanceForm({ initialAssetId, editSessionId, onSuccess }:
                      </div>
 
                      <div className="space-y-2">
-                        <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Next Maintenance Date</label>
+                        <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Next Maintenance Date</label>
                         <div className="relative">
                            <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
                            <Input 
@@ -294,7 +295,7 @@ export function LogMaintenanceForm({ initialAssetId, editSessionId, onSuccess }:
                      </div>
                      
                      <div className="space-y-2">
-                        <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Parts Replaced</label>
+                        <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Parts Replaced</label>
                         
                         {/* Display Added Parts */}
                         {assetData[asset.id]?.parts?.length > 0 && (
@@ -329,7 +330,7 @@ export function LogMaintenanceForm({ initialAssetId, editSessionId, onSuccess }:
                      </div>
 
                      <div className="space-y-2 pt-2">
-                        <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Machine-Specific Remark (optional)</label>
+                        <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Machine-Specific Remark (optional)</label>
                         <Input 
                           placeholder="Specific notes for this machine (overrides general remark)" 
                           value={assetData[asset.id]?.remark || ''}
@@ -345,10 +346,10 @@ export function LogMaintenanceForm({ initialAssetId, editSessionId, onSuccess }:
         </div>
       </Card>
 
-      <div className="flex items-center justify-end gap-3 pt-4">
-        <Button variant="outline" className="h-11 rounded-xl px-6 font-bold text-sm text-foreground hover:bg-secondary">Cancel</Button>
+      <div className="sticky bottom-0 bg-background/80 backdrop-blur-md border-t border-border p-4 flex items-center justify-end gap-3 z-20 shadow-sm rounded-xl mt-6">
+        <Button variant="outline" onClick={onCancel} className="h-11 rounded-xl px-6 font-medium text-sm text-foreground hover:bg-secondary border-slate-200 dark:border-slate-800">Cancel</Button>
         <Button onClick={handleLog} disabled={selectedAssetIds.length === 0}
-          className="h-11 rounded-xl px-8 bg-blue-500 hover:bg-blue-600 text-white font-bold text-sm shadow-sm gap-2 disabled:opacity-50">
+          className="h-11 rounded-xl px-8 bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm shadow-sm gap-2 disabled:opacity-50">
           <CheckCircle2 className="h-4 w-4" /> {editSessionId ? 'UPDATE LOG' : `SAVE LOGS ${selectedAssetIds.length > 0 ? `(${selectedAssetIds.length})` : ''}`}
         </Button>
       </div>

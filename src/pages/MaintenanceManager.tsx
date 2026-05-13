@@ -33,9 +33,11 @@ export function MaintenanceManager() {
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
   const [logViewAssetId, setLogViewAssetId] = useState<string | null>(null);
   const [logAssetId, setLogAssetId] = useState<string | null>(null);
+  const [previousTab, setPreviousTab] = useState<MaintenanceTab>('dashboard');
   const { maintenanceAssets } = useOperations();
   
   const handleLogAsset = (id: string) => {
+    setPreviousTab(activeTab);
     setLogAssetId(id);
     setActiveTab('log');
     setSelectedAssetId(null);
@@ -85,7 +87,7 @@ export function MaintenanceManager() {
           <Button 
             size="sm" 
             className="gap-2 h-9 bg-blue-600 hover:bg-blue-700 text-white shadow-sm" 
-            onClick={() => setActiveTab('log')}
+            onClick={() => { setPreviousTab(activeTab); setActiveTab('log'); }}
           >
             <Plus className="h-4 w-4" /> <span className="hidden sm:inline">Log Service</span>
           </Button>
@@ -98,7 +100,6 @@ export function MaintenanceManager() {
     { id: 'dashboard', label: 'Overview', icon: LayoutDashboard },
     { id: 'machines', label: 'Machines', count: machinesCount, icon: Activity },
     { id: 'vehicles', label: 'Vehicles', count: vehiclesCount, icon: Truck },
-    { id: 'log', label: 'Service Log', icon: Wrench },
   ];
 
   return (
@@ -159,7 +160,13 @@ export function MaintenanceManager() {
             onLogAsset={handleLogAsset}
           />
         )}
-        {activeTab === 'log' && <LogMaintenanceForm initialAssetId={logAssetId} />}
+        {activeTab === 'log' && (
+          <LogMaintenanceForm 
+            initialAssetId={logAssetId} 
+            onSuccess={() => setActiveTab(previousTab)} 
+            onCancel={() => setActiveTab(previousTab)}
+          />
+        )}
       </div>
     </div>
   );

@@ -27,9 +27,10 @@ interface MaintenanceAssetDetailViewProps {
 }
 
 export function MaintenanceAssetDetailView({ asset, onBack, onLogService }: MaintenanceAssetDetailViewProps) {
-  const { maintenanceSessions } = useOperations();
+  const { maintenanceSessions, dailyMachineLogs, vehicleTrips } = useOperations();
   const [timeRange, setTimeRange] = useState<'6m' | '1y' | 'all'>('1y');
   const [showLogDialog, setShowLogDialog] = useState(false);
+  const [activeTab, setActiveTab] = useState<'maintenance' | 'operational'>('maintenance');
 
   const assetSessions = useMemo(() => {
     return maintenanceSessions
@@ -80,9 +81,6 @@ export function MaintenanceAssetDetailView({ asset, onBack, onLogService }: Main
     asset.name,
     `${asset.category} · ${asset.site}`,
     <div className="flex items-center gap-2">
-      <Button variant="outline" size="sm" className="gap-2 h-8 text-xs font-semibold" onClick={onBack}>
-        <ArrowLeft className="h-3.5 w-3.5" /> Back
-      </Button>
       <span className={cn('hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border', statusConfig.color, statusConfig.bg, statusConfig.border)}>
         {statusConfig.label}
       </span>
@@ -92,10 +90,50 @@ export function MaintenanceAssetDetailView({ asset, onBack, onLogService }: Main
     </div>
   );
 
+  const operationalLogs = useMemo(() => {
+    if (asset.category === 'machine') {
+      return dailyMachineLogs
+        .filter(log => log.assetId === asset.id)
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    } else {
+      return vehicleTrips
+        .filter(trip => trip.vehicle_id === asset.id)
+        .sort((a, b) => new Date(b.departure_time).getTime() - new Date(a.departure_time).getTime());
+    }
+  }, [asset.id, asset.category, dailyMachineLogs, vehicleTrips]);
+
   return (
     <div className="flex flex-col gap-5 max-w-6xl mx-auto pb-10 animate-in fade-in slide-in-from-bottom-2 duration-300">
+      
+      {/* Back & Tabs Header */}
+      <div className="flex items-center gap-3 sm:gap-4 mb-2 overflow-x-auto scrollbar-hide shrink-0 pb-1 -mx-2 px-2 sm:mx-0 sm:px-0">
+        <Button variant="outline" size="sm" className="gap-2 h-9 rounded-xl font-bold shrink-0 text-slate-700 hover:bg-slate-100" onClick={onBack}>
+          <ArrowLeft className="h-4 w-4" /> Back
+        </Button>
+        
+        <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl shrink-0">
+           <button 
+             onClick={() => setActiveTab('maintenance')}
+             className={cn("px-4 py-1.5 rounded-lg text-[11px] sm:text-xs font-bold uppercase transition-all whitespace-nowrap", 
+               activeTab === 'maintenance' ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300'
+             )}
+           >
+              Maintenance Log
+           </button>
+           <button 
+             onClick={() => setActiveTab('operational')}
+             className={cn("px-4 py-1.5 rounded-lg text-[11px] sm:text-xs font-bold uppercase transition-all whitespace-nowrap",
+               activeTab === 'operational' ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300'
+             )}
+           >
+              {asset.category === 'machine' ? 'Machine Log' : 'Movement Log'}
+           </button>
+        </div>
+      </div>
 
-      {/* KPI Strip */}
+      {activeTab === 'maintenance' ? (
+        <>
+          {/* KPI Strip */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
           { label: 'Total Cost', value: `₦${stats.totalCost.toLocaleString()}`, icon: DollarSign, accent: 'emerald' },
@@ -286,6 +324,90 @@ export function MaintenanceAssetDetailView({ asset, onBack, onLogService }: Main
           </div>
         </div>
       </div>
+        </>
+      ) : (
+        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col">
+          <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2.5">
+              <Activity className="h-4 w-4 text-blue-500" /> 
+              {asset.category === 'machine' ? 'Operational History' : 'Trip & Movement History'}
+            </h3>
+            <span className="text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-500 px-2.5 py-1 rounded-full">
+              {operationalLogs.length} Records
+            </span>
+          </div>
+          
+          {operationalLogs.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20 px-4 text-center">
+              <div className="h-12 w-12 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center mb-3">
+                <History className="h-6 w-6 text-slate-300 dark:text-slate-600" />
+              </div>
+              <p className="text-sm font-semibold text-slate-400">No logs available</p>
+              <p className="text-xs font-medium text-slate-400 mt-1 max-w-xs">
+                When this {asset.category} is logged on sites, its history will appear here.
+              </p>
+            </div>
+          ) : (
+            <div className="divide-y divide-slate-100 dark:divide-slate-800">
+              {operationalLogs.map((log: any, idx) => (
+                <div key={idx} className="px-6 py-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap mb-1">
+                        <span className="text-sm font-bold text-slate-800 dark:text-slate-200">
+                          {asset.category === 'machine' ? formatDisplayDate(log.date) : formatDisplayDate(log.departure_time)}
+                        </span>
+                        {asset.category === 'machine' ? (
+                          <>
+                            <span className="text-[10px] font-bold border px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 border-blue-100">
+                              Site: {log.siteName || log.site_name}
+                            </span>
+                            {log.isActive ? (
+                              <span className="text-[10px] font-bold border px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 border-emerald-100">Active</span>
+                            ) : (
+                              <span className="text-[10px] font-bold border px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 border-slate-200">Inactive</span>
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            <span className="text-[10px] font-bold border px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 border-blue-100">
+                              {log.route || 'No Route'}
+                            </span>
+                            {log.distance && (
+                              <span className="text-[10px] font-bold border px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border-slate-200">
+                                {log.distance} km
+                              </span>
+                            )}
+                          </>
+                        )}
+                      </div>
+                      
+                      <div className="flex flex-wrap gap-4 mt-2">
+                        {asset.category === 'machine' && log.dieselUsage > 0 && (
+                          <div className="flex items-center gap-1.5 text-xs font-medium text-slate-500">
+                            <Activity className="h-3 w-3" /> Diesel: {log.dieselUsage}L
+                          </div>
+                        )}
+                        {asset.category === 'vehicle' && log.fuel_volume > 0 && (
+                          <div className="flex items-center gap-1.5 text-xs font-medium text-slate-500">
+                            <Activity className="h-3 w-3" /> Fuel: {log.fuel_volume}L
+                          </div>
+                        )}
+                      </div>
+                      
+                      {((asset.category === 'machine' && log.issuesOnSite) || (asset.category === 'vehicle' && log.notes)) && (
+                        <p className="text-xs text-slate-500 mt-2 max-w-lg leading-relaxed">
+                          <span className="font-semibold">Notes:</span> {log.issuesOnSite || log.notes}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Full Log History Dialog */}
       <Dialog open={showLogDialog} onOpenChange={setShowLogDialog}>

@@ -99,38 +99,41 @@ export function MaintenanceDashboard() {
   return (
     <div className="space-y-6">
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row items-end justify-end gap-3">
-        {period !== 'all' && (
-          <div className="flex items-center gap-2">
-            {period === 'month' && (
+      <div className="flex items-center justify-between w-full overflow-x-auto scrollbar-hide">
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          {period !== 'all' && (
+            <>
+              {period === 'month' && (
+                <select 
+                  value={selectedMonth} 
+                  onChange={(e) => setSelectedMonth(Number(e.target.value))}
+                  className="h-8 sm:h-[34px] rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[11px] sm:text-xs font-semibold px-2 sm:px-3 outline-none text-slate-700 dark:text-slate-300 cursor-pointer"
+                >
+                  {Array.from({ length: 12 }).map((_, i) => {
+                    const d = new Date(); d.setMonth(i);
+                    return <option key={i} value={i}>{d.toLocaleString('default', { month: 'short' })}</option>;
+                  })}
+                </select>
+              )}
               <select 
-                value={selectedMonth} 
-                onChange={(e) => setSelectedMonth(Number(e.target.value))}
-                className="h-[34px] rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold px-3 outline-none text-slate-700 dark:text-slate-300"
+                value={selectedYear} 
+                onChange={(e) => setSelectedYear(Number(e.target.value))}
+                className="h-8 sm:h-[34px] rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[11px] sm:text-xs font-semibold px-2 sm:px-3 outline-none text-slate-700 dark:text-slate-300 cursor-pointer"
               >
-                {Array.from({ length: 12 }).map((_, i) => {
-                  const d = new Date(); d.setMonth(i);
-                  return <option key={i} value={i}>{d.toLocaleString('default', { month: 'long' })}</option>;
+                {Array.from({ length: 5 }).map((_, i) => {
+                  const y = new Date().getFullYear() - i;
+                  return <option key={y} value={y}>{y}</option>;
                 })}
               </select>
-            )}
-            <select 
-              value={selectedYear} 
-              onChange={(e) => setSelectedYear(Number(e.target.value))}
-              className="h-[34px] rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold px-3 outline-none text-slate-700 dark:text-slate-300"
-            >
-              {Array.from({ length: 5 }).map((_, i) => {
-                const y = new Date().getFullYear() - i;
-                return <option key={y} value={y}>{y}</option>;
-              })}
-            </select>
-          </div>
-        )}
-        <div className="flex bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg border border-slate-200 dark:border-slate-700">
+            </>
+          )}
+        </div>
+        
+        <div className="flex bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg border border-slate-200 dark:border-slate-700 shrink-0 ml-2">
           {(['month', 'year', 'all'] as const).map(r => (
             <button key={r} onClick={() => setPeriod(r)}
               className={cn(
-                'px-4 py-1.5 rounded-md text-[11px] font-bold uppercase transition-all',
+                'px-2.5 py-1 sm:px-4 sm:py-1.5 rounded-md text-[10px] sm:text-[11px] font-bold uppercase transition-all',
                 period === r ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300'
               )}>
               {r}
@@ -205,10 +208,10 @@ export function MaintenanceDashboard() {
             </CardTitle>
           </CardHeader>
           <CardContent className="p-5 sm:p-6">
-            <div className="h-[250px] flex items-center">
+            <div className="h-auto min-h-[250px] flex flex-col sm:flex-row items-center gap-6 sm:gap-0 pt-2 sm:pt-0">
               {topPartsUsed.length > 0 ? (
                 <>
-                  <div className="flex-1 h-full">
+                  <div className="w-full sm:flex-1 h-[200px] sm:h-[250px]">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Pie data={topPartsUsed} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="count">
@@ -223,7 +226,7 @@ export function MaintenanceDashboard() {
                       </PieChart>
                     </ResponsiveContainer>
                   </div>
-                  <div className="flex-1 space-y-3 pl-4">
+                  <div className="w-full sm:flex-1 space-y-3 sm:pl-4">
                     {topPartsUsed.map((part, idx) => (
                       <div key={idx} className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
