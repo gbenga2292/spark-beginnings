@@ -106,7 +106,7 @@ export function MaintenanceManager() {
     <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10 px-4 sm:px-6 lg:px-8">
       {/* Tabs - Hidden if viewing details or log */}
       {!isSubViewActive && (
-        <div className="flex border-b border-slate-200 dark:border-slate-800 gap-8 px-2 mx-1 mb-6 overflow-x-auto scrollbar-hide">
+        <div className="flex border-b border-slate-200 dark:border-slate-800 gap-8 px-2 mx-1 mb-1 overflow-x-auto scrollbar-hide">
           {tabs.map((tab) => (
             <button
               key={tab.id}
@@ -138,7 +138,7 @@ export function MaintenanceManager() {
       )}
 
       {/* Tab Content */}
-      <div className="flex-1 mt-2">
+      <div className="flex-1">
         {activeTab === 'dashboard' && <MaintenanceDashboard />}
         {activeTab === 'machines' && (
           <MaintenanceAssetGrid 

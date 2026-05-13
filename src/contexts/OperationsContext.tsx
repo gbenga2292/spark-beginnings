@@ -717,6 +717,42 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
 
     setMaintenanceSessions(prev => [newSession, ...prev]);
     persistMaintenance(newSession);
+
+    // DAILY JOURNAL SYNC
+    setTimeout(() => {
+      const appStore = useAppStore.getState();
+      const existingJournal = appStore.dailyJournals.find(j => j.date === newSession.date);
+      
+      const narrationText = `Maintenance Logged - Tech: ${newSession.technician} | Type: ${newSession.type}\n` +
+        `Remark: ${newSession.generalRemark || 'N/A'}\n` + 
+        newSession.assets.map(a => `- ${a.assetName}: ${a.workDone || a.remark || 'Maintained'}`).join('\n');
+      
+      const newEntry = {
+          id: `maint-${newSession.id}`,
+          journalId: existingJournal ? existingJournal.id : `DJ-${newSession.date.replace(/-/g, '')}`,
+          siteId: 'dcel-office',
+          siteName: 'DCEL OFFICE',
+          clientName: 'DCEL',
+          narration: narrationText,
+          createdAt: new Date().toISOString(),
+          loggedBy: (user as any)?.user_metadata?.name || user?.email || 'Unknown User'
+      };
+      
+      if (existingJournal) {
+          let currentEntries = appStore.siteJournalEntries.filter(e => e.journalId === existingJournal.id);
+          currentEntries = currentEntries.filter(e => e.id !== newEntry.id);
+          currentEntries.push(newEntry);
+          appStore.updateDailyJournal(existingJournal.id, existingJournal, currentEntries);
+      } else {
+          appStore.addDailyJournal({
+              id: `DJ-${newSession.date.replace(/-/g, '')}`,
+              date: newSession.date,
+              generalNotes: 'Maintenance recorded.',
+              loggedBy: (user as any)?.user_metadata?.name || user?.email || 'Unknown User',
+              createdAt: new Date().toISOString()
+          }, [newEntry]);
+      }
+    }, 0);
   };
 
   const updateMaintenance = (id: string, updates: Partial<Omit<MaintenanceSession, 'id'>>) => {
@@ -772,6 +808,43 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
 
       const updatedSession = { ...oldSession, ...updates } as MaintenanceSession;
       persistMaintenance(updatedSession);
+
+      // DAILY JOURNAL SYNC
+      setTimeout(() => {
+        const appStore = useAppStore.getState();
+        const existingJournal = appStore.dailyJournals.find(j => j.date === updatedSession.date);
+        
+        const narrationText = `Maintenance Updated - Tech: ${updatedSession.technician} | Type: ${updatedSession.type}\n` +
+          `Remark: ${updatedSession.generalRemark || 'N/A'}\n` + 
+          updatedSession.assets.map(a => `- ${a.assetName}: ${a.workDone || a.remark || 'Maintained'}`).join('\n');
+        
+        const newEntry = {
+            id: `maint-${updatedSession.id}`,
+            journalId: existingJournal ? existingJournal.id : `DJ-${updatedSession.date.replace(/-/g, '')}`,
+            siteId: 'dcel-office',
+            siteName: 'DCEL OFFICE',
+            clientName: 'DCEL',
+            narration: narrationText,
+            createdAt: new Date().toISOString(),
+            loggedBy: (user as any)?.user_metadata?.name || user?.email || 'Unknown User'
+        };
+        
+        if (existingJournal) {
+            let currentEntries = appStore.siteJournalEntries.filter(e => e.journalId === existingJournal.id);
+            currentEntries = currentEntries.filter(e => e.id !== newEntry.id);
+            currentEntries.push(newEntry);
+            appStore.updateDailyJournal(existingJournal.id, existingJournal, currentEntries);
+        } else {
+            appStore.addDailyJournal({
+                id: `DJ-${updatedSession.date.replace(/-/g, '')}`,
+                date: updatedSession.date,
+                generalNotes: 'Maintenance updated.',
+                loggedBy: (user as any)?.user_metadata?.name || user?.email || 'Unknown User',
+                createdAt: new Date().toISOString()
+            }, [newEntry]);
+        }
+      }, 0);
+
       return prev.map(s => s.id === id ? updatedSession : s);
     });
   };

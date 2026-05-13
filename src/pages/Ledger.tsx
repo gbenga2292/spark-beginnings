@@ -1061,7 +1061,7 @@ export function Ledger() {
                       <div className="space-y-1.5">
                         <label className="text-[10px] font-bold text-slate-500 uppercase">Category</label>
                         <select className="w-full h-9 px-2 rounded-md border border-slate-200 text-xs bg-white truncate" value={item.category} onChange={e => setItemField(idx, 'category', e.target.value)}>
-                          <option value="" disabled>Select...</option>
+                          <option value="">Select...</option>
                           {sortedCategories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
                         </select>
                       </div>
@@ -1149,7 +1149,7 @@ export function Ledger() {
                     </td>
                     <td className={tdClass}>
                       <select className={inputClass} value={item.category} onChange={e => setItemField(idx, 'category', e.target.value)}>
-                        <option value="" disabled></option>
+                        <option value=""></option>
                         {sortedCategories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
                       </select>
                     </td>

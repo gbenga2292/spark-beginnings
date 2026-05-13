@@ -182,11 +182,85 @@ export function FinancialReports() {
       ? [MONTHS_LIST.find(m => m.value === (filterMonth === "All" ? null : parseInt(filterMonth, 10)))?.key || 'jan']
       : MONTHS.map(m => m.key);
       
+    const yearToCalculate = filterYear === 'All' ? new Date().getFullYear() : parseInt(filterYear, 10);
+
     return monthsToProcess.reduce((acc, monthKey) => {
-      acc[monthKey] = calculatePayrollForMonth(monthKey);
+      acc[monthKey] = calculatePayrollForMonth(monthKey, yearToCalculate);
       return acc;
     }, {} as Record<string, any[]>);
-  }, [calculatePayrollForMonth, MONTHS, mainTab, accountsTab, filterMonth]);
+  }, [calculatePayrollForMonth, MONTHS, mainTab, accountsTab, filterMonth, filterYear]);
+
+  const proratedMonthsPayroll = useMemo(() => {
+    const today = new Date();
+    const currentMonthVal = today.getMonth() + 1;
+    const currentDate = today.getDate();
+    const reportYear = filterYear === 'All' ? today.getFullYear() : parseInt(filterYear, 10);
+    const isCurrentYear = reportYear === today.getFullYear();
+    const isPastYear = reportYear < today.getFullYear();
+
+    const processed: Record<string, any[]> = {};
+
+    MONTHS.forEach(month => {
+      const monthObj = MONTHS_LIST.find(m => m.key === month.key);
+      const monthVal = monthObj ? monthObj.value : 1;
+
+      let prorateFactor = 1;
+
+      if (isPastYear) {
+        prorateFactor = 1;
+      } else if (isCurrentYear) {
+        if (monthVal > currentMonthVal) {
+          prorateFactor = 0;
+        } else if (monthVal === currentMonthVal) {
+          const daysInMonth = new Date(reportYear, monthVal, 0).getDate();
+          prorateFactor = currentDate / daysInMonth;
+        } else {
+          prorateFactor = 1;
+        }
+      } else {
+        prorateFactor = 0;
+      }
+
+      const originalRows = allMonthsPayroll[month.key] || [];
+      
+      if (prorateFactor === 1) {
+        processed[month.key] = originalRows;
+      } else if (prorateFactor === 0) {
+        processed[month.key] = [];
+      } else {
+        processed[month.key] = originalRows.map(r => {
+          if (r.staffType === 'FIELD') return r;
+          
+          const proratedSalary = r.salary * prorateFactor;
+          const proratedBasic = r.basicSalary * prorateFactor;
+          const proratedHousing = r.housing * prorateFactor;
+          const proratedTransport = r.transport * prorateFactor;
+          const proratedOther = r.otherAllowances * prorateFactor;
+          const proratedPension = r.pension * prorateFactor;
+          const proratedEmployerPension = r.employerPension * prorateFactor;
+          const proratedPaye = r.paye * prorateFactor;
+          const proratedLoan = r.loanRepayment * prorateFactor;
+          
+          return {
+            ...r,
+            salary: proratedSalary,
+            basicSalary: proratedBasic,
+            housing: proratedHousing,
+            transport: proratedTransport,
+            otherAllowances: proratedOther,
+            pension: proratedPension,
+            employerPension: proratedEmployerPension,
+            paye: proratedPaye,
+            loanRepayment: proratedLoan,
+            grossPay: proratedSalary + r.overtime,
+            takeHomePay: (proratedSalary + r.overtime) - (proratedPaye + proratedLoan + proratedPension)
+          };
+        });
+      }
+    });
+
+    return processed;
+  }, [allMonthsPayroll, MONTHS, filterYear]);
 
   // Payroll Exposure calculations
   const payrollStats = useMemo(() => {
@@ -198,7 +272,7 @@ export function FinancialReports() {
       : MONTHS.map(m => m.key);
 
     monthsToProcess.forEach(monthKey => {
-      const rows = allMonthsPayroll[monthKey] || [];
+      const rows = proratedMonthsPayroll[monthKey] || [];
       rows.forEach(row => {
         totalGrossExposure += row.grossPay;
         totalOvertimeCost += row.overtime;
@@ -213,12 +287,12 @@ export function FinancialReports() {
     loans.forEach(l => { if (l.status === 'Active') outstandingLoans += l.remainingBalance; });
 
     return { totalGrossExposure, totalStatutory, totalOvertimeCost, outstandingLoans };
-  }, [allMonthsPayroll, MONTHS, filterMonth, salaryAdvances, loans]);
+  }, [proratedMonthsPayroll, MONTHS, filterMonth, salaryAdvances, loans]);
 
   // Annual Payroll & Overtime Trend
   const payrollChartData = useMemo(() => {
     return MONTHS.map((m) => {
-      const rows = allMonthsPayroll[m.key] || [];
+      const rows = proratedMonthsPayroll[m.key] || [];
       let totalPayroll = 0, totalOvertime = 0;
       rows.forEach(row => {
         totalPayroll += row.grossPay;
@@ -226,16 +300,16 @@ export function FinancialReports() {
       });
       return { name: m.label.substring(0, 3), Payroll: totalPayroll, Overtime: totalOvertime };
     });
-  }, [allMonthsPayroll, MONTHS]);
+  }, [proratedMonthsPayroll, MONTHS]);
 
   const payrollSummaryData = useMemo(() => {
     return MONTHS.map(month => {
-      const results = allMonthsPayroll[month.key] || [];
+      const results = proratedMonthsPayroll[month.key] || [];
       let salary = 0;
       let overtime = 0;
       let grossPay = 0;
       let employeePension = 0;
-      let loans = 0;
+      let loansAmount = 0;
       let paye = 0;
 
       results.forEach(r => {
@@ -243,10 +317,10 @@ export function FinancialReports() {
         overtime += r.overtime;
         grossPay += (r.salary + r.overtime);
         employeePension += r.pension;
-        loans += r.loanRepayment;
+        loansAmount += r.loanRepayment;
         paye += r.paye;
       });
-      const totalPayout = grossPay - (employeePension + loans + paye);
+      const totalPayout = grossPay - (employeePension + loansAmount + paye);
 
       return {
         monthLabel: month.label,
@@ -254,12 +328,12 @@ export function FinancialReports() {
         overtime,
         grossPay,
         employeePension,
-        loans,
+        loans: loansAmount,
         paye,
         totalPayout
       };
     });
-  }, [allMonthsPayroll, MONTHS]);
+  }, [proratedMonthsPayroll, MONTHS]);
 
   const [summaryTab, setSummaryTab] = useState<'client' | 'site'>('client');
   const [debtorView, setDebtorView] = useState<'client' | 'site'>('client');

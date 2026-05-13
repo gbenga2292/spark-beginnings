@@ -105,7 +105,8 @@ export interface InterviewCandidate {
   followUpInterviewId?: string;
 
   // Filled in when interview is conducted
-  scoresheet?: InterviewScoresheet;
+  scoresheet?: InterviewScoresheet; // Legacy/Primary
+  scoresheets?: InterviewScoresheet[]; // Multi-interviewer support
 
   // Metadata
   invitedBy: string;          // user name

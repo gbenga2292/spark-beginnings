@@ -12,11 +12,12 @@ import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { cn, generateId } from '@/src/lib/utils';
 import { NumericFormat } from 'react-number-format';
 
-const getVatDetails = (amount: number, payVat: string, vatRate: number) => {
-    const vat = payVat === 'Add' ? Math.round(((amount * 7.5) / 107.5) * 100) / 100 
-              : payVat === 'Yes' ? Math.round(((amount / (100 + vatRate)) * vatRate) * 100) / 100 
+const getVatDetails = (amount: number, payVat: string, vatRate: number, damages: number = 0) => {
+    const baseAmount = amount - damages;
+    const vat = payVat === 'Add' ? Math.round(((baseAmount * 7.5) / 107.5) * 100) / 100 
+              : payVat === 'Yes' ? Math.round(((baseAmount / (100 + vatRate)) * vatRate) * 100) / 100 
               : 0;
-    const amountForVat = payVat !== 'No' ? amount - vat : amount;
+    const amountForVat = payVat !== 'No' ? baseAmount - vat : baseAmount;
     return { vat, amountForVat };
 };
 
@@ -59,6 +60,7 @@ export function Payments({ setPreviewModal, searchTerm = '' }: { setPreviewModal
         amount: '',
         withholdingTax: '',
         discount: '',
+        damages: '',
     };
     const [form, setForm] = useState(initialForm);
 
@@ -73,13 +75,14 @@ export function Payments({ setPreviewModal, searchTerm = '' }: { setPreviewModal
 
     const livePreview = useMemo(() => {
         const amount = parseFloat(form.amount) || 0;
+        const damages = parseFloat(form.damages) || 0;
         const siteObj = sites.find(s => s.name === form.site && s.client === form.client);
         const payVat = siteObj ? siteObj.vat : 'No';
 
-        const { vat, amountForVat } = getVatDetails(amount, payVat, vatRate);
+        const { vat, amountForVat } = getVatDetails(amount, payVat, vatRate, damages);
 
-        return { amount, vat, payVat, amountForVat };
-    }, [form.amount, form.site, form.client, sites, vatRate]);
+        return { amount, vat, payVat, amountForVat, damages };
+    }, [form.amount, form.site, form.client, form.damages, sites, vatRate]);
 
     const calculatePayment = (): Omit<Payment, 'id'> | null => {
         if (!form.date || !form.client || !form.site) {
@@ -90,6 +93,7 @@ export function Payments({ setPreviewModal, searchTerm = '' }: { setPreviewModal
         const amount = parseFloat(form.amount.replace(/,/g, '')) || 0;
         const withholdingTax = parseFloat(form.withholdingTax.replace(/,/g, '')) || 0;
         const discount = parseFloat(form.discount.replace(/,/g, '')) || 0;
+        const damages = parseFloat(form.damages.replace(/,/g, '')) || 0;
         
         const siteObj = sites.find(s => s.name === form.site && s.client === form.client);
         const payVat = siteObj ? siteObj.vat : 'No';
@@ -101,6 +105,7 @@ export function Payments({ setPreviewModal, searchTerm = '' }: { setPreviewModal
             amount,
             withholdingTax,
             discount,
+            damages,
             payVat,
         };
     };
@@ -129,6 +134,7 @@ export function Payments({ setPreviewModal, searchTerm = '' }: { setPreviewModal
             amount: pay.amount.toString(),
             withholdingTax: pay.withholdingTax ? pay.withholdingTax.toString() : '',
             discount: pay.discount ? pay.discount.toString() : '',
+            damages: pay.damages ? pay.damages.toString() : '',
         });
         setIsModalOpen(true);
     };
@@ -265,15 +271,15 @@ export function Payments({ setPreviewModal, searchTerm = '' }: { setPreviewModal
                 toast.info('No payments to export');
                 return;
             }
-            const headers = ['id', 'client', 'tin', 'site', 'date', 'amount', 'withholdingTax', 'discount', 'payVat', 'vat', 'amountForVat'];
+            const headers = ['id', 'client', 'tin', 'site', 'date', 'amount', 'withholdingTax', 'discount', 'damages', 'payVat', 'vat', 'amountForVat'];
             const extractCSV = (val: any) => typeof val === 'number' ? String(val) : `"${String(val ?? '').replace(/"/g, '""')}"`;
 
             const rows = payments.map(pay => {
-                const { vat, amountForVat: amtForVat } = getVatDetails(pay.amount || 0, pay.payVat, vatRate);
+                const { vat, amountForVat: amtForVat } = getVatDetails(pay.amount || 0, pay.payVat, vatRate, pay.damages || 0);
                 const tin = getTinForClient(pay.client);
                 
                 const data = [
-                    pay.id, pay.client, tin, pay.site, formatDisplayDate(pay.date), pay.amount, pay.withholdingTax, pay.discount, pay.payVat, vat, amtForVat
+                    pay.id, pay.client, tin, pay.site, formatDisplayDate(pay.date), pay.amount, pay.withholdingTax, pay.discount, pay.damages || 0, pay.payVat, vat, amtForVat
                 ];
                 return data.map(extractCSV).join(',');
             });
@@ -346,6 +352,7 @@ export function Payments({ setPreviewModal, searchTerm = '' }: { setPreviewModal
             else if (sortField === 'amount') { valA = a.amount || 0; valB = b.amount || 0; }
             else if (sortField === 'withholdingTax') { valA = a.withholdingTax || 0; valB = b.withholdingTax || 0; }
             else if (sortField === 'discount') { valA = a.discount || 0; valB = b.discount || 0; }
+            else if (sortField === 'damages') { valA = a.damages || 0; valB = b.damages || 0; }
             else if (sortField === 'payVat') { valA = (a.payVat || '').toLowerCase(); valB = (b.payVat || '').toLowerCase(); }
             else if (sortField === 'vat') { valA = a.vat || 0; valB = b.vat || 0; }
             else if (sortField === 'amountForVat') { valA = a.amountForVat || 0; valB = b.amountForVat || 0; }
@@ -358,16 +365,17 @@ export function Payments({ setPreviewModal, searchTerm = '' }: { setPreviewModal
     const tableSums = useMemo(() => {
         return sortedPayments.reduce((acc, p) => {
             // LIVE VAT CALCULATION
-            const { vat, amountForVat: amtForVat } = getVatDetails(p.amount || 0, p.payVat, vatRate);
+            const { vat, amountForVat: amtForVat } = getVatDetails(p.amount || 0, p.payVat, vatRate, p.damages || 0);
 
             return {
                 amount: acc.amount + (p.amount || 0),
                 wht: acc.wht + (p.withholdingTax || 0),
                 discount: acc.discount + (p.discount || 0),
+                damages: acc.damages + (p.damages || 0),
                 vat: acc.vat + vat,
                 amtForVat: acc.amtForVat + amtForVat,
             };
-        }, { amount: 0, wht: 0, discount: 0, vat: 0, amtForVat: 0 });
+        }, { amount: 0, wht: 0, discount: 0, damages: 0, vat: 0, amtForVat: 0 });
     }, [sortedPayments, vatRate]);
 
     const formatSum = (val: number) => {
@@ -535,12 +543,16 @@ export function Payments({ setPreviewModal, searchTerm = '' }: { setPreviewModal
                                     <p className="text-[10px] text-slate-400 font-bold uppercase truncate">WHT</p>
                                     <p className="text-[11px] sm:text-xs font-mono font-black text-slate-600 break-all" title={'₦' + formatSum(tableSums.wht)}>₦{formatSum(tableSums.wht)}</p>
                                 </div>
+                                <div className="bg-white p-2 rounded border border-slate-100 shadow-sm min-w-0">
+                                    <p className="text-[10px] text-slate-400 font-bold uppercase truncate">Damages</p>
+                                    <p className="text-[11px] sm:text-xs font-mono font-black text-rose-600 break-all" title={'₦' + formatSum(tableSums.damages)}>₦{formatSum(tableSums.damages)}</p>
+                                </div>
                             </div>
                         </div>
 
                         <div className="md:hidden divide-y divide-slate-100 px-4">
                             {sortedPayments.map((p: Payment) => {
-                                const { vat, amountForVat } = getVatDetails(p.amount || 0, p.payVat, vatRate);
+                                const { vat, amountForVat } = getVatDetails(p.amount || 0, p.payVat, vatRate, p.damages || 0);
                                 return (
                                 <div key={p.id} className="py-4 bg-white hover:bg-slate-50 transition-colors">
                                     <div className="flex justify-between items-start mb-2">
@@ -559,6 +571,7 @@ export function Payments({ setPreviewModal, searchTerm = '' }: { setPreviewModal
                                         </Badge>
                                         <span className="text-[10px] bg-indigo-50 border border-indigo-100 rounded px-1.5 py-0.5 text-indigo-700 font-mono">VAT Amt: ₦{priv?.canViewAmounts === false ? '***' : vat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                         <span className="text-[10px] bg-emerald-50 border border-emerald-100 rounded px-1.5 py-0.5 text-emerald-700 font-mono">Amt For VAT: ₦{priv?.canViewAmounts === false ? '***' : amountForVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                        {p.damages ? <span className="text-[10px] bg-rose-50 border border-rose-100 rounded px-1.5 py-0.5 text-rose-700 font-mono">Damages: ₦{priv?.canViewAmounts === false ? '***' : p.damages.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span> : null}
                                     </div>
                                     {showActions && (
                                         <div className="flex items-center justify-end gap-1 mt-2 pt-2 border-t border-slate-50">
@@ -608,6 +621,11 @@ export function Payments({ setPreviewModal, searchTerm = '' }: { setPreviewModal
                                             ₦{formatSum(tableSums.discount)}
                                         </div>
                                     </TableHead>
+                                    <TableHead className="px-4 py-2.5 text-right">
+                                        <div className="text-[11px] font-mono font-bold text-rose-600 bg-white px-2 py-1 rounded border border-rose-100 shadow-sm inline-block">
+                                            ₦{formatSum(tableSums.damages)}
+                                        </div>
+                                    </TableHead>
                                     <TableHead className="px-4 py-2.5 text-center"></TableHead>
                                     <TableHead className="px-4 py-2.5 text-right">
                                         <div className="text-[12px] font-mono font-black text-indigo-600 bg-white px-2 py-1 rounded border border-indigo-50 shadow-sm inline-block">
@@ -630,6 +648,7 @@ export function Payments({ setPreviewModal, searchTerm = '' }: { setPreviewModal
                                         { field: 'amount',         label: 'Amount (₦)',  align: 'right'  },
                                         { field: 'withholdingTax', label: 'WHT',         align: 'right'  },
                                         { field: 'discount',       label: 'Discount',    align: 'right'  },
+                                        { field: 'damages',        label: 'Damages',     align: 'right'  },
                                         { field: 'payVat',         label: 'VAT Policy',  align: 'center' },
                                         { field: 'vat',            label: 'VAT (₦)',     align: 'right'  },
                                         { field: 'amountForVat',   label: 'Amt For VAT', align: 'right'  },
@@ -668,6 +687,9 @@ export function Payments({ setPreviewModal, searchTerm = '' }: { setPreviewModal
                                         <TableCell className="px-4 py-3 text-right text-slate-500 font-mono">
                                             {p.discount ? p.discount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}
                                         </TableCell>
+                                        <TableCell className="px-4 py-3 text-right text-rose-500 font-mono">
+                                            {p.damages ? p.damages.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}
+                                        </TableCell>
                                         <TableCell className="px-4 py-3 text-center text-xs">
                                             <Badge variant={p.payVat === 'Yes' ? 'default' : p.payVat === 'Add' ? 'outline' : 'secondary'} className={`${p.payVat === 'Yes' ? 'bg-indigo-100 text-indigo-800' : ''}`}>
                                                 {p.payVat || 'No'}
@@ -675,13 +697,13 @@ export function Payments({ setPreviewModal, searchTerm = '' }: { setPreviewModal
                                         </TableCell>
                                         <TableCell className="px-4 py-3 text-right text-indigo-600 font-mono font-medium">
                                             {priv?.canViewAmounts === false ? '***' : (() => {
-                                                const { vat } = getVatDetails(p.amount || 0, p.payVat, vatRate);
+                                                const { vat } = getVatDetails(p.amount || 0, p.payVat, vatRate, p.damages || 0);
                                                 return vat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                                             })()}
                                         </TableCell>
                                         <TableCell className="px-4 py-3 text-right text-emerald-600 font-mono font-medium">
                                             {priv?.canViewAmounts === false ? '***' : (() => {
-                                                const { amountForVat } = getVatDetails(p.amount || 0, p.payVat, vatRate);
+                                                const { amountForVat } = getVatDetails(p.amount || 0, p.payVat, vatRate, p.damages || 0);
                                                 return amountForVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                                             })()}
                                         </TableCell>
@@ -718,7 +740,7 @@ export function Payments({ setPreviewModal, searchTerm = '' }: { setPreviewModal
 
             {isModalOpen && (
                 <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white max-w-lg w-full rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+                    <div className="bg-white max-w-lg w-full max-h-[90vh] md:max-h-[85vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col">
                         <div className="bg-slate-50/50 p-5 border-b border-slate-100 flex justify-between items-center">
                             <div>
                                 <h2 className="text-lg font-bold text-slate-800">{selectedId ? 'Edit Payment' : 'Create Payment'}</h2>
@@ -775,6 +797,12 @@ export function Payments({ setPreviewModal, searchTerm = '' }: { setPreviewModal
                                 <div className="space-y-1.5">
                                     <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Discount</label>
                                     <NumericFormat customInput={Input} thousandSeparator decimalScale={2} value={form.discount} onValueChange={(v) => handleChange('discount', v.value || '')} className="bg-slate-50 h-11" />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-5 pt-3 border-t border-slate-100">
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Damages (Not Vatable)</label>
+                                    <NumericFormat customInput={Input} thousandSeparator decimalScale={2} value={form.damages} onValueChange={(v) => handleChange('damages', v.value || '')} className="bg-slate-50 h-11" />
                                 </div>
                             </div>
 

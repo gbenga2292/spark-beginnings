@@ -605,6 +605,7 @@ export interface Payment {
   amount: number;
   withholdingTax: number;
   discount: number;
+  damages?: number;
   payVat: 'Yes' | 'No' | 'Add';
   vat?: number;
   amountForVat?: number;
