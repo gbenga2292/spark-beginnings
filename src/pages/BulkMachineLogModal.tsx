@@ -121,26 +121,30 @@ export function BulkMachineLogModal({ isOpen, onClose, siteId, siteName, machine
                   <div key={m.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:px-4 bg-white dark:bg-slate-950 gap-3 hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors">
                     <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">{m.name}</p>
                     <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 sm:gap-3 w-full sm:w-auto">
-                      <div className="flex p-1 bg-slate-100/50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 rounded-md flex-1 sm:flex-none gap-0.5">
-                        <button type="button" onClick={() => handleSetOpDay(m.id, 'full')}
-                          className={cn("flex-1 flex items-center justify-center gap-1 py-1 text-[10px] font-bold rounded transition-all",
-                            data.operationalDay === 'full' ? "bg-emerald-500 text-white shadow-sm" : "text-slate-500 hover:text-emerald-600 hover:bg-emerald-50")}>
-                          <CheckCircle2 className="h-3 w-3" /> Full
-                        </button>
-                        <button type="button" onClick={() => handleSetOpDay(m.id, 'half')}
-                          className={cn("flex-1 flex items-center justify-center gap-1 py-1 text-[10px] font-bold rounded transition-all",
-                            data.operationalDay === 'half' ? "bg-amber-400 text-white shadow-sm" : "text-slate-500 hover:text-amber-600 hover:bg-amber-50")}>
-                          <Clock className="h-3 w-3" /> Half
-                        </button>
-                        <button type="button" onClick={() => handleSetOpDay(m.id, 'none')}
-                          className={cn("flex-1 flex items-center justify-center gap-1 py-1 text-[10px] font-bold rounded transition-all",
-                            data.operationalDay === 'none' ? "bg-rose-500 text-white shadow-sm" : "text-slate-500 hover:text-rose-600 hover:bg-rose-50")}>
-                          <AlertTriangle className="h-3 w-3" /> None
-                        </button>
+                      <div className="flex flex-col">
+                        <div className="flex p-1 bg-slate-100/50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 rounded-md flex-1 sm:flex-none gap-0.5">
+                          <button type="button" onClick={() => handleSetOpDay(m.id, 'full')}
+                            className={cn("flex-1 flex items-center justify-center gap-1 py-1 px-3 text-[10px] font-bold rounded transition-all",
+                              data.operationalDay === 'full' ? "bg-emerald-500 text-white shadow-sm" : "text-slate-500 hover:text-emerald-600 hover:bg-emerald-50")}>
+                            <CheckCircle2 className="h-3 w-3" /> FULL DAY
+                          </button>
+                          <button type="button" onClick={() => handleSetOpDay(m.id, 'half')}
+                            className={cn("flex-1 flex items-center justify-center gap-1 py-1 px-3 text-[10px] font-bold rounded transition-all",
+                              data.operationalDay === 'half' ? "bg-amber-400 text-white shadow-sm" : "text-slate-500 hover:text-amber-600 hover:bg-amber-50")}>
+                            <Clock className="h-3 w-3" /> HALF DAY
+                          </button>
+                          <button type="button" onClick={() => handleSetOpDay(m.id, 'none')}
+                            className={cn("flex-1 flex items-center justify-center gap-1 py-1 px-3 text-[10px] font-bold rounded transition-all",
+                              data.operationalDay === 'none' ? "bg-rose-500 text-white shadow-sm" : "text-slate-500 hover:text-rose-600 hover:bg-rose-50")}>
+                            <AlertTriangle className="h-3 w-3" /> OFF
+                          </button>
+                        </div>
+                        <p className="text-[9px] text-slate-400 mt-1 font-medium text-center">machine worked period</p>
                       </div>
                       {isActive && (
-                        <div className="w-24 shrink-0 ml-auto sm:ml-0">
+                        <div className="w-24 shrink-0 ml-auto sm:ml-0 flex flex-col">
                           <Input type="number" min="0" step="0.1" value={data.dieselUsage} onChange={e => handleDieselChange(m.id, e.target.value)} placeholder="Diesel (L)" className="h-8 text-xs font-semibold text-right" />
+                          <p className="text-[9px] text-slate-400 mt-1 font-medium text-center italic">diesel filled</p>
                         </div>
                       )}
                     </div>

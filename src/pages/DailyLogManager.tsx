@@ -4,7 +4,7 @@ import {
   CheckCircle2, Fuel, User, MessageSquare, 
   BarChart3, History, Plus, Save, Trash2, Edit2, Wrench, Activity,
   ChevronLeft, ChevronRight, ChevronDown, Eye, Lock,
-  Image as ImageIcon, Video, X, UploadCloud, FileVideo
+  Image as ImageIcon, Video, X, UploadCloud, FileVideo, Camera
 } from 'lucide-react';
 import { useOperations } from '../contexts/OperationsContext';
 import { useAppStore } from '../store/appStore';
@@ -23,6 +23,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription 
 } from '@/src/components/ui/dialog';
 import { toast } from 'sonner';
+import { CustomCamera } from '../components/ui/CustomCamera';
 
 interface DailyLogManagerProps {
   assetId: string;
@@ -86,6 +87,7 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
   const [mediaPreviews, setMediaPreviews] = useState<{ url: string; type: 'image' | 'video'; name: string }[]>([]);
   const [uploadedMedia, setUploadedMedia] = useState<any[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [showCamera, setShowCamera] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   // Constants - Replace with your actual deployment URL
@@ -149,6 +151,15 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
       name: file.name
     }));
     setMediaPreviews(prev => [...prev, ...newPreviews]);
+  };
+
+  const handleCapture = (file: File) => {
+    setMediaFiles(prev => [...prev, file]);
+    setMediaPreviews(prev => [...prev, {
+      url: URL.createObjectURL(file),
+      type: file.type.startsWith('video/') ? 'video' as const : 'image' as const,
+      name: file.name
+    }]);
   };
 
   const removeMedia = (index: number) => {
@@ -359,7 +370,7 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
                                   day === 'half' ? "bg-amber-50 text-amber-700 border-amber-100" :
                                   "bg-rose-50 text-rose-700 border-rose-100"
                                 )}>
-                                  {day === 'full' ? 'FULL DAY' : day === 'half' ? 'HALF DAY' : 'NO DAY'}
+                                  {day === 'full' ? 'FULL DAY' : day === 'half' ? 'HALF DAY' : 'OFF'}
                                 </Badge>
                               );
                             })()}
@@ -457,40 +468,43 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
                   </div>
                   <div className="space-y-2">
                     <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider ml-1">Day Type</label>
-                    <div className="flex p-1 bg-slate-100/50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 rounded-md gap-1">
-                      <button
-                        onClick={() => setOperationalDay('full')}
-                        className={cn(
-                          "flex-1 flex items-center justify-center gap-1.5 py-1.5 text-[11px] font-bold rounded transition-all",
-                          operationalDay === 'full'
-                            ? "bg-emerald-500 text-white shadow-sm"
-                            : "text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
-                        )}
-                      >
-                        <CheckCircle2 className="h-3.5 w-3.5" /> Full Day
-                      </button>
-                      <button
-                        onClick={() => setOperationalDay('half')}
-                        className={cn(
-                          "flex-1 flex items-center justify-center gap-1.5 py-1.5 text-[11px] font-bold rounded transition-all",
-                          operationalDay === 'half'
-                            ? "bg-amber-400 text-white shadow-sm"
-                            : "text-slate-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20"
-                        )}
-                      >
-                        <Clock className="h-3.5 w-3.5" /> Half Day
-                      </button>
-                      <button
-                        onClick={() => setOperationalDay('none')}
-                        className={cn(
-                          "flex-1 flex items-center justify-center gap-1.5 py-1.5 text-[11px] font-bold rounded transition-all",
-                          operationalDay === 'none'
-                            ? "bg-rose-500 text-white shadow-sm"
-                            : "text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20"
-                        )}
-                      >
-                        <AlertTriangle className="h-3.5 w-3.5" /> No Day
-                      </button>
+                    <div className="flex flex-col">
+                      <div className="flex p-1 bg-slate-100/50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 rounded-md gap-1">
+                        <button
+                          onClick={() => setOperationalDay('full')}
+                          className={cn(
+                            "flex-1 flex items-center justify-center gap-1.5 py-1.5 text-[11px] font-bold rounded transition-all",
+                            operationalDay === 'full'
+                              ? "bg-emerald-500 text-white shadow-sm"
+                              : "text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
+                          )}
+                        >
+                          <CheckCircle2 className="h-3.5 w-3.5" /> FULL DAY
+                        </button>
+                        <button
+                          onClick={() => setOperationalDay('half')}
+                          className={cn(
+                            "flex-1 flex items-center justify-center gap-1.5 py-1.5 text-[11px] font-bold rounded transition-all",
+                            operationalDay === 'half'
+                              ? "bg-amber-400 text-white shadow-sm"
+                              : "text-slate-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20"
+                          )}
+                        >
+                          <Clock className="h-3.5 w-3.5" /> HALF DAY
+                        </button>
+                        <button
+                          onClick={() => setOperationalDay('none')}
+                          className={cn(
+                            "flex-1 flex items-center justify-center gap-1.5 py-1.5 text-[11px] font-bold rounded transition-all",
+                            operationalDay === 'none'
+                              ? "bg-rose-500 text-white shadow-sm"
+                              : "text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20"
+                          )}
+                        >
+                          <AlertTriangle className="h-3.5 w-3.5" /> OFF
+                        </button>
+                      </div>
+                      <p className="text-[10px] text-slate-400 mt-1 font-medium text-center">machine worked period</p>
                     </div>
                   </div>
                   {isActive && (
@@ -505,6 +519,7 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
                           className="pl-9 h-10 border-slate-200 dark:border-slate-700 rounded-md focus:ring-2 focus:ring-blue-500"
                           placeholder="0.00"
                         />
+                        <p className="text-[10px] text-slate-400 mt-1 font-medium text-center italic">diesel filled</p>
                       </div>
                     </div>
                   )}
@@ -577,14 +592,25 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
                       <ImageIcon className="h-4 w-4 text-blue-500" />
                       <h3 className="font-semibold text-slate-800 dark:text-white">Photos & Videos</h3>
                     </div>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="gap-2 h-8 text-xs font-medium rounded-md border-blue-200 text-blue-600 hover:bg-blue-50 hover:text-blue-700 dark:border-blue-900/30 dark:hover:bg-blue-900/20"
-                      onClick={() => fileInputRef.current?.click()}
-                    >
-                      <Plus className="h-3.5 w-3.5" /> Add Media
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="h-8 w-8 p-0 rounded-md border-blue-200 text-blue-600 hover:bg-blue-50 dark:border-blue-900/30 dark:hover:bg-blue-900/20"
+                        onClick={() => setShowCamera(true)}
+                        title="Take Photo/Video"
+                      >
+                        <Camera className="h-4 w-4" />
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="gap-2 h-8 text-xs font-medium rounded-md border-blue-200 text-blue-600 hover:bg-blue-50 hover:text-blue-700 dark:border-blue-900/30 dark:hover:bg-blue-900/20"
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        <Plus className="h-3.5 w-3.5" /> Add Media
+                      </Button>
+                    </div>
                     <input 
                       type="file" 
                       ref={fileInputRef} 
@@ -923,6 +949,13 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
               </div>
             </Card>
           </div>
+        )}
+
+        {showCamera && (
+          <CustomCamera 
+            onCapture={handleCapture}
+            onClose={() => setShowCamera(false)}
+          />
         )}
       </div>
 

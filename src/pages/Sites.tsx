@@ -7,7 +7,7 @@ import { Input } from '@/src/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
 import { Badge } from '@/src/components/ui/badge';
 import { Dialog, DialogFooter } from '@/src/components/ui/dialog';
-import { Search, Plus, MapPin, Building2, X, Save, Pencil, Trash2, Download, Upload, CheckCircle2, Circle, Eye, FileText, MoreVertical, Clock, LayoutGrid, List, ArrowUpDown, ChevronUp, ChevronDown, MessageSquare, BookOpen, Calendar, Phone, Mail, Car, MessageCircle, Users, ArrowLeft, Check, Bell, UserCheck } from 'lucide-react';
+import { Search, Plus, MapPin, Building2, X, Save, Pencil, Trash2, Download, Upload, CheckCircle2, Circle, Eye, FileText, MoreVertical, Clock, LayoutGrid, List, ArrowUpDown, ChevronUp, ChevronDown, MessageSquare, BookOpen, Calendar, Phone, Mail, Car, MessageCircle, Users, ArrowLeft, Check, Bell, UserCheck, UserCircle, Briefcase } from 'lucide-react';
 import { useAppStore, Site } from '@/src/store/appStore';
 import { toast, showConfirm } from '@/src/components/ui/toast';
 import { SiteQuestionnaire } from '@/src/types/SiteQuestionnaire';
@@ -231,63 +231,105 @@ export function Sites() {
 
   const buildNarrative = (site: any, q: SiteQuestionnaire | null): string => {
     const lines: string[] = [];
+    const isEnded = site.status === 'Ended';
     const name = site.name || 'this site';
     const client = site.client || 'the client';
 
+    // Helper for tense-aware verbs
+    const getVerb = (present: string, past: string) => isEnded ? past : present;
+
     // Opening
-    lines.push(`${name} is a dewatering project undertaken by DCEL on behalf of ${client}.`);
+    lines.push(`${name} ${getVerb('is', 'was')} a dewatering project undertaken by DCEL on behalf of ${client}.`);
 
     if (q) {
       // Phase 1 — Project Scope
       const p1 = q.phase1;
-      if (p1.whatIsBeingBuilt) lines.push(`The project involves ${p1.whatIsBeingBuilt.toLowerCase()}.`);
-      if (p1.excavationDepthMeters) lines.push(`Excavation is planned to a depth of ${p1.excavationDepthMeters} metres.`);
-      if (p1.siteLength && p1.siteWidth) lines.push(`The site measures approximately ${p1.siteLength}m by ${p1.siteWidth}m.`);
-      if (p1.timelineStartDate) lines.push(`Works are scheduled to commence on ${p1.timelineStartDate}.`);
-      const dataAvail = [p1.geotechnicalReportAvailable && 'geotechnical report', p1.hydrogeologicalDataAvailable && 'hydrogeological data'].filter(Boolean);
-      if (dataAvail.length) lines.push(`Background data available at inquiry: ${dataAvail.join(' and ')}.`);
+      if (p1.whatIsBeingBuilt) {
+        lines.push(`The project ${getVerb('involves', 'involved')} ${p1.whatIsBeingBuilt.toLowerCase()}.`);
+      }
+      if (p1.excavationDepthMeters) {
+        lines.push(`Excavation ${getVerb('is planned', 'was')} to a depth of ${p1.excavationDepthMeters} metres.`);
+      }
+      if (p1.siteLength && p1.siteWidth) {
+        lines.push(`The site ${getVerb('measures', 'measured')} approximately ${p1.siteLength}m by ${p1.siteWidth}m.`);
+      }
+      if (p1.timelineStartDate) {
+        lines.push(`Works ${getVerb('are scheduled to commence', 'commenced')} on ${p1.timelineStartDate}.`);
+      }
+      
+      const dataAvail = [
+        p1.geotechnicalReportAvailable && 'geotechnical report', 
+        p1.hydrogeologicalDataAvailable && 'hydrogeological data'
+      ].filter(Boolean);
+      
+      if (dataAvail.length) {
+        lines.push(`Background data available at inquiry: ${dataAvail.join(' and ')}.`);
+      }
 
       // Phase 2 — Site Assessment
       const p2 = q.phase2;
       const visited = p2.siteVisited || p2.walkthroughCompleted;
-      if (visited) lines.push(`A site visit and walkthrough were conducted to assess site conditions.`);
-      if (p2.knownObstacles) lines.push(`Known site obstacles include: ${p2.knownObstacles}.`);
-      if (p2.dischargeLocation) lines.push(`Dewatering discharge will be directed to ${p2.dischargeLocation}.`);
-      if (p2.dieselSupplyStrategy) lines.push(`Diesel supply is to be provided by ${p2.dieselSupplyStrategy}.`);
+      if (visited) {
+        lines.push(`A site visit and walkthrough were conducted to assess site conditions.`);
+      }
+      if (p2.knownObstacles) {
+        lines.push(`Known site obstacles ${getVerb('include', 'included')}: ${p2.knownObstacles}.`);
+      }
+      if (p2.dischargeLocation) {
+        lines.push(`Dewatering discharge ${getVerb('will be', 'was')} directed to ${p2.dischargeLocation}.`);
+      }
+      if (p2.dieselSupplyStrategy) {
+        lines.push(`Diesel supply ${getVerb('is to be', 'was')} provided by ${p2.dieselSupplyStrategy}.`);
+      }
 
       // Phase 3 — Engineering
       const p3 = q.phase3;
       const methods = (p3.dewateringMethods || []);
-      if (methods.length) lines.push(`The approved dewatering method(s) for this site: ${methods.join(', ')}.`);
-      if (p3.totalWellpointsRequired) lines.push(`The system requires ${p3.totalWellpointsRequired} wellpoints across ${p3.totalHeadersRequired || '—'} header pipes.`);
-      if (p3.totalPumpsRequired) lines.push(`A total of ${p3.totalPumpsRequired} pump(s) will be deployed.`);
-      if (p3.expectedDailyDieselUsage) lines.push(`Daily diesel consumption is estimated at ${p3.expectedDailyDieselUsage}.`);
+      if (methods.length) {
+        lines.push(`The approved dewatering method(s) for this site: ${methods.join(', ')}.`);
+      }
+      if (p3.totalWellpointsRequired) {
+        lines.push(`The system ${getVerb('requires', 'required')} ${p3.totalWellpointsRequired} wellpoints across ${p3.totalHeadersRequired || '—'} header pipes.`);
+      }
+      if (p3.totalPumpsRequired) {
+        lines.push(`A total of ${p3.totalPumpsRequired} pump(s) ${getVerb('will be', 'were')} deployed.`);
+      }
+      if (p3.expectedDailyDieselUsage) {
+        lines.push(`${getVerb('Estimated daily', 'Actual')} diesel consumption ${getVerb('is', 'was')} ${p3.expectedDailyDieselUsage}.`);
+      }
 
       // Phase 4 — Commercial
       const p4 = q.phase4;
       if (p4.scopeOfWorkSummary) lines.push(`Scope of work: ${p4.scopeOfWorkSummary}`);
       if (p4.scopeExclusionsSummary) lines.push(`Exclusions from scope: ${p4.scopeExclusionsSummary}`);
       if (p4.clientTaxStatus) lines.push(`Client tax classification is ${p4.clientTaxStatus}.`);
-      if (p4.proposalAccepted) lines.push(`The client has formally accepted the proposal.`);
+      if (p4.proposalAccepted) lines.push(`The client formally accepted the proposal.`);
 
       // Phase 5 — Handover
       const p5 = q.phase5;
       const milestones: string[] = [];
       if (p5.safetyPlanIntegrated) milestones.push('site safety plan integrated');
       if (p5.stage1AdvanceReceived) milestones.push('50% advance payment received');
-      if (p5.stage2InstallationComplete) milestones.push('installation complete and system started');
+      if (p5.stage2InstallationComplete) milestones.push(isEnded ? 'installation completed' : 'installation complete and system started');
       if (p5.stage2FirstInvoiceIssued) milestones.push('first hire invoice issued');
-      if (p5.stage3TimelyBilling) milestones.push('regular hire invoicing ongoing');
+      if (p5.stage3TimelyBilling) milestones.push(isEnded ? 'billing cycle completed' : 'regular hire invoicing ongoing');
       if (p5.stage4DemobilizationComplete) milestones.push('demobilisation complete');
       if (p5.stage4FinalInvoiceIssued) milestones.push('final invoice and WHT credit issued');
-      if (milestones.length) lines.push(`Project milestones achieved: ${milestones.join(', ')}.`);
-      if (p5.actualEndDate) lines.push(`The project concluded on ${p5.actualEndDate}.`);
+      
+      if (milestones.length) {
+        lines.push(`Project milestones achieved: ${milestones.join(', ')}.`);
+      }
+      if (p5.actualEndDate) {
+        lines.push(`The project concluded on ${p5.actualEndDate}.`);
+      }
     } else {
       lines.push(`No detailed onboarding record has been linked to this site yet.`);
     }
 
     lines.push(`Current site status: ${site.status}. VAT: ${site.vat}.`);
-    if (site.startDate) lines.push(`Start date: ${site.startDate}${site.endDate ? `. End date: ${site.endDate}` : ''}.`);
+    if (site.startDate) {
+      lines.push(`${getVerb('Start date', 'Project started')}: ${site.startDate}${site.endDate ? `. Concluded: ${site.endDate}` : ''}.`);
+    }
     return lines.join(' ');
   };
 
@@ -301,7 +343,8 @@ export function Sites() {
   const canDeleteSite = !currentUser || (sitePriv?.canView === true && sitePriv?.canDeleteSite === true);
   const canImport     = !currentUser || (sitePriv?.canView === true && sitePriv?.canImport === true);
   const canExport     = !currentUser || (sitePriv?.canView === true && sitePriv?.canExport === true);
-  const hasActions    = canEditSite || canDeleteSite;
+  const canViewComm   = !currentUser || currentUser?.privileges?.commLog?.canView === true;
+  const hasActions    = true; // Always show menu for Site Summary/Conversations/Diary
 
   const sites = useAppStore((s) => s.sites);
   const pendingSites = useAppStore((s) => s.pendingSites);
@@ -974,7 +1017,7 @@ export function Sites() {
                     onClick={() => setContactsFor(selectedClient.name)}
                   >
                     <UserCheck className="w-4 h-4" />
-                    <span className="hidden sm:inline">Client Contacts</span>
+                    <span className="text-xs sm:text-sm">Client Contacts</span>
                     {(() => {
                       const count = clientContacts.filter(c => c.clientName === selectedClient.name).length;
                       return count > 0 ? (
@@ -1187,26 +1230,30 @@ export function Sites() {
                                     <span>Site Summary</span>
                                   </DropdownMenuItem>
                                   
-                                  <DropdownMenuItem 
-                                    onClick={() => {
-                                      const linkedQ = pendingSites.find(ps => ps.siteName === site.name && ps.clientName === site.client);
-                                      if (linkedQ) navigate(`/sites/onboarding/${linkedQ.id}`);
-                                      else navigate('/sites/onboarding/new', { state: { linkedSite: site } });
-                                    }}
-                                    className="gap-2"
-                                  >
-                                    <Eye className="h-4 w-4 text-slate-400" />
-                                    <span>View Onboarding</span>
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem 
-                                    onClick={() => {
-                                      navigate(`/sites/conversations/${site.id}`);
-                                    }}
-                                    className="gap-2"
-                                  >
-                                    <MessageSquare className="h-4 w-4 text-slate-400" />
-                                    <span>Site Conversations</span>
-                                  </DropdownMenuItem>
+                                  {canEditSite && (
+                                    <DropdownMenuItem 
+                                      onClick={() => {
+                                        const linkedQ = pendingSites.find(ps => ps.siteName === site.name && ps.clientName === site.client);
+                                        if (linkedQ) navigate(`/sites/onboarding/${linkedQ.id}`);
+                                        else navigate('/sites/onboarding/new', { state: { linkedSite: site } });
+                                      }}
+                                      className="gap-2"
+                                    >
+                                      <Eye className="h-4 w-4 text-slate-400" />
+                                      <span>View Onboarding</span>
+                                    </DropdownMenuItem>
+                                  )}
+                                  {canViewComm && (
+                                    <DropdownMenuItem 
+                                      onClick={() => {
+                                        navigate(`/sites/conversations/${site.id}`);
+                                      }}
+                                      className="gap-2"
+                                    >
+                                      <MessageSquare className="h-4 w-4 text-slate-400" />
+                                      <span>Site Conversations</span>
+                                    </DropdownMenuItem>
+                                  )}
 
                                   <DropdownMenuItem 
                                     onClick={() => {
@@ -1324,25 +1371,29 @@ export function Sites() {
                                     <FileText className="h-4 w-4 text-slate-400" />
                                     <span>Site Summary</span>
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem 
-                                    onClick={() => {
-                                      if (q) navigate(`/sites/onboarding/${q.id}`);
-                                      else navigate('/sites/onboarding/new', { state: { linkedSite: site } });
-                                    }}
-                                    className="gap-2"
-                                  >
-                                    <Eye className="h-4 w-4 text-slate-400" />
-                                    <span>View Onboarding</span>
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem 
-                                    onClick={() => {
-                                      navigate(`/sites/conversations/${site.id}`);
-                                    }}
-                                    className="gap-2"
-                                  >
-                                    <MessageSquare className="h-4 w-4 text-slate-400" />
-                                    <span>Site Conversations</span>
-                                  </DropdownMenuItem>
+                                  {canEditSite && (
+                                    <DropdownMenuItem 
+                                      onClick={() => {
+                                        if (q) navigate(`/sites/onboarding/${q.id}`);
+                                        else navigate('/sites/onboarding/new', { state: { linkedSite: site } });
+                                      }}
+                                      className="gap-2"
+                                    >
+                                      <Eye className="h-4 w-4 text-slate-400" />
+                                      <span>View Onboarding</span>
+                                    </DropdownMenuItem>
+                                  )}
+                                  {canViewComm && (
+                                    <DropdownMenuItem 
+                                      onClick={() => {
+                                        navigate(`/sites/conversations/${site.id}`);
+                                      }}
+                                      className="gap-2"
+                                    >
+                                      <MessageSquare className="h-4 w-4 text-slate-400" />
+                                      <span>Site Conversations</span>
+                                    </DropdownMenuItem>
+                                  )}
 
                                   <DropdownMenuItem 
                                     onClick={() => {
@@ -1431,9 +1482,11 @@ export function Sites() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right" onClick={e => e.stopPropagation()}>
-                        <Button variant="ghost" size="sm" className="text-slate-400 hover:text-indigo-600 hover:bg-slate-50" onClick={() => navigate(`/sites/onboarding/${site.id}`)}>
-                          <Eye className="h-4 w-4 mr-2" /> View Form
-                        </Button>
+                        {canEditSite && (
+                          <Button variant="ghost" size="sm" className="text-slate-400 hover:text-indigo-600 hover:bg-slate-50" onClick={() => navigate(`/sites/onboarding/${site.id}`)}>
+                            <Eye className="h-4 w-4 mr-2" /> View Form
+                          </Button>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -1490,9 +1543,11 @@ export function Sites() {
                       </div>
 
                       <div className="pt-2 flex justify-end">
-                        <Button variant="ghost" size="sm" className="h-7 text-xs text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 font-semibold" onClick={(e) => { e.stopPropagation(); navigate(`/sites/onboarding/${site.id}`); }}>
-                          <Eye className="h-3 w-3 mr-1.5" /> View Form
-                        </Button>
+                        {canEditSite && (
+                          <Button variant="ghost" size="sm" className="h-7 text-xs text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 font-semibold" onClick={(e) => { e.stopPropagation(); navigate(`/sites/onboarding/${site.id}`); }}>
+                            <Eye className="h-3 w-3 mr-1.5" /> View Form
+                          </Button>
+                        )}
                       </div>
                     </CardContent>
                   </Card>
@@ -1518,25 +1573,101 @@ export function Sites() {
 
       {/* ── Site Narrative Info Modal ── */}
       {narrativeSite && (
-        <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden">
-            <div className="bg-gradient-to-r from-indigo-600 to-indigo-500 px-6 py-5 flex items-start justify-between">
-              <div>
-                <h2 className="text-white font-bold text-lg">{narrativeSite.site.name}</h2>
-                <p className="text-indigo-200 text-sm mt-0.5">{narrativeSite.site.client} · {narrativeSite.site.status}</p>
+        <div className="fixed inset-0 bg-slate-900/60 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
+          <div className="bg-white h-full sm:h-auto sm:max-h-[90vh] w-full max-w-xl sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-10 duration-300">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-indigo-600 to-indigo-500 px-5 sm:px-6 py-4 sm:py-5 flex items-start justify-between shrink-0">
+              <div className="pr-8">
+                <h2 className="text-white font-bold text-lg leading-tight truncate">{narrativeSite.site.name}</h2>
+                <div className="flex items-center gap-2 mt-1">
+                  <p className="text-indigo-100 text-xs font-medium bg-white/10 px-2 py-0.5 rounded uppercase tracking-wider">{narrativeSite.site.status}</p>
+                  <span className="text-indigo-300 text-xs">•</span>
+                  <p className="text-indigo-100 text-xs truncate max-w-[150px] sm:max-w-none">{narrativeSite.site.client}</p>
+                </div>
               </div>
-              <button onClick={() => setNarrativeSite(null)} className="text-indigo-200 hover:text-white mt-1">
+              <button 
+                onClick={() => setNarrativeSite(null)} 
+                className="text-white/80 hover:text-white bg-white/10 hover:bg-white/20 p-2 rounded-full transition-colors shrink-0"
+              >
                 <X className="h-5 w-5" />
               </button>
             </div>
-            <div className="px-6 py-5">
-              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Project Summary</h3>
-              <p className="text-slate-700 text-sm leading-relaxed whitespace-pre-line">
-                {buildNarrative(narrativeSite.site, narrativeSite.q)}
-              </p>
+
+            {/* Scrollable Content */}
+            <div className="p-5 sm:p-6 overflow-y-auto style-scroll flex-1">
+              {/* Quick Info Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-6">
+                <div className="bg-slate-50 p-3 sm:p-4 rounded-xl border border-slate-100 group hover:border-indigo-100 transition-colors">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="p-1.5 bg-indigo-50 rounded-md text-indigo-600">
+                      <MapPin className="h-3.5 w-3.5" />
+                    </div>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Site Address</p>
+                  </div>
+                  <p className="text-sm font-semibold text-slate-700">{narrativeSite.q?.address || 'Address not listed'}</p>
+                </div>
+
+                <div className="bg-slate-50 p-3 sm:p-4 rounded-xl border border-slate-100 group hover:border-indigo-100 transition-colors">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="p-1.5 bg-emerald-50 rounded-md text-emerald-600">
+                      <UserCircle className="h-3.5 w-3.5" />
+                    </div>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Contact Person</p>
+                  </div>
+                  <p className="text-sm font-semibold text-slate-700">
+                    {narrativeSite.q?.contactPersonName || 'Contact not listed'}
+                    {narrativeSite.q?.contactPersonPhone && (
+                      <span className="block text-[11px] text-slate-500 font-medium mt-1 bg-white inline-block px-1.5 py-0.5 rounded border border-slate-100">
+                        {narrativeSite.q.contactPersonPhone}
+                      </span>
+                    )}
+                  </p>
+                </div>
+
+                <div className="bg-slate-50 p-3 sm:p-4 rounded-xl border border-slate-100 group hover:border-indigo-100 transition-colors">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="p-1.5 bg-amber-50 rounded-md text-amber-600">
+                      <Briefcase className="h-3.5 w-3.5" />
+                    </div>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Project Name</p>
+                  </div>
+                  <p className="text-sm font-semibold text-slate-700 truncate">{narrativeSite.q?.phase1?.whatIsBeingBuilt || 'Dewatering Operations'}</p>
+                </div>
+
+                <div className="bg-slate-50 p-3 sm:p-4 rounded-xl border border-slate-100 group hover:border-indigo-100 transition-colors">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="p-1.5 bg-blue-50 rounded-md text-blue-600">
+                      <FileText className="h-3.5 w-3.5" />
+                    </div>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tax Status</p>
+                  </div>
+                  <p className="text-sm font-semibold text-slate-700">{narrativeSite.q?.phase4?.clientTaxStatus || 'Standard'}</p>
+                </div>
+              </div>
+
+              {/* Narrative Section */}
+              <div className="relative">
+                <div className="absolute left-0 top-0 bottom-0 w-1 bg-indigo-50 rounded-full" />
+                <div className="pl-5">
+                  <h3 className="text-xs font-bold text-indigo-600 uppercase tracking-widest mb-3 flex items-center gap-2">
+                    <BookOpen className="h-3.5 w-3.5" />
+                    Project Narrative
+                  </h3>
+                  <div className="text-slate-600 text-sm leading-relaxed whitespace-pre-line font-medium">
+                    {buildNarrative(narrativeSite.site, narrativeSite.q)}
+                  </div>
+                </div>
+              </div>
             </div>
-            <div className="px-6 py-4 border-t border-slate-100 flex justify-end">
-              <Button variant="outline" onClick={() => setNarrativeSite(null)}>Close</Button>
+
+            {/* Footer */}
+            <div className="px-5 sm:px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end shrink-0">
+              <Button 
+                onClick={() => setNarrativeSite(null)}
+                className="w-full sm:w-auto bg-white hover:bg-slate-50 text-slate-600 border-slate-200 shadow-sm"
+              >
+                Close Summary
+              </Button>
             </div>
           </div>
         </div>

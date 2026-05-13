@@ -123,7 +123,7 @@ export function ClientContactsPanel({ clientName, onClose }: Props) {
   const updateClientContact = useAppStore(s => s.updateClientContact);
   const deleteClientContact = useAppStore(s => s.deleteClientContact);
 
-  const clientContacts = contacts.filter(c => c.clientName === clientName);
+  const clientContacts = contacts.filter(c => c.clientName.trim().toLowerCase() === clientName.trim().toLowerCase());
   const clientSites = sites.filter(s => s.client === clientName);
 
   const [editingId, setEditingId] = useState<string | null>(null);

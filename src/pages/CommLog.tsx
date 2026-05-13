@@ -1708,16 +1708,42 @@ export function CommLog() {
         isInternal: form.isInternal,
         reportedBy: form.isInternal ? (form.reportedBy.length > 0 ? form.reportedBy : undefined) : undefined,
       });
-      // Auto-save new external contact person
-      if (!form.isInternal && form.contactPerson.trim() && form.client.trim()) {
-        const already = existingContacts.some(
-          c => c.clientName === form.client && c.name.toLowerCase() === form.contactPerson.trim().toLowerCase()
+      // Auto-save external contact person
+      if (!form.isInternal && form.contactPerson?.trim() && form.client?.trim()) {
+        const trimmedClient = form.client.trim();
+        const trimmedName = form.contactPerson.trim();
+        
+        const existing = existingContacts.find(
+          c => c.clientName.trim().toLowerCase() === trimmedClient.toLowerCase() && 
+               c.name.trim().toLowerCase() === trimmedName.toLowerCase()
         );
-        if (!already) {
+
+        if (existing) {
+          // If contact exists, ensure current site is linked
+          const hasSiteId = form.siteId && existing.siteIds?.includes(form.siteId);
+          const hasSiteName = form.siteName && existing.siteNames?.includes(form.siteName);
+          
+          if ((form.siteId && !hasSiteId) || (form.siteName && !hasSiteName)) {
+            const updateClientContact = useAppStore.getState().updateClientContact;
+            const updatedSiteIds = form.siteId 
+              ? Array.from(new Set([...(existing.siteIds || []), form.siteId]))
+              : (existing.siteIds || []);
+            const updatedSiteNames = form.siteName
+              ? Array.from(new Set([...(existing.siteNames || []), form.siteName]))
+              : (existing.siteNames || []);
+
+            updateClientContact(existing.id, {
+              siteIds: updatedSiteIds,
+              siteNames: updatedSiteNames,
+              updatedAt: new Date().toISOString(),
+            });
+          }
+        } else {
+          // Create new contact if not found
           addClientContact({
             id: generateId(),
-            name: form.contactPerson.trim(),
-            clientName: form.client,
+            name: trimmedName,
+            clientName: trimmedClient,
             siteIds: form.siteId ? [form.siteId] : [],
             siteNames: form.siteName ? [form.siteName] : [],
             isActive: true,
