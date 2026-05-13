@@ -421,6 +421,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                         title: r.title,
                         body: r.body || 'Task Reminder',
                         schedule: { at: new Date(r.remindAt) },
+                        group: 'dcel_office_suite',
                     };
                 });
 

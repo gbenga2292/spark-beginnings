@@ -172,7 +172,7 @@ export function TaskPopupNotifications() {
   const initialised = useRef(false);
 
   /* ── Helpers ─────────────────────────────────────────────────────────── */
-  const pushPopup = useCallback((p: Omit<TaskPopup, 'id' | 'timestamp'> & { dedupeKey?: string }) => {
+  const pushPopup = useCallback((p: Omit<TaskPopup, 'id' | 'timestamp'> & { dedupeKey?: string; nativeId?: number; skipNative?: boolean }) => {
     const dedupeKey = p.dedupeKey || `${p.type}-${p.title}-${p.body}`;
     if (shownIds.current.has(dedupeKey)) return;
     shownIds.current.add(dedupeKey);
@@ -184,16 +184,31 @@ export function TaskPopupNotifications() {
     };
     setPopups(prev => [popup, ...prev].slice(0, MAX_POPUPS));
 
-    // Also trigger native push/local notification if on Android
-    if (Capacitor.isNativePlatform()) {
+    // NOTE: We only fire a native notification here for immediate events (mentions, assignments, etc.)
+    // Scheduled reminders are handled by the syncLocalNotifications logic in AppDataContext.
+    if (Capacitor.isNativePlatform() && !p.skipNative) {
+      // Use a deterministic ID: 
+      // 1. Provided nativeId
+      // 2. Hash of reminderId (matches AppDataContext logic)
+      // 3. Hash of dedupeKey
+      // 4. Fallback: Hash of title
+      let notificationId = p.nativeId;
+      
+      if (!notificationId) {
+        const seed = p.reminderId || dedupeKey || p.title;
+        notificationId = Math.abs(seed.split('').reduce((a, b) => { a = ((a << 5) - a) + b.charCodeAt(0); return a & a; }, 0)) % 1000000;
+      }
+
       LocalNotifications.schedule({
         notifications: [{
-          id: Math.floor(Math.random() * 1000000),
+          id: notificationId,
           title: p.title,
           body: p.body,
+          extra: { taskUrl: p.taskUrl, subtaskUrl: p.subtaskUrl },
+          group: 'dcel_office_suite',
         }]
       }).catch(console.error);
-    } else {
+    } else if (!Capacitor.isNativePlatform() && !p.skipNative) {
       // web notification fallback
       if ('Notification' in window && Notification.permission === 'granted') {
         new Notification(p.title, { body: p.body });
@@ -302,13 +317,22 @@ export function TaskPopupNotifications() {
         if (isNewTask)  type = 'new_task';
         else if (isAssigned) type = 'assignment';
 
+        // If it's an assignment reminder, use the same dedupe key as the subtask listener
+        // to prevent double notifications (one from real-time subtask, one from reminder table).
+        const dedupeKey = (isAssigned && rem.subtaskId) 
+          ? `assign-sub-${rem.subtaskId}`
+          : (isAssigned && rem.mainTaskId)
+            ? `assign-main-${rem.mainTaskId}`
+            : `rem-popup-${rem.id}`;
+
         pushPopup({
           type,
           title: isNewTask ? '🆕 New Task' : isAssigned ? '✅ Task Assigned' : '🔔 Reminder',
           body:  rem.body || rem.title || 'You have a reminder',
           taskUrl:   rem.mainTaskId ? `/tasks?openTask=${rem.mainTaskId}` : undefined,
-          dedupeKey: `rem-popup-${rem.id}`,
+          dedupeKey,
           reminderId: rem.id,
+          skipNative: true, // Reminders are already handled by native scheduling in AppDataContext
         });
       });
     };
@@ -405,7 +429,7 @@ export function TaskPopupNotifications() {
             body:      `${payload.new.title}${mt ? ` (${mt.title})` : ''}`,
             subtaskUrl: `/tasks?open=${payload.new.id}`,
             taskUrl:   mt ? `/tasks?openTask=${mt.id}` : undefined,
-            dedupeKey: `assign-sub-${payload.new.id}-${Date.now()}`,
+            dedupeKey: `assign-sub-${payload.new.id}`,
           });
         }
       )
@@ -431,7 +455,7 @@ export function TaskPopupNotifications() {
             body:      `${payload.new.title}${mt ? ` (${mt.title})` : ''}`,
             subtaskUrl: `/tasks?open=${payload.new.id}`,
             taskUrl:   mt ? `/tasks?openTask=${mt.id}` : undefined,
-            dedupeKey: `assign-sub-insert-${payload.new.id}-${Date.now()}`,
+            dedupeKey: `assign-sub-insert-${payload.new.id}`,
           });
         }
       )

@@ -2357,12 +2357,19 @@ function EditSubtaskDialog({ subtask, users, onClose, onSave }: {
 }) {
   const [title, setTitle] = useState(subtask.title);
   const [description, setDesc] = useState(subtask.description ?? '');
-  const [assignedTo, setAssignedTo] = useState(subtask.assignedTo ?? '');
+  const [assignedTo, setAssignedTo] = useState<string[]>(subtask.assignedTo ? subtask.assignedTo.split(',').filter(Boolean) : []);
+  const [openSubDrop, setOpenSubDrop] = useState(false);
   const [deadline, setDeadline] = useState(subtask.deadline ?? '');
   const [status, setStatus] = useState<SubTaskStatus>(subtask.status);
   const [priority, setPriority] = useState<TaskPriority | undefined>(subtask.priority);
   const [requiresApproval, setRequiresApproval] = useState(subtask.requiresApproval || false);
   const [approverId, setApproverId] = useState(subtask.approverId || '');
+
+  useEffect(() => {
+    if (!requiresApproval && status === 'pending_approval') {
+      setStatus('in_progress');
+    }
+  }, [requiresApproval, status]);
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
@@ -2370,7 +2377,7 @@ function EditSubtaskDialog({ subtask, users, onClose, onSave }: {
     onSave({
       title: title.trim(),
       description: description.trim(),
-      assignedTo: assignedTo || null,
+      assignedTo: assignedTo.length > 0 ? assignedTo.join(',') : null,
       deadline: deadline || undefined,
       status: (requiresApproval && status === 'not_started') ? 'pending_approval' : status,
       priority,
@@ -2382,16 +2389,16 @@ function EditSubtaskDialog({ subtask, users, onClose, onSave }: {
   const statusOptions: { value: SubTaskStatus; label: string; cls: string }[] = [
     { value: 'not_started', label: 'Not Started', cls: 'chip-pending' },
     { value: 'in_progress', label: 'In Progress', cls: 'chip-in-progress' },
-    { value: 'pending_approval', label: 'Pending Approval', cls: 'chip-pending-approval' },
+    ...(requiresApproval ? [{ value: 'pending_approval' as SubTaskStatus, label: 'Pending Approval', cls: 'chip-pending-approval' }] : []),
     { value: 'completed', label: 'Completed', cls: 'chip-completed' },
   ];
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
       <motion.div initial={{ opacity: 0, scale: 0.96, y: 8 }} animate={{ opacity: 1, scale: 1, y: 0 }}
         transition={{ duration: 0.18 }}
-        className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-md">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-gradient-to-r from-primary/5 to-transparent">
+        className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-gradient-to-r from-primary/5 to-transparent shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
               <Pencil className="w-4.5 h-4.5 text-primary" />
@@ -2401,90 +2408,124 @@ function EditSubtaskDialog({ subtask, users, onClose, onSave }: {
               <p className="text-[11px] text-muted-foreground mt-0.5 truncate max-w-[280px]">{subtask.title}</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-full hover:bg-muted transition-colors flex-shrink-0">
+          <button type="button" onClick={onClose} className="p-1.5 rounded-full hover:bg-muted transition-colors flex-shrink-0">
             <X className="w-4 h-4 text-muted-foreground" />
           </button>
         </div>
 
-        <form onSubmit={handleSave} className="px-6 py-5 space-y-4">
-          <div>
-            <label className="block text-xs font-semibold text-foreground uppercase tracking-wide mb-1.5">Title <span className="text-red-400">*</span></label>
-            <input required autoFocus value={title} onChange={e => setTitle(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all shadow-sm" />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-foreground uppercase tracking-wide mb-1.5">Description</label>
-            <textarea rows={2} value={description} onChange={e => setDesc(e.target.value)}
-              placeholder="Optional notes…"
-              className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none transition-all shadow-sm" />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
+        <form onSubmit={handleSave} className="flex flex-col flex-1 overflow-hidden">
+          <div className="px-6 py-5 space-y-4 overflow-y-auto no-scrollbar">
             <div>
-              <label className="block text-xs font-semibold text-foreground uppercase tracking-wide mb-1.5">Assigned To</label>
-              <select value={assignedTo} onChange={e => setAssignedTo(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all shadow-sm cursor-pointer">
-                <option value="">Unassigned</option>
-                {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-              </select>
+              <label className="block text-xs font-semibold text-foreground uppercase tracking-wide mb-1.5">Title <span className="text-red-400">*</span></label>
+              <input required autoFocus value={title} onChange={e => setTitle(e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all shadow-sm" />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-foreground uppercase tracking-wide mb-1.5">Deadline</label>
-              <input type="date" value={deadline} onChange={e => setDeadline(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all shadow-sm" />
+              <label className="block text-xs font-semibold text-foreground uppercase tracking-wide mb-1.5">Description</label>
+              <textarea rows={2} value={description} onChange={e => setDesc(e.target.value)}
+                placeholder="Optional notes…"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none transition-all shadow-sm" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-foreground uppercase tracking-wide mb-1.5">Assigned To</label>
+                <div className="relative">
+                  <button type="button" onClick={() => setOpenSubDrop(!openSubDrop)}
+                    className="w-full px-3.5 py-2.5 flex items-center justify-between gap-2 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all shadow-sm cursor-pointer overflow-hidden">
+                    <span className="truncate">{assignedTo.length > 0 ? `${assignedTo.length} selected` : 'Unassigned'}</span>
+                    <ChevronDown className="w-3.5 h-3.5 text-muted-foreground opacity-50 shrink-0" />
+                  </button>
+                  {openSubDrop && (
+                    <>
+                      <div className="fixed inset-0 z-[100]" onClick={() => setOpenSubDrop(false)} />
+                      <div className="absolute top-full left-0 mt-1 min-w-[200px] w-max max-w-[350px] max-h-[200px] overflow-y-auto bg-card border border-border rounded-lg shadow-xl z-[101] py-1 hide-scrollbar">
+                        <label className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted transition-colors border-b border-border">
+                          <input type="checkbox"
+                            checked={assignedTo.length === users.length && users.length > 0}
+                            onChange={(e) => {
+                              if (e.target.checked) setAssignedTo(users.map(u => u.id));
+                              else setAssignedTo([]);
+                            }}
+                            className="w-3 h-3 rounded text-primary focus:ring-primary/20" />
+                          <span className="text-xs font-semibold text-foreground whitespace-normal leading-tight">All staff</span>
+                        </label>
+                        {users.map(u => (
+                          <label key={u.id} className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted transition-colors">
+                            <input type="checkbox"
+                              checked={assignedTo.includes(u.id)}
+                              onChange={(e) => {
+                                if (e.target.checked) setAssignedTo(prev => [...prev, u.id]);
+                                else setAssignedTo(prev => prev.filter(id => id !== u.id));
+                              }}
+                              className="w-3 h-3 rounded" />
+                            <span className="text-xs text-foreground whitespace-normal leading-tight">{u.name}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-foreground uppercase tracking-wide mb-1.5">Deadline</label>
+                <input type="date" value={deadline} onChange={e => setDeadline(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all shadow-sm" />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-foreground uppercase tracking-wide mb-2">Priority</label>
+              <div className="flex items-center gap-2 flex-wrap bg-muted/30 p-1.5 rounded-xl border border-border/50">
+                <button type="button" onClick={() => setPriority(undefined)}
+                  className={`flex-1 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-sm ${!priority ? 'bg-background text-foreground border border-border ring-1 ring-primary/20' : 'text-muted-foreground hover:text-foreground hover:bg-black/5'}`}>None</button>
+                {PRIORITY_ORDER.map(p => (
+                  <button key={p} type="button" onClick={() => setPriority(p)}
+                    className={`flex-1 flex justify-center items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-sm border ${priority === p ? `${PRIORITY_CONFIG[p].className} ring-1 ring-primary/20` : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-black/5'}`}>
+                    <span className={`w-2 h-2 rounded-full ${PRIORITY_CONFIG[p].dot}`} />
+                    {PRIORITY_CONFIG[p].label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-foreground uppercase tracking-wide mb-2">Status</label>
+              <div className="grid grid-cols-2 gap-2 bg-muted/30 p-1.5 rounded-xl border border-border/50">
+                {statusOptions.map(opt => (
+                  <button key={opt.value} type="button" onClick={() => setStatus(opt.value)}
+                    className={`py-2 px-3 rounded-xl border text-xs font-semibold transition-all shadow-sm ${status === opt.value
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-black/5 bg-background'
+                      }`}>
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="bg-muted/20 p-4 rounded-xl border border-border/50 space-y-3 mb-2">
+              <label className="flex items-center gap-2 cursor-pointer group">
+                <input type="checkbox" checked={requiresApproval} onChange={e => setRequiresApproval(e.target.checked)}
+                  className="w-4 h-4 rounded border-border text-primary focus:ring-primary/20 transition-all" />
+                <span className="text-sm font-medium text-foreground group-hover:text-primary transition-colors">Requires Approval</span>
+              </label>
+              {requiresApproval && (
+                <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}>
+                  <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1.5">Approving Authority</label>
+                  <select
+                    value={approverId}
+                    onChange={e => setApproverId(e.target.value)}
+                    required={requiresApproval}
+                    className="w-full px-3.5 py-2 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all shadow-sm"
+                  >
+                    <option value="">Choose an approver...</option>
+                    {users.map(u => (
+                      <option key={u.id} value={u.id}>{u.name}</option>
+                    ))}
+                  </select>
+                </motion.div>
+              )}
             </div>
           </div>
-          <div>
-            <label className="block text-xs font-semibold text-foreground uppercase tracking-wide mb-2">Priority</label>
-            <div className="flex items-center gap-2 flex-wrap bg-muted/30 p-1.5 rounded-xl border border-border/50">
-              <button type="button" onClick={() => setPriority(undefined)}
-                className={`flex-1 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-sm ${!priority ? 'bg-background text-foreground border border-border ring-1 ring-primary/20' : 'text-muted-foreground hover:text-foreground hover:bg-black/5'}`}>None</button>
-              {PRIORITY_ORDER.map(p => (
-                <button key={p} type="button" onClick={() => setPriority(p)}
-                  className={`flex-1 flex justify-center items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-sm border ${priority === p ? `${PRIORITY_CONFIG[p].className} ring-1 ring-primary/20` : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-black/5'}`}>
-                  <span className={`w-2 h-2 rounded-full ${PRIORITY_CONFIG[p].dot}`} />
-                  {PRIORITY_CONFIG[p].label}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-foreground uppercase tracking-wide mb-2">Status</label>
-            <div className="grid grid-cols-2 gap-2 bg-muted/30 p-1.5 rounded-xl border border-border/50">
-              {statusOptions.map(opt => (
-                <button key={opt.value} type="button" onClick={() => setStatus(opt.value)}
-                  className={`py-2 px-3 rounded-xl border text-xs font-semibold transition-all shadow-sm ${status === opt.value
-                    ? 'bg-primary text-primary-foreground border-primary'
-                    : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-black/5 bg-background'
-                    }`}>
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="bg-muted/20 p-4 rounded-xl border border-border/50 space-y-3">
-            <label className="flex items-center gap-2 cursor-pointer group">
-              <input type="checkbox" checked={requiresApproval} onChange={e => setRequiresApproval(e.target.checked)}
-                className="w-4 h-4 rounded border-border text-primary focus:ring-primary/20 transition-all" />
-              <span className="text-sm font-medium text-foreground group-hover:text-primary transition-colors">Requires Approval</span>
-            </label>
-            {requiresApproval && (
-              <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}>
-                <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1.5">Approving Authority</label>
-                <select
-                  value={approverId}
-                  onChange={e => setApproverId(e.target.value)}
-                  required={requiresApproval}
-                  className="w-full px-3.5 py-2 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all shadow-sm"
-                >
-                  <option value="">Choose an approver...</option>
-                  {users.map(u => (
-                    <option key={u.id} value={u.id}>{u.name}</option>
-                  ))}
-                </select>
-              </motion.div>
-            )}
-          </div>
-          <div className="flex justify-end gap-3 pt-1">
+          
+          <div className="flex justify-end gap-3 px-6 py-4 border-t border-border bg-muted/10 shrink-0">
             <Button type="button" onClick={onClose}
               className="px-5 h-auto py-2.5 rounded-xl border border-border bg-card text-sm text-muted-foreground hover:bg-muted transition-colors">Cancel</Button>
             <Button type="submit" disabled={!title.trim()}

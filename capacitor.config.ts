@@ -16,6 +16,10 @@ const config: CapacitorConfig = {
     allowMixedContent: false, // We use HTTPS everywhere — keep this false
   },
   plugins: {
+    LocalNotifications: {
+      smallIcon: 'ic_launcher_foreground',
+      iconColor: '#4f46e5',
+    },
     // Allow camera and media access
     Filesystem: {
       iosScheme: 'ionic',

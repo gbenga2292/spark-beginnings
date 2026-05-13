@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { formatDisplayDate } from '@/src/lib/dateUtils';
 import {
-  ArrowLeft, Download, Eye, Calendar, User, Car, MapPin, Package, X, FileText, Share2, CheckCircle2
+  ArrowLeft, Download, Eye, Calendar, User, Car, MapPin, Package, X, FileText, Share2, CheckCircle2, Printer
 } from 'lucide-react';
 import { Waybill } from '../types/operations';
 import { useOperations } from '../contexts/OperationsContext';
@@ -87,6 +87,13 @@ export function WaybillDetailView({ waybill, onClose }: WaybillDetailViewProps) 
     generatePdfDoc().save(`WB-${waybill.id.substring(0, 8).toUpperCase()}.pdf`);
   };
 
+  const handlePrint = () => {
+    const doc = generatePdfDoc();
+    doc.autoPrint();
+    const blobUrl = doc.output('bloburl');
+    window.open(blobUrl, '_blank');
+  };
+
   const handleShare = async () => {
     try {
       const doc = generatePdfDoc();
@@ -94,13 +101,19 @@ export function WaybillDetailView({ waybill, onClose }: WaybillDetailViewProps) 
       
       if (navigator.share) {
         const file = new File([pdfBlob], `WB-${waybill.id.substring(0, 8).toUpperCase()}.pdf`, { type: 'application/pdf' });
-        await navigator.share({
-          title: `Waybill REF-${waybill.id.substring(0, 8).toUpperCase()}`,
-          text: `Please find attached the Waybill REF-${waybill.id.substring(0, 8).toUpperCase()}`,
-          files: [file],
-        });
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          await navigator.share({
+            title: `Waybill REF-${waybill.id.substring(0, 8).toUpperCase()}`,
+            text: `Please find attached the Waybill REF-${waybill.id.substring(0, 8).toUpperCase()}`,
+            files: [file],
+          });
+        } else {
+          // If files can't be shared but share API exists, fallback to download
+          handleDownload();
+        }
       } else {
-        alert('Sharing is not supported on this browser. You can download the PDF instead.');
+        // Fallback silently to download if not supported
+        handleDownload();
       }
     } catch (error) {
       console.error('Error sharing document:', error);
@@ -139,10 +152,10 @@ export function WaybillDetailView({ waybill, onClose }: WaybillDetailViewProps) 
         <Button
           variant="outline"
           size="sm"
-          className="h-9 px-2 sm:px-3 gap-2 text-slate-600 border-slate-200 bg-white hover:bg-slate-50 font-semibold text-[11px] uppercase tracking-tight shadow-sm transition-all"
-          onClick={() => setShowPdfPreview(false)}
+          className="h-9 px-3 gap-2 text-slate-600 border-slate-200 bg-white hover:bg-slate-50 font-semibold text-[11px] uppercase tracking-tight shadow-sm transition-all"
+          onClick={handlePrint}
         >
-          <ArrowLeft className="h-4 w-4" /> <span className="hidden sm:inline">Back to Waybill Info</span>
+          <Printer className="h-4 w-4" /> <span className="hidden sm:inline">Print PDF</span>
         </Button>
         <Button
           size="sm"
@@ -158,14 +171,6 @@ export function WaybillDetailView({ waybill, onClose }: WaybillDetailViewProps) 
           variant="outline"
           size="sm"
           className="h-9 px-2 sm:px-3 gap-2 text-slate-600 border-slate-200 bg-white hover:bg-slate-50 font-semibold text-[11px] uppercase tracking-tight shadow-sm transition-all"
-          onClick={onClose}
-        >
-          <ArrowLeft className="h-4 w-4" /> <span className="hidden sm:inline">Back to Waybills</span>
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-9 px-2 sm:px-3 gap-2 text-slate-600 border-slate-200 bg-white hover:bg-slate-50 font-semibold text-[11px] uppercase tracking-tight shadow-sm transition-all"
           onClick={handlePreview}
         >
           <Eye className="h-4 w-4" /> <span className="hidden sm:inline">Preview</span>
@@ -177,6 +182,14 @@ export function WaybillDetailView({ waybill, onClose }: WaybillDetailViewProps) 
           onClick={handleShare}
         >
           <Share2 className="h-4 w-4" /> <span className="hidden sm:inline">Share</span>
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-9 px-2 sm:px-3 gap-2 text-slate-600 border-slate-200 bg-white hover:bg-slate-50 font-semibold text-[11px] uppercase tracking-tight shadow-sm transition-all"
+          onClick={handlePrint}
+        >
+          <Printer className="h-4 w-4" /> <span className="hidden sm:inline">Print</span>
         </Button>
         <Button
           size="sm"
@@ -205,11 +218,22 @@ export function WaybillDetailView({ waybill, onClose }: WaybillDetailViewProps) 
         )}
       </div>
     ),
-    [waybill.id, showPdfPreview]
+    [waybill.id, showPdfPreview, waybill.type, waybill.status, waybill.siteName]
   );
 
   return (
     <>
+      <div className="flex items-center max-w-5xl mx-auto pt-4 pb-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="gap-2 text-slate-500 hover:text-slate-800 -ml-2 font-medium"
+          onClick={showPdfPreview ? () => setShowPdfPreview(false) : onClose}
+        >
+          <ArrowLeft className="h-4 w-4" /> {showPdfPreview ? 'Back to Waybill Info' : 'Back to Waybills'}
+        </Button>
+      </div>
+
       {showPdfPreview ? (
         <div className="flex flex-col gap-6 max-w-5xl mx-auto pb-10 h-[80vh] min-h-[600px] animate-in fade-in slide-in-from-bottom-2 duration-300">
           <div className="flex-1 w-full bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col">

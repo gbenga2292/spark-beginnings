@@ -746,7 +746,30 @@ function vehicleMovementToDb(v: any) {
 
 export async function fetchAllAppData(privs?: any) {
   const isAdmin = privs?.users?.canManage === true;
-  const canView = (mod: string) => isAdmin || (privs && privs[mod] && privs[mod].canView === true);
+  const canView = (mod: string) => {
+    if (isAdmin) return true;
+    if (privs && privs[mod] && privs[mod].canView === true) return true;
+    
+    // Allow fetching dependent data for Weekly Report if they have the specific sub-privilege
+    const wr = privs?.weeklyReport;
+    if (wr?.canView) {
+      if (['employees', 'attendance', 'leaves', 'disciplinary', 'evaluations'].includes(mod)) {
+        return wr.canViewHr === true;
+      }
+      if (['ledger', 'payments'].includes(mod)) {
+        return wr.canViewFinance === true;
+      }
+    }
+    
+    // Allow fetching dependent data for General Reports if they have the reports privilege
+    if (privs?.reports?.canView === true) {
+      if (['employees', 'attendance', 'leaves', 'invoices', 'payments', 'ledger'].includes(mod)) {
+        return true;
+      }
+    }
+    
+    return false;
+  };
 
   const [
     sitesRes, clientsRes, employeesRes, attendanceRes,
