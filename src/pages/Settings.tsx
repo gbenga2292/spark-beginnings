@@ -18,6 +18,8 @@ import { supabase } from '@/src/integrations/supabase/client';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { exportFullAppToExcel, restoreFullAppFromExcel } from '@/src/lib/excelBackup';
 import { usePriv } from '@/src/hooks/usePriv';
+import { Capacitor, CapacitorHttp } from '@capacitor/core';
+import packageJson from '../../../package.json';
 
 interface CompanyInfo {
   name: string;
@@ -61,9 +63,10 @@ const DEFAULT_BACKUP_SETTINGS: BackupSettings = {
 
 export function Settings() {
   const [activeTab, setActiveTab] = useState('general');
-  const [appVersion, setAppVersion] = useState('1.0.0');
+  const [appVersion, setAppVersion] = useState((packageJson as any).version || '1.5.2');
   const [isChecking, setIsChecking] = useState(false);
   const isElectron = ((window as any).electronAPI as any)?.isElectron as boolean | undefined;
+  const isAndroidNative = Capacitor.getPlatform() === 'android';
 
   /* ── Company info state ─────────────────────────────────────── */
   const [isEditing, setIsEditing] = useState(false);
@@ -97,8 +100,10 @@ export function Settings() {
   useEffect(() => {
     if (isElectron && ((window as any).electronAPI as any)?.getVersion) {
       ((window as any).electronAPI as any).getVersion().then((v: string) => setAppVersion(v)).catch(console.error);
+    } else if (isAndroidNative) {
+      setAppVersion('1.5.2');
     }
-  }, [isElectron]);
+  }, [isElectron, isAndroidNative]);
 
   /* ── Load company info from Supabase on mount ─────────────────── */
   useEffect(() => {
@@ -428,11 +433,45 @@ export function Settings() {
     }
   };
 
-  const handleCheckForUpdates = () => {
+  const handleCheckForUpdates = async () => {
     if (isElectron && ((window as any).electronAPI as any)?.checkForUpdates) {
       setIsChecking(true);
       ((window as any).electronAPI as any).checkForUpdates();
       setTimeout(() => setIsChecking(false), 3000);
+    } else if (isAndroidNative) {
+      setIsChecking(true);
+      try {
+        const CURRENT_VERSION = '1.5.2';
+        const UPDATE_SERVER_URL = import.meta.env.VITE_UPDATE_SERVER_URL || 'https://dewaterconstruct.com/app-updates';
+        const response = await CapacitorHttp.get({
+          url: `${UPDATE_SERVER_URL}/version.json?t=${Date.now()}`,
+          headers: { 'Cache-Control': 'no-cache' },
+        });
+        if (response.status !== 200) throw new Error('Failed to fetch update info');
+        const data = response.data;
+        const normalizeVersion = (v: string) => v.replace(/^v/i, '').trim();
+        const cParts = normalizeVersion(CURRENT_VERSION).split('.').map(Number);
+        const rParts = normalizeVersion(data.version).split('.').map(Number);
+        
+        let isNewer = false;
+        for (let i = 0; i < Math.max(cParts.length, rParts.length); i++) {
+          const c = cParts[i] || 0;
+          const r = rParts[i] || 0;
+          if (r > c) { isNewer = true; break; }
+          if (r < c) { isNewer = false; break; }
+        }
+
+        if (data.version && isNewer) {
+          toast.success(`Update v${data.version} is available! Please check the app sidebar to download and install the update.`);
+        } else {
+          toast.success('Your application is up to date.');
+        }
+      } catch (err) {
+        console.error('Update check failed:', err);
+        toast.error('Failed to check for updates.');
+      } finally {
+        setIsChecking(false);
+      }
     }
   };
 
@@ -968,7 +1007,7 @@ export function Settings() {
                 <div className="flex flex-col gap-2">
                   <Button
                     onClick={handleCheckForUpdates}
-                    disabled={!isElectron || isChecking}
+                    disabled={(!isElectron && !isAndroidNative) || isChecking}
                     className="bg-indigo-600 hover:bg-indigo-700 text-white min-w-[160px]"
                   >
                     {isChecking
@@ -977,8 +1016,8 @@ export function Settings() {
                     }
                     {isChecking ? 'Checking...' : 'Check for Updates'}
                   </Button>
-                  {!isElectron && (
-                    <p className="text-xs text-slate-400 text-center">Only available in Desktop App</p>
+                  {!isElectron && !isAndroidNative && (
+                    <p className="text-xs text-slate-400 text-center">Only available in Desktop & Android App</p>
                   )}
                 </div>
               </div>

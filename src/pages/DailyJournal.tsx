@@ -694,9 +694,15 @@ export function DailyJournal() {
           y += 10;
 
           const siteLogs = dailyMachineLogs.filter(l => l.siteId === entry.siteId && l.date === journal.date);
-          const machineNarrative = siteLogs.map(ml => 
-            `[${ml.assetName}]: ${ml.isActive ? 'Operational' : 'Inactive'}${ml.isActive && ml.dieselUsage > 0 ? `. ${ml.dieselUsage}L of diesel filled` : ''}.${ml.issuesOnSite ? ` Note: ${ml.issuesOnSite}` : ''}`
-          ).join('\n');
+          const machineNarrative = siteLogs.map(ml => {
+            const opLabel = ml.operationalDay === 'full' ? 'Full Day' : ml.operationalDay === 'half' ? 'Half Day' : ml.operationalDay === 'none' ? 'Not Operational' : (ml.isActive ? 'Full Day' : 'Not Operational');
+            let text = `[${ml.assetName}]: ${opLabel}`;
+            if (ml.dieselUsage > 0) text += ` • Diesel: ${ml.dieselUsage}L`;
+            if (ml.supervisorOnSite) text += ` • Supervisor: ${ml.supervisorOnSite}`;
+            if (ml.issuesOnSite) text += ` • Notes: ${ml.issuesOnSite}`;
+            if (ml.maintenanceDetails) text += ` • Maintenance: ${ml.maintenanceDetails}`;
+            return text;
+          }).join('\n');
           
           const combinedNarration = [entry.narration, machineNarrative].filter(Boolean).join('\n\n');
 
@@ -808,6 +814,11 @@ export function DailyJournal() {
             setPdfExportDate(diaryDate);
             setShowPdfPreview(true);
           }}
+          onDateChange={setDiaryDate}
+          onEditMachineLog={(machine, siteId, siteName) => {
+            setFormDate(diaryDate);
+            setMachineLogContext({ assetId: machine.id, assetName: machine.name, siteId, siteName });
+          }}
         />
         {renderModal()} {renderDeleteConfirm()} {renderExportModal()} {renderMachineLogModal()}
       </>
@@ -822,7 +833,16 @@ export function DailyJournal() {
     const cells = eachDayOfInterval({ start, end }).map(day => {
       const ds = format(day, 'yyyy-MM-dd');
       const dayJs = dailyJournals.filter(j => j.date === ds);
-      const entryCount = siteJournalEntries.filter(e => dayJs.some(j => j.id === e.journalId)).length;
+      const baseEntryCount = siteJournalEntries.filter(e => dayJs.some(j => j.id === e.journalId)).length;
+      
+      const machineLogsForDay = dailyMachineLogs.filter(l => l.date === ds);
+      const uniqueMachineSites = new Set(machineLogsForDay.map(l => l.siteId)).size;
+      const entrySiteIds = new Set(siteJournalEntries.filter(e => dayJs.some(j => j.id === e.journalId)).map(e => e.siteId));
+      const standaloneMachineSites = Array.from(new Set(machineLogsForDay.map(l => l.siteId))).filter(id => !entrySiteIds.has(id));
+      
+      const totalEntries = baseEntryCount + standaloneMachineSites.length;
+      const totalSessions = dayJs.length + (standaloneMachineSites.length > 0 ? 1 : 0);
+      
       const isT = isSameDay(day, new Date());
       return (
         <div key={ds} className={cn('border-b border-r border-border p-1 sm:p-2 flex flex-col min-h-[70px] sm:min-h-[100px] group relative', isT && 'bg-blue-50/50 dark:bg-blue-950/20')}>
@@ -837,17 +857,17 @@ export function DailyJournal() {
               </button>
             )}
           </div>
-          {dayJs.length > 0 && (
+          {totalSessions > 0 && (
             <button onClick={() => setDiaryDate(ds)} className="mt-auto sm:mt-1 text-left w-full">
               {/* Desktop View */}
               <div className="hidden sm:block text-[10px] font-medium px-1.5 py-1 rounded bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 hover:bg-blue-100 transition-colors truncate">
-                {entryCount} log{entryCount !== 1 ? 's' : ''}{' \u2022 '}{dayJs.length} session{dayJs.length !== 1 ? 's' : ''}
+                {totalEntries} log{totalEntries !== 1 ? 's' : ''}{' \u2022 '}{totalSessions} session{totalSessions !== 1 ? 's' : ''}
               </div>
               {/* Mobile View */}
               <div className="sm:hidden flex items-center justify-center">
                 <div className="flex items-center justify-center gap-1 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded-full">
                   <div className="h-1.5 w-1.5 rounded-full bg-blue-500 shrink-0"></div>
-                  <span className="text-[10px] font-bold text-blue-700 dark:text-blue-300 leading-none">{entryCount}</span>
+                  <span className="text-[10px] font-bold text-blue-700 dark:text-blue-300 leading-none">{totalEntries}</span>
                 </div>
               </div>
             </button>

@@ -1640,6 +1640,7 @@ export type Database = {
           amount_for_vat: number
           client: string
           created_at: string
+          damages: number | null
           date: string
           discount: number
           id: string
@@ -1653,6 +1654,7 @@ export type Database = {
           amount_for_vat?: number
           client: string
           created_at?: string
+          damages?: number | null
           date?: string
           discount?: number
           id?: string
@@ -1666,6 +1668,7 @@ export type Database = {
           amount_for_vat?: number
           client?: string
           created_at?: string
+          damages?: number | null
           date?: string
           discount?: number
           id?: string

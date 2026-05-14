@@ -115,4 +115,12 @@ export interface InterviewCandidate {
 
   // If forwarded to onboarding, track the employee ID created
   onboardingEmployeeId?: string;
+
+  // AI-extracted CV data from the Invite stage — auto-populates the Scoresheet History tab
+  cvQualifications?: QualificationRow[];
+  cvWorkExperience?: WorkExperienceRow[];
+
+  // Optional invite details
+  source?: string;
+  remarks?: string;
 }

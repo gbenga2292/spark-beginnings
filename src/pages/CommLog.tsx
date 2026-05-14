@@ -223,6 +223,68 @@ function LogForm({ form, onChange, onSave, onCancel, isEdit, editingId, isDark }
   // track sites the user has already decided on (to avoid re-prompting)
   const [processedKeys, setProcessedKeys] = useState<Set<string>>(new Set());
   const [isManualSite, setIsManualSite] = useState(false);
+  const [isManualContact, setIsManualContact] = useState(false);
+
+  // Auto-migrate past log contacts to clientContacts
+  useEffect(() => {
+    if (!form.client) return;
+
+    const clientStr = form.client.trim().toLowerCase();
+    
+    // We get current state directly to avoid loop
+    const currentContacts = useAppStore.getState().clientContacts;
+    const existingLower = new Set(
+      currentContacts
+        .filter(c => c.clientName.trim().toLowerCase() === clientStr)
+        .map(c => c.name.trim().toLowerCase())
+    );
+
+    const toAdd = new Map<string, any>();
+
+    commLogs.forEach(l => {
+      if (l.isInternal || !l.contactPerson) return;
+      const lClient = (l.client || '').trim().toLowerCase();
+      const lSite = (l.siteName || '').trim().toLowerCase();
+      
+      const siteStr = (form.siteName || '').trim().toLowerCase();
+      
+      // Match if log's client matches selected client OR log's site matches selected site
+      if ((lClient && lClient === clientStr) || (siteStr && lSite === siteStr)) {
+        const name = l.contactPerson.trim();
+        const lower = name.toLowerCase();
+
+        if (lower && !existingLower.has(lower)) {
+          if (!toAdd.has(lower)) {
+            toAdd.set(lower, {
+              name,
+              siteIds: l.siteId ? [l.siteId] : [],
+              siteNames: l.siteName ? [l.siteName] : [],
+            });
+          } else {
+            const item = toAdd.get(lower)!;
+            if (l.siteId && !item.siteIds.includes(l.siteId)) item.siteIds.push(l.siteId);
+            if (l.siteName && !item.siteNames.includes(l.siteName)) item.siteNames.push(l.siteName);
+          }
+        }
+      }
+    });
+
+    if (toAdd.size > 0) {
+      const addContact = useAppStore.getState().addClientContact;
+      toAdd.forEach((item) => {
+        addContact({
+          id: generateId(),
+          name: item.name,
+          clientName: form.client, // Save exactly under currently selected client
+          siteIds: item.siteIds,
+          siteNames: item.siteNames,
+          isActive: true,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+      });
+    }
+  }, [form.client, form.siteName, commLogs]);
 
   const inputCls = cn(
     'flex h-9 w-full rounded-md border px-3 py-1 text-sm shadow-sm transition-colors',
@@ -804,25 +866,87 @@ function LogForm({ form, onChange, onSave, onCancel, isEdit, editingId, isDark }
               })()}
             </div>
           </div>
-        ) : (
-          <div>
-            <div className={labelCls}>Contact Person</div>
-            {/* Show known contacts as a datalist suggestion */}
-            <datalist id="cl-known-contacts">
-              {clientContacts
-                .filter(c => c.clientName === form.client && c.isActive)
-                .map(c => <option key={c.id} value={c.name} />)}
-            </datalist>
-            <input
-              type="text"
-              list="cl-known-contacts"
-              placeholder="e.g. Mr. Adeyemi, Site Manager"
-              value={form.contactPerson}
-              onChange={e => onChange({ contactPerson: e.target.value })}
-              className={inputCls}
-            />
-          </div>
-        )}
+        ) : (() => {
+          const clientStr = (form.client || '').trim().toLowerCase();
+          
+          // Deduplicate active contacts by name (case-insensitive) just in case
+          const uniqueContacts = new Map<string, typeof clientContacts[0]>();
+          clientContacts.forEach(c => {
+            if (c.isActive && (c.clientName || '').trim().toLowerCase() === clientStr) {
+              const lower = c.name.trim().toLowerCase();
+              if (!uniqueContacts.has(lower)) {
+                uniqueContacts.set(lower, c);
+              }
+            }
+          });
+          
+          const activeClientContacts = Array.from(uniqueContacts.values());
+          const hasAnyOptions = activeClientContacts.length > 0;
+          const isKnownOption = (name: string) => activeClientContacts.some(c => c.name.trim().toLowerCase() === name.trim().toLowerCase());
+
+          return (
+            <div>
+              <div className={labelCls}>Contact Person</div>
+              {!hasAnyOptions ? (
+                <input
+                  type="text"
+                  placeholder="e.g. Mr. Adeyemi, Site Manager"
+                  value={form.contactPerson}
+                  onChange={e => onChange({ contactPerson: e.target.value })}
+                  className={inputCls}
+                />
+              ) : !isManualContact ? (
+                <select
+                  value={isKnownOption(form.contactPerson) ? (activeClientContacts.find(c => c.name.trim().toLowerCase() === (form.contactPerson || '').trim().toLowerCase())?.name || form.contactPerson) : (form.contactPerson ? '__CUSTOM__' : '')}
+                  onChange={e => {
+                    const val = e.target.value;
+                    if (val === '__ADD_NEW__') {
+                      setIsManualContact(true);
+                      onChange({ contactPerson: '' });
+                    } else if (val === '__CUSTOM__') {
+                      // Do nothing
+                    } else {
+                      onChange({ contactPerson: val });
+                    }
+                  }}
+                  className={selectCls}
+                >
+                  <option value="">Select contact...</option>
+                  {activeClientContacts.map(c => (
+                    <option key={c.id} value={c.name}>
+                      {c.name} {c.position ? `— ${c.position}` : ''}
+                    </option>
+                  ))}
+                  <option value="__ADD_NEW__">+ Type a new contact...</option>
+                  {form.contactPerson && !isKnownOption(form.contactPerson) && (
+                    <option value="__CUSTOM__">Custom: {form.contactPerson}</option>
+                  )}
+                </select>
+              ) : (
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    autoFocus
+                    placeholder="Type new contact name..."
+                    value={form.contactPerson}
+                    onChange={e => onChange({ contactPerson: e.target.value })}
+                    className={cn(inputCls, 'flex-1')}
+                  />
+                  <Button 
+                    variant="ghost" 
+                    className="h-9 px-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800" 
+                    onClick={() => {
+                      setIsManualContact(false);
+                      onChange({ contactPerson: '' });
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* Subject */}
         {!form.parentId && (

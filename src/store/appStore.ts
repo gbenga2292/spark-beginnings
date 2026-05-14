@@ -1457,6 +1457,7 @@ export const useAppStore = create<AppState>()(
       // Interview Candidates
       addInterviewCandidate: (candidate) => {
         set((s) => ({ interviewCandidates: [candidate, ...s.interviewCandidates] }));
+        db.insertInterviewCandidate(candidate).catch(e => console.error('Failed to save candidate to DB:', e));
       },
       updateInterviewCandidate: (id, updates) => {
         set((s) => ({
@@ -1464,9 +1465,11 @@ export const useAppStore = create<AppState>()(
             c.id === id ? { ...c, ...updates, updatedAt: new Date().toISOString() } : c
           ),
         }));
+        db.updateInterviewCandidate(id, updates).catch(e => console.error('Failed to update candidate in DB:', e));
       },
       deleteInterviewCandidate: (id) => {
         set((s) => ({ interviewCandidates: s.interviewCandidates.filter((c) => c.id !== id) }));
+        db.deleteInterviewCandidate(id).catch(e => console.error('Failed to delete candidate from DB:', e));
       },
       setInterviewCandidates: (candidates) => {
         set({ interviewCandidates: candidates });

@@ -1039,8 +1039,6 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                 if (!base64Data) continue;
                 const mimeMatch = att.base64?.match(/data:(.*?);base64/);
                 const mime = mimeMatch ? mimeMatch[1] : 'application/octet-stream';
-                const ext = att.name.split('.').pop() || 'bin';
-                const filePath = `${authorId}/${Date.now()}_${att.name}`;
 
                 // Convert base64 to Uint8Array
                 const byteChars = atob(base64Data);
@@ -1048,16 +1046,39 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                 for (let i = 0; i < byteChars.length; i++) byteArr[i] = byteChars.charCodeAt(i);
                 const blob = new Blob([byteArr], { type: mime });
 
-                const { error: upErr } = await supabase.storage
-                    .from('task-attachments')
-                    .upload(filePath, blob, { contentType: mime, upsert: true });
-                if (upErr) {
-                    console.error('File upload error:', upErr);
-                    toast.error(`Failed to upload ${att.name}`);
+                const formData = new FormData();
+                formData.append('media', blob, att.name);
+                formData.append('uploaded_by', authorId);
+
+                const apiKey = import.meta.env.VITE_MEDIA_API_KEY;
+                const serverUrl = import.meta.env.VITE_MEDIA_SERVER_URL;
+
+                if (!serverUrl || !apiKey) {
+                    toast.error('Media server configuration is missing in .env');
                     continue;
                 }
-                const { data: urlData } = supabase.storage.from('task-attachments').getPublicUrl(filePath);
-                uploadedAttachments.push({ name: att.name, url: urlData.publicUrl, type: mime });
+
+                try {
+                    const res = await fetch(`${serverUrl}/task_upload.php`, {
+                        method: 'POST',
+                        headers: {
+                            'X-API-Key': apiKey,
+                        },
+                        body: formData
+                    });
+                    
+                    if (!res.ok) throw new Error('Upload failed with status ' + res.status);
+                    const responseData = await res.json();
+                    
+                    if (responseData.url) {
+                        uploadedAttachments.push({ name: att.name, url: responseData.url, type: mime });
+                    } else {
+                        throw new Error(responseData.error || 'Unknown error from server');
+                    }
+                } catch (upErr) {
+                    console.error('File upload error:', upErr);
+                    toast.error(`Failed to upload ${att.name}`);
+                }
             }
         }
 

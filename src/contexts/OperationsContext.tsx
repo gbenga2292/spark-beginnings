@@ -1046,6 +1046,7 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
             }
             return [newLog, ...prev];
           });
+
         } catch (error) {
           console.error('Error logging daily activity:', error);
           throw error;

@@ -56,11 +56,12 @@ export function FinancialReports() {
   const sites = useAppStore(state => state.sites);
   const vatRate = useAppStore((state) => state.payrollVariables.vatRate);
 
-  const getVatDetails = (amount: number, payVat: string, vatRate: number) => {
-    const vat = payVat === 'Add' ? Math.round(((amount * 7.5) / 107.5) * 100) / 100 
-              : payVat === 'Yes' ? Math.round(((amount / (100 + vatRate)) * vatRate) * 100) / 100 
+  const getVatDetails = (amount: number, payVat: string, vatRate: number, damages: number = 0) => {
+    const baseAmount = amount - damages;
+    const vat = payVat === 'Add' ? Math.round(((baseAmount * 7.5) / 107.5) * 100) / 100 
+              : payVat === 'Yes' ? Math.round(((baseAmount / (100 + vatRate)) * vatRate) * 100) / 100 
               : 0;
-    const amountForVat = payVat !== 'No' ? amount - vat : amount;
+    const amountForVat = payVat !== 'No' ? baseAmount - vat : baseAmount;
     return { vat, amountForVat };
   };
 
@@ -458,7 +459,7 @@ export function FinancialReports() {
       
       const siteKey = `${(p.client || '').trim()}|${(p.site || '').trim()}`;
       const payVat = p.payVat || siteIndex.get(siteKey)?.vat || 'No';
-      const { vat } = getVatDetails(p.amount || 0, payVat, vatRate);
+      const { vat } = getVatDetails(p.amount || 0, payVat, vatRate, (p as any).damages || 0);
       
       if (vat > 0) clientVatMap.set(p.client, (clientVatMap.get(p.client) || 0) + vat);
       totalVATCollected += (vat || 0);
@@ -616,7 +617,7 @@ export function FinancialReports() {
       // Calculate VAT Paid dynamically based on payment amount and site VAT settings
       const siteKey = `${clientName}|${siteName}`;
       const payVatSetting = pay.payVat || siteIndex.get(siteKey)?.vat || 'No';
-      const { vat } = getVatDetails(pay.amount || 0, payVatSetting, vatRate);
+      const { vat } = getVatDetails(pay.amount || 0, payVatSetting, vatRate, (pay as any).damages || 0);
       r.vatPaid += (vat || 0);
     });
 
@@ -837,7 +838,7 @@ export function FinancialReports() {
     const extractCSV = (val: any) => typeof val === 'number' ? String(val) : `"${String(val ?? '').replace(/"/g, '""')}"`;
     const data = payments.map(p => {
         const payVat = p.payVat || (sites.find(s => s.name === p.site && s.client === p.client)?.vat as any) || 'No';
-        const { vat, amountForVat } = getVatDetails(p.amount || 0, payVat, vatRate);
+        const { vat, amountForVat } = getVatDetails(p.amount || 0, payVat, vatRate, (p as any).damages || 0);
         return [ p.client, getTin(p.client), p.site, formatDisplayDate(p.date), p.amount, amountForVat, p.withholdingTax || 0, vat || 0, p.discount || 0];
     });
     const csvData = [headers.join(','), ...data.map(row => row.map(extractCSV).join(','))].join('\n');
@@ -877,7 +878,7 @@ export function FinancialReports() {
     const head = [["Client", "Client TIN", "Site", "Date", "Amount (₦)", "WHT (₦)", "VAT (₦)"]];
     const body = payments.map(p => {
         const payVat = p.payVat || (sites.find(s => s.name === p.site && s.client === p.client)?.vat as any) || 'No';
-        const { vat } = getVatDetails(p.amount || 0, payVat, vatRate);
+        const { vat } = getVatDetails(p.amount || 0, payVat, vatRate, (p as any).damages || 0);
         return [
             p.client,
             getTin(p.client),

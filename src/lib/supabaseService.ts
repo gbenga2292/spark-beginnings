@@ -11,6 +11,7 @@ import type {
   CompanyExpense, StaffMeritRecord, LeaveType, DailyJournal, SiteJournalEntry
 } from '@/src/store/appStore';
 import { useUserStore, type AppUser, type PrivilegePreset } from '@/src/store/userStore';
+import type { InterviewCandidate } from '@/src/types/interviews';
 
 // Workspace identifier — update this if this app is ever redeployed for another organisation.
 const getWS = () => useUserStore.getState().getCurrentUser()?.workspaceId || 'dcel-team';
@@ -144,6 +145,7 @@ export function dbToPayment(r: any): Payment {
     amount: Number(r.amount), withholdingTax: Number(r.withholding_tax),
     discount: Number(r.discount), payVat: r.pay_vat,
     vat: Number(r.vat), amountForVat: Number(r.amount_for_vat),
+    damages: r.damages != null ? Number(r.damages) : undefined,
   };
 }
 
@@ -394,6 +396,65 @@ export function dbToSiteJournalEntry(r: any): SiteJournalEntry {
   };
 }
 
+export function dbToInterviewCandidate(r: any): InterviewCandidate {
+  return {
+    id: r.id,
+    candidateName: r.candidate_name,
+    phone: r.phone || undefined,
+    email: r.email || undefined,
+    appliedRole: r.applied_role,
+    department: r.department || undefined,
+    stage: r.stage,
+    scheduledDate: r.scheduled_date,
+    scheduledTime: r.scheduled_time || undefined,
+    status: r.status,
+    decision: r.decision || undefined,
+    callbackDate: r.callback_date || undefined,
+    rejectionNote: r.rejection_note || undefined,
+    followUpInterviewId: r.follow_up_interview_id || undefined,
+    scoresheet: r.scoresheet || undefined,
+    scoresheets: r.scoresheets || [],
+    cvQualifications: r.cv_qualifications || [],
+    cvWorkExperience: r.cv_work_experience || [],
+    invitedBy: r.invited_by,
+    source: r.source || undefined,
+    remarks: r.remarks || undefined,
+    onboardingEmployeeId: r.onboarding_employee_id || undefined,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at || undefined,
+  };
+}
+
+function interviewCandidateToDb(c: InterviewCandidate) {
+  return {
+    id: c.id,
+    workspace_id: getWS(),
+    candidate_name: c.candidateName,
+    phone: c.phone || null,
+    email: c.email || null,
+    applied_role: c.appliedRole,
+    department: c.department || null,
+    stage: c.stage,
+    scheduled_date: c.scheduledDate,
+    scheduled_time: c.scheduledTime || null,
+    status: c.status,
+    decision: c.decision || null,
+    callback_date: c.callbackDate || null,
+    rejection_note: c.rejectionNote || null,
+    follow_up_interview_id: c.followUpInterviewId || null,
+    scoresheet: c.scoresheet || null,
+    scoresheets: c.scoresheets || [],
+    cv_qualifications: c.cvQualifications || [],
+    cv_work_experience: c.cvWorkExperience || [],
+    invited_by: c.invitedBy,
+    source: (c as any).source || null,
+    remarks: (c as any).remarks || null,
+    onboarding_employee_id: c.onboardingEmployeeId || null,
+    created_at: c.createdAt,
+    updated_at: c.updatedAt || null,
+  };
+}
+
 export function dailyJournalToDb(j: DailyJournal): any {
   return {
     id: j.id,
@@ -543,6 +604,7 @@ function paymentToDb(p: Payment) {
     amount: p.amount, withholding_tax: p.withholdingTax,
     discount: p.discount, pay_vat: p.payVat,
     vat: p.vat, amount_for_vat: p.amountForVat,
+    damages: p.damages || 0,
   };
 }
 
@@ -789,6 +851,7 @@ export async function fetchAllAppData(privs?: any) {
     vehicleDocTypesRes,
     dailyJournalsRes,
     siteJournalEntriesRes,
+    interviewRes,
   ] = await Promise.all([
     supabase.from('sites').select('*').order('created_at'),
     supabase.from('clients').select('*').order('name'),
@@ -823,6 +886,7 @@ export async function fetchAllAppData(privs?: any) {
     supabase.from('vehicle_document_types').select('*').order('name'),
     supabase.from('daily_journals').select('*').order('date', { ascending: false }),
     supabase.from('site_journal_entries').select('*'),
+    supabase.from('interview_candidates').select('*').order('created_at', { ascending: false }),
   ]);
 
   const settings = settingsRes.data;
@@ -863,6 +927,7 @@ export async function fetchAllAppData(privs?: any) {
     vehicleDocumentTypes: (vehicleDocTypesRes.data || []).map(dbToVehicleDocumentType),
     dailyJournals: (dailyJournalsRes.data || []).map(dbToDailyJournal),
     siteJournalEntries: (siteJournalEntriesRes?.data || []).map(dbToSiteJournalEntry),
+    interviewCandidates: ((interviewRes as any)?.data || []).map(dbToInterviewCandidate),
     positions: (positionsRes.data || []).map((p: any) => ({
       id: p.id,
       title: p.title || p.name,
@@ -1290,6 +1355,7 @@ export const db = {
     if (p.amount !== undefined) update.amount = p.amount;
     if (p.withholdingTax !== undefined) update.withholding_tax = p.withholdingTax;
     if (p.discount !== undefined) update.discount = p.discount;
+    if (p.damages !== undefined) update.damages = p.damages;
     if (p.payVat !== undefined) update.pay_vat = p.payVat;
     if (p.vat !== undefined) update.vat = p.vat;
     if (p.amountForVat !== undefined) update.amount_for_vat = p.amountForVat;
@@ -1922,5 +1988,37 @@ export const db = {
   async deleteSiteJournalEntry(id: string) {
     const { error } = await supabase.from('site_journal_entries').delete().eq('id', id);
     if (error) { console.error('deleteSiteJournalEntry:', error); throw error; }
-  }
+  },
+
+  // Interview Candidates
+  async insertInterviewCandidate(c: InterviewCandidate) {
+    const { error } = await supabase.from('interview_candidates').upsert(interviewCandidateToDb(c), { onConflict: 'id' });
+    if (error) { console.error('insertInterviewCandidate:', error); throw error; }
+  },
+  async updateInterviewCandidate(id: string, updates: Partial<InterviewCandidate>) {
+    const patch: any = { updated_at: new Date().toISOString() };
+    if (updates.candidateName !== undefined) patch.candidate_name = updates.candidateName;
+    if (updates.phone !== undefined) patch.phone = updates.phone || null;
+    if (updates.email !== undefined) patch.email = updates.email || null;
+    if (updates.appliedRole !== undefined) patch.applied_role = updates.appliedRole;
+    if (updates.department !== undefined) patch.department = updates.department || null;
+    if (updates.stage !== undefined) patch.stage = updates.stage;
+    if (updates.scheduledDate !== undefined) patch.scheduled_date = updates.scheduledDate;
+    if (updates.scheduledTime !== undefined) patch.scheduled_time = updates.scheduledTime || null;
+    if (updates.status !== undefined) patch.status = updates.status;
+    if (updates.decision !== undefined) patch.decision = updates.decision || null;
+    if (updates.callbackDate !== undefined) patch.callback_date = updates.callbackDate || null;
+    if (updates.rejectionNote !== undefined) patch.rejection_note = updates.rejectionNote || null;
+    if (updates.scoresheet !== undefined) patch.scoresheet = updates.scoresheet || null;
+    if (updates.scoresheets !== undefined) patch.scoresheets = updates.scoresheets || [];
+    if (updates.cvQualifications !== undefined) patch.cv_qualifications = updates.cvQualifications || [];
+    if (updates.cvWorkExperience !== undefined) patch.cv_work_experience = updates.cvWorkExperience || [];
+    if (updates.onboardingEmployeeId !== undefined) patch.onboarding_employee_id = updates.onboardingEmployeeId || null;
+    const { error } = await supabase.from('interview_candidates').update(patch).eq('id', id);
+    if (error) { console.error('updateInterviewCandidate:', error); throw error; }
+  },
+  async deleteInterviewCandidate(id: string) {
+    const { error } = await supabase.from('interview_candidates').delete().eq('id', id);
+    if (error) { console.error('deleteInterviewCandidate:', error); throw error; }
+  },
 };

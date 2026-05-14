@@ -3,7 +3,7 @@ import { useAppStore, DEFAULT_OFFBOARDING_TASKS, DEFAULT_LEAVE_TYPES } from '@/s
 import { useUserStore, NO_ACCESS, UserPrivileges } from '@/src/store/userStore';
 import { fetchAllAppData, fetchAllUsers, fetchPresets, db } from '@/src/lib/supabaseService';
 import { supabase } from '@/src/integrations/supabase/client';
-import { dbToSite, dbToEmployee, dbToAttendance, dbToInvoice, dbToPendingInvoice, dbToSalaryAdvance, dbToLoan, dbToPayment, dbToVatPayment, dbToLeave, dbToProfile, dbToDisciplinary, dbToEvaluation, dbToCommLog, dbToCompanyExpense, dbToPendingSite, dbToLedgerEntry, dbToClientProfile, dbToDailyJournal, dbToSiteJournalEntry, dbToVehicle, dbToVehicleMovement, dbToVehicleDocumentType } from '@/src/lib/supabaseService';
+import { dbToSite, dbToEmployee, dbToAttendance, dbToInvoice, dbToPendingInvoice, dbToSalaryAdvance, dbToLoan, dbToPayment, dbToVatPayment, dbToLeave, dbToProfile, dbToDisciplinary, dbToEvaluation, dbToCommLog, dbToCompanyExpense, dbToPendingSite, dbToLedgerEntry, dbToClientProfile, dbToDailyJournal, dbToSiteJournalEntry, dbToVehicle, dbToVehicleMovement, dbToVehicleDocumentType, dbToInterviewCandidate } from '@/src/lib/supabaseService';
 import { generateId } from '@/src/lib/utils';
 import { cacheSet, cacheGet } from '@/src/lib/offlineCache';
 import { useNetworkStore } from '@/src/store/networkStore';
@@ -173,6 +173,7 @@ export function useDataLoader(isAuthenticated: boolean) {
           vehicles: appData.vehicles || [],
           vehicleTrips: appData.vehicleTrips || [],
           vehicleDocumentTypes: appData.vehicleDocumentTypes || [],
+          interviewCandidates: appData.interviewCandidates || [],
           ...(appData.payrollVariables ? { payrollVariables: appData.payrollVariables as any } : {}),
           ...(appData.payeTaxVariables ? { payeTaxVariables: appData.payeTaxVariables as any } : {}),
           ...(appData.monthValues && Object.keys(appData.monthValues as any).length > 0 ? { monthValues: appData.monthValues as any } : {}),
@@ -719,6 +720,20 @@ export function useRealtimeData(isAuthenticated: boolean) {
                 useAppStore.setState({ vehicleDocumentTypes: current.map(t => t.id === updated.id ? updated : t) });
               } else if (eventType === 'DELETE') {
                 useAppStore.setState({ vehicleDocumentTypes: current.filter(t => t.id !== oldRow.id) });
+              }
+              break;
+            }
+            case 'interview_candidates': {
+              const current = appState.interviewCandidates;
+              if (eventType === 'INSERT') {
+                if (!current.some(c => c.id === newRow.id)) {
+                  useAppStore.setState({ interviewCandidates: [dbToInterviewCandidate(newRow), ...current] });
+                }
+              } else if (eventType === 'UPDATE') {
+                const updated = dbToInterviewCandidate(newRow);
+                useAppStore.setState({ interviewCandidates: current.map(c => c.id === updated.id ? updated : c) });
+              } else if (eventType === 'DELETE') {
+                useAppStore.setState({ interviewCandidates: current.filter(c => c.id !== oldRow.id) });
               }
               break;
             }

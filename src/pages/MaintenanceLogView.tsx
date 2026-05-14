@@ -368,28 +368,7 @@ export function MaintenanceLogView({ asset, onBack, onLogService }: MaintenanceL
                       )}
                     </div>
 
-                    {currentUser?.privileges?.operations?.canDeleteLogs && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-900/20"
-                        onClick={async () => {
-                          if (!window.confirm('Are you sure you want to delete this operational log?')) return;
-                          try {
-                            if (asset.category === 'machine') {
-                              await deleteDailyLog(log.id);
-                            } else {
-                              await deleteVehicleTripRecord(log.id);
-                            }
-                            toast.success('Log deleted successfully');
-                          } catch (err) {
-                            toast.error('Failed to delete log');
-                          }
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    )}
+
                   </div>
                 </div>
               ))}

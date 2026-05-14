@@ -6,6 +6,7 @@ import { useUserStore, UserPrivileges } from '@/src/store/userStore';
 import { useAppStore } from '@/src/store/appStore';
 import { useTheme } from '@/src/hooks/useTheme';
 import { toast, showConfirm } from '@/src/components/ui/toast';
+import { supabase } from '@/src/integrations/supabase/client';
 import logoSrc from '../../../logo/logo-2.png';
 import {
   LayoutDashboard,
@@ -191,20 +192,33 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
   const isElectron = !!(window as any).electronAPI?.isElectron;
 
   // ── Android Auto-Update Logic (mobile-only) ────────────────────────────
-  const CURRENT_VERSION = '1.5.1'; // Matches package.json
+  const CURRENT_VERSION = '1.5.2'; // Matches package.json
   const UPDATE_SERVER_URL = import.meta.env.VITE_UPDATE_SERVER_URL || 'https://dewaterconstruct.com/app-updates';
   
   const [updateInfo, setUpdateInfo] = useState<{ version: string; url: string; notes: string } | null>(null);
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
 
-  const startDownload = (url: string) => {
+  const startDownload = async (url: string) => {
     try {
       setIsDownloading(true);
-      // Hand off to Android's native Download Manager via the '_system' target.
-      // This bypasses WebView CORS entirely — the native downloader has no origin restrictions.
-      // Download progress is tracked in the Android notification bar.
-      window.open(url, '_system');
+      let finalUrl = url;
+      
+      // If the URL looks like a filename (not a full HTTP link), we assume it's in our private Supabase bucket
+      if (!url.startsWith('http')) {
+        const { data, error } = await supabase.storage
+          .from('app-updates')
+          .createSignedUrl(url, 60); // Link expires in 60 seconds
+          
+        if (error) throw error;
+        if (data?.signedUrl) {
+          finalUrl = data.signedUrl;
+        }
+      }
+
+      // Trigger direct download without opening the Android external file browser
+      // Using the short-lived signed URL protects the private APK from the public web
+      window.location.href = finalUrl;
       setIsUpdateModalOpen(false);
       toast.success('Download started! Track progress in your notification bar, then tap the APK to install.');
     } catch (err: any) {
@@ -231,7 +245,19 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
         if (response.status !== 200) return;
         const data = response.data;
 
-        if (data.version && data.version !== CURRENT_VERSION) {
+        const normalizeVersion = (v: string) => v.replace(/^v/i, '').trim();
+        const cParts = normalizeVersion(CURRENT_VERSION).split('.').map(Number);
+        const rParts = normalizeVersion(data.version).split('.').map(Number);
+        
+        let isNewer = false;
+        for (let i = 0; i < Math.max(cParts.length, rParts.length); i++) {
+          const c = cParts[i] || 0;
+          const r = rParts[i] || 0;
+          if (r > c) { isNewer = true; break; }
+          if (r < c) { isNewer = false; break; }
+        }
+
+        if (data.version && isNewer) {
           setUpdateInfo(data);
         }
       } catch (err) {

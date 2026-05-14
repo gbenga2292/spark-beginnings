@@ -3,8 +3,8 @@ import { useAppStore, DailyJournal as DailyJournalType, SiteJournalEntry } from 
 import { useUserStore } from '@/src/store/userStore';
 import { useTheme } from '@/src/hooks/useTheme';
 import { cn } from '@/src/lib/utils';
-import { ArrowLeft, MapPin, Edit, Trash2, BookOpen, Plus, FileText, Image as ImageIcon, FileVideo, Play } from 'lucide-react';
-import { format, isSameDay } from 'date-fns';
+import { ArrowLeft, MapPin, Edit, Trash2, BookOpen, Plus, FileText, Image as ImageIcon, FileVideo, Play, ChevronLeft, ChevronRight } from 'lucide-react';
+import { format, isSameDay, addDays, subDays } from 'date-fns';
 import { useOperations } from '../contexts/OperationsContext';
 import { MediaViewer, type MediaItem } from '@/src/components/ui/MediaViewer';
 
@@ -94,10 +94,12 @@ interface DiaryDetailViewProps {
   onDeleteJournal: (id: string) => void;
   onDeleteEntry: (id: string) => void;
   onExportPdf: (date: string) => void;
+  onDateChange?: (date: string) => void;
+  onEditMachineLog?: (machine: {id: string, name: string}, siteId: string, siteName: string) => void;
 }
 
 export function DiaryDetailView({
-  date, onBack, onAddSession, onEditJournal, onDeleteJournal, onDeleteEntry, onExportPdf,
+  date, onBack, onAddSession, onEditJournal, onDeleteJournal, onDeleteEntry, onExportPdf, onDateChange, onEditMachineLog
 }: DiaryDetailViewProps) {
   const { isDark } = useTheme();
   const currentUser = useUserStore(s => s.getCurrentUser());
@@ -105,9 +107,41 @@ export function DiaryDetailView({
   const { dailyMachineLogs } = useOperations();
 
   const diaryDate = new Date(date + 'T00:00:00');
-  const journals = dailyJournals.filter(j => j.date === date)
+  const baseJournals = dailyJournals.filter(j => j.date === date)
     .sort((a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime());
-  const allEntries = siteJournalEntries.filter(e => journals.some(j => j.id === e.journalId));
+  const baseEntries = siteJournalEntries.filter(e => baseJournals.some(j => j.id === e.journalId));
+  
+  // Dynamically include standalone machine logs as entries
+  const machineLogs = dailyMachineLogs.filter(l => l.date === date);
+  const entrySiteIds = new Set(baseEntries.map(e => e.siteId));
+  const standaloneMachineSites = Array.from(new Set(machineLogs.map(l => l.siteId))).filter(id => !entrySiteIds.has(id));
+  
+  const journals = [...baseJournals];
+  const allEntries = [...baseEntries];
+  
+  if (standaloneMachineSites.length > 0) {
+    const systemSessionId = 'system-machine-session';
+    journals.push({
+      id: systemSessionId,
+      date: date,
+      loggedBy: machineLogs[0]?.loggedBy || 'System Auto-Log',
+      createdAt: machineLogs[0]?.created_at || new Date().toISOString()
+    } as any);
+    
+    standaloneMachineSites.forEach(siteId => {
+      const logsForSite = machineLogs.filter(l => l.siteId === siteId);
+      allEntries.push({
+        id: `standalone-${siteId}`,
+        journalId: systemSessionId,
+        siteId: siteId,
+        siteName: logsForSite[0]?.siteName || 'Unknown Site',
+        clientName: 'Site Operation',
+        narration: '',
+        loggedBy: logsForSite[0]?.loggedBy || 'System Auto-Log'
+      } as any);
+    });
+  }
+
   const uniqueSites = [...new Set(allEntries.map(e => `${e.siteName}|${e.clientName}`))].map(str => {
     const [site, client] = str.split('|');
     return { site, client };
@@ -121,6 +155,24 @@ export function DiaryDetailView({
         <button onClick={onBack} className="flex items-center gap-2 text-sm text-slate-500 hover:text-indigo-600 font-semibold transition-colors">
           <ArrowLeft className="h-4 w-4" /> Back to Calendar
         </button>
+        {onDateChange && (
+          <div className="flex items-center gap-1.5 ml-auto">
+            <button 
+              onClick={() => onDateChange(format(subDays(diaryDate, 1), 'yyyy-MM-dd'))} 
+              className="flex items-center justify-center h-8 w-8 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 hover:text-indigo-600 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors shadow-sm"
+              title="Previous Date"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <button 
+              onClick={() => onDateChange(format(addDays(diaryDate, 1), 'yyyy-MM-dd'))} 
+              className="flex items-center justify-center h-8 w-8 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 hover:text-indigo-600 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors shadow-sm"
+              title="Next Date"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Diary card */}
@@ -175,8 +227,9 @@ export function DiaryDetailView({
             <div className="space-y-6">
               {journals.map((journal, ji) => {
                 const jEntries = allEntries.filter(e => e.journalId === journal.id);
+                const isSystemSession = journal.id === 'system-machine-session';
                 const isAuthor = journal.loggedBy === currentUser?.name;
-                const canEdit = isAuthor;
+                const canEdit = isAuthor && !isSystemSession;
                 return (
                   <div key={journal.id} className="relative">
                     {/* Session header */}
@@ -211,7 +264,7 @@ export function DiaryDetailView({
                     <div className="ml-3 sm:ml-12 pl-6 sm:pl-0 border-l-2 border-slate-100 dark:border-slate-800 sm:border-0 space-y-3">
                       {jEntries.map(entry => {
                         const isEntryAuthor = (entry.loggedBy || journal.loggedBy) === currentUser?.name;
-                        const canDel = isEntryAuthor;
+                        const canDel = isEntryAuthor && !isSystemSession;
                         return (
                           <div key={entry.id} className={cn(
                             'rounded-xl p-4 group relative overflow-hidden',
@@ -244,14 +297,29 @@ export function DiaryDetailView({
                                     <div className="mt-3 bg-slate-100/50 dark:bg-slate-900/50 rounded-lg p-3 border border-slate-200/50 dark:border-slate-700/50">
                                       <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Machine Log Narrative</p>
                                       <ul className="space-y-1.5 list-none">
-                                        {machineLogs.map(ml => (
-                                          <li key={ml.id} className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed relative pl-4">
-                                            <div className={cn("absolute left-0 top-2 h-1.5 w-1.5 rounded-full", ml.isActive ? "bg-emerald-500" : "bg-rose-500")} />
-                                            <span className="font-semibold text-slate-800 dark:text-slate-200">{ml.assetName}</span> is {ml.isActive ? 'operational' : 'inactive'}
-                                            {ml.isActive && ml.dieselUsage > 0 ? ` and ${ml.dieselUsage}L of diesel was filled on it` : ''}.
-                                            {ml.issuesOnSite ? ` Note: ${ml.issuesOnSite}` : ''}
-                                          </li>
-                                        ))}
+                                        {machineLogs.map(ml => {
+                                          const opLabel = ml.operationalDay === 'full' ? 'Full Day' : ml.operationalDay === 'half' ? 'Half Day' : ml.operationalDay === 'none' ? 'Not Operational' : (ml.isActive ? 'Full Day' : 'Not Operational');
+                                          return (
+                                            <li key={ml.id} className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed relative pl-4 pb-1 group flex items-start justify-between">
+                                              <div>
+                                                <div className={cn("absolute left-0 top-2 h-1.5 w-1.5 rounded-full", ml.isActive ? "bg-emerald-500" : "bg-rose-500")} />
+                                                <span className="font-semibold text-slate-800 dark:text-slate-200">{ml.assetName}</span>
+                                                {` - ${opLabel}`}
+                                                {ml.dieselUsage > 0 ? ` • Diesel: ${ml.dieselUsage}L` : ''}
+                                                {ml.supervisorOnSite ? ` • Supervisor: ${ml.supervisorOnSite}` : ''}
+                                                {ml.issuesOnSite ? ` • Notes: ${ml.issuesOnSite}` : ''}
+                                                {ml.maintenanceDetails ? ` • Maintenance: ${ml.maintenanceDetails}` : ''}
+                                              </div>
+                                              {onEditMachineLog && (
+                                                <button onClick={() => onEditMachineLog({id: ml.assetId, name: ml.assetName}, ml.siteId, ml.siteName)} 
+                                                  className="sm:opacity-0 sm:group-hover:opacity-100 p-1.5 rounded-md hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all ml-2 flex-shrink-0"
+                                                  title="Edit Machine Log">
+                                                  <Edit className="h-3.5 w-3.5" />
+                                                </button>
+                                              )}
+                                            </li>
+                                          );
+                                        })}
                                       </ul>
                                     </div>
                                   );

@@ -3,7 +3,7 @@ import { useAppStore } from '@/src/store/appStore';
 import { useUserStore } from '@/src/store/userStore';
 import { useTheme } from '@/src/hooks/useTheme';
 import { cn } from '@/src/lib/utils';
-import { toast } from '@/src/components/ui/toast';
+import { toast, showConfirm } from '@/src/components/ui/toast';
 import { Button } from '@/src/components/ui/button';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -17,7 +17,15 @@ import type {
 } from '@/src/types/interviews';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 
-const uid = () => crypto.randomUUID();
+const uid = () => {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+};
 const today = () => new Date().toISOString().split('T')[0];
 const fmt = (d?: string) => d ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '-';
 
@@ -47,8 +55,8 @@ const emptySheet = (candidate?: InterviewCandidate): InterviewScoresheet => ({
   applicantName: candidate?.candidateName || '',
   jobTitle: candidate?.appliedRole || '',
   stage: candidate?.stage || 'Preliminary',
-  qualifications: [{ dates: '', institution: '', qualification: '' }],
-  workExperience: [{ date: '', organisation: '', jobTitle: '' }],
+  qualifications: candidate?.cvQualifications?.length ? candidate.cvQualifications : [{ dates: '', institution: '', qualification: '' }],
+  workExperience: candidate?.cvWorkExperience?.length ? candidate.cvWorkExperience : [{ date: '', organisation: '', jobTitle: '' }],
   keyAttributes: {},
   presentSalary: '',
   askingSalary: '',
@@ -62,65 +70,192 @@ const emptySheet = (candidate?: InterviewCandidate): InterviewScoresheet => ({
   interviewDate: today(),
 });
 
+const extractPdfText = async (file: File) => {
+  const { pdfjs } = await import('react-pdf');
+  pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+  const arrayBuffer = await file.arrayBuffer();
+  const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
+  let text = '';
+  const maxPages = Math.min(pdf.numPages, 5);
+  for (let i = 1; i <= maxPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    text += content.items.map((s: any) => s.str).join(' ') + '\n';
+  }
+  return text;
+};
+
+const extractResumeData = async (file: File) => {
+  let apiKey = import.meta.env.VITE_GROQ_API_KEY || localStorage.getItem('GROQ_API_KEY');
+  if (!apiKey) {
+    apiKey = window.prompt('Please enter your Groq API Key to use the AI OCR feature (or add VITE_GROQ_API_KEY to your .env file):');
+    if (!apiKey) {
+      throw new Error('API Key is required for AI OCR');
+    }
+    localStorage.setItem('GROQ_API_KEY', apiKey);
+  }
+
+  const basePrompt = `Extract the following information from this resume/CV:
+1. Candidate Name (candidateName)
+2. Phone Number (phone)
+3. Email Address (email)
+4. Qualifications/Education Background (qualifications) - array of { dates, institution, qualification }
+5. Professional/Work Experience (workExperience) - array of { date, organisation, jobTitle }
+
+Return ONLY a valid JSON object matching this structure without any markdown formatting:
+{
+  "candidateName": "",
+  "phone": "",
+  "email": "",
+  "qualifications": [{ "dates": "", "institution": "", "qualification": "" }],
+  "workExperience": [{ "date": "", "organisation": "", "jobTitle": "" }]
+}`;
+
+  let requestBody: any;
+
+  if (file.type.startsWith('image/')) {
+    const base64 = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve((reader.result as string).split(',')[1]);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+    
+    requestBody = {
+      model: 'llama-3.2-11b-vision-preview',
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'text', text: basePrompt },
+          { type: 'image_url', image_url: { url: `data:${file.type};base64,${base64}` } }
+        ]
+      }],
+      temperature: 0
+    };
+  } else {
+    let textContent = '';
+    if (file.type === 'application/pdf') {
+      try {
+        textContent = await extractPdfText(file);
+      } catch (e) {
+        console.error('PDF extraction failed', e);
+        throw new Error('Could not read PDF text. Try saving as an image or use a text-based PDF.');
+      }
+    } else {
+      textContent = await file.text();
+    }
+
+    requestBody = {
+      model: 'llama-3.1-8b-instant',
+      messages: [{ role: 'user', content: `${basePrompt}\n\nResume Text:\n${textContent.substring(0, 10000)}` }],
+      temperature: 0,
+      response_format: { type: 'json_object' }
+    };
+  }
+
+  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(requestBody)
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error?.message || 'Failed to call Groq API');
+  }
+
+  const data = await res.json();
+  let jsonString = data.choices[0].message.content;
+  // Fallback to extract json block if model wraps it in markdown
+  const match = jsonString.match(/\{[\s\S]*\}/);
+  if (match) {
+    jsonString = match[0];
+  }
+  return JSON.parse(jsonString);
+};
+
 /* ── InviteDialog ─────────────────────────────────────────────────────── */
 function InviteDialog({ open, onClose, currentUser }: { open: boolean; onClose: () => void; currentUser: any }) {
-  const { addInterviewCandidate, positions, departments } = useAppStore();
+  const { addInterviewCandidate, interviewCandidates, positions, departments } = useAppStore();
   const { isDark } = useTheme();
   const [f, setF] = useState({ 
     candidateName:'', phone:'', email:'', appliedRole:'', department:'', 
     stage:'Preliminary' as InterviewStage, scheduledDate: today(), scheduledTime:'',
     source: '', remarks: '' 
   });
+  const [cvQualifications, setCvQualifications] = useState<{dates:string;institution:string;qualification:string}[]>([]);
+  const [cvWorkExperience, setCvWorkExperience] = useState<{date:string;organisation:string;jobTitle:string}[]>([]);
   const [isOcrLoading, setIsOcrLoading] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const inp = cn('w-full border rounded-xl px-3 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent', isDark ? 'bg-slate-900 border-slate-700 text-white placeholder:text-slate-600' : 'bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400');
   const lbl = 'block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 ml-1';
 
-  const runInviteOcr = (file?: File) => {
+  const runInviteOcr = async (file?: File) => {
+    if (!file) return;
     setIsOcrLoading(true);
-    setTimeout(() => {
-      let extractedName = 'Adewale Okafor';
-      if (file) {
-        const namePart = file.name.split('.')[0].replace(/[-_]/g, ' ').replace(/cv|resume|v\d+/gi, '').trim();
-        if (namePart && namePart.length > 2) {
-          extractedName = namePart.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
-        }
-      }
-
-      // High-fidelity mock extraction with realistic variations
-      const nameKey = extractedName.toLowerCase().replace(/\s+/g, '.');
-      const providers = ['spark-global.com', 'outlook.com', 'icloud.com', 'gmail.com'];
-      const randomDomain = providers[Math.floor(Math.random() * providers.length)];
-      
-      // Generate a structured phone number
-      const prefix = ['080', '070', '081', '090'][Math.floor(Math.random() * 4)];
-      const phoneSuffix = Math.floor(10000000 + Math.random() * 90000000).toString().slice(-8);
-      const phone = `${prefix}${phoneSuffix}`;
-
+    try {
+      const data = await extractResumeData(file);
       setF(p => ({
         ...p,
-        candidateName: extractedName,
-        phone: phone,
-        email: `${nameKey}@${randomDomain}`,
+        candidateName: data.candidateName || p.candidateName,
+        phone: data.phone || p.phone,
+        email: data.email || p.email,
       }));
+      if (data.qualifications?.length) setCvQualifications(data.qualifications);
+      if (data.workExperience?.length) setCvWorkExperience(data.workExperience);
+      const quals = data.qualifications?.length || 0;
+      const exp = data.workExperience?.length || 0;
+      toast.success(`AI Intelligence: Extracted details for "${data.candidateName || file.name}" — ${quals} qualifications, ${exp} work records. These will auto-populate the Assessment History tab.`);
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e.message === 'API Key is required for AI OCR' ? e.message : 'AI OCR Failed: Ensure the file is a PDF or Image, and API Key is valid.');
+    } finally {
       setIsOcrLoading(false);
-      toast.success(`AI Intelligence: Successfully extracted profile for "${extractedName}".`);
-    }, 1500);
+    }
   };
 
   const handleFileClick = () => fileInputRef.current?.click();
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) runInviteOcr(file);
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const submit = () => {
+  const submit = async () => {
     if (!f.candidateName.trim() || !f.appliedRole.trim() || !f.scheduledDate) { toast.error('Name, role and date required'); return; }
-    addInterviewCandidate({ id: uid(), ...f, status:'Invited', invitedBy: currentUser?.name ?? 'HR', createdAt: new Date().toISOString() });
+    
+    const isDuplicate = interviewCandidates.some(c => 
+      c.candidateName.toLowerCase().trim() === f.candidateName.toLowerCase().trim() ||
+      (f.email && c.email?.toLowerCase().trim() === f.email.toLowerCase().trim()) ||
+      (f.phone && c.phone?.trim() === f.phone.trim())
+    );
+
+    if (isDuplicate) {
+      const ok = await showConfirm(`A candidate named "${f.candidateName.trim()}" or with matching contact details already exists. Do you want to proceed and create a duplicate record?`, { confirmLabel: 'Yes, Proceed' });
+      if (!ok) return;
+    }
+
+    addInterviewCandidate({ 
+      id: uid(), ...f, 
+      status:'Invited', 
+      invitedBy: currentUser?.name ?? 'HR', 
+      createdAt: new Date().toISOString(),
+      ...(cvQualifications.length ? { cvQualifications } : {}),
+      ...(cvWorkExperience.length ? { cvWorkExperience } : {}),
+    });
     toast.success('Candidate invited!');
-    onClose();
+    handleClose();
+  };
+
+  const handleClose = () => {
     setF({ candidateName:'', phone:'', email:'', appliedRole:'', department:'', stage:'Preliminary', scheduledDate: today(), scheduledTime:'', source:'', remarks:'' });
+    setCvQualifications([]);
+    setCvWorkExperience([]);
+    onClose();
   };
 
   return (
@@ -144,7 +279,7 @@ function InviteDialog({ open, onClose, currentUser }: { open: boolean; onClose: 
                   <p className="text-[11px] text-muted-foreground">Upload a CV or manually fill the form to invite a candidate.</p>
                 </div>
               </div>
-              <button onClick={onClose} className="p-1.5 rounded-full hover:bg-muted transition-colors flex-shrink-0">
+              <button onClick={handleClose} className="p-1.5 rounded-full hover:bg-muted transition-colors flex-shrink-0">
                 <X className="w-4 h-4 text-muted-foreground" />
               </button>
             </div>
@@ -236,7 +371,7 @@ function InviteDialog({ open, onClose, currentUser }: { open: boolean; onClose: 
             </div>
 
             <div className="flex justify-end gap-3 px-4 sm:px-6 py-4 pb-6 sm:pb-4 border-t border-border bg-muted/30 shrink-0 flex-col sm:flex-row">
-              <Button variant="outline" onClick={onClose} className="w-full sm:w-auto h-auto py-2.5 rounded-xl text-sm font-medium order-2 sm:order-1 border-border">Cancel</Button>
+              <Button variant="outline" onClick={handleClose} className="w-full sm:w-auto h-auto py-2.5 rounded-xl text-sm font-medium order-2 sm:order-1 border-border">Cancel</Button>
               <Button onClick={submit} className="w-full sm:w-auto px-5 h-auto py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors shadow-sm order-1 sm:order-2">
                 Generate Invitation
               </Button>
@@ -269,57 +404,27 @@ function ScoresheetDialog({ open, candidate, onClose, onSave, onForward, current
     }
   }, [candidate, currentUser]);
 
-  const runMockOcr = (file?: File) => {
+  const runMockOcr = async (file?: File) => {
+    if (!file) return;
     setIsOcrLoading(true);
-    let extractedName = candidate?.candidateName || 'Adewale Okafor';
-    if (file) {
-      const namePart = file.name.split('.')[0].replace(/[-_]/g, ' ').replace(/cv|resume|v\d+/gi, '').trim();
-      if (namePart && namePart.length > 2) {
-        extractedName = namePart.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
-      }
-    }
-    setTimeout(() => {
-      const mockDatasets = [
-        {
-          quals: [
-            { dates: '2014-2018', institution: 'University of Ibadan', qualification: 'B.Sc. Mechanical Engineering' },
-            { dates: '2019-2020', institution: 'Project Management Institute', qualification: 'PMP Certification' }
-          ],
-          exp: [
-            { date: '2020-2024', organisation: 'LeadWay Infrastructure', jobTitle: 'Project Manager' },
-            { date: '2018-2020', organisation: 'Tariq Construction', jobTitle: 'Graduate Trainee' }
-          ],
-          present: '₦550,000', ask: '₦750,000', notice: '1 Month', reason: 'Seeking a more structured environment with career progression.'
-        },
-        {
-          quals: [
-            { dates: '2010-2014', institution: 'Covenant University', qualification: 'B.Eng. Electrical Engineering' },
-            { dates: '2021', institution: 'AWS', qualification: 'Cloud Practitioner' }
-          ],
-          exp: [
-            { date: '2015-Present', organisation: 'Energy Solutions Ltd', jobTitle: 'Senior Field Engineer' }
-          ],
-          present: '₦400,000', ask: '₦550,000', notice: '2 Weeks', reason: 'Relocation to Lagos and interest in renewable energy projects.'
-        }
-      ];
-
-      const data = mockDatasets[Math.floor(Math.random() * mockDatasets.length)];
-
+    try {
+      const data = await extractResumeData(file);
       setSheet(p => ({
         ...p,
-        qualifications: data.quals,
-        workExperience: data.exp,
-        presentSalary: data.present,
-        askingSalary: data.ask,
-        noticePeriod: data.notice,
-        reasonForLeaving: data.reason,
-        applicantName: extractedName,
+        applicantName: data.candidateName || p.applicantName,
+        qualifications: data.qualifications?.length ? data.qualifications : p.qualifications,
+        workExperience: data.workExperience?.length ? data.workExperience : p.workExperience,
       }));
-
+      toast.success(`AI Deep Scan: Extracted ${data.qualifications?.length || 0} qualifications and ${data.workExperience?.length || 0} work records.`);
+      if (data.qualifications?.length || data.workExperience?.length) {
+        setActiveTab('quals');
+      }
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e.message === 'API Key is required for AI OCR' ? e.message : 'AI Deep Scan Failed. Please check your API Key and file format.');
+    } finally {
       setIsOcrLoading(false);
-      toast.success(`AI Deep Scan: Extracted ${data.quals.length} qualifications and ${data.exp.length} work records.`);
-      setActiveTab('quals');
-    }, 2000);
+    }
   };
 
   const handleOcrClick = () => fileInputRef.current?.click();
@@ -609,7 +714,7 @@ export default function InterviewManager() {
     'Interview Management',
     'Track candidates, conduct interviews, and manage evaluations.',
     user?.privileges?.interviews?.canAdd && (
-      <Button onClick={() => setShowInvite(true)} className="bg-indigo-600 hover:bg-indigo-700 text-white flex gap-2">
+      <Button onClick={() => setShowInvite(true)} className="hidden sm:flex bg-indigo-600 hover:bg-indigo-700 text-white gap-2">
         <Plus className="h-4 w-4" /> Invite Candidate
       </Button>
     )
@@ -680,6 +785,12 @@ export default function InterviewManager() {
 
   return (
     <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto">
+
+      {user?.privileges?.interviews?.canAdd && (
+        <Button onClick={() => setShowInvite(true)} className="w-full sm:hidden bg-indigo-600 hover:bg-indigo-700 text-white flex gap-2 h-11 text-base rounded-xl shadow-sm">
+          <Plus className="h-5 w-5" /> Invite Candidate
+        </Button>
+      )}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
@@ -769,8 +880,9 @@ export default function InterviewManager() {
                                   </>
                                 )}
                                 {user?.privileges?.interviews?.canDelete && (
-                                  <Button variant="ghost" size="icon" onClick={() => {
-                                    if (confirm('Delete this candidate?')) deleteInterviewCandidate(c.id);
+                                  <Button variant="ghost" size="icon" onClick={async () => {
+                                    const ok = await showConfirm('Delete this candidate?', { variant: 'danger' });
+                                    if (ok) deleteInterviewCandidate(c.id);
                                   }}>
                                     <Trash2 className="h-4 w-4 text-red-500" />
                                   </Button>
@@ -827,8 +939,9 @@ export default function InterviewManager() {
                               </>
                             )}
                             {user?.privileges?.interviews?.canDelete && (
-                              <Button variant="outline" size="sm" className="h-8 px-2 text-red-600 border-red-200 hover:bg-red-50 dark:border-red-800/50 dark:hover:bg-red-900/30" onClick={() => {
-                                if (confirm('Delete this candidate?')) deleteInterviewCandidate(c.id);
+                              <Button variant="outline" size="sm" className="h-8 px-2 text-red-600 border-red-200 hover:bg-red-50 dark:border-red-800/50 dark:hover:bg-red-900/30" onClick={async () => {
+                                const ok = await showConfirm('Delete this candidate?', { variant: 'danger' });
+                                if (ok) deleteInterviewCandidate(c.id);
                               }}>
                                 <Trash2 className="h-4 w-4" />
                               </Button>
@@ -901,8 +1014,9 @@ export default function InterviewManager() {
                           </>
                         )}
                         {user?.privileges?.interviews?.canDelete && (
-                          <Button variant="ghost" size="icon" onClick={() => {
-                            if (confirm('Delete this candidate?')) deleteInterviewCandidate(c.id);
+                          <Button variant="ghost" size="icon" onClick={async () => {
+                            const ok = await showConfirm('Delete this candidate?', { variant: 'danger' });
+                            if (ok) deleteInterviewCandidate(c.id);
                           }}>
                             <Trash2 className="h-4 w-4 text-red-500" />
                           </Button>
@@ -967,8 +1081,9 @@ export default function InterviewManager() {
                       </>
                     )}
                     {user?.privileges?.interviews?.canDelete && (
-                      <Button variant="outline" size="sm" className="h-8 px-2 text-red-600 border-red-200 hover:bg-red-50 dark:border-red-800/50 dark:hover:bg-red-900/30" onClick={() => {
-                        if (confirm('Delete this candidate?')) deleteInterviewCandidate(c.id);
+                      <Button variant="outline" size="sm" className="h-8 px-2 text-red-600 border-red-200 hover:bg-red-50 dark:border-red-800/50 dark:hover:bg-red-900/30" onClick={async () => {
+                        const ok = await showConfirm('Delete this candidate?', { variant: 'danger' });
+                        if (ok) deleteInterviewCandidate(c.id);
                       }}>
                         <Trash2 className="h-4 w-4" />
                       </Button>

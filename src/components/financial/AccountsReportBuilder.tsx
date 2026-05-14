@@ -112,6 +112,7 @@ const TXN_COLUMNS: ColumnDef[] = [
   { id: 'payAmount',    label: 'Amount Paid (Cash)',summable: true,  sources: ['PAYMENT'] },
   { id: 'amountForVAT', label: 'Amount For VAT',   summable: true,  sources: ['PAYMENT'] },
   { id: 'payVat',       label: 'VAT Amount (Pay)', summable: true,  sources: ['PAYMENT'] },
+  { id: 'payDamages',   label: 'Damages',          summable: true,  sources: ['PAYMENT'] },
   { id: 'wht',          label: 'Withholding Tax',  summable: true,  sources: ['PAYMENT'] },
   { id: 'discount',     label: 'Discount',          summable: true,  sources: ['PAYMENT'] },
   { id: 'totalCleared', label: 'Total Value Cleared',summable: true, sources: ['PAYMENT'] },
@@ -212,7 +213,7 @@ const BUILT_IN_PRESETS: ReportPreset[] = [
   {
     id: '__pay', name: 'Payment Report', builtIn: true,
     sources: ['PAYMENT'],
-    columns: ['sn','client','site','date','payAmount','amountForVAT','payVat','wht','discount','totalCleared'],
+    columns: ['sn','client','site','date','payAmount','amountForVAT','payVat','payDamages','wht','discount','totalCleared'],
   },
   {
     id: '__vat', name: 'VAT Report', builtIn: true,
@@ -405,12 +406,13 @@ export function AccountsReportBuilder({
     return s?.phase4?.clientTinNumber || '';
   }, [clientProfiles, pendingSites]);
 
-  const getVatDetails = useCallback((amount: number, payVat: string, rate: number) => {
+  const getVatDetails = useCallback((amount: number, payVat: string, rate: number, damages: number = 0) => {
+    const baseAmount = amount - damages;
     const vat =
-      payVat === 'Add' ? Math.round(((amount * 7.5) / 107.5) * 100) / 100
-      : payVat === 'Yes' ? Math.round(((amount / (100 + rate)) * rate) * 100) / 100
+      payVat === 'Add' ? Math.round(((baseAmount * 7.5) / 107.5) * 100) / 100
+      : payVat === 'Yes' ? Math.round(((baseAmount / (100 + rate)) * rate) * 100) / 100
       : 0;
-    return { vat, amountForVat: payVat !== 'No' ? amount - vat : amount };
+    return { vat, amountForVat: payVat !== 'No' ? baseAmount - vat : baseAmount };
   }, []);
 
   // ── Available clients ────────────────────────────────────────────────────────
@@ -530,7 +532,7 @@ export function AccountsReportBuilder({
             if (!keepByDate(r.date, (r as any).client || '')) return false;
             const pvVal = (r as any).payVat ||
               (sites.find(s => s.name === (r as any).site && s.client === (r as any).client)?.vat as any) || 'No';
-            const { vat } = getVatDetails((r as any).amount || 0, pvVal, vatRate);
+            const { vat } = getVatDetails((r as any).amount || 0, pvVal, vatRate, (r as any).damages || 0);
             return vat > 0; // only payments that carry VAT
           })
           .forEach(r => rows.push({ _source: 'VAT', _raw: { ...r, _isVatLiability: true } }));
@@ -628,7 +630,7 @@ export function AccountsReportBuilder({
           const g = groupedMap.get(client)!;
           if (rec._raw._isVatLiability) {
             const pvVal = rec._raw.payVat || (sites.find(s => s.name === rec._raw.site && s.client === rec._raw.client)?.vat as any) || 'No';
-            const { vat, amountForVat } = getVatDetails(rec._raw.amount || 0, pvVal, vatRate);
+            const { vat, amountForVat } = getVatDetails(rec._raw.amount || 0, pvVal, vatRate, rec._raw.damages || 0);
             g._raw.vatAmtPaid += rec._raw.amount || 0;
             g._raw.vatableAmt += amountForVat;
             g._raw.vatOwed    += vat;
@@ -727,7 +729,7 @@ export function AccountsReportBuilder({
         row.periodCleared += (r.amount || 0) + (r.withholdingTax || 0) + (r.discount || 0);
         
         const pvVal = r.payVat || (sites.find(s => s.name === r.site && s.client === r.client)?.vat as any) || 'No';
-        const { vat } = getVatDetails(r.amount || 0, pvVal, vatRate);
+        const { vat } = getVatDetails(r.amount || 0, pvVal, vatRate, r.damages || 0);
         row.vatOwedFromPayments += vat;
       } else if (rec._source === 'VAT') {
         // Only count actual remittances towards the 'remitted' total.
@@ -737,7 +739,7 @@ export function AccountsReportBuilder({
           row.vatRemitted += r.amount || 0;
         } else if (r._isVatLiability) {
           const pvVal = r.payVat || (sites.find(s => s.name === r.site && s.client === r.client)?.vat as any) || 'No';
-          const { vat } = getVatDetails(r.amount || 0, pvVal, vatRate);
+          const { vat } = getVatDetails(r.amount || 0, pvVal, vatRate, r.damages || 0);
           row.vatOwedFromPayments += vat;
         }
       } else if (rec._source === 'LEDGER') {
@@ -890,15 +892,16 @@ export function AccountsReportBuilder({
       }
     }
 
-    const payOnly = ['payAmount','amountForVAT','payVat','wht','discount','totalCleared'];
+    const payOnly = ['payAmount','amountForVAT','payVat','payDamages','wht','discount','totalCleared'];
     if (payOnly.includes(colId)) {
       if (src !== 'PAYMENT') return '—';
       const pvVal = r.payVat || (sites.find(s => s.name === r.site && s.client === r.client)?.vat as any) || 'No';
-      const { vat, amountForVat } = getVatDetails(r.amount || 0, pvVal, vatRate);
+      const { vat, amountForVat } = getVatDetails(r.amount || 0, pvVal, vatRate, r.damages || 0);
       switch (colId) {
         case 'payAmount':    return r.amount || 0;
         case 'amountForVAT':return amountForVat;
         case 'payVat':       return vat;
+        case 'payDamages':   return r.damages || 0;
         case 'wht':          return r.withholdingTax || 0;
         case 'discount':     return r.discount || 0;
         case 'totalCleared': return (r.amount || 0) + (r.withholdingTax || 0) + (r.discount || 0);
@@ -918,7 +921,7 @@ export function AccountsReportBuilder({
       // Detailed view: Return values based on record type to ensure total sum is correct
       if (r._isVatLiability) {
         const pvVal = r.payVat || (sites.find(s => s.name === r.site && s.client === r.client)?.vat as any) || 'No';
-        const { vat, amountForVat } = getVatDetails(r.amount || 0, pvVal, vatRate);
+        const { vat, amountForVat } = getVatDetails(r.amount || 0, pvVal, vatRate, r.damages || 0);
         const norm = normalizeDate(r.date);
         const payMoIdx = norm ? parseInt(norm.substring(5, 7), 10) - 1 : -1;
         const payYr    = norm ? norm.substring(0, 4) : '';
