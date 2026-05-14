@@ -843,7 +843,7 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
                     <AssignMultiDropdown
                       activeSubtask={activeSubtask}
                       activeMainTask={activeMainTask}
-                      users={users.filter(u => !u.isDeleted && !u.isSuspended)}
+                      users={users.filter(u => u.isActive)}
                       currentUser={currentUser}
                       assignSubtask={assignSubtask}
                       addSubtask={addSubtask}
@@ -1491,7 +1491,7 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
                 Invite the HOD, CEO, or other stakeholders to join the evaluation panel. They will each receive a subtask to record their independent feedback.
               </p>
               <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2">
-                {users.filter(u => !u.isDeleted && !u.isSuspended).map(u => {
+                {users.filter(u => u.isActive).map(u => {
                   const isSelected = panelInvite.panelists.includes(u.id);
                   return (
                     <div 

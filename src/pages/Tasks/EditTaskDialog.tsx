@@ -96,12 +96,12 @@ export function EditTaskDialog({ task, users, onClose, onSave }: EditTaskDialogP
                 {openDropdown && (
                   <>
                     <div className="fixed inset-0 z-[100]" onClick={() => setOpenDropdown(false)} />
-                    <div className="absolute top-full left-0 mt-2 w-full max-h-[220px] overflow-y-auto bg-card border border-border rounded-xl shadow-xl z-[101] py-1 hide-scrollbar">
+                    <div className="absolute top-full left-0 mt-2 w-full max-h-[300px] overflow-y-auto bg-card border border-border rounded-xl shadow-xl z-[101] pt-1 pb-10">
                       <label className="flex items-center gap-2.5 px-3 py-2 cursor-pointer hover:bg-muted transition-colors w-full border-b border-border">
                         <input type="checkbox"
-                          checked={assignedTo.length === users.length && users.length > 0}
+                          checked={assignedTo.length === users.filter(u => u.isActive).length && users.filter(u => u.isActive).length > 0}
                           onChange={(e) => {
-                            if (e.target.checked) setAssignedTo(users.map(u => u.id));
+                            if (e.target.checked) setAssignedTo(users.filter(u => u.isActive).map(u => u.id));
                             else setAssignedTo([]);
                           }}
                           className="w-3.5 h-3.5 rounded border-border text-primary focus:ring-primary/20"
@@ -111,7 +111,7 @@ export function EditTaskDialog({ task, users, onClose, onSave }: EditTaskDialogP
                         </div>
                         <span className="text-xs font-semibold text-foreground truncate">All staff</span>
                       </label>
-                      {users.map(u => (
+                      {users.filter(u => u.isActive).map(u => (
                         <label key={u.id} className="flex items-center gap-2.5 px-3 py-2 cursor-pointer hover:bg-muted transition-colors w-full">
                           <input
                             type="checkbox"
@@ -195,7 +195,7 @@ export function EditTaskDialog({ task, users, onClose, onSave }: EditTaskDialogP
                   className="w-full px-3.5 py-2 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all shadow-sm"
                 >
                   <option value="">Choose an approver...</option>
-                  {users.map(u => (
+                  {users.filter(u => u.isActive).map(u => (
                     <option key={u.id} value={u.id}>{u.name}</option>
                   ))}
                 </select>

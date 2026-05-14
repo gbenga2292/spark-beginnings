@@ -68,7 +68,7 @@ export function SalaryLoans({ setPreviewModal }: { setPreviewModal?: (val: any) 
     const selectedLevel = selectedEmployee?.level ?? 100; 
 
     return users.filter((u: any) => {
-      if (u.isDeleted) return false;
+      if (!u.isActive) return false;
       
       const uEmp = employees.find(e => {
         const uName = u.name?.toLowerCase() || '';

@@ -51,7 +51,7 @@ export function TaskDetailSheet({ subtaskId, onClose }: TaskDetailSheetProps) {
   }, [subtaskId]);
 
   // Make sure we only pass active, non-deleted users to align with the rest of the application
-  const activeUsers = users.filter((u: any) => !u.isDeleted && !u.isSuspended) as AppUser[];
+  const activeUsers = users.filter((u: any) => u.isActive) as AppUser[];
 
   return (
     <Sheet open={!!subtaskId} onOpenChange={(open) => !open && onClose()} modal={false}>

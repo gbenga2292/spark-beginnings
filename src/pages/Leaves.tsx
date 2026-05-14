@@ -42,7 +42,7 @@ export function Leaves() {
   } = useAppStore();
 
   // Approver options — all active system users
-  const approverOptions = users.filter((u: any) => !u.isDeleted);
+  const approverOptions = users.filter((u: any) => u.isActive);
 
   // ─── Permissions ───────────────────────────────────────────
   const priv = usePriv('leaves');

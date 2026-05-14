@@ -15,8 +15,10 @@ export function AssignUserDialog({ currentAssignees, users, onAssign, onClose }:
   const [search, setSearch] = useState('');
 
   const filtered = users.filter(u =>
+    (u.isActive) && (
     u.name.toLowerCase().includes(search.toLowerCase()) ||
     u.email?.toLowerCase().includes(search.toLowerCase())
+    )
   );
 
   const toggle = (uid: string) => {
@@ -76,7 +78,7 @@ export function AssignUserDialog({ currentAssignees, users, onAssign, onClose }:
         </div>
 
         {/* User list */}
-        <div className="overflow-y-auto flex-1 p-2 space-y-0.5">
+        <div className="overflow-y-auto flex-1 p-2 space-y-0.5 pb-12">
           {/* Unassign option */}
           <button
             onClick={() => setSelected(new Set())}

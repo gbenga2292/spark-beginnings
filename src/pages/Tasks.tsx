@@ -353,7 +353,7 @@ function PersonalTasksView() {
 
                   return (
                     <div key={mt.id} id={`task-row-${mt.id}`}
-                      className={`bg-card border rounded-xl overflow-hidden hover:shadow-sm transition-all border-l-4 ${mt.priority ? PRIORITY_CONFIG[mt.priority as TaskPriority].border : 'border-l-indigo-300 dark:border-l-indigo-700'} border-indigo-100 dark:border-indigo-900/30`}>
+                      className={`bg-card border rounded-xl overflow-visible hover:shadow-sm transition-all border-l-4 ${mt.priority ? PRIORITY_CONFIG[mt.priority as TaskPriority].border : 'border-l-indigo-300 dark:border-l-indigo-700'} border-indigo-100 dark:border-indigo-900/30`}>
                       {/* Task header */}
                       <div role="button" tabIndex={0}
                         onClick={() => toggle(mt.id)}
@@ -717,7 +717,7 @@ function AdminTasksView() {
   const employees = useAppStore(state => state.employees);
   const activeEmpIds = new Set(employees.filter(e => e.status === 'Active' || e.status === 'On Leave').map(e => e.id));
 
-  const activeUsers = wsMembers;
+  const activeUsers = wsMembers.filter(u => u.isActive);
   const teamSubtaskIds = new Set(teamTasks.map(mt => mt.id));
   const teamSubtasks = subtasks.filter(s => teamSubtaskIds.has(s.mainTaskId));
   const mySubs = teamSubtasks.filter(s => {
@@ -1052,7 +1052,7 @@ function AdminTasksView() {
                   const isOverdue = isPast(endDate) && pct < 100;
                   const isExpanded = mt ? expanded.has(mt.id) : false;
                   return (
-                    <div key={proj.id} id={`proj-card-${proj.id}`} className="bg-card border border-border rounded-xl flex flex-col overflow-hidden transition-colors hover:shadow-sm">
+                    <div key={proj.id} id={`proj-card-${proj.id}`} className="bg-card border border-border rounded-xl flex flex-col overflow-visible transition-colors hover:shadow-sm">
                       <div
                         onClick={async () => {
                           if (mt) {
@@ -2414,7 +2414,7 @@ function EditSubtaskDialog({ subtask, users, onClose, onSave }: {
         </div>
 
         <form onSubmit={handleSave} className="flex flex-col flex-1 overflow-hidden">
-          <div className="px-6 py-5 space-y-4 overflow-y-auto no-scrollbar">
+          <div className="px-6 pt-5 pb-80 space-y-4 overflow-y-auto">
             <div>
               <label className="block text-xs font-semibold text-foreground uppercase tracking-wide mb-1.5">Title <span className="text-red-400">*</span></label>
               <input required autoFocus value={title} onChange={e => setTitle(e.target.value)}
@@ -2438,18 +2438,18 @@ function EditSubtaskDialog({ subtask, users, onClose, onSave }: {
                   {openSubDrop && (
                     <>
                       <div className="fixed inset-0 z-[100]" onClick={() => setOpenSubDrop(false)} />
-                      <div className="absolute top-full left-0 mt-1 min-w-[200px] w-max max-w-[350px] max-h-[200px] overflow-y-auto bg-card border border-border rounded-lg shadow-xl z-[101] py-1 hide-scrollbar">
+                      <div className="absolute top-full left-0 mt-1 min-w-[200px] w-max max-w-[350px] max-h-[320px] overflow-y-auto bg-card border border-border rounded-lg shadow-xl z-[101] pt-1 pb-12">
                         <label className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted transition-colors border-b border-border">
                           <input type="checkbox"
-                            checked={assignedTo.length === users.length && users.length > 0}
+                            checked={assignedTo.length === users.filter(u => u.isActive).length && users.filter(u => u.isActive).length > 0}
                             onChange={(e) => {
-                              if (e.target.checked) setAssignedTo(users.map(u => u.id));
+                              if (e.target.checked) setAssignedTo(users.filter(u => u.isActive).map(u => u.id));
                               else setAssignedTo([]);
                             }}
                             className="w-3 h-3 rounded text-primary focus:ring-primary/20" />
                           <span className="text-xs font-semibold text-foreground whitespace-normal leading-tight">All staff</span>
                         </label>
-                        {users.map(u => (
+                        {users.filter(u => u.isActive).map(u => (
                           <label key={u.id} className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted transition-colors">
                             <input type="checkbox"
                               checked={assignedTo.includes(u.id)}
@@ -2516,7 +2516,7 @@ function EditSubtaskDialog({ subtask, users, onClose, onSave }: {
                     className="w-full px-3.5 py-2 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all shadow-sm"
                   >
                     <option value="">Choose an approver...</option>
-                    {users.map(u => (
+                    {users.filter(u => u.isActive).map(u => (
                       <option key={u.id} value={u.id}>{u.name}</option>
                     ))}
                   </select>

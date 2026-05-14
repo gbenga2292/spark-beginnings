@@ -201,7 +201,13 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                     const mapped = stRes.data.map(mapSubtaskToCamel);
                     setSubtasks(mapped);
                 }
-                if (pRes.data) setUsers(pRes.data);
+                if (pRes.data) {
+                    const mapped = pRes.data.map((p: any) => ({
+                        ...p,
+                        isActive: p.is_active ?? p.isActive ?? true,
+                    }));
+                    setUsers(mapped);
+                }
                 let loadedProjects: any[] = [];
                 if (mtRes.data) {
                     const genericProjects = mtRes.data
@@ -603,13 +609,27 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
     }, []);
 
     const updateSubtask = useCallback(async (id: string, p: any) => {
-        const payload: any = { ...p };
-        if (p.assignedTo !== undefined) { payload.assignedTo = p.assignedTo; }
-        if (p.mainTaskId !== undefined) { payload.mainTaskId = p.mainTaskId; }
-        if (payload.requiresApproval !== undefined) {
-            payload.requires_approval = payload.requiresApproval;
-            delete payload.requiresApproval;
-        }
+        // Whitelist allowed columns for the subtasks table to prevent 400 errors
+        const allowedColumns = [
+            'title', 'description', 'status', 'assignedTo', 'assigned_to', 
+            'priority', 'deadline', 'main_task_id', 'mainTaskId', 
+            'requires_approval', 'approver_id', 'is_deleted', 'deleted_at', 
+            'completed_at', 'workspaceId'
+        ];
+
+        const payload: any = {};
+        
+        // Map UI properties to DB columns and only include whitelisted fields
+        Object.keys(p).forEach(key => {
+            if (key === 'requiresApproval') {
+                payload.requires_approval = p.requiresApproval;
+            } else if (key === 'approverId') {
+                payload.approver_id = p.approverId;
+            } else if (allowedColumns.includes(key)) {
+                payload[key] = p[key];
+            }
+        });
+
         const { data, error } = await supabase.from('subtasks').update(payload).eq('id', id).select().single();
         if (error) {
             console.error('updateSubtask error:', error);
