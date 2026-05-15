@@ -512,13 +512,25 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
                 </button>
               </div>
 
-              <button
-                onClick={() => navigateSubtask(1)}
-                disabled={activeIndex >= flatSubtasks.length - 1 || activeIndex === -1}
-                className="hidden md:flex relative items-center gap-2 px-6 py-2.5 rounded-xl bg-white text-slate-700 text-sm font-bold shadow-[0_0_0_1px_#e2e8f0,0_3px_0_0_#cbd5e1] hover:bg-slate-50 active:translate-y-[3px] active:shadow-[0_0_0_1px_#e2e8f0,0_0_0_0_#cbd5e1] transition-colors disabled:opacity-40 disabled:active:translate-y-0 disabled:active:shadow-[0_0_0_1px_#e2e8f0,0_3px_0_0_#cbd5e1] disabled:cursor-not-allowed select-none"
-              >
-                Next Task <ArrowRight className="w-4 h-4 text-slate-400" />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => navigateSubtask(1)}
+                  disabled={activeIndex >= flatSubtasks.length - 1 || activeIndex === -1}
+                  className="hidden md:flex relative items-center gap-2 px-6 py-2.5 rounded-xl bg-white text-slate-700 text-sm font-bold shadow-[0_0_0_1px_#e2e8f0,0_3px_0_0_#cbd5e1] hover:bg-slate-50 active:translate-y-[3px] active:shadow-[0_0_0_1px_#e2e8f0,0_0_0_0_#cbd5e1] transition-colors disabled:opacity-40 disabled:active:translate-y-0 disabled:active:shadow-[0_0_0_1px_#e2e8f0,0_3px_0_0_#cbd5e1] disabled:cursor-not-allowed select-none"
+                >
+                  Next Task <ArrowRight className="w-4 h-4 text-slate-400" />
+                </button>
+                <button
+                  onClick={() => {
+                    onSelectSubtask(null);
+                    navigate(-1);
+                  }}
+                  className="md:hidden flex items-center justify-center w-8 h-8 rounded-full bg-slate-200/50 hover:bg-slate-200 text-slate-500 transition-colors"
+                  title="Close Task"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
             {/* Scrollable Content */}
@@ -1660,6 +1672,14 @@ function UpdatesFeed({ subtask, mainTask, users, currentUser, postComment, getSu
   const [text, setText] = useState("");
   const comments = getSubtaskComments(subtask.id);
   const endRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 120)}px`;
+    }
+  }, [text]);
 
   // Mention State
   const [showMention, setShowMention] = useState(false);
@@ -2140,8 +2160,9 @@ function UpdatesFeed({ subtask, mainTask, users, currentUser, postComment, getSu
             )}
 
             <input type="file" ref={fileInputRef} onChange={handleFileSelect} className="hidden" multiple />
-            <div className="flex items-end bg-white dark:bg-[#2a3942] rounded-full px-4 py-2 shadow-sm border border-[#ced4d8] dark:border-[#2a3942]">
+            <div className="flex items-end bg-white dark:bg-[#2a3942] rounded-2xl px-4 py-2 shadow-sm border border-[#ced4d8] dark:border-[#2a3942]">
               <textarea
+                ref={textareaRef}
                 id={`updates-textarea-${subtask.id}`}
                 value={text}
                 onChange={e => {
@@ -2181,7 +2202,7 @@ function UpdatesFeed({ subtask, mainTask, users, currentUser, postComment, getSu
                 placeholder="Type a message"
                 rows={1}
                 style={{ maxHeight: 120, overflowY: 'auto' }}
-                className="flex-1 w-full text-[14px] text-slate-800 dark:text-[#e9edef] bg-transparent resize-none focus:outline-none placeholder:text-slate-400 dark:placeholder:text-[#8696a0] leading-snug"
+                className="flex-1 w-full text-[14px] text-slate-800 dark:text-[#e9edef] bg-transparent resize-none focus:outline-none placeholder:text-slate-400 dark:placeholder:text-[#8696a0] leading-snug py-0.5"
               />
               <div className="flex items-center gap-1 ml-1 flex-shrink-0 pb-px">
                 <button

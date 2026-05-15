@@ -54,6 +54,7 @@ export interface AppUser {
     role: UserRole;
     isSuspended: boolean;
     isDeleted: boolean;
+    isActive: boolean;
     createdAt: string;
     lastLogin?: string;
     avatarColor: string;

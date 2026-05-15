@@ -9,7 +9,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Users, Plus, Search, CheckCircle2, XCircle, PhoneCall, 
   UserPlus, Trash2, Eye, FileText, CalendarDays, Star, 
-  Briefcase, Filter, ArrowRight, ClipboardList, RefreshCw, UserCheck, X
+  Briefcase, Filter, ArrowRight, ClipboardList, RefreshCw, UserCheck, X, ChevronDown, ChevronUp, BarChart2
 } from 'lucide-react';
 import type { 
   InterviewCandidate, InterviewStage, InterviewDecision, 
@@ -85,6 +85,13 @@ const extractPdfText = async (file: File) => {
   return text;
 };
 
+const extractDocxText = async (file: File) => {
+  const mammoth = await import('mammoth/mammoth.browser');
+  const arrayBuffer = await file.arrayBuffer();
+  const result = await mammoth.extractRawText({ arrayBuffer });
+  return result.value;
+};
+
 const extractResumeData = async (file: File) => {
   let apiKey = import.meta.env.VITE_GROQ_API_KEY || localStorage.getItem('GROQ_API_KEY');
   if (!apiKey) {
@@ -141,6 +148,15 @@ Return ONLY a valid JSON object matching this structure without any markdown for
         console.error('PDF extraction failed', e);
         throw new Error('Could not read PDF text. Try saving as an image or use a text-based PDF.');
       }
+    } else if (file.name.toLowerCase().endsWith('.docx') || file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+      try {
+        textContent = await extractDocxText(file);
+      } catch (e) {
+        console.error('DOCX extraction failed', e);
+        throw new Error('Could not read DOCX text. Please convert to PDF or Image.');
+      }
+    } else if (file.name.toLowerCase().endsWith('.doc') || file.type === 'application/msword') {
+      throw new Error('Legacy .doc format is not supported. Please save as .docx or .pdf.');
     } else {
       textContent = await file.text();
     }
@@ -709,6 +725,7 @@ export default function InterviewManager() {
   const [activeCandidate, setActiveCandidate] = useState<InterviewCandidate | null>(null);
   const [showScoresheet, setShowScoresheet] = useState(false);
   const [isGrouped, setIsGrouped] = useState(false);
+  const [showStats, setShowStats] = useState(true);
 
   useSetPageTitle(
     'Interview Management',
@@ -758,10 +775,15 @@ export default function InterviewManager() {
 
     const newEmpId = uid();
     const sheet = finalizedSheet || candidate.scoresheet;
+    
+    const nameParts = candidate.candidateName.trim().split(' ');
+    const firstname = nameParts[0] || 'Unknown';
+    const surname = nameParts.length > 1 ? nameParts.slice(1).join(' ') : 'Unknown';
 
     addEmployee({
       id: newEmpId,
-      name: candidate.candidateName,
+      firstname,
+      surname,
       role: candidate.appliedRole,
       department: candidate.department || 'Unassigned',
       status: 'Onboarding',
@@ -792,19 +814,40 @@ export default function InterviewManager() {
         </Button>
       )}
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          { label: 'Total Candidates', value: stats.total, icon: Users, color: 'text-blue-600 bg-blue-50' },
-          { label: 'Scheduled', value: stats.scheduled, icon: CalendarDays, color: 'text-amber-600 bg-amber-50' },
-          { label: 'Completed', value: stats.completed, icon: CheckCircle2, color: 'text-green-600 bg-green-50' },
-          { label: 'Shortlisted', value: stats.shortlisted, icon: Star, color: 'text-indigo-600 bg-indigo-50' },
-        ].map((s, i) => (
-          <div key={i} className={cn("p-4 rounded-2xl border flex items-center gap-4", isDark ? "bg-slate-800/50 border-slate-700" : "bg-white")}>
-            <div className={cn("p-3 rounded-xl", s.color)}><s.icon className="h-5 w-5" /></div>
-            <div><p className="text-2xl font-bold">{s.value}</p><p className="text-xs text-slate-500">{s.label}</p></div>
-          </div>
-        ))}
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+          <BarChart2 className="w-4 h-4 text-indigo-500" />
+          Overview Statistics
+        </h3>
+        <Button variant="ghost" size="sm" className="h-8 text-xs text-slate-500" onClick={() => setShowStats(!showStats)}>
+          {showStats ? <><ChevronUp className="w-3.5 h-3.5 mr-1" /> Hide</> : <><ChevronDown className="w-3.5 h-3.5 mr-1" /> Show</>}
+        </Button>
       </div>
+
+      <AnimatePresence initial={false}>
+        {showStats && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="overflow-hidden"
+          >
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 pb-2">
+              {[
+                { label: 'Total Candidates', value: stats.total, icon: Users, color: 'text-blue-600 bg-blue-50' },
+                { label: 'Scheduled', value: stats.scheduled, icon: CalendarDays, color: 'text-amber-600 bg-amber-50' },
+                { label: 'Completed', value: stats.completed, icon: CheckCircle2, color: 'text-green-600 bg-green-50' },
+                { label: 'Shortlisted', value: stats.shortlisted, icon: Star, color: 'text-indigo-600 bg-indigo-50' },
+              ].map((s, i) => (
+                <div key={i} className={cn("p-4 rounded-2xl border flex items-center gap-4", isDark ? "bg-slate-800/50 border-slate-700" : "bg-white")}>
+                  <div className={cn("p-3 rounded-xl", s.color)}><s.icon className="h-5 w-5" /></div>
+                  <div><p className="text-2xl font-bold">{s.value}</p><p className="text-xs text-slate-500">{s.label}</p></div>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <div className={cn("rounded-2xl border overflow-hidden", isDark ? "bg-slate-800/50 border-slate-700" : "bg-white shadow-sm")}>
         <div className="p-4 border-b flex flex-col sm:flex-row gap-4 justify-between items-center">

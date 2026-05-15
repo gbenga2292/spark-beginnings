@@ -1829,7 +1829,7 @@ export const db = {
     await supabase.from('leave_types').delete().neq('name', '');
     if (types.length > 0) {
       const { error } = await supabase.from('leave_types').insert(types.map(t => ({
-        ...(t.id ? { id: t.id } : {}),
+        ...(t.id && t.id.length === 36 ? { id: t.id } : {}),
         name: t.name,
         default_days: t.defaultDays || 0,
       })));

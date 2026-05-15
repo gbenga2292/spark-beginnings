@@ -8,7 +8,7 @@ import {
   Clock, FileText, UserPlus, UserMinus, Users, Building, Activity,
   CalendarDays, Check, Search, AlertCircle, Mail, RotateCcw,
   ShieldCheck, CalendarCheck2, FileSignature, GraduationCap, Package,
-  ChevronDown, ChevronUp, Lock, Unlock, Siren, UserCheck, Pencil, PauseCircle, PlayCircle, X, CheckCircle2, Star
+  ChevronDown, ChevronUp, Lock, Unlock, Siren, UserCheck, Pencil, PauseCircle, PlayCircle, X, CheckCircle2, Star, Trash2
 } from 'lucide-react';
 import { useAppStore, Employee, OnboardingTask, OnboardingChecklist, GuarantorInfo } from '@/src/store/appStore';
 import { toast, showConfirm } from '@/src/components/ui/toast';
@@ -225,6 +225,7 @@ function DoneBadge({ done }: { done: boolean }) {
 export function Onboarding() {
   const employees = useAppStore(s => s.employees);
   const updateEmployee = useAppStore(s => s.updateEmployee);
+  const deleteEmployee = useAppStore(s => s.deleteEmployee);
   const departments = useAppStore(s => s.departments);
   const positions = useAppStore(s => s.positions);
   const ledgerBeneficiaryBanks = useAppStore(s => s.ledgerBeneficiaryBanks);
@@ -679,6 +680,18 @@ export function Onboarding() {
     toast.success(`Successfully updated checklists for all ${activeEmployees.length} active staff!`);
   };
 
+  const handleDeleteEmployee = async (emp: Employee, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const ok = await showConfirm(
+      `Are you sure you want to permanently delete ${emp.firstname} ${emp.surname}? This action cannot be undone.`,
+      { variant: 'danger', confirmLabel: 'Delete Employee' }
+    );
+    if (!ok) return;
+    deleteEmployee(emp.id);
+    toast.success(`${emp.firstname} ${emp.surname} has been deleted.`);
+    if (selectedEmployeeId === emp.id) setSelectedEmployeeId(null);
+  };
+
   const toggleOffboardingTask = (taskId: string) => {
     if (!selectedEmployee) return;
     const tasks = (selectedEmployee.offboardingTasks || []).map(t => {
@@ -936,6 +949,15 @@ export function Onboarding() {
                               : <PauseCircle className="h-3.5 w-3.5" />
                             }
                           </button>
+                          {isAdmin && (
+                            <button
+                              className="h-7 w-7 rounded-md flex items-center justify-center text-rose-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                              title="Delete pending hire"
+                              onClick={e => handleDeleteEmployee(emp, e)}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          )}
                         </div>
                       )}
                     </div>

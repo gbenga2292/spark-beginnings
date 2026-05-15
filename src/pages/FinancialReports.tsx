@@ -24,7 +24,6 @@ import * as XLSX from 'xlsx';
 import { usePayrollCalculator } from '@/src/hooks/usePayrollCalculator';
 import { usePriv } from '@/src/hooks/usePriv';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
-import { useHeaderPortalTarget } from '@/src/hooks/useHeaderPortal';
 import { SiteSummary } from './SiteSummary';
 import { AccountsReportBuilder } from '@/src/components/financial/AccountsReportBuilder';
 
@@ -134,23 +133,24 @@ export function FinancialReports() {
     }
   };
 
-  const headerPortalTarget = useHeaderPortalTarget();
-
   const headerActions = (
-    <Button 
-      size="sm" 
-      className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2 font-bold whitespace-nowrap flex shrink-0 border border-indigo-500 shadow-sm px-2 sm:px-4" 
-      onClick={() => setReportBuilderOpen(true)}
-      title="Open Report Builder"
-    >
-      <div className="h-5 w-5 bg-white/20 rounded-full flex items-center justify-center shrink-0"><FileSpreadsheet className="h-3 w-3 text-white" /></div>
-      <span className="hidden sm:inline-block">Open Report Builder</span>
-    </Button>
+    <div className="flex">
+      <Button 
+        size="sm" 
+        className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2 font-bold whitespace-nowrap shrink-0 border border-indigo-500 shadow-sm px-2 sm:px-4" 
+        onClick={() => setReportBuilderOpen(true)}
+        title="Open Report Builder"
+      >
+        <div className="h-5 w-5 bg-white/20 rounded-full flex items-center justify-center shrink-0"><FileSpreadsheet className="h-3 w-3 text-white" /></div>
+        <span>Open Report Builder</span>
+      </Button>
+    </div>
   );
 
   useSetPageTitle(
     tabInfo[mainTab].title,
-    tabInfo[mainTab].subtitle
+    tabInfo[mainTab].subtitle,
+    headerActions
   );
 
   const currentYear = new Date().getFullYear();
@@ -167,7 +167,7 @@ export function FinancialReports() {
 
   const { calculatePayrollForMonth, MONTHS } = usePayrollCalculator();
 
-  const headerPortalNode = headerPortalTarget ? createPortal(headerActions, headerPortalTarget) : null;
+
 
   const hideAmounts = priv.canViewAmounts === false;
   const fm = (n: number) => hideAmounts ? '***' : n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -1370,7 +1370,6 @@ export function FinancialReports() {
 
   return (
     <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
-      {headerPortalNode}
       <AccountsReportBuilder
         open={reportBuilderOpen}
         onOpenChange={setReportBuilderOpen}
