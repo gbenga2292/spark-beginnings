@@ -5,6 +5,7 @@ import { toast } from '@/src/components/ui/toast';
 import logoSrc from '../../logo/logo-2.png';
 import type { MainTask, SubTask, TaskComment, AppUser, CommentAttachment } from '@/src/types/tasks';
 import { useAppStore } from '@/src/store/appStore';
+import { useUserStore } from '@/src/store/userStore';
 import { formatDisplayDate } from '@/src/lib/dateUtils';
 import { useRef } from 'react';
 import { Capacitor } from '@capacitor/core';
@@ -161,7 +162,8 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
     const { user } = useAuth();
     const [mainTasks, setMainTasks] = useState<any[]>([]);
     const [subtasks, setSubtasks] = useState<any[]>([]);
-    const [users, setUsers] = useState<any[]>([]);
+    // Derive users from the global userStore — kept real-time by useRealtimeData in useDataLoader
+    const users = useUserStore(state => state.users);
     const [comments, setComments] = useState<any[]>([]);
     const [projects, setProjects] = useState<any[]>([]);
     const [reminders, setReminders] = useState<any[]>([]);
@@ -175,10 +177,9 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         // ── Initial fetch ─────────────────────────────────────────────────────
         const fetchAll = async () => {
             try {
-                const [mtRes, stRes, pRes, projRes, commRes, remRes] = await Promise.all([
+                const [mtRes, stRes, projRes, commRes, remRes] = await Promise.all([
                     supabase.from('main_tasks').select('*').eq('is_deleted', false),
                     supabase.from('subtasks').select('*').eq('is_deleted', false),
-                    supabase.from('profiles').select('*'),
                     supabase.from('sites').select('*'),
                     supabase.from('task_updates').select('*').order('created_at', { ascending: true }),
                     supabase.from('reminders').select('*'),
@@ -188,7 +189,6 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
 
                 if (mtRes.error && !mtRes.error.message?.includes('AbortError')) console.error('Failed to load main_tasks:', mtRes.error);
                 if (stRes.error && !stRes.error.message?.includes('AbortError')) console.error('Failed to load subtasks:', stRes.error);
-                if (pRes.error && !pRes.error.message?.includes('AbortError')) console.error('Failed to load profiles:', pRes.error);
                 if (projRes.error && !projRes.error.message?.includes('AbortError')) console.error('Failed to load sites:', projRes.error);
                 if (commRes.error && !commRes.error.message?.includes('AbortError')) console.error('Failed to load task_updates:', commRes.error);
                 if (remRes.error && !remRes.error.message?.includes('AbortError')) console.error('Failed to load reminders:', remRes.error);
@@ -200,13 +200,6 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                 if (stRes.data) {
                     const mapped = stRes.data.map(mapSubtaskToCamel);
                     setSubtasks(mapped);
-                }
-                if (pRes.data) {
-                    const mapped = pRes.data.map((p: any) => ({
-                        ...p,
-                        isActive: p.is_active ?? p.isActive ?? true,
-                    }));
-                    setUsers(mapped);
                 }
                 let loadedProjects: any[] = [];
                 if (mtRes.data) {
@@ -301,7 +294,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                 fetchAll();
                 pruneExpiredArchive();
             }
-        }, 150);
+        }, 0);
 
         // ── Real-time subscriptions ───────────────────────────────────────────
         const channel = supabase
@@ -449,10 +442,10 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         const payload = {
             title: task.title,
             description: task.description || null,
-            createdBy: task.createdBy || user?.id,
-            teamId: task.teamId || '',
-            workspaceId: task.workspaceId || task.teamId || '',
-            assignedTo: task.assignedTo || null,
+            created_by: task.createdBy || user?.id,
+            team_id: task.teamId || '',
+            workspace_id: task.workspaceId || task.teamId || '',
+            assigned_to: task.assignedTo || null,
             deadline: task.deadline || null,
             priority: task.priority || null,
             is_project: task.is_project || false,
@@ -492,13 +485,13 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                 const subTasksPayload = targetSubs.map(s => ({
                     title: s.title,
                     description: s.description || null,
-                    assignedTo: s.assignedTo || null,
+                    assigned_to: s.assignedTo || null,
                     status: s.status || 'not_started',
                     deadline: s.deadline || null,
                     priority: s.priority || null,
                     requires_approval: s.requiresApproval || false,
                     approver_id: s.approverId || null,
-                    mainTaskId: data.id,
+                    main_task_id: data.id,
                 }));
                 const { data: insertedSubs, error: subErr } = await supabase.from('subtasks').insert(subTasksPayload).select();
                 if (subErr) {
@@ -530,10 +523,10 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         if (p.description !== undefined)        payload.description = p.description ?? null;
         if (p.deadline !== undefined)           payload.deadline = p.deadline ?? null;
         if (p.priority !== undefined)           payload.priority = p.priority ?? null;
-        if (p.assignedTo !== undefined)         payload.assignedTo = p.assignedTo ?? null;
-        if (p.teamId !== undefined)             payload.teamId = p.teamId;
-        if (p.workspaceId !== undefined)        payload.workspaceId = p.workspaceId;
-        if (p.createdBy !== undefined)          payload.createdBy = p.createdBy;
+        if (p.assignedTo !== undefined)         payload.assigned_to = p.assignedTo ?? null;
+        if (p.teamId !== undefined)             payload.team_id = p.teamId;
+        if (p.workspaceId !== undefined)        payload.workspace_id = p.workspaceId;
+        if (p.createdBy !== undefined)          payload.created_by = p.createdBy;
         if (p.is_deleted !== undefined)         payload.is_deleted = p.is_deleted;
         if (p.is_project !== undefined)         payload.is_project = p.is_project;
         if (p.isProject !== undefined)          payload.is_project = p.isProject;
@@ -589,12 +582,13 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         const payload = {
             title: sub.title,
             description: sub.description || null,
-            assignedTo: sub.assignedTo || null,
-            status: sub.status || 'not_started',
+            assigned_to: sub.assignedTo || null,
+            status: sub.requiresApproval ? 'pending_approval' : (sub.status || 'not_started'),
             deadline: sub.deadline || null,
             priority: sub.priority || null,
             requires_approval: sub.requiresApproval || false,
-            mainTaskId: sub.mainTaskId,
+            approver_id: sub.approverId || null,
+            main_task_id: sub.mainTaskId,
         };
         const { data, error } = await supabase.from('subtasks').insert(payload).select().single();
         if (error) {
@@ -734,7 +728,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
     };
 
     const assignSubtask = useCallback(async (id: string, userId: string) => {
-        const { data, error } = await supabase.from('subtasks').update({ assignedTo: userId }).eq('id', id).select().single();
+        const { data, error } = await supabase.from('subtasks').update({ assigned_to: userId }).eq('id', id).select().single();
         if (error) {
             console.error('assignSubtask error:', error);
             toast.error('Failed to assign subtask.');
@@ -813,7 +807,8 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
 
     const approveSubtask = useCallback(async (id: string, userId?: string, note?: string) => {
         // Update task itself
-        const { data, error } = await supabase.from('subtasks').update({ status: 'completed', approvedBy: userId || user?.id }).eq('id', id).select().single();
+        const now = new Date().toISOString();
+        const { data, error } = await supabase.from('subtasks').update({ status: 'completed', approved_by: userId || user?.id, completed_at: now }).eq('id', id).select().single();
         if (error) {
             console.error('approveSubtask error:', error);
             toast.error('Failed to approve task.');
@@ -992,13 +987,13 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
             // Ignore parse errors (normal task descriptions)
         }
 
-        if (data) setSubtasks(prev => prev.map(s => s.id === id ? data : s));
+        if (data) setSubtasks(prev => prev.map(s => s.id === id ? mapSubtaskToCamel(data) : s));
         toast.success('Approval processed successfully');
     }, [user?.id, mainTasks, users]);
 
     const rejectSubtask = useCallback(async (id: string, _userId?: string, note?: string) => {
         // Update task itself
-        const { data, error } = await supabase.from('subtasks').update({ status: 'in_progress', rejectedAt: new Date().toISOString() }).eq('id', id).select().single();
+        const { data, error } = await supabase.from('subtasks').update({ status: 'in_progress', rejected_at: new Date().toISOString() }).eq('id', id).select().single();
         if (error) {
             console.error('rejectSubtask error:', error);
             toast.error('Failed to reject task.');
@@ -1045,7 +1040,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
             // Ignore parse errors
         }
 
-        if (data) setSubtasks(prev => prev.map(s => s.id === id ? data : s));
+        if (data) setSubtasks(prev => prev.map(s => s.id === id ? mapSubtaskToCamel(data) : s));
         toast.info('Request rejected');
     }, [user?.id, mainTasks, users]);
 

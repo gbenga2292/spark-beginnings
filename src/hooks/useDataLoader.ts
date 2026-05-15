@@ -262,7 +262,7 @@ export function useDataLoader(isAuthenticated: boolean) {
           console.log('[DataLoader] Fell back to cached data');
         } catch {}
       }
-    }, 300); // Small 300ms delay to prevent lock-stealing conflicts with other providers
+    }, 50); // Small delay to prevent lock-stealing conflicts with other providers
 
     return () => clearTimeout(timeoutId);
   }, [isAuthenticated]);
@@ -315,6 +315,11 @@ export function useRealtimeData(isAuthenticated: boolean) {
           const eventType = payload.eventType;
           const newRow = payload.new as Record<string, any>;
           const oldRow = payload.old as Record<string, any>;
+
+          // Task-related tables are exclusively managed by AppDataContext's own
+          // realtime channel ('app-realtime'). Skip them here to avoid double-processing.
+          const TASK_TABLES = ['main_tasks', 'subtasks', 'task_updates', 'reminders'];
+          if (TASK_TABLES.includes(table)) return;
 
           // Helper to get current state safely
           const appState = useAppStore.getState();

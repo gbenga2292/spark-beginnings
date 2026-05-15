@@ -90,9 +90,9 @@ export function FinancialReports() {
   const sitesPriv = usePriv('sites');
   const [ledgerSummaryView, setLedgerSummaryView] = useState<'category' | 'bank' | 'client' | 'site'>('category');
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [fullScreenTable, setFullScreenTable] = useState<'ledger' | 'payroll' | null>(null);
+  const [fullScreenTable, setFullScreenTable] = useState<'ledger' | 'payroll' | 'ledger-breakdown' | null>(null);
 
-  const toggleFullScreen = async (tableName: 'ledger' | 'payroll') => {
+  const toggleFullScreen = async (tableName: 'ledger' | 'payroll' | 'ledger-breakdown') => {
     if (fullScreenTable === tableName) {
       if (document.fullscreenElement) {
         await document.exitFullscreen().catch(console.error);
@@ -176,7 +176,7 @@ export function FinancialReports() {
   // Canonical pre-computation of all payroll data to prevent multiple O(N) calculations
   // OPTIMIZED: Only calculate if we are actually looking at payroll data
   const allMonthsPayroll = useMemo(() => {
-    if (mainTab !== 'payroll-summary' && accountsTab !== 'payroll') return {};
+    if (!(mainTab === 'payroll-summary' && accountsTab === 'payroll')) return {};
     
     // Only calculate the specific month if filtered, otherwise all
     const monthsToProcess = (filterMonth === "All" ? null : parseInt(filterMonth, 10))
@@ -1587,16 +1587,33 @@ export function FinancialReports() {
               </div>
 
               {/* Monthly breakdown table */}
-              <Card className="shadow-sm border-slate-200 overflow-hidden">
-                <CardHeader className="bg-slate-50/50 border-b border-slate-100 py-3 px-4">
-                  <CardTitle className="text-slate-800 text-base capitalize">By {ledgerSummaryView} — Monthly Breakdown ({filterYear === 'All' ? 'All Time' : filterYear}{filterMonth !== 'All' ? ` - Month ${filterMonth}` : ''})</CardTitle>
+              <Card className={`shadow-sm border-slate-200 overflow-hidden ${fullScreenTable === 'ledger-breakdown' ? 'fixed z-[100] m-0 rounded-none bg-slate-50 border-none landscape:inset-0 landscape:w-screen landscape:h-screen landscape:flex landscape:flex-col portrait:top-1/2 portrait:left-1/2 portrait:w-[100vh] portrait:h-[100vw] portrait:-translate-x-1/2 portrait:-translate-y-1/2 portrait:rotate-90 portrait:flex portrait:flex-col' : ''}`}>
+                <CardHeader className={`bg-slate-50/50 border-b border-slate-100 py-3 px-4 flex flex-row items-center justify-between ${fullScreenTable === 'ledger-breakdown' ? 'hidden' : ''}`}>
+                  <CardTitle className="text-slate-800 text-base capitalize m-0">By {ledgerSummaryView} — Monthly Breakdown ({filterYear === 'All' ? 'All Time' : filterYear}{filterMonth !== 'All' ? ` - Month ${filterMonth}` : ''})</CardTitle>
+                  <Button variant="outline" size="sm" className="gap-2 border-slate-200 text-slate-700 hover:bg-slate-100" onClick={() => toggleFullScreen('ledger-breakdown')}>
+                    <Maximize2 className="h-4 w-4" />
+                    <span className="hidden sm:inline">Full Screen</span>
+                  </Button>
                 </CardHeader>
-                <CardContent className="p-0">
-                  <div className="overflow-x-auto">
+                
+                {fullScreenTable === 'ledger-breakdown' && (
+                  <Button 
+                    variant="default" 
+                    size="icon" 
+                    className="fixed top-4 right-4 z-[110] rounded-full shadow-2xl bg-indigo-600 hover:bg-indigo-700 text-white w-12 h-12" 
+                    onClick={() => toggleFullScreen('ledger-breakdown')}
+                    title="Exit Full Screen"
+                  >
+                    <Minimize2 className="h-5 w-5" />
+                  </Button>
+                )}
+
+                <CardContent className={`p-0 flex flex-col ${fullScreenTable === 'ledger-breakdown' ? 'flex-1 h-full min-h-0' : ''}`}>
+                  <div className={`overflow-auto relative no-scrollbar ${fullScreenTable === 'ledger-breakdown' ? 'flex-1 h-full min-h-0' : 'max-h-[60vh]'}`}>
                     <table className="w-full text-sm">
-                      <thead className="bg-indigo-700 text-white">
+                      <thead className="bg-indigo-700 text-white sticky top-0 z-20 shadow-md">
                         <tr>
-                          <th className="py-2.5 px-4 text-left font-semibold capitalize">{ledgerSummaryView}</th>
+                          <th className="py-2.5 px-4 text-left font-semibold capitalize sticky left-0 z-30 bg-indigo-700">{ledgerSummaryView}</th>
                           {MONTH_NAMES.map((m, mi) => { if (filterMonth !== "All" && String(mi + 1) !== filterMonth) return null; return (
                             <th key={m} className="py-2.5 px-2 text-right font-semibold whitespace-nowrap">{m}</th>
                                   ); })}
@@ -1612,7 +1629,7 @@ export function FinancialReports() {
                           const rowTotal = totalsPerGroup[gi];
                           return (
                             <tr key={grp} className={`border-b border-slate-100 hover:bg-indigo-50/30 transition-colors ${gi % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'}`}>
-                              <td className="py-2 px-4 font-medium text-slate-700 whitespace-nowrap">{grp || '—'}</td>
+                              <td className={`py-2 px-4 font-medium text-slate-700 whitespace-nowrap sticky left-0 z-10 shadow-[1px_0_3px_rgba(0,0,0,0.05)] border-r border-slate-100 ${gi % 2 === 0 ? 'bg-white' : 'bg-[#fcfdfe]'}`}>{grp || '—'}</td>
                               {MONTH_NAMES.map((_, mi) => { if (filterMonth !== "All" && String(mi + 1) !== filterMonth) return null;
                                 const val = mthMap.get(mi) || 0;
                                 return (
@@ -1631,8 +1648,8 @@ export function FinancialReports() {
                         })}
                         {/* Grand total row */}
                         {groups.length > 0 && (
-                          <tr className="bg-indigo-50 border-t-2 border-indigo-200 font-bold">
-                            <td className="py-2.5 px-4 text-slate-800">TOTAL</td>
+                          <tr className="bg-indigo-50 hover:bg-indigo-50 border-t-2 border-indigo-200 font-bold shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.1)] relative z-10">
+                            <td className="py-2.5 px-4 text-slate-800 sticky left-0 z-20 bg-indigo-50 shadow-[2px_0_5px_rgba(0,0,0,0.3)] border-r border-indigo-100">TOTAL</td>
                             {MONTH_NAMES.map((_, mi) => { if (filterMonth !== "All" && String(mi + 1) !== filterMonth) return null;
                               const colTotal = filteredLedger
                                 .filter(e => { const d = new Date(e.date); return !isNaN(d.getTime()) && d.getMonth() === mi; })

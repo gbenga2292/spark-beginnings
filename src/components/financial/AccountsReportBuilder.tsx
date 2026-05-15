@@ -455,6 +455,7 @@ export function AccountsReportBuilder({
   // ── Pre-cache payroll rows per year×month to avoid re-invoking heavy calculator on every sidebar interaction ──
   const payrollCache = useMemo(() => {
     const cache = new Map<string, ReturnType<typeof calculatePayrollForMonth>>();
+    if (!selectedSources.includes('PAYROLL')) return cache;
     selectedYears.forEach(yr => {
       selectedMonths.forEach(mKey => {
         const key = `${yr}_${mKey}`;
@@ -462,7 +463,7 @@ export function AccountsReportBuilder({
       });
     });
     return cache;
-  }, [selectedYears, selectedMonths, calculatePayrollForMonth]);
+  }, [selectedYears, selectedMonths, calculatePayrollForMonth, selectedSources]);
 
   // ── Pre-compute which sources are blocked to avoid calling isComboAllowed per-button on every render ──
   const blockedSources = useMemo(() => {
