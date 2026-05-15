@@ -883,7 +883,13 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
                 <div className="mb-10">
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3">STATUS:</p>
                   <div className="flex items-center gap-0">
-                    {STATUS_FLOW.filter(s => s !== 'pending_approval' || activeSubtask.requiresApproval || (activeSubtask as any).requires_approval || activeSubtask.status === 'pending_approval').map((status, i, filtered) => {
+                    {STATUS_FLOW.filter(s => {
+                      const reqApp = activeSubtask.requiresApproval || (activeSubtask as any).requires_approval;
+                      if (reqApp) {
+                        return s === 'pending_approval' || s === 'completed';
+                      }
+                      return s !== 'pending_approval';
+                    }).map((status, i, filtered) => {
                       const currentIdx = filtered.indexOf(activeSubtask.status);
                       const isActive = activeSubtask.status === status;
                       const isPastPhase = i < currentIdx;

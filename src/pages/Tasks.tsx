@@ -2386,10 +2386,12 @@ function EditSubtaskDialog({ subtask, users, onClose, onSave }: {
     });
   };
 
-  const statusOptions: { value: SubTaskStatus; label: string; cls: string }[] = [
+  const statusOptions: { value: SubTaskStatus; label: string; cls: string }[] = requiresApproval ? [
+    { value: 'pending_approval' as SubTaskStatus, label: 'Pending Approval', cls: 'chip-pending-approval' },
+    { value: 'completed', label: 'Completed', cls: 'chip-completed' },
+  ] : [
     { value: 'not_started', label: 'Not Started', cls: 'chip-pending' },
     { value: 'in_progress', label: 'In Progress', cls: 'chip-in-progress' },
-    ...(requiresApproval ? [{ value: 'pending_approval' as SubTaskStatus, label: 'Pending Approval', cls: 'chip-pending-approval' }] : []),
     { value: 'completed', label: 'Completed', cls: 'chip-completed' },
   ];
 
