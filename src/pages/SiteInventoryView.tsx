@@ -409,7 +409,6 @@ export function SiteInventoryView({ site, questionnaire, onBack }: SiteInventory
                                   </div>
                                   <div className="flex-1 min-w-0">
                                     <h4 className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{machine.name}</h4>
-                                    <p className="text-[11px] font-medium text-blue-600 dark:text-blue-400 uppercase tracking-wider">S/N: {machine.serialNumber || 'N/A'}</p>
                                   </div>
                                   {mAsset && (
                                     <Badge
@@ -479,7 +478,6 @@ export function SiteInventoryView({ site, questionnaire, onBack }: SiteInventory
                                 </div>
                                 <div className="flex-1 min-w-0">
                                   <h4 className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{machine.name}</h4>
-                                  <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">S/N: {machine.serialNumber || 'N/A'}</p>
                                 </div>
                                 <Badge variant="outline" className="text-[10px] font-bold px-2 py-0.5 shrink-0 text-slate-500 border-slate-300">
                                   Past

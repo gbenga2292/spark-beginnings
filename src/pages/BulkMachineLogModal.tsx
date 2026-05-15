@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useOperations } from '@/src/contexts/OperationsContext';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/src/components/ui/dialog';
 import { Button } from '@/src/components/ui/button';
@@ -21,7 +21,7 @@ interface BulkMachineLogModalProps {
 }
 
 export function BulkMachineLogModal({ isOpen, onClose, siteId, siteName, machines, date }: BulkMachineLogModalProps) {
-  const { logDailyActivity } = useOperations();
+  const { logDailyActivity, dailyMachineLogs } = useOperations();
   const { employees } = useAppStore();
 
   const dewateringStaff = employees.filter(e => 
@@ -29,6 +29,8 @@ export function BulkMachineLogModal({ isOpen, onClose, siteId, siteName, machine
     e.staffType === 'FIELD'
   );
 
+  const [startDate, setStartDate] = useState(date);
+  const [endDate, setEndDate] = useState(date);
   const [machineData, setMachineData] = useState<Record<string, { operationalDay: OperationalDay; dieselUsage: string }>>({});
   const [supervisorOnSite, setSupervisorOnSite] = useState('');
   const [issuesOnSite, setIssuesOnSite] = useState('');
@@ -38,8 +40,41 @@ export function BulkMachineLogModal({ isOpen, onClose, siteId, siteName, machine
 
   const areAllNoDay = machines.length > 0 && machines.every(m => machineData[m.id]?.operationalDay === 'none');
 
+  // Check for existing logs in the current range
+  const existingLoggedDates = useMemo(() => {
+    if (!startDate || !endDate) return [];
+    
+    const datesWithLogs = new Set<string>();
+    let currentDate = new Date(startDate);
+    const lastDate = new Date(endDate);
+    
+    const datesToCheck: string[] = [];
+    if (currentDate <= lastDate) {
+      while (currentDate <= lastDate) {
+        datesToCheck.push(currentDate.toISOString().split('T')[0]);
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
+    }
+
+    const machineIds = machines.map(m => m.id);
+
+    dailyMachineLogs.forEach(log => {
+      if (
+        machineIds.includes(log.assetId) &&
+        log.siteId === siteId &&
+        datesToCheck.includes(log.date)
+      ) {
+        datesWithLogs.add(log.date);
+      }
+    });
+
+    return Array.from(datesWithLogs).sort();
+  }, [startDate, endDate, machines, dailyMachineLogs, siteId]);
+
   useEffect(() => {
     if (isOpen) {
+      setStartDate(date);
+      setEndDate(date);
       const initData: Record<string, { operationalDay: OperationalDay; dieselUsage: string }> = {};
       machines.forEach(m => {
         initData[m.id] = { operationalDay: 'full', dieselUsage: '' };
@@ -68,28 +103,46 @@ export function BulkMachineLogModal({ isOpen, onClose, siteId, siteName, machine
     setIsSubmitting(true);
 
     try {
-      const promises = machines.map(m => {
-        const data = machineData[m.id] || { operationalDay: 'full' as OperationalDay, dieselUsage: '' };
-        const isActive = data.operationalDay !== 'none';
-        return logDailyActivity({
-          assetId: m.id,
-          assetName: m.name,
-          siteId,
-          siteName,
-          date,
-          isActive,
-          operationalDay: data.operationalDay,
-          dieselUsage: parseFloat(data.dieselUsage) || 0,
-          issuesOnSite,
-          clientFeedback: isActive ? clientFeedback : '',
-          maintenanceDetails: isActive ? maintenanceDetails : '',
-          supervisorOnSite: isActive ? supervisorOnSite : '',
-          downtimeEntries: []
+      const datesToLog: string[] = [];
+      let currentDate = new Date(startDate);
+      const lastDate = new Date(endDate);
+      
+      // Prevent infinite loops if end date is before start date
+      if (currentDate > lastDate) {
+        toast.error('End date must be after or equal to start date.');
+        setIsSubmitting(false);
+        return;
+      }
+
+      while (currentDate <= lastDate) {
+        datesToLog.push(currentDate.toISOString().split('T')[0]);
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
+
+      const promises = datesToLog.flatMap(logDate => {
+        return machines.map(m => {
+          const data = machineData[m.id] || { operationalDay: 'full' as OperationalDay, dieselUsage: '' };
+          const isActive = data.operationalDay !== 'none';
+          return logDailyActivity({
+            assetId: m.id,
+            assetName: m.name,
+            siteId,
+            siteName,
+            date: logDate,
+            isActive,
+            operationalDay: data.operationalDay,
+            dieselUsage: parseFloat(data.dieselUsage) || 0,
+            issuesOnSite,
+            clientFeedback: isActive ? clientFeedback : '',
+            maintenanceDetails: isActive ? maintenanceDetails : '',
+            supervisorOnSite: isActive ? supervisorOnSite : '',
+            downtimeEntries: []
+          });
         });
       });
 
       await Promise.all(promises);
-      toast.success(`Successfully logged ${machines.length} machines.`);
+      toast.success(`Successfully logged ${machines.length} machines for ${datesToLog.length} day(s).`);
       onClose();
     } catch (error) {
       toast.error('Failed to save bulk machine logs.');
@@ -107,7 +160,26 @@ export function BulkMachineLogModal({ isOpen, onClose, siteId, siteName, machine
             <Wrench className="h-5 w-5 text-indigo-500" />
             Bulk Log Machines
           </DialogTitle>
-          <p className="text-xs text-slate-500 mt-1">Logging {machines.length} machines for {date}</p>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mt-3">
+             <div className="flex items-center gap-2">
+               <Label className="text-xs font-bold text-slate-600 dark:text-slate-400">From Date:</Label>
+               <Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="h-8 text-xs w-36 bg-white dark:bg-slate-950" required />
+             </div>
+             <div className="flex items-center gap-2">
+               <Label className="text-xs font-bold text-slate-600 dark:text-slate-400">To Date:</Label>
+               <Input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} min={startDate} className="h-8 text-xs w-36 bg-white dark:bg-slate-950" required />
+             </div>
+          </div>
+          {existingLoggedDates.length > 0 && (
+            <div className="mt-3 p-2.5 rounded-md bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 flex items-start gap-2">
+              <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-500 shrink-0 mt-0.5" />
+              <div className="text-xs text-amber-800 dark:text-amber-400">
+                <span className="font-bold">Note:</span> Logs already exist for some machines on: 
+                <span className="font-semibold ml-1">{existingLoggedDates.map(d => new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })).join(', ')}</span>.
+                Saving will duplicate or overwrite.
+              </div>
+            </div>
+          )}
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6">

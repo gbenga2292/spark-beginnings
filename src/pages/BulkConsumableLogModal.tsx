@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useAppStore, Site } from '@/src/store/appStore';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/src/components/ui/dialog';
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Label } from '@/src/components/ui/label';
 import { Textarea } from '@/src/components/ui/textarea';
-import { Calendar, User, Info, AlignLeft, PackageCheck } from 'lucide-react';
+import { Calendar, User, Info, AlignLeft, PackageCheck, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { ConsumableUsageLog } from '@/src/types/operations';
 
@@ -24,12 +24,43 @@ interface BulkConsumableLogModalProps {
 }
 
 export function BulkConsumableLogModal({ isOpen, onClose, site, consumables }: BulkConsumableLogModalProps) {
-  const { addConsumableLogs, employees } = useAppStore();
+  const { addConsumableLogs, employees, consumableLogs } = useAppStore();
 
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
+  const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
   const [usedBy, setUsedBy] = useState('');
   const [usedFor, setUsedFor] = useState('');
   const [notes, setNotes] = useState('');
+
+  const existingLoggedDates = useMemo(() => {
+    if (!startDate || !endDate) return [];
+    
+    const datesWithLogs = new Set<string>();
+    let currentDate = new Date(startDate);
+    const lastDate = new Date(endDate);
+    
+    const datesToCheck: string[] = [];
+    if (currentDate <= lastDate) {
+      while (currentDate <= lastDate) {
+        datesToCheck.push(currentDate.toISOString().split('T')[0]);
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
+    }
+
+    const consumableIds = consumables.map(c => c.assetId);
+
+    consumableLogs.forEach(log => {
+      if (
+        consumableIds.includes(log.assetId) &&
+        log.siteId === site.id &&
+        datesToCheck.includes(log.date)
+      ) {
+        datesWithLogs.add(log.date);
+      }
+    });
+
+    return Array.from(datesWithLogs).sort();
+  }, [startDate, endDate, consumables, consumableLogs, site.id]);
 
   // Track quantities for each consumable: key is assetId, value is quantity
   const [quantities, setQuantities] = useState<Record<string, number>>({});
@@ -66,23 +97,39 @@ export function BulkConsumableLogModal({ isOpen, onClose, site, consumables }: B
       }
     }
 
-    const newLogs: ConsumableUsageLog[] = itemsToLog.map(item => ({
-      id: crypto.randomUUID(),
-      assetId: item.assetId,
-      assetName: item.assetName,
-      siteId: site.id,
-      siteName: site.name,
-      date,
-      quantityUsed: quantities[item.assetId],
-      usedBy,
-      usedFor,
-      notes,
-      loggedBy: 'Current User',
-      created_at: new Date().toISOString()
-    }));
+    const datesToLog: string[] = [];
+    let currentDate = new Date(startDate);
+    const lastDate = new Date(endDate);
+    
+    if (currentDate > lastDate) {
+      toast.error('End date must be after or equal to start date.');
+      return;
+    }
+
+    while (currentDate <= lastDate) {
+      datesToLog.push(currentDate.toISOString().split('T')[0]);
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+
+    const newLogs: ConsumableUsageLog[] = datesToLog.flatMap(logDate => {
+      return itemsToLog.map(item => ({
+        id: crypto.randomUUID(),
+        assetId: item.assetId,
+        assetName: item.assetName,
+        siteId: site.id,
+        siteName: site.name,
+        date: logDate,
+        quantityUsed: quantities[item.assetId],
+        usedBy,
+        usedFor,
+        notes,
+        loggedBy: 'Current User',
+        created_at: new Date().toISOString()
+      }));
+    });
 
     addConsumableLogs(newLogs);
-    toast.success(`Successfully logged ${newLogs.length} items.`);
+    toast.success(`Successfully logged ${newLogs.length} item(s) across ${datesToLog.length} day(s).`);
     
     // Reset form
     setQuantities({});
@@ -109,17 +156,42 @@ export function BulkConsumableLogModal({ isOpen, onClose, site, consumables }: B
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4">
               <div className="space-y-1.5">
                 <Label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                  <Calendar className="h-3.5 w-3.5 text-slate-400" /> Date *
+                  <Calendar className="h-3.5 w-3.5 text-slate-400" /> From Date *
                 </Label>
                 <Input
                   type="date"
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  required
+                  className="h-10 text-sm"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                  <Calendar className="h-3.5 w-3.5 text-slate-400" /> To Date *
+                </Label>
+                <Input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  min={startDate}
                   required
                   className="h-10 text-sm"
                 />
               </div>
               
+              {existingLoggedDates.length > 0 && (
+                <div className="md:col-span-2 mt-1 mb-2 p-2.5 rounded-md bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 flex items-start gap-2">
+                  <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-500 shrink-0 mt-0.5" />
+                  <div className="text-xs text-amber-800 dark:text-amber-400">
+                    <span className="font-bold">Note:</span> Consumable logs already exist on: 
+                    <span className="font-semibold ml-1">{existingLoggedDates.map(d => new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })).join(', ')}</span>.
+                    Saving will add additional log entries for these dates.
+                  </div>
+                </div>
+              )}
+
               <div className="space-y-1.5">
                 <Label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
                   <User className="h-3.5 w-3.5 text-slate-400" /> Used By (Who) *

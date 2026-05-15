@@ -42,6 +42,8 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
   
   const [view, setView] = useState<'history' | 'form' | 'analytics' | 'calendar' | 'detail'>(initialDate ? 'form' : 'history');
   const [viewingLog, setViewingLog] = useState<DailyMachineLog | null>(null);
+  const [analyticsYear, setAnalyticsYear] = useState<string>(new Date().getFullYear().toString());
+  const [analyticsMonth, setAnalyticsMonth] = useState<string>('all');
   
   const [selectedLog, setSelectedLog] = useState<DailyMachineLog | null>(() => {
     if (!initialDate) return null;
@@ -59,6 +61,7 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
   
   // Form State
   const [date, setDate] = useState(() => selectedLog?.date || initialDate || new Date().toISOString().split('T')[0]);
+  const [endDate, setEndDate] = useState<string>('');
 
   // Derive initial operationalDay from existing log, defaulting to 'full'
   const deriveOpDay = (log: DailyMachineLog | null): OperationalDay => {
@@ -99,6 +102,46 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
       .filter(l => l.assetId === assetId && l.siteId === siteId)
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [dailyMachineLogs, assetId, siteId]);
+
+  const filteredLogs = useMemo(() => {
+    return logs.filter(l => {
+      const d = new Date(l.date);
+      const yearMatch = d.getFullYear().toString() === analyticsYear;
+      const monthMatch = analyticsMonth === 'all' || d.getMonth().toString() === analyticsMonth;
+      return yearMatch && monthMatch;
+    });
+  }, [logs, analyticsYear, analyticsMonth]);
+
+  const availableYears = useMemo(() => {
+    const years = new Set(logs.map(l => new Date(l.date).getFullYear().toString()));
+    years.add(new Date().getFullYear().toString());
+    return Array.from(years).sort((a, b) => Number(b) - Number(a));
+  }, [logs]);
+
+  const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  const dieselChartData = useMemo(() => {
+    if (analyticsMonth === 'all') {
+      // 12 monthly bars showing avg diesel/active day for the selected year
+      return MONTHS_SHORT.map((label, mIdx) => {
+        const mLogs = filteredLogs.filter(l => new Date(l.date).getMonth() === mIdx);
+        const activeLogs = mLogs.filter(l => (l.dieselUsage || 0) > 0);
+        const avg = activeLogs.length > 0
+          ? mLogs.reduce((acc, l) => acc + (l.dieselUsage || 0), 0) / activeLogs.length
+          : 0;
+        return { label, value: avg, isAvg: true };
+      });
+    }
+    // Per-day within the selected month
+    const map: Record<string, number> = {};
+    filteredLogs.forEach(l => {
+      const key = new Date(l.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+      map[key] = (map[key] || 0) + (l.dieselUsage || 0);
+    });
+    return Object.entries(map)
+      .sort((a, b) => new Date(a[0]).getTime() - new Date(b[0]).getTime())
+      .map(([label, value]) => ({ label, value, isAvg: false }));
+  }, [filteredLogs, analyticsMonth]);
 
   const handleAddDowntime = () => {
     if (!dtReason) return;
@@ -173,29 +216,47 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
 
   const handleSaveLog = async () => {
     try {
-      const logId = await logDailyActivity({
-        assetId,
-        assetName,
-        siteId,
-        siteName,
-        date,
-        isActive,
-        operationalDay,
-        dieselUsage: Number(dieselUsage),
-        supervisorOnSite,
-        clientFeedback,
-        maintenanceDetails,
-        issuesOnSite,
-        downtimeEntries,
-        loggedBy: currentUser?.name || 'Unknown'
-      });
+      // Build list of dates to log
+      const start = new Date(date);
+      const end = endDate && endDate >= date ? new Date(endDate) : new Date(date);
+      const datesToLog: string[] = [];
+      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        datesToLog.push(d.toISOString().split('T')[0]);
+      }
 
-      // Handle Media Upload if any
+      // Filter out dates that already have a log (when not editing)
+      const existingDates = new Set(logs.map(l => l.date));
+      const newDates = selectedLog ? datesToLog : datesToLog.filter(d => !existingDates.has(d));
+      const skipped = datesToLog.length - newDates.length;
+
+      if (newDates.length === 0) {
+        toast.error('All dates in this range already have logs. Please change the date range.');
+        return;
+      }
+
+      for (const logDate of newDates) {
+        await logDailyActivity({
+          assetId,
+          assetName,
+          siteId,
+          siteName,
+          date: logDate,
+          isActive,
+          operationalDay,
+          dieselUsage: Number(dieselUsage),
+          supervisorOnSite,
+          clientFeedback,
+          maintenanceDetails,
+          issuesOnSite,
+          downtimeEntries,
+          loggedBy: currentUser?.name || 'Unknown'
+        });
+      }
+
+      // Handle Media Upload if any (attach to start date only)
       if (mediaFiles.length > 0) {
         setIsUploading(true);
-        
         try {
-          // Upload files sequentially or in parallel
           const uploadPromises = mediaFiles.map(async (file) => {
             const formData = new FormData();
             formData.append('media', file);
@@ -206,23 +267,17 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
             formData.append('log_date', date);
             formData.append('uploaded_by', currentUser?.id || 'unknown');
             formData.append('uploaded_by_name', currentUser?.name || 'Unknown');
-
             const response = await fetch(`${MEDIA_SERVER_URL}/upload.php`, {
               method: 'POST',
               body: formData,
             });
-
             if (!response.ok) throw new Error(`Failed to upload ${file.name}`);
             return response.json();
           });
-
           await Promise.all(uploadPromises);
           toast.success(`${mediaFiles.length} media files uploaded to MySQL storage`);
-          
-          // Clear local state after success
           setMediaFiles([]);
           setMediaPreviews([]);
-          // Refresh list
           fetchUploadedMedia(siteId, assetId, date);
         } catch (uploadErr) {
           console.error('Media upload error:', uploadErr);
@@ -232,8 +287,11 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
         }
       }
 
-
-      toast.success('Daily log saved successfully');
+      if (skipped > 0) {
+        toast.success(`${newDates.length} log${newDates.length !== 1 ? 's' : ''} saved. ${skipped} date${skipped !== 1 ? 's' : ''} skipped (already logged).`);
+      } else {
+        toast.success(`${newDates.length} log${newDates.length !== 1 ? 's' : ''} saved successfully`);
+      }
       if (isEmbedded) {
         onBack();
       } else {
@@ -247,6 +305,7 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
 
   const resetForm = () => {
     setDate(initialDate || new Date().toISOString().split('T')[0]);
+    setEndDate('');
     setOperationalDay('full');
     setDieselUsage('0');
     setSupervisorOnSite('');
@@ -260,6 +319,7 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
   const editLog = (log: DailyMachineLog) => {
     setSelectedLog(log);
     setDate(log.date);
+    setEndDate('');
     setOperationalDay(deriveOpDay(log));
     setDieselUsage(log.dieselUsage.toString());
     setSupervisorOnSite(log.supervisorOnSite || '');
@@ -267,10 +327,7 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
     setMaintenanceDetails(log.maintenanceDetails || '');
     setIssuesOnSite(log.issuesOnSite || '');
     setDowntimeEntries(log.downtimeEntries || []);
-    
-    // Fetch associated media from custom storage
     fetchUploadedMedia(log.siteId, log.assetId, log.date);
-    
     setView('form');
   };
 
@@ -452,20 +509,55 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
           <div className="max-w-4xl mx-auto pb-20 animate-in fade-in slide-in-from-bottom-4 duration-500">
             <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden rounded-lg">
               <div className="p-6 space-y-6">
-                {/* Basic Info Section */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {/* Date Range + Day Type + Diesel */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                  {/* Start Date */}
                   <div className="space-y-2">
-                    <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider ml-1">Log Date</label>
+                    <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider ml-1">
+                      {selectedLog ? 'Log Date' : 'From Date'}
+                    </label>
                     <div className="relative">
                       <Calendar className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
                       <Input 
                         type="date" 
                         value={date} 
-                        onChange={e => setDate(e.target.value)}
+                        onChange={e => { setDate(e.target.value); if (endDate && e.target.value > endDate) setEndDate(''); }}
                         className="pl-9 h-10 border-slate-200 dark:border-slate-700 rounded-md focus:ring-2 focus:ring-blue-500"
                       />
                     </div>
                   </div>
+
+                  {/* End Date — hidden when editing */}
+                  {!selectedLog && (
+                    <div className="space-y-2">
+                      <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider ml-1">To Date</label>
+                      <div className="relative">
+                        <Calendar className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                        <Input 
+                          type="date" 
+                          value={endDate} 
+                          min={date}
+                          onChange={e => setEndDate(e.target.value)}
+                          className="pl-9 h-10 border-slate-200 dark:border-slate-700 rounded-md focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                      {endDate && endDate >= date && (() => {
+                        const start = new Date(date);
+                        const end = new Date(endDate);
+                        const total = Math.round((end.getTime() - start.getTime()) / 86400000) + 1;
+                        const existingCount = logs.filter(l => l.date >= date && l.date <= endDate).length;
+                        const newCount = total - existingCount;
+                        return (
+                          <div className="mt-1 flex items-center gap-1.5">
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 dark:bg-blue-900/20">{newCount} new</span>
+                            {existingCount > 0 && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-600 dark:bg-amber-900/20">{existingCount} will skip</span>}
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  )}
+
+                  {/* Day Type */}
                   <div className="space-y-2">
                     <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider ml-1">Day Type</label>
                     <div className="flex flex-col">
@@ -507,6 +599,8 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
                       <p className="text-[10px] text-slate-400 mt-1 font-medium text-center">machine worked period</p>
                     </div>
                   </div>
+
+                  {/* Diesel */}
                   {isActive && (
                     <div className="space-y-2">
                       <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider ml-1">Diesel Usage (L)</label>
@@ -767,14 +861,22 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
               </div>
 
               {/* Legend */}
-              <div className="flex items-center gap-6 mb-8 px-2">
+              <div className="flex flex-wrap items-center gap-4 mb-8 px-2">
                 <div className="flex items-center gap-2">
                   <div className="h-3 w-3 rounded-full bg-orange-500 shadow-sm shadow-orange-500/20" />
                   <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Arrived on Site</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="h-3 w-3 rounded-full bg-blue-500 shadow-sm shadow-blue-500/20" />
-                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Log Submitted</span>
+                  <div className="h-3 w-3 rounded-full bg-emerald-500 shadow-sm shadow-emerald-500/20" />
+                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Full Day</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="h-3 w-3 rounded-full bg-amber-400 shadow-sm shadow-amber-400/20" />
+                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Half Day</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="h-3 w-3 rounded-full bg-rose-400 shadow-sm shadow-rose-400/20" />
+                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Off / Down</span>
                 </div>
               </div>
 
@@ -804,41 +906,67 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
                       w.items.some(it => it.assetId === assetId) &&
                       w.sentToSiteDate?.startsWith(dateStr)
                     );
+                    const opDay = hasLog ? (hasLog.operationalDay ?? (hasLog.isActive ? 'full' : 'none')) : null;
 
                     days.push(
                       <div 
                         key={i} 
                         className={cn(
                           "h-24 rounded-3xl border p-3 flex flex-col justify-between transition-all group relative overflow-hidden",
-                          hasLog ? "bg-blue-50/50 border-blue-100 dark:bg-blue-900/10 dark:border-blue-900/20" : 
+                          opDay === 'full' ? "bg-emerald-50/60 border-emerald-100 dark:bg-emerald-900/10 dark:border-emerald-900/20" :
+                          opDay === 'half' ? "bg-amber-50/60 border-amber-100 dark:bg-amber-900/10 dark:border-amber-900/20" :
+                          opDay === 'none' ? "bg-rose-50/40 border-rose-100 dark:bg-rose-900/10 dark:border-rose-900/20" :
                           isArrivalDate ? "bg-orange-50/50 border-orange-100 dark:bg-orange-900/10 dark:border-orange-900/20" :
                           "bg-slate-50/30 border-slate-100 dark:bg-slate-800/20 dark:border-slate-800/50 hover:bg-white dark:hover:bg-slate-800 transition-colors shadow-sm"
                         )}
                       >
                         <span className={cn(
                           "text-sm font-bold",
-                          hasLog ? "text-blue-600" : isArrivalDate ? "text-orange-600" : "text-slate-400 dark:text-slate-600"
+                          opDay === 'full' ? "text-emerald-700" :
+                          opDay === 'half' ? "text-amber-600" :
+                          opDay === 'none' ? "text-rose-500" :
+                          isArrivalDate ? "text-orange-600" : "text-slate-400 dark:text-slate-600"
                         )}>
                           {i}
                         </span>
 
-                        <div className="flex gap-1">
-                          {isArrivalDate && (
-                            <div className="h-2 w-2 rounded-full bg-orange-500 shadow-sm animate-pulse" />
+                        <div className="flex flex-col gap-0.5">
+                          {opDay && (
+                            <span className={cn(
+                              "text-[8px] font-black uppercase tracking-wider leading-none",
+                              opDay === 'full' ? "text-emerald-600" :
+                              opDay === 'half' ? "text-amber-500" : "text-rose-400"
+                            )}>
+                              {opDay === 'full' ? 'Full Day' : opDay === 'half' ? 'Half Day' : 'Off'}
+                            </span>
                           )}
-                          {hasLog && (
-                            <div className="h-2 w-2 rounded-full bg-blue-500 shadow-sm" />
-                          )}
+                          <div className="flex gap-1">
+                            {isArrivalDate && (
+                              <div className="h-2 w-2 rounded-full bg-orange-500 shadow-sm animate-pulse" />
+                            )}
+                            {opDay === 'full' && <div className="h-2 w-2 rounded-full bg-emerald-500 shadow-sm" />}
+                            {opDay === 'half' && <div className="h-2 w-2 rounded-full bg-amber-400 shadow-sm" />}
+                            {opDay === 'none' && <div className="h-2 w-2 rounded-full bg-rose-400 shadow-sm" />}
+                          </div>
                         </div>
 
                         {/* Hover Overlay */}
                         {(hasLog || isArrivalDate) && (
-                          <div className="absolute inset-0 bg-white/60 dark:bg-slate-900/60 backdrop-blur-[1px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer px-2 text-center" onClick={() => hasLog && editLog(hasLog)}>
-                            <p className="text-[10px] font-bold text-slate-800 dark:text-white leading-tight">
-                              {isArrivalDate && "Arrived on Site"}
-                              {isArrivalDate && hasLog && <br />}
-                              {hasLog && `Logged: ${hasLog.dieselUsage}L Diesel`}
-                            </p>
+                          <div className="absolute inset-0 bg-white/70 dark:bg-slate-900/70 backdrop-blur-[1px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer px-2 text-center" onClick={() => hasLog && editLog(hasLog)}>
+                            <div className="space-y-0.5">
+                              {isArrivalDate && <p className="text-[9px] font-bold text-orange-600">Arrived on Site</p>}
+                              {opDay && (
+                                <p className={cn(
+                                  "text-[10px] font-black",
+                                  opDay === 'full' ? "text-emerald-700" : opDay === 'half' ? "text-amber-600" : "text-rose-500"
+                                )}>
+                                  {opDay === 'full' ? 'FULL DAY' : opDay === 'half' ? 'HALF DAY' : 'OFF'}
+                                </p>
+                              )}
+                              {hasLog && hasLog.dieselUsage > 0 && (
+                                <p className="text-[9px] font-bold text-slate-600 dark:text-slate-300">{hasLog.dieselUsage}L Diesel</p>
+                              )}
+                            </div>
                           </div>
                         )}
                       </div>
@@ -853,6 +981,28 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
 
         {view === 'analytics' && (
           <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in zoom-in-95 duration-500">
+            {/* Filters */}
+            <div className="flex flex-wrap items-center gap-3">
+              <select
+                value={analyticsYear}
+                onChange={e => setAnalyticsYear(e.target.value)}
+                className="h-9 px-3 text-sm font-semibold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg focus:ring-2 focus:ring-blue-500"
+              >
+                {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
+              </select>
+              <select
+                value={analyticsMonth}
+                onChange={e => setAnalyticsMonth(e.target.value)}
+                className="h-9 px-3 text-sm font-semibold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="all">All Months</option>
+                {['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'].map((m, i) => (
+                  <option key={i} value={i.toString()}>{m}</option>
+                ))}
+              </select>
+              <span className="text-xs text-slate-400 font-medium">{filteredLogs.length} log{filteredLogs.length !== 1 ? 's' : ''} in view</span>
+            </div>
+
             {/* Quick Stats Grid */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <Card className="p-6 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 rounded-3xl shadow-sm">
@@ -860,7 +1010,7 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
                   <Activity className="h-5 w-5" />
                 </div>
                 <p className="text-2xl font-black text-slate-800 dark:text-white">
-                  {logs.length > 0 ? ((logs.filter(l => l.isActive).length / logs.length) * 100).toFixed(0) : 0}%
+                  {filteredLogs.length > 0 ? ((filteredLogs.filter(l => l.isActive).length / filteredLogs.length) * 100).toFixed(0) : 0}%
                 </p>
                 <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Uptime</p>
               </Card>
@@ -869,7 +1019,7 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
                   <Clock className="h-5 w-5" />
                 </div>
                 <p className="text-2xl font-black text-slate-800 dark:text-white">
-                  {logs.reduce((acc, l) => acc + l.downtimeEntries.reduce((a, e) => a + e.durationHours, 0), 0)}
+                  {filteredLogs.reduce((acc, l) => acc + l.downtimeEntries.reduce((a, e) => a + e.durationHours, 0), 0)}
                 </p>
                 <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Total Downtime (Hrs)</p>
               </Card>
@@ -878,7 +1028,7 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
                   <Fuel className="h-5 w-5" />
                 </div>
                 <p className="text-2xl font-black text-slate-800 dark:text-white">
-                  {logs.reduce((acc, l) => acc + l.dieselUsage, 0).toFixed(1)}
+                  {filteredLogs.reduce((acc, l) => acc + l.dieselUsage, 0).toFixed(1)}
                 </p>
                 <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Total Diesel (L)</p>
               </Card>
@@ -886,27 +1036,26 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
                 <div className="h-10 w-10 rounded-2xl bg-emerald-50 dark:bg-emerald-900/20 flex items-center justify-center text-emerald-600 mb-4">
                   <Calendar className="h-5 w-5" />
                 </div>
-                <p className="text-2xl font-black text-slate-800 dark:text-white">{logs.length}</p>
+                <p className="text-2xl font-black text-slate-800 dark:text-white">{filteredLogs.length}</p>
                 <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Days on Site</p>
               </Card>
             </div>
 
+            {/* Operational Trends */}
             <Card className="p-8 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 rounded-[32px] shadow-sm overflow-hidden relative">
               <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full -mr-16 -mt-16 blur-2xl" />
               <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-6 flex items-center gap-2">
                 <Activity className="h-5 w-5 text-blue-500" /> Operational Trends
               </h3>
-              
-              <div className="h-64 flex items-end gap-2 px-4">
-                {logs.slice(0, 14).reverse().map((log, i) => {
+              <div className="h-48 flex items-end gap-1.5 px-2">
+                {filteredLogs.slice(0, 20).reverse().map((log, i) => {
                   const downtimeHours = log.downtimeEntries.reduce((a, e) => a + e.durationHours, 0);
                   const uptimeHeight = Math.max(10, 100 - (downtimeHours * 5));
-                  
                   return (
-                    <div key={log.id} className="flex-1 flex flex-col items-center gap-2 group relative">
+                    <div key={log.id} className="flex-1 flex flex-col items-center gap-1 group relative">
                       <div 
                         className={cn(
-                          "w-full rounded-t-xl transition-all duration-500 group-hover:scale-x-110",
+                          "w-full rounded-t-lg transition-all duration-500",
                           log.isActive ? "bg-blue-500 shadow-lg shadow-blue-500/20" : "bg-rose-400"
                         )}
                         style={{ height: `${uptimeHeight}%` }}
@@ -915,39 +1064,91 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
                           {log.isActive ? 'Active' : 'Down'} · {downtimeHours}h DT
                         </div>
                       </div>
-                      <div className="text-[9px] font-bold text-slate-400 rotate-45 mt-2 origin-left">
+                      <div className="text-[8px] font-bold text-slate-400 rotate-45 mt-1 origin-left">
                         {new Date(log.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
                       </div>
                     </div>
                   );
                 })}
-              </div>
-              
-              <div className="mt-12 grid grid-cols-2 gap-8">
-                <div className="space-y-4">
-                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Recent Issues</h4>
-                  <div className="space-y-2">
-                    {logs.filter(l => l.issuesOnSite).slice(0, 3).map(l => (
-                      <div key={l.id} className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 text-xs border border-slate-100 dark:border-slate-800">
-                        <p className="font-bold text-slate-500 mb-1">{formatDisplayDate(l.date)}</p>
-                        <p className="text-slate-600 dark:text-slate-400 line-clamp-2">{l.issuesOnSite}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <div className="space-y-4">
-                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Client Sentiment</h4>
-                  <div className="space-y-2">
-                    {logs.filter(l => l.clientFeedback).slice(0, 3).map(l => (
-                      <div key={l.id} className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 text-xs border border-slate-100 dark:border-slate-800">
-                        <p className="font-bold text-slate-500 mb-1">{formatDisplayDate(l.date)}</p>
-                        <p className="text-slate-600 dark:text-slate-400 italic line-clamp-2">"{l.clientFeedback}"</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                {filteredLogs.length === 0 && (
+                  <div className="flex-1 flex items-center justify-center text-slate-300 text-sm">No data for selected period</div>
+                )}
               </div>
             </Card>
+
+            {/* Diesel Usage Chart */}
+            <Card className="p-8 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 rounded-[32px] shadow-sm">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                  <Fuel className="h-5 w-5 text-amber-500" />
+                  {analyticsMonth === 'all' ? `Avg Diesel/Day by Month — ${analyticsYear}` : `Daily Diesel — ${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][Number(analyticsMonth)]} ${analyticsYear}`}
+                </h3>
+                {analyticsMonth === 'all' && (
+                  <span className="text-[10px] font-bold text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">Avg L/active day</span>
+                )}
+              </div>
+              <div className="h-48 flex items-end gap-1.5 px-2">
+                {dieselChartData.map((entry, i) => {
+                  const maxVal = Math.max(...dieselChartData.map(e => e.value), 1);
+                  const h = entry.value > 0 ? Math.max(8, (entry.value / maxVal) * 100) : 0;
+                  return (
+                    <div key={i} className="flex-1 flex flex-col items-center gap-1 group relative">
+                      {entry.value > 0 && (
+                        <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-amber-600 text-white text-[9px] py-0.5 px-1.5 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+                          {entry.isAvg ? `avg ${entry.value.toFixed(1)}L` : `${entry.value.toFixed(1)}L`}
+                        </div>
+                      )}
+                      <div
+                        className={`w-full rounded-t-lg transition-colors ${entry.value > 0 ? 'bg-amber-400 hover:bg-amber-500' : 'bg-slate-100 dark:bg-slate-800'}`}
+                        style={{ height: h > 0 ? `${h}%` : '4px' }}
+                      />
+                      <div className="text-[8px] font-bold text-slate-400 mt-1 truncate w-full text-center">{entry.label}</div>
+                    </div>
+                  );
+                })}
+                {dieselChartData.length === 0 && (
+                  <div className="flex-1 flex items-center justify-center text-slate-300 text-sm">No diesel usage logged for selected period</div>
+                )}
+              </div>
+              <div className="mt-10 flex items-center justify-between text-xs text-slate-500 border-t border-slate-100 dark:border-slate-800 pt-4">
+                <span>Total: <strong className="text-amber-600">{filteredLogs.reduce((a, l) => a + l.dieselUsage, 0).toFixed(1)} L</strong></span>
+                <span>{analyticsMonth === 'all' ? 'Peak month:' : 'Avg/day:'}
+                  <strong className="text-amber-600 ml-1">
+                    {analyticsMonth === 'all'
+                      ? dieselChartData.reduce((a, b) => a.value > b.value ? a : b, { label: '—', value: 0 }).label
+                      : `${filteredLogs.filter(l => l.dieselUsage > 0).length > 0 ? (filteredLogs.reduce((a, l) => a + l.dieselUsage, 0) / filteredLogs.filter(l => l.dieselUsage > 0).length).toFixed(1) : '0'} L`}
+                  </strong>
+                </span>
+              </div>
+            </Card>
+
+            {/* Issues & Feedback */}
+            <div className="grid grid-cols-2 gap-6">
+              <Card className="p-6 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 rounded-3xl shadow-sm">
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Recent Issues</h4>
+                <div className="space-y-2">
+                  {filteredLogs.filter(l => l.issuesOnSite).slice(0, 3).map(l => (
+                    <div key={l.id} className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 text-xs border border-slate-100 dark:border-slate-800">
+                      <p className="font-bold text-slate-500 mb-1">{formatDisplayDate(l.date)}</p>
+                      <p className="text-slate-600 dark:text-slate-400 line-clamp-2">{l.issuesOnSite}</p>
+                    </div>
+                  ))}
+                  {filteredLogs.filter(l => l.issuesOnSite).length === 0 && <p className="text-xs text-slate-300">No issues in this period</p>}
+                </div>
+              </Card>
+              <Card className="p-6 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 rounded-3xl shadow-sm">
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Client Sentiment</h4>
+                <div className="space-y-2">
+                  {filteredLogs.filter(l => l.clientFeedback).slice(0, 3).map(l => (
+                    <div key={l.id} className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 text-xs border border-slate-100 dark:border-slate-800">
+                      <p className="font-bold text-slate-500 mb-1">{formatDisplayDate(l.date)}</p>
+                      <p className="text-slate-600 dark:text-slate-400 italic line-clamp-2">"{l.clientFeedback}"</p>
+                    </div>
+                  ))}
+                  {filteredLogs.filter(l => l.clientFeedback).length === 0 && <p className="text-xs text-slate-300">No feedback in this period</p>}
+                </div>
+              </Card>
+            </div>
           </div>
         )}
 

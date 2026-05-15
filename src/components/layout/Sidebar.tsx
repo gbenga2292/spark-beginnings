@@ -373,7 +373,7 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
       {/* Mobile Backdrop */}
       {isOpen && (
         <div
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          className="fixed inset-0 bg-black/50 z-50 lg:hidden"
           onClick={() => setIsOpen?.(false)}
         />
       )}
@@ -381,7 +381,7 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
       {/* Sidebar Container */}
       <div
         className={cn(
-          'fixed lg:relative flex h-full flex-col border-r transition-all duration-300 z-40',
+          'fixed lg:relative flex h-full flex-col border-r transition-all duration-300 z-50',
           sidebarBg,
           isCollapsed ? 'w-20' : 'w-64',
           isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
