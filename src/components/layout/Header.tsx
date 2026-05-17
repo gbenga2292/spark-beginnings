@@ -1,4 +1,27 @@
 import { formatDisplayDate } from '@/src/lib/dateUtils';
+import React, { isValidElement, Children } from 'react';
+
+// Helper to determine if a React node tree is effectively empty (e.g. nested fragments or divs with falsy children)
+const isNodeEmpty = (node: any): boolean => {
+  if (node === null || node === undefined || node === false || node === true) return true;
+  if (typeof node === 'string' || typeof node === 'number') return node.toString().trim() === '';
+  
+  if (Array.isArray(node)) {
+    return node.every(isNodeEmpty);
+  }
+  
+  if (isValidElement(node)) {
+    if (typeof node.type === 'string' || node.type === React.Fragment) {
+       const children = (node.props as any)?.children;
+       return isNodeEmpty(children);
+    }
+    // It's a custom component, we can't easily tell if it will render empty.
+    // So to be safe, assume it's NOT empty.
+    return false;
+  }
+  
+  return false;
+};
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import { Bell, Search, LogOut, Menu, X, User, Settings, ChevronRight, CalendarClock, Users, MapPin, Wallet, FileText, Landmark, Library, UserPlus, ShieldCheck, LayoutDashboard, Clock, AlertCircle, AtSign, ArrowLeft, ArrowUpCircle, RefreshCw, MoreVertical } from 'lucide-react';
@@ -229,7 +252,7 @@ export function Header({ onMenuClick }: HeaderProps) {
   const [mobileOverflowOpen, setMobileOverflowOpen] = useState(false);
   const [checkingUpdate, setCheckingUpdate] = useState(false);
 
-  const CURRENT_VERSION = '1.5.2'; // Matches package.json
+  const CURRENT_VERSION = '1.5.3'; // Matches package.json
   const UPDATE_SERVER_URL = import.meta.env.VITE_UPDATE_SERVER_URL || 'https://dewaterconstruct.com/app-updates';
 
   // ── Platform Detection ─────────────────────────────────────────────────
@@ -357,6 +380,8 @@ export function Header({ onMenuClick }: HeaderProps) {
       }, 0)
     : 0;
 
+  const hasVisibleActions = headerButtons && !isNodeEmpty(headerButtons);
+
   return (
     <header className={`flex min-h-[56px] py-2 sm:py-0 h-auto items-center justify-between border-b px-3 md:px-6 gap-2 md:gap-4 transition-colors duration-200 relative z-40 ${
       isDark ? 'bg-slate-900 border-slate-700/60' : 'bg-white border-slate-200'
@@ -403,7 +428,7 @@ export function Header({ onMenuClick }: HeaderProps) {
       <div className="flex items-center gap-2">
 
         {/* ── Mobile 3-dot overflow button (only when page has actions) ── */}
-        {headerButtons && (
+        {hasVisibleActions && (
           <div ref={overflowRef} className="relative sm:hidden">
             <button
               onClick={() => {

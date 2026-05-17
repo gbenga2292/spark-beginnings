@@ -829,6 +829,18 @@ export async function fetchAllAppData(privs?: any) {
         return true;
       }
     }
+
+    // Allow fetching employees for modules that require them for dropdowns (e.g., supervisor on site, assignees)
+    if (mod === 'employees') {
+      if (
+        privs?.operations?.canView === true ||
+        privs?.dailyJournal?.canView === true ||
+        privs?.tasks?.canView === true ||
+        privs?.opsVehicles?.canView === true
+      ) {
+        return true;
+      }
+    }
     
     return false;
   };
