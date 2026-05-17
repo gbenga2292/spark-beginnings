@@ -25,8 +25,10 @@ import {
   Moon,
   Check,
   LayoutTemplate,
-  CalendarDays
+  CalendarDays,
+  Fingerprint
 } from 'lucide-react';
+import { BiometricAuth } from '@aparajita/capacitor-biometric-auth';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { toast, showConfirm } from '@/src/components/ui/toast';
 
@@ -86,6 +88,12 @@ export function Profile() {
   const [mfaFactorId, setMfaFactorId] = useState('');
   const [mfaCode, setMfaCode] = useState('');
 
+  // Biometric States
+  const [isBiometricAvailable, setIsBiometricAvailable] = useState(false);
+  const [isBiometricEnabled, setIsBiometricEnabled] = useState(false);
+  const [showBiometricPasswordPrompt, setShowBiometricPasswordPrompt] = useState(false);
+  const [biometricSetupPassword, setBiometricSetupPassword] = useState('');
+
   useEffect(() => {
     const checkMfa = async () => {
       try {
@@ -103,7 +111,59 @@ export function Profile() {
       }
     };
     checkMfa();
+
+    const checkBiometric = async () => {
+      try {
+        const info = await BiometricAuth.checkBiometry();
+        setIsBiometricAvailable(info.isAvailable);
+      } catch (e) {
+        setIsBiometricAvailable(false);
+      }
+    };
+    checkBiometric();
+    setIsBiometricEnabled(!!localStorage.getItem('biometric_credentials'));
   }, []);
+
+  const handleToggleBiometric = async () => {
+    setErrorMessage('');
+    if (isBiometricEnabled) {
+      localStorage.removeItem('biometric_credentials');
+      setIsBiometricEnabled(false);
+      setSuccessMessage('Biometric Sign-In disabled.');
+    } else {
+      setShowBiometricPasswordPrompt(true);
+    }
+  };
+
+  const handleEnableBiometric = async () => {
+    setErrorMessage('');
+    if (!biometricSetupPassword) {
+      setErrorMessage('Please enter your password to enable Biometrics.');
+      return;
+    }
+    try {
+      const emailToUse = currentUser?.email || user?.email;
+      if (!emailToUse) throw new Error('No email found');
+      
+      const { error } = await supabase.auth.signInWithPassword({ email: emailToUse, password: biometricSetupPassword });
+      if (error) throw error;
+      
+      await BiometricAuth.authenticate({ reason: 'Authenticate to enable Biometric Sign-In' });
+      
+      const creds = btoa(JSON.stringify({ email: emailToUse, password: biometricSetupPassword }));
+      localStorage.setItem('biometric_credentials', creds);
+      setIsBiometricEnabled(true);
+      setShowBiometricPasswordPrompt(false);
+      setBiometricSetupPassword('');
+      setSuccessMessage('Biometric Sign-In enabled successfully.');
+    } catch (err: any) {
+      if (err.code === 'userCancel' || err.code === 'systemCancel') {
+        // User cancelled, do nothing
+      } else {
+        setErrorMessage(err.message || 'Biometric verification failed.');
+      }
+    }
+  };
 
   const handleEnrollMfa = async () => {
     setIsEnrollingMfa(true);
@@ -458,16 +518,6 @@ export function Profile() {
                     <CardDescription className="text-xs text-slate-500">Credentials & MFA</CardDescription>
                   </div>
                 </div>
-                {!isChangingPassword && (
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => setIsChangingPassword(true)}
-                    className="h-8 px-4 rounded-lg font-bold text-[10px] uppercase tracking-wider border-slate-200 dark:border-slate-700"
-                  >
-                    Update
-                  </Button>
-                )}
               </div>
             </CardHeader>
             <CardContent className="pt-6">
@@ -583,6 +633,60 @@ export function Profile() {
                          Enable
                        </Button>
                     )}
+                  </div>
+                )}
+                
+                {/* Biometric Authentication */}
+                <div className="h-px bg-slate-100 dark:bg-slate-800 my-4" />
+                {showBiometricPasswordPrompt ? (
+                  <div className="space-y-4 animate-in fade-in duration-300">
+                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">Verify Password to Enable Biometrics</p>
+                    <div className="space-y-2 px-1">
+                      <Input
+                        type="password"
+                        value={biometricSetupPassword}
+                        onChange={(e) => setBiometricSetupPassword(e.target.value)}
+                        placeholder="Enter your current password"
+                        className="h-11 rounded-lg bg-slate-50/50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 font-bold"
+                      />
+                    </div>
+                    <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                      <Button onClick={handleEnableBiometric} className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold h-11 rounded-xl shadow-lg active:scale-95 transition-all">
+                        Verify & Enable
+                      </Button>
+                      <Button variant="ghost" onClick={() => {
+                        setShowBiometricPasswordPrompt(false);
+                        setBiometricSetupPassword('');
+                        setErrorMessage('');
+                      }} className="h-11 rounded-xl font-bold text-slate-500 dark:text-slate-400">Cancel</Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between py-2 p-3 rounded-xl bg-white dark:bg-slate-800/30 border border-slate-100 dark:border-slate-800/50">
+                    <div className="flex items-center gap-4">
+                      <div className="h-10 w-10 shrink-0 rounded-xl bg-blue-50 dark:bg-blue-950/20 flex items-center justify-center border border-blue-100 dark:border-blue-900/30">
+                        <Fingerprint className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                          Biometric Sign-In
+                        </p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                          {isBiometricAvailable ? "Log in using Fingerprint or Face ID" : "Not supported on this device/browser"}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={handleToggleBiometric}
+                      disabled={!isBiometricAvailable && !isBiometricEnabled}
+                      className={`relative inline-flex h-7 w-12 items-center rounded-full transition-all duration-300 shadow-inner ${
+                        isBiometricEnabled ? 'bg-emerald-500' : 'bg-slate-200 dark:bg-slate-700'
+                      } ${!isBiometricAvailable && !isBiometricEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    >
+                      <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-xl transition-transform duration-300 ${
+                        isBiometricEnabled ? 'translate-x-6' : 'translate-x-1'
+                      }`} />
+                    </button>
                   </div>
                 )}
               </CardContent>

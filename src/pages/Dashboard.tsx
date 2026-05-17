@@ -227,6 +227,25 @@ export function Dashboard() {
         return Object.entries(deptMap).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
     }, [employees]);
 
+    // ── ELAPSED WORKING DAYS ──
+    const elapsedWorkDaysYear = useMemo(() => {
+        const today = new Date();
+        const yearToUse = filterYear;
+        const startOfYear = new Date(yearToUse, 0, 1);
+        const endOfYear = new Date(yearToUse, 11, 31);
+        const targetEnd = yearToUse === today.getFullYear() ? today : endOfYear;
+        
+        let days = 0;
+        for (let d = new Date(startOfYear); d <= targetEnd; d.setDate(d.getDate() + 1)) {
+            const dow = d.getDay();
+            if (dow === 0) continue; // Skip Sunday (6 working days)
+            const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+            const isHoliday = holidays.some(h => h.date === dateStr);
+            if (!isHoliday) days++;
+        }
+        return days;
+    }, [filterYear, holidays]);
+
     // ── DYNAMIC ATTENDANCE & OT TREND ──
     const attendanceTrend = useMemo(() => {
         const historicallyActiveStaff = employees.filter(e => {
@@ -624,8 +643,8 @@ export function Dashboard() {
                                     <div className="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400 mt-1">Active Loans</div>
                                 </div>
                                 <div className="text-center p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg">
-                                    <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{kpiStats.totalPresentDays}</div>
-                                    <div className="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400 mt-1">Days Worked</div>
+                                    <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{elapsedWorkDaysYear}</div>
+                                    <div className="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400 mt-1">Working Days</div>
                                 </div>
                             </div>
                         </CardContent>

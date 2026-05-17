@@ -501,13 +501,14 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
               </div>
 
               <div className="flex flex-col items-center">
-                <div className="text-xs font-bold tracking-widest text-slate-400 uppercase">
+                <div className="text-xs font-bold tracking-widest text-slate-400 uppercase mb-1.5">
                   Task Navigation
                 </div>
                 <button 
                   onClick={() => setShowUpdatesOnMobile(true)}
-                  className="xl:hidden mt-0.5 px-3 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-full text-[10px] font-bold transition-colors"
+                  className="xl:hidden flex items-center gap-1.5 px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full text-[11px] font-bold shadow-md shadow-indigo-600/20 transition-all active:scale-95"
                 >
+                  <MessageSquare className="w-3.5 h-3.5" />
                   View Updates
                 </button>
               </div>
@@ -522,8 +523,12 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
                 </button>
                 <button
                   onClick={() => {
-                    onSelectSubtask(null);
-                    navigate(-1);
+                    if (onClose) {
+                      onClose();
+                    } else {
+                      onSelectSubtask(null);
+                      setShowListOnMobile(true);
+                    }
                   }}
                   className="md:hidden flex items-center justify-center w-8 h-8 rounded-full bg-slate-200/50 hover:bg-slate-200 text-slate-500 transition-colors"
                   title="Close Task"

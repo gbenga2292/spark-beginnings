@@ -6,7 +6,8 @@ import { useUserStore } from '@/src/store/userStore';
 import { supabase } from '@/src/integrations/supabase/client';
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
-import { Mail, Lock, AlertCircle, ShieldCheck, Users, BarChart3, ArrowRight, Eye, EyeOff } from 'lucide-react';
+import { Mail, Lock, AlertCircle, ShieldCheck, Users, BarChart3, ArrowRight, Eye, EyeOff, Fingerprint } from 'lucide-react';
+import { BiometricAuth } from '@aparajita/capacitor-biometric-auth';
 import logoSrc from '../../logo/logo-2.png';
 
 const CURRENT_YEAR = new Date().getFullYear();
@@ -19,6 +20,8 @@ export function Login() {
   const [rememberMe, setRememberMe] = useState(false);
   const [savedEmails, setSavedEmails] = useState<string[]>([]);
   const [showPassword, setShowPassword] = useState(false);
+  const [hasBiometricCreds, setHasBiometricCreds] = useState(false);
+  const [isBiometricAvailable, setIsBiometricAvailable] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(() => {
     return localStorage.getItem('hasSeenOnboarding') !== 'true';
   });
@@ -50,22 +53,36 @@ export function Login() {
       setEmail(lastRemembered);
       setRememberMe(true);
     }
+
+    // Check biometric setup
+    const credsStr = localStorage.getItem('biometric_credentials');
+    if (credsStr) {
+      setHasBiometricCreds(true);
+      const checkBiometric = async () => {
+        try {
+          const info = await BiometricAuth.checkBiometry();
+          setIsBiometricAvailable(info.isAvailable);
+        } catch (e) {
+          setIsBiometricAvailable(false);
+        }
+      };
+      checkBiometric();
+    }
   }, []);
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const performLogin = async (emailToUse: string, passwordToUse: string) => {
     setError('');
     setIsLoading(true);
 
     // Domain validation
-    if (!email.toLowerCase().endsWith('@dewaterconstruct.com')) {
+    if (!emailToUse.toLowerCase().endsWith('@dewaterconstruct.com')) {
       setError('Only @dewaterconstruct.com email addresses are allowed.');
       setIsLoading(false);
       return;
     }
 
     try {
-      const { error: authError } = await signIn(email, password);
+      const { error: authError } = await signIn(emailToUse, passwordToUse);
       if (authError) {
         const isOffline =
           !navigator.onLine ||
@@ -121,7 +138,7 @@ export function Login() {
       // Save email for memory (autocomplete)
       try {
         const currentEmails = JSON.parse(localStorage.getItem('savedLoginEmails') || '[]');
-        const updatedEmails = [email, ...currentEmails.filter((e: string) => e !== email)].slice(0, 5); // Keep up to 5 unique emails
+        const updatedEmails = [emailToUse, ...currentEmails.filter((e: string) => e !== emailToUse)].slice(0, 5); // Keep up to 5 unique emails
         localStorage.setItem('savedLoginEmails', JSON.stringify(updatedEmails));
       } catch (e) {
         console.error('Error saving email memory');
@@ -129,7 +146,7 @@ export function Login() {
 
       // Handle remember me
       if (rememberMe) {
-        localStorage.setItem('lastRememberedEmail', email);
+        localStorage.setItem('lastRememberedEmail', emailToUse);
       } else {
         localStorage.removeItem('lastRememberedEmail'); // Clear if not checked
       }
@@ -148,6 +165,31 @@ export function Login() {
           : err.message || 'An error occurred.'
       );
       setIsLoading(false);
+    }
+  };
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await performLogin(email, password);
+  };
+
+  const handleBiometricLogin = async () => {
+    setError('');
+    const credsStr = localStorage.getItem('biometric_credentials');
+    if (!credsStr) return;
+    
+    try {
+      await BiometricAuth.authenticate({ reason: 'Authenticate to log in' });
+      const creds = JSON.parse(atob(credsStr));
+      
+      setEmail(creds.email);
+      setPassword(creds.password);
+      
+      await performLogin(creds.email, creds.password);
+    } catch (err: any) {
+      if (err.code !== 'userCancel' && err.code !== 'systemCancel') {
+        setError(err.message || 'Biometric authentication failed.');
+      }
     }
   };
 
@@ -375,17 +417,32 @@ export function Login() {
               </button>
             </div>
 
-            <Button
-              type="submit"
-              disabled={isLoading}
-              className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-lg shadow-blue-500/20 hover:shadow-blue-500/30 transition-all disabled:opacity-70 flex items-center justify-center gap-2"
-            >
-              {isLoading ? (
-                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              ) : (
-                <>Sign In <ArrowRight className="w-4 h-4" /></>
+            <div className="flex gap-3">
+              <Button
+                type="submit"
+                disabled={isLoading}
+                className="flex-1 h-12 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-lg shadow-blue-500/20 hover:shadow-blue-500/30 transition-all disabled:opacity-70 flex items-center justify-center gap-2"
+              >
+                {isLoading ? (
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : (
+                  <>Sign In <ArrowRight className="w-4 h-4" /></>
+                )}
+              </Button>
+
+              {hasBiometricCreds && isBiometricAvailable && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={isLoading}
+                  onClick={handleBiometricLogin}
+                  className="h-12 w-12 border-blue-200 text-blue-600 hover:bg-blue-50 hover:border-blue-300 rounded-lg shadow-sm flex items-center justify-center transition-all disabled:opacity-70 flex-shrink-0"
+                  title="Sign In with Biometrics"
+                >
+                  <Fingerprint className="h-6 w-6" />
+                </Button>
               )}
-            </Button>
+            </div>
           </form>
 
           {/* Footer */}

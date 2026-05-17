@@ -282,8 +282,7 @@ export function TaskPopupNotifications() {
 
         const isGlobal    = !rem.recipientIds || rem.recipientIds.length === 0;
         const isRecipient = isGlobal || rem.recipientIds?.includes(userId);
-        const isSelf      = rem.createdBy === userId;
-        if (!isRecipient || isSelf) return;
+        if (!isRecipient) return;
 
         const remindAt = new Date(rem.remindAt).getTime();
         const diff = now - remindAt;
