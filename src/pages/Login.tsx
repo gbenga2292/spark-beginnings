@@ -19,6 +19,14 @@ export function Login() {
   const [rememberMe, setRememberMe] = useState(false);
   const [savedEmails, setSavedEmails] = useState<string[]>([]);
   const [showPassword, setShowPassword] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(() => {
+    return localStorage.getItem('hasSeenOnboarding') !== 'true';
+  });
+
+  const handleFinishOnboarding = () => {
+    localStorage.setItem('hasSeenOnboarding', 'true');
+    setShowOnboarding(false);
+  };
 
   const { signIn } = useAuth();
   const login = useAuthStore((state) => state.login);
@@ -207,28 +215,93 @@ export function Login() {
       </div>
 
       {/* ── Right Panel (Form) ──────────────────────────────────── */}
-      <div className="w-full lg:w-[45%] flex items-center justify-center px-6 py-12 sm:px-12 bg-white">
-        <div className="w-full max-w-[400px]">
+      <div className="w-full lg:w-[45%] flex items-center justify-center px-4 sm:px-6 py-8 sm:py-12 bg-white relative min-h-[100dvh] lg:min-h-full">
+        
+        {/* MOBILE ONBOARDING OVERLAY */}
+        {showOnboarding && (
+          <div className="absolute inset-0 z-50 bg-white flex flex-col lg:hidden animate-in fade-in slide-in-from-right-4 duration-500">
+            {/* Header */}
+            <div className="px-6 pt-14 pb-8 flex justify-center border-b border-slate-100">
+              <img src={logoSrc} alt="DCEL" className="h-12 w-auto" />
+            </div>
+            
+            {/* Content */}
+            <div className="flex-1 flex flex-col justify-center px-8 py-6">
+              <p className="text-[11px] font-bold text-blue-600 uppercase tracking-widest mb-3 text-center">
+                Dewatering Construction Etc Limited
+              </p>
+              <h2 className="text-[24px] font-extrabold text-slate-900 leading-tight mb-3 text-center tracking-tight">
+                Your Complete<br />Operations Portal
+              </h2>
+              <p className="text-slate-500 text-[14px] text-center mb-10 leading-relaxed max-w-[280px] mx-auto font-medium">
+                Manage HR, finance, and site operations efficiently from anywhere.
+              </p>
+              
+              {/* Feature List */}
+              <div className="space-y-4 mb-4 max-w-[300px] mx-auto w-full">
+                <div className="flex items-start gap-4">
+                  <div className="flex-shrink-0 w-10 h-10 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-center">
+                    <Users className="w-4.5 h-4.5 text-blue-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-[13px] font-bold text-slate-900">HR & Payroll</h3>
+                    <p className="text-[12px] text-slate-500 mt-0.5 leading-snug font-medium">Track attendance, leaves, and salary automatically.</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-4">
+                  <div className="flex-shrink-0 w-10 h-10 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-center">
+                    <BarChart3 className="w-4.5 h-4.5 text-blue-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-[13px] font-bold text-slate-900">Financial Reports</h3>
+                    <p className="text-[12px] text-slate-500 mt-0.5 leading-snug font-medium">View invoices, payments, and VAT summaries.</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-4">
+                  <div className="flex-shrink-0 w-10 h-10 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-center">
+                    <ShieldCheck className="w-4.5 h-4.5 text-blue-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-[13px] font-bold text-slate-900">Secure Access</h3>
+                    <p className="text-[12px] text-slate-500 mt-0.5 leading-snug font-medium">Role-based controls for every team member.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            {/* Footer / Actions */}
+            <div className="p-6 pb-10 bg-white">
+              <Button
+                onClick={handleFinishOnboarding}
+                className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm rounded-lg shadow-lg shadow-blue-500/20 transition-all flex items-center justify-center gap-2 active:scale-[0.98]"
+              >
+                Continue to Login <ArrowRight className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        )}
+
+        <div className={`w-full max-w-[400px] mx-auto relative z-10 ${showOnboarding ? 'hidden lg:block' : 'block animate-in fade-in slide-in-from-bottom-4 duration-500'}`}>
 
           {/* Mobile logo */}
-          <div className="lg:hidden flex items-center justify-center gap-3 mb-10">
+          <div className="lg:hidden flex items-center justify-center gap-3 mb-10 mt-2">
             <img src={logoSrc} alt="DCEL" className="h-12 w-auto" />
           </div>
 
           {/* Heading */}
           <div className="mb-8">
-            <p className="text-[11px] font-semibold text-blue-600 uppercase tracking-widest mb-2">
+            <p className="text-[11px] font-semibold text-blue-600 uppercase tracking-widest mb-2 text-center lg:text-left">
               Dewatering Construction Etc Limited
             </p>
-            <h2 className="text-2xl font-bold text-slate-900">Welcome Back</h2>
-            <p className="text-slate-500 text-sm mt-1.5">Enter your credentials to access the portal</p>
+            <h2 className="text-2xl font-bold text-slate-900 text-center lg:text-left">Welcome Back</h2>
+            <p className="text-slate-500 text-sm mt-1.5 text-center lg:text-left">Enter your credentials to access the portal</p>
           </div>
 
           {/* Error */}
           {error && (
             <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-4 py-3 mb-6">
               <AlertCircle className="h-4 w-4 flex-shrink-0" />
-              {error}
+              <span className="font-medium">{error}</span>
             </div>
           )}
 
@@ -247,7 +320,7 @@ export function Login() {
                   autoComplete="email"
                   list="saved-emails-list"
                   placeholder="admin@dewaterconstruct.com"
-                  className="h-11 pl-10 bg-slate-50 border-slate-200 focus:border-blue-500 focus:ring-blue-500/20 rounded-lg text-sm"
+                  className="h-12 pl-10 bg-slate-50 border-slate-200 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 rounded-lg text-sm transition-all"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -270,7 +343,7 @@ export function Login() {
                   id="password"
                   type={showPassword ? "text" : "password"}
                   placeholder="Enter your password"
-                  className="h-11 pl-10 pr-10 bg-slate-50 border-slate-200 focus:border-blue-500 focus:ring-blue-500/20 rounded-lg text-sm"
+                  className="h-12 pl-10 pr-10 bg-slate-50 border-slate-200 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 rounded-lg text-sm transition-all tracking-wider"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
@@ -278,7 +351,7 @@ export function Login() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none p-1 rounded hover:bg-slate-100 transition-colors"
                   aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -287,21 +360,25 @@ export function Login() {
             </div>
 
             <div className="flex items-center justify-between pt-1">
-              <label className="flex items-center gap-2 cursor-pointer select-none">
+              <label className="flex items-center gap-2 cursor-pointer select-none group">
                 <input
                   type="checkbox"
-                  className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500/20"
+                  className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500/20 cursor-pointer"
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
                 />
-                <span className="text-sm text-slate-500">Remember me</span>
+                <span className="text-sm text-slate-500 font-medium group-hover:text-slate-700 transition-colors">Remember me</span>
               </label>
+              
+              <button type="button" className="text-sm font-semibold text-blue-600 hover:text-blue-700 transition-colors focus:outline-none">
+                Forgot password?
+              </button>
             </div>
 
             <Button
               type="submit"
               disabled={isLoading}
-              className="w-full h-11 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-lg shadow-blue-500/20 hover:shadow-blue-500/30 transition-all disabled:opacity-70 flex items-center justify-center gap-2"
+              className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-lg shadow-blue-500/20 hover:shadow-blue-500/30 transition-all disabled:opacity-70 flex items-center justify-center gap-2"
             >
               {isLoading ? (
                 <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -312,12 +389,15 @@ export function Login() {
           </form>
 
           {/* Footer */}
-          <p className="mt-10 text-center text-[11px] text-slate-400">
-            © {CURRENT_YEAR} Dewatering Construction Etc Limited. All rights reserved.
-          </p>
+          <div className="mt-12 text-center lg:mt-16">
+            <p className="text-[11px] text-slate-400 font-medium uppercase tracking-wide">
+              © {CURRENT_YEAR} Dewatering Construction Etc Limited.
+            </p>
+          </div>
         </div>
       </div>
     </div>
   );
 }
+
 

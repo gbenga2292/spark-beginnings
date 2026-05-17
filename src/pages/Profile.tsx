@@ -38,6 +38,11 @@ const THEME_OPTIONS: { id: ColorTheme; label: string; swatches: string[] }[] = [
   { id: 'rose',    label: 'Rose',    swatches: ['#e11d48', '#f43f5e', '#fb7185'] },
   { id: 'violet',  label: 'Violet',  swatches: ['#7c3aed', '#8b5cf6', '#a78bfa'] },
   { id: 'slate',   label: 'Slate',   swatches: ['#475569', '#64748b', '#94a3b8'] },
+  { id: 'burgundy',label: 'Burgundy IDE', swatches: ['#380000', '#580000', '#ffb4b4'] },
+  { id: 'midnight',label: 'Midnight IDE', swatches: ['#001428', '#002341', '#b4d2ff'] },
+  { id: 'monokai', label: 'Monokai IDE', swatches: ['#272822', '#3e3d32', '#a6e22e'] },
+  { id: 'solarized',label: 'Solarized Dark', swatches: ['#002b36', '#073642', '#2aa198'] },
+  { id: 'tokyo-night',label: 'Tokyo Night', swatches: ['#1a1b26', '#24283b', '#7aa2f7'] },
 ];
 
 const UI_THEME_OPTIONS: { id: UITheme; label: string; description: string }[] = [
@@ -46,8 +51,6 @@ const UI_THEME_OPTIONS: { id: UITheme; label: string; description: string }[] = 
   { id: 'glass', label: 'Glassmorphism', description: 'Frosted glass effects' },
   { id: 'brutalism', label: 'Neo-Brutalism', description: 'Bold, high-contrast' },
   { id: 'minimalist', label: 'Minimalist', description: 'Sleek, borderless' },
-  { id: 'burgundy', label: 'Burgundy IDE', description: 'Deep dark red editor mode' },
-  { id: 'midnight', label: 'Midnight IDE', description: 'Deep navy blue editor mode' },
 ];
 
 export function Profile() {
@@ -614,7 +617,7 @@ export function Profile() {
                 </div>
 
                 <div className="space-y-2 px-1">
-                  <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 ml-1">Accent Color</label>
+                  <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 ml-1">Color Palette / IDE Theme</label>
                   <select
                     value={colorTheme}
                     onChange={(e) => setColorTheme(e.target.value as ColorTheme)}

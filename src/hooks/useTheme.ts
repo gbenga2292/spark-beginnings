@@ -1,16 +1,17 @@
 import { useEffect, useState } from 'react';
 
 type Mode = 'light' | 'dark';
-export type ColorTheme = 'default' | 'ocean' | 'forest' | 'sunset' | 'rose' | 'violet' | 'slate';
-export type UITheme = 'default' | 'modern' | 'glass' | 'brutalism' | 'minimalist' | 'burgundy' | 'midnight';
+export type ColorTheme = 'default' | 'ocean' | 'forest' | 'sunset' | 'rose' | 'violet' | 'slate' | 'burgundy' | 'midnight' | 'monokai' | 'solarized' | 'tokyo-night';
+export type UITheme = 'default' | 'modern' | 'glass' | 'brutalism' | 'minimalist';
 
 const MODE_KEY = 'dcel-theme';
 const COLOR_KEY = 'dcel-color-theme';
 const UI_KEY = 'dcel-ui-theme';
 const CALENDAR_KEY = 'dcel-floating-calendar';
 
-const ALL_COLOR_THEMES: ColorTheme[] = ['default', 'ocean', 'forest', 'sunset', 'rose', 'violet', 'slate'];
-const ALL_UI_THEMES: UITheme[] = ['default', 'modern', 'glass', 'brutalism', 'minimalist', 'burgundy', 'midnight'];
+const ALL_COLOR_THEMES: ColorTheme[] = ['default', 'ocean', 'forest', 'sunset', 'rose', 'violet', 'slate', 'burgundy', 'midnight', 'monokai', 'solarized', 'tokyo-night'];
+const ALL_UI_THEMES: UITheme[] = ['default', 'modern', 'glass', 'brutalism', 'minimalist'];
+export const IDE_THEMES: ColorTheme[] = ['burgundy', 'midnight', 'monokai', 'solarized', 'tokyo-night'];
 
 function getInitialMode(): Mode {
   try {
@@ -51,34 +52,42 @@ let _ui: UITheme = getInitialUI();
 let _showCalendar: boolean = getInitialCalendar();
 const _listeners = new Set<() => void>();
 
-function applyMode(m: Mode) {
-  _mode = m;
-  try { localStorage.setItem(MODE_KEY, m); } catch {}
-  if (m === 'dark') {
+function updateHtmlClasses() {
+  ALL_COLOR_THEMES.forEach(t => document.documentElement.classList.remove(`theme-${t}`));
+  if (_color !== 'default') {
+    document.documentElement.classList.add(`theme-${_color}`);
+  }
+  
+  if (_mode === 'dark' || IDE_THEMES.includes(_color)) {
     document.documentElement.classList.add('dark');
   } else {
     document.documentElement.classList.remove('dark');
   }
+  
+  ALL_UI_THEMES.forEach(t => document.documentElement.classList.remove(`ui-${t}`));
+  if (_ui !== 'default') {
+    document.documentElement.classList.add(`ui-${_ui}`);
+  }
+}
+
+function applyMode(m: Mode) {
+  _mode = m;
+  try { localStorage.setItem(MODE_KEY, m); } catch {}
+  updateHtmlClasses();
   _listeners.forEach(fn => fn());
 }
 
 function applyColor(c: ColorTheme) {
   _color = c;
   try { localStorage.setItem(COLOR_KEY, c); } catch {}
-  ALL_COLOR_THEMES.forEach(t => document.documentElement.classList.remove(`theme-${t}`));
-  if (c !== 'default') {
-    document.documentElement.classList.add(`theme-${c}`);
-  }
+  updateHtmlClasses();
   _listeners.forEach(fn => fn());
 }
 
 function applyUI(u: UITheme) {
   _ui = u;
   try { localStorage.setItem(UI_KEY, u); } catch {}
-  ALL_UI_THEMES.forEach(t => document.documentElement.classList.remove(`ui-${t}`));
-  if (u !== 'default') {
-    document.documentElement.classList.add(`ui-${u}`);
-  }
+  updateHtmlClasses();
   _listeners.forEach(fn => fn());
 }
 
@@ -120,7 +129,7 @@ export function useTheme() {
     setColorTheme,
     setUITheme,
     setShowFloatingCalendar,
-    isDark: _mode === 'dark',
+    isDark: _mode === 'dark' || IDE_THEMES.includes(_color),
   };
 }
 

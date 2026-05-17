@@ -1,5 +1,19 @@
 @import "tailwindcss";
 
+@theme {
+  --color-indigo-50: var(--theme-primary-50, #eef2ff);
+  --color-indigo-100: var(--theme-primary-100, #e0e7ff);
+  --color-indigo-200: var(--theme-primary-200, #c7d2fe);
+  --color-indigo-300: var(--theme-primary-300, #a5b4fc);
+  --color-indigo-400: var(--theme-primary-400, #818cf8);
+  --color-indigo-500: var(--theme-primary-500, #6366f1);
+  --color-indigo-600: var(--theme-primary-600, #4f46e5);
+  --color-indigo-700: var(--theme-primary-700, #4338ca);
+  --color-indigo-800: var(--theme-primary-800, #3730a3);
+  --color-indigo-900: var(--theme-primary-900, #312e81);
+  --color-indigo-950: var(--theme-primary-950, #1e1b4b);
+}
+
 /* ── Class-based dark mode (Tailwind v4) ─────────────────────────────
    Without this, Tailwind v4 dark: variants respond to the OS
    prefers-color-scheme media query, ignoring the .dark class that
@@ -38,8 +52,8 @@
    ══════════════════════════════════════════════════════════════════════ */
 .rdp-day-fully button { background-color: #10b981 !important; color: #fff !important; border-radius: 9999px !important; font-weight: 600 !important; }
 .rdp-day-fully button:hover { background-color: #059669 !important; }
-.rdp-day-special button { background-color: var(--color-indigo-500, #3b82f6) !important; color: #fff !important; border-radius: 9999px !important; font-weight: 600 !important; }
-.rdp-day-special button:hover { background-color: var(--color-indigo-600, #2563eb) !important; }
+.rdp-day-special button { background-color: var(--theme-primary-500, #3b82f6) !important; color: #fff !important; border-radius: 9999px !important; font-weight: 600 !important; }
+.rdp-day-special button:hover { background-color: var(--theme-primary-600, #2563eb) !important; }
 .rdp-day-partial button { background-color: #f59e0b !important; color: #1c1917 !important; border-radius: 9999px !important; font-weight: 600 !important; }
 .rdp-day-partial button:hover { background-color: #d97706 !important; }
 
@@ -166,98 +180,228 @@
 
 /* ══════════════════════════════════════════════════════════════════════
    COLOR THEME SYSTEM
-   Tailwind v4 resolves bg-indigo-600 → var(--color-indigo-600) etc.
+   Tailwind v4 resolves bg-indigo-600 → var(--theme-primary-600) etc.
    We simply redefine those CSS variables per theme class on <html>.
    ══════════════════════════════════════════════════════════════════════ */
 
 /* ── Ocean (Blue) ─────────────────────────────────────────────────── */
 .theme-ocean {
-  --color-indigo-50:  #eff6ff;
-  --color-indigo-100: #dbeafe;
-  --color-indigo-200: #bfdbfe;
-  --color-indigo-300: #93c5fd;
-  --color-indigo-400: #60a5fa;
-  --color-indigo-500: #3b82f6;
-  --color-indigo-600: #2563eb;
-  --color-indigo-700: #1d4ed8;
-  --color-indigo-800: #1e40af;
-  --color-indigo-900: #1e3a8a;
-  --color-indigo-950: #172554;
+  --theme-primary-50:  #eff6ff;
+  --theme-primary-100: #dbeafe;
+  --theme-primary-200: #bfdbfe;
+  --theme-primary-300: #93c5fd;
+  --theme-primary-400: #60a5fa;
+  --theme-primary-500: #3b82f6;
+  --theme-primary-600: #2563eb;
+  --theme-primary-700: #1d4ed8;
+  --theme-primary-800: #1e40af;
+  --theme-primary-900: #1e3a8a;
+  --theme-primary-950: #172554;
 }
 
 /* ── Forest (Emerald) ─────────────────────────────────────────────── */
 .theme-forest {
-  --color-indigo-50:  #ecfdf5;
-  --color-indigo-100: #d1fae5;
-  --color-indigo-200: #a7f3d0;
-  --color-indigo-300: #6ee7b7;
-  --color-indigo-400: #34d399;
-  --color-indigo-500: #10b981;
-  --color-indigo-600: #059669;
-  --color-indigo-700: #047857;
-  --color-indigo-800: #065f46;
-  --color-indigo-900: #064e3b;
-  --color-indigo-950: #022c22;
+  --theme-primary-50:  #ecfdf5;
+  --theme-primary-100: #d1fae5;
+  --theme-primary-200: #a7f3d0;
+  --theme-primary-300: #6ee7b7;
+  --theme-primary-400: #34d399;
+  --theme-primary-500: #10b981;
+  --theme-primary-600: #059669;
+  --theme-primary-700: #047857;
+  --theme-primary-800: #065f46;
+  --theme-primary-900: #064e3b;
+  --theme-primary-950: #022c22;
 }
 
 /* ── Sunset (Amber) ───────────────────────────────────────────────── */
 .theme-sunset {
-  --color-indigo-50:  #fffbeb;
-  --color-indigo-100: #fef3c7;
-  --color-indigo-200: #fde68a;
-  --color-indigo-300: #fcd34d;
-  --color-indigo-400: #fbbf24;
-  --color-indigo-500: #f59e0b;
-  --color-indigo-600: #d97706;
-  --color-indigo-700: #b45309;
-  --color-indigo-800: #92400e;
-  --color-indigo-900: #78350f;
-  --color-indigo-950: #451a03;
+  --theme-primary-50:  #fffbeb;
+  --theme-primary-100: #fef3c7;
+  --theme-primary-200: #fde68a;
+  --theme-primary-300: #fcd34d;
+  --theme-primary-400: #fbbf24;
+  --theme-primary-500: #f59e0b;
+  --theme-primary-600: #d97706;
+  --theme-primary-700: #b45309;
+  --theme-primary-800: #92400e;
+  --theme-primary-900: #78350f;
+  --theme-primary-950: #451a03;
 }
 
 /* ── Rose (Pink) ──────────────────────────────────────────────────── */
 .theme-rose {
-  --color-indigo-50:  #fff1f2;
-  --color-indigo-100: #ffe4e6;
-  --color-indigo-200: #fecdd3;
-  --color-indigo-300: #fda4af;
-  --color-indigo-400: #fb7185;
-  --color-indigo-500: #f43f5e;
-  --color-indigo-600: #e11d48;
-  --color-indigo-700: #be123c;
-  --color-indigo-800: #9f1239;
-  --color-indigo-900: #881337;
-  --color-indigo-950: #4c0519;
+  --theme-primary-50:  #fff1f2;
+  --theme-primary-100: #ffe4e6;
+  --theme-primary-200: #fecdd3;
+  --theme-primary-300: #fda4af;
+  --theme-primary-400: #fb7185;
+  --theme-primary-500: #f43f5e;
+  --theme-primary-600: #e11d48;
+  --theme-primary-700: #be123c;
+  --theme-primary-800: #9f1239;
+  --theme-primary-900: #881337;
+  --theme-primary-950: #4c0519;
 }
 
 /* ── Violet (Purple) ──────────────────────────────────────────────── */
 .theme-violet {
-  --color-indigo-50:  #f5f3ff;
-  --color-indigo-100: #ede9fe;
-  --color-indigo-200: #ddd6fe;
-  --color-indigo-300: #c4b5fd;
-  --color-indigo-400: #a78bfa;
-  --color-indigo-500: #8b5cf6;
-  --color-indigo-600: #7c3aed;
-  --color-indigo-700: #6d28d9;
-  --color-indigo-800: #5b21b6;
-  --color-indigo-900: #4c1d95;
-  --color-indigo-950: #2e1065;
+  --theme-primary-50:  #f5f3ff;
+  --theme-primary-100: #ede9fe;
+  --theme-primary-200: #ddd6fe;
+  --theme-primary-300: #c4b5fd;
+  --theme-primary-400: #a78bfa;
+  --theme-primary-500: #8b5cf6;
+  --theme-primary-600: #7c3aed;
+  --theme-primary-700: #6d28d9;
+  --theme-primary-800: #5b21b6;
+  --theme-primary-900: #4c1d95;
+  --theme-primary-950: #2e1065;
 }
 
 /* ── Slate (Neutral) ──────────────────────────────────────────────── */
 .theme-slate {
-  --color-indigo-50:  #f8fafc;
-  --color-indigo-100: #f1f5f9;
-  --color-indigo-200: #e2e8f0;
-  --color-indigo-300: #cbd5e1;
-  --color-indigo-400: #94a3b8;
-  --color-indigo-500: #64748b;
-  --color-indigo-600: #475569;
-  --color-indigo-700: #334155;
-  --color-indigo-800: #1e293b;
-  --color-indigo-900: #0f172a;
-  --color-indigo-950: #020617;
+  --theme-primary-50:  #f8fafc;
+  --theme-primary-100: #f1f5f9;
+  --theme-primary-200: #e2e8f0;
+  --theme-primary-300: #cbd5e1;
+  --theme-primary-400: #94a3b8;
+  --theme-primary-500: #64748b;
+  --theme-primary-600: #475569;
+  --theme-primary-700: #334155;
+  --theme-primary-800: #1e293b;
+  --theme-primary-900: #0f172a;
+  --theme-primary-950: #020617;
+}
+
+/* ── Burgundy (Deep Red IDE) ──────────────────────────────────────── */
+.theme-burgundy {
+  --theme-primary-50:  #fff1f2;
+  --theme-primary-100: #ffe4e6;
+  --theme-primary-200: #fecdd3;
+  --theme-primary-300: #fda4af;
+  --theme-primary-400: #fb7185;
+  --theme-primary-500: #f43f5e;
+  --theme-primary-600: #e11d48;
+  --theme-primary-700: #be123c;
+  --theme-primary-800: #9f1239;
+  --theme-primary-900: #881337;
+  --theme-primary-950: #4c0519;
+}
+.theme-burgundy, .dark.theme-burgundy {
+  --color-background:      38   0   0; 
+  --color-foreground:     255 220 220; 
+  --color-card:            58   0   0; 
+  --color-card-foreground: 255 220 220; 
+  --color-muted:           80   0   0;   
+  --color-muted-foreground: 255 180 180;
+  --color-border:         100   0   0; 
+  --color-input:          100   0   0;   
+  --color-ring:           225  29  72;
+}
+
+/* ── Midnight (Navy IDE) ──────────────────────────────────────────── */
+.theme-midnight {
+  --theme-primary-50:  #f0f9ff;
+  --theme-primary-100: #e0f2fe;
+  --theme-primary-200: #bae6fd;
+  --theme-primary-300: #7dd3fc;
+  --theme-primary-400: #38bdf8;
+  --theme-primary-500: #0ea5e9;
+  --theme-primary-600: #0284c7;
+  --theme-primary-700: #0369a1;
+  --theme-primary-800: #075985;
+  --theme-primary-900: #0c4a6e;
+  --theme-primary-950: #082f49;
+}
+.theme-midnight, .dark.theme-midnight {
+  --color-background:       0  20  40;
+  --color-foreground:     220 235 255;
+  --color-card:             0  35  65;
+  --color-card-foreground: 220 235 255;
+  --color-muted:            0  50  90;
+  --color-muted-foreground: 180 210 255;
+  --color-border:           0  70 120;
+  --color-input:            0  70 120;
+  --color-ring:             2  132 199;
+}
+
+/* ── Monokai (Dark IDE) ──────────────────────────────────────────── */
+.theme-monokai {
+  --theme-primary-50:  #f4f5f2;
+  --theme-primary-100: #e2e4dd;
+  --theme-primary-200: #c6c9bc;
+  --theme-primary-300: #a1a690;
+  --theme-primary-400: #a6e22e;
+  --theme-primary-500: #a6e22e; 
+  --theme-primary-600: #88c010;
+  --theme-primary-700: #669900;
+  --theme-primary-800: #4a7300;
+  --theme-primary-900: #2d4c00;
+  --theme-primary-950: #152600;
+}
+.theme-monokai, .dark.theme-monokai {
+  --color-background:      39  40  34; 
+  --color-foreground:     248 248 242; 
+  --color-card:            62  61  50; 
+  --color-card-foreground: 248 248 242;
+  --color-muted:           73  72  62; 
+  --color-muted-foreground: 117 113  94;
+  --color-border:          73  72  62; 
+  --color-input:           73  72  62;
+  --color-ring:           166 226  46;
+}
+
+/* ── Solarized Dark (Teal IDE) ──────────────────────────────────────────── */
+.theme-solarized {
+  --theme-primary-50:  #e0f2f1;
+  --theme-primary-100: #b2dfdb;
+  --theme-primary-200: #80cbc4;
+  --theme-primary-300: #4db6ac;
+  --theme-primary-400: #26a69a;
+  --theme-primary-500: #2aa198;
+  --theme-primary-600: #218c83;
+  --theme-primary-700: #1b7a70;
+  --theme-primary-800: #14615a;
+  --theme-primary-900: #0c423d;
+  --theme-primary-950: #062623;
+}
+.theme-solarized, .dark.theme-solarized {
+  --color-background:       0  43  54;
+  --color-foreground:     131 148 150;
+  --color-card:             7  54  66;
+  --color-card-foreground: 147 161 161;
+  --color-muted:            7  54  66;
+  --color-muted-foreground: 88 110 117;
+  --color-border:           7  54  66;
+  --color-input:            7  54  66;
+  --color-ring:            42 161 152;
+}
+
+/* ── Tokyo Night (Purple IDE) ──────────────────────────────────────────── */
+.theme-tokyo-night {
+  --theme-primary-50:  #f0f4ff;
+  --theme-primary-100: #e0ebff;
+  --theme-primary-200: #c2d6ff;
+  --theme-primary-300: #94b8ff;
+  --theme-primary-400: #7aa2f7;
+  --theme-primary-500: #5d81d9;
+  --theme-primary-600: #4264b3;
+  --theme-primary-700: #2e4a8f;
+  --theme-primary-800: #1c326b;
+  --theme-primary-900: #0f1d47;
+  --theme-primary-950: #060b24;
+}
+.theme-tokyo-night, .dark.theme-tokyo-night {
+  --color-background:      26  27  38; 
+  --color-foreground:     169 177 214; 
+  --color-card:            36  40  59; 
+  --color-card-foreground: 192 202 245; 
+  --color-muted:           65  72 104; 
+  --color-muted-foreground: 86  95 137; 
+  --color-border:          65  72 104;
+  --color-input:           65  72 104;
+  --color-ring:           122 162 247; 
 }
 
 
@@ -286,17 +430,17 @@
   --color-popover-foreground: 15 23 42;
 
   /* We map indigo to blue as the base color for the entire app */
-  --color-indigo-50:  #eff6ff;
-  --color-indigo-100: #dbeafe;
-  --color-indigo-200: #bfdbfe;
-  --color-indigo-300: #93c5fd;
-  --color-indigo-400: #60a5fa;
-  --color-indigo-500: #3b82f6;
-  --color-indigo-600: #2563eb;
-  --color-indigo-700: #1d4ed8;
-  --color-indigo-800: #1e40af;
-  --color-indigo-900: #1e3a8a;
-  --color-indigo-950: #172554;
+  --theme-primary-50:  #eff6ff;
+  --theme-primary-100: #dbeafe;
+  --theme-primary-200: #bfdbfe;
+  --theme-primary-300: #93c5fd;
+  --theme-primary-400: #60a5fa;
+  --theme-primary-500: #3b82f6;
+  --theme-primary-600: #2563eb;
+  --theme-primary-700: #1d4ed8;
+  --theme-primary-800: #1e40af;
+  --theme-primary-900: #1e3a8a;
+  --theme-primary-950: #172554;
   --color-secondary:     241 245 249;
   --color-secondary-foreground: 15 23 42;
   --color-accent:        241 245 249;
@@ -339,14 +483,14 @@
 }
 
 /* Force card-coloured surfaces opaque in dark mode */
-.dark .bg-card     { background-color: rgb(30 41 59)  !important; }  /* slate-800 */
-.dark .bg-background { background-color: rgb(15 23 42) !important; }  /* slate-950 */
-.dark .bg-muted    { background-color: rgb(30 41 59)  !important; }
-.dark .bg-popover  { background-color: rgb(30 41 59)  !important; }
-.dark .text-foreground  { color: rgb(226 232 240) !important; }
-.dark .text-muted-foreground { color: rgb(100 116 139) !important; }
-.dark .text-popover-foreground { color: rgb(226 232 240) !important; }
-.dark .border-border    { border-color: rgb(51 65 85)  !important; }
+.dark .bg-card     { background-color: rgb(var(--color-card))  !important; }
+.dark .bg-background { background-color: rgb(var(--color-background)) !important; }
+.dark .bg-muted    { background-color: rgb(var(--color-muted))  !important; }
+.dark .bg-popover  { background-color: rgb(var(--color-popover))  !important; }
+.dark .text-foreground  { color: rgb(var(--color-foreground)) !important; }
+.dark .text-muted-foreground { color: rgb(var(--color-muted-foreground)) !important; }
+.dark .text-popover-foreground { color: rgb(var(--color-popover-foreground)) !important; }
+.dark .border-border    { border-color: rgb(var(--color-border))  !important; }
 
 /* ══════════════════════════════════════════════════════════════════════
    GLOBAL DARK MODE SURFACE & TEXT OVERRIDES
@@ -357,46 +501,46 @@
 
 /* ── White & light-grey surfaces → dark slate ──────────────────────── */
 .dark .bg-white {
-  background-color: rgb(30 41 59) !important;        /* slate-800 */
+  background-color: rgb(var(--color-card)) !important;
 }
 .dark .bg-slate-50 {
-  background-color: rgb(15 23 42) !important;        /* slate-950 */
+  background-color: rgb(var(--color-background)) !important;
 }
 /* Handles bg-slate-50/50 and similar opacity variants */
 .dark [class*="bg-slate-50"] {
-  background-color: rgb(15 23 42 / 0.85) !important;
+  background-color: rgba(var(--color-background), 0.85) !important;
 }
 .dark .bg-slate-100 {
-  background-color: rgb(30 41 59) !important;        /* slate-800 */
+  background-color: rgb(var(--color-card)) !important;
 }
 .dark .bg-slate-200 {
-  background-color: rgb(51 65 85) !important;        /* slate-700 */
+  background-color: rgb(var(--color-border)) !important;
 }
 
 /* ── Text that would be invisible on dark surfaces ──────────────────── */
 /* These classes are widely used in table cells and form labels */
-.dark .text-slate-900 { color: rgb(226 232 240) !important; }  /* → slate-200 */
-.dark .text-slate-800 { color: rgb(203 213 225) !important; }  /* → slate-300 */
-.dark .text-slate-700 { color: rgb(148 163 184) !important; }  /* → slate-400 */
+.dark .text-slate-900 { color: rgb(var(--color-foreground)) !important; }
+.dark .text-slate-800 { color: rgb(var(--color-foreground)) !important; }
+.dark .text-slate-700 { color: rgb(var(--color-muted-foreground)) !important; }
 /* slate-600 and below retain their own colour — readable on dark too */
 
 /* ── Borders that disappear on dark surfaces ────────────────────────── */
-.dark .border-slate-100 { border-color: rgb(51 65 85)  !important; }  /* slate-700 */
-.dark .border-slate-200 { border-color: rgb(51 65 85)  !important; }
-.dark .divide-slate-100 { border-color: rgb(51 65 85)  !important; }
-.dark .divide-slate-200 { border-color: rgb(51 65 85)  !important; }
+.dark .border-slate-100 { border-color: rgb(var(--color-border))  !important; }
+.dark .border-slate-200 { border-color: rgb(var(--color-border))  !important; }
+.dark .divide-slate-100 { border-color: rgb(var(--color-border))  !important; }
+.dark .divide-slate-200 { border-color: rgb(var(--color-border))  !important; }
 
 /* ── Form inputs / selects / textareas without dark: variants ───────── */
 .dark input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]),
 .dark select,
 .dark textarea {
-  background-color: rgb(15 23 42)  !important;       /* slate-950 */
-  border-color:     rgb(51 65 85)  !important;       /* slate-700 */
-  color:            rgb(226 232 240) !important;     /* slate-200 */
+  background-color: rgb(var(--color-background))  !important;
+  border-color:     rgb(var(--color-border))  !important;
+  color:            rgb(var(--color-foreground)) !important;
 }
 .dark input::placeholder,
 .dark textarea::placeholder {
-  color: rgb(71 85 105) !important;                  /* slate-600 */
+  color: rgb(var(--color-muted-foreground)) !important;
 }
 
 /* ── Table rows / cells — prevent dark-text-on-dark blending ────────── */
@@ -510,76 +654,7 @@ html.dark.ui-brutalism {
   border-radius: 0px !important;
 }
 
-/* ── Burgundy IDE (VS Code Red) ──────────────────────────────────────── */
-html.ui-burgundy {
-  --color-background:      38  0  0 !important;   /* Main background #260000 */
-  --color-foreground:     255 220 220 !important; /* Text */
-  --color-card:            58  0  0 !important;   /* Cards #3A0000 */
-  --color-card-foreground: 255 220 220 !important; 
-  --color-muted:           80  0  0 !important;   
-  --color-muted-foreground: 255 180 180 !important;
-  --color-border:         100  0  0 !important; 
-  --color-input:          100  0  0 !important;   
-}
-html.ui-burgundy body, html.ui-burgundy .bg-slate-50, html.ui-burgundy .bg-white {
-  background-color: rgb(var(--color-background)) !important;
-  color: rgb(var(--color-foreground)) !important;
-}
-html.ui-burgundy .bg-card, html.ui-burgundy [data-radix-popper-content-wrapper], html.ui-burgundy .bg-slate-100 {
-  background-color: rgb(var(--color-card)) !important;
-  border-color: rgb(var(--color-border)) !important;
-  color: rgb(var(--color-foreground)) !important;
-}
-html.ui-burgundy input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), html.ui-burgundy select, html.ui-burgundy textarea {
-  background-color: rgb(var(--color-card)) !important; 
-  border-color: rgb(var(--color-border)) !important; 
-  color: rgb(var(--color-foreground)) !important;
-}
-html.ui-burgundy .border-slate-200, html.ui-burgundy .border-slate-100 { 
-  border-color: rgb(var(--color-border)) !important; 
-}
-html.ui-burgundy .text-slate-900 { color: #fff !important; }
-html.ui-burgundy .text-slate-800, html.ui-burgundy .text-slate-700 { color: rgb(255 220 220) !important; }
-html.ui-burgundy .text-slate-600, html.ui-burgundy .text-slate-500 { color: rgb(255 180 180) !important; }
-html.ui-burgundy table { color: rgb(var(--color-foreground)) !important; }
-html.ui-burgundy thead tr { background-color: rgb(var(--color-background)) !important; }
-html.ui-burgundy tbody tr:hover { background-color: rgb(var(--color-muted)) !important; }
 
-/* ── Midnight IDE (VS Code Navy) ─────────────────────────────────────── */
-html.ui-midnight {
-  --color-background:       0  20  40 !important;   /* Main background #001428 */
-  --color-foreground:     220 235 255 !important;   /* Text */
-  --color-card:             0  35  65 !important;   /* Cards #002341 */
-  --color-card-foreground: 220 235 255 !important;
-  --color-muted:            0  50  90 !important;
-  --color-muted-foreground: 180 210 255 !important;
-  --color-border:           0  70 120 !important; 
-  --color-input:            0  70 120 !important;   
-}
-
-html.ui-midnight body, html.ui-midnight .bg-slate-50, html.ui-midnight .bg-white {
-  background-color: rgb(var(--color-background)) !important;
-  color: rgb(var(--color-foreground)) !important;
-}
-html.ui-midnight .bg-card, html.ui-midnight [data-radix-popper-content-wrapper], html.ui-midnight .bg-slate-100 {
-  background-color: rgb(var(--color-card)) !important;
-  border-color: rgb(var(--color-border)) !important;
-  color: rgb(var(--color-foreground)) !important;
-}
-html.ui-midnight input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), html.ui-midnight select, html.ui-midnight textarea {
-  background-color: rgb(var(--color-card)) !important; 
-  border-color: rgb(var(--color-border)) !important; 
-  color: rgb(var(--color-foreground)) !important;
-}
-html.ui-midnight .border-slate-200, html.ui-midnight .border-slate-100 { 
-  border-color: rgb(var(--color-border)) !important; 
-}
-html.ui-midnight .text-slate-900 { color: #fff !important; }
-html.ui-midnight .text-slate-800, html.ui-midnight .text-slate-700 { color: rgb(220 235 255) !important; }
-html.ui-midnight .text-slate-600, html.ui-midnight .text-slate-500 { color: rgb(180 210 255) !important; }
-html.ui-midnight table { color: rgb(var(--color-foreground)) !important; }
-html.ui-midnight thead tr { background-color: rgb(var(--color-background)) !important; }
-html.ui-midnight tbody tr:hover { background-color: rgb(var(--color-muted)) !important; }
 
 /* ══════════════════════════════════════════════════════════════════════
    BOTTOM SHEET ANIMATION — used by the mobile 3-dot action menu

@@ -360,13 +360,13 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
 
   // ── Theme tokens (shared across all categories) ────────────────────────────
   const sidebarBg   = isDark ? 'bg-slate-900 border-slate-700/60' : 'bg-white border-slate-200';
-  const navBg       = isDark ? 'bg-slate-900' : 'bg-gradient-to-b from-blue-600 via-indigo-600 to-violet-700';
-  const catBtnBase  = isDark ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-white hover:bg-white hover:text-blue-600';
-  const catBtnActive = isDark ? 'bg-blue-700 text-white shadow-md' : 'bg-white text-blue-600 shadow-md';
-  const itemBase    = isDark ? 'text-slate-400 hover:bg-slate-800 hover:text-slate-100' : 'text-white/95 hover:bg-white hover:text-blue-600';
-  const itemActive  = isDark ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-blue-600 shadow-md';
+  const navBg       = isDark ? 'bg-slate-900' : 'bg-gradient-to-b from-indigo-600 via-indigo-700 to-indigo-800';
+  const catBtnBase  = isDark ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-white hover:bg-white hover:text-indigo-600';
+  const catBtnActive = isDark ? 'bg-indigo-700 text-white shadow-md' : 'bg-white text-indigo-600 shadow-md';
+  const itemBase    = isDark ? 'text-slate-400 hover:bg-slate-800 hover:text-slate-100' : 'text-white/95 hover:bg-white hover:text-indigo-600';
+  const itemActive  = isDark ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-indigo-600 shadow-md';
   const iconBase    = isDark ? 'text-slate-500 group-hover:text-slate-300' : 'text-white/70 group-hover:text-inherit';
-  const iconActive  = isDark ? 'text-white' : 'text-blue-600';
+  const iconActive  = isDark ? 'text-white' : 'text-indigo-600';
 
   return (
     <>
