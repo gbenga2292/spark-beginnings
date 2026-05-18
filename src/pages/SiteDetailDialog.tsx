@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { parseISO } from 'date-fns';
+import { normalizeDate } from '@/src/lib/dateUtils';
 import {
   X, MapPin, DollarSign, Activity, Wrench, MessagesSquare,
   CheckCircle2, AlertTriangle, Clock, Fuel, Calendar,
@@ -40,7 +41,9 @@ export function SiteDetailDialog({ site, filterMonth, filterYear, onClose, onEdi
     if (!dateStr) return false;
     if (filterMonth === 'all' && filterYear === 'all') return true;
     try {
-      const d = parseISO(dateStr);
+      const normalized = normalizeDate(dateStr);
+      if (!normalized) return false;
+      const d = parseISO(normalized);
       if (isNaN(d.getTime())) return false;
       const matchYear = filterYear === 'all' || d.getFullYear().toString() === filterYear;
       const matchMonth = filterMonth === 'all' || (d.getMonth() + 1).toString() === filterMonth;

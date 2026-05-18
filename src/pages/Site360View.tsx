@@ -3,7 +3,7 @@ import { parseISO } from 'date-fns';
 import {
   ArrowLeft, MapPin, DollarSign, Activity, Wrench, MessagesSquare,
   AlertTriangle, Clock, Fuel, Calendar, FileText, Users, Settings2,
-  ChevronDown, Sparkles, RefreshCcw, Send, ChevronUp, Filter
+  ChevronDown, Sparkles, RefreshCcw, Send, ChevronUp, Filter, CheckCircle2, Plus
 } from 'lucide-react';
 import { Badge } from '@/src/components/ui/badge';
 import { Button } from '@/src/components/ui/button';
@@ -13,6 +13,8 @@ import { useAppStore, Site } from '@/src/store/appStore';
 import { useOperations } from '@/src/contexts/OperationsContext';
 import { useAppData, deriveMainTaskStatus } from '@/src/contexts/AppDataContext';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
+import { InvoiceDetailDialog } from './InvoiceDetailDialog';
+import { Invoice } from '@/src/store/appStore';
 
 type SiteTab = 'financials' | 'operations' | 'maintenance' | 'comms';
 
@@ -50,25 +52,82 @@ export function Site360View({ site, clientSites, onSiteChange, onBack, onEditSit
 
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
+  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+  const [showCommDialog, setShowCommDialog] = useState(false);
+  const [finTab, setFinTab] = useState<'invoices' | 'payments' | 'expenses' | 'vat'>('invoices');
+
   const invoices = useAppStore(s => s.invoices);
   const payments = useAppStore(s => s.payments);
+  const vatPayments = useAppStore(s => s.vatPayments);
+
+  const invoicePaymentMap = useMemo(() => {
+    const allSiteInvoices = invoices.filter(i => i.siteId === site.id || i.siteName?.trim() === site.name.trim()).sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    const allSitePayments = payments.filter(p => p.site?.trim() === site.name.trim() || p.client?.trim() === site.name.trim()).sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    let totalPaymentAvailable = allSitePayments.reduce((sum, p) => sum + (p.amount || 0), 0);
+
+    const map: Record<string, { paid: number; isPaid: boolean }> = {};
+
+    allSiteInvoices.forEach(inv => {
+      const invAmount = inv.totalCharge || inv.amount || 0;
+      const allocated = Math.min(totalPaymentAvailable, invAmount);
+      totalPaymentAvailable -= allocated;
+      map[inv.id] = {
+        paid: allocated,
+        isPaid: allocated >= invAmount * 0.99
+      };
+    });
+
+    return map;
+  }, [invoices, payments, site]);
+
   const ledgerEntries = useAppStore(s => s.ledgerEntries);
   const vatRate = useAppStore(s => s.payrollVariables.vatRate);
   const commLogs = useAppStore(s => s.commLogs);
+  const addCommLog = useAppStore(s => s.addCommLog);
   const clientContacts = useAppStore(s => s.clientContacts);
-  const { dailyMachineLogs, maintenanceAssets, maintenanceSessions } = useOperations();
+  const { dailyMachineLogs, maintenanceAssets, maintenanceSessions, waybills, assets } = useOperations();
   const { mainTasks, subtasks } = useAppData();
 
   const isWithinFilter = (dateStr?: string) => {
     if (!dateStr) return false;
     if (filterMonth === 'all' && filterYear === 'all') return true;
-    try {
-      const d = parseISO(dateStr);
-      if (isNaN(d.getTime())) return false;
-      const matchYear = filterYear === 'all' || d.getFullYear().toString() === filterYear;
-      const matchMonth = filterMonth === 'all' || (d.getMonth() + 1).toString() === filterMonth;
-      return matchYear && matchMonth;
-    } catch { return false; }
+    let year = '';
+    let month = '';
+    if (dateStr.includes('-')) {
+      const parts = dateStr.split('-');
+      if (parts.length >= 2) {
+        year = parts[0];
+        month = parseInt(parts[1], 10).toString();
+      }
+    } else if (dateStr.includes('/')) {
+      const parts = dateStr.split('/');
+      if (parts.length >= 3) {
+        year = parts[2];
+        month = parseInt(parts[1], 10).toString();
+      }
+    }
+    if (!year || !month) return false;
+    const matchYear = filterYear === 'all' || year === filterYear;
+    const matchMonth = filterMonth === 'all' || month === filterMonth;
+    return matchYear && matchMonth;
+  };
+
+  const isBeforeFilter = (dateStr?: string) => {
+    if (!dateStr || filterMonth === 'all' || filterYear === 'all') return false;
+    let year = '';
+    let month = '';
+    if (dateStr.includes('-')) {
+      const parts = dateStr.split('-');
+      if (parts.length >= 2) { year = parts[0]; month = parts[1]; }
+    } else if (dateStr.includes('/')) {
+      const parts = dateStr.split('/');
+      if (parts.length >= 3) { year = parts[2]; month = parts[1]; }
+    }
+    if (!year || !month) return false;
+    const curYM = `${filterYear}-${parseInt(filterMonth, 10).toString().padStart(2, '0')}`;
+    const dateYM = `${year}-${parseInt(month, 10).toString().padStart(2, '0')}`;
+    return dateYM < curYM;
   };
 
   const data = useMemo(() => {
@@ -76,26 +135,90 @@ export function Site360View({ site, clientSites, onSiteChange, onBack, onEditSit
       (i.siteId === site.id || i.siteName?.trim() === site.name.trim()) && isWithinFilter(i.date)
     );
     const totalBilled = siteInvoices.reduce((a, i) => a + (i.totalCharge || i.amount || 0), 0);
-    const sitePayments = payments.filter(p => p.site?.trim() === site.name.trim() && isWithinFilter(p.date));
+    const sitePayments = payments.filter(p => (p.site?.trim() === site.name.trim() || p.client?.trim() === site.name.trim()) && isWithinFilter(p.date));
     const totalReceived = sitePayments.reduce((a, p) => a + (p.amount || 0), 0);
     const outstanding = totalBilled - totalReceived;
 
-    const vatGenerated = siteInvoices.reduce((acc, i) => {
-      if (i.vat !== undefined) return acc + i.vat;
-      const base = (i.totalCost || i.amount || 0) - (i.damages || 0);
-      const vatInc = i.vatInc || 'No';
-      let vat = 0;
-      if (vatInc === 'Yes') vat = (base / (100 + vatRate)) * vatRate;
-      else if (vatInc === 'Add') vat = base * (vatRate / 100);
-      return acc + Math.round(vat * 100) / 100;
+    const vatGenerated = 0; // VAT is only on payments, not invoices
+
+    const periodVatCollected = sitePayments.reduce((sum, p) => {
+      if (p.vat !== undefined && p.vat > 0) return sum + p.vat;
+      const baseAmount = (p.amount || 0) - (p.damages || 0);
+      const payVat = p.payVat || 'No';
+      let vatVal = 0;
+      if (payVat === 'Add') vatVal = ((baseAmount * vatRate) / (100 + vatRate));
+      else if (payVat === 'Yes') vatVal = ((baseAmount / (100 + vatRate)) * vatRate);
+      return sum + Math.round(vatVal * 100) / 100;
     }, 0);
 
-    const siteCosts = ledgerEntries.filter(l => l.site?.trim() === site.name.trim() && isWithinFilter(l.date));
+    const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    const clientVatPayments = vatPayments.filter(vp => vp.client?.trim() === site.client?.trim());
+
+    const prevPayments = payments.filter(p => (p.site?.trim() === site.name.trim() || p.client?.trim() === site.name.trim()) && isBeforeFilter(p.date));
+    const prevVatCollected = prevPayments.reduce((sum, p) => {
+      if (p.vat !== undefined && p.vat > 0) return sum + p.vat;
+      const baseAmount = (p.amount || 0) - (p.damages || 0);
+      const payVat = p.payVat || 'No';
+      let vatVal = 0;
+      if (payVat === 'Add') vatVal = ((baseAmount * vatRate) / (100 + vatRate));
+      else if (payVat === 'Yes') vatVal = ((baseAmount / (100 + vatRate)) * vatRate);
+      return sum + Math.round(vatVal * 100) / 100;
+    }, 0);
+
+    const prevVatRemitted = clientVatPayments.filter(vp => {
+      if (filterMonth === 'all' || filterYear === 'all') return false;
+      if (!vp.year) return false;
+      if (vp.year < filterYear) return true;
+      const monthIndex = MONTHS.findIndex(m => m.toLowerCase() === vp.month?.toLowerCase());
+      if (vp.year === filterYear && monthIndex !== -1 && monthIndex < (parseInt(filterMonth, 10) - 1)) return true;
+      return false;
+    }).reduce((sum, vp) => sum + (vp.amount || 0), 0);
+
+    const unpaidVatBroughtForward = Math.max(0, prevVatCollected - prevVatRemitted);
+
+    const periodVatRemitted = clientVatPayments.filter(vp => {
+      if (filterMonth === 'all' && filterYear === 'all') return true;
+      const matchYear = filterYear === 'all' || vp.year === filterYear;
+      const monthName = filterMonth !== 'all' ? MONTHS[parseInt(filterMonth, 10) - 1] : null;
+      const matchMonth = filterMonth === 'all' || vp.month?.toLowerCase() === monthName?.toLowerCase();
+      return matchYear && matchMonth;
+    }).reduce((sum, vp) => sum + (vp.amount || 0), 0);
+
+    const totalVatRemitted = clientVatPayments.reduce((sum, vp) => sum + (vp.amount || 0), 0);
+
+    const siteCosts = ledgerEntries.filter(l => (l.site?.trim() === site.name.trim() || l.client?.trim() === site.name.trim()) && isWithinFilter(l.date));
     const totalCost = siteCosts.reduce((a, l) => a + (l.amount || 0), 0);
 
     const machineLogs = dailyMachineLogs.filter(l => l.siteId === site.id && isWithinFilter(l.date));
     const totalDiesel = machineLogs.reduce((a, l) => a + (l.dieselUsage || 0), 0);
     const activeDays = machineLogs.filter(l => l.isActive).length;
+
+    const machineDays = machineLogs.reduce((sum, l) => {
+      if (l.operationalDay === 'half') return sum + 0.5;
+      if (l.operationalDay === 'none') return sum + 0;
+      if (l.operationalDay === 'full') return sum + 1;
+      return sum + (l.isActive ? 1 : 0);
+    }, 0);
+
+    const activeMachinesCount = new Set(machineLogs.filter(l => l.isActive || l.operationalDay === 'full' || l.operationalDay === 'half').map(l => l.assetId)).size;
+
+    const siteWaybills = waybills.filter(w =>
+      (w.siteName?.toLowerCase() === site.name.toLowerCase() || w.siteId === site.id) &&
+      w.status !== 'outstanding'
+    );
+    const inventoryMap = new Map<string, number>();
+    siteWaybills.filter(w => w.type === 'waybill' && w.status !== 'outstanding').forEach(wb => {
+      wb.items.forEach(item => {
+        inventoryMap.set(item.assetId, (inventoryMap.get(item.assetId) || 0) + item.quantity);
+      });
+    });
+    siteWaybills.filter(w => w.type === 'return').forEach(wb => {
+      wb.items.forEach(item => {
+        const cur = inventoryMap.get(item.assetId) || 0;
+        inventoryMap.set(item.assetId, Math.max(0, cur - item.quantity));
+      });
+    });
+    const machinesOnSiteCount = assets.filter(a => a.type === 'equipment' && a.requiresLogging && (inventoryMap.get(a.id) || 0) > 0).length;
 
     const siteMaintAssets = maintenanceAssets.filter(a => a.site?.trim() === site.name.trim());
     const siteMaintSessions = maintenanceSessions.filter(s_session =>
@@ -120,18 +243,18 @@ export function Site360View({ site, clientSites, onSiteChange, onBack, onEditSit
     );
 
     const alerts: { title: string; type: 'warning' | 'danger' }[] = [];
-    if (outstanding > 0) alerts.push({ title: `Unpaid Balance: ₦${outstanding.toLocaleString()}`, type: 'warning' });
     if (siteMaintAssets.some(a => a.status === 'overdue')) alerts.push({ title: 'Overdue maintenance on one or more assets', type: 'danger' });
     if (siteTasks.length > 3) alerts.push({ title: `${siteTasks.length} pending tasks`, type: 'warning' });
 
     return {
-      siteInvoices, totalBilled, totalReceived, outstanding, vatGenerated, totalCost,
-      machineLogs, totalDiesel, activeDays,
+      siteInvoices, sitePayments, siteCosts, totalBilled, totalReceived, outstanding, vatGenerated, totalCost,
+      periodVatCollected, unpaidVatBroughtForward, periodVatRemitted, totalVatRemitted,
+      machineLogs, totalDiesel, activeDays, machineDays, activeMachinesCount, machinesOnSiteCount,
       siteMaintAssets, siteMaintSessions, totalMaintenanceCost,
       siteTasks, siteComms, siteContacts, alerts,
       profit: totalBilled - totalCost
     };
-  }, [site, filterMonth, filterYear, invoices, payments, ledgerEntries, vatRate, dailyMachineLogs, maintenanceAssets, maintenanceSessions, mainTasks, subtasks, commLogs, clientContacts]);
+  }, [site, filterMonth, filterYear, invoices, payments, vatPayments, ledgerEntries, vatRate, dailyMachineLogs, maintenanceAssets, maintenanceSessions, mainTasks, subtasks, commLogs, clientContacts, waybills, assets]);
 
   const card = cn('p-5 rounded-2xl border shadow-sm', isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200');
 
@@ -307,16 +430,18 @@ Answer site-specific questions using this context only. Be concise.`;
           </div>
 
           {/* KPI Strip */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {[
-              { label: 'Total Billed', value: `₦${data.totalBilled.toLocaleString()}`, color: 'text-emerald-600' },
-              { label: 'Outstanding', value: `₦${data.outstanding.toLocaleString()}`, color: data.outstanding > 0 ? 'text-rose-500' : 'text-emerald-500' },
-              { label: 'Machine Days', value: data.machineLogs.length.toString(), color: 'text-indigo-600' },
+              { label: 'Unpaid Balance', value: `₦${data.outstanding.toLocaleString()}`, color: data.outstanding > 0 ? 'text-rose-500' : 'text-emerald-500' },
+              { label: 'Machine Days', value: `${data.machineDays} Day${data.machineDays === 1 ? '' : 's'}`, subtext: `${data.activeMachinesCount} active machine${data.activeMachinesCount === 1 ? '' : 's'} (${data.machinesOnSiteCount} total on site)`, color: 'text-indigo-600' },
               { label: 'Pending Tasks', value: data.siteTasks.length.toString(), color: 'text-amber-600' },
             ].map(k => (
               <div key={k.label} className={card}>
                 <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">{k.label}</p>
-                <p className={cn('text-2xl font-black', k.color)}>{k.value}</p>
+                <div className="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-2">
+                  <p className={cn('text-2xl font-black shrink-0', k.color)}>{k.value}</p>
+                  {k.subtext && <span className="text-xs font-semibold text-slate-400 dark:text-slate-500 leading-normal">{k.subtext}</span>}
+                </div>
               </div>
             ))}
           </div>
@@ -358,41 +483,156 @@ Answer site-specific questions using this context only. Be concise.`;
             {/* FINANCIALS */}
             {activeTab === 'financials' && (
               <>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                {/* Financial Sub-Tabs */}
+                <div className="flex items-center gap-3 overflow-x-auto pb-2">
                   {[
-                    { label: 'Payments Received', value: `₦${data.totalReceived.toLocaleString()}`, color: 'text-sky-600' },
-                    { label: 'VAT Generated', value: `₦${data.vatGenerated.toLocaleString()}`, color: 'text-amber-600' },
-                    { label: 'Profit Estimate', value: `₦${data.profit.toLocaleString()}`, color: data.profit >= 0 ? 'text-emerald-600' : 'text-rose-500' },
-                  ].map(k => (
-                    <div key={k.label} className={card}>
-                      <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">{k.label}</p>
-                      <p className={cn('text-xl font-black', k.color)}>{k.value}</p>
-                    </div>
+                    { id: 'invoices', label: 'Invoices', count: data.siteInvoices.length, amount: `₦${data.totalBilled.toLocaleString()}`, icon: FileText },
+                    { id: 'payments', label: 'Payments', count: data.sitePayments.length, amount: `₦${data.totalReceived.toLocaleString()}`, icon: DollarSign },
+                    { id: 'expenses', label: 'Expenses', count: data.siteCosts.length, amount: `₦${data.totalCost.toLocaleString()}`, icon: FileText },
+                    { id: 'vat', label: 'VAT Remitted', count: null, amount: `₦${data.periodVatRemitted.toLocaleString()}`, icon: CheckCircle2 },
+                  ].map(t => (
+                    <button
+                      key={t.id}
+                      onClick={() => setFinTab(t.id as any)}
+                      className={cn(
+                        "flex flex-col items-start p-4 rounded-2xl border text-left transition-all min-w-[170px] flex-1 shadow-sm",
+                        finTab === t.id
+                          ? "bg-indigo-50 text-indigo-950 dark:bg-indigo-950/40 dark:text-indigo-200 border-indigo-500 ring-1 ring-indigo-500"
+                          : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50"
+                      )}
+                    >
+                      <div className="flex items-center justify-between w-full mb-1.5">
+                        <span className="text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
+                          <t.icon className="w-4 h-4 text-indigo-500" /> {t.label} {t.count !== null ? `(${t.count})` : ''}
+                        </span>
+                        {finTab === t.id && <span className="w-2 h-2 rounded-full bg-indigo-600 dark:bg-indigo-400 animate-pulse" />}
+                      </div>
+                      <p className="text-xl font-black text-slate-900 dark:text-slate-100">{t.amount}</p>
+                    </button>
                   ))}
                 </div>
-                <div className={card}>
-                  <h3 className="font-bold mb-4 flex items-center gap-2 text-lg"><FileText className="w-5 h-5 text-indigo-500" /> Invoices ({data.siteInvoices.length})</h3>
-                  {data.siteInvoices.length > 0 ? (
-                    <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                      {data.siteInvoices.map(inv => {
-                        const paid = payments.filter(p => p.site?.trim() === site.name.trim() && p.date >= inv.date).reduce((a, p) => a + p.amount, 0);
-                        const isPaid = paid >= (inv.totalCharge || inv.amount || 0) * 0.99;
-                        return (
-                          <div key={inv.id} className="py-3 flex items-center justify-between gap-3">
+
+                {/* Tab Content */}
+                {finTab === 'vat' && (
+                  <div className={cn(card, "bg-gradient-to-br from-indigo-50/50 via-white to-purple-50/50 dark:from-indigo-950/20 dark:via-slate-900 dark:to-purple-950/20 border-indigo-100 dark:border-indigo-900/50 animate-in fade-in duration-200")}>
+                    <h3 className="font-bold mb-4 flex items-center gap-2 text-lg text-indigo-950 dark:text-indigo-300">
+                      <CheckCircle2 className="w-5 h-5 text-indigo-500" /> VAT Intelligence & Compliance
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="p-4 rounded-xl bg-white/80 dark:bg-slate-800/80 border border-slate-100 dark:border-slate-700/50 shadow-sm flex flex-col justify-between">
+                        <div>
+                          <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">VAT Collected (Selected Period)</p>
+                          <p className="text-xl font-black text-sky-600 dark:text-sky-400">₦{data.periodVatCollected.toLocaleString()}</p>
+                          <p className="text-xs text-slate-400 mt-1">Derived from client payments received</p>
+                        </div>
+                        <div className="mt-3">
+                          <Badge className="bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300 font-semibold text-xs py-1 px-2.5">
+                            {filterMonth === 'all' && filterYear === 'all' ? 'All-Time Payments' : 'Period Payments'}
+                          </Badge>
+                        </div>
+                      </div>
+
+                      <div className="p-4 rounded-xl bg-white/80 dark:bg-slate-800/80 border border-slate-100 dark:border-slate-700/50 shadow-sm flex flex-col justify-between">
+                        <div>
+                          <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Prior Unpaid VAT (Brought Forward)</p>
+                          <p className="text-xl font-black text-amber-600 dark:text-amber-400">₦{data.unpaidVatBroughtForward.toLocaleString()}</p>
+                          <p className="text-xs text-slate-400 mt-1">Accumulated unpaid VAT from previous periods</p>
+                        </div>
+                        <div className="mt-3">
+                          <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300 font-semibold text-xs py-1 px-2.5">
+                            Accumulated Liability
+                          </Badge>
+                        </div>
+                      </div>
+
+                      <div className="p-4 rounded-xl bg-white/80 dark:bg-slate-800/80 border border-slate-100 dark:border-slate-700/50 shadow-sm flex flex-col justify-between">
+                        <div>
+                          <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">VAT Remitted to FIRS (Selected Period)</p>
+                          <p className="text-xl font-black text-emerald-600 dark:text-emerald-400">₦{data.periodVatRemitted.toLocaleString()}</p>
+                          <p className="text-xs text-slate-400 mt-1">Total All-Time Remitted: ₦{data.totalVatRemitted.toLocaleString()}</p>
+                        </div>
+                        <div className="mt-3">
+                          <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 font-semibold text-xs py-1 px-2.5">
+                            Official Tax Remittance
+                          </Badge>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {finTab === 'invoices' && (
+                  <div className={cn(card, "animate-in fade-in duration-200")}>
+                    <h3 className="font-bold mb-4 flex items-center gap-2 text-lg"><FileText className="w-5 h-5 text-indigo-500" /> Invoices ({data.siteInvoices.length})</h3>
+                    {data.siteInvoices.length > 0 ? (
+                      <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                        {data.siteInvoices.map(inv => {
+                          const { isPaid } = invoicePaymentMap[inv.id] || { paid: 0, isPaid: false };
+                          return (
+                            <div
+                              key={inv.id}
+                              onClick={() => setSelectedInvoice(inv)}
+                              className="py-3 flex items-center justify-between gap-3 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 px-2 rounded-xl transition-colors"
+                            >
+                              <div>
+                                <p className="font-semibold text-sm">{inv.invoiceNumber || inv.id.slice(0, 8)}</p>
+                                <p className="text-xs text-slate-500">{inv.date ? new Date(inv.date).toLocaleDateString('en-GB') : '—'} · {inv.billingCycle || 'Custom'}</p>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <p className="font-bold text-sm">₦{(inv.totalCharge || inv.amount || 0).toLocaleString()}</p>
+                                <Badge className={isPaid ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}>{isPaid ? 'Paid' : 'Unpaid'}</Badge>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : <p className="text-slate-500 text-sm text-center py-8">No invoices for this site in the selected period.</p>}
+                  </div>
+                )}
+
+                {finTab === 'payments' && (
+                  <div className={cn(card, "animate-in fade-in duration-200")}>
+                    <h3 className="font-bold mb-4 flex items-center gap-2 text-lg"><DollarSign className="w-5 h-5 text-emerald-500" /> Payments Received ({data.sitePayments.length})</h3>
+                    {data.sitePayments.length > 0 ? (
+                      <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                        {data.sitePayments.map(pay => (
+                          <div key={pay.id} className="py-3 flex items-center justify-between gap-3 px-2 hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-xl transition-colors">
                             <div>
-                              <p className="font-semibold text-sm">{inv.invoiceNumber || inv.id.slice(0, 8)}</p>
-                              <p className="text-xs text-slate-500">{inv.date ? new Date(inv.date).toLocaleDateString('en-GB') : '—'} · {inv.billingCycle || 'Custom'}</p>
+                              <p className="font-semibold text-sm">Payment · {pay.date ? pay.date : '—'}</p>
+                              <p className="text-xs text-slate-500">VAT Included: {pay.payVat || 'No'} {pay.vat ? `(₦${pay.vat.toLocaleString()})` : ''}</p>
                             </div>
                             <div className="flex items-center gap-3">
-                              <p className="font-bold text-sm">₦{(inv.totalCharge || inv.amount || 0).toLocaleString()}</p>
-                              <Badge className={isPaid ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}>{isPaid ? 'Paid' : 'Unpaid'}</Badge>
+                              <p className="font-bold text-sm text-emerald-600 dark:text-emerald-400">₦{(pay.amount || 0).toLocaleString()}</p>
+                              <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">Received</Badge>
                             </div>
                           </div>
-                        );
-                      })}
-                    </div>
-                  ) : <p className="text-slate-500 text-sm text-center py-8">No invoices for this site in the selected period.</p>}
-                </div>
+                        ))}
+                      </div>
+                    ) : <p className="text-slate-500 text-sm text-center py-8">No payments recorded for this site in the selected period.</p>}
+                  </div>
+                )}
+
+                {finTab === 'expenses' && (
+                  <div className={cn(card, "animate-in fade-in duration-200")}>
+                    <h3 className="font-bold mb-4 flex items-center gap-2 text-lg"><FileText className="w-5 h-5 text-rose-500" /> Site Expenses ({data.siteCosts.length})</h3>
+                    {data.siteCosts.length > 0 ? (
+                      <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                        {data.siteCosts.map(cost => (
+                          <div key={cost.id} className="py-3 flex items-center justify-between gap-3 px-2 hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-xl transition-colors">
+                            <div>
+                              <p className="font-semibold text-sm">{cost.description || cost.category || 'Expense'}</p>
+                              <p className="text-xs text-slate-500">{cost.date ? cost.date : '—'} · {cost.category} {cost.vendor ? `· ${cost.vendor}` : ''}</p>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <p className="font-bold text-sm text-rose-600 dark:text-rose-400">₦{(cost.amount || 0).toLocaleString()}</p>
+                              <Badge className="bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300">Expense</Badge>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : <p className="text-slate-500 text-sm text-center py-8">No expenses recorded for this site in the selected period.</p>}
+                  </div>
+                )}
               </>
             )}
 
@@ -502,7 +742,12 @@ Answer site-specific questions using this context only. Be concise.`;
                   )) : <p className="text-slate-500 text-sm text-center py-8">No pending tasks.</p>}
                 </div>
                 <div className={card}>
-                  <h3 className="font-bold mb-4 text-lg flex items-center gap-2"><MessagesSquare className="w-5 h-5 text-blue-500" /> Communication Logs ({data.siteComms.length})</h3>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="font-bold text-lg flex items-center gap-2"><MessagesSquare className="w-5 h-5 text-blue-500" /> Communication Logs ({data.siteComms.length})</h3>
+                    <Button onClick={() => setShowCommDialog(true)} size="sm" className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-1.5 rounded-xl h-8 px-2.5">
+                      <Plus className="w-4 h-4" /> Add Log
+                    </Button>
+                  </div>
                   {data.siteComms.length > 0 ? (
                     <div className="relative pl-5 border-l-2 border-slate-200 dark:border-slate-700 space-y-4">
                       {data.siteComms.slice(0, 10).map(log => (
@@ -532,7 +777,183 @@ Answer site-specific questions using this context only. Be concise.`;
               </div>
             )}
           </div>
+
+          <InvoiceDetailDialog
+            invoice={selectedInvoice}
+            invoiceList={data.siteInvoices}
+            open={!!selectedInvoice}
+            onClose={() => setSelectedInvoice(null)}
+            onNavigate={setSelectedInvoice}
+            onEdit={() => alert('To edit this invoice, please visit the Invoices & Billing module.')}
+            onPrint={() => alert('To print this invoice, please visit the Invoices & Billing module.')}
+          />
+
+          <ExternalCommDialog
+            open={showCommDialog}
+            onClose={() => setShowCommDialog(false)}
+            site={site}
+            onSave={(log) => {
+              addCommLog(log);
+              alert('External communication log added successfully!');
+            }}
+          />
         </div>
+      </div>
+    </div>
+  );
+}
+
+function ExternalCommDialog({ open, onClose, site, onSave }: { open: boolean; onClose: () => void; site: Site; onSave: (log: any) => void }) {
+  const [form, setForm] = useState({
+    subject: '',
+    notes: '',
+    direction: 'Outgoing' as 'Incoming' | 'Outgoing',
+    channel: 'Email' as 'Email' | 'Phone' | 'WhatsApp' | 'In-Person' | 'Official Letter',
+    contactPerson: '',
+    outcome: '',
+    followUpDate: '',
+  });
+
+  if (!open) return null;
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.notes.trim()) {
+      alert('Please enter communication notes');
+      return;
+    }
+    const today = new Date().toISOString().split('T')[0];
+    onSave({
+      id: Math.random().toString(36).substr(2, 9),
+      date: today,
+      direction: form.direction,
+      channel: form.channel,
+      contactType: 'Client',
+      client: site.client || site.name,
+      siteId: site.id,
+      siteName: site.name,
+      contactPerson: form.contactPerson.trim() || undefined,
+      subject: form.subject.trim() || undefined,
+      notes: form.notes,
+      outcome: form.outcome.trim() || undefined,
+      followUpDate: form.followUpDate || undefined,
+      followUpDone: false,
+      loggedBy: 'Admin',
+      createdAt: new Date().toISOString(),
+      isInternal: false,
+    });
+    onClose();
+    setForm({
+      subject: '',
+      notes: '',
+      direction: 'Outgoing',
+      channel: 'Email',
+      contactPerson: '',
+      outcome: '',
+      followUpDate: '',
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xl max-w-lg w-full overflow-hidden flex flex-col max-h-[90vh]">
+        <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-900/50">
+          <div>
+            <h3 className="font-bold text-lg text-slate-900 dark:text-slate-100">Log External Communication</h3>
+            <p className="text-xs text-slate-500">For {site.name}</p>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-lg font-semibold">✕</button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-5 space-y-4 overflow-y-auto flex-1">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Direction</label>
+              <select
+                value={form.direction}
+                onChange={e => setForm({ ...form, direction: e.target.value as any })}
+                className="w-full h-10 px-3 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                <option value="Outgoing">Outgoing</option>
+                <option value="Incoming">Incoming</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Channel</label>
+              <select
+                value={form.channel}
+                onChange={e => setForm({ ...form, channel: e.target.value as any })}
+                className="w-full h-10 px-3 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                <option value="Email">Email</option>
+                <option value="Phone">Phone</option>
+                <option value="WhatsApp">WhatsApp</option>
+                <option value="In-Person">In-Person</option>
+                <option value="Official Letter">Official Letter</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Subject / Summary</label>
+            <input
+              type="text"
+              placeholder="E.g. Quotation sent, Site inspection meeting..."
+              value={form.subject}
+              onChange={e => setForm({ ...form, subject: e.target.value })}
+              className="w-full h-10 px-3 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Contact Person (Optional)</label>
+            <input
+              type="text"
+              placeholder="E.g. Engr. Felix"
+              value={form.contactPerson}
+              onChange={e => setForm({ ...form, contactPerson: e.target.value })}
+              className="w-full h-10 px-3 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Notes *</label>
+            <textarea
+              rows={3}
+              required
+              placeholder="Details of the conversation or interaction..."
+              value={form.notes}
+              onChange={e => setForm({ ...form, notes: e.target.value })}
+              className="w-full p-3 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Outcome / Next Steps (Optional)</label>
+            <input
+              type="text"
+              placeholder="E.g. Client to approve quotation by Friday"
+              value={form.outcome}
+              onChange={e => setForm({ ...form, outcome: e.target.value })}
+              className="w-full h-10 px-3 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Follow-up Date (Optional)</label>
+            <input
+              type="date"
+              value={form.followUpDate}
+              onChange={e => setForm({ ...form, followUpDate: e.target.value })}
+              className="w-full h-10 px-3 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+
+          <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-3">
+            <Button type="button" variant="outline" onClick={onClose} className="rounded-xl">Cancel</Button>
+            <Button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl">Save Log</Button>
+          </div>
+        </form>
       </div>
     </div>
   );

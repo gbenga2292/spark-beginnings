@@ -110,6 +110,7 @@ export interface ClientProfile {
   createdAt?: string;
   address?: string;
   mainContactPerson?: string;
+  contactPhone?: string;
 }
 
 export interface Site {
@@ -122,6 +123,8 @@ export interface Site {
   endDate?: string;
   address?: string;
   mainContactPerson?: string;
+  contactPhone?: string;
+  position?: string;
 }
 
 export interface TaxBracket {

@@ -14,6 +14,7 @@ import { useAppData, deriveMainTaskStatus } from '@/src/contexts/AppDataContext'
 import { useOperations } from '@/src/contexts/OperationsContext';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { parseISO } from 'date-fns';
+import { normalizeDate } from '@/src/lib/dateUtils';
 import { Site360View } from './Site360View';
 
 type TabType = 'overview' | 'contacts' | 'financials' | 'operations' | 'activity';
@@ -34,6 +35,7 @@ export function Client360() {
   const clientProfiles = useAppStore(s => s.clientProfiles);
   const updateSite = useAppStore(s => s.updateSite);
   const updateClientProfile = useAppStore(s => s.updateClientProfile);
+  const addClientProfile = useAppStore(s => s.addClientProfile);
   const { mainTasks, subtasks } = useAppData();
   const { dailyMachineLogs, assets, waybills } = useOperations();
 
@@ -59,6 +61,7 @@ export function Client360() {
   const [filterMonth, setFilterMonth] = useState<string>('all');
   const [filterYear, setFilterYear] = useState<string>('all');
   const [isChatCollapsed, setIsChatCollapsed] = useState(true);
+  const [showFilterMenu, setShowFilterMenu] = useState(false);
 
   const clientData = useMemo(() => {
     if (!selectedClient) return null;
@@ -68,7 +71,9 @@ export function Client360() {
       if (!dateString) return false;
       if (filterMonth === 'all' && filterYear === 'all') return true;
       try {
-        const d = parseISO(dateString);
+        const normalized = normalizeDate(dateString);
+        if (!normalized) return false;
+        const d = parseISO(normalized);
         if (isNaN(d.getTime())) return false;
         
         const matchesYear = filterYear === 'all' || d.getFullYear().toString() === filterYear;
@@ -80,7 +85,42 @@ export function Client360() {
       }
     };
 
-    const clientSites = sites.filter(s => s.client.trim() === selectedClient && isWithinTimeFilter(s.startDate));
+    const isSiteActiveInFilter = (s: Site) => {
+      if (filterMonth === 'all' && filterYear === 'all') return true;
+      if (!s.startDate) return true;
+      try {
+        const start = parseISO(s.startDate);
+        if (isNaN(start.getTime())) return true;
+
+        if (filterYear !== 'all') {
+          const filterY = parseInt(filterYear, 10);
+          if (start.getFullYear() > filterY) return false; // started after filter year
+          if (s.endDate) {
+            const end = parseISO(s.endDate);
+            if (!isNaN(end.getTime()) && end.getFullYear() < filterY) return false; // ended before filter year
+          }
+        }
+
+        if (filterMonth !== 'all' && filterYear !== 'all') {
+          const filterY = parseInt(filterYear, 10);
+          const filterM = parseInt(filterMonth, 10);
+          const filterDateStart = new Date(filterY, filterM - 1, 1);
+          const filterDateEnd = new Date(filterY, filterM, 0, 23, 59, 59);
+
+          if (start > filterDateEnd) return false; // started after filter month ended
+          if (s.endDate) {
+            const end = parseISO(s.endDate);
+            if (!isNaN(end.getTime()) && end < filterDateStart) return false; // ended before filter month started
+          }
+        }
+
+        return true;
+      } catch {
+        return true;
+      }
+    };
+
+    const clientSites = sites.filter(s => s.client.trim() === selectedClient && isSiteActiveInFilter(s));
     const activeSites = clientSites.filter(s => s.status === 'Active');
 
     // Financial calculations
@@ -109,6 +149,88 @@ export function Client360() {
     
     // Capture the months the VAT payments cover
     const vatMonthsIncluded = Array.from(new Set(clientVatPayments.map(vp => `${vp.month} ${vp.year}`)));
+
+    // Detailed payment and VAT registry mapping
+    const vatDueByMonthYear: Record<string, number> = {};
+    const vatPaymentsByMonthYear: Record<string, number> = {};
+
+    // 1. Calculate VAT due for each month-year from ALL client payments
+    const allClientPayments = payments.filter(p => p.client?.trim() === selectedClient);
+    allClientPayments.forEach(p => {
+      const normalized = normalizeDate(p.date);
+      if (!normalized) return;
+      const d = parseISO(normalized);
+      if (isNaN(d.getTime())) return;
+      const monthName = d.toLocaleString('en-US', { month: 'long' });
+      const yearStr = d.getFullYear().toString();
+      const key = `${monthName.toLowerCase()}-${yearStr}`;
+
+      let vatAmount = p.vat || 0;
+      if (!vatAmount && p.payVat && p.payVat !== 'No') {
+        const base = (p.amount || 0) - (p.damages || 0);
+        if (p.payVat === 'Add') {
+          vatAmount = base * (vatRate / 100);
+        } else if (p.payVat === 'Yes') {
+          vatAmount = (base / (100 + vatRate)) * vatRate;
+        }
+      }
+      vatDueByMonthYear[key] = (vatDueByMonthYear[key] || 0) + vatAmount;
+    });
+
+    // 2. Calculate VAT paid for each month-year from ALL client VAT payments
+    const allClientVatPayments = vatPayments.filter(vp => vp.client?.trim() === selectedClient);
+    allClientVatPayments.forEach(vp => {
+      if (!vp.month || !vp.year) return;
+      const key = `${vp.month.trim().toLowerCase()}-${vp.year.trim()}`;
+      vatPaymentsByMonthYear[key] = (vatPaymentsByMonthYear[key] || 0) + (vp.amount || 0);
+    });
+
+    // 3. Map filtered clientPayments with their individual VAT details and the monthly status
+    const paymentsWithVatStatus = clientPayments.map(p => {
+      const normalized = normalizeDate(p.date);
+      let monthName = 'Unknown';
+      let yearStr = 'Unknown';
+      let key = '';
+      if (normalized) {
+        const d = parseISO(normalized);
+        if (!isNaN(d.getTime())) {
+          monthName = d.toLocaleString('en-US', { month: 'long' });
+          yearStr = d.getFullYear().toString();
+          key = `${monthName.toLowerCase()}-${yearStr}`;
+        }
+      }
+
+      let vatAmount = p.vat || 0;
+      if (!vatAmount && p.payVat && p.payVat !== 'No') {
+        const base = (p.amount || 0) - (p.damages || 0);
+        if (p.payVat === 'Add') {
+          vatAmount = base * (vatRate / 100);
+        } else if (p.payVat === 'Yes') {
+          vatAmount = (base / (100 + vatRate)) * vatRate;
+        }
+      }
+
+      const totalDueForMonth = key ? (vatDueByMonthYear[key] || 0) : 0;
+      const totalPaidForMonth = key ? (vatPaymentsByMonthYear[key] || 0) : 0;
+
+      let settlementStatus: 'Fully Settled' | 'Partially Settled' | 'Unsettled' = 'Unsettled';
+      if (totalPaidForMonth >= totalDueForMonth && totalDueForMonth > 0) {
+        settlementStatus = 'Fully Settled';
+      } else if (totalPaidForMonth > 0) {
+        settlementStatus = 'Partially Settled';
+      }
+
+      return {
+        ...p,
+        vatAmount,
+        monthName,
+        yearStr,
+        key,
+        totalDueForMonth,
+        totalPaidForMonth,
+        settlementStatus
+      };
+    });
 
     const clientCosts = ledgerEntries.filter(l => l.client?.trim() === selectedClient && isWithinTimeFilter(l.date));
     const totalCost = clientCosts.reduce((acc, l) => acc + (l.amount || 0), 0);
@@ -166,6 +288,7 @@ export function Client360() {
       clientSites, activeSites: activeSites.length, totalSites: clientSites.length,
       clientInvoices: invoices.filter(i => i.client?.trim() === selectedClient),
       vatDeficit, paymentsCleared, totalRevenue, totalCost, profit: totalRevenue - totalCost,
+      paymentsWithVatStatus,
       pendingTasks, contacts, logs, 
       deployedStaffCount: uniqueStaffIds.size,
       machineLogs: clientMachineLogs,
@@ -285,52 +408,102 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
 
   const headerActions = (
     <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3 w-full md:w-auto">
-      {/* Filters */}
+      {/* Filters Dropdown */}
       {clientData && (
-        <div className="flex items-center gap-2">
-          {/* Month Selector */}
-          <div className={cn("flex items-center px-2 py-1.5 rounded-lg border shadow-sm transition-colors w-full md:w-auto", 
-            isDark ? "bg-slate-900 border-slate-700 hover:border-indigo-500" : "bg-white border-slate-200 hover:border-indigo-300"
-          )}>
-            <div className="relative w-full">
-              <select
-                value={filterMonth}
-                onChange={(e) => setFilterMonth(e.target.value)}
-                className={cn(
-                  "appearance-none bg-transparent font-medium text-xs pr-6 focus:outline-none cursor-pointer w-full",
-                  isDark ? "text-white" : "text-slate-900"
-                )}
-              >
-                <option value="all">All Months</option>
-                {months.map(m => (
-                  <option key={m.value} value={m.value}>{m.label}</option>
-                ))}
-              </select>
-              <ChevronDown className="w-3 h-3 absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400" />
+        <div className="relative">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowFilterMenu(!showFilterMenu)}
+            className={cn(
+              "h-9 px-3 gap-2 border shadow-sm font-medium text-xs rounded-lg transition-colors w-full md:w-auto justify-between md:justify-center",
+              isDark ? "bg-slate-900 border-slate-700 text-white hover:bg-slate-800" : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50",
+              (filterMonth !== 'all' || filterYear !== 'all') && "border-indigo-500 text-indigo-600 dark:text-indigo-400"
+            )}
+          >
+            <div className="flex items-center gap-2">
+              <Filter className="w-3.5 h-3.5" />
+              <span>Filter</span>
             </div>
-          </div>
+            {(filterMonth !== 'all' || filterYear !== 'all') && (
+              <span className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse" />
+            )}
+          </Button>
 
-          {/* Year Selector */}
-          <div className={cn("flex items-center px-2 py-1.5 rounded-lg border shadow-sm transition-colors w-full md:w-auto", 
-            isDark ? "bg-slate-900 border-slate-700 hover:border-indigo-500" : "bg-white border-slate-200 hover:border-indigo-300"
-          )}>
-            <div className="relative w-full">
-              <select
-                value={filterYear}
-                onChange={(e) => setFilterYear(e.target.value)}
-                className={cn(
-                  "appearance-none bg-transparent font-medium text-xs pr-6 focus:outline-none cursor-pointer w-full",
-                  isDark ? "text-white" : "text-slate-900"
+          {showFilterMenu && (
+            <div className={cn(
+              "absolute right-0 top-full mt-2 w-64 p-4 rounded-2xl border shadow-xl z-50 space-y-3 animate-in fade-in-50 zoom-in-95 duration-200",
+              isDark ? "bg-slate-900 border-slate-800 text-white" : "bg-white border-slate-200 text-slate-900"
+            )}>
+              <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Filter By Period</span>
+                {(filterMonth !== 'all' || filterYear !== 'all') && (
+                  <button 
+                    onClick={() => { setFilterMonth('all'); setFilterYear('all'); }} 
+                    className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline"
+                  >
+                    Reset
+                  </button>
                 )}
+              </div>
+              
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">Month</label>
+                <div className={cn("flex items-center px-2 py-1.5 rounded-lg border shadow-sm transition-colors", 
+                  isDark ? "bg-slate-800 border-slate-700 focus-within:border-indigo-500" : "bg-slate-50 border-slate-200 focus-within:border-indigo-300"
+                )}>
+                  <div className="relative w-full">
+                    <select
+                      value={filterMonth}
+                      onChange={(e) => setFilterMonth(e.target.value)}
+                      className={cn(
+                        "appearance-none bg-transparent font-medium text-xs pr-6 focus:outline-none cursor-pointer w-full",
+                        isDark ? "text-white" : "text-slate-900"
+                      )}
+                    >
+                      <option value="all">All Months</option>
+                      {months.map(m => (
+                        <option key={m.value} value={m.value}>{m.label}</option>
+                      ))}
+                    </select>
+                    <ChevronDown className="w-3 h-3 absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400" />
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">Year</label>
+                <div className={cn("flex items-center px-2 py-1.5 rounded-lg border shadow-sm transition-colors", 
+                  isDark ? "bg-slate-800 border-slate-700 focus-within:border-indigo-500" : "bg-slate-50 border-slate-200 focus-within:border-indigo-300"
+                )}>
+                  <div className="relative w-full">
+                    <select
+                      value={filterYear}
+                      onChange={(e) => setFilterYear(e.target.value)}
+                      className={cn(
+                        "appearance-none bg-transparent font-medium text-xs pr-6 focus:outline-none cursor-pointer w-full",
+                        isDark ? "text-white" : "text-slate-900"
+                      )}
+                    >
+                      <option value="all">All Years</option>
+                      {years.map(y => (
+                        <option key={y} value={y}>{y}</option>
+                      ))}
+                    </select>
+                    <ChevronDown className="w-3 h-3 absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400" />
+                  </div>
+                </div>
+              </div>
+
+              <Button 
+                size="sm" 
+                className="w-full bg-indigo-600 hover:bg-indigo-500 text-white text-xs h-8 mt-2" 
+                onClick={() => setShowFilterMenu(false)}
               >
-                <option value="all">All Years</option>
-                {years.map(y => (
-                  <option key={y} value={y}>{y}</option>
-                ))}
-              </select>
-              <ChevronDown className="w-3 h-3 absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400" />
+                Apply Filters
+              </Button>
             </div>
-          </div>
+          )}
         </div>
       )}
 
@@ -362,7 +535,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
     selectedSite ? null : 'Client 360 Dashboard', 
     selectedSite ? '' : 'Unified view of financial, operational, and relationship health', 
     selectedSite ? null : headerActions, 
-    [selectedClient, filterMonth, filterYear, clientData, allClients, isDark, selectedSite]
+    [selectedClient, filterMonth, filterYear, clientData, allClients, isDark, selectedSite, showFilterMenu]
   );
 
   if (allClients.length === 0) {
@@ -388,6 +561,17 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
     const profile = clientProfiles.find(p => p.name.trim() === selectedClient);
     if (profile && clientEditForm.id) {
       updateClientProfile(profile.id, clientEditForm);
+    } else {
+      const newProfile: ClientProfile = {
+        id: crypto.randomUUID(),
+        name: selectedClient,
+        tinNumber: clientEditForm.tinNumber,
+        address: clientEditForm.address,
+        mainContactPerson: clientEditForm.mainContactPerson,
+        contactPhone: clientEditForm.contactPhone,
+        startDate: clientEditForm.startDate || new Date().toISOString().split('T')[0],
+      };
+      addClientProfile(newProfile);
     }
     setClientEditOpen(false);
   };
@@ -609,24 +793,162 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
 
               {/* FINANCIALS TAB */}
               {activeTab === 'financials' && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                   <div className={cn("p-6 rounded-2xl border shadow-sm", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
-                      <h3 className="text-lg font-bold mb-4 flex items-center gap-2"><DollarSign className="w-5 h-5 text-emerald-500"/> Revenue & Costs</h3>
-                      <div className="space-y-4">
-                        <div className="flex justify-between items-center pb-4 border-b border-slate-100 dark:border-slate-800">
-                          <span className="text-slate-500 font-medium">Total Payments Received</span>
-                          <span className="font-bold text-lg text-emerald-600">₦{clientData.paymentsCleared.toLocaleString()}</span>
-                        </div>
-                        <div className="flex justify-between items-center pb-4 border-b border-slate-100 dark:border-slate-800">
-                          <span className="text-slate-500 font-medium">Total Ledger Costs</span>
-                          <span className="font-bold text-lg text-rose-500">₦{clientData.totalCost.toLocaleString()}</span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-slate-700 dark:text-slate-300 font-bold">Estimated Profit/Margin</span>
-                          <span className={cn("font-black text-xl", clientData.profit >= 0 ? "text-emerald-600" : "text-rose-500")}>₦{clientData.profit.toLocaleString()}</span>
+                <div className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Revenue & Profit (Accrual Basis) */}
+                    <div className={cn("p-6 rounded-3xl border shadow-sm flex flex-col justify-between", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
+                      <div>
+                        <h3 className="text-lg font-bold mb-4 flex items-center gap-2"><DollarSign className="w-5 h-5 text-emerald-500"/> Revenue & Accrued Profit</h3>
+                        <div className="space-y-4">
+                          <div className="flex justify-between items-center pb-3.5 border-b border-slate-100 dark:border-slate-800">
+                            <div className="flex flex-col">
+                              <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Total Billed Revenue</span>
+                              <span className="text-xs text-slate-400">Total amount invoiced to the client</span>
+                            </div>
+                            <span className="font-bold text-lg text-indigo-600 dark:text-indigo-400">₦{clientData.totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                          </div>
+                          <div className="flex justify-between items-center pb-3.5 border-b border-slate-100 dark:border-slate-800">
+                            <div className="flex flex-col">
+                              <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Total Project Costs</span>
+                              <span className="text-xs text-slate-400">Expenses logged for this client's sites</span>
+                            </div>
+                            <span className="font-bold text-lg text-rose-500">₦{clientData.totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                          </div>
                         </div>
                       </div>
-                   </div>
+                      <div className="flex justify-between items-center pt-5 mt-4 border-t border-slate-100 dark:border-slate-800">
+                        <div className="flex flex-col">
+                          <span className="text-sm font-bold text-slate-850 dark:text-slate-150">Estimated Profit / Margin</span>
+                          <span className="text-xs text-slate-400">Total Billed Revenue - Project Costs</span>
+                        </div>
+                        <span className={cn("font-black text-xl tracking-tight", clientData.profit >= 0 ? "text-emerald-600" : "text-rose-500")}>
+                          ₦{clientData.profit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Cash Flow & Collection Status */}
+                    <div className={cn("p-6 rounded-3xl border shadow-sm flex flex-col justify-between", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
+                      <div>
+                        <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                          <span className="p-1 rounded-lg bg-emerald-500/10 text-emerald-500 font-bold text-sm">₦</span> Cash Flow & Collection
+                        </h3>
+                        <div className="space-y-4">
+                          <div className="flex justify-between items-center pb-3.5 border-b border-slate-100 dark:border-slate-800">
+                            <div className="flex flex-col">
+                              <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Total Payments Received</span>
+                              <span className="text-xs text-slate-400">Cash cleared in bank from this client</span>
+                            </div>
+                            <span className="font-bold text-lg text-emerald-600">₦{clientData.paymentsCleared.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                          </div>
+                          <div className="flex justify-between items-center pb-3.5 border-b border-slate-100 dark:border-slate-800">
+                            <div className="flex flex-col">
+                              <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Outstanding Balance</span>
+                              <span className="text-xs text-slate-400">Invoiced amount awaiting payment</span>
+                            </div>
+                            <span className={cn("font-bold text-lg", (clientData.totalRevenue - clientData.paymentsCleared) > 0 ? "text-amber-600 dark:text-amber-400" : "text-slate-500")}>
+                              ₦{(clientData.totalRevenue - clientData.paymentsCleared).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex justify-between items-center pt-5 mt-4 border-t border-slate-100 dark:border-slate-800">
+                        <div className="flex flex-col">
+                          <span className="text-sm font-bold text-slate-850 dark:text-slate-150">Actual Cash Profit</span>
+                          <span className="text-xs text-slate-400">Cash Received - Project Costs</span>
+                        </div>
+                        <span className={cn("font-black text-xl tracking-tight", (clientData.paymentsCleared - clientData.totalCost) >= 0 ? "text-emerald-600" : "text-rose-500")}>
+                          ₦{(clientData.paymentsCleared - clientData.totalCost).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Payments & VAT Settlement Registry */}
+                  <div className={cn("p-6 rounded-3xl border shadow-sm", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                      <div>
+                        <h3 className="text-lg font-bold flex items-center gap-2">
+                          <CheckCircle2 className="w-5 h-5 text-indigo-500" />
+                          Payments & VAT Settlement Registry
+                        </h3>
+                        <p className="text-xs text-slate-500 mt-1">
+                          Registry of all payments received from this client, calculated VAT due, and VAT remittance settlement status by period.
+                        </p>
+                      </div>
+                    </div>
+
+                    {clientData.paymentsWithVatStatus && clientData.paymentsWithVatStatus.length > 0 ? (
+                      <div className="overflow-x-auto style-scroll rounded-xl border border-slate-100 dark:border-slate-800">
+                        <table className="w-full text-left text-xs border-collapse">
+                          <thead>
+                            <tr className={cn("border-b font-bold text-slate-500 uppercase tracking-wider text-[10px]", isDark ? "bg-slate-800/40 border-slate-800" : "bg-slate-50 border-slate-100")}>
+                              <th className="p-3">Payment Date</th>
+                              <th className="p-3">Site</th>
+                              <th className="p-3 text-right">Amount Received</th>
+                              <th className="p-3 text-center">VAT Rate</th>
+                              <th className="p-3 text-right">VAT Due</th>
+                              <th className="p-3 text-center">VAT Period</th>
+                              <th className="p-3 text-center">Filing Settlement Status</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                            {clientData.paymentsWithVatStatus.map((p, idx) => {
+                              const settlementColor = 
+                                p.settlementStatus === 'Fully Settled' ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/50' :
+                                p.settlementStatus === 'Partially Settled' ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-900/50' :
+                                'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/20 dark:text-rose-400 dark:border-rose-900/50';
+
+                              return (
+                                <tr key={p.id || idx} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
+                                  <td className="p-3 font-medium text-slate-900 dark:text-white">
+                                    {new Date(normalizeDate(p.date) || p.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                  </td>
+                                  <td className="p-3 text-slate-650 dark:text-slate-350 font-semibold">{p.site}</td>
+                                  <td className="p-3 text-right font-bold text-slate-850 dark:text-slate-150">
+                                    ₦{(p.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </td>
+                                  <td className="p-3 text-center">
+                                    <Badge variant="outline" className={cn("text-[10px]", 
+                                      p.payVat === 'Add' ? 'text-indigo-600 bg-indigo-50 border-indigo-200 dark:bg-indigo-950/30 dark:text-indigo-400 dark:border-indigo-900' :
+                                      p.payVat === 'Yes' ? 'text-teal-650 bg-teal-50 border-teal-200 dark:bg-teal-950/30 dark:text-teal-400 dark:border-teal-900' :
+                                      'text-slate-500 bg-slate-50 border-slate-200 dark:bg-slate-850 dark:text-slate-400 dark:border-slate-800'
+                                    )}>
+                                      {p.payVat === 'Add' ? `Add ${vatRate}%` : p.payVat === 'Yes' ? `Incl. ${vatRate}%` : 'Exempt / No VAT'}
+                                    </Badge>
+                                  </td>
+                                  <td className="p-3 text-right font-black text-indigo-600 dark:text-indigo-400">
+                                    ₦{(p.vatAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </td>
+                                  <td className="p-3 text-center text-slate-650 dark:text-slate-350 font-medium">
+                                    {p.monthName} {p.yearStr}
+                                  </td>
+                                  <td className="p-3 text-center">
+                                    <div className="flex flex-col items-center gap-1">
+                                      <Badge className={cn("text-[10px] py-0.5 px-2 font-bold", settlementColor)}>
+                                        {p.settlementStatus}
+                                      </Badge>
+                                      {p.key && (
+                                        <span className="text-[10px] text-slate-400 font-semibold">
+                                          Remitted: ₦{p.totalPaidForMonth.toLocaleString(undefined, { maximumFractionDigits: 0 })} / ₦{p.totalDueForMonth.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <div className="py-12 flex flex-col items-center justify-center text-center text-slate-500">
+                        <DollarSign className="w-12 h-12 text-slate-300 dark:text-slate-700 mb-3" />
+                        <p className="font-semibold text-sm">No Payments Logged</p>
+                        <p className="text-xs text-slate-400 mt-1">No payments have been recorded for this client within the selected filter period.</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -745,11 +1067,11 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
             <div className="space-y-4">
               <div>
                 <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Client Name</label>
-                <input value={clientEditForm.name || ''} onChange={e => setClientEditForm(f => ({ ...f, name: e.target.value }))} className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')} />
+                <input value={clientEditForm.name || ''} readOnly disabled className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none cursor-not-allowed opacity-70', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-100 border-slate-200 text-slate-500')} />
               </div>
               <div>
                 <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">TIN Number</label>
-                <input value={clientEditForm.tinNumber || ''} onChange={e => setClientEditForm(f => ({ ...f, tinNumber: e.target.value }))} placeholder="Optional" className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')} />
+                <input value={clientEditForm.tinNumber || ''} readOnly disabled placeholder="Optional" className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none cursor-not-allowed opacity-70', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-100 border-slate-200 text-slate-500')} />
               </div>
               <div>
                 <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Address</label>
@@ -760,8 +1082,12 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                 <input value={clientEditForm.mainContactPerson || ''} onChange={e => setClientEditForm(f => ({ ...f, mainContactPerson: e.target.value }))} placeholder="e.g. John Doe" className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')} />
               </div>
               <div>
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Contact Phone Number</label>
+                <input value={clientEditForm.contactPhone || ''} onChange={e => setClientEditForm(f => ({ ...f, contactPhone: e.target.value }))} placeholder="e.g. +234 801 234 5678" className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')} />
+              </div>
+              <div>
                 <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Start Date</label>
-                <input type="date" value={clientEditForm.startDate || ''} onChange={e => setClientEditForm(f => ({ ...f, startDate: e.target.value }))} className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')} />
+                <input type="date" value={clientEditForm.startDate || ''} readOnly disabled className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none cursor-not-allowed opacity-70', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-100 border-slate-200 text-slate-500')} />
               </div>
             </div>
             <div className="flex gap-3 mt-6">
@@ -783,38 +1109,20 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
             </div>
             <div className="space-y-4">
               <div>
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Site Name</label>
-                <input value={siteEditForm.name || ''} onChange={e => setSiteEditForm(f => ({ ...f, name: e.target.value }))} className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')} />
-              </div>
-              <div>
                 <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Address</label>
-                <textarea value={siteEditForm.address || ''} onChange={e => setSiteEditForm(f => ({ ...f, address: e.target.value }))} rows={2} className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')} />
+                <textarea value={siteEditForm.address || ''} onChange={e => setSiteEditForm(f => ({ ...f, address: e.target.value }))} rows={2} placeholder="e.g. 5 Marina Road, Lagos Island" className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')} />
               </div>
               <div>
                 <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Main Contact Person</label>
-                <input value={siteEditForm.mainContactPerson || ''} onChange={e => setSiteEditForm(f => ({ ...f, mainContactPerson: e.target.value }))} className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')} />
+                <input value={siteEditForm.mainContactPerson || ''} onChange={e => setSiteEditForm(f => ({ ...f, mainContactPerson: e.target.value }))} placeholder="e.g. John Doe" className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')} />
               </div>
               <div>
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Status</label>
-                <select value={siteEditForm.status || 'Active'} onChange={e => setSiteEditForm(f => ({ ...f, status: e.target.value as Site['status'] }))} className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 appearance-none', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}>
-                  <option>Active</option><option>Inactive</option><option>Ended</option>
-                </select>
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Contact Phone Number</label>
+                <input value={siteEditForm.contactPhone || ''} onChange={e => setSiteEditForm(f => ({ ...f, contactPhone: e.target.value }))} placeholder="e.g. +234 801 234 5678" className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')} />
               </div>
               <div>
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">VAT</label>
-                <select value={siteEditForm.vat || 'No'} onChange={e => setSiteEditForm(f => ({ ...f, vat: e.target.value as Site['vat'] }))} className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 appearance-none', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}>
-                  <option>Yes</option><option>No</option><option>Add</option>
-                </select>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Start Date</label>
-                  <input type="date" value={siteEditForm.startDate || ''} onChange={e => setSiteEditForm(f => ({ ...f, startDate: e.target.value }))} className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')} />
-                </div>
-                <div>
-                  <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">End Date</label>
-                  <input type="date" value={siteEditForm.endDate || ''} onChange={e => setSiteEditForm(f => ({ ...f, endDate: e.target.value }))} className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')} />
-                </div>
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Position</label>
+                <input value={siteEditForm.position || ''} onChange={e => setSiteEditForm(f => ({ ...f, position: e.target.value }))} placeholder="e.g. Site Manager" className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')} />
               </div>
             </div>
             <div className="flex gap-3 mt-6">

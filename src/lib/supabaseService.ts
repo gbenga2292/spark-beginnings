@@ -21,11 +21,32 @@ import type { Vehicle, VehicleTripLeg } from '@/src/types/operations';
 // ─── Mappers: DB → App ──────────────────────────────────────
 
 export function dbToClientProfile(r: any): any {
-  return { id: r.id, name: r.name, tinNumber: r.tin_number || undefined, startDate: r.start_date || undefined, createdAt: r.created_at };
+  return { 
+    id: r.id, 
+    name: r.name, 
+    tinNumber: r.tin_number || undefined, 
+    startDate: r.start_date || undefined, 
+    createdAt: r.created_at,
+    address: r.address || undefined,
+    mainContactPerson: r.contact_person || undefined,
+    contactPhone: r.contact_phone || undefined,
+  };
 }
 
 export function dbToSite(r: any): Site {
-  return { id: r.id, name: r.name, client: r.client, vat: r.vat, status: r.status, startDate: r.start_date, endDate: r.end_date };
+  return { 
+    id: r.id, 
+    name: r.name, 
+    client: r.client, 
+    vat: r.vat, 
+    status: r.status, 
+    startDate: r.start_date, 
+    endDate: r.end_date,
+    address: r.location || undefined,
+    mainContactPerson: r.contact_person || undefined,
+    contactPhone: r.phone || undefined,
+    position: r.position || undefined,
+  };
 }
 
 export function dbToEmployee(r: any): Employee {
@@ -482,11 +503,31 @@ export function siteJournalEntryToDb(e: SiteJournalEntry): any {
 // ─── Exported DB Methods ──────────────────────────────────────
 
 function clientProfileToDb(c: any) {
-  return { id: c.id, name: c.name, tin_number: c.tinNumber || '', start_date: c.startDate || '' };
+  return { 
+    id: c.id, 
+    name: c.name, 
+    tin_number: c.tinNumber || '', 
+    start_date: c.startDate || '',
+    address: c.address || null,
+    contact_person: c.mainContactPerson || null,
+    contact_phone: c.contactPhone || null,
+  };
 }
 
 function siteToDb(s: Site) {
-  return { id: s.id, name: s.name, client: s.client, vat: s.vat, status: s.status, start_date: s.startDate, end_date: s.endDate };
+  return { 
+    id: s.id, 
+    name: s.name, 
+    client: s.client, 
+    vat: s.vat, 
+    status: s.status, 
+    start_date: s.startDate, 
+    end_date: s.endDate,
+    location: s.address || null,
+    contact_person: s.mainContactPerson || null,
+    phone: s.contactPhone || null,
+    position: s.position || null,
+  };
 }
 
 
@@ -998,6 +1039,10 @@ export const db = {
     if (s.status !== undefined) update.status = s.status;
     if (s.startDate !== undefined) update.start_date = s.startDate;
     if (s.endDate !== undefined) update.end_date = s.endDate;
+    if (s.address !== undefined) update.location = s.address || null;
+    if (s.mainContactPerson !== undefined) update.contact_person = s.mainContactPerson || null;
+    if (s.contactPhone !== undefined) update.phone = s.contactPhone || null;
+    if (s.position !== undefined) update.position = s.position || null;
     const { error } = await supabase.from('sites').update(update).eq('id', id);
     if (error) { console.error('updateSite:', error); throw error; }
   },
@@ -1034,6 +1079,9 @@ export const db = {
     if (c.name !== undefined) update.name = c.name;
     if (c.tinNumber !== undefined) update.tin_number = c.tinNumber;
     if (c.startDate !== undefined) update.start_date = c.startDate;
+    if (c.address !== undefined) update.address = c.address;
+    if (c.mainContactPerson !== undefined) update.contact_person = c.mainContactPerson;
+    if (c.contactPhone !== undefined) update.contact_phone = c.contactPhone;
     const { error } = await supabase.from('clients').update(update).eq('id', id);
     if (error) { console.error('updateClientProfile:', error); throw error; }
   },
