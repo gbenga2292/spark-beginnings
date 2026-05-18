@@ -622,15 +622,15 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                   <div className="p-1.5 bg-indigo-500/20 rounded-lg"><Sparkles className="w-4 h-4 text-indigo-300" /></div>
                   <span className="text-sm font-bold uppercase tracking-wider text-indigo-200">Decision Intelligence Assistant</span>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5">
                   {!isChatCollapsed && messages.length === 0 && (
-                    <div className="flex items-center gap-2">
-                      <Button onClick={(e) => { e.stopPropagation(); openClientEdit(); }} variant="outline" size="sm" className="h-8 text-xs bg-indigo-900/40 hover:bg-indigo-800/60 text-indigo-200 border-indigo-700">
-                        <Edit2 className="w-3.5 h-3.5 mr-1.5" /> Edit Client
+                    <div className="flex items-center gap-1.5">
+                      <Button onClick={(e) => { e.stopPropagation(); openClientEdit(); }} variant="outline" size="sm" className="h-8 text-xs bg-indigo-900/40 hover:bg-indigo-800/60 text-indigo-200 border-indigo-700 px-2 sm:px-3">
+                        <Edit2 className="w-3.5 h-3.5 sm:mr-1.5" /><span className="hidden sm:inline">Edit Client</span>
                       </Button>
-                      <Button onClick={(e) => { e.stopPropagation(); sendChatMessage(true); }} disabled={isGeneratingBrief} size="sm" className="bg-indigo-600 hover:bg-indigo-500 text-white border-0 h-8 text-xs">
-                        {isGeneratingBrief ? <RefreshCcw className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5 mr-1.5" />}
-                        {isGeneratingBrief ? 'Analyzing...' : 'Generate Brief'}
+                      <Button onClick={(e) => { e.stopPropagation(); sendChatMessage(true); }} disabled={isGeneratingBrief} size="sm" className="bg-indigo-600 hover:bg-indigo-500 text-white border-0 h-8 text-xs px-2 sm:px-3">
+                        {isGeneratingBrief ? <RefreshCcw className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5 sm:mr-1.5" />}
+                        <span className="hidden sm:inline">{isGeneratingBrief ? 'Analyzing...' : 'Generate Brief'}</span>
                       </Button>
                     </div>
                   )}
@@ -684,22 +684,22 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
             </div>
 
             {/* Navigation Tabs */}
-            <div className="flex items-center gap-1 border-b border-slate-200 dark:border-slate-800 mb-6 overflow-x-auto style-scroll pb-px">
+            <div className="flex items-center gap-0.5 sm:gap-1 border-b border-slate-200 dark:border-slate-800 mb-6 overflow-x-auto style-scroll pb-px">
               {[
                 { id: 'overview', label: 'Overview', icon: Activity },
                 { id: 'financials', label: 'Financials', icon: DollarSign },
-                { id: 'operations', label: 'Operations & Sites', icon: Briefcase },
-                { id: 'contacts', label: 'Contacts Directory', icon: Users },
-                { id: 'activity', label: 'Interaction History', icon: MessagesSquare }
+                { id: 'operations', label: 'Operations', icon: Briefcase },
+                { id: 'contacts', label: 'Contacts', icon: Users },
+                { id: 'activity', label: 'Activity', icon: MessagesSquare }
               ].map(tab => (
                 <button key={tab.id} onClick={() => setActiveTab(tab.id as TabType)}
                   className={cn(
-                    "flex items-center gap-2 px-4 py-3 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap",
+                    "flex items-center gap-1.5 px-2.5 sm:px-4 py-3 text-xs sm:text-sm font-semibold border-b-2 transition-colors whitespace-nowrap",
                     activeTab === tab.id 
                       ? "border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400" 
                       : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
                   )}>
-                  <tab.icon className="w-4 h-4" /> {tab.label}
+                  <tab.icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> {tab.label}
                 </button>
               ))}
             </div>
@@ -711,37 +711,43 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
               {activeTab === 'overview' && (
                 <div className="space-y-6">
                   {/* KPI Cards */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div className={cn("p-5 rounded-2xl border shadow-sm", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
-                      <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1 flex items-center gap-1.5"><DollarSign className="w-3.5 h-3.5"/> Total Revenue</p>
-                      <p className="text-2xl font-black text-emerald-600">₦{clientData.totalRevenue.toLocaleString()}</p>
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                    <div className={cn("p-3 sm:p-5 rounded-2xl border shadow-sm min-w-0", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
+                      <p className="text-[10px] sm:text-xs text-slate-500 font-bold uppercase tracking-wider mb-1 flex items-center gap-1.5 truncate"><DollarSign className="w-3.5 h-3.5 shrink-0"/> Total Revenue</p>
+                      <p className="text-sm min-[390px]:text-base sm:text-lg md:text-2xl font-black text-emerald-600 truncate" title={`₦${clientData.totalRevenue.toLocaleString()}`}>
+                        ₦{Math.round(clientData.totalRevenue).toLocaleString()}
+                      </p>
                     </div>
-                    <div className={cn("p-5 rounded-2xl border shadow-sm flex flex-col justify-between", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
-                      <div>
-                        <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1 flex items-center gap-1.5"><AlertTriangle className="w-3.5 h-3.5"/> VAT Deficit</p>
-                        <p className={cn("text-2xl font-black", clientData.vatDeficit > 0 ? "text-rose-500" : "text-emerald-500")}>
-                          ₦{clientData.vatDeficit.toLocaleString()}
+                    <div className={cn("p-3 sm:p-5 rounded-2xl border shadow-sm flex flex-col justify-between min-w-0", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
+                      <div className="min-w-0">
+                        <p className="text-[10px] sm:text-xs text-slate-500 font-bold uppercase tracking-wider mb-1 flex items-center gap-1.5 truncate"><AlertTriangle className="w-3.5 h-3.5 shrink-0"/> VAT Deficit</p>
+                        <p className={cn("text-sm min-[390px]:text-base sm:text-lg md:text-2xl font-black truncate", clientData.vatDeficit > 0 ? "text-rose-500" : "text-emerald-500")} title={`₦${clientData.vatDeficit.toLocaleString()}`}>
+                          ₦{Math.round(clientData.vatDeficit).toLocaleString()}
                         </p>
                       </div>
-                      <p className="text-[11px] text-slate-400 mt-2 font-medium bg-slate-100 dark:bg-slate-800 rounded px-2 py-1 truncate" title={clientData.vatMonthsIncluded.length > 0 ? `Payments include: ${clientData.vatMonthsIncluded.join(', ')}` : 'No VAT payments in this period'}>
+                      <p className="text-[10px] sm:text-[11px] text-slate-400 mt-2 font-medium bg-slate-100 dark:bg-slate-800 rounded px-1.5 sm:px-2 py-0.5 sm:py-1 truncate max-w-full block" title={clientData.vatMonthsIncluded.length > 0 ? `Payments include: ${clientData.vatMonthsIncluded.join(', ')}` : 'No VAT payments in this period'}>
                         {clientData.vatMonthsIncluded.length > 0 ? `Paid for: ${clientData.vatMonthsIncluded.join(', ')}` : 'No VAT payments'}
                       </p>
                     </div>
-                    <div className={cn("p-5 rounded-2xl border shadow-sm", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
-                      <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1 flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5"/> Active Sites</p>
-                      <p className="text-2xl font-black text-indigo-600">{clientData.activeSites} <span className="text-sm font-medium text-slate-400">/ {clientData.totalSites}</span></p>
+                    <div className={cn("p-3 sm:p-5 rounded-2xl border shadow-sm min-w-0", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
+                      <p className="text-[10px] sm:text-xs text-slate-500 font-bold uppercase tracking-wider mb-1 flex items-center gap-1.5 truncate"><CheckCircle2 className="w-3.5 h-3.5 shrink-0"/> Active Sites</p>
+                      <p className="text-sm min-[390px]:text-base sm:text-lg md:text-2xl font-black text-indigo-600 truncate">
+                        {clientData.activeSites} <span className="text-xs sm:text-sm font-medium text-slate-400">/ {clientData.totalSites}</span>
+                      </p>
                     </div>
-                    <div className={cn("p-5 rounded-2xl border shadow-sm", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
-                      <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1 flex items-center gap-1.5"><Users className="w-3.5 h-3.5"/> Deployed Staff</p>
-                      <p className="text-2xl font-black text-sky-600">{clientData.deployedStaffCount} <span className="text-sm font-medium text-slate-400">Today</span></p>
+                    <div className={cn("p-3 sm:p-5 rounded-2xl border shadow-sm min-w-0", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
+                      <p className="text-[10px] sm:text-xs text-slate-500 font-bold uppercase tracking-wider mb-1 flex items-center gap-1.5 truncate"><Users className="w-3.5 h-3.5 shrink-0"/> Deployed Staff</p>
+                      <p className="text-sm min-[390px]:text-base sm:text-lg md:text-2xl font-black text-sky-600 truncate">
+                        {clientData.deployedStaffCount} <span className="text-xs sm:text-sm font-medium text-slate-400">Today</span>
+                      </p>
                     </div>
                   </div>
 
                   {/* Proactive Alerts & Health Score */}
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <div className={cn("p-6 rounded-2xl border shadow-sm flex flex-col items-center justify-center text-center", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
-                      <div className="mb-4 relative">
-                        <svg className="w-32 h-32 transform -rotate-90">
+                  <div className="grid grid-cols-1 gap-4 sm:gap-6">
+                    <div className={cn("p-5 sm:p-6 rounded-2xl border shadow-sm flex flex-col sm:flex-row items-center text-center sm:text-left gap-4 sm:gap-6", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
+                      <div className="relative shrink-0 w-20 h-20 sm:w-24 sm:h-24">
+                        <svg viewBox="0 0 128 128" className="w-full h-full transform -rotate-90">
                           <circle cx="64" cy="64" r="56" fill="none" stroke="currentColor" strokeWidth="12" className={isDark ? "text-slate-800" : "text-slate-100"} />
                           <circle cx="64" cy="64" r="56" fill="none" stroke="currentColor" strokeWidth="12" 
                             strokeDasharray="351.8" strokeDashoffset={351.8 - (351.8 * clientData.healthScore) / 100}
@@ -750,16 +756,18 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                           />
                         </svg>
                         <div className="absolute inset-0 flex flex-col items-center justify-center">
-                          <span className={cn("text-3xl font-black", clientData.healthScore > 80 ? "text-emerald-600" : clientData.healthScore > 50 ? "text-amber-600" : "text-rose-600")}>
+                          <span className={cn("text-2xl sm:text-3xl font-black", clientData.healthScore > 80 ? "text-emerald-600" : clientData.healthScore > 50 ? "text-amber-600" : "text-rose-600")}>
                             {clientData.healthScore}
                           </span>
                         </div>
                       </div>
-                      <h3 className="text-lg font-bold text-slate-800 dark:text-slate-200">Client Health Score</h3>
-                      <p className="text-sm text-slate-500 mt-1">Based on financial, operational, and workflow metrics</p>
+                      <div>
+                        <h3 className="text-base sm:text-lg font-bold text-slate-800 dark:text-slate-200">Client Health Score</h3>
+                        <p className="text-xs sm:text-sm text-slate-500 mt-1 max-w-xs">Based on financial, operational, and workflow metrics</p>
+                      </div>
                     </div>
 
-                    <div className={cn("p-6 rounded-2xl border shadow-sm lg:col-span-2", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
+                    <div className={cn("p-4 sm:p-6 rounded-2xl border shadow-sm flex-1", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
                       <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
                         {clientData.alerts.length > 0 ? <ShieldAlert className="w-5 h-5 text-amber-500" /> : <ShieldCheck className="w-5 h-5 text-emerald-500" />} 
                         Proactive Alerts
@@ -880,7 +888,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
 
                     {clientData.paymentsWithVatStatus && clientData.paymentsWithVatStatus.length > 0 ? (
                       <div className="overflow-x-auto style-scroll rounded-xl border border-slate-100 dark:border-slate-800">
-                        <table className="w-full text-left text-xs border-collapse">
+                        <table className="w-full text-left text-xs border-collapse min-w-[640px]">
                           <thead>
                             <tr className={cn("border-b font-bold text-slate-500 uppercase tracking-wider text-[10px]", isDark ? "bg-slate-800/40 border-slate-800" : "bg-slate-50 border-slate-100")}>
                               <th className="p-3">Payment Date</th>
@@ -909,12 +917,12 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                                     ₦{(p.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                   </td>
                                   <td className="p-3 text-center">
-                                    <Badge variant="outline" className={cn("text-[10px]", 
+                                    <Badge variant="outline" className={cn("text-[9px] sm:text-[10px] px-1.5 sm:px-2 whitespace-nowrap", 
                                       p.payVat === 'Add' ? 'text-indigo-600 bg-indigo-50 border-indigo-200 dark:bg-indigo-950/30 dark:text-indigo-400 dark:border-indigo-900' :
                                       p.payVat === 'Yes' ? 'text-teal-650 bg-teal-50 border-teal-200 dark:bg-teal-950/30 dark:text-teal-400 dark:border-teal-900' :
                                       'text-slate-500 bg-slate-50 border-slate-200 dark:bg-slate-850 dark:text-slate-400 dark:border-slate-800'
                                     )}>
-                                      {p.payVat === 'Add' ? `Add ${vatRate}%` : p.payVat === 'Yes' ? `Incl. ${vatRate}%` : 'Exempt / No VAT'}
+                                      {p.payVat === 'Add' ? `Add ${vatRate}%` : p.payVat === 'Yes' ? `Incl. ${vatRate}%` : <><span className="inline sm:hidden">Exempt</span><span className="hidden sm:inline">Exempt / No VAT</span></>}
                                     </Badge>
                                   </td>
                                   <td className="p-3 text-right font-black text-indigo-600 dark:text-indigo-400">
@@ -925,7 +933,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                                   </td>
                                   <td className="p-3 text-center">
                                     <div className="flex flex-col items-center gap-1">
-                                      <Badge className={cn("text-[10px] py-0.5 px-2 font-bold", settlementColor)}>
+                                      <Badge className={cn("text-[9px] sm:text-[10px] py-0.5 px-1.5 sm:px-2 font-bold whitespace-nowrap", settlementColor)}>
                                         {p.settlementStatus}
                                       </Badge>
                                       {p.key && (
@@ -979,7 +987,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
 
               {/* OPERATIONS TAB */}
               {activeTab === 'operations' && (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 gap-5">
                   <div className={cn("p-6 rounded-2xl border shadow-sm flex flex-col", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
                     <h3 className="text-lg font-bold mb-4 flex items-center gap-2"><MapPin className="w-5 h-5 text-indigo-500"/> Site Portfolio ({clientData.clientSites.length})</h3>
                     <div className="space-y-3 flex-1 overflow-y-auto max-h-[400px] style-scroll pr-2">
@@ -1014,7 +1022,13 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                               <span className="font-semibold text-sm block mb-1">{task.title}</span>
                               <span className="text-xs text-slate-500 flex items-center gap-1"><Calendar className="w-3 h-3"/> Due: {task.deadline ? new Date(task.deadline).toLocaleDateString() : 'None'}</span>
                             </div>
-                            <Badge variant="outline" className="text-[10px] whitespace-nowrap">{task.requiresApproval ? "Pending Approval" : "In Progress"}</Badge>
+                            <Badge variant="outline" className="text-[9px] sm:text-[10px] px-1.5 sm:px-2 shrink-0 whitespace-nowrap">
+                              {task.requiresApproval ? (
+                                <><span className="inline sm:hidden">Approval</span><span className="hidden sm:inline">Pending Approval</span></>
+                              ) : (
+                                <><span className="inline sm:hidden">Active</span><span className="hidden sm:inline">In Progress</span></>
+                              )}
+                            </Badge>
                           </div>
                         </div>
                       )) : <p className="text-slate-500 text-sm text-center py-8">No active workflow tasks.</p>}
@@ -1057,14 +1071,18 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
 
       {/* Client Edit Dialog */}
       {clientEditOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setClientEditOpen(false)} />
-          <div className={cn('relative z-10 w-full max-w-md rounded-3xl shadow-2xl p-6', isDark ? 'bg-slate-900 border border-slate-700' : 'bg-white border border-slate-200')}>
-            <div className="flex justify-between items-center mb-5">
-              <h2 className="text-lg font-black">Edit Client</h2>
+          <div className={cn('relative z-10 w-full max-w-md rounded-3xl shadow-2xl p-5 sm:p-6 max-h-[90vh] flex flex-col', isDark ? 'bg-slate-900 border border-slate-700' : 'bg-white border border-slate-200')}>
+            <div className="flex justify-between items-center mb-5 shrink-0">
+              <h2 className="text-lg font-black flex items-center gap-2">
+                <Edit2 className="w-5 h-5 text-indigo-600" />
+                Edit Client
+              </h2>
               <Button variant="ghost" size="icon" onClick={() => setClientEditOpen(false)} className="h-8 w-8"><X className="w-4 h-4" /></Button>
             </div>
-            <div className="space-y-4">
+            
+            <div className="space-y-4 overflow-y-auto pr-1 flex-1 style-scroll mb-4">
               <div>
                 <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Client Name</label>
                 <input value={clientEditForm.name || ''} readOnly disabled className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none cursor-not-allowed opacity-70', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-100 border-slate-200 text-slate-500')} />
@@ -1090,9 +1108,9 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                 <input type="date" value={clientEditForm.startDate || ''} readOnly disabled className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none cursor-not-allowed opacity-70', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-100 border-slate-200 text-slate-500')} />
               </div>
             </div>
-            <div className="flex gap-3 mt-6">
-              <Button variant="outline" onClick={() => setClientEditOpen(false)} className="flex-1">Cancel</Button>
-              <Button onClick={saveClientEdit} className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white">Save Changes</Button>
+            <div className="flex gap-3 shrink-0 pt-3 border-t border-slate-100 dark:border-slate-800">
+              <Button variant="outline" onClick={() => setClientEditOpen(false)} className="flex-1 rounded-xl">Cancel</Button>
+              <Button onClick={saveClientEdit} className="flex-1 bg-indigo-600 hover:bg-indigo-50 text-white rounded-xl">Save Changes</Button>
             </div>
           </div>
         </div>
@@ -1100,14 +1118,18 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
 
       {/* Site Edit Dialog */}
       {siteEditTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setSiteEditTarget(null)} />
-          <div className={cn('relative z-10 w-full max-w-md rounded-3xl shadow-2xl p-6', isDark ? 'bg-slate-900 border border-slate-700' : 'bg-white border border-slate-200')}>
-            <div className="flex justify-between items-center mb-5">
-              <h2 className="text-lg font-black">Edit Site</h2>
+          <div className={cn('relative z-10 w-full max-w-md rounded-3xl shadow-2xl p-5 sm:p-6 max-h-[90vh] flex flex-col', isDark ? 'bg-slate-900 border border-slate-700' : 'bg-white border border-slate-200')}>
+            <div className="flex justify-between items-center mb-5 shrink-0">
+              <h2 className="text-lg font-black flex items-center gap-2">
+                <Edit2 className="w-5 h-5 text-indigo-600" />
+                Edit Site
+              </h2>
               <Button variant="ghost" size="icon" onClick={() => setSiteEditTarget(null)} className="h-8 w-8"><X className="w-4 h-4" /></Button>
             </div>
-            <div className="space-y-4">
+            
+            <div className="space-y-4 overflow-y-auto pr-1 flex-1 style-scroll mb-4">
               <div>
                 <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Address</label>
                 <textarea value={siteEditForm.address || ''} onChange={e => setSiteEditForm(f => ({ ...f, address: e.target.value }))} rows={2} placeholder="e.g. 5 Marina Road, Lagos Island" className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')} />
@@ -1125,9 +1147,10 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                 <input value={siteEditForm.position || ''} onChange={e => setSiteEditForm(f => ({ ...f, position: e.target.value }))} placeholder="e.g. Site Manager" className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')} />
               </div>
             </div>
-            <div className="flex gap-3 mt-6">
-              <Button variant="outline" onClick={() => setSiteEditTarget(null)} className="flex-1">Cancel</Button>
-              <Button onClick={saveSiteEdit} className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white">Save Changes</Button>
+            
+            <div className="flex gap-3 shrink-0 pt-3 border-t border-slate-100 dark:border-slate-800">
+              <Button variant="outline" onClick={() => setSiteEditTarget(null)} className="flex-1 rounded-xl">Cancel</Button>
+              <Button onClick={saveSiteEdit} className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl">Save Changes</Button>
             </div>
           </div>
         </div>

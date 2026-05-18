@@ -15,7 +15,7 @@ import { AddSubtaskInline } from './Tasks/AddSubtaskInline';
 import { AssignUserDialog } from './Tasks/AssignUserDialog';
 import type { AppUser } from "@/src/store/userStore";
 import type { TaskPriority } from "@/src/types/tasks";
-import { KanbanSquare, LayoutList, RotateCcw, Reply, Trash2, Archive, LayoutGrid, BarChart2, CheckCircle2, History, Plus, Search, Circle, Loader2, Calendar, X, Users, Clock, ChevronDown, ChevronRight, UserCheck, ArrowUpDown, Flag, MessageSquare, Send, Pencil, Lock, User, FolderOpen, List, Bell, RefreshCw, Link as LinkIcon, FileText, Paperclip, AtSign } from 'lucide-react';
+import { KanbanSquare, LayoutList, RotateCcw, Reply, Trash2, Archive, LayoutGrid, BarChart2, CheckCircle2, History, Plus, Search, Circle, Loader2, Calendar, X, Users, Clock, ChevronDown, ChevronRight, UserCheck, ArrowUpDown, Flag, MessageSquare, Send, Pencil, Lock, User, FolderOpen, List, Bell, RefreshCw, Link as LinkIcon, FileText, Paperclip, AtSign, MapPin } from 'lucide-react';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { useTaskReadTracker } from '@/src/hooks/useTaskReadTracker';
 import { Button } from '@/src/components/ui/button';
@@ -2355,6 +2355,10 @@ function EditSubtaskDialog({ subtask, users, onClose, onSave }: {
   onClose: () => void;
   onSave: (patch: Partial<SubTask>) => void;
 }) {
+  const clientProfiles = useAppStore(s => s.clientProfiles);
+  const allSites = useAppStore(s => s.sites);
+  const { mainTasks } = useAppData();
+
   const [title, setTitle] = useState(subtask.title);
   const [description, setDesc] = useState(subtask.description ?? '');
   const [assignedTo, setAssignedTo] = useState<string[]>(subtask.assignedTo ? subtask.assignedTo.split(',').filter(Boolean) : []);
@@ -2364,6 +2368,12 @@ function EditSubtaskDialog({ subtask, users, onClose, onSave }: {
   const [priority, setPriority] = useState<TaskPriority | undefined>(subtask.priority);
   const [requiresApproval, setRequiresApproval] = useState(subtask.requiresApproval || false);
   const [approverId, setApproverId] = useState(subtask.approverId || '');
+
+  // Tag to Site — inherit from parent task if subtask has none
+  const parentTask = mainTasks.find(t => t.id === subtask.mainTaskId);
+  const [tagToSite, setTagToSite] = useState(!!(subtask.clientId || subtask.siteId || parentTask?.clientId || parentTask?.siteId));
+  const [clientId, setClientId] = useState(subtask.clientId || parentTask?.clientId || '');
+  const [siteId, setSiteId] = useState(subtask.siteId || parentTask?.siteId || '');
 
   useEffect(() => {
     if (!requiresApproval && status === 'pending_approval') {
@@ -2382,7 +2392,9 @@ function EditSubtaskDialog({ subtask, users, onClose, onSave }: {
       status: (requiresApproval && status === 'not_started') ? 'pending_approval' : status,
       priority,
       requiresApproval,
-      approverId: requiresApproval ? approverId : undefined
+      approverId: requiresApproval ? approverId : undefined,
+      clientId: tagToSite && clientId ? clientId : null,
+      siteId: tagToSite && siteId ? siteId : null,
     });
   };
 
@@ -2524,6 +2536,55 @@ function EditSubtaskDialog({ subtask, users, onClose, onSave }: {
                   </select>
                 </motion.div>
               )}
+            </div>
+
+            {/* Tag to Site Section */}
+            <div className={`border border-border rounded-xl transition-all ${tagToSite ? 'bg-primary/5 border-primary/20' : ''}`}>
+               <div className="flex items-center justify-between px-4 py-3 cursor-pointer" onClick={() => setTagToSite(!tagToSite)}>
+                  <div className="flex items-center gap-2.5">
+                     <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${tagToSite ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
+                        <MapPin className="w-4 h-4" />
+                     </div>
+                     <div>
+                        <span className="text-sm font-semibold text-foreground">Tag to Site / Client</span>
+                        <p className="text-[10px] text-muted-foreground">{parentTask?.clientId ? 'Inherited from parent task' : 'Associate with a client and site'}</p>
+                     </div>
+                  </div>
+                  <div className={`w-10 h-6 rounded-full transition-colors relative ${tagToSite ? 'bg-primary' : 'bg-slate-200'}`}>
+                     <div className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow-sm transition-all ${tagToSite ? 'left-5' : 'left-1'}`} />
+                  </div>
+               </div>
+               <AnimatePresence>
+                  {tagToSite && (
+                     <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+                        <div className="px-4 pb-4 pt-1 grid grid-cols-2 gap-4">
+                           <div>
+                              <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1.5">Client</label>
+                              <select value={clientId} onChange={e => { setClientId(e.target.value); setSiteId(''); }}
+                                 className="w-full px-3 py-2 rounded-xl border border-border bg-background text-xs focus:outline-none focus:ring-2 focus:ring-primary/20">
+                                 <option value="">No Client</option>
+                                 {clientProfiles.map(c => (
+                                    <option key={c.id} value={c.id}>{c.name}</option>
+                                 ))}
+                              </select>
+                           </div>
+                           <div>
+                              <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1.5">Site</label>
+                              <select value={siteId} onChange={e => setSiteId(e.target.value)} disabled={!clientId}
+                                 className="w-full px-3 py-2 rounded-xl border border-border bg-background text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50">
+                                 <option value="">No Site</option>
+                                 {allSites.filter(s => {
+                                    const cName = clientProfiles.find(c => c.id === clientId)?.name;
+                                    return s.client === cName || s.client === clientId;
+                                 }).map(s => (
+                                    <option key={s.id} value={s.id}>{s.name}</option>
+                                 ))}
+                              </select>
+                           </div>
+                        </div>
+                     </motion.div>
+                  )}
+               </AnimatePresence>
             </div>
           </div>
           

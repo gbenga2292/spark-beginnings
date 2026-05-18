@@ -88,6 +88,8 @@ export interface SubTask {
     approvedBy?: string;
     approverId?: string;
     rejectedAt?: string;
+    clientId?: string;
+    siteId?: string;
 }
 
 export interface MainTask {
@@ -107,6 +109,8 @@ export interface MainTask {
     createdAt: string;
     updatedAt: string;
     deadline?: string;
+    clientId?: string;
+    siteId?: string;
 }
 
 // ─── Notifications ────────────────────────────────────────────────────────────

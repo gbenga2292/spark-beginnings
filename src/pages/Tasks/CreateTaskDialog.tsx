@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Plus, ChevronDown, Clock, RefreshCw, Users, Bell, CheckCircle2 } from 'lucide-react';
+import { X, Plus, ChevronDown, Clock, RefreshCw, Users, Bell, CheckCircle2, MapPin } from 'lucide-react';
 import { Button } from '@/src/components/ui/button';
 import { useAppData } from '@/src/contexts/AppDataContext';
+import { useAppStore } from '@/src/store/appStore';
 import type { SubTask, SubTaskStatus, MainTask, AppUser, TaskPriority } from "@/src/types/tasks";
 import { PRIORITY_ORDER, PRIORITY_CONFIG } from "@/src/components/tasks/TasksShared";
 
@@ -19,6 +20,8 @@ interface CreateTaskDialogProps {
 
 export function CreateTaskDialog({ onClose, onSubmit, users, currentUserId, teamId, workspaceId, isPersonal, isExternalHr }: CreateTaskDialogProps) {
   const { addReminder, createMainTask } = useAppData();
+  const clientProfiles = useAppStore(s => s.clientProfiles);
+  const sites = useAppStore(s => s.sites);
 
   const [title, setTitle] = useState("");
   const [description, setDesc] = useState("");
@@ -32,6 +35,11 @@ export function CreateTaskDialog({ onClose, onSubmit, users, currentUserId, team
   const [isHrTask, setIsHrTask] = useState(isExternalHr ?? false);
   const [showSubs, setShowSubs] = useState(true);
   const [subtasks, setSubs] = useState<{ title: string; assignedTo: string[]; deadline: string; deadlineTime: string; priority: TaskPriority | undefined; requiresApproval: boolean; approverId?: string }[]>([]);
+
+  // ── Tag to Site state ─────────────────────────────────────────────────────
+  const [tagToSite, setTagToSite] = useState(false);
+  const [clientId, setClientId] = useState<string>("");
+  const [siteId, setSiteId] = useState<string>("");
 
   // ── Reminder state ────────────────────────────────────────────────────────
   const [enableReminder, setEnableReminder] = useState(false);
@@ -82,6 +90,8 @@ export function CreateTaskDialog({ onClose, onSubmit, users, currentUserId, team
         priority: s.priority,
         requiresApproval: s.requiresApproval,
         approverId: s.requiresApproval ? s.approverId : undefined,
+        clientId: tagToSite && clientId ? clientId : undefined,
+        siteId: tagToSite && siteId ? siteId : undefined,
       });
     });
 
@@ -100,6 +110,8 @@ export function CreateTaskDialog({ onClose, onSubmit, users, currentUserId, team
         requiresApproval, 
         approverId: requiresApproval ? approverId : undefined,
         is_hr_task: isHrTask,
+        clientId: tagToSite && clientId ? clientId : undefined,
+        siteId: tagToSite && siteId ? siteId : undefined,
         skipAutoSubtask: finalSubs.length > 0
       },
       finalSubs
@@ -265,6 +277,56 @@ export function CreateTaskDialog({ onClose, onSubmit, users, currentUserId, team
               HR Task 
             </span>
           </label>
+
+          {/* Tag to Site Section */}
+          <div className={`mt-2 border border-border rounded-xl transition-all ${tagToSite ? 'bg-primary/5 border-primary/20' : ''}`}>
+             <div className="flex items-center justify-between px-4 py-3 cursor-pointer" onClick={() => setTagToSite(!tagToSite)}>
+                <div className="flex items-center gap-2.5">
+                   <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${tagToSite ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
+                      <MapPin className="w-4 h-4" />
+                   </div>
+                   <div>
+                      <span className="text-sm font-semibold text-foreground">Tag to Site / Client</span>
+                      <p className="text-[10px] text-muted-foreground">Associate this task with a specific client and site</p>
+                   </div>
+                </div>
+                <div className={`w-10 h-6 rounded-full transition-colors relative ${tagToSite ? 'bg-primary' : 'bg-slate-200'}`}>
+                   <div className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow-sm transition-all ${tagToSite ? 'left-5' : 'left-1'}`} />
+                </div>
+             </div>
+
+             <AnimatePresence>
+                {tagToSite && (
+                   <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+                      <div className="px-4 pb-4 pt-1 grid grid-cols-2 gap-4">
+                         <div>
+                            <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1.5">Client</label>
+                            <select value={clientId} onChange={e => { setClientId(e.target.value); setSiteId(''); }}
+                               className="w-full px-3 py-2 rounded-xl border border-border bg-background text-xs focus:outline-none focus:ring-2 focus:ring-primary/20">
+                               <option value="">No Client</option>
+                               {clientProfiles.map(c => (
+                                  <option key={c.id} value={c.id}>{c.name}</option>
+                               ))}
+                            </select>
+                         </div>
+                         <div>
+                            <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1.5">Site</label>
+                            <select value={siteId} onChange={e => setSiteId(e.target.value)} disabled={!clientId}
+                               className="w-full px-3 py-2 rounded-xl border border-border bg-background text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50">
+                               <option value="">No Site</option>
+                               {sites.filter(s => {
+                                  const cName = clientProfiles.find(c => c.id === clientId)?.name;
+                                  return s.client === cName || s.client === clientId;
+                               }).map(s => (
+                                  <option key={s.id} value={s.id}>{s.name}</option>
+                               ))}
+                            </select>
+                         </div>
+                      </div>
+                   </motion.div>
+                )}
+             </AnimatePresence>
+          </div>
 
           <div className="border border-border rounded-xl overflow-hidden">
             <button type="button" onClick={toggleSubs}

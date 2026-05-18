@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Pencil, ChevronDown, Clock, RefreshCw, Users, Bell, CheckCircle2 } from 'lucide-react';
+import { X, Pencil, ChevronDown, Clock, RefreshCw, Users, Bell, CheckCircle2, MapPin } from 'lucide-react';
 import { Button } from '@/src/components/ui/button';
 import { useAuth } from '@/src/hooks/useAuth';
 import { useAppData } from '@/src/contexts/AppDataContext';
+import { useAppStore } from '@/src/store/appStore';
 import type { MainTask, AppUser, TaskPriority } from "@/src/types/tasks";
 import { PRIORITY_ORDER, PRIORITY_CONFIG } from "@/src/components/tasks/TasksShared";
 
@@ -15,6 +16,9 @@ interface EditTaskDialogProps {
 }
 
 export function EditTaskDialog({ task, users, onClose, onSave }: EditTaskDialogProps) {
+  const clientProfiles = useAppStore(s => s.clientProfiles);
+  const sites = useAppStore(s => s.sites);
+
   const [title, setTitle] = useState(task.title);
   const [description, setDesc] = useState(task.description ?? "");
   const [assignedTo, setAssignedTo] = useState<string[]>(
@@ -26,6 +30,11 @@ export function EditTaskDialog({ task, users, onClose, onSave }: EditTaskDialogP
   const [approverId, setApproverId] = useState(task.approverId || '');
   const [isHrTask, setIsHrTask] = useState(task.is_hr_task ?? false);
   const [openDropdown, setOpenDropdown] = useState(false);
+
+  // Tag to Site state — pre-populate from existing task
+  const [tagToSite, setTagToSite] = useState(!!(task.clientId || task.siteId));
+  const [clientId, setClientId] = useState(task.clientId || '');
+  const [siteId, setSiteId] = useState(task.siteId || '');
 
   const isProj = !!task.is_project;
   const label = isProj ? "Project" : "Task";
@@ -42,7 +51,9 @@ export function EditTaskDialog({ task, users, onClose, onSave }: EditTaskDialogP
       priority, 
       requiresApproval, 
       approverId: requiresApproval ? approverId : undefined,
-      is_hr_task: isHrTask 
+      is_hr_task: isHrTask,
+      clientId: tagToSite && clientId ? clientId : null,
+      siteId: tagToSite && siteId ? siteId : null,
     });
   };
 
@@ -213,6 +224,55 @@ export function EditTaskDialog({ task, users, onClose, onSave }: EditTaskDialogP
               HR Task 
             </span>
           </label>
+
+          {/* Tag to Site Section */}
+          <div className={`mt-1 border border-border rounded-xl transition-all ${tagToSite ? 'bg-primary/5 border-primary/20' : ''}`}>
+             <div className="flex items-center justify-between px-4 py-3 cursor-pointer" onClick={() => setTagToSite(!tagToSite)}>
+                <div className="flex items-center gap-2.5">
+                   <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${tagToSite ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
+                      <MapPin className="w-4 h-4" />
+                   </div>
+                   <div>
+                      <span className="text-sm font-semibold text-foreground">Tag to Site / Client</span>
+                      <p className="text-[10px] text-muted-foreground">Associate with a specific client and site</p>
+                   </div>
+                </div>
+                <div className={`w-10 h-6 rounded-full transition-colors relative ${tagToSite ? 'bg-primary' : 'bg-slate-200'}`}>
+                   <div className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow-sm transition-all ${tagToSite ? 'left-5' : 'left-1'}`} />
+                </div>
+             </div>
+             <AnimatePresence>
+                {tagToSite && (
+                   <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+                      <div className="px-4 pb-4 pt-1 grid grid-cols-2 gap-4">
+                         <div>
+                            <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1.5">Client</label>
+                            <select value={clientId} onChange={e => { setClientId(e.target.value); setSiteId(''); }}
+                               className="w-full px-3 py-2 rounded-xl border border-border bg-background text-xs focus:outline-none focus:ring-2 focus:ring-primary/20">
+                               <option value="">No Client</option>
+                               {clientProfiles.map(c => (
+                                  <option key={c.id} value={c.id}>{c.name}</option>
+                               ))}
+                            </select>
+                         </div>
+                         <div>
+                            <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1.5">Site</label>
+                            <select value={siteId} onChange={e => setSiteId(e.target.value)} disabled={!clientId}
+                               className="w-full px-3 py-2 rounded-xl border border-border bg-background text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50">
+                               <option value="">No Site</option>
+                               {sites.filter(s => {
+                                  const cName = clientProfiles.find(c => c.id === clientId)?.name;
+                                  return s.client === cName || s.client === clientId;
+                               }).map(s => (
+                                  <option key={s.id} value={s.id}>{s.name}</option>
+                               ))}
+                            </select>
+                         </div>
+                      </div>
+                   </motion.div>
+                )}
+             </AnimatePresence>
+          </div>
 
           <EditTaskReminderSection taskId={task.id} assignedTo={assignedTo.join(',')} users={users} />
 

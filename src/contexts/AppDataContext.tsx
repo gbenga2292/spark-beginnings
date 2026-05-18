@@ -119,6 +119,8 @@ export function mapMainTaskToCamel(m: any) {
         deletedAt: m.deleted_at || m.deletedAt,
         createdAt: m.created_at || m.createdAt,
         updatedAt: m.updated_at || m.updatedAt,
+        clientId: m.client_id || m.clientId,
+        siteId: m.site_id || m.siteId,
     };
 }
 
@@ -139,6 +141,8 @@ export function mapSubtaskToCamel(s: any) {
         deletedAt: s.deleted_at || s.deletedAt,
         createdAt: s.created_at || s.createdAt,
         updatedAt: s.updated_at || s.updatedAt,
+        clientId: s.client_id || s.clientId,
+        siteId: s.site_id || s.siteId,
     };
 }
 
@@ -443,7 +447,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
             title: task.title,
             description: task.description || null,
             created_by: task.createdBy || user?.id,
-            team_id: task.teamId || '',
+            teamId: task.teamId || '',
             workspace_id: task.workspaceId || task.teamId || '',
             assigned_to: task.assignedTo || null,
             deadline: task.deadline || null,
@@ -452,6 +456,8 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
             requires_approval: task.requiresApproval || false,
             approver_id: task.approverId || null,
             is_hr_task: task.is_hr_task || false,
+            client_id: task.clientId || null,
+            site_id: task.siteId || null,
         };
         const { data, error } = await supabase.from('main_tasks').insert(payload).select().single();
         if (error) {
@@ -478,6 +484,8 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                     priority: payload.priority,
                     requiresApproval: task.requiresApproval || false,
                     approverId: task.approverId || null,
+                    clientId: payload.client_id,
+                    siteId: payload.site_id,
                 }];
             }
 
@@ -492,6 +500,8 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                     requires_approval: s.requiresApproval || false,
                     approver_id: s.approverId || null,
                     main_task_id: data.id,
+                    client_id: s.clientId || null,
+                    site_id: s.siteId || null,
                 }));
                 const { data: insertedSubs, error: subErr } = await supabase.from('subtasks').insert(subTasksPayload).select();
                 if (subErr) {
@@ -524,7 +534,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         if (p.deadline !== undefined)           payload.deadline = p.deadline ?? null;
         if (p.priority !== undefined)           payload.priority = p.priority ?? null;
         if (p.assignedTo !== undefined)         payload.assigned_to = p.assignedTo ?? null;
-        if (p.teamId !== undefined)             payload.team_id = p.teamId;
+        if (p.teamId !== undefined)             payload.teamId = p.teamId;
         if (p.workspaceId !== undefined)        payload.workspace_id = p.workspaceId;
         if (p.createdBy !== undefined)          payload.created_by = p.createdBy;
         if (p.is_deleted !== undefined)         payload.is_deleted = p.is_deleted;
@@ -534,6 +544,8 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         if (p.requires_approval !== undefined)  payload.requires_approval = p.requires_approval;
         if (p.is_hr_task !== undefined)         payload.is_hr_task = p.is_hr_task;
         if (p.isHrTask !== undefined)           payload.is_hr_task = p.isHrTask;
+        if (p.clientId !== undefined)           payload.client_id = p.clientId;
+        if (p.siteId !== undefined)             payload.site_id = p.siteId;
         const { data, error } = await supabase.from('main_tasks').update(payload).eq('id', id).select().single();
         if (error) {
             console.error('updateMainTask error:', error);
@@ -589,6 +601,8 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
             requires_approval: sub.requiresApproval || false,
             approver_id: sub.approverId || null,
             main_task_id: sub.mainTaskId,
+            client_id: sub.clientId || null,
+            site_id: sub.siteId || null,
         };
         const { data, error } = await supabase.from('subtasks').insert(payload).select().single();
         if (error) {
@@ -608,7 +622,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
             'title', 'description', 'status', 'assignedTo', 'assigned_to', 
             'priority', 'deadline', 'main_task_id', 'mainTaskId', 
             'requires_approval', 'approver_id', 'is_deleted', 'deleted_at', 
-            'completed_at', 'workspaceId'
+            'completed_at', 'workspaceId', 'client_id', 'clientId', 'site_id', 'siteId'
         ];
 
         const payload: any = {};
@@ -619,6 +633,10 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                 payload.requires_approval = p.requiresApproval;
             } else if (key === 'approverId') {
                 payload.approver_id = p.approverId;
+            } else if (key === 'clientId') {
+                payload.client_id = p.clientId;
+            } else if (key === 'siteId') {
+                payload.site_id = p.siteId;
             } else if (allowedColumns.includes(key)) {
                 payload[key] = p[key];
             }

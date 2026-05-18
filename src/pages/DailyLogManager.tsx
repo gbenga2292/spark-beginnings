@@ -7,7 +7,7 @@ import {
   Image as ImageIcon, Video, X, UploadCloud, FileVideo, Camera
 } from 'lucide-react';
 import { useOperations } from '../contexts/OperationsContext';
-import { useAppStore } from '../store/appStore';
+import { useAppStore, AttendanceRecord } from '../store/appStore';
 import { useUserStore } from '../store/userStore';
 import { DailyMachineLog, DowntimeEntry, OperationalDay } from '../types/operations';
 import { Button } from '@/src/components/ui/button';
@@ -24,6 +24,7 @@ import {
 } from '@/src/components/ui/dialog';
 import { toast } from 'sonner';
 import { CustomCamera } from '../components/ui/CustomCamera';
+import { POSITION_HIERARCHY } from '@/src/lib/hierarchy';
 
 interface DailyLogManagerProps {
   assetId: string;
@@ -37,7 +38,7 @@ interface DailyLogManagerProps {
 
 export function DailyLogManager({ assetId, assetName, siteId, siteName, initialDate, isEmbedded, onBack }: DailyLogManagerProps) {
   const { dailyMachineLogs, logDailyActivity, deleteDailyLog, waybills } = useOperations();
-  const { employees } = useAppStore();
+  const { employees, attendanceRecords } = useAppStore();
   const currentUser = useUserStore(s => s.users.find(u => u.id === s.currentUserId));
   
   const [view, setView] = useState<'history' | 'form' | 'analytics' | 'calendar' | 'detail'>(initialDate ? 'form' : 'history');
@@ -74,6 +75,94 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
   const isActive = operationalDay !== 'none';
   const [dieselUsage, setDieselUsage] = useState<string>(selectedLog ? selectedLog.dieselUsage.toString() : '0');
   const [supervisorOnSite, setSupervisorOnSite] = useState(selectedLog?.supervisorOnSite || '');
+
+  // Auto-select supervisor based on attendance when date/site changes
+  React.useEffect(() => {
+    // Only auto-select when creating a new log or if the supervisor is currently empty
+    if (selectedLog && date === selectedLog.date) return;
+
+    const findAutoSupervisor = () => {
+      if (!date || !siteName) return '';
+
+      // Get attendance records for this date and site
+      const siteRecords = attendanceRecords.filter(r => 
+        r.date === date && 
+        ((r.day === 'Yes' && r.daySite === siteName) || 
+         (r.night === 'Yes' && r.nightSite === siteName))
+      );
+
+      if (siteRecords.length === 0) return '';
+
+      // Map to employees and filter to only include dewateringStaff
+      const dewateringStaffIds = new Set(dewateringStaff.map(s => s.id));
+      const dewateringStaffNames = new Set(dewateringStaff.map(s => `${s.firstname} ${s.surname}`.toUpperCase()));
+
+      const matchedStaff = siteRecords
+        .map(r => {
+          const emp = employees.find(e => 
+            e.id === r.staffId || 
+            `${e.firstname} ${e.surname}`.toUpperCase() === r.staffName.toUpperCase()
+          );
+          return { record: r, employee: emp };
+        })
+        .filter(x => 
+          x.employee && 
+          (dewateringStaffIds.has(x.employee.id) || 
+           dewateringStaffNames.has(`${x.employee.firstname} ${x.employee.surname}`.toUpperCase()))
+        );
+
+      if (matchedStaff.length === 0) return '';
+
+      // Helper to get shift priority (lower number = higher priority)
+      // Night shift takes priority
+      const getShiftPriority = (r: AttendanceRecord) => {
+        if (r.night === 'Yes' && r.nightSite === siteName) return 1;
+        if (r.day === 'Yes' && r.daySite === siteName) return 2;
+        return 3;
+      };
+
+      // Helper to normalize position index
+      const getNormalizedPositionIndex = (pos?: string) => {
+        if (!pos) return 999;
+        let normalized = pos;
+        if (normalized === 'Assistant Site Supervisor') {
+          normalized = 'Assistant Supervisor';
+        }
+        const idx = POSITION_HIERARCHY.indexOf(normalized);
+        return idx === -1 ? 999 : idx;
+      };
+
+      // Sort staff
+      const sorted = [...matchedStaff].sort((a, b) => {
+        // 1. Shift Priority
+        const shiftA = getShiftPriority(a.record);
+        const shiftB = getShiftPriority(b.record);
+        if (shiftA !== shiftB) return shiftA - shiftB;
+
+        // 2. Position Hierarchy
+        const posA = getNormalizedPositionIndex(a.employee?.position || a.record.position);
+        const posB = getNormalizedPositionIndex(b.employee?.position || b.record.position);
+        if (posA !== posB) return posA - posB;
+
+        // 3. Start Date Seniority
+        const dateA = a.employee?.startDate ? new Date(a.employee.startDate).getTime() : Infinity;
+        const dateB = b.employee?.startDate ? new Date(b.employee.startDate).getTime() : Infinity;
+        return dateA - dateB;
+      });
+
+      const bestMatch = sorted[0];
+      if (bestMatch && bestMatch.employee) {
+        return `${bestMatch.employee.firstname} ${bestMatch.employee.surname}`;
+      }
+      return '';
+    };
+
+    const autoSelected = findAutoSupervisor();
+    if (autoSelected) {
+      setSupervisorOnSite(autoSelected);
+    }
+  }, [date, siteName, attendanceRecords, employees, dewateringStaff, selectedLog]);
+
   const [clientFeedback, setClientFeedback] = useState(selectedLog?.clientFeedback || '');
   const [maintenanceDetails, setMaintenanceDetails] = useState(selectedLog?.maintenanceDetails || '');
   const [issuesOnSite, setIssuesOnSite] = useState(selectedLog?.issuesOnSite || '');
@@ -224,6 +313,13 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
         datesToLog.push(d.toISOString().split('T')[0]);
       }
 
+      const todayStr = new Date().toISOString().split('T')[0];
+      const futureDates = datesToLog.filter(d => d > todayStr);
+      if (futureDates.length > 0) {
+        toast.error('Cannot log activity for future dates.');
+        return;
+      }
+
       // Filter out dates that already have a log (when not editing)
       const existingDates = new Set(logs.map(l => l.date));
       const newDates = selectedLog ? datesToLog : datesToLog.filter(d => !existingDates.has(d));
@@ -341,52 +437,65 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
   useSetPageTitle(
     assetName,
     `Site: ${siteName}`,
-    <div className="flex items-center gap-1 sm:gap-2">
-      <Button variant="outline" size="icon" className="h-8 w-8 sm:h-9 sm:w-auto sm:px-3 sm:gap-2" onClick={onBack}>
-        <ArrowLeft className="h-4 w-4" /> <span className="hidden sm:inline">Back</span>
-      </Button>
+    <div className="flex items-center gap-1.5 sm:gap-3">
       {!isEmbedded && (
+        <div className="flex bg-slate-100 dark:bg-slate-800/50 p-1 rounded-lg">
+          <button 
+            className={cn(
+              "px-3 py-1.5 text-xs font-bold rounded-md transition-all", 
+              view === 'history' 
+                ? 'bg-white dark:bg-slate-700 text-blue-700 dark:text-blue-300 shadow-sm' 
+                : 'text-slate-500 hover:text-slate-700'
+            )}
+            onClick={() => setView('history')}
+          >
+            History
+          </button>
+          <button 
+            className={cn(
+              "px-3 py-1.5 text-xs font-bold rounded-md transition-all", 
+              view === 'analytics' 
+                ? 'bg-white dark:bg-slate-700 text-blue-700 dark:text-blue-300 shadow-sm' 
+                : 'text-slate-500 hover:text-slate-700'
+            )}
+            onClick={() => setView('analytics')}
+          >
+            Analytics
+          </button>
+          <button 
+            className={cn(
+              "px-3 py-1.5 text-xs font-bold rounded-md transition-all", 
+              view === 'calendar' 
+                ? 'bg-white dark:bg-slate-700 text-blue-700 dark:text-blue-300 shadow-sm' 
+                : 'text-slate-500 hover:text-slate-700'
+            )}
+            onClick={() => setView('calendar')}
+          >
+            Calendar
+          </button>
+        </div>
+      )}
+      <Button variant="outline" size="sm" className="h-8 gap-1.5 rounded-lg border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800" onClick={onBack}>
+        <ArrowLeft className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Back</span>
+      </Button>
+      {!isEmbedded && view !== 'form' && view !== 'detail' && (
         <Button 
           size="sm"
-          className="gap-2 bg-blue-600 hover:bg-blue-700 text-white h-8 sm:h-9 px-3"
+          className="gap-1.5 bg-blue-600 hover:bg-blue-700 text-white h-8 px-3 rounded-lg shadow-sm font-bold text-xs"
           onClick={() => {
             resetForm();
             setView('form');
           }}
         >
-          <Plus className="h-4 w-4" /> <span className="hidden sm:inline">File Log</span>
+          <Plus className="h-3.5 w-3.5" /> <span>File Log</span>
         </Button>
       )}
-    </div>
+    </div>,
+    [view, assetName, siteName, isEmbedded]
   );
 
   return (
     <div className="flex flex-col h-full bg-slate-50 dark:bg-slate-950 overflow-hidden animate-in fade-in slide-in-from-right-4 duration-300">
-      {/* Tabs */}
-      {!isEmbedded && (
-        <div className="bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800/60 p-3 sm:p-4 flex items-center justify-center sm:justify-start overflow-x-auto scrollbar-hide shadow-sm z-10 sticky top-0">
-          <div className="flex bg-slate-100 dark:bg-slate-800/50 p-1 rounded-lg w-full sm:w-auto">
-            <button 
-              className={cn("flex-1 sm:flex-none px-4 py-2 text-sm font-semibold rounded-md transition-all", view === 'history' ? 'bg-white dark:bg-slate-700 text-blue-700 dark:text-blue-300 shadow-sm' : 'text-slate-500 hover:text-slate-700')}
-              onClick={() => setView('history')}
-            >
-              History
-            </button>
-            <button 
-              className={cn("flex-1 sm:flex-none px-4 py-2 text-sm font-semibold rounded-md transition-all", view === 'analytics' ? 'bg-white dark:bg-slate-700 text-blue-700 dark:text-blue-300 shadow-sm' : 'text-slate-500 hover:text-slate-700')}
-              onClick={() => setView('analytics')}
-            >
-              Analytics
-            </button>
-            <button 
-              className={cn("flex-1 sm:flex-none px-4 py-2 text-sm font-semibold rounded-md transition-all", view === 'calendar' ? 'bg-white dark:bg-slate-700 text-blue-700 dark:text-blue-300 shadow-sm' : 'text-slate-500 hover:text-slate-700')}
-              onClick={() => setView('calendar')}
-            >
-              Calendar
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-6">
@@ -521,6 +630,7 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
                       <Input 
                         type="date" 
                         value={date} 
+                        max={new Date().toISOString().split('T')[0]}
                         onChange={e => { setDate(e.target.value); if (endDate && e.target.value > endDate) setEndDate(''); }}
                         className="pl-9 h-10 border-slate-200 dark:border-slate-700 rounded-md focus:ring-2 focus:ring-blue-500"
                       />
@@ -537,6 +647,7 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
                           type="date" 
                           value={endDate} 
                           min={date}
+                          max={new Date().toISOString().split('T')[0]}
                           onChange={e => setEndDate(e.target.value)}
                           className="pl-9 h-10 border-slate-200 dark:border-slate-700 rounded-md focus:ring-2 focus:ring-blue-500"
                         />
@@ -907,21 +1018,38 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
                       w.sentToSiteDate?.startsWith(dateStr)
                     );
                     const opDay = hasLog ? (hasLog.operationalDay ?? (hasLog.isActive ? 'full' : 'none')) : null;
+                    const todayStr = new Date().toISOString().split('T')[0];
+                    const isFuture = dateStr > todayStr;
 
                     days.push(
                       <div 
                         key={i} 
                         className={cn(
                           "h-24 rounded-3xl border p-3 flex flex-col justify-between transition-all group relative overflow-hidden",
-                          opDay === 'full' ? "bg-emerald-50/60 border-emerald-100 dark:bg-emerald-900/10 dark:border-emerald-900/20" :
-                          opDay === 'half' ? "bg-amber-50/60 border-amber-100 dark:bg-amber-900/10 dark:border-amber-900/20" :
-                          opDay === 'none' ? "bg-rose-50/40 border-rose-100 dark:bg-rose-900/10 dark:border-rose-900/20" :
-                          isArrivalDate ? "bg-orange-50/50 border-orange-100 dark:bg-orange-900/10 dark:border-orange-900/20" :
-                          "bg-slate-50/30 border-slate-100 dark:bg-slate-800/20 dark:border-slate-800/50 hover:bg-white dark:hover:bg-slate-800 transition-colors shadow-sm"
+                          isFuture 
+                            ? "bg-slate-100/10 border-slate-100/50 dark:bg-slate-900/10 dark:border-slate-800/30 opacity-40 cursor-not-allowed select-none"
+                            : cn(
+                                opDay === 'full' ? "bg-emerald-50/60 border-emerald-100 dark:bg-emerald-900/10 dark:border-emerald-900/20" :
+                                opDay === 'half' ? "bg-amber-50/60 border-amber-100 dark:bg-amber-900/10 dark:border-amber-900/20" :
+                                opDay === 'none' ? "bg-rose-50/40 border-rose-100 dark:bg-rose-900/10 dark:border-rose-900/20" :
+                                isArrivalDate ? "bg-orange-50/50 border-orange-100 dark:bg-orange-900/10 dark:border-orange-900/20" :
+                                "bg-slate-50/30 border-slate-100 dark:bg-slate-800/20 dark:border-slate-800/50 hover:bg-white dark:hover:bg-slate-800 transition-colors shadow-sm cursor-pointer"
+                              )
                         )}
+                        onClick={() => {
+                          if (isFuture) return;
+                          if (hasLog) {
+                            editLog(hasLog);
+                          } else {
+                            resetForm();
+                            setDate(dateStr);
+                            setView('form');
+                          }
+                        }}
                       >
                         <span className={cn(
                           "text-sm font-bold",
+                          isFuture ? "text-slate-300 dark:text-slate-700" :
                           opDay === 'full' ? "text-emerald-700" :
                           opDay === 'half' ? "text-amber-600" :
                           opDay === 'none' ? "text-rose-500" :
@@ -951,20 +1079,29 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
                         </div>
 
                         {/* Hover Overlay */}
-                        {(hasLog || isArrivalDate) && (
-                          <div className="absolute inset-0 bg-white/70 dark:bg-slate-900/70 backdrop-blur-[1px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer px-2 text-center" onClick={() => hasLog && editLog(hasLog)}>
+                        {!isFuture && (
+                          <div 
+                            className="absolute inset-0 bg-white/80 dark:bg-slate-900/80 backdrop-blur-[1.5px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer px-2 text-center"
+                          >
                             <div className="space-y-0.5">
-                              {isArrivalDate && <p className="text-[9px] font-bold text-orange-600">Arrived on Site</p>}
-                              {opDay && (
-                                <p className={cn(
-                                  "text-[10px] font-black",
-                                  opDay === 'full' ? "text-emerald-700" : opDay === 'half' ? "text-amber-600" : "text-rose-500"
-                                )}>
-                                  {opDay === 'full' ? 'FULL DAY' : opDay === 'half' ? 'HALF DAY' : 'OFF'}
-                                </p>
-                              )}
-                              {hasLog && hasLog.dieselUsage > 0 && (
-                                <p className="text-[9px] font-bold text-slate-600 dark:text-slate-300">{hasLog.dieselUsage}L Diesel</p>
+                              {hasLog ? (
+                                <>
+                                  <p className={cn(
+                                    "text-[10px] font-black",
+                                    opDay === 'full' ? "text-emerald-700" : opDay === 'half' ? "text-amber-600" : "text-rose-500"
+                                  )}>
+                                    {opDay === 'full' ? 'FULL DAY' : opDay === 'half' ? 'HALF DAY' : 'OFF'}
+                                  </p>
+                                  {hasLog.dieselUsage > 0 && (
+                                    <p className="text-[9px] font-bold text-slate-600 dark:text-slate-300">{hasLog.dieselUsage}L Diesel</p>
+                                  )}
+                                  <p className="text-[8px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest mt-1">Edit Log</p>
+                                </>
+                              ) : (
+                                <>
+                                  <Plus className="h-4 w-4 text-blue-600 dark:text-blue-400 mx-auto mb-0.5" />
+                                  <p className="text-[10px] font-black text-blue-600 dark:text-blue-400">LOG DAY</p>
+                                </>
                               )}
                             </div>
                           </div>
