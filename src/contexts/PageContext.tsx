@@ -5,7 +5,7 @@ interface PageState {
   title: string;
   headerButtons: ReactNode | null;
   subtitle: string;
-  showBackButton: boolean;
+  showBackButton: boolean | (() => void);
 }
 
 // Dispatch definition
@@ -13,7 +13,7 @@ interface PageDispatch {
   setTitle: (title: string) => void;
   setHeaderButtons: (buttons: ReactNode | null) => void;
   setSubtitle: (subtitle: string) => void;
-  setShowBackButton: (show: boolean) => void;
+  setShowBackButton: (show: boolean | (() => void)) => void;
 }
 
 const PageStateContext = createContext<PageState | undefined>(undefined);
@@ -23,7 +23,7 @@ export function PageProvider({ children }: { children: ReactNode }) {
   const [title, setTitle] = useState('');
   const [subtitle, setSubtitle] = useState('');
   const [headerButtons, setHeaderButtons] = useState<ReactNode | null>(null);
-  const [showBackButton, setShowBackButton] = useState(false);
+  const [showBackButton, setShowBackButton] = useState<boolean | (() => void)>(false);
 
   const stateValue = useMemo(() => ({ title, subtitle, headerButtons, showBackButton }), [title, subtitle, headerButtons, showBackButton]);
   const dispatchValue = useMemo(() => ({ setTitle, setSubtitle, setHeaderButtons, setShowBackButton }), []);
@@ -61,7 +61,7 @@ export function useSetPageTitle(
   subtitle: string = '',
   buttons: ReactNode | null = null,
   deps: any[] = [],
-  showBackButton: boolean = false
+  showBackButton: boolean | (() => void) = false
 ) {
   const dispatch = useContext(PageDispatchContext);
 
@@ -88,7 +88,8 @@ export function useSetPageTitle(
     setTitle(title);
     setSubtitle(subtitle);
     setHeaderButtons(buttonsRef.current);
-    setShowBackButton(showBackButton);
+    // Wrap the function in another function if it is a callback so that useState stores the function rather than executing it.
+    setShowBackButton(() => showBackButton);
 
     return () => {
       // Only clear if we are still the latest owner (i.e. no newer component mounted yet)

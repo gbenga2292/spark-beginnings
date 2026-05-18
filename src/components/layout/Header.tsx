@@ -24,7 +24,7 @@ const isNodeEmpty = (node: any): boolean => {
 };
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { Capacitor, CapacitorHttp } from '@capacitor/core';
-import { Bell, Search, LogOut, Menu, X, User, Settings, ChevronRight, CalendarClock, Users, MapPin, Wallet, FileText, Landmark, Library, UserPlus, ShieldCheck, LayoutDashboard, Clock, AlertCircle, AtSign, ArrowLeft, ArrowUpCircle, RefreshCw, MoreVertical } from 'lucide-react';
+import { Bell, Search, LogOut, Menu, X, User, Settings, ChevronRight, CalendarClock, Users, MapPin, Wallet, FileText, Landmark, Library, UserPlus, ShieldCheck, LayoutDashboard, Clock, AlertCircle, AtSign, ArrowLeft, ArrowUpCircle, RefreshCw, MoreVertical, Sparkles } from 'lucide-react';
 import { toast } from '@/src/components/ui/toast';
 import { StatusIndicator } from '@/src/components/offline/StatusIndicator';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -400,7 +400,7 @@ export function Header({ onMenuClick }: HeaderProps) {
               <Button 
                 variant="ghost" 
                 size="icon" 
-                onClick={() => navigate(-1)} 
+                onClick={() => typeof showBackButton === 'function' ? showBackButton() : navigate(-1)} 
                 className={`h-7 w-7 rounded-lg -ml-1 transition-all ${
                   isDark ? 'text-slate-400 hover:bg-slate-800' : 'text-slate-500 hover:bg-slate-100'
                 }`}
@@ -504,6 +504,7 @@ export function Header({ onMenuClick }: HeaderProps) {
 
         <StatusIndicator />
         <div className={`h-6 w-px hidden sm:block ${isDark ? 'bg-slate-700' : 'bg-slate-200'} mx-1`} />
+        
         {/* Notification Bell */}
         <div ref={notifRef} className="relative">
           <button

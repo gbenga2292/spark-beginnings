@@ -472,7 +472,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                 targetSubs = [{
                     title: payload.title,
                     description: payload.description,
-                    assignedTo: payload.assignedTo,
+                    assignedTo: payload.assigned_to,
                     status: task.requiresApproval ? 'pending_approval' : 'not_started',
                     deadline: payload.deadline,
                     priority: payload.priority,

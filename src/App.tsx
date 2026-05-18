@@ -24,6 +24,7 @@ const Employees = lazy(() => import('./pages/Employees').then(m => ({ default: m
 const Beneficiaries = lazy(() => import('./pages/Beneficiaries').then(m => ({ default: m.Beneficiaries })));
 const Organogram = lazy(() => import('./pages/Organogram').then(m => ({ default: m.Organogram })));
 const Sites = lazy(() => import('./pages/Sites').then(m => ({ default: m.Sites })));
+const Client360 = lazy(() => import('./pages/Client360').then(m => ({ default: m.Client360 })));
 const SiteDiary = lazy(() => import('./pages/SiteDiary').then(m => ({ default: m.SiteDiary })));
 const SiteConversations = lazy(() => import('./pages/SiteConversations').then(m => ({ default: m.SiteConversations })));
 const SiteOnboarding = lazy(() => import('./pages/SiteOnboarding').then(m => ({ default: m.SiteOnboarding })));
@@ -184,6 +185,7 @@ function AppContent() {
             <Route path="beneficiaries" element={<Page label="Beneficiaries"><ProtectedRoute requiredModule="beneficiaries"><Beneficiaries /></ProtectedRoute></Page>} />
             <Route path="organogram" element={<Page label="Organogram"><ProtectedRoute requiredModule="employees"><Organogram /></ProtectedRoute></Page>} />
             <Route path="sites" element={<Page label="Sites"><ProtectedRoute requiredModule="sites"><Sites /></ProtectedRoute></Page>} />
+            <Route path="client-360" element={<Page label="Client 360"><ProtectedRoute requiredModule="sites"><Client360 /></ProtectedRoute></Page>} />
             <Route path="sites/diary/:siteId" element={<Page label="Site Diary"><ProtectedRoute requiredModule="sites"><SiteDiary /></ProtectedRoute></Page>} />
             <Route path="sites/conversations/:siteId" element={<Page label="Site Conversations"><ProtectedRoute requiredModule="sites"><SiteConversations /></ProtectedRoute></Page>} />
             <Route path="sites/onboarding/:id" element={<Page label="Site Onboarding"><ProtectedRoute requiredModule="sites"><SiteOnboarding /></ProtectedRoute></Page>} />

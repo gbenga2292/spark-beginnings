@@ -108,6 +108,8 @@ export interface ClientProfile {
   tinNumber?: string;
   startDate?: string;
   createdAt?: string;
+  address?: string;
+  mainContactPerson?: string;
 }
 
 export interface Site {
@@ -118,6 +120,8 @@ export interface Site {
   status: 'Active' | 'Inactive' | 'Ended';
   startDate?: string;
   endDate?: string;
+  address?: string;
+  mainContactPerson?: string;
 }
 
 export interface TaxBracket {
