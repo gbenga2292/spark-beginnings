@@ -11,6 +11,7 @@ import { NairaSign } from '@/src/components/ui/naira-sign';
 import { computeWorkDays, computeWorkDaysInRange, MONTH_INDEX } from '@/src/lib/workdays';
 import { toast, showConfirm } from '@/src/components/ui/toast';
 import { usePriv } from '@/src/hooks/usePriv';
+import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { formatDisplayDate, normalizeDate, getPayrollPeriodDates } from '@/src/lib/dateUtils';
 import { generateId } from '@/src/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/src/components/ui/dialog';
@@ -628,6 +629,48 @@ export function Variables() {
       const srvSheet = srvData.length > 0 ? XLSX.utils.json_to_sheet(srvData, { header: ['ServiceName', 'TaskTitle', 'Assignee'] }) : XLSX.utils.aoa_to_sheet([['ServiceName', 'TaskTitle', 'Assignee']]);
       XLSX.utils.book_append_sheet(wb, srvSheet, 'Service_Templates');
 
+      // Ledger Categories
+      const lCatData = ledgerCategories.map(c => ({ Category: c.name }));
+      const lCatSheet = lCatData.length > 0 ? XLSX.utils.json_to_sheet(lCatData, { header: ['Category'] }) : XLSX.utils.aoa_to_sheet([['Category']]);
+      XLSX.utils.book_append_sheet(wb, lCatSheet, 'Ledger_Categories');
+
+      // Ledger Vendors
+      const lVendorData = ledgerVendors.map(v => ({ Vendor: v.name, TIN: v.tinNumber || '' }));
+      const lVendorSheet = lVendorData.length > 0 ? XLSX.utils.json_to_sheet(lVendorData, { header: ['Vendor', 'TIN'] }) : XLSX.utils.aoa_to_sheet([['Vendor', 'TIN']]);
+      XLSX.utils.book_append_sheet(wb, lVendorSheet, 'Ledger_Vendors');
+
+      // Ledger Banks
+      const lBankData = ledgerBanks.map(b => ({ Bank: b.name }));
+      const lBankSheet = lBankData.length > 0 ? XLSX.utils.json_to_sheet(lBankData, { header: ['Bank'] }) : XLSX.utils.aoa_to_sheet([['Bank']]);
+      XLSX.utils.book_append_sheet(wb, lBankSheet, 'Ledger_Banks');
+
+      // Ledger Beneficiary Banks
+      const lBenBankData = ledgerBeneficiaryBanks.map(b => ({ Bank: b.name }));
+      const lBenBankSheet = lBenBankData.length > 0 ? XLSX.utils.json_to_sheet(lBenBankData, { header: ['Bank'] }) : XLSX.utils.aoa_to_sheet([['Bank']]);
+      XLSX.utils.book_append_sheet(wb, lBenBankSheet, 'Ledger_Beneficiary_Banks');
+
+      // PAYE Extra Conditions
+      const payeExtraData = localPayeVars.extraConditions.map(ec => ({
+        Label: ec.label,
+        'Amount (₦)': ec.amount,
+        Enabled: ec.enabled ? 'Yes' : 'No'
+      }));
+      const payeExtraSheet = payeExtraData.length > 0 ? XLSX.utils.json_to_sheet(payeExtraData) : XLSX.utils.aoa_to_sheet([['Label', 'Amount (₦)', 'Enabled']]);
+      XLSX.utils.book_append_sheet(wb, payeExtraSheet, 'PAYE_Extra_Conditions');
+
+      // HR Onboarding Labels
+      const onboardLabelsData = Object.entries(localHrVars.onboardingStageLabels || {}).map(([step, label]) => ({
+        Step: step,
+        Label: label
+      }));
+      const onboardLabelsSheet = onboardLabelsData.length > 0 ? XLSX.utils.json_to_sheet(onboardLabelsData) : XLSX.utils.aoa_to_sheet([['Step', 'Label']]);
+      XLSX.utils.book_append_sheet(wb, onboardLabelsSheet, 'Onboarding_Labels');
+
+      // Operations: Vehicle Document Types
+      const vDocData = vehicleDocumentTypes.map(v => ({ DocumentType: v.name }));
+      const vDocSheet = vDocData.length > 0 ? XLSX.utils.json_to_sheet(vDocData, { header: ['DocumentType'] }) : XLSX.utils.aoa_to_sheet([['DocumentType']]);
+      XLSX.utils.book_append_sheet(wb, vDocSheet, 'Vehicle_Document_Types');
+
       // HR & Month Variables
       const hrData = [
         { Key: 'Absence Threshold', Value: localHrVars.flaggedAbsenceThreshold },
@@ -812,6 +855,18 @@ export function Variables() {
             await setLedgerBeneficiaryBanks(newLBenBanks);
           }
 
+          if (wb.SheetNames.includes('Vehicle_Document_Types')) {
+            const data = XLSX.utils.sheet_to_json<any>(wb.Sheets['Vehicle_Document_Types']);
+            const addedDocs = new Set<string>();
+            data.forEach(row => {
+              const name = String(row.DocumentType || row.Document_Type || '').trim();
+              if (name && (isOverwrite || !vehicleDocumentTypes.some(v => v.name.toLowerCase() === name.toLowerCase())) && !addedDocs.has(name.toLowerCase())) {
+                addVehicleDocumentType(name);
+                addedDocs.add(name.toLowerCase());
+              }
+            });
+          }
+
           if (wb.SheetNames.includes('Payroll_Variables')) {
             const pvData = XLSX.utils.sheet_to_json<any>(wb.Sheets['Payroll_Variables']);
             const newPv = { ...localPayrollVars };
@@ -955,45 +1010,42 @@ export function Variables() {
     });
   };
 
+  const headerButtons = (
+    <div className="flex flex-col md:flex-row md:items-center gap-2">
+      {priv.canImport && (
+        <label className="flex items-center gap-2 px-3 h-9 bg-white rounded-md border border-slate-200 text-slate-600 text-[11px] font-bold uppercase tracking-tight cursor-pointer hover:bg-slate-50 transition-all shadow-sm">
+          <Download className="h-3.5 w-3.5 text-indigo-500" />
+          Import
+          <input
+            type="file"
+            accept=".xlsx, .xls, .csv"
+            onChange={handleImportVariables}
+            className="hidden"
+          />
+        </label>
+      )}
+      {priv.canExport && (
+        <Button 
+          variant="outline" 
+          onClick={handleExportVariables} 
+          className="gap-2 h-9 px-3 border-slate-200 bg-white text-slate-600 hover:bg-slate-50 font-bold text-[11px] uppercase tracking-tight shadow-sm"
+        >
+          <Upload className="h-3.5 w-3.5 text-emerald-500" />
+          Export
+        </Button>
+      )}
+      {priv.canEdit && (
+        <Button onClick={handleSave} className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-md font-semibold gap-2 transition-all">
+          <Save className="h-4 w-4" /> Save Changes
+        </Button>
+      )}
+    </div>
+  );
+
+  useSetPageTitle('System Variables', 'Configure global application variables, templates, and statutory parameters.', headerButtons, [priv, localMonthVals, localPayeVars, localPayrollVars, localHrVars, departmentTasksList]);
+
   return (
     <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-        <div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 bg-clip-text text-transparent bg-gradient-to-r from-slate-700 to-slate-400">
-            System Variables
-          </h1>
-          <p className="text-sm font-medium text-slate-500 mt-1">Configure global application variables, templates, and statutory parameters.</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {priv.canImport && (
-            <label className="flex items-center gap-2 px-3 h-9 bg-white rounded-md border border-slate-200 text-slate-600 text-[11px] font-bold uppercase tracking-tight cursor-pointer hover:bg-slate-50 transition-all shadow-sm">
-              <Download className="h-3.5 w-3.5 text-indigo-500" />
-              Import
-              <input
-                type="file"
-                accept=".xlsx, .xls, .csv"
-                onChange={handleImportVariables}
-                className="hidden"
-              />
-            </label>
-          )}
-          {priv.canExport && (
-            <Button 
-              variant="outline" 
-              onClick={handleExportVariables} 
-              className="gap-2 h-9 px-3 border-slate-200 bg-white text-slate-600 hover:bg-slate-50 font-bold text-[11px] uppercase tracking-tight shadow-sm"
-            >
-              <Upload className="h-3.5 w-3.5 text-emerald-500" />
-              Export
-            </Button>
-          )}
-          {priv.canEdit && (
-            <Button onClick={handleSave} className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-md font-semibold gap-2 transition-all">
-              <Save className="h-4 w-4" /> Save Changes
-            </Button>
-          )}
-        </div>
-      </div>
 
       {/* Section selector */}
       <div className="flex gap-1 bg-slate-100 rounded-xl p-1 self-start">

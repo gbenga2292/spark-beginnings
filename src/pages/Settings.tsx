@@ -518,7 +518,18 @@ export function Settings() {
     ? new Date(backupSettings.lastBackupAt).toLocaleString()
     : 'Never';
 
-  useSetPageTitle('Settings', 'Manage company preferences, backup, integrations, and variables');
+  const getTabTitle = () => {
+    switch(activeTab) {
+      case 'general': return 'General Settings';
+      case 'backup': return 'Backup & Restore';
+      case 'integrations': return 'Integrations';
+      case 'updates': return 'System Updates';
+      case 'variables': return null; // Variables handles its own title
+      default: return 'Settings';
+    }
+  };
+
+  useSetPageTitle(getTabTitle(), 'Manage company preferences, backup, integrations, and variables');
 
   return (
     <div className="flex flex-col gap-8">

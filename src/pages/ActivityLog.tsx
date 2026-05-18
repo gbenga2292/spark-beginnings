@@ -16,6 +16,7 @@ export function ActivityLog() {
   const [fromDate, setFromDate] = useState<string>('');
   const [toDate, setToDate] = useState<string>('');
   const [page, setPage] = useState(0);
+  const [showFilters, setShowFilters] = useState(false);
   const PAGE_SIZE = 50;
 
   const users = useUserStore(s => s.users); // To map auth.uid() to user pretty name
@@ -184,22 +185,32 @@ export function ActivityLog() {
     <div className="flex flex-col h-full gap-6">
 
       <div className="flex flex-col gap-4">
-        <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
-          <div className="relative w-full max-w-sm">
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-            <input 
-               value={search} 
-               onChange={e => setSearch(e.target.value)} 
-               placeholder="Filter current view by table name..." 
-               className="w-full h-9 pl-9 pr-3 rounded-lg border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30" 
-            />
+        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+          <div className="flex items-center gap-2 w-full sm:max-w-sm">
+            <div className="relative w-full">
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+              <input 
+                 value={search} 
+                 onChange={e => setSearch(e.target.value)} 
+                 placeholder="Filter current view by table name..." 
+                 className="w-full h-9 pl-9 pr-3 rounded-lg border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30" 
+              />
+            </div>
+            <Button 
+              variant="outline" 
+              className="sm:hidden h-9 px-3 border-slate-200 text-slate-600 bg-white shadow-sm shrink-0" 
+              onClick={() => setShowFilters(!showFilters)}
+            >
+              <Settings className="h-4 w-4 mr-1.5" />
+              Filters
+            </Button>
           </div>
           
-          <div className="flex items-center gap-3 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
+          <div className={`${showFilters ? 'flex flex-col items-stretch' : 'hidden'} sm:flex sm:flex-row sm:items-center gap-3 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0`}>
             <select
               value={filterUser}
               onChange={(e) => { setFilterUser(e.target.value); setPage(0); }}
-              className="h-9 px-3 rounded-lg border border-slate-200 bg-white text-sm text-slate-700 min-w-[150px] max-w-[200px]"
+              className="h-9 px-3 rounded-lg border border-slate-200 bg-white text-sm text-slate-700 w-full sm:min-w-[150px] sm:max-w-[200px]"
             >
               <option value="ALL">All Users</option>
               {users.map(u => (
@@ -212,23 +223,23 @@ export function ActivityLog() {
                  type="date" 
                  value={fromDate}
                  onChange={e => { setFromDate(e.target.value); setPage(0); }}
-                 className="h-9 w-[120px] sm:w-[140px] px-2 rounded-lg border border-slate-200 bg-white text-xs sm:text-sm text-slate-700" 
+                 className="h-9 w-1/2 sm:w-[140px] px-2 rounded-lg border border-slate-200 bg-white text-xs sm:text-sm text-slate-700" 
                />
                <span className="text-slate-400 text-xs">to</span>
                <input 
                  type="date" 
                  value={toDate}
                  onChange={e => { setToDate(e.target.value); setPage(0); }}
-                 className="h-9 w-[120px] sm:w-[140px] px-2 rounded-lg border border-slate-200 bg-white text-xs sm:text-sm text-slate-700" 
+                 className="h-9 w-1/2 sm:w-[140px] px-2 rounded-lg border border-slate-200 bg-white text-xs sm:text-sm text-slate-700" 
                />
             </div>
             
-            <div className="flex flex-shrink-0 gap-1 bg-slate-100 p-1 rounded-lg">
+            <div className="flex flex-wrap sm:flex-nowrap shrink-0 gap-1 bg-slate-100 p-1 rounded-lg">
               {['ALL', 'INSERT', 'UPDATE', 'DELETE'].map(act => (
                 <button
                   key={act}
                   onClick={() => { setFilterAction(act); setPage(0); }}
-                  className={`px-3 py-1.5 text-[11px] font-bold rounded-md transition-colors ${filterAction === act ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500 hover:text-slate-700'}`}
+                  className={`flex-1 sm:flex-none px-3 py-1.5 text-[11px] font-bold rounded-md transition-colors ${filterAction === act ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500 hover:text-slate-700'}`}
                 >
                   {act}
                 </button>
