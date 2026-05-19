@@ -35,7 +35,7 @@ const STATUS_STYLES: Record<string, { bg: string, label: string, icon: any }> = 
   },
   not_started: {
     bg: 'bg-indigo-500', // Blue
-    label: 'Not Started',
+    label: 'To Start',
     icon: CheckSquare,
   },
   reminder: {

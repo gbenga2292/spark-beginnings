@@ -3,8 +3,10 @@ import {
   Building2, MapPin, AlertTriangle, FileText, CheckCircle2, Clock, 
   Calendar, Sparkles, ChevronDown, ChevronUp, Users, Phone, DollarSign,
   Activity, Briefcase, MessagesSquare, RefreshCcw, Filter, Send,
-  ShieldAlert, ShieldCheck, Settings2, X, Edit2, ChevronRight
+  ShieldAlert, ShieldCheck, Settings2, X, Edit2, ChevronRight, CheckSquare
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { TaskDetailSheet } from '@/src/components/tasks/TaskDetailSheet';
 import { Button } from '@/src/components/ui/button';
 import { Badge } from '@/src/components/ui/badge';
 import { useTheme } from '@/src/hooks/useTheme';
@@ -17,7 +19,7 @@ import { parseISO } from 'date-fns';
 import { normalizeDate } from '@/src/lib/dateUtils';
 import { Site360View } from './Site360View';
 
-type TabType = 'overview' | 'contacts' | 'financials' | 'operations' | 'activity';
+type TabType = 'overview' | 'contacts' | 'financials' | 'operations' | 'activity' | 'tasks';
 
 export function Client360() {
   const { isDark } = useTheme();
@@ -62,6 +64,8 @@ export function Client360() {
   const [filterYear, setFilterYear] = useState<string>('all');
   const [isChatCollapsed, setIsChatCollapsed] = useState(true);
   const [showFilterMenu, setShowFilterMenu] = useState(false);
+  const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
+  const [openSubtaskId, setOpenSubtaskId] = useState<string | null>(null);
 
   const clientData = useMemo(() => {
     if (!selectedClient) return null;
@@ -235,8 +239,26 @@ export function Client360() {
     const clientCosts = ledgerEntries.filter(l => l.client?.trim() === selectedClient && isWithinTimeFilter(l.date));
     const totalCost = clientCosts.reduce((acc, l) => acc + (l.amount || 0), 0);
 
-    const clientTasks = mainTasks.filter(t => t.title?.toLowerCase().includes(clientNameLow) || (t.description && t.description.toLowerCase().includes(clientNameLow)));
+    const clientId = clientProfiles.find(c => c.name.trim() === selectedClient)?.id;
+    const clientSiteIds = new Set(clientSites.map(s => s.id));
+    const clientTasks = mainTasks.filter(t => {
+      if (t.title?.toLowerCase().includes(clientNameLow)) return true;
+      if (t.description && t.description.toLowerCase().includes(clientNameLow)) return true;
+      if (clientId && t.clientId === clientId) return true;
+      if (t.siteId && clientSiteIds.has(t.siteId)) return true;
+
+      const tSubs = subtasks.filter(s => s.mainTaskId === t.id);
+      if (tSubs.some(s => 
+        (s.title?.toLowerCase().includes(clientNameLow)) || 
+        (s.description?.toLowerCase().includes(clientNameLow)) ||
+        (s.siteId && clientSiteIds.has(s.siteId)) ||
+        (clientId && s.clientId === clientId)
+      )) return true;
+
+      return false;
+    });
     const pendingTasks = clientTasks.filter(t => deriveMainTaskStatus(t.id, subtasks) !== 'completed' && !t.isDeleted && isWithinTimeFilter(t.deadline || t.createdAt));
+    const completedTasks = clientTasks.filter(t => deriveMainTaskStatus(t.id, subtasks) === 'completed' && !t.isDeleted && isWithinTimeFilter(t.deadline || t.createdAt));
 
     const contacts = clientContacts.filter(c => c.clientName?.trim() === selectedClient && isWithinTimeFilter(c.createdAt));
     const logs = commLogs.filter(c => c.client?.trim() === selectedClient && isWithinTimeFilter(c.date)).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -261,13 +283,13 @@ export function Client360() {
     const alerts: { title: string; type: 'danger' | 'warning' | 'info' }[] = [];
 
     // Financial Health
-    if (vatDeficit > 50000) { healthScore -= 15; alerts.push({ title: `High VAT Deficit: ₦${vatDeficit.toLocaleString()}`, type: 'danger' }); }
-    else if (vatDeficit > 0) { healthScore -= 5; alerts.push({ title: `Pending VAT: ₦${vatDeficit.toLocaleString()}`, type: 'warning' }); }
+    if (vatDeficit > 50000) { healthScore -= 15; alerts.push({ title: `High VAT Deficit: â‚¦${vatDeficit.toLocaleString()}`, type: 'danger' }); }
+    else if (vatDeficit > 0) { healthScore -= 5; alerts.push({ title: `Pending VAT: â‚¦${vatDeficit.toLocaleString()}`, type: 'warning' }); }
 
     const outstandingBalance = totalRevenue - paymentsCleared;
     if (outstandingBalance > 0) {
       healthScore -= 10;
-      alerts.push({ title: `Unpaid Balance: ₦${outstandingBalance.toLocaleString()}`, type: 'warning' });
+      alerts.push({ title: `Unpaid Balance: â‚¦${outstandingBalance.toLocaleString()}`, type: 'warning' });
     }
 
     // Operational Health
@@ -289,7 +311,7 @@ export function Client360() {
       clientInvoices: invoices.filter(i => i.client?.trim() === selectedClient),
       vatDeficit, paymentsCleared, totalRevenue, totalCost, profit: totalRevenue - totalCost,
       paymentsWithVatStatus,
-      pendingTasks, contacts, logs, 
+      pendingTasks, completedTasks, contacts, logs, 
       deployedStaffCount: uniqueStaffIds.size,
       machineLogs: clientMachineLogs,
       activeMachinesCount: deployedMachines.length,
@@ -331,7 +353,7 @@ export function Client360() {
     setIsGeneratingBrief(true);
 
     try {
-      const invoiceContext = clientData.clientInvoices.map(i => `Invoice ${i.invoiceNumber}: ₦${i.totalCharge}, Status: ${i.status}, Date: ${i.date}`).join(' | ');
+      const invoiceContext = clientData.clientInvoices.map(i => `Invoice ${i.invoiceNumber}: â‚¦${i.totalCharge}, Status: ${i.status}, Date: ${i.date}`).join(' | ');
       const machineContext = clientData.machineLogs.slice(0, 10).map(m => `${m.assetName} on ${m.date}: ${m.dieselUsage}L used, Issues: ${m.issuesOnSite || 'None'}`).join(' | ');
       const commContext = clientData.logs.slice(0, 5).map(l => `[${l.date}] ${l.channel} - ${l.notes}`).join(' | ');
       const waybillContext = clientData.waybills.slice(0, 5).map(w => `${w.type} Waybill ${w.id.substring(0,6)}: ${w.items.map(i => `${i.quantity}x ${i.assetName}`).join(', ')} (${w.status})`).join(' | ');
@@ -342,9 +364,9 @@ Your goal is to answer questions strictly based on the following context for cli
 Context:
 - Active Sites: ${clientData.activeSites} out of ${clientData.totalSites}
 - Total Active Machines on Site: ${clientData.activeMachinesCount} ${deployedMachinesList ? `(${deployedMachinesList})` : ''}
-- VAT Deficit: ₦${clientData.vatDeficit}
-- Total Revenue Paid: ₦${clientData.paymentsCleared}
-- Profit Margin: ₦${clientData.profit}
+- VAT Deficit: â‚¦${clientData.vatDeficit}
+- Total Revenue Paid: â‚¦${clientData.paymentsCleared}
+- Profit Margin: â‚¦${clientData.profit}
 - Pending Workflow Tasks: ${clientData.pendingTasks.length}
 - Unique Staff Deployed in this period: ${clientData.deployedStaffCount}
 - Recent Invoices: ${invoiceContext || 'None'}
@@ -550,7 +572,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
     );
   }
 
-  // ── Handlers for edit dialogs ──
+  // â”€â”€ Handlers for edit dialogs â”€â”€
   const openClientEdit = () => {
     const profile = clientProfiles.find(p => p.name.trim() === selectedClient);
     setClientEditForm(profile ? { ...profile } : { name: selectedClient });
@@ -625,9 +647,6 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                 <div className="flex items-center gap-1.5">
                   {!isChatCollapsed && messages.length === 0 && (
                     <div className="flex items-center gap-1.5">
-                      <Button onClick={(e) => { e.stopPropagation(); openClientEdit(); }} variant="outline" size="sm" className="h-8 text-xs bg-indigo-900/40 hover:bg-indigo-800/60 text-indigo-200 border-indigo-700 px-2 sm:px-3">
-                        <Edit2 className="w-3.5 h-3.5 sm:mr-1.5" /><span className="hidden sm:inline">Edit Client</span>
-                      </Button>
                       <Button onClick={(e) => { e.stopPropagation(); sendChatMessage(true); }} disabled={isGeneratingBrief} size="sm" className="bg-indigo-600 hover:bg-indigo-500 text-white border-0 h-8 text-xs px-2 sm:px-3">
                         {isGeneratingBrief ? <RefreshCcw className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5 sm:mr-1.5" />}
                         <span className="hidden sm:inline">{isGeneratingBrief ? 'Analyzing...' : 'Generate Brief'}</span>
@@ -684,24 +703,32 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
             </div>
 
             {/* Navigation Tabs */}
-            <div className="flex items-center gap-0.5 sm:gap-1 border-b border-slate-200 dark:border-slate-800 mb-6 overflow-x-auto style-scroll pb-px">
-              {[
-                { id: 'overview', label: 'Overview', icon: Activity },
-                { id: 'financials', label: 'Financials', icon: DollarSign },
-                { id: 'operations', label: 'Operations', icon: Briefcase },
-                { id: 'contacts', label: 'Contacts', icon: Users },
-                { id: 'activity', label: 'Activity', icon: MessagesSquare }
-              ].map(tab => (
-                <button key={tab.id} onClick={() => setActiveTab(tab.id as TabType)}
-                  className={cn(
-                    "flex items-center gap-1.5 px-2.5 sm:px-4 py-3 text-xs sm:text-sm font-semibold border-b-2 transition-colors whitespace-nowrap",
-                    activeTab === tab.id 
-                      ? "border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400" 
-                      : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
-                  )}>
-                  <tab.icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> {tab.label}
-                </button>
-              ))}
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 mb-6 gap-4">
+              <div className="flex items-center gap-0.5 sm:gap-1 overflow-x-auto style-scroll pb-px flex-1">
+                {[
+                  { id: 'overview', label: 'Overview', icon: Activity },
+                  { id: 'financials', label: 'Financials', icon: DollarSign },
+                  { id: 'operations', label: 'Sites', icon: Briefcase },
+                  { id: 'contacts', label: 'Contacts', icon: Users },
+                  { id: 'activity', label: 'Activity', icon: MessagesSquare },
+                  { id: 'tasks', label: 'Tasks', icon: CheckSquare }
+                ].map(tab => (
+                  <button key={tab.id} onClick={() => setActiveTab(tab.id as TabType)}
+                    className={cn(
+                      "flex items-center gap-1.5 px-2.5 sm:px-4 py-3 text-xs sm:text-sm font-semibold border-b-2 transition-colors whitespace-nowrap",
+                      activeTab === tab.id 
+                        ? "border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400" 
+                        : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                    )}>
+                    <tab.icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> {tab.label}
+                  </button>
+                ))}
+              </div>
+              <div className="shrink-0 pb-1 pr-1">
+                <Button onClick={openClientEdit} variant="outline" size="sm" className={cn("h-8 text-xs px-2 sm:px-3 font-medium shadow-sm transition-colors", isDark ? "bg-slate-900 border-slate-700 hover:bg-slate-800 text-slate-200" : "bg-white border-slate-200 hover:bg-slate-50 text-slate-700")}>
+                  <Edit2 className="w-3.5 h-3.5 sm:mr-1.5" /><span className="hidden sm:inline">Edit Client</span>
+                </Button>
+              </div>
             </div>
 
             {/* Tab Content */}
@@ -714,15 +741,15 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                     <div className={cn("p-3 sm:p-5 rounded-2xl border shadow-sm min-w-0", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
                       <p className="text-[10px] sm:text-xs text-slate-500 font-bold uppercase tracking-wider mb-1 flex items-center gap-1.5 truncate"><DollarSign className="w-3.5 h-3.5 shrink-0"/> Total Revenue</p>
-                      <p className="text-sm min-[390px]:text-base sm:text-lg md:text-2xl font-black text-emerald-600 truncate" title={`₦${clientData.totalRevenue.toLocaleString()}`}>
-                        ₦{Math.round(clientData.totalRevenue).toLocaleString()}
+                      <p className="text-sm min-[390px]:text-base sm:text-lg md:text-2xl font-black text-emerald-600 truncate" title={`â‚¦${clientData.totalRevenue.toLocaleString()}`}>
+                        â‚¦{Math.round(clientData.totalRevenue).toLocaleString()}
                       </p>
                     </div>
                     <div className={cn("p-3 sm:p-5 rounded-2xl border shadow-sm flex flex-col justify-between min-w-0", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
                       <div className="min-w-0">
                         <p className="text-[10px] sm:text-xs text-slate-500 font-bold uppercase tracking-wider mb-1 flex items-center gap-1.5 truncate"><AlertTriangle className="w-3.5 h-3.5 shrink-0"/> VAT Deficit</p>
-                        <p className={cn("text-sm min-[390px]:text-base sm:text-lg md:text-2xl font-black truncate", clientData.vatDeficit > 0 ? "text-rose-500" : "text-emerald-500")} title={`₦${clientData.vatDeficit.toLocaleString()}`}>
-                          ₦{Math.round(clientData.vatDeficit).toLocaleString()}
+                        <p className={cn("text-sm min-[390px]:text-base sm:text-lg md:text-2xl font-black truncate", clientData.vatDeficit > 0 ? "text-rose-500" : "text-emerald-500")} title={`â‚¦${clientData.vatDeficit.toLocaleString()}`}>
+                          â‚¦{Math.round(clientData.vatDeficit).toLocaleString()}
                         </p>
                       </div>
                       <p className="text-[10px] sm:text-[11px] text-slate-400 mt-2 font-medium bg-slate-100 dark:bg-slate-800 rounded px-1.5 sm:px-2 py-0.5 sm:py-1 truncate max-w-full block" title={clientData.vatMonthsIncluded.length > 0 ? `Payments include: ${clientData.vatMonthsIncluded.join(', ')}` : 'No VAT payments in this period'}>
@@ -813,33 +840,25 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                               <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Total Billed Revenue</span>
                               <span className="text-xs text-slate-400">Total amount invoiced to the client</span>
                             </div>
-                            <span className="font-bold text-lg text-indigo-600 dark:text-indigo-400">₦{clientData.totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                            <span className="font-bold text-lg text-indigo-600 dark:text-indigo-400">â‚¦{clientData.totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                           </div>
                           <div className="flex justify-between items-center pb-3.5 border-b border-slate-100 dark:border-slate-800">
                             <div className="flex flex-col">
                               <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Total Project Costs</span>
                               <span className="text-xs text-slate-400">Expenses logged for this client's sites</span>
                             </div>
-                            <span className="font-bold text-lg text-rose-500">₦{clientData.totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                            <span className="font-bold text-lg text-rose-500">â‚¦{clientData.totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                           </div>
                         </div>
                       </div>
-                      <div className="flex justify-between items-center pt-5 mt-4 border-t border-slate-100 dark:border-slate-800">
-                        <div className="flex flex-col">
-                          <span className="text-sm font-bold text-slate-850 dark:text-slate-150">Estimated Profit / Margin</span>
-                          <span className="text-xs text-slate-400">Total Billed Revenue - Project Costs</span>
-                        </div>
-                        <span className={cn("font-black text-xl tracking-tight", clientData.profit >= 0 ? "text-emerald-600" : "text-rose-500")}>
-                          ₦{clientData.profit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </span>
-                      </div>
+
                     </div>
 
                     {/* Cash Flow & Collection Status */}
                     <div className={cn("p-6 rounded-3xl border shadow-sm flex flex-col justify-between", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
                       <div>
                         <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-                          <span className="p-1 rounded-lg bg-emerald-500/10 text-emerald-500 font-bold text-sm">₦</span> Cash Flow & Collection
+                          <span className="p-1 rounded-lg bg-emerald-500/10 text-emerald-500 font-bold text-sm">â‚¦</span> Cash Flow & Collection
                         </h3>
                         <div className="space-y-4">
                           <div className="flex justify-between items-center pb-3.5 border-b border-slate-100 dark:border-slate-800">
@@ -847,7 +866,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                               <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Total Payments Received</span>
                               <span className="text-xs text-slate-400">Cash cleared in bank from this client</span>
                             </div>
-                            <span className="font-bold text-lg text-emerald-600">₦{clientData.paymentsCleared.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                            <span className="font-bold text-lg text-emerald-600">â‚¦{clientData.paymentsCleared.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                           </div>
                           <div className="flex justify-between items-center pb-3.5 border-b border-slate-100 dark:border-slate-800">
                             <div className="flex flex-col">
@@ -855,20 +874,12 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                               <span className="text-xs text-slate-400">Invoiced amount awaiting payment</span>
                             </div>
                             <span className={cn("font-bold text-lg", (clientData.totalRevenue - clientData.paymentsCleared) > 0 ? "text-amber-600 dark:text-amber-400" : "text-slate-500")}>
-                              ₦{(clientData.totalRevenue - clientData.paymentsCleared).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              â‚¦{(clientData.totalRevenue - clientData.paymentsCleared).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </span>
                           </div>
                         </div>
                       </div>
-                      <div className="flex justify-between items-center pt-5 mt-4 border-t border-slate-100 dark:border-slate-800">
-                        <div className="flex flex-col">
-                          <span className="text-sm font-bold text-slate-850 dark:text-slate-150">Actual Cash Profit</span>
-                          <span className="text-xs text-slate-400">Cash Received - Project Costs</span>
-                        </div>
-                        <span className={cn("font-black text-xl tracking-tight", (clientData.paymentsCleared - clientData.totalCost) >= 0 ? "text-emerald-600" : "text-rose-500")}>
-                          ₦{(clientData.paymentsCleared - clientData.totalCost).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </span>
-                      </div>
+
                     </div>
                   </div>
 
@@ -914,7 +925,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                                   </td>
                                   <td className="p-3 text-slate-650 dark:text-slate-350 font-semibold">{p.site}</td>
                                   <td className="p-3 text-right font-bold text-slate-850 dark:text-slate-150">
-                                    ₦{(p.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    â‚¦{(p.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                   </td>
                                   <td className="p-3 text-center">
                                     <Badge variant="outline" className={cn("text-[9px] sm:text-[10px] px-1.5 sm:px-2 whitespace-nowrap", 
@@ -926,7 +937,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                                     </Badge>
                                   </td>
                                   <td className="p-3 text-right font-black text-indigo-600 dark:text-indigo-400">
-                                    ₦{(p.vatAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    â‚¦{(p.vatAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                   </td>
                                   <td className="p-3 text-center text-slate-650 dark:text-slate-350 font-medium">
                                     {p.monthName} {p.yearStr}
@@ -938,7 +949,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                                       </Badge>
                                       {p.key && (
                                         <span className="text-[10px] text-slate-400 font-semibold">
-                                          Remitted: ₦{p.totalPaidForMonth.toLocaleString(undefined, { maximumFractionDigits: 0 })} / ₦{p.totalDueForMonth.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                                          Remitted: â‚¦{p.totalPaidForMonth.toLocaleString(undefined, { maximumFractionDigits: 0 })} / â‚¦{p.totalDueForMonth.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                                         </span>
                                       )}
                                     </div>
@@ -987,7 +998,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
 
               {/* OPERATIONS TAB */}
               {activeTab === 'operations' && (
-                <div className="grid grid-cols-1 gap-5">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
                   <div className={cn("p-6 rounded-2xl border shadow-sm flex flex-col", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
                     <h3 className="text-lg font-bold mb-4 flex items-center gap-2"><MapPin className="w-5 h-5 text-indigo-500"/> Site Portfolio ({clientData.clientSites.length})</h3>
                     <div className="space-y-3 flex-1 overflow-y-auto max-h-[400px] style-scroll pr-2">
@@ -1054,11 +1065,109 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                             <Badge variant="outline" className="text-[10px] h-5">{log.channel}</Badge>
                           </div>
                           <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">{log.notes}</p>
-                          <p className="text-xs font-medium text-slate-500">Logged by: {log.loggedBy} {log.contactPerson && `• Contacted: ${log.contactPerson}`}</p>
+                          <p className="text-xs font-medium text-slate-500">Logged by: {log.loggedBy} {log.contactPerson && `â€¢ Contacted: ${log.contactPerson}`}</p>
                         </div>
                       </div>
                     )) : <p className="text-slate-500 text-sm">No communication logs recorded.</p>}
                   </div>
+                </div>
+              )}
+
+              {/* TASKS TAB */}
+              {activeTab === 'tasks' && (
+                <div className="space-y-4">
+                  <div className={cn("p-4 sm:p-6 rounded-2xl border shadow-sm", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="font-bold text-lg flex items-center gap-2"><CheckSquare className="w-5 h-5 text-indigo-500" /> Pending Tasks ({clientData.pendingTasks.length})</h3>
+                    </div>
+                    {clientData.pendingTasks.length > 0 ? (
+                      <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                        {clientData.pendingTasks.map(task => {
+                          const taskSubs = subtasks.filter(s => s.mainTaskId === task.id);
+                          const completed = taskSubs.filter(s => s.status === 'completed').length;
+                          const isExpanded = expandedTasks.has(task.id);
+                          return (
+                            <div key={task.id} className="py-3 flex flex-col gap-3 border-b border-slate-50 dark:border-slate-800/40 last:border-b-0">
+                              <div className="flex justify-between items-start gap-3 cursor-pointer group" onClick={() => { const next = new Set(expandedTasks); if (next.has(task.id)) next.delete(task.id); else next.add(task.id); setExpandedTasks(next); }}>
+                                <div className="flex-shrink-0 mt-0.5 text-slate-400 group-hover:text-indigo-500 transition-colors">{isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}</div>
+                                <div className="min-w-0 flex-1">
+                                  <p className="font-semibold text-sm truncate group-hover:text-indigo-600 transition-colors">{task.title}</p>
+                                  {task.deadline && <p className="text-xs text-slate-500 mt-0.5">Due: {new Date(task.deadline).toLocaleDateString('en-GB')}</p>}
+                                  {taskSubs.length > 0 && (<div className="mt-1.5 flex items-center gap-2"><div className="flex-1 max-w-[120px] h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden"><div className="h-full bg-indigo-500 rounded-full" style={{ width: `${Math.round((completed / taskSubs.length) * 100)}%` }} /></div><span className="text-[10px] text-slate-500 font-medium">{completed}/{taskSubs.length} done</span></div>)}
+                                </div>
+                                <div className="flex flex-col items-end gap-1 shrink-0">
+                                  {task.priority && (<span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${task.priority === 'urgent' ? 'bg-red-100 text-red-700' : task.priority === 'high' ? 'bg-orange-100 text-orange-700' : task.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' : 'bg-slate-100 text-slate-600'}`}>{task.priority}</span>)}
+                                  <Badge variant="outline" className="text-[9px] sm:text-xs px-1.5 sm:px-2.5 whitespace-nowrap">{task.requiresApproval ? 'Approval' : 'Active'}</Badge>
+                                </div>
+                              </div>
+                              <AnimatePresence initial={false}>
+                                {isExpanded && (
+                                  <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }} className="overflow-hidden">
+                                    <div className="pl-7 pr-2 space-y-2 pt-1 pb-2">
+                                      {taskSubs.length === 0 ? <p className="text-xs text-slate-500 italic">No subtasks.</p> : taskSubs.map(sub => (
+                                        <div key={sub.id} onClick={(e) => { e.stopPropagation(); setOpenSubtaskId(sub.id!); }} className="flex items-center justify-between gap-3 p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer border border-transparent hover:border-slate-200 dark:hover:border-slate-700 transition-all group/sub">
+                                          <p className={`text-[13px] font-medium truncate group-hover/sub:text-indigo-600 transition-colors flex-1 min-w-0 ${sub.status === 'completed' ? 'line-through text-slate-400' : 'text-slate-700 dark:text-slate-300'}`}>{sub.title}</p>
+                                          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap flex-shrink-0 ml-2 ${sub.status === 'completed' ? 'bg-emerald-100 text-emerald-700' : sub.status === 'in_progress' ? 'bg-blue-100 text-blue-700' : sub.status === 'pending_approval' ? 'bg-purple-100 text-purple-700' : 'bg-slate-100 text-slate-600'}`}>{sub.status.replace(/_/g, ' ')}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </motion.div>
+                                )}
+                              </AnimatePresence>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="text-center py-12">
+                        <CheckSquare className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                        <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">No pending tasks</h3>
+                        <p className="text-xs text-slate-500 mt-1">All tasks for this client have been completed.</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {clientData.completedTasks.length > 0 && (
+                    <div className={cn("p-4 sm:p-6 rounded-2xl border shadow-sm", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="font-bold text-lg flex items-center gap-2"><CheckCircle2 className="w-5 h-5 text-emerald-500" /> Completed Tasks ({clientData.completedTasks.length})</h3>
+                      </div>
+                      <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                        {clientData.completedTasks.map(task => {
+                          const taskSubs = subtasks.filter(s => s.mainTaskId === task.id);
+                          const completed = taskSubs.filter(s => s.status === 'completed').length;
+                          const isExpanded = expandedTasks.has(task.id);
+                          return (
+                            <div key={task.id} className="py-3 flex flex-col gap-3 border-b border-slate-50 dark:border-slate-800/40 last:border-b-0">
+                              <div className="flex justify-between items-start gap-3 cursor-pointer group" onClick={() => { const next = new Set(expandedTasks); if (next.has(task.id)) next.delete(task.id); else next.add(task.id); setExpandedTasks(next); }}>
+                                <div className="flex-shrink-0 mt-0.5 text-slate-400 group-hover:text-indigo-500 transition-colors">{isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}</div>
+                                <div className="min-w-0 flex-1">
+                                  <p className="font-semibold text-sm truncate group-hover:text-indigo-600 transition-colors text-slate-500 line-through">{task.title}</p>
+                                  {task.deadline && <p className="text-xs text-slate-500 mt-0.5">Due: {new Date(task.deadline).toLocaleDateString('en-GB')}</p>}
+                                  {taskSubs.length > 0 && (<div className="mt-1.5 flex items-center gap-2"><div className="flex-1 max-w-[120px] h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden"><div className="h-full bg-emerald-500 rounded-full" style={{ width: `${Math.round((completed / taskSubs.length) * 100)}%` }} /></div><span className="text-[10px] text-slate-500 font-medium">{completed}/{taskSubs.length} done</span></div>)}
+                                </div>
+                                <Badge variant="outline" className="text-[9px] sm:text-xs px-1.5 sm:px-2.5 whitespace-nowrap bg-emerald-50 text-emerald-700 border-emerald-200 flex-shrink-0">Completed</Badge>
+                              </div>
+                              <AnimatePresence initial={false}>
+                                {isExpanded && (
+                                  <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }} className="overflow-hidden">
+                                    <div className="pl-7 pr-2 space-y-2 pt-1 pb-2">
+                                      {taskSubs.length === 0 ? <p className="text-xs text-slate-500 italic">No subtasks.</p> : taskSubs.map(sub => (
+                                        <div key={sub.id} onClick={(e) => { e.stopPropagation(); setOpenSubtaskId(sub.id!); }} className="flex items-center justify-between gap-3 p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer border border-transparent hover:border-slate-200 dark:hover:border-slate-700 transition-all group/sub">
+                                          <p className={`text-[13px] font-medium truncate group-hover/sub:text-indigo-600 transition-colors flex-1 min-w-0 ${sub.status === 'completed' ? 'line-through text-slate-400' : 'text-slate-700 dark:text-slate-300'}`}>{sub.title}</p>
+                                          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap flex-shrink-0 ml-2 ${sub.status === 'completed' ? 'bg-emerald-100 text-emerald-700' : sub.status === 'in_progress' ? 'bg-blue-100 text-blue-700' : sub.status === 'pending_approval' ? 'bg-purple-100 text-purple-700' : 'bg-slate-100 text-slate-600'}`}>{sub.status.replace(/_/g, ' ')}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </motion.div>
+                                )}
+                              </AnimatePresence>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1075,42 +1184,20 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setClientEditOpen(false)} />
           <div className={cn('relative z-10 w-full max-w-md rounded-3xl shadow-2xl p-5 sm:p-6 max-h-[90vh] flex flex-col', isDark ? 'bg-slate-900 border border-slate-700' : 'bg-white border border-slate-200')}>
             <div className="flex justify-between items-center mb-5 shrink-0">
-              <h2 className="text-lg font-black flex items-center gap-2">
-                <Edit2 className="w-5 h-5 text-indigo-600" />
-                Edit Client
-              </h2>
+              <h2 className="text-lg font-black flex items-center gap-2"><Edit2 className="w-5 h-5 text-indigo-600" /> Edit Client</h2>
               <Button variant="ghost" size="icon" onClick={() => setClientEditOpen(false)} className="h-8 w-8"><X className="w-4 h-4" /></Button>
             </div>
-            
             <div className="space-y-4 overflow-y-auto pr-1 flex-1 style-scroll mb-4">
-              <div>
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Client Name</label>
-                <input value={clientEditForm.name || ''} readOnly disabled className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none cursor-not-allowed opacity-70', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-100 border-slate-200 text-slate-500')} />
-              </div>
-              <div>
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">TIN Number</label>
-                <input value={clientEditForm.tinNumber || ''} readOnly disabled placeholder="Optional" className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none cursor-not-allowed opacity-70', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-100 border-slate-200 text-slate-500')} />
-              </div>
-              <div>
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Address</label>
-                <textarea value={clientEditForm.address || ''} onChange={e => setClientEditForm(f => ({ ...f, address: e.target.value }))} rows={2} placeholder="e.g. 5 Marina Road, Lagos Island" className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')} />
-              </div>
-              <div>
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Main Contact Person</label>
-                <input value={clientEditForm.mainContactPerson || ''} onChange={e => setClientEditForm(f => ({ ...f, mainContactPerson: e.target.value }))} placeholder="e.g. John Doe" className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')} />
-              </div>
-              <div>
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Contact Phone Number</label>
-                <input value={clientEditForm.contactPhone || ''} onChange={e => setClientEditForm(f => ({ ...f, contactPhone: e.target.value }))} placeholder="e.g. +234 801 234 5678" className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')} />
-              </div>
-              <div>
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Start Date</label>
-                <input type="date" value={clientEditForm.startDate || ''} readOnly disabled className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none cursor-not-allowed opacity-70', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-100 border-slate-200 text-slate-500')} />
-              </div>
+              <div><label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Client Name</label><input value={clientEditForm.name || ''} readOnly disabled className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none cursor-not-allowed opacity-70', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-100 border-slate-200 text-slate-500')} /></div>
+              <div><label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">TIN Number</label><input value={clientEditForm.tinNumber || ''} readOnly disabled placeholder="Optional" className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none cursor-not-allowed opacity-70', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-100 border-slate-200 text-slate-500')} /></div>
+              <div><label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Address</label><textarea value={clientEditForm.address || ''} onChange={e => setClientEditForm(f => ({ ...f, address: e.target.value }))} rows={2} placeholder="e.g. 5 Marina Road, Lagos Island" className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')} /></div>
+              <div><label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Main Contact Person</label><input value={clientEditForm.mainContactPerson || ''} onChange={e => setClientEditForm(f => ({ ...f, mainContactPerson: e.target.value }))} placeholder="e.g. John Doe" className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')} /></div>
+              <div><label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Contact Phone Number</label><input value={clientEditForm.contactPhone || ''} onChange={e => setClientEditForm(f => ({ ...f, contactPhone: e.target.value }))} placeholder="e.g. +234 801 234 5678" className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')} /></div>
+              <div><label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Start Date</label><input type="date" value={clientEditForm.startDate || ''} readOnly disabled className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none cursor-not-allowed opacity-70', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-100 border-slate-200 text-slate-500')} /></div>
             </div>
             <div className="flex gap-3 shrink-0 pt-3 border-t border-slate-100 dark:border-slate-800">
               <Button variant="outline" onClick={() => setClientEditOpen(false)} className="flex-1 rounded-xl">Cancel</Button>
-              <Button onClick={saveClientEdit} className="flex-1 bg-indigo-600 hover:bg-indigo-50 text-white rounded-xl">Save Changes</Button>
+              <Button onClick={saveClientEdit} className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl">Save Changes</Button>
             </div>
           </div>
         </div>
@@ -1122,32 +1209,15 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setSiteEditTarget(null)} />
           <div className={cn('relative z-10 w-full max-w-md rounded-3xl shadow-2xl p-5 sm:p-6 max-h-[90vh] flex flex-col', isDark ? 'bg-slate-900 border border-slate-700' : 'bg-white border border-slate-200')}>
             <div className="flex justify-between items-center mb-5 shrink-0">
-              <h2 className="text-lg font-black flex items-center gap-2">
-                <Edit2 className="w-5 h-5 text-indigo-600" />
-                Edit Site
-              </h2>
+              <h2 className="text-lg font-black flex items-center gap-2"><Edit2 className="w-5 h-5 text-indigo-600" /> Edit Site</h2>
               <Button variant="ghost" size="icon" onClick={() => setSiteEditTarget(null)} className="h-8 w-8"><X className="w-4 h-4" /></Button>
             </div>
-            
             <div className="space-y-4 overflow-y-auto pr-1 flex-1 style-scroll mb-4">
-              <div>
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Address</label>
-                <textarea value={siteEditForm.address || ''} onChange={e => setSiteEditForm(f => ({ ...f, address: e.target.value }))} rows={2} placeholder="e.g. 5 Marina Road, Lagos Island" className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')} />
-              </div>
-              <div>
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Main Contact Person</label>
-                <input value={siteEditForm.mainContactPerson || ''} onChange={e => setSiteEditForm(f => ({ ...f, mainContactPerson: e.target.value }))} placeholder="e.g. John Doe" className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')} />
-              </div>
-              <div>
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Contact Phone Number</label>
-                <input value={siteEditForm.contactPhone || ''} onChange={e => setSiteEditForm(f => ({ ...f, contactPhone: e.target.value }))} placeholder="e.g. +234 801 234 5678" className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')} />
-              </div>
-              <div>
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Position</label>
-                <input value={siteEditForm.position || ''} onChange={e => setSiteEditForm(f => ({ ...f, position: e.target.value }))} placeholder="e.g. Site Manager" className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')} />
-              </div>
+              <div><label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Address</label><textarea value={siteEditForm.address || ''} onChange={e => setSiteEditForm(f => ({ ...f, address: e.target.value }))} rows={2} placeholder="e.g. 5 Marina Road, Lagos Island" className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')} /></div>
+              <div><label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Main Contact Person</label><input value={siteEditForm.mainContactPerson || ''} onChange={e => setSiteEditForm(f => ({ ...f, mainContactPerson: e.target.value }))} placeholder="e.g. John Doe" className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')} /></div>
+              <div><label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Contact Phone Number</label><input value={siteEditForm.contactPhone || ''} onChange={e => setSiteEditForm(f => ({ ...f, contactPhone: e.target.value }))} placeholder="e.g. +234 801 234 5678" className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')} /></div>
+              <div><label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Position</label><input value={siteEditForm.position || ''} onChange={e => setSiteEditForm(f => ({ ...f, position: e.target.value }))} placeholder="e.g. Site Manager" className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')} /></div>
             </div>
-            
             <div className="flex gap-3 shrink-0 pt-3 border-t border-slate-100 dark:border-slate-800">
               <Button variant="outline" onClick={() => setSiteEditTarget(null)} className="flex-1 rounded-xl">Cancel</Button>
               <Button onClick={saveSiteEdit} className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl">Save Changes</Button>
@@ -1155,6 +1225,8 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
           </div>
         </div>
       )}
+
+      <TaskDetailSheet subtaskId={openSubtaskId} onClose={() => setOpenSubtaskId(null)} />
     </>
   );
-}
+}

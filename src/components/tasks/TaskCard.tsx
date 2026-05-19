@@ -13,7 +13,7 @@ const PRIORITY_CONFIG: Record<TaskPriority, { label: string; dot: string; border
 };
 
 const statusConfig: Record<SubTaskStatus, { label: string; pillClass: string; dot: string; icon: React.ElementType }> = {
-  not_started: { label: "Not Started", pillClass: "chip-pending", dot: "bg-gray-400", icon: Circle },
+  not_started: { label: "To Start", pillClass: "chip-pending", dot: "bg-gray-400", icon: Circle },
   in_progress: { label: "In Progress", pillClass: "chip-in-progress", dot: "bg-blue-600", icon: Loader2 },
   pending_approval: { label: "Pending", pillClass: "chip-pending-approval", dot: "bg-amber-400", icon: Hourglass },
   completed: { label: "Done", pillClass: "chip-completed", dot: "bg-green-600", icon: CheckCircle2 },

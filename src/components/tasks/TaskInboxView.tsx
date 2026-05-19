@@ -21,7 +21,7 @@ import { AppraisalScoreSheet } from "../evaluations/AppraisalScoreSheet";
 
 // ── Status Config ─────────────────────────────────────────────────────────────
 const statusConfig: Record<SubTaskStatus, { label: string; pillClass: string; dotColor: string; icon: React.ElementType }> = {
-  not_started: { label: "Not Started", pillClass: "bg-slate-100 text-slate-600 border border-slate-200", dotColor: "bg-slate-400", icon: Circle },
+  not_started: { label: "To Start", pillClass: "bg-slate-100 text-slate-600 border border-slate-200", dotColor: "bg-slate-400", icon: Circle },
   in_progress: { label: "In Progress", pillClass: "bg-blue-100 text-blue-700 border border-blue-200", dotColor: "bg-blue-500", icon: Loader2 },
   pending_approval: { label: "Approval Needed", pillClass: "bg-amber-100 text-amber-700 border border-amber-200", dotColor: "bg-amber-500", icon: Hourglass },
   completed: { label: "Completed", pillClass: "bg-green-100 text-green-700 border border-green-200", dotColor: "bg-green-500", icon: CheckCircle2 },
@@ -29,7 +29,7 @@ const statusConfig: Record<SubTaskStatus, { label: string; pillClass: string; do
 
 const STATUS_FLOW: SubTaskStatus[] = ["not_started", "in_progress", "pending_approval", "completed"];
 const STATUS_LABELS: Record<SubTaskStatus, string> = {
-  not_started: "Not Started",
+  not_started: "To Start",
   in_progress: "In Progress",
   pending_approval: "Approval Needed",
   completed: "Completed",

@@ -170,7 +170,7 @@ function PersonalTasksView() {
 
   const STATUS_TABS = [
     { label: "All", value: "all" },
-    { label: "Not Started", value: "not_started" },
+    { label: "To Start", value: "not_started" },
     { label: "In Progress", value: "in_progress" },
     { label: "Completed", value: "completed" },
   ] as const;
@@ -745,7 +745,7 @@ function AdminTasksView() {
   // Status Tabs Definition
   const STATUS_TABS = [
     { label: "All", value: "all" },
-    { label: "Not Started", value: "not_started" },
+    { label: "To Start", value: "not_started" },
     { label: "In Progress", value: "in_progress" },
     { label: "Approval", value: "pending_approval" },
     { label: "Completed", value: "completed" },
@@ -753,7 +753,7 @@ function AdminTasksView() {
 
   const MY_STATUS_TABS = [
     { label: "All", value: "all" },
-    { label: "Not Started", value: "not_started" },
+    { label: "To Start", value: "not_started" },
     { label: "In Progress", value: "in_progress" },
     { label: "Approval", value: "pending_approval" },
     { label: "Done", value: "completed" },
@@ -2402,7 +2402,7 @@ function EditSubtaskDialog({ subtask, users, onClose, onSave }: {
     { value: 'pending_approval' as SubTaskStatus, label: 'Pending Approval', cls: 'chip-pending-approval' },
     { value: 'completed', label: 'Completed', cls: 'chip-completed' },
   ] : [
-    { value: 'not_started', label: 'Not Started', cls: 'chip-pending' },
+    { value: 'not_started', label: 'To Start', cls: 'chip-pending' },
     { value: 'in_progress', label: 'In Progress', cls: 'chip-in-progress' },
     { value: 'completed', label: 'Completed', cls: 'chip-completed' },
   ];

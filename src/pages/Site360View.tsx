@@ -1,9 +1,11 @@
 import { useMemo, useState, useRef, useEffect } from 'react';
 import { parseISO } from 'date-fns';
+import { motion, AnimatePresence } from 'framer-motion';
+
 import {
   ArrowLeft, MapPin, DollarSign, Activity, Wrench, MessagesSquare,
   AlertTriangle, Clock, Fuel, Calendar, FileText, Users, Settings2,
-  ChevronDown, Sparkles, RefreshCcw, Send, ChevronUp, Filter, CheckCircle2, Plus, Pencil
+  ChevronDown, Sparkles, RefreshCcw, Send, ChevronUp, Filter, CheckCircle2, Plus, Pencil, ChevronRight
 } from 'lucide-react';
 import { Badge } from '@/src/components/ui/badge';
 import { Button } from '@/src/components/ui/button';
@@ -16,6 +18,7 @@ import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { InvoiceDetailDialog } from './InvoiceDetailDialog';
 import { Invoice } from '@/src/store/appStore';
 import { ClientContactsPanel } from './ClientContactsPanel';
+import { TaskDetailSheet } from '@/src/components/tasks/TaskDetailSheet';
 
 type SiteTab = 'financials' | 'operations' | 'maintenance' | 'comms';
 
@@ -32,6 +35,9 @@ export function Site360View({ site, clientSites, onSiteChange, onBack, onEditSit
   const [activeTab, setActiveTab] = useState<SiteTab>('financials');
   const [showFilters, setShowFilters] = useState(false);
   const [showContactsPanel, setShowContactsPanel] = useState(false);
+  const [isContactsCollapsed, setIsContactsCollapsed] = useState(false);
+  const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
+  const [openSubtaskId, setOpenSubtaskId] = useState<string | null>(null);
 
   // Own filter state
   const currentYear = new Date().getFullYear();
@@ -231,16 +237,27 @@ export function Site360View({ site, clientSites, onSiteChange, onBack, onEditSit
     );
 
     const siteNameLow = site.name.toLowerCase();
-    // Tasks tagged directly to this site (via new siteId field) OR mentioning site name
-    const siteTasks = mainTasks.filter(t =>
-      !t.isDeleted &&
-      deriveMainTaskStatus(t.id, subtasks) !== 'completed' &&
-      (
-        t.siteId === site.id ||
-        t.title?.toLowerCase().includes(siteNameLow) ||
-        t.description?.toLowerCase().includes(siteNameLow)
-      )
-    );
+    const siteTasks = mainTasks.filter(t => {
+      if (t.isDeleted) return false;
+
+      // Check main task properties
+      if (t.siteId === site.id) return true;
+      if (t.title?.toLowerCase().includes(siteNameLow)) return true;
+      if (t.description?.toLowerCase().includes(siteNameLow)) return true;
+
+      // Check subtasks properties
+      const tSubs = subtasks.filter(s => s.mainTaskId === t.id);
+      if (tSubs.some(s => 
+        s.siteId === site.id || 
+        s.title?.toLowerCase().includes(siteNameLow) || 
+        s.description?.toLowerCase().includes(siteNameLow)
+      )) return true;
+
+      return false;
+    });
+
+    const pendingSiteTasks = siteTasks.filter(t => deriveMainTaskStatus(t.id, subtasks) !== 'completed');
+    const completedSiteTasks = siteTasks.filter(t => deriveMainTaskStatus(t.id, subtasks) === 'completed');
 
     const siteComms = commLogs.filter(l =>
       (l.siteId === site.id || l.siteName?.trim() === site.name.trim()) && isWithinFilter(l.date)
@@ -298,7 +315,7 @@ export function Site360View({ site, clientSites, onSiteChange, onBack, onEditSit
       periodVatCollected, unpaidVatBroughtForward, periodVatRemitted, totalVatRemitted,
       machineLogs, totalDiesel, activeDays, machineDays, activeMachinesCount, machinesOnSiteCount,
       siteMaintAssets, siteMaintSessions, totalMaintenanceCost,
-      siteTasks, siteComms, siteContacts, alerts,
+      siteTasks, pendingSiteTasks, completedSiteTasks, siteComms, siteContacts, alerts,
       profit: totalBilled - totalCost
     };
   }, [site, filterMonth, filterYear, invoices, payments, vatPayments, ledgerEntries, vatRate, dailyMachineLogs, maintenanceAssets, maintenanceSessions, mainTasks, subtasks, commLogs, clientContacts, waybills, assets]);
@@ -408,87 +425,141 @@ Answer site-specific questions using this context only. Be concise.`;
         <div className="max-w-6xl mx-auto space-y-4 animate-in fade-in duration-500">
 
 
-          <div className={cn('bg-gradient-to-br from-indigo-900 to-slate-900 rounded-2xl shadow-lg relative overflow-hidden border border-indigo-700/50 flex flex-col transition-all duration-300', isChatCollapsed ? 'h-auto' : 'h-[300px]')}>
-            <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none"><Sparkles className="w-48 h-48" /></div>
-            <div className="flex items-center justify-between p-4 border-b border-indigo-800/50 relative z-10 shrink-0 cursor-pointer hover:bg-indigo-800/20 transition-colors" onClick={() => setIsChatCollapsed(!isChatCollapsed)}>
-              <div className="flex items-center gap-2">
-                <div className="p-1.5 bg-indigo-500/20 rounded-lg"><Sparkles className="w-4 h-4 text-indigo-300" /></div>
-                <span className="text-sm font-bold uppercase tracking-wider text-indigo-200">Site Intelligence Assistant</span>
+          {/* ── Hero: AI Assistant + Site Identity side by side ── */}
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 items-stretch">
+
+            {/* AI Chat — wider column (3/5) */}
+            <div className={cn('lg:col-span-3 bg-gradient-to-br from-indigo-900 to-slate-900 rounded-2xl shadow-lg relative overflow-hidden border border-indigo-700/50 flex flex-col transition-all duration-300', isChatCollapsed ? 'h-auto' : 'lg:h-[300px] h-[260px]')}>
+              <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none"><Sparkles className="w-48 h-48" /></div>
+              <div className="flex items-center justify-between p-4 border-b border-indigo-800/50 relative z-10 shrink-0 cursor-pointer hover:bg-indigo-800/20 transition-colors" onClick={() => setIsChatCollapsed(!isChatCollapsed)}>
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 bg-indigo-500/20 rounded-lg"><Sparkles className="w-4 h-4 text-indigo-300" /></div>
+                  <span className="text-sm font-bold uppercase tracking-wider text-indigo-200">Site Intelligence Assistant</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  {!isChatCollapsed && messages.length === 0 && (
+                    <div className="flex items-center gap-1.5">
+                      <Button onClick={e => { e.stopPropagation(); sendChatMessage(true); }} disabled={isGeneratingBrief} size="sm" className="bg-indigo-600 hover:bg-indigo-500 text-white border-0 h-8 text-xs px-2 sm:px-3">
+                        {isGeneratingBrief ? <RefreshCcw className="w-3.5 h-3.5 animate-spin sm:mr-1.5" /> : <Sparkles className="w-3.5 h-3.5 sm:mr-1.5" />}
+                        <span className="hidden sm:inline">{isGeneratingBrief ? 'Analyzing...' : 'Generate Brief'}</span>
+                      </Button>
+                    </div>
+                  )}
+                  <Button variant="ghost" size="sm" className="text-indigo-200 hover:text-white hover:bg-indigo-800/50 h-8 w-8 p-0" onClick={e => { e.stopPropagation(); setIsChatCollapsed(!isChatCollapsed); }}>
+                    {isChatCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+                  </Button>
+                </div>
               </div>
-              <div className="flex items-center gap-1.5">
-                {!isChatCollapsed && messages.length === 0 && (
-                  <div className="flex items-center gap-1.5">
-                    <Button onClick={(e) => { e.stopPropagation(); onEditSite(site); }} variant="outline" size="sm" className="h-8 text-xs bg-indigo-900/40 hover:bg-indigo-800/60 text-indigo-200 border-indigo-700 px-2 sm:px-3">
-                      <Settings2 className="w-3.5 h-3.5 sm:mr-1.5" /><span className="hidden sm:inline">Edit Site</span>
-                    </Button>
-                    <Button onClick={e => { e.stopPropagation(); sendChatMessage(true); }} disabled={isGeneratingBrief} size="sm" className="bg-indigo-600 hover:bg-indigo-500 text-white border-0 h-8 text-xs px-2 sm:px-3">
-                      {isGeneratingBrief ? <RefreshCcw className="w-3.5 h-3.5 animate-spin sm:mr-1.5" /> : <Sparkles className="w-3.5 h-3.5 sm:mr-1.5" />}
-                      <span className="hidden sm:inline">{isGeneratingBrief ? 'Analyzing...' : 'Generate Brief'}</span>
-                    </Button>
+              {!isChatCollapsed && (
+                <>
+                  <div className="flex-1 overflow-y-auto p-4 space-y-3 style-scroll relative z-10">
+                    {messages.length === 0 && !isGeneratingBrief && <p className="text-sm text-indigo-300 italic text-center mt-6">Click "Generate Brief" to get a site intelligence summary.</p>}
+                    {messages.map((msg, idx) => (
+                      <div key={idx} className={cn('flex w-full', msg.role === 'user' ? 'justify-end' : 'justify-start')}>
+                        <div className={cn('max-w-[85%] rounded-xl p-3 text-sm', msg.role === 'user' ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-slate-800/80 text-indigo-50 rounded-bl-none border border-indigo-700/30')}>{msg.content}</div>
+                      </div>
+                    ))}
+                    {isGeneratingBrief && <div className="flex justify-start"><div className="bg-slate-800/80 text-indigo-200 rounded-xl rounded-bl-none border border-indigo-700/30 p-3 text-sm flex items-center gap-2"><RefreshCcw className="w-4 h-4 animate-spin" /> Thinking...</div></div>}
+                    <div ref={chatEndRef} />
                   </div>
-                )}
-                <Button variant="ghost" size="sm" className="text-indigo-200 hover:text-white hover:bg-indigo-800/50 h-8 w-8 p-0" onClick={e => { e.stopPropagation(); setIsChatCollapsed(!isChatCollapsed); }}>
+                  <div className="p-3 bg-slate-900/80 border-t border-indigo-800/50 shrink-0 relative z-10 flex items-center gap-2">
+                    <input type="text" value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && sendChatMessage()} placeholder="Ask about invoices, machines, maintenance..." className="flex-1 bg-slate-800 border border-slate-700 text-white placeholder:text-slate-400 text-sm rounded-lg h-9 px-3 focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+                    <Button size="icon" onClick={() => sendChatMessage()} disabled={!chatInput.trim() || isGeneratingBrief} className="h-9 w-9 bg-indigo-600 hover:bg-indigo-500 shrink-0"><Send className="w-4 h-4" /></Button>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Site Identity Card — narrower column (2/5) */}
+            <div className={cn(
+              'lg:col-span-2 p-5 rounded-3xl border shadow-sm flex flex-col justify-between transition-all duration-300',
+              isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200',
+              isChatCollapsed ? 'lg:h-[72px] h-auto justify-center py-3' : 'lg:h-[300px]'
+            )}>
+              <div 
+                className="flex items-start justify-between cursor-pointer group select-none"
+                onClick={() => setIsChatCollapsed(!isChatCollapsed)}
+              >
+                <div className="flex items-start gap-3 min-w-0 flex-1">
+                  <div className={cn('p-2.5 rounded-2xl shrink-0 mt-0.5 transition-colors', isDark ? 'bg-indigo-900/50 group-hover:bg-indigo-800/60' : 'bg-indigo-50 group-hover:bg-indigo-100')}>
+                    <MapPin className="w-5 h-5 text-indigo-600" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <h1 className="text-lg sm:text-xl font-black text-slate-900 dark:text-white leading-tight truncate">{site.name}</h1>
+                    <p className="text-slate-500 text-xs mt-0.5">Client: <span className="font-semibold text-slate-700 dark:text-slate-300">{site.client}</span></p>
+                    
+                    {!isChatCollapsed && (
+                      <div className="flex flex-wrap items-center gap-1.5 mt-2.5">
+                        <Badge className={cn('text-xs',
+                          site.status === 'Active' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' :
+                            site.status === 'Ended' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-600'
+                        )}>{site.status}</Badge>
+                        <span className="text-xs text-slate-500 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">VAT: <strong>{site.vat}</strong></span>
+                        {site.startDate && <span className="text-xs text-slate-500 flex items-center gap-1"><Calendar className="w-3 h-3" />Since {new Date(site.startDate).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}</span>}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                
+                {/* Visual expand/collapse indicator synced with Left column */}
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 h-8 w-8 p-0 shrink-0 ml-2" 
+                  onClick={e => { e.stopPropagation(); setIsChatCollapsed(!isChatCollapsed); }}
+                >
                   {isChatCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
                 </Button>
               </div>
-            </div>
-            {!isChatCollapsed && (
-              <>
-                <div className="flex-1 overflow-y-auto p-4 space-y-3 style-scroll relative z-10">
-                  {messages.length === 0 && !isGeneratingBrief && <p className="text-sm text-indigo-300 italic text-center mt-6">Click "Generate Brief" to get a site intelligence summary.</p>}
-                  {messages.map((msg, idx) => (
-                    <div key={idx} className={cn('flex w-full', msg.role === 'user' ? 'justify-end' : 'justify-start')}>
-                      <div className={cn('max-w-[85%] rounded-xl p-3 text-sm', msg.role === 'user' ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-slate-800/80 text-indigo-50 rounded-bl-none border border-indigo-700/30')}>{msg.content}</div>
+
+              {/* Quick stats strip inside identity card — animates smoothly on toggle */}
+              <AnimatePresence initial={false}>
+                {!isChatCollapsed && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.3, ease: 'easeInOut' }}
+                    className="overflow-hidden"
+                  >
+                    <div className="grid grid-cols-2 gap-2 mt-4 pt-1 border-t border-slate-100 dark:border-slate-800/50">
+                      <div className={cn('rounded-xl p-3 transition-colors', isDark ? 'bg-slate-800/50 hover:bg-slate-800' : 'bg-slate-50 hover:bg-slate-100')}>
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-0.5">Unpaid</p>
+                        <p className={cn('text-base font-black truncate', data.outstanding > 0 ? 'text-rose-500' : 'text-emerald-500')}>
+                          ₦{Math.round(data.outstanding).toLocaleString()}
+                        </p>
+                      </div>
+                      <div className={cn('rounded-xl p-3 transition-colors', isDark ? 'bg-slate-800/50 hover:bg-slate-800' : 'bg-slate-50 hover:bg-slate-100')}>
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-0.5">Pending Tasks</p>
+                        <p className="text-base font-black text-amber-600">{data.siteTasks.length}</p>
+                      </div>
+                      <div className={cn('rounded-xl p-3 transition-colors', isDark ? 'bg-slate-800/50 hover:bg-slate-800' : 'bg-slate-50 hover:bg-slate-100')}>
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-0.5">Machine Days</p>
+                        <p className="text-base font-black text-indigo-600">{data.machineDays}</p>
+                      </div>
+                      <div className={cn('rounded-xl p-3 transition-colors', isDark ? 'bg-slate-800/50 hover:bg-slate-800' : 'bg-slate-50 hover:bg-slate-100')}>
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-0.5">Contacts</p>
+                        <p className="text-base font-black text-slate-700 dark:text-slate-200">{data.siteContacts.length}</p>
+                      </div>
                     </div>
-                  ))}
-                  {isGeneratingBrief && <div className="flex justify-start"><div className="bg-slate-800/80 text-indigo-200 rounded-xl rounded-bl-none border border-indigo-700/30 p-3 text-sm flex items-center gap-2"><RefreshCcw className="w-4 h-4 animate-spin" /> Thinking...</div></div>}
-                  <div ref={chatEndRef} />
-                </div>
-                <div className="p-3 bg-slate-900/80 border-t border-indigo-800/50 shrink-0 relative z-10 flex items-center gap-2">
-                  <input type="text" value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && sendChatMessage()} placeholder="Ask about invoices, machines, maintenance..." className="flex-1 bg-slate-800 border border-slate-700 text-white placeholder:text-slate-400 text-sm rounded-lg h-9 px-3 focus:outline-none focus:ring-1 focus:ring-indigo-500" />
-                  <Button size="icon" onClick={() => sendChatMessage()} disabled={!chatInput.trim() || isGeneratingBrief} className="h-9 w-9 bg-indigo-600 hover:bg-indigo-500 shrink-0"><Send className="w-4 h-4" /></Button>
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* Site Identity Card */}
-          <div className={cn('p-4 sm:p-6 rounded-3xl border shadow-sm', isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200')}>
-            <div className="flex items-start gap-3 sm:gap-4">
-              <div className={cn('p-2.5 sm:p-3 rounded-2xl shrink-0', isDark ? 'bg-indigo-900/50' : 'bg-indigo-50')}>
-                <MapPin className="w-5 h-5 sm:w-6 sm:h-6 text-indigo-600" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <h1 className="text-lg sm:text-2xl font-black text-slate-900 dark:text-white truncate">{site.name}</h1>
-                <p className="text-slate-500 text-xs sm:text-sm mt-0.5">Client: <span className="font-semibold text-slate-700 dark:text-slate-300">{site.client}</span></p>
-                <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mt-2 sm:mt-3">
-                  <Badge className={cn('text-xs',
-                    site.status === 'Active' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' :
-                      site.status === 'Ended' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-600'
-                  )}>{site.status}</Badge>
-                  <span className="text-xs text-slate-500 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">VAT: <strong>{site.vat}</strong></span>
-                  {site.startDate && <span className="text-xs text-slate-500 flex items-center gap-1"><Calendar className="w-3 h-3" />Since {new Date(site.startDate).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}</span>}
-                </div>
-              </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </div>
 
-          {/* KPI Strip */}
+          {/* Secondary Stats Strip — unique metrics not shown in hero card */}
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
             {[
-              { label: 'Unpaid Balance', value: `₦${Math.round(data.outstanding).toLocaleString()}`, fullValue: `₦${data.outstanding.toLocaleString()}`, color: data.outstanding > 0 ? 'text-rose-500' : 'text-emerald-500' },
-              { label: 'Machine Days', value: `${data.machineDays} Day${data.machineDays === 1 ? '' : 's'}`, subtext: `${data.activeMachinesCount} active (${data.machinesOnSiteCount} total)`, fullSubtext: `${data.activeMachinesCount} active machine${data.activeMachinesCount === 1 ? '' : 's'} (${data.machinesOnSiteCount} total on site)`, color: 'text-indigo-600' },
-              { label: 'Pending Tasks', value: data.siteTasks.length.toString(), color: 'text-amber-600' },
+              { label: 'Total Billed', value: `₦${Math.round(data.totalBilled).toLocaleString()}`, subtext: `${data.siteInvoices.length} invoice${data.siteInvoices.length !== 1 ? 's' : ''}`, color: 'text-sky-600' },
+              { label: 'Diesel Used', value: `${Math.round(data.totalDiesel).toLocaleString()}L`, subtext: `${data.activeDays} active day${data.activeDays !== 1 ? 's' : ''}`, color: 'text-amber-600' },
+              { label: 'Maintenance Cost', value: `₦${Math.round(data.totalMaintenanceCost).toLocaleString()}`, subtext: `${data.siteMaintAssets.length} asset${data.siteMaintAssets.length !== 1 ? 's' : ''} tracked`, color: 'text-rose-500' },
             ].map(k => (
               <div key={k.label} className={cn(card, "p-3 sm:p-5 min-w-0 flex flex-col justify-between")}>
                 <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-500 mb-1 truncate">{k.label}</p>
-                <div className="flex flex-col gap-1 min-w-0">
-                  <p className={cn('text-sm min-[390px]:text-base sm:text-lg md:text-2xl font-black truncate', k.color)} title={k.fullValue || k.value}>{k.value}</p>
-                  {k.subtext && (
-                    <span className="text-[10px] sm:text-xs font-semibold text-slate-400 dark:text-slate-500 leading-normal truncate block max-w-full" title={k.fullSubtext || k.subtext}>
-                      {k.subtext}
-                    </span>
-                  )}
+                <div className="flex flex-col gap-0.5 min-w-0">
+                  <p className={cn('text-sm min-[390px]:text-base sm:text-lg md:text-2xl font-black truncate', k.color)}>{k.value}</p>
+                  {k.subtext && <span className="text-[10px] sm:text-xs font-semibold text-slate-400 dark:text-slate-500 truncate">{k.subtext}</span>}
                 </div>
               </div>
             ))}
@@ -511,18 +582,25 @@ Answer site-specific questions using this context only. Be concise.`;
           )}
 
           {/* Tabs */}
-          <div className={cn('flex items-center gap-1 border-b overflow-x-auto style-scroll pb-px', isDark ? 'border-slate-800' : 'border-slate-200')}>
-            {tabs.map(tab => (
-              <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-                className={cn(
-                  'flex items-center gap-2 px-4 py-3 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap',
-                  activeTab === tab.id
-                    ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400'
-                    : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
-                )}>
-                <tab.icon className="w-4 h-4" /> {tab.label}
-              </button>
-            ))}
+          <div className={cn('flex items-center justify-between border-b mb-6 gap-4', isDark ? 'border-slate-800' : 'border-slate-200')}>
+            <div className="flex items-center gap-1 overflow-x-auto style-scroll pb-px flex-1">
+              {tabs.map(tab => (
+                <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+                  className={cn(
+                    'flex items-center gap-2 px-4 py-3 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap',
+                    activeTab === tab.id
+                      ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400'
+                      : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                  )}>
+                  <tab.icon className="w-4 h-4" /> {tab.label}
+                </button>
+              ))}
+            </div>
+            <div className="shrink-0 pb-1 pr-1">
+              <Button onClick={() => onEditSite(site)} variant="outline" size="sm" className={cn("h-8 text-xs px-2 sm:px-3 font-medium shadow-sm transition-colors", isDark ? "bg-slate-900 border-slate-700 hover:bg-slate-800 text-slate-200" : "bg-white border-slate-200 hover:bg-slate-50 text-slate-700")}>
+                <Settings2 className="w-3.5 h-3.5 sm:mr-1.5" /><span className="hidden sm:inline">Edit Site</span>
+              </Button>
+            </div>
           </div>
 
           {/* Tab Content */}
@@ -532,7 +610,7 @@ Answer site-specific questions using this context only. Be concise.`;
             {activeTab === 'financials' && (
               <>
                 {/* Financial Sub-Tabs */}
-                <div className="flex items-center gap-2 sm:gap-3 overflow-x-auto pb-2 style-scroll">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
                   {[
                     { id: 'invoices', label: 'Invoices', count: data.siteInvoices.length, amount: `₦${Math.round(data.totalBilled).toLocaleString()}`, icon: FileText },
                     { id: 'payments', label: 'Payments', count: data.sitePayments.length, amount: `₦${Math.round(data.totalReceived).toLocaleString()}`, icon: DollarSign },
@@ -543,19 +621,26 @@ Answer site-specific questions using this context only. Be concise.`;
                       key={t.id}
                       onClick={() => setFinTab(t.id as any)}
                       className={cn(
-                        "flex flex-col items-start p-2.5 sm:p-4 rounded-xl sm:rounded-2xl border text-left transition-all min-w-[110px] min-[375px]:min-w-[130px] sm:min-w-[160px] flex-1 shadow-sm bg-transparent cursor-pointer",
+                        "flex flex-col items-start p-3 sm:p-4 rounded-xl border text-left transition-all duration-200 outline-none w-full",
                         finTab === t.id
-                          ? "bg-indigo-50 text-indigo-950 dark:bg-indigo-950/40 dark:text-indigo-200 border-indigo-500 ring-1 ring-indigo-500"
-                          : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50"
+                          ? "bg-blue-50/50 border-blue-500 shadow-sm dark:bg-blue-900/20 dark:border-blue-500"
+                          : "bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50 dark:bg-slate-900 dark:border-slate-800 dark:hover:border-slate-700"
                       )}
                     >
-                      <div className="flex items-center justify-between w-full mb-1 sm:mb-1.5">
-                        <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider flex items-center gap-1 sm:gap-1.5 text-slate-500 dark:text-slate-400 truncate max-w-full">
-                          <t.icon className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-indigo-500 shrink-0" /> <span className="truncate">{t.label}</span> {t.count !== null ? `(${t.count})` : ''}
+                      <div className="flex items-center justify-between w-full mb-1 sm:mb-2">
+                        <span className={cn(
+                          "text-[10px] sm:text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5",
+                          finTab === t.id ? "text-blue-600 dark:text-blue-400" : "text-slate-500 dark:text-slate-400"
+                        )}>
+                          <t.icon className="w-3.5 h-3.5 shrink-0" />
+                          <span className="truncate">{t.label} {t.count !== null && `(${t.count})`}</span>
                         </span>
-                        {finTab === t.id && <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-indigo-600 dark:bg-indigo-400 shrink-0 animate-pulse" />}
+                        {finTab === t.id && <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-blue-500 shrink-0" />}
                       </div>
-                      <p className="text-xs min-[375px]:text-sm min-[400px]:text-base sm:text-lg md:text-xl font-black text-slate-900 dark:text-slate-100 truncate w-full">{t.amount}</p>
+                      <p className={cn(
+                        "text-sm sm:text-lg lg:text-xl font-black truncate w-full",
+                        isDark ? "text-slate-100" : "text-slate-900"
+                      )}>{t.amount}</p>
                     </button>
                   ))}
                 </div>
@@ -778,52 +863,202 @@ Answer site-specific questions using this context only. Be concise.`;
             {activeTab === 'comms' && (
               <div className="grid grid-cols-1 gap-5">
                 <div className={card}>
-                  <h3 className="font-bold mb-4 text-lg flex items-center gap-2"><Clock className="w-5 h-5 text-amber-500" /> Pending Tasks ({data.siteTasks.length})</h3>
-                  {data.siteTasks.length > 0 ? (
+                  <h3 className="font-bold mb-4 text-lg flex items-center gap-2"><Clock className="w-5 h-5 text-amber-500" /> Pending Tasks ({data.pendingSiteTasks.length})</h3>
+                  {data.pendingSiteTasks.length > 0 ? (
                     <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                      {data.siteTasks.map(task => {
+                      {data.pendingSiteTasks.map(task => {
                         const taskSubs = subtasks.filter(s => s.mainTaskId === task.id);
                         const completed = taskSubs.filter(s => s.status === 'completed').length;
                         const isTagged = task.siteId === site.id;
                         return (
-                          <div key={task.id} className="py-3 flex justify-between items-start gap-3">
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <p className="font-semibold text-sm truncate">{task.title}</p>
-                                {isTagged && (
-                                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-700 flex items-center gap-1 shrink-0">
-                                    <MapPin className="w-2.5 h-2.5" /> Tagged
-                                  </span>
+                          <div key={task.id} className="py-3 flex flex-col gap-3 border-b border-slate-50 dark:border-slate-800/40 last:border-b-0">
+                            <div 
+                              className="flex justify-between items-start gap-3 cursor-pointer group"
+                              onClick={() => {
+                                const next = new Set(expandedTasks);
+                                if (next.has(task.id)) next.delete(task.id);
+                                else next.add(task.id);
+                                setExpandedTasks(next);
+                              }}
+                            >
+                              <div className="flex-shrink-0 mt-0.5 text-slate-400 group-hover:text-indigo-500 transition-colors">
+                                {expandedTasks.has(task.id) ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <p className="font-semibold text-sm truncate group-hover:text-indigo-600 transition-colors">{task.title}</p>
+                                  {isTagged && (
+                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-700 flex items-center gap-1 shrink-0">
+                                      <MapPin className="w-2.5 h-2.5" /> Tagged
+                                    </span>
+                                  )}
+                                </div>
+                                {task.deadline && <p className="text-xs text-slate-500 mt-0.5">Due: {new Date(task.deadline).toLocaleDateString('en-GB')}</p>}
+                                {taskSubs.length > 0 && (
+                                  <div className="mt-1.5 flex items-center gap-2">
+                                    <div className="flex-1 max-w-[120px] h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                                      <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${Math.round((completed / taskSubs.length) * 100)}%` }} />
+                                    </div>
+                                    <span className="text-[10px] text-slate-500 font-medium">{completed}/{taskSubs.length} done</span>
+                                  </div>
                                 )}
                               </div>
-                              {task.deadline && <p className="text-xs text-slate-500 mt-0.5">Due: {new Date(task.deadline).toLocaleDateString('en-GB')}</p>}
-                              {taskSubs.length > 0 && (
-                                <div className="mt-1.5 flex items-center gap-2">
-                                  <div className="flex-1 max-w-[120px] h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
-                                    <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${Math.round((completed / taskSubs.length) * 100)}%` }} />
+                              <div className="flex flex-col items-end gap-1 shrink-0">
+                                {task.priority && (
+                                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
+                                    task.priority === 'urgent' ? 'bg-red-100 text-red-700' :
+                                    task.priority === 'high' ? 'bg-orange-100 text-orange-700' :
+                                    task.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' : 'bg-slate-100 text-slate-600'
+                                  }`}>{task.priority}</span>
+                                )}
+                                <Badge variant="outline" className="text-[9px] sm:text-xs px-1.5 sm:px-2.5 whitespace-nowrap">
+                                  {task.requiresApproval ? 'Approval' : 'Active'}
+                                </Badge>
+                              </div>
+                            </div>
+                            
+                            <AnimatePresence initial={false}>
+                              {expandedTasks.has(task.id) && (
+                                <motion.div
+                                  initial={{ height: 0, opacity: 0 }}
+                                  animate={{ height: 'auto', opacity: 1 }}
+                                  exit={{ height: 0, opacity: 0 }}
+                                  transition={{ duration: 0.2 }}
+                                  className="overflow-hidden"
+                                >
+                                  <div className="pl-7 pr-2 space-y-2 pt-1 pb-2">
+                                    {taskSubs.length === 0 ? (
+                                      <p className="text-xs text-slate-500 italic">No subtasks.</p>
+                                    ) : (
+                                      taskSubs.map(sub => (
+                                        <div 
+                                          key={sub.id} 
+                                          onClick={(e) => { e.stopPropagation(); setOpenSubtaskId(sub.id!); }}
+                                          className="flex items-start justify-between gap-3 p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer border border-transparent hover:border-slate-200 dark:hover:border-slate-700 transition-all group/sub"
+                                        >
+                                          <div className="min-w-0 flex-1">
+                                            <p className={`text-[13px] font-medium truncate group-hover/sub:text-indigo-600 transition-colors ${sub.status === 'completed' ? 'line-through text-slate-400' : 'text-slate-700 dark:text-slate-300'}`}>
+                                              {sub.title}
+                                            </p>
+                                          </div>
+                                          <div className="flex-shrink-0 flex items-center gap-2">
+                                            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${
+                                              sub.status === 'completed' ? 'bg-emerald-100 text-emerald-700' : 
+                                              sub.status === 'in_progress' ? 'bg-blue-100 text-blue-700' : 
+                                              sub.status === 'pending_approval' ? 'bg-purple-100 text-purple-700' : 'bg-slate-100 text-slate-600'
+                                            }`}>
+                                              {sub.status.replace('_', ' ')}
+                                            </span>
+                                          </div>
+                                        </div>
+                                      ))
+                                    )}
                                   </div>
-                                  <span className="text-[10px] text-slate-500 font-medium">{completed}/{taskSubs.length} done</span>
-                                </div>
+                                </motion.div>
                               )}
-                            </div>
-                            <div className="flex flex-col items-end gap-1 shrink-0">
-                              {task.priority && (
-                                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
-                                  task.priority === 'urgent' ? 'bg-red-100 text-red-700' :
-                                  task.priority === 'high' ? 'bg-orange-100 text-orange-700' :
-                                  task.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' : 'bg-slate-100 text-slate-600'
-                                }`}>{task.priority}</span>
-                              )}
-                              <Badge variant="outline" className="text-[9px] sm:text-xs px-1.5 sm:px-2.5 whitespace-nowrap">
-                                {task.requiresApproval ? 'Approval' : 'Active'}
-                              </Badge>
-                            </div>
+                            </AnimatePresence>
                           </div>
                         );
                       })}
                     </div>
                   ) : <p className="text-slate-500 text-sm text-center py-8">No pending tasks.</p>}
                 </div>
+
+                {data.completedSiteTasks.length > 0 && (
+                  <div className={card}>
+                    <h3 className="font-bold mb-4 text-lg flex items-center gap-2"><CheckCircle2 className="w-5 h-5 text-emerald-500" /> Completed Tasks ({data.completedSiteTasks.length})</h3>
+                    <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                      {data.completedSiteTasks.map(task => {
+                        const taskSubs = subtasks.filter(s => s.mainTaskId === task.id);
+                        const completed = taskSubs.filter(s => s.status === 'completed').length;
+                        const isTagged = task.siteId === site.id;
+                        return (
+                          <div key={task.id} className="py-3 flex flex-col gap-3 border-b border-slate-50 dark:border-slate-800/40 last:border-b-0">
+                            <div 
+                              className="flex justify-between items-start gap-3 cursor-pointer group"
+                              onClick={() => {
+                                const next = new Set(expandedTasks);
+                                if (next.has(task.id)) next.delete(task.id);
+                                else next.add(task.id);
+                                setExpandedTasks(next);
+                              }}
+                            >
+                              <div className="flex-shrink-0 mt-0.5 text-slate-400 group-hover:text-indigo-500 transition-colors">
+                                {expandedTasks.has(task.id) ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <p className="font-semibold text-sm truncate group-hover:text-indigo-600 transition-colors text-slate-500 line-through">{task.title}</p>
+                                  {isTagged && (
+                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-700 flex items-center gap-1 shrink-0">
+                                      <MapPin className="w-2.5 h-2.5" /> Tagged
+                                    </span>
+                                  )}
+                                </div>
+                                {task.deadline && <p className="text-xs text-slate-500 mt-0.5">Due: {new Date(task.deadline).toLocaleDateString('en-GB')}</p>}
+                                {taskSubs.length > 0 && (
+                                  <div className="mt-1.5 flex items-center gap-2">
+                                    <div className="flex-1 max-w-[120px] h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                                      <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${Math.round((completed / taskSubs.length) * 100)}%` }} />
+                                    </div>
+                                    <span className="text-[10px] text-slate-500 font-medium">{completed}/{taskSubs.length} done</span>
+                                  </div>
+                                )}
+                              </div>
+                              <div className="flex flex-col items-end gap-1 shrink-0">
+                                <Badge variant="outline" className="text-[9px] sm:text-xs px-1.5 sm:px-2.5 whitespace-nowrap bg-emerald-50 text-emerald-700 border-emerald-200">
+                                  Completed
+                                </Badge>
+                              </div>
+                            </div>
+                            
+                            <AnimatePresence initial={false}>
+                              {expandedTasks.has(task.id) && (
+                                <motion.div
+                                  initial={{ height: 0, opacity: 0 }}
+                                  animate={{ height: 'auto', opacity: 1 }}
+                                  exit={{ height: 0, opacity: 0 }}
+                                  transition={{ duration: 0.2 }}
+                                  className="overflow-hidden"
+                                >
+                                  <div className="pl-7 pr-2 space-y-2 pt-1 pb-2">
+                                    {taskSubs.length === 0 ? (
+                                      <p className="text-xs text-slate-500 italic">No subtasks.</p>
+                                    ) : (
+                                      taskSubs.map(sub => (
+                                        <div 
+                                          key={sub.id} 
+                                          onClick={(e) => { e.stopPropagation(); setOpenSubtaskId(sub.id!); }}
+                                          className="flex items-start justify-between gap-3 p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer border border-transparent hover:border-slate-200 dark:hover:border-slate-700 transition-all group/sub"
+                                        >
+                                          <div className="min-w-0 flex-1">
+                                            <p className={`text-[13px] font-medium truncate group-hover/sub:text-indigo-600 transition-colors ${sub.status === 'completed' ? 'line-through text-slate-400' : 'text-slate-700 dark:text-slate-300'}`}>
+                                              {sub.title}
+                                            </p>
+                                          </div>
+                                          <div className="flex-shrink-0 flex items-center gap-2">
+                                            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${
+                                              sub.status === 'completed' ? 'bg-emerald-100 text-emerald-700' : 
+                                              sub.status === 'in_progress' ? 'bg-blue-100 text-blue-700' : 
+                                              sub.status === 'pending_approval' ? 'bg-purple-100 text-purple-700' : 'bg-slate-100 text-slate-600'
+                                            }`}>
+                                              {sub.status.replace('_', ' ')}
+                                            </span>
+                                          </div>
+                                        </div>
+                                      ))
+                                    )}
+                                  </div>
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 <div className={card}>
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="font-bold text-base sm:text-lg flex items-center gap-2"><MessagesSquare className="w-5 h-5 text-blue-500" /> Communication Logs ({data.siteComms.length})</h3>
@@ -847,40 +1082,56 @@ Answer site-specific questions using this context only. Be concise.`;
 
                   {data.siteContacts.length > 0 && (
                     <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800">
-                      <div className="flex justify-between items-center mb-3">
-                        <h4 className="font-bold flex items-center gap-2">
+                      <div 
+                        className="flex justify-between items-center mb-3 cursor-pointer select-none group"
+                        onClick={() => setIsContactsCollapsed(!isContactsCollapsed)}
+                      >
+                        <h4 className="font-bold flex items-center gap-2 group-hover:text-indigo-600 transition-colors">
                           <Users className="w-4 h-4 text-indigo-500" /> Site Contacts
+                          {isContactsCollapsed ? <ChevronDown className="w-4 h-4 text-slate-400 ml-1" /> : <ChevronUp className="w-4 h-4 text-slate-400 ml-1" />}
                         </h4>
                         <button
                           type="button"
-                          onClick={() => setShowContactsPanel(true)}
+                          onClick={(e) => { e.stopPropagation(); setShowContactsPanel(true); }}
                           className="text-xs text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 font-bold flex items-center gap-1 bg-transparent border-0 cursor-pointer"
                         >
                           <Pencil className="w-3 h-3" /> Edit Contacts
                         </button>
                       </div>
-                      <div className="space-y-3">
-                        {data.siteContacts.map(c => (
-                          <div key={c.id} className="py-2 flex justify-between items-center border-b border-slate-50 dark:border-slate-800/40 last:border-b-0">
-                            <div className="min-w-0 flex-1 pr-3">
-                              <p className="font-semibold text-sm truncate">
-                                {c.name} <span className="text-xs text-indigo-500">· {c.position}</span>
-                              </p>
-                              <p className="text-xs text-slate-500 truncate mt-0.5">{[c.phone, c.email].filter(Boolean).join(' · ')}</p>
+                      <AnimatePresence initial={false}>
+                        {!isContactsCollapsed && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={{ duration: 0.2 }}
+                            className="overflow-hidden"
+                          >
+                            <div className="space-y-3 pt-1">
+                              {data.siteContacts.map(c => (
+                                <div key={c.id} className="py-2 flex justify-between items-center border-b border-slate-50 dark:border-slate-800/40 last:border-b-0">
+                                  <div className="min-w-0 flex-1 pr-3">
+                                    <p className="font-semibold text-sm truncate">
+                                      {c.name} <span className="text-xs text-indigo-500">· {c.position}</span>
+                                    </p>
+                                    <p className="text-xs text-slate-500 truncate mt-0.5">{[c.phone, c.email].filter(Boolean).join(' · ')}</p>
+                                  </div>
+                                  {c.position !== 'Past Contact' && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setShowContactsPanel(true)}
+                                      className="text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800/60 bg-transparent border-0 cursor-pointer shrink-0"
+                                      title="Edit Contact Details"
+                                    >
+                                      <Pencil className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
+                                </div>
+                              ))}
                             </div>
-                            {c.position !== 'Past Contact' && (
-                              <button
-                                type="button"
-                                onClick={() => setShowContactsPanel(true)}
-                                className="text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800/60 bg-transparent border-0 cursor-pointer shrink-0"
-                                title="Edit Contact Details"
-                              >
-                                <Pencil className="w-3.5 h-3.5" />
-                              </button>
-                            )}
-                          </div>
-                        ))}
-                      </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
                     </div>
                   )}
                 </div>
@@ -917,6 +1168,8 @@ Answer site-specific questions using this context only. Be concise.`;
           )}
         </div>
       </div>
+      
+      <TaskDetailSheet subtaskId={openSubtaskId} onClose={() => setOpenSubtaskId(null)} />
     </div>
   );
 }

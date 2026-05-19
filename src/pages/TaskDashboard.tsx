@@ -23,7 +23,7 @@ const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { st
 const item = { hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] as [number, number, number, number] } } };
 
 const statusConfig = {
-  not_started: { label: "Not Started", pillClass: "chip-pending", icon: Circle },
+  not_started: { label: "To Start", pillClass: "chip-pending", icon: Circle },
   in_progress: { label: "In Progress", pillClass: "chip-in-progress", icon: Loader2 },
   pending_approval: { label: "Pending Approval", pillClass: "chip-pending-approval", icon: Circle },
   completed: { label: "Completed", pillClass: "chip-completed", icon: CheckCircle2 }
