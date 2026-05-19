@@ -48,7 +48,9 @@ import {
   Info,
   Sparkles,
   ArrowUpCircle,
-  RefreshCw
+  RefreshCw,
+  FolderOpen,
+  TrendingUp
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { NairaSign } from '@/src/components/ui/naira-sign';
@@ -106,7 +108,6 @@ const navigation: NavCategory[] = [
     items: [
       { name: 'Task Register', href: '/tasks', icon: ClipboardCheck, privKey: 'tasks', privField: 'canViewMyTasks' },
       { name: 'Reminders', href: '/tasks/reminders', icon: Bell, privKey: 'tasks', privField: 'canViewReminders' },
-      { name: 'Reports', href: '/tasks/reports', icon: BarChart3, privKey: 'tasks', privField: 'canViewReports' },
     ],
   },
   // ── HR ───────────────────────────────────────────────────────────────────
@@ -124,7 +125,6 @@ const navigation: NavCategory[] = [
       { name: 'Evaluations', href: '/evaluations', icon: ClipboardList, privKey: 'evaluations', privField: 'canView' },
       { name: 'Interviews', href: '/interviews', icon: Users, privKey: 'interviews', privField: 'canView' },
       { name: 'Performance & Conduct', href: '/performance-conduct', icon: AlertTriangle, privKey: 'disciplinary', privField: 'canView' },
-      { name: 'HR Reports', href: '/reports', icon: FileText, privKey: 'reports', privField: 'canView' },
     ],
   },
   // ── Operations ───────────────────────────────────────────────────────────
@@ -147,10 +147,9 @@ const navigation: NavCategory[] = [
     icon: Building2,
     items: [
       { name: 'Client 360', href: '/client-360', icon: Sparkles, privKey: 'sites', privField: 'canView' },
-      { name: 'Sites Overview', href: '/sites', icon: MapPin, privKey: 'sites', privField: 'canView' },
+      { name: 'Client Overview', href: '/sites', icon: MapPin, privKey: 'sites', privField: 'canView' },
       { name: 'External Comms', href: '/comm-log', icon: MessageSquare, privKey: 'commLog', privField: 'canView' },
       { name: 'Daily Journal', href: '/daily-journal', icon: BookOpen, privKey: 'dailyJournal', privField: 'canView' },
-      { name: 'Weekly Report', href: '/weekly-report', icon: BarChart2, privKey: 'weeklyReport', privField: 'canView' },
     ],
   },
   // ── Account ───────────────────────────────────────────────────────────────
@@ -163,7 +162,17 @@ const navigation: NavCategory[] = [
       { name: 'Non-Employee Directory', href: '/beneficiaries', icon: Users, privKey: 'beneficiaries', privField: 'canView' },
       { name: 'Ledger', href: '/ledger', icon: BookOpen, privKey: 'ledger', privField: 'canView' },
       { name: 'Company Expenses', href: '/company-expenses', icon: BookOpen, privKey: 'ledger', privField: 'canView' },
+    ],
+  },
+  // ── Reports ──────────────────────────────────────────────────────────────
+  {
+    name: 'Reports',
+    icon: FolderOpen,
+    items: [
+      { name: 'HR Reports', href: '/reports', icon: FileText, privKey: 'reports', privField: 'canView' },
       { name: 'Account Reports', href: '/financial-reports', icon: BarChart3, privKey: 'financialReports', privField: 'canView' },
+      { name: 'Task Reports', href: '/tasks/reports', icon: ClipboardList, privKey: 'tasks', privField: 'canViewReports' },
+      { name: 'Weekly Report', href: '/weekly-report', icon: BarChart2, privKey: 'weeklyReport', privField: 'canView' },
     ],
   },
   {
