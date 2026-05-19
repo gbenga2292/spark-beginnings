@@ -73,15 +73,15 @@ export function AddSubtaskInline({ mainTaskId, users, isPersonal, onAdd }: AddSu
                 <div className="absolute top-full left-0 mt-1 min-w-[200px] w-max max-w-[350px] max-h-[320px] overflow-y-auto bg-card border border-border rounded-lg shadow-xl z-[101] pt-1 pb-12">
                   <label className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted transition-colors border-b border-border">
                     <input type="checkbox"
-                      checked={assignedTo.length === users.filter(u => u.isActive).length && users.filter(u => u.isActive).length > 0}
+                      checked={assignedTo.length === users.filter(u => u.isActive !== false).length && users.filter(u => u.isActive !== false).length > 0}
                       onChange={(e) => {
-                        if (e.target.checked) setAssignedTo(users.filter(u => u.isActive).map(u => u.id));
+                        if (e.target.checked) setAssignedTo(users.filter(u => u.isActive !== false).map(u => u.id));
                         else setAssignedTo([]);
                       }}
                       className="w-3 h-3 rounded text-primary focus:ring-primary/20" />
                     <span className="text-xs font-semibold text-foreground whitespace-normal leading-tight">All staff</span>
                   </label>
-                  {users.filter(u => u.isActive).map(u => (
+                  {users.filter(u => u.isActive !== false).map(u => (
                     <label key={u.id} className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted transition-colors">
                       <input type="checkbox"
                         checked={assignedTo.includes(u.id)}
@@ -127,7 +127,7 @@ export function AddSubtaskInline({ mainTaskId, users, isPersonal, onAdd }: AddSu
               className="w-full px-3 py-1.5 rounded-lg border border-border bg-card text-xs focus:outline-none focus:ring-2 focus:ring-primary/20"
             >
               <option value="">Choose an approver...</option>
-              {users.filter(u => u.isActive).map(u => (
+              {users.filter(u => u.isActive !== false).map(u => (
                 <option key={u.id} value={u.id}>{u.name}</option>
               ))}
             </select>

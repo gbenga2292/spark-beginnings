@@ -15,7 +15,7 @@ export function AssignUserDialog({ currentAssignees, users, onAssign, onClose }:
   const [search, setSearch] = useState('');
 
   const filtered = users.filter(u =>
-    (u.isActive) && (
+    (u.isActive !== false) && (
     u.name.toLowerCase().includes(search.toLowerCase()) ||
     u.email?.toLowerCase().includes(search.toLowerCase())
     )

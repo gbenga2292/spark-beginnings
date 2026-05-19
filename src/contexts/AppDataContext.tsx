@@ -448,7 +448,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
             description: task.description || null,
             created_by: task.createdBy || user?.id,
             teamId: task.teamId || '',
-            workspace_id: task.workspaceId || task.teamId || '',
+            workspaceId: task.workspaceId || task.teamId || '',
             assigned_to: task.assignedTo || null,
             deadline: task.deadline || null,
             priority: task.priority || null,
@@ -535,7 +535,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         if (p.priority !== undefined)           payload.priority = p.priority ?? null;
         if (p.assignedTo !== undefined)         payload.assigned_to = p.assignedTo ?? null;
         if (p.teamId !== undefined)             payload.teamId = p.teamId;
-        if (p.workspaceId !== undefined)        payload.workspace_id = p.workspaceId;
+        if (p.workspaceId !== undefined)        payload.workspaceId = p.workspaceId;
         if (p.createdBy !== undefined)          payload.created_by = p.createdBy;
         if (p.is_deleted !== undefined)         payload.is_deleted = p.is_deleted;
         if (p.is_project !== undefined)         payload.is_project = p.is_project;

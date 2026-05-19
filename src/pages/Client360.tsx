@@ -1,10 +1,13 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   Building2, MapPin, AlertTriangle, FileText, CheckCircle2, Clock, 
   Calendar, Sparkles, ChevronDown, ChevronUp, Users, Phone, DollarSign,
   Activity, Briefcase, MessagesSquare, RefreshCcw, Filter, Send,
-  ShieldAlert, ShieldCheck, Settings2, X, Edit2, ChevronRight, CheckSquare
+  ShieldAlert, ShieldCheck, Settings2, X, Edit2, ChevronRight, CheckSquare,
+  Plus, Trash2, Circle, Eye
 } from 'lucide-react';
+import { toast, showConfirm } from '@/src/components/ui/toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import { TaskDetailSheet } from '@/src/components/tasks/TaskDetailSheet';
 import { Button } from '@/src/components/ui/button';
@@ -18,8 +21,9 @@ import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { parseISO } from 'date-fns';
 import { normalizeDate } from '@/src/lib/dateUtils';
 import { Site360View } from './Site360View';
+import { ClientContactsPanel } from './ClientContactsPanel';
 
-type TabType = 'overview' | 'contacts' | 'financials' | 'operations' | 'activity' | 'tasks';
+type TabType = 'overview' | 'contacts' | 'financials' | 'operations' | 'activity' | 'tasks' | 'onboarding';
 
 export function Client360() {
   const { isDark } = useTheme();
@@ -38,8 +42,11 @@ export function Client360() {
   const updateSite = useAppStore(s => s.updateSite);
   const updateClientProfile = useAppStore(s => s.updateClientProfile);
   const addClientProfile = useAppStore(s => s.addClientProfile);
+  const pendingSites = useAppStore(s => s.pendingSites);
+  const deletePendingSite = useAppStore(s => s.deletePendingSite);
   const { mainTasks, subtasks } = useAppData();
   const { dailyMachineLogs, assets, waybills } = useOperations();
+  const navigate = useNavigate();
 
   // Dialog state
   const [selectedSite, setSelectedSite] = useState<Site | null>(null);
@@ -47,6 +54,37 @@ export function Client360() {
   const [siteEditTarget, setSiteEditTarget] = useState<Site | null>(null);
   const [clientEditForm, setClientEditForm] = useState<Partial<ClientProfile>>({});
   const [siteEditForm, setSiteEditForm] = useState<Partial<Site>>({});
+  const [showContactsPanel, setShowContactsPanel] = useState(false);
+
+  // Pending Onboarding: delete with guard
+  const handleDeletePendingOnboarding = async (site: { id: string; siteName: string; clientName: string }) => {
+    const linkedLogs = commLogs.filter(l =>
+      l.client?.toLowerCase().trim() === site.clientName?.toLowerCase().trim() &&
+      (l.siteName?.toLowerCase().trim() === site.siteName?.toLowerCase().trim())
+    );
+    const linkedTasks = mainTasks.filter((t: any) =>
+      (t.title?.toLowerCase().includes(site.siteName?.toLowerCase())) ||
+      (t.description?.toLowerCase().includes(site.siteName?.toLowerCase()))
+    );
+    if (linkedLogs.length > 0 || linkedTasks.length > 0) {
+      const parts: string[] = [];
+      if (linkedTasks.length > 0) parts.push(`${linkedTasks.length} task(s)`);
+      if (linkedLogs.length > 0) parts.push(`${linkedLogs.length} comm log(s)`);
+      const ok = await showConfirm(
+        `"${site.siteName}" has linked ${parts.join(' and ')}. These will NOT be deleted. Permanently remove this onboarding record?`,
+        { variant: 'danger', confirmLabel: 'Delete Onboarding', cancelLabel: 'Keep It' }
+      );
+      if (!ok) return;
+    } else {
+      const ok = await showConfirm(
+        `Permanently delete the pending onboarding for "${site.siteName}"? This cannot be undone.`,
+        { variant: 'danger', confirmLabel: 'Delete', cancelLabel: 'Cancel' }
+      );
+      if (!ok) return;
+    }
+    deletePendingSite(site.id);
+    toast.success(`Onboarding for "${site.siteName}" deleted.`);
+  };
 
   // Extract unique client names, excluding internal 'DCEL'
   const allClients = useMemo(() => {
@@ -59,6 +97,12 @@ export function Client360() {
   }, [sites]);
 
   const [selectedClient, setSelectedClient] = useState<string>(allClients[0] || '');
+  const clientPendingSites = useMemo(() => {
+    return pendingSites.filter(ps =>
+      ps.clientName?.trim().toLowerCase() === selectedClient?.trim().toLowerCase() &&
+      ps.status === 'Pending'
+    );
+  }, [pendingSites, selectedClient]);
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [filterMonth, setFilterMonth] = useState<string>('all');
   const [filterYear, setFilterYear] = useState<string>('all');
@@ -66,6 +110,7 @@ export function Client360() {
   const [showFilterMenu, setShowFilterMenu] = useState(false);
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   const [openSubtaskId, setOpenSubtaskId] = useState<string | null>(null);
+  const [taskSubTab, setTaskSubTab] = useState<'pending' | 'approval' | 'completed'>('pending');
 
   const clientData = useMemo(() => {
     if (!selectedClient) return null;
@@ -257,8 +302,18 @@ export function Client360() {
 
       return false;
     });
-    const pendingTasks = clientTasks.filter(t => deriveMainTaskStatus(t.id, subtasks) !== 'completed' && !t.isDeleted && isWithinTimeFilter(t.deadline || t.createdAt));
-    const completedTasks = clientTasks.filter(t => deriveMainTaskStatus(t.id, subtasks) === 'completed' && !t.isDeleted && isWithinTimeFilter(t.deadline || t.createdAt));
+    const pendingTasks = clientTasks.filter(t => {
+      const status = deriveMainTaskStatus(t.id, subtasks);
+      return (status === 'not_started' || status === 'in_progress') && !t.isDeleted && isWithinTimeFilter(t.deadline || t.createdAt);
+    });
+    const approvalTasks = clientTasks.filter(t => {
+      const status = deriveMainTaskStatus(t.id, subtasks);
+      return status === 'pending_approval' && !t.isDeleted && isWithinTimeFilter(t.deadline || t.createdAt);
+    });
+    const completedTasks = clientTasks.filter(t => {
+      const status = deriveMainTaskStatus(t.id, subtasks);
+      return status === 'completed' && !t.isDeleted && isWithinTimeFilter(t.deadline || t.createdAt);
+    });
 
     const contacts = clientContacts.filter(c => c.clientName?.trim() === selectedClient && isWithinTimeFilter(c.createdAt));
     const logs = commLogs.filter(c => c.client?.trim() === selectedClient && isWithinTimeFilter(c.date)).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -283,13 +338,13 @@ export function Client360() {
     const alerts: { title: string; type: 'danger' | 'warning' | 'info' }[] = [];
 
     // Financial Health
-    if (vatDeficit > 50000) { healthScore -= 15; alerts.push({ title: `High VAT Deficit: â‚¦${vatDeficit.toLocaleString()}`, type: 'danger' }); }
-    else if (vatDeficit > 0) { healthScore -= 5; alerts.push({ title: `Pending VAT: â‚¦${vatDeficit.toLocaleString()}`, type: 'warning' }); }
+    if (vatDeficit > 50000) { healthScore -= 15; alerts.push({ title: `High VAT Deficit: ₦${vatDeficit.toLocaleString()}`, type: 'danger' }); }
+    else if (vatDeficit > 0) { healthScore -= 5; alerts.push({ title: `Pending VAT: ₦${vatDeficit.toLocaleString()}`, type: 'warning' }); }
 
     const outstandingBalance = totalRevenue - paymentsCleared;
     if (outstandingBalance > 0) {
       healthScore -= 10;
-      alerts.push({ title: `Unpaid Balance: â‚¦${outstandingBalance.toLocaleString()}`, type: 'warning' });
+      alerts.push({ title: `Unpaid Balance: ₦${outstandingBalance.toLocaleString()}`, type: 'warning' });
     }
 
     // Operational Health
@@ -311,7 +366,7 @@ export function Client360() {
       clientInvoices: invoices.filter(i => i.client?.trim() === selectedClient),
       vatDeficit, paymentsCleared, totalRevenue, totalCost, profit: totalRevenue - totalCost,
       paymentsWithVatStatus,
-      pendingTasks, completedTasks, contacts, logs, 
+      pendingTasks, completedTasks, approvalTasks, contacts, logs, 
       deployedStaffCount: uniqueStaffIds.size,
       machineLogs: clientMachineLogs,
       activeMachinesCount: deployedMachines.length,
@@ -353,7 +408,7 @@ export function Client360() {
     setIsGeneratingBrief(true);
 
     try {
-      const invoiceContext = clientData.clientInvoices.map(i => `Invoice ${i.invoiceNumber}: â‚¦${i.totalCharge}, Status: ${i.status}, Date: ${i.date}`).join(' | ');
+      const invoiceContext = clientData.clientInvoices.map(i => `Invoice ${i.invoiceNumber}: ₦${i.totalCharge}, Status: ${i.status}, Date: ${i.date}`).join(' | ');
       const machineContext = clientData.machineLogs.slice(0, 10).map(m => `${m.assetName} on ${m.date}: ${m.dieselUsage}L used, Issues: ${m.issuesOnSite || 'None'}`).join(' | ');
       const commContext = clientData.logs.slice(0, 5).map(l => `[${l.date}] ${l.channel} - ${l.notes}`).join(' | ');
       const waybillContext = clientData.waybills.slice(0, 5).map(w => `${w.type} Waybill ${w.id.substring(0,6)}: ${w.items.map(i => `${i.quantity}x ${i.assetName}`).join(', ')} (${w.status})`).join(' | ');
@@ -364,9 +419,9 @@ Your goal is to answer questions strictly based on the following context for cli
 Context:
 - Active Sites: ${clientData.activeSites} out of ${clientData.totalSites}
 - Total Active Machines on Site: ${clientData.activeMachinesCount} ${deployedMachinesList ? `(${deployedMachinesList})` : ''}
-- VAT Deficit: â‚¦${clientData.vatDeficit}
-- Total Revenue Paid: â‚¦${clientData.paymentsCleared}
-- Profit Margin: â‚¦${clientData.profit}
+- VAT Deficit: ₦${clientData.vatDeficit}
+- Total Revenue Paid: ₦${clientData.paymentsCleared}
+- Profit Margin: ₦${clientData.profit}
 - Pending Workflow Tasks: ${clientData.pendingTasks.length}
 - Unique Staff Deployed in this period: ${clientData.deployedStaffCount}
 - Recent Invoices: ${invoiceContext || 'None'}
@@ -711,7 +766,8 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                   { id: 'operations', label: 'Sites', icon: Briefcase },
                   { id: 'contacts', label: 'Contacts', icon: Users },
                   { id: 'activity', label: 'Activity', icon: MessagesSquare },
-                  { id: 'tasks', label: 'Tasks', icon: CheckSquare }
+                  { id: 'tasks', label: 'Tasks', icon: CheckSquare },
+                  { id: 'onboarding', label: 'Onboarding', icon: Clock }
                 ].map(tab => (
                   <button key={tab.id} onClick={() => setActiveTab(tab.id as TabType)}
                     className={cn(
@@ -741,15 +797,15 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                     <div className={cn("p-3 sm:p-5 rounded-2xl border shadow-sm min-w-0", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
                       <p className="text-[10px] sm:text-xs text-slate-500 font-bold uppercase tracking-wider mb-1 flex items-center gap-1.5 truncate"><DollarSign className="w-3.5 h-3.5 shrink-0"/> Total Revenue</p>
-                      <p className="text-sm min-[390px]:text-base sm:text-lg md:text-2xl font-black text-emerald-600 truncate" title={`â‚¦${clientData.totalRevenue.toLocaleString()}`}>
-                        â‚¦{Math.round(clientData.totalRevenue).toLocaleString()}
+                      <p className="text-sm min-[390px]:text-base sm:text-lg md:text-2xl font-black text-emerald-600 truncate" title={`₦${clientData.totalRevenue.toLocaleString()}`}>
+                        ₦{Math.round(clientData.totalRevenue).toLocaleString()}
                       </p>
                     </div>
                     <div className={cn("p-3 sm:p-5 rounded-2xl border shadow-sm flex flex-col justify-between min-w-0", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
                       <div className="min-w-0">
                         <p className="text-[10px] sm:text-xs text-slate-500 font-bold uppercase tracking-wider mb-1 flex items-center gap-1.5 truncate"><AlertTriangle className="w-3.5 h-3.5 shrink-0"/> VAT Deficit</p>
-                        <p className={cn("text-sm min-[390px]:text-base sm:text-lg md:text-2xl font-black truncate", clientData.vatDeficit > 0 ? "text-rose-500" : "text-emerald-500")} title={`â‚¦${clientData.vatDeficit.toLocaleString()}`}>
-                          â‚¦{Math.round(clientData.vatDeficit).toLocaleString()}
+                        <p className={cn("text-sm min-[390px]:text-base sm:text-lg md:text-2xl font-black truncate", clientData.vatDeficit > 0 ? "text-rose-500" : "text-emerald-500")} title={`₦${clientData.vatDeficit.toLocaleString()}`}>
+                          ₦{Math.round(clientData.vatDeficit).toLocaleString()}
                         </p>
                       </div>
                       <p className="text-[10px] sm:text-[11px] text-slate-400 mt-2 font-medium bg-slate-100 dark:bg-slate-800 rounded px-1.5 sm:px-2 py-0.5 sm:py-1 truncate max-w-full block" title={clientData.vatMonthsIncluded.length > 0 ? `Payments include: ${clientData.vatMonthsIncluded.join(', ')}` : 'No VAT payments in this period'}>
@@ -840,14 +896,14 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                               <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Total Billed Revenue</span>
                               <span className="text-xs text-slate-400">Total amount invoiced to the client</span>
                             </div>
-                            <span className="font-bold text-lg text-indigo-600 dark:text-indigo-400">â‚¦{clientData.totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                            <span className="font-bold text-lg text-indigo-600 dark:text-indigo-400">₦{clientData.totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                           </div>
                           <div className="flex justify-between items-center pb-3.5 border-b border-slate-100 dark:border-slate-800">
                             <div className="flex flex-col">
                               <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Total Project Costs</span>
                               <span className="text-xs text-slate-400">Expenses logged for this client's sites</span>
                             </div>
-                            <span className="font-bold text-lg text-rose-500">â‚¦{clientData.totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                            <span className="font-bold text-lg text-rose-500">₦{clientData.totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                           </div>
                         </div>
                       </div>
@@ -858,7 +914,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                     <div className={cn("p-6 rounded-3xl border shadow-sm flex flex-col justify-between", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
                       <div>
                         <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-                          <span className="p-1 rounded-lg bg-emerald-500/10 text-emerald-500 font-bold text-sm">â‚¦</span> Cash Flow & Collection
+                          <span className="p-1 rounded-lg bg-emerald-500/10 text-emerald-500 font-bold text-sm">₦</span> Cash Flow & Collection
                         </h3>
                         <div className="space-y-4">
                           <div className="flex justify-between items-center pb-3.5 border-b border-slate-100 dark:border-slate-800">
@@ -866,7 +922,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                               <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Total Payments Received</span>
                               <span className="text-xs text-slate-400">Cash cleared in bank from this client</span>
                             </div>
-                            <span className="font-bold text-lg text-emerald-600">â‚¦{clientData.paymentsCleared.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                            <span className="font-bold text-lg text-emerald-600">₦{clientData.paymentsCleared.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                           </div>
                           <div className="flex justify-between items-center pb-3.5 border-b border-slate-100 dark:border-slate-800">
                             <div className="flex flex-col">
@@ -874,7 +930,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                               <span className="text-xs text-slate-400">Invoiced amount awaiting payment</span>
                             </div>
                             <span className={cn("font-bold text-lg", (clientData.totalRevenue - clientData.paymentsCleared) > 0 ? "text-amber-600 dark:text-amber-400" : "text-slate-500")}>
-                              â‚¦{(clientData.totalRevenue - clientData.paymentsCleared).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              ₦{(clientData.totalRevenue - clientData.paymentsCleared).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </span>
                           </div>
                         </div>
@@ -925,7 +981,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                                   </td>
                                   <td className="p-3 text-slate-650 dark:text-slate-350 font-semibold">{p.site}</td>
                                   <td className="p-3 text-right font-bold text-slate-850 dark:text-slate-150">
-                                    â‚¦{(p.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    ₦{(p.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                   </td>
                                   <td className="p-3 text-center">
                                     <Badge variant="outline" className={cn("text-[9px] sm:text-[10px] px-1.5 sm:px-2 whitespace-nowrap", 
@@ -937,7 +993,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                                     </Badge>
                                   </td>
                                   <td className="p-3 text-right font-black text-indigo-600 dark:text-indigo-400">
-                                    â‚¦{(p.vatAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    ₦{(p.vatAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                   </td>
                                   <td className="p-3 text-center text-slate-650 dark:text-slate-350 font-medium">
                                     {p.monthName} {p.yearStr}
@@ -949,7 +1005,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                                       </Badge>
                                       {p.key && (
                                         <span className="text-[10px] text-slate-400 font-semibold">
-                                          Remitted: â‚¦{p.totalPaidForMonth.toLocaleString(undefined, { maximumFractionDigits: 0 })} / â‚¦{p.totalDueForMonth.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                                          Remitted: ₦{p.totalPaidForMonth.toLocaleString(undefined, { maximumFractionDigits: 0 })} / ₦{p.totalDueForMonth.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                                         </span>
                                       )}
                                     </div>
@@ -973,32 +1029,59 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
 
               {/* CONTACTS TAB */}
               {activeTab === 'contacts' && (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {clientData.contacts.length > 0 ? clientData.contacts.map(contact => (
-                    <div key={contact.id} className={cn("p-5 rounded-2xl border shadow-sm", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
-                      <div className="flex items-start justify-between mb-3">
-                        <div>
-                          <h4 className="font-bold text-slate-800 dark:text-slate-200">{contact.name}</h4>
-                          <p className="text-xs text-indigo-600 dark:text-indigo-400 font-medium">{contact.position || 'No Position Specified'}</p>
-                        </div>
-                        <Badge variant="outline" className={contact.isActive ? "text-emerald-600 bg-emerald-50 border-emerald-200" : "text-slate-500 bg-slate-50 border-slate-200"}>
-                          {contact.isActive ? 'Active' : 'Inactive'}
-                        </Badge>
-                      </div>
-                      <div className="space-y-2 mt-4 text-sm text-slate-600 dark:text-slate-400">
-                        {contact.phone && <p className="flex items-center gap-2"><Phone className="w-3.5 h-3.5"/> {contact.phone}</p>}
-                        {contact.email && <p className="flex items-center gap-2"><FileText className="w-3.5 h-3.5"/> {contact.email}</p>}
-                      </div>
+                <div className="space-y-4 col-span-full">
+                  <div className="flex justify-between items-center bg-slate-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-slate-100 dark:border-slate-800">
+                    <div>
+                      <h3 className="text-base font-bold text-slate-800 dark:text-slate-200">Contacts Directory</h3>
+                      <p className="text-xs text-slate-500 mt-0.5">Manage contact details, positions, phone, email and status for {selectedClient}.</p>
                     </div>
-                  )) : (
-                    <div className="col-span-full py-12 text-center text-slate-500">No contacts recorded for this client.</div>
-                  )}
+                    <Button
+                      onClick={() => setShowContactsPanel(true)}
+                      size="sm"
+                      className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl flex items-center gap-1.5"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                      <span>Manage Contacts</span>
+                    </Button>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {clientData.contacts.length > 0 ? clientData.contacts.map(contact => (
+                      <div key={contact.id} className={cn("p-5 rounded-2xl border shadow-sm relative group", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
+                        <div className="flex items-start justify-between mb-3">
+                          <div>
+                            <h4 className="font-bold text-slate-800 dark:text-slate-200">{contact.name}</h4>
+                            <p className="text-xs text-indigo-600 dark:text-indigo-400 font-medium">{contact.position || 'No Position Specified'}</p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className={contact.isActive ? "text-emerald-600 bg-emerald-50 border-emerald-200" : "text-slate-500 bg-slate-50 border-slate-200"}>
+                              {contact.isActive ? 'Active' : 'Inactive'}
+                            </Badge>
+                            <button
+                              type="button"
+                              onClick={() => setShowContactsPanel(true)}
+                              className="text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800/60 bg-transparent border-0 cursor-pointer opacity-0 group-hover:opacity-100"
+                              title="Edit Contact"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                        <div className="space-y-2 mt-4 text-sm text-slate-600 dark:text-slate-400">
+                          {contact.phone && <p className="flex items-center gap-2"><Phone className="w-3.5 h-3.5"/> {contact.phone}</p>}
+                          {contact.email && <p className="flex items-center gap-2"><FileText className="w-3.5 h-3.5"/> {contact.email}</p>}
+                        </div>
+                      </div>
+                    )) : (
+                      <div className="col-span-full py-12 text-center text-slate-500">No contacts recorded for this client.</div>
+                    )}
+                  </div>
                 </div>
               )}
 
               {/* OPERATIONS TAB */}
               {activeTab === 'operations' && (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                <div className="w-full">
                   <div className={cn("p-6 rounded-2xl border shadow-sm flex flex-col", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
                     <h3 className="text-lg font-bold mb-4 flex items-center gap-2"><MapPin className="w-5 h-5 text-indigo-500"/> Site Portfolio ({clientData.clientSites.length})</h3>
                     <div className="space-y-3 flex-1 overflow-y-auto max-h-[400px] style-scroll pr-2">
@@ -1022,29 +1105,6 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                       ))}
                     </div>
                   </div>
-                  
-                  <div className={cn("p-6 rounded-2xl border shadow-sm flex flex-col", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
-                    <h3 className="text-lg font-bold mb-4 flex items-center gap-2"><Clock className="w-5 h-5 text-amber-500"/> Active Workflows ({clientData.pendingTasks.length})</h3>
-                    <div className="space-y-3 flex-1 overflow-y-auto max-h-[400px] style-scroll pr-2">
-                      {clientData.pendingTasks.length > 0 ? clientData.pendingTasks.map(task => (
-                        <div key={task.id} className={cn("p-3 rounded-lg border", isDark ? "border-slate-800 bg-slate-800/50" : "border-slate-100 bg-slate-50")}>
-                          <div className="flex justify-between items-start gap-2">
-                            <div>
-                              <span className="font-semibold text-sm block mb-1">{task.title}</span>
-                              <span className="text-xs text-slate-500 flex items-center gap-1"><Calendar className="w-3 h-3"/> Due: {task.deadline ? new Date(task.deadline).toLocaleDateString() : 'None'}</span>
-                            </div>
-                            <Badge variant="outline" className="text-[9px] sm:text-[10px] px-1.5 sm:px-2 shrink-0 whitespace-nowrap">
-                              {task.requiresApproval ? (
-                                <><span className="inline sm:hidden">Approval</span><span className="hidden sm:inline">Pending Approval</span></>
-                              ) : (
-                                <><span className="inline sm:hidden">Active</span><span className="hidden sm:inline">In Progress</span></>
-                              )}
-                            </Badge>
-                          </div>
-                        </div>
-                      )) : <p className="text-slate-500 text-sm text-center py-8">No active workflow tasks.</p>}
-                    </div>
-                  </div>
                 </div>
               )}
 
@@ -1065,7 +1125,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                             <Badge variant="outline" className="text-[10px] h-5">{log.channel}</Badge>
                           </div>
                           <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">{log.notes}</p>
-                          <p className="text-xs font-medium text-slate-500">Logged by: {log.loggedBy} {log.contactPerson && `â€¢ Contacted: ${log.contactPerson}`}</p>
+                          <p className="text-xs font-medium text-slate-500">Logged by: {log.loggedBy} {log.contactPerson && `• Contacted: ${log.contactPerson}`}</p>
                         </div>
                       </div>
                     )) : <p className="text-slate-500 text-sm">No communication logs recorded.</p>}
@@ -1076,96 +1136,303 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
               {/* TASKS TAB */}
               {activeTab === 'tasks' && (
                 <div className="space-y-4">
-                  <div className={cn("p-4 sm:p-6 rounded-2xl border shadow-sm", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="font-bold text-lg flex items-center gap-2"><CheckSquare className="w-5 h-5 text-indigo-500" /> Pending Tasks ({clientData.pendingTasks.length})</h3>
-                    </div>
-                    {clientData.pendingTasks.length > 0 ? (
-                      <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                        {clientData.pendingTasks.map(task => {
-                          const taskSubs = subtasks.filter(s => s.mainTaskId === task.id);
-                          const completed = taskSubs.filter(s => s.status === 'completed').length;
-                          const isExpanded = expandedTasks.has(task.id);
-                          return (
-                            <div key={task.id} className="py-3 flex flex-col gap-3 border-b border-slate-50 dark:border-slate-800/40 last:border-b-0">
-                              <div className="flex justify-between items-start gap-3 cursor-pointer group" onClick={() => { const next = new Set(expandedTasks); if (next.has(task.id)) next.delete(task.id); else next.add(task.id); setExpandedTasks(next); }}>
-                                <div className="flex-shrink-0 mt-0.5 text-slate-400 group-hover:text-indigo-500 transition-colors">{isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}</div>
-                                <div className="min-w-0 flex-1">
-                                  <p className="font-semibold text-sm truncate group-hover:text-indigo-600 transition-colors">{task.title}</p>
-                                  {task.deadline && <p className="text-xs text-slate-500 mt-0.5">Due: {new Date(task.deadline).toLocaleDateString('en-GB')}</p>}
-                                  {taskSubs.length > 0 && (<div className="mt-1.5 flex items-center gap-2"><div className="flex-1 max-w-[120px] h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden"><div className="h-full bg-indigo-500 rounded-full" style={{ width: `${Math.round((completed / taskSubs.length) * 100)}%` }} /></div><span className="text-[10px] text-slate-500 font-medium">{completed}/{taskSubs.length} done</span></div>)}
-                                </div>
-                                <div className="flex flex-col items-end gap-1 shrink-0">
-                                  {task.priority && (<span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${task.priority === 'urgent' ? 'bg-red-100 text-red-700' : task.priority === 'high' ? 'bg-orange-100 text-orange-700' : task.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' : 'bg-slate-100 text-slate-600'}`}>{task.priority}</span>)}
-                                  <Badge variant="outline" className="text-[9px] sm:text-xs px-1.5 sm:px-2.5 whitespace-nowrap">{task.requiresApproval ? 'Approval' : 'Active'}</Badge>
-                                </div>
-                              </div>
-                              <AnimatePresence initial={false}>
-                                {isExpanded && (
-                                  <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }} className="overflow-hidden">
-                                    <div className="pl-7 pr-2 space-y-2 pt-1 pb-2">
-                                      {taskSubs.length === 0 ? <p className="text-xs text-slate-500 italic">No subtasks.</p> : taskSubs.map(sub => (
-                                        <div key={sub.id} onClick={(e) => { e.stopPropagation(); setOpenSubtaskId(sub.id!); }} className="flex items-center justify-between gap-3 p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer border border-transparent hover:border-slate-200 dark:hover:border-slate-700 transition-all group/sub">
-                                          <p className={`text-[13px] font-medium truncate group-hover/sub:text-indigo-600 transition-colors flex-1 min-w-0 ${sub.status === 'completed' ? 'line-through text-slate-400' : 'text-slate-700 dark:text-slate-300'}`}>{sub.title}</p>
-                                          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap flex-shrink-0 ml-2 ${sub.status === 'completed' ? 'bg-emerald-100 text-emerald-700' : sub.status === 'in_progress' ? 'bg-blue-100 text-blue-700' : sub.status === 'pending_approval' ? 'bg-purple-100 text-purple-700' : 'bg-slate-100 text-slate-600'}`}>{sub.status.replace(/_/g, ' ')}</span>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </motion.div>
-                                )}
-                              </AnimatePresence>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <div className="text-center py-12">
-                        <CheckSquare className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-                        <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">No pending tasks</h3>
-                        <p className="text-xs text-slate-500 mt-1">All tasks for this client have been completed.</p>
-                      </div>
-                    )}
+                  {/* Secondary Tab Switcher */}
+                  <div className="flex border-b border-slate-200 dark:border-slate-800 mb-2 overflow-x-auto style-scroll pb-px gap-1">
+                    {[
+                      { id: 'pending', label: 'Pending / Active', count: clientData.pendingTasks.length, color: 'text-indigo-650 bg-indigo-50 dark:bg-indigo-950/20 dark:text-indigo-400', icon: CheckSquare },
+                      { id: 'approval', label: 'Pending Approval', count: clientData.approvalTasks.length, color: 'text-amber-700 bg-amber-50 dark:bg-amber-950/20 dark:text-amber-400', icon: ShieldAlert },
+                      { id: 'completed', label: 'Completed', count: clientData.completedTasks.length, color: 'text-emerald-700 bg-emerald-50 dark:bg-emerald-950/20 dark:text-emerald-400', icon: CheckCircle2 }
+                    ].map(subTab => {
+                      const isActive = taskSubTab === subTab.id;
+                      return (
+                        <button
+                          key={subTab.id}
+                          onClick={() => setTaskSubTab(subTab.id as any)}
+                          className={cn(
+                            "flex items-center gap-2 px-3.5 py-2.5 text-xs sm:text-sm font-bold border-b-2 transition-all relative shrink-0",
+                            isActive
+                              ? "border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400"
+                              : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                          )}
+                        >
+                          <subTab.icon className={cn("w-4 h-4", isActive ? "text-indigo-600 dark:text-indigo-400" : "text-slate-400")} />
+                          <span>{subTab.label}</span>
+                          <span className={cn(
+                            "text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0",
+                            isActive ? subTab.color : "bg-slate-100 text-slate-650 dark:bg-slate-800 dark:text-slate-400"
+                          )}>
+                            {subTab.count}
+                          </span>
+                        </button>
+                      );
+                    })}
                   </div>
 
-                  {clientData.completedTasks.length > 0 && (
-                    <div className={cn("p-4 sm:p-6 rounded-2xl border shadow-sm", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
+                  {/* Tab Contents */}
+                  {taskSubTab === 'pending' && (
+                    <div className={cn("p-4 sm:p-6 rounded-2xl border shadow-sm animate-in fade-in duration-300", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
                       <div className="flex items-center justify-between mb-4">
-                        <h3 className="font-bold text-lg flex items-center gap-2"><CheckCircle2 className="w-5 h-5 text-emerald-500" /> Completed Tasks ({clientData.completedTasks.length})</h3>
+                        <h3 className="font-bold text-lg flex items-center gap-2">
+                          <CheckSquare className="w-5 h-5 text-indigo-500" /> Pending Tasks ({clientData.pendingTasks.length})
+                        </h3>
                       </div>
-                      <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                        {clientData.completedTasks.map(task => {
-                          const taskSubs = subtasks.filter(s => s.mainTaskId === task.id);
-                          const completed = taskSubs.filter(s => s.status === 'completed').length;
-                          const isExpanded = expandedTasks.has(task.id);
-                          return (
-                            <div key={task.id} className="py-3 flex flex-col gap-3 border-b border-slate-50 dark:border-slate-800/40 last:border-b-0">
-                              <div className="flex justify-between items-start gap-3 cursor-pointer group" onClick={() => { const next = new Set(expandedTasks); if (next.has(task.id)) next.delete(task.id); else next.add(task.id); setExpandedTasks(next); }}>
-                                <div className="flex-shrink-0 mt-0.5 text-slate-400 group-hover:text-indigo-500 transition-colors">{isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}</div>
-                                <div className="min-w-0 flex-1">
-                                  <p className="font-semibold text-sm truncate group-hover:text-indigo-600 transition-colors text-slate-500 line-through">{task.title}</p>
-                                  {task.deadline && <p className="text-xs text-slate-500 mt-0.5">Due: {new Date(task.deadline).toLocaleDateString('en-GB')}</p>}
-                                  {taskSubs.length > 0 && (<div className="mt-1.5 flex items-center gap-2"><div className="flex-1 max-w-[120px] h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden"><div className="h-full bg-emerald-500 rounded-full" style={{ width: `${Math.round((completed / taskSubs.length) * 100)}%` }} /></div><span className="text-[10px] text-slate-500 font-medium">{completed}/{taskSubs.length} done</span></div>)}
+                      {clientData.pendingTasks.length > 0 ? (
+                        <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                          {clientData.pendingTasks.map(task => {
+                            const taskSubs = subtasks.filter(s => s.mainTaskId === task.id);
+                            const completed = taskSubs.filter(s => s.status === 'completed').length;
+                            const isExpanded = expandedTasks.has(task.id);
+                            return (
+                              <div key={task.id} className="py-3 flex flex-col gap-3 border-b border-slate-50 dark:border-slate-800/40 last:border-b-0">
+                                <div className="flex justify-between items-start gap-3 cursor-pointer group" onClick={() => { const next = new Set(expandedTasks); if (next.has(task.id)) next.delete(task.id); else next.add(task.id); setExpandedTasks(next); }}>
+                                  <div className="flex-shrink-0 mt-0.5 text-slate-400 group-hover:text-indigo-500 transition-colors">{isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}</div>
+                                  <div className="min-w-0 flex-1">
+                                    <p className="font-semibold text-sm truncate group-hover:text-indigo-600 transition-colors">{task.title}</p>
+                                    {task.deadline && <p className="text-xs text-slate-500 mt-0.5">Due: {new Date(task.deadline).toLocaleDateString('en-GB')}</p>}
+                                    {taskSubs.length > 0 && (<div className="mt-1.5 flex items-center gap-2"><div className="flex-1 max-w-[120px] h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden"><div className="h-full bg-indigo-500 rounded-full" style={{ width: `${Math.round((completed / taskSubs.length) * 100)}%` }} /></div><span className="text-[10px] text-slate-500 font-medium">{completed}/{taskSubs.length} done</span></div>)}
+                                  </div>
+                                  <div className="flex flex-col items-end gap-1 shrink-0">
+                                    {task.priority && (<span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wider ${task.priority === 'urgent' ? 'bg-red-100 text-red-700' : task.priority === 'high' ? 'bg-orange-100 text-orange-700' : task.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' : 'bg-slate-100 text-slate-650'}`}>{task.priority}</span>)}
+                                    <Badge variant="outline" className="text-[9px] sm:text-[10px] px-1.5 sm:px-2.5 whitespace-nowrap bg-indigo-50/50 text-indigo-700 border-indigo-200">Active</Badge>
+                                  </div>
                                 </div>
-                                <Badge variant="outline" className="text-[9px] sm:text-xs px-1.5 sm:px-2.5 whitespace-nowrap bg-emerald-50 text-emerald-700 border-emerald-200 flex-shrink-0">Completed</Badge>
+                                <AnimatePresence initial={false}>
+                                  {isExpanded && (
+                                    <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }} className="overflow-hidden">
+                                      <div className="pl-7 pr-2 space-y-2 pt-1 pb-2">
+                                        {taskSubs.length === 0 ? <p className="text-xs text-slate-500 italic">No subtasks.</p> : taskSubs.map(sub => (
+                                          <div key={sub.id} onClick={(e) => { e.stopPropagation(); setOpenSubtaskId(sub.id!); }} className="flex items-center justify-between gap-3 p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer border border-transparent hover:border-slate-200 dark:hover:border-slate-700 transition-all group/sub">
+                                            <p className={`text-[13px] font-medium truncate group-hover/sub:text-indigo-600 transition-colors flex-1 min-w-0 ${sub.status === 'completed' ? 'line-through text-slate-400' : 'text-slate-700 dark:text-slate-300'}`}>{sub.title}</p>
+                                            <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full whitespace-nowrap flex-shrink-0 ml-2 ${sub.status === 'completed' ? 'bg-emerald-100 text-emerald-700' : sub.status === 'in_progress' ? 'bg-blue-100 text-blue-700' : sub.status === 'pending_approval' ? 'bg-amber-100 text-amber-700' : 'bg-slate-150 text-slate-600'}`}>{sub.status === 'not_started' ? 'To Start' : sub.status === 'in_progress' ? 'In Progress' : sub.status === 'pending_approval' ? 'Pending Approval' : 'Completed'}</span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </motion.div>
+                                  )}
+                                </AnimatePresence>
                               </div>
-                              <AnimatePresence initial={false}>
-                                {isExpanded && (
-                                  <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }} className="overflow-hidden">
-                                    <div className="pl-7 pr-2 space-y-2 pt-1 pb-2">
-                                      {taskSubs.length === 0 ? <p className="text-xs text-slate-500 italic">No subtasks.</p> : taskSubs.map(sub => (
-                                        <div key={sub.id} onClick={(e) => { e.stopPropagation(); setOpenSubtaskId(sub.id!); }} className="flex items-center justify-between gap-3 p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer border border-transparent hover:border-slate-200 dark:hover:border-slate-700 transition-all group/sub">
-                                          <p className={`text-[13px] font-medium truncate group-hover/sub:text-indigo-600 transition-colors flex-1 min-w-0 ${sub.status === 'completed' ? 'line-through text-slate-400' : 'text-slate-700 dark:text-slate-300'}`}>{sub.title}</p>
-                                          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap flex-shrink-0 ml-2 ${sub.status === 'completed' ? 'bg-emerald-100 text-emerald-700' : sub.status === 'in_progress' ? 'bg-blue-100 text-blue-700' : sub.status === 'pending_approval' ? 'bg-purple-100 text-purple-700' : 'bg-slate-100 text-slate-600'}`}>{sub.status.replace(/_/g, ' ')}</span>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </motion.div>
-                                )}
-                              </AnimatePresence>
-                            </div>
-                          );
-                        })}
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="text-center py-12">
+                          <CheckSquare className="w-12 h-12 text-slate-350 mx-auto mb-3 opacity-60" />
+                          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">No pending tasks</h3>
+                          <p className="text-xs text-slate-500 mt-1">There are no active or to-start tasks logged for this client.</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {taskSubTab === 'approval' && (
+                    <div className={cn("p-4 sm:p-6 rounded-2xl border shadow-sm animate-in fade-in duration-300", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="font-bold text-lg flex items-center gap-2">
+                          <ShieldAlert className="w-5 h-5 text-amber-500" /> Pending Approvals ({clientData.approvalTasks.length})
+                        </h3>
                       </div>
+                      {clientData.approvalTasks.length > 0 ? (
+                        <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                          {clientData.approvalTasks.map(task => {
+                            const taskSubs = subtasks.filter(s => s.mainTaskId === task.id);
+                            const completed = taskSubs.filter(s => s.status === 'completed').length;
+                            const isExpanded = expandedTasks.has(task.id);
+                            return (
+                              <div key={task.id} className="py-3 flex flex-col gap-3 border-b border-slate-50 dark:border-slate-800/40 last:border-b-0">
+                                <div className="flex justify-between items-start gap-3 cursor-pointer group" onClick={() => { const next = new Set(expandedTasks); if (next.has(task.id)) next.delete(task.id); else next.add(task.id); setExpandedTasks(next); }}>
+                                  <div className="flex-shrink-0 mt-0.5 text-slate-400 group-hover:text-indigo-500 transition-colors">{isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}</div>
+                                  <div className="min-w-0 flex-1">
+                                    <p className="font-semibold text-sm truncate group-hover:text-indigo-600 transition-colors">{task.title}</p>
+                                    {task.deadline && <p className="text-xs text-slate-500 mt-0.5">Due: {new Date(task.deadline).toLocaleDateString('en-GB')}</p>}
+                                    {taskSubs.length > 0 && (<div className="mt-1.5 flex items-center gap-2"><div className="flex-1 max-w-[120px] h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden"><div className="h-full bg-amber-500 rounded-full" style={{ width: `${Math.round((completed / taskSubs.length) * 100)}%` }} /></div><span className="text-[10px] text-slate-500 font-medium">{completed}/{taskSubs.length} done</span></div>)}
+                                  </div>
+                                  <div className="flex flex-col items-end gap-1 shrink-0">
+                                    {task.priority && (<span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wider ${task.priority === 'urgent' ? 'bg-red-100 text-red-700' : task.priority === 'high' ? 'bg-orange-100 text-orange-700' : task.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' : 'bg-slate-100 text-slate-650'}`}>{task.priority}</span>)}
+                                    <Badge variant="outline" className="text-[9px] sm:text-[10px] px-1.5 sm:px-2.5 whitespace-nowrap bg-amber-50 text-amber-700 border-amber-200">Needs Approval</Badge>
+                                  </div>
+                                </div>
+                                <AnimatePresence initial={false}>
+                                  {isExpanded && (
+                                    <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }} className="overflow-hidden">
+                                      <div className="pl-7 pr-2 space-y-2 pt-1 pb-2">
+                                        {taskSubs.length === 0 ? <p className="text-xs text-slate-500 italic">No subtasks.</p> : taskSubs.map(sub => (
+                                          <div key={sub.id} onClick={(e) => { e.stopPropagation(); setOpenSubtaskId(sub.id!); }} className="flex items-center justify-between gap-3 p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer border border-transparent hover:border-slate-200 dark:hover:border-slate-700 transition-all group/sub">
+                                            <p className={`text-[13px] font-medium truncate group-hover/sub:text-indigo-600 transition-colors flex-1 min-w-0 ${sub.status === 'completed' ? 'line-through text-slate-400' : 'text-slate-700 dark:text-slate-300'}`}>{sub.title}</p>
+                                            <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full whitespace-nowrap flex-shrink-0 ml-2 ${sub.status === 'completed' ? 'bg-emerald-100 text-emerald-700' : sub.status === 'in_progress' ? 'bg-blue-100 text-blue-700' : sub.status === 'pending_approval' ? 'bg-amber-100 text-amber-700' : 'bg-slate-150 text-slate-600'}`}>{sub.status === 'not_started' ? 'To Start' : sub.status === 'in_progress' ? 'In Progress' : sub.status === 'pending_approval' ? 'Pending Approval' : 'Completed'}</span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </motion.div>
+                                  )}
+                                </AnimatePresence>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="text-center py-12">
+                          <ShieldCheck className="w-12 h-12 text-emerald-400 mx-auto mb-3 opacity-60" />
+                          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">No pending approvals</h3>
+                          <p className="text-xs text-slate-500 mt-1">All review requests are completed or fully resolved.</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {taskSubTab === 'completed' && (
+                    <div className={cn("p-4 sm:p-6 rounded-2xl border shadow-sm animate-in fade-in duration-300", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="font-bold text-lg flex items-center gap-2">
+                          <CheckCircle2 className="w-5 h-5 text-emerald-500" /> Completed Tasks ({clientData.completedTasks.length})
+                        </h3>
+                      </div>
+                      {clientData.completedTasks.length > 0 ? (
+                        <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                          {clientData.completedTasks.map(task => {
+                            const taskSubs = subtasks.filter(s => s.mainTaskId === task.id);
+                            const completed = taskSubs.filter(s => s.status === 'completed').length;
+                            const isExpanded = expandedTasks.has(task.id);
+                            return (
+                              <div key={task.id} className="py-3 flex flex-col gap-3 border-b border-slate-50 dark:border-slate-800/40 last:border-b-0">
+                                <div className="flex justify-between items-start gap-3 cursor-pointer group" onClick={() => { const next = new Set(expandedTasks); if (next.has(task.id)) next.delete(task.id); else next.add(task.id); setExpandedTasks(next); }}>
+                                  <div className="flex-shrink-0 mt-0.5 text-slate-400 group-hover:text-indigo-500 transition-colors">{isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}</div>
+                                  <div className="min-w-0 flex-1">
+                                    <p className="font-semibold text-sm truncate group-hover:text-indigo-600 transition-colors text-slate-500 line-through">{task.title}</p>
+                                    {task.deadline && <p className="text-xs text-slate-500 mt-0.5">Due: {new Date(task.deadline).toLocaleDateString('en-GB')}</p>}
+                                    {taskSubs.length > 0 && (<div className="mt-1.5 flex items-center gap-2"><div className="flex-1 max-w-[120px] h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden"><div className="h-full bg-emerald-500 rounded-full" style={{ width: `${Math.round((completed / taskSubs.length) * 100)}%` }} /></div><span className="text-[10px] text-slate-500 font-medium">{completed}/{taskSubs.length} done</span></div>)}
+                                  </div>
+                                  <Badge variant="outline" className="text-[9px] sm:text-[10px] px-1.5 sm:px-2.5 whitespace-nowrap bg-emerald-50 text-emerald-700 border-emerald-200 flex-shrink-0 font-bold">Completed</Badge>
+                                </div>
+                                <AnimatePresence initial={false}>
+                                  {isExpanded && (
+                                    <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }} className="overflow-hidden">
+                                      <div className="pl-7 pr-2 space-y-2 pt-1 pb-2">
+                                        {taskSubs.length === 0 ? <p className="text-xs text-slate-500 italic">No subtasks.</p> : taskSubs.map(sub => (
+                                          <div key={sub.id} onClick={(e) => { e.stopPropagation(); setOpenSubtaskId(sub.id!); }} className="flex items-center justify-between gap-3 p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer border border-transparent hover:border-slate-200 dark:hover:border-slate-700 transition-all group/sub">
+                                            <p className={`text-[13px] font-medium truncate group-hover/sub:text-indigo-600 transition-colors flex-1 min-w-0 line-through text-slate-400`}>{sub.title}</p>
+                                            <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full whitespace-nowrap flex-shrink-0 ml-2 bg-emerald-100 text-emerald-700`}>Completed</span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </motion.div>
+                                  )}
+                                </AnimatePresence>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="text-center py-12">
+                          <CheckCircle2 className="w-12 h-12 text-slate-300 mx-auto mb-3 opacity-65" />
+                          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">No completed tasks</h3>
+                          <p className="text-xs text-slate-500 mt-1">There are no completed tasks recorded for this client yet.</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {activeTab === 'onboarding' && (
+                <div className="space-y-4">
+                  {/* Header with Add button */}
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className={cn("text-lg font-bold flex items-center gap-2", isDark ? "text-slate-100" : "text-slate-800")}>
+                        <Clock className="w-5 h-5 text-amber-500" /> Pending Onboardings
+                      </h3>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        {clientPendingSites.length} pending record{clientPendingSites.length !== 1 ? 's' : ''} for {selectedClient}
+                      </p>
+                    </div>
+                    <Button
+                      onClick={() => navigate('/sites/onboarding/new', { state: { prefillClient: selectedClient } })}
+                      className="bg-indigo-600 hover:bg-indigo-500 text-white gap-2 h-9 text-xs font-semibold shadow-sm"
+                      size="sm"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Add Onboarding
+                    </Button>
+                  </div>
+
+                  {clientPendingSites.length === 0 ? (
+                    <div className={cn("p-10 rounded-2xl border shadow-sm text-center", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
+                      <Clock className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                      <h4 className="text-sm font-semibold text-slate-600 dark:text-slate-400">No Pending Onboardings</h4>
+                      <p className="text-xs text-slate-400 mt-1">No onboarding records found for {selectedClient}.</p>
+                      <Button
+                        onClick={() => navigate('/sites/onboarding/new', { state: { prefillClient: selectedClient } })}
+                        className="mt-4 bg-indigo-600 hover:bg-indigo-500 text-white gap-2 text-xs"
+                        size="sm"
+                      >
+                        <Plus className="w-3.5 h-3.5" /> Start New Onboarding
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {clientPendingSites.map(site => {
+                        const phases = [1,2,3,4,5] as const;
+                        const completedCount = phases.filter(p => !!(site as any)[`phase${p}`]?.completed).length;
+                        return (
+                          <div
+                            key={site.id}
+                            className={cn("rounded-2xl border shadow-sm overflow-hidden flex flex-col transition-all hover:shadow-md", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}
+                          >
+                            <div className="h-1 bg-gradient-to-r from-amber-400 to-orange-400" />
+                            <div className="p-4 flex flex-col gap-3 flex-1">
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <div className="h-8 w-8 rounded-lg bg-amber-50 border border-amber-100 flex items-center justify-center shrink-0">
+                                    <Clock className="h-4 w-4 text-amber-500" />
+                                  </div>
+                                  <div className="min-w-0">
+                                    <h4 className="text-sm font-bold text-slate-800 dark:text-slate-100 uppercase truncate leading-tight" title={site.siteName}>{site.siteName}</h4>
+                                    <p className="text-[11px] text-slate-500 truncate">{site.createdAt ? new Date(site.createdAt).toLocaleDateString('en-GB') : '—'}</p>
+                                  </div>
+                                </div>
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 whitespace-nowrap shrink-0">
+                                  {completedCount}/5 done
+                                </span>
+                              </div>
+
+                              <div className="grid grid-cols-5 gap-1 bg-slate-50 dark:bg-slate-800 rounded-xl p-2">
+                                {phases.map(phase => {
+                                  const isDone = !!(site as any)[`phase${phase}`]?.completed;
+                                  return (
+                                    <div key={phase} className="flex flex-col items-center gap-1">
+                                      <span className="text-[9px] font-bold text-slate-400">P{phase}</span>
+                                      {isDone
+                                        ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+                                        : <Circle className="h-3.5 w-3.5 text-slate-200 dark:text-slate-700" />}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+
+                              <div className="h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                                <div
+                                  className="h-full bg-gradient-to-r from-amber-400 to-emerald-500 rounded-full transition-all"
+                                  style={{ width: `${(completedCount / 5) * 100}%` }}
+                                />
+                              </div>
+
+                              <div className="flex items-center justify-between pt-1">
+                                <button
+                                  onClick={() => handleDeletePendingOnboarding(site)}
+                                  className="flex items-center gap-1.5 text-[11px] font-semibold text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg px-2 py-1 transition-colors"
+                                >
+                                  <Trash2 className="h-3 w-3" /> Delete
+                                </button>
+                                <button
+                                  onClick={() => navigate(`/sites/onboarding/${site.id}`)}
+                                  className="flex items-center gap-1.5 text-[11px] font-semibold text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 rounded-lg px-2 py-1 transition-colors"
+                                >
+                                  <Eye className="h-3 w-3" /> View Form
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -1227,6 +1494,12 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
       )}
 
       <TaskDetailSheet subtaskId={openSubtaskId} onClose={() => setOpenSubtaskId(null)} />
+      {showContactsPanel && (
+        <ClientContactsPanel
+          clientName={selectedClient}
+          onClose={() => setShowContactsPanel(false)}
+        />
+      )}
     </>
   );
 }

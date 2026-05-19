@@ -5,7 +5,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft, MapPin, DollarSign, Activity, Wrench, MessagesSquare,
   AlertTriangle, Clock, Fuel, Calendar, FileText, Users, Settings2,
-  ChevronDown, Sparkles, RefreshCcw, Send, ChevronUp, Filter, CheckCircle2, Plus, Pencil, ChevronRight
+  ChevronDown, Sparkles, RefreshCcw, Send, ChevronUp, Filter, CheckCircle2, Plus, Pencil, ChevronRight,
+  CheckSquare, ShieldAlert, ShieldCheck, ClipboardList, Package, Truck, X
 } from 'lucide-react';
 import { Badge } from '@/src/components/ui/badge';
 import { Button } from '@/src/components/ui/button';
@@ -14,6 +15,7 @@ import { useTheme } from '@/src/hooks/useTheme';
 import { useAppStore, Site } from '@/src/store/appStore';
 import { useOperations } from '@/src/contexts/OperationsContext';
 import { useAppData, deriveMainTaskStatus } from '@/src/contexts/AppDataContext';
+import { useAuth } from '@/src/hooks/useAuth';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { InvoiceDetailDialog } from './InvoiceDetailDialog';
 import { Invoice } from '@/src/store/appStore';
@@ -32,12 +34,32 @@ interface Props {
 
 export function Site360View({ site, clientSites, onSiteChange, onBack, onEditSite }: Props) {
   const { isDark } = useTheme();
+  const { createMainTask, users } = useAppData();
+  const { user: currentUser } = useAuth();
+  const clientProfiles = useAppStore(s => s.clientProfiles);
+  const [showAddTaskForm, setShowAddTaskForm] = useState(false);
+  const [taskTitle, setTaskTitle] = useState('');
+  const [taskDesc, setTaskDesc] = useState('');
+  const [taskAssignees, setTaskAssignees] = useState<string[]>([]);
+  const [taskDeadline, setTaskDeadline] = useState('');
+  const [taskPriority, setTaskPriority] = useState<'low' | 'medium' | 'high'>('medium');
+  const [taskRequiresApproval, setTaskRequiresApproval] = useState(false);
+  const [taskApprover, setTaskApprover] = useState('');
+  const [isSubmittingTask, setIsSubmittingTask] = useState(false);
+
+  const matchingClient = useMemo(() => {
+    return clientProfiles?.find(c => c.name?.trim().toLowerCase() === site.client?.trim().toLowerCase());
+  }, [clientProfiles, site.client]);
+  const derivedClientId = matchingClient ? matchingClient.id : null;
+
   const [activeTab, setActiveTab] = useState<SiteTab>('financials');
   const [showFilters, setShowFilters] = useState(false);
   const [showContactsPanel, setShowContactsPanel] = useState(false);
   const [isContactsCollapsed, setIsContactsCollapsed] = useState(false);
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   const [openSubtaskId, setOpenSubtaskId] = useState<string | null>(null);
+  const [taskSubTab, setTaskSubTab] = useState<'pending' | 'approval' | 'completed'>('pending');
+  const [operationsSubTab, setOperationsSubTab] = useState<'logs' | 'materials' | 'waybills'>('logs');
 
   // Own filter state
   const currentYear = new Date().getFullYear();
@@ -57,8 +79,58 @@ export function Site360View({ site, clientSites, onSiteChange, onBack, onEditSit
   const [isGeneratingBrief, setIsGeneratingBrief] = useState(false);
   const [isChatCollapsed, setIsChatCollapsed] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
+  useEffect(() => {
+    if (messages.length > 0) {
+      chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages]);
+
+  useEffect(() => {
+    if (containerRef.current) {
+      containerRef.current.scrollTop = 0;
+    }
+  }, [site.id]);
+
+  const handleCreateTaskSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!taskTitle.trim() || isSubmittingTask) return;
+    setIsSubmittingTask(true);
+
+    try {
+      await createMainTask({
+        title: taskTitle.trim(),
+        description: taskDesc.trim() || null,
+        createdBy: currentUser?.id,
+        teamId: 'dcel-team',
+        workspaceId: 'dcel-team',
+        assignedTo: taskAssignees.length > 0 ? taskAssignees.join(',') : null,
+        deadline: taskDeadline || null,
+        priority: taskPriority,
+        requiresApproval: taskRequiresApproval,
+        approverId: taskRequiresApproval && taskApprover ? taskApprover : null,
+        clientId: derivedClientId || undefined,
+        siteId: site.id || undefined,
+        is_hr_task: false,
+        skipAutoSubtask: true
+      }, []);
+
+      // Reset form
+      setTaskTitle('');
+      setTaskDesc('');
+      setTaskAssignees([]);
+      setTaskDeadline('');
+      setTaskPriority('medium');
+      setTaskRequiresApproval(false);
+      setTaskApprover('');
+      setShowAddTaskForm(false);
+    } catch (error) {
+      console.error('Failed to create site task:', error);
+    } finally {
+      setIsSubmittingTask(false);
+    }
+  };
 
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [showCommDialog, setShowCommDialog] = useState(false);
@@ -256,7 +328,11 @@ export function Site360View({ site, clientSites, onSiteChange, onBack, onEditSit
       return false;
     });
 
-    const pendingSiteTasks = siteTasks.filter(t => deriveMainTaskStatus(t.id, subtasks) !== 'completed');
+    const pendingSiteTasks = siteTasks.filter(t => {
+      const s = deriveMainTaskStatus(t.id, subtasks);
+      return s === 'not_started' || s === 'in_progress';
+    });
+    const approvalSiteTasks = siteTasks.filter(t => deriveMainTaskStatus(t.id, subtasks) === 'pending_approval');
     const completedSiteTasks = siteTasks.filter(t => deriveMainTaskStatus(t.id, subtasks) === 'completed');
 
     const siteComms = commLogs.filter(l =>
@@ -314,8 +390,9 @@ export function Site360View({ site, clientSites, onSiteChange, onBack, onEditSit
       siteInvoices, sitePayments, siteCosts, totalBilled, totalReceived, outstanding, vatGenerated, totalCost,
       periodVatCollected, unpaidVatBroughtForward, periodVatRemitted, totalVatRemitted,
       machineLogs, totalDiesel, activeDays, machineDays, activeMachinesCount, machinesOnSiteCount,
+      siteWaybills, materialsOnSite: assets.filter(a => (inventoryMap.get(a.id) || 0) > 0).map(a => ({ ...a, quantity: inventoryMap.get(a.id) || 0 })),
       siteMaintAssets, siteMaintSessions, totalMaintenanceCost,
-      siteTasks, pendingSiteTasks, completedSiteTasks, siteComms, siteContacts, alerts,
+      siteTasks, pendingSiteTasks, approvalSiteTasks, completedSiteTasks, siteComms, siteContacts, alerts,
       profit: totalBilled - totalCost
     };
   }, [site, filterMonth, filterYear, invoices, payments, vatPayments, ledgerEntries, vatRate, dailyMachineLogs, maintenanceAssets, maintenanceSessions, mainTasks, subtasks, commLogs, clientContacts, waybills, assets]);
@@ -419,9 +496,117 @@ Answer site-specific questions using this context only. Be concise.`;
 
   useSetPageTitle('Site 360', `Operational command center for ${site.name}`, headerActions, [filterMonth, filterYear, site.name, isDark, showFilters, clientSites], onBack);
 
+  const renderTaskRow = (task: any, statusType: 'pending' | 'approval' | 'completed') => {
+    const taskSubs = subtasks.filter(s => s.mainTaskId === task.id);
+    const completed = taskSubs.filter(s => s.status === 'completed').length;
+    const isTagged = task.siteId === site.id;
+    return (
+      <div key={task.id} className="py-3 flex flex-col gap-3 border-b border-slate-50 dark:border-slate-800/40 last:border-b-0">
+        <div 
+          className="flex justify-between items-start gap-3 cursor-pointer group"
+          onClick={() => {
+            const next = new Set(expandedTasks);
+            if (next.has(task.id)) next.delete(task.id);
+            else next.add(task.id);
+            setExpandedTasks(next);
+          }}
+        >
+          <div className="flex-shrink-0 mt-0.5 text-slate-400 group-hover:text-indigo-500 transition-colors">
+            {expandedTasks.has(task.id) ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className={cn(
+                "font-semibold text-sm truncate group-hover:text-indigo-600 transition-colors",
+                statusType === 'completed' ? "text-slate-500 line-through" : "text-slate-700 dark:text-slate-200"
+              )}>{task.title}</p>
+              {isTagged && (
+                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-700 flex items-center gap-1 shrink-0">
+                  <MapPin className="w-2.5 h-2.5" /> Tagged
+                </span>
+              )}
+            </div>
+            {task.deadline && <p className="text-xs text-slate-500 mt-0.5">Due: {new Date(task.deadline).toLocaleDateString('en-GB')}</p>}
+            {taskSubs.length > 0 && (
+              <div className="mt-1.5 flex items-center gap-2">
+                <div className="flex-1 max-w-[120px] h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                  <div className={cn(
+                    "h-full rounded-full",
+                    statusType === 'completed' ? "bg-emerald-500" : "bg-indigo-500"
+                  )} style={{ width: `${Math.round((completed / taskSubs.length) * 100)}%` }} />
+                </div>
+                <span className="text-[10px] text-slate-500 font-medium">{completed}/{taskSubs.length} done</span>
+              </div>
+            )}
+          </div>
+          <div className="flex flex-col items-end gap-1 shrink-0">
+            {statusType !== 'completed' && task.priority && (
+              <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wider ${
+                task.priority === 'urgent' ? 'bg-red-100 text-red-700 dark:bg-red-950/30 dark:text-red-300' :
+                task.priority === 'high' ? 'bg-orange-100 text-orange-700 dark:bg-orange-950/30 dark:text-orange-300' :
+                task.priority === 'medium' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-950/30 dark:text-yellow-300' :
+                'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'
+              }`}>{task.priority}</span>
+            )}
+            <Badge variant="outline" className={cn(
+              "text-[9px] sm:text-xs px-1.5 sm:px-2.5 whitespace-nowrap uppercase tracking-wider",
+              statusType === 'completed' ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-800/50" :
+              statusType === 'approval' ? "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-800/50" :
+              "bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/30 dark:text-indigo-300 dark:border-indigo-800/50"
+            )}>
+              {statusType === 'completed' ? 'Completed' : statusType === 'approval' ? 'Approval' : 'Active'}
+            </Badge>
+          </div>
+        </div>
+        
+        <AnimatePresence initial={false}>
+          {expandedTasks.has(task.id) && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="overflow-hidden"
+            >
+              <div className="pl-7 pr-2 space-y-2 pt-1 pb-2">
+                {taskSubs.length === 0 ? (
+                  <p className="text-xs text-slate-500 italic">No subtasks.</p>
+                ) : (
+                  taskSubs.map(sub => (
+                    <div 
+                      key={sub.id} 
+                      onClick={(e) => { e.stopPropagation(); setOpenSubtaskId(sub.id!); }}
+                      className="flex items-start justify-between gap-3 p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer border border-transparent hover:border-slate-200 dark:hover:border-slate-700 transition-all group/sub"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className={`text-[13px] font-medium truncate group-hover/sub:text-indigo-600 transition-colors ${sub.status === 'completed' ? 'line-through text-slate-400' : 'text-slate-700 dark:text-slate-300'}`}>
+                          {sub.title}
+                        </p>
+                      </div>
+                      <div className="flex-shrink-0 flex items-center gap-2">
+                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap capitalize ${
+                          sub.status === 'completed' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300' : 
+                          sub.status === 'in_progress' ? 'bg-blue-100 text-blue-700 dark:bg-blue-950/30 dark:text-blue-300' : 
+                          sub.status === 'pending_approval' ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300' : 
+                          'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'
+                        }`}>
+                          {sub.status === 'not_started' ? 'To Start' : sub.status.replace('_', ' ')}
+                        </span>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    );
+  };
+
   return (
     <div className="flex flex-col h-full min-h-0 overflow-hidden bg-slate-50 dark:bg-slate-950">
-      <div className="flex-1 overflow-y-auto p-2 sm:p-4 lg:p-6 style-scroll">
+      <div ref={containerRef} className="flex-1 overflow-y-auto p-2 sm:p-4 lg:p-6 style-scroll">
         <div className="max-w-6xl mx-auto space-y-4 animate-in fade-in duration-500">
 
 
@@ -552,7 +737,7 @@ Answer site-specific questions using this context only. Be concise.`;
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
             {[
               { label: 'Total Billed', value: `₦${Math.round(data.totalBilled).toLocaleString()}`, subtext: `${data.siteInvoices.length} invoice${data.siteInvoices.length !== 1 ? 's' : ''}`, color: 'text-sky-600' },
-              { label: 'Diesel Used', value: `${Math.round(data.totalDiesel).toLocaleString()}L`, subtext: `${data.activeDays} active day${data.activeDays !== 1 ? 's' : ''}`, color: 'text-amber-600' },
+              { label: 'Diesel Used', value: `${Math.round(data.totalDiesel).toLocaleString()}L`, subtext: `${data.machineLogs.length} log day${data.machineLogs.length !== 1 ? 's' : ''}`, color: 'text-amber-600' },
               { label: 'Maintenance Cost', value: `₦${Math.round(data.totalMaintenanceCost).toLocaleString()}`, subtext: `${data.siteMaintAssets.length} asset${data.siteMaintAssets.length !== 1 ? 's' : ''} tracked`, color: 'text-rose-500' },
             ].map(k => (
               <div key={k.label} className={cn(card, "p-3 sm:p-5 min-w-0 flex flex-col justify-between")}>
@@ -772,40 +957,144 @@ Answer site-specific questions using this context only. Be concise.`;
             {/* OPERATIONS */}
             {activeTab === 'operations' && (
               <>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
-                  {[
-                    { label: 'Total Log Days', value: data.machineLogs.length, color: 'text-indigo-600' },
-                    { label: 'Active Days', value: data.activeDays, color: 'text-emerald-600' },
-                    { label: 'Total Diesel (L)', value: Math.round(data.totalDiesel).toLocaleString(), color: 'text-amber-600' },
-                  ].map(k => (
-                    <div key={k.label} className={cn(card, "p-3 sm:p-5 min-w-0 flex flex-col justify-between")}>
-                      <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-500 mb-1 truncate">{k.label}</p>
-                      <p className={cn('text-sm min-[390px]:text-base sm:text-lg md:text-2xl font-black truncate', k.color)}>{k.value}</p>
-                    </div>
-                  ))}
-                </div>
+
                 <div className={card}>
-                  <h3 className="font-bold mb-4 flex items-center gap-2 text-lg"><Activity className="w-5 h-5 text-indigo-500" /> Machine Logs</h3>
-                  {data.machineLogs.length > 0 ? (
-                    <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                      {data.machineLogs.slice().sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(log => (
-                        <div key={log.id} className="py-3 flex items-start justify-between gap-3">
-                          <div>
-                            <p className="font-semibold text-sm">{log.assetName}</p>
-                            <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-2">
-                              <Calendar className="w-3 h-3" />{new Date(log.date).toLocaleDateString('en-GB')}
-                              <Fuel className="w-3 h-3 ml-1" />{log.dieselUsage}L
-                            </p>
-                            {log.issuesOnSite && <p className="text-xs text-amber-600 mt-1">{log.issuesOnSite}</p>}
-                            {log.maintenanceDetails && <p className="text-xs text-slate-400 mt-1">{log.maintenanceDetails}</p>}
-                          </div>
-                          <Badge className={log.isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}>
-                            {log.isActive ? `Active · ${log.operationalDay || 'full'}` : 'Inactive'}
-                          </Badge>
-                        </div>
+                  <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-100 dark:border-slate-800 flex-wrap gap-2">
+                    <h3 className="font-bold text-lg flex items-center gap-2">
+                      <Activity className="w-5 h-5 text-indigo-500" /> Operational Hub
+                    </h3>
+                    <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800/80 p-0.5 rounded-xl">
+                      {[
+                        { id: 'logs', label: 'Machine Logs', count: data.machineLogs.length, icon: ClipboardList, activeColor: 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 font-bold shadow-sm' },
+                        { id: 'materials', label: 'Materials on Site', count: data.materialsOnSite.length, icon: Package, activeColor: 'bg-white dark:bg-slate-700 text-amber-600 dark:text-amber-400 font-bold shadow-sm' },
+                        { id: 'waybills', label: 'Waybills', count: data.siteWaybills.length, icon: Truck, activeColor: 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 font-bold shadow-sm' },
+                      ].map(subTab => (
+                        <button
+                          key={subTab.id}
+                          type="button"
+                          onClick={() => setOperationsSubTab(subTab.id as any)}
+                          className={cn(
+                            "flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all border-0 cursor-pointer whitespace-nowrap",
+                            operationsSubTab === subTab.id
+                              ? subTab.activeColor
+                              : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                          )}
+                        >
+                          <subTab.icon className="w-3.5 h-3.5" />
+                          <span>{subTab.label}</span>
+                          <span className={cn(
+                            "text-[10px] px-1.5 py-0.5 rounded-full shrink-0 font-extrabold",
+                            operationsSubTab === subTab.id
+                              ? (subTab.id === 'logs' ? 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300' :
+                                 subTab.id === 'materials' ? 'bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300' :
+                                 'bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300')
+                              : "bg-slate-200/60 dark:bg-slate-700 text-slate-600 dark:text-slate-400"
+                          )}>
+                            {subTab.count}
+                          </span>
+                        </button>
                       ))}
                     </div>
-                  ) : <p className="text-slate-500 text-sm text-center py-8">No machine logs in this period.</p>}
+                  </div>
+
+                  {/* Operational Sub-Tabs Content */}
+                  {operationsSubTab === 'logs' && (
+                    <div className="space-y-1 animate-in fade-in duration-200">
+                      {data.machineLogs.length > 0 ? (
+                        <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                          {data.machineLogs.slice().sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(log => (
+                            <div key={log.id} className="py-3 flex items-start justify-between gap-3">
+                              <div>
+                                <p className="font-semibold text-sm">{log.assetName}</p>
+                                <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-2">
+                                  <Calendar className="w-3 h-3" />{new Date(log.date).toLocaleDateString('en-GB')}
+                                  <Fuel className="w-3 h-3 ml-1" />{log.dieselUsage}L
+                                </p>
+                                {log.issuesOnSite && <p className="text-xs text-amber-600 mt-1">{log.issuesOnSite}</p>}
+                                {log.maintenanceDetails && <p className="text-xs text-slate-400 mt-1">{log.maintenanceDetails}</p>}
+                              </div>
+                              <Badge className={log.isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}>
+                                {log.isActive ? `Active · ${log.operationalDay || 'full'}` : 'Inactive'}
+                              </Badge>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-10 flex flex-col items-center">
+                          <ClipboardList className="w-10 h-10 text-slate-400 mb-2 opacity-60" />
+                          <p className="text-slate-500 font-medium text-sm">No machine logs in this period</p>
+                          <p className="text-slate-400 text-xs mt-0.5">Machine activity registers here daily.</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {operationsSubTab === 'materials' && (
+                    <div className="space-y-1 animate-in fade-in duration-200">
+                      {data.materialsOnSite.length > 0 ? (
+                        <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                          {data.materialsOnSite.map(item => (
+                            <div key={item.id} className="py-3 flex items-center justify-between gap-3 px-2 hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-xl transition-colors">
+                              <div>
+                                <p className="font-semibold text-sm">{item.name}</p>
+                                <p className="text-xs text-slate-500">Asset Ref: {item.id.slice(0, 8)} · Type: {item.category || 'Material'}</p>
+                              </div>
+                              <div className="flex items-center gap-2.5">
+                                <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300 border border-amber-200 dark:border-amber-800/50">
+                                  Qty: {item.quantity}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-10 flex flex-col items-center">
+                          <Package className="w-10 h-10 text-slate-400 mb-2 opacity-60" />
+                          <p className="text-slate-500 font-medium text-sm">No materials on site</p>
+                          <p className="text-slate-400 text-xs mt-0.5">Use waybills to dispatch materials or equipment to this site.</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {operationsSubTab === 'waybills' && (
+                    <div className="space-y-1 animate-in fade-in duration-200">
+                      {data.siteWaybills.length > 0 ? (
+                        <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                          {data.siteWaybills.map(wb => (
+                            <div key={wb.id} className="py-3 flex flex-col gap-2 px-2 hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-xl transition-colors">
+                              <div className="flex items-center justify-between gap-3">
+                                <div>
+                                  <p className="font-semibold text-sm capitalize">{wb.type} · REF-{wb.id.substring(0, 8).toUpperCase()}</p>
+                                  <p className="text-xs text-slate-500">Date: {wb.issueDate ? new Date(wb.issueDate).toLocaleDateString('en-GB') : '—'} · Driver: {wb.driverName || 'Admin'}</p>
+                                </div>
+                                <Badge className={cn('text-xs capitalize', 
+                                  wb.type === 'waybill' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300' : 'bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300'
+                                )}>
+                                  {wb.type}
+                                </Badge>
+                              </div>
+                              {wb.items && wb.items.length > 0 && (
+                                <div className="flex flex-wrap gap-1.5 pl-2 mt-1">
+                                  {wb.items.map((it: any, index: number) => (
+                                    <span key={index} className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 px-2 py-0.5 rounded-md font-medium">
+                                      {it.assetName} ({it.quantity})
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-10 flex flex-col items-center">
+                          <Truck className="w-10 h-10 text-slate-400 mb-2 opacity-60" />
+                          <p className="text-slate-500 font-medium text-sm">No waybills recorded</p>
+                          <p className="text-slate-400 text-xs mt-0.5">Waybill documentation will appear here once registered.</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </>
             )}
@@ -861,203 +1150,283 @@ Answer site-specific questions using this context only. Be concise.`;
 
             {/* COMMS & TASKS */}
             {activeTab === 'comms' && (
-              <div className="grid grid-cols-1 gap-5">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
                 <div className={card}>
-                  <h3 className="font-bold mb-4 text-lg flex items-center gap-2"><Clock className="w-5 h-5 text-amber-500" /> Pending Tasks ({data.pendingSiteTasks.length})</h3>
-                  {data.pendingSiteTasks.length > 0 ? (
-                    <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                      {data.pendingSiteTasks.map(task => {
-                        const taskSubs = subtasks.filter(s => s.mainTaskId === task.id);
-                        const completed = taskSubs.filter(s => s.status === 'completed').length;
-                        const isTagged = task.siteId === site.id;
-                        return (
-                          <div key={task.id} className="py-3 flex flex-col gap-3 border-b border-slate-50 dark:border-slate-800/40 last:border-b-0">
-                            <div 
-                              className="flex justify-between items-start gap-3 cursor-pointer group"
-                              onClick={() => {
-                                const next = new Set(expandedTasks);
-                                if (next.has(task.id)) next.delete(task.id);
-                                else next.add(task.id);
-                                setExpandedTasks(next);
-                              }}
-                            >
-                              <div className="flex-shrink-0 mt-0.5 text-slate-400 group-hover:text-indigo-500 transition-colors">
-                                {expandedTasks.has(task.id) ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                              </div>
-                              <div className="min-w-0 flex-1">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <p className="font-semibold text-sm truncate group-hover:text-indigo-600 transition-colors">{task.title}</p>
-                                  {isTagged && (
-                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-700 flex items-center gap-1 shrink-0">
-                                      <MapPin className="w-2.5 h-2.5" /> Tagged
-                                    </span>
-                                  )}
-                                </div>
-                                {task.deadline && <p className="text-xs text-slate-500 mt-0.5">Due: {new Date(task.deadline).toLocaleDateString('en-GB')}</p>}
-                                {taskSubs.length > 0 && (
-                                  <div className="mt-1.5 flex items-center gap-2">
-                                    <div className="flex-1 max-w-[120px] h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
-                                      <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${Math.round((completed / taskSubs.length) * 100)}%` }} />
-                                    </div>
-                                    <span className="text-[10px] text-slate-500 font-medium">{completed}/{taskSubs.length} done</span>
-                                  </div>
-                                )}
-                              </div>
-                              <div className="flex flex-col items-end gap-1 shrink-0">
-                                {task.priority && (
-                                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
-                                    task.priority === 'urgent' ? 'bg-red-100 text-red-700' :
-                                    task.priority === 'high' ? 'bg-orange-100 text-orange-700' :
-                                    task.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' : 'bg-slate-100 text-slate-600'
-                                  }`}>{task.priority}</span>
-                                )}
-                                <Badge variant="outline" className="text-[9px] sm:text-xs px-1.5 sm:px-2.5 whitespace-nowrap">
-                                  {task.requiresApproval ? 'Approval' : 'Active'}
-                                </Badge>
-                              </div>
-                            </div>
-                            
-                            <AnimatePresence initial={false}>
-                              {expandedTasks.has(task.id) && (
-                                <motion.div
-                                  initial={{ height: 0, opacity: 0 }}
-                                  animate={{ height: 'auto', opacity: 1 }}
-                                  exit={{ height: 0, opacity: 0 }}
-                                  transition={{ duration: 0.2 }}
-                                  className="overflow-hidden"
-                                >
-                                  <div className="pl-7 pr-2 space-y-2 pt-1 pb-2">
-                                    {taskSubs.length === 0 ? (
-                                      <p className="text-xs text-slate-500 italic">No subtasks.</p>
-                                    ) : (
-                                      taskSubs.map(sub => (
-                                        <div 
-                                          key={sub.id} 
-                                          onClick={(e) => { e.stopPropagation(); setOpenSubtaskId(sub.id!); }}
-                                          className="flex items-start justify-between gap-3 p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer border border-transparent hover:border-slate-200 dark:hover:border-slate-700 transition-all group/sub"
-                                        >
-                                          <div className="min-w-0 flex-1">
-                                            <p className={`text-[13px] font-medium truncate group-hover/sub:text-indigo-600 transition-colors ${sub.status === 'completed' ? 'line-through text-slate-400' : 'text-slate-700 dark:text-slate-300'}`}>
-                                              {sub.title}
-                                            </p>
-                                          </div>
-                                          <div className="flex-shrink-0 flex items-center gap-2">
-                                            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${
-                                              sub.status === 'completed' ? 'bg-emerald-100 text-emerald-700' : 
-                                              sub.status === 'in_progress' ? 'bg-blue-100 text-blue-700' : 
-                                              sub.status === 'pending_approval' ? 'bg-purple-100 text-purple-700' : 'bg-slate-100 text-slate-600'
-                                            }`}>
-                                              {sub.status.replace('_', ' ')}
-                                            </span>
-                                          </div>
-                                        </div>
-                                      ))
-                                    )}
-                                  </div>
-                                </motion.div>
-                              )}
-                            </AnimatePresence>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : <p className="text-slate-500 text-sm text-center py-8">No pending tasks.</p>}
-                </div>
-
-                {data.completedSiteTasks.length > 0 && (
-                  <div className={card}>
-                    <h3 className="font-bold mb-4 text-lg flex items-center gap-2"><CheckCircle2 className="w-5 h-5 text-emerald-500" /> Completed Tasks ({data.completedSiteTasks.length})</h3>
-                    <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                      {data.completedSiteTasks.map(task => {
-                        const taskSubs = subtasks.filter(s => s.mainTaskId === task.id);
-                        const completed = taskSubs.filter(s => s.status === 'completed').length;
-                        const isTagged = task.siteId === site.id;
-                        return (
-                          <div key={task.id} className="py-3 flex flex-col gap-3 border-b border-slate-50 dark:border-slate-800/40 last:border-b-0">
-                            <div 
-                              className="flex justify-between items-start gap-3 cursor-pointer group"
-                              onClick={() => {
-                                const next = new Set(expandedTasks);
-                                if (next.has(task.id)) next.delete(task.id);
-                                else next.add(task.id);
-                                setExpandedTasks(next);
-                              }}
-                            >
-                              <div className="flex-shrink-0 mt-0.5 text-slate-400 group-hover:text-indigo-500 transition-colors">
-                                {expandedTasks.has(task.id) ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                              </div>
-                              <div className="min-w-0 flex-1">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <p className="font-semibold text-sm truncate group-hover:text-indigo-600 transition-colors text-slate-500 line-through">{task.title}</p>
-                                  {isTagged && (
-                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-700 flex items-center gap-1 shrink-0">
-                                      <MapPin className="w-2.5 h-2.5" /> Tagged
-                                    </span>
-                                  )}
-                                </div>
-                                {task.deadline && <p className="text-xs text-slate-500 mt-0.5">Due: {new Date(task.deadline).toLocaleDateString('en-GB')}</p>}
-                                {taskSubs.length > 0 && (
-                                  <div className="mt-1.5 flex items-center gap-2">
-                                    <div className="flex-1 max-w-[120px] h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
-                                      <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${Math.round((completed / taskSubs.length) * 100)}%` }} />
-                                    </div>
-                                    <span className="text-[10px] text-slate-500 font-medium">{completed}/{taskSubs.length} done</span>
-                                  </div>
-                                )}
-                              </div>
-                              <div className="flex flex-col items-end gap-1 shrink-0">
-                                <Badge variant="outline" className="text-[9px] sm:text-xs px-1.5 sm:px-2.5 whitespace-nowrap bg-emerald-50 text-emerald-700 border-emerald-200">
-                                  Completed
-                                </Badge>
-                              </div>
-                            </div>
-                            
-                            <AnimatePresence initial={false}>
-                              {expandedTasks.has(task.id) && (
-                                <motion.div
-                                  initial={{ height: 0, opacity: 0 }}
-                                  animate={{ height: 'auto', opacity: 1 }}
-                                  exit={{ height: 0, opacity: 0 }}
-                                  transition={{ duration: 0.2 }}
-                                  className="overflow-hidden"
-                                >
-                                  <div className="pl-7 pr-2 space-y-2 pt-1 pb-2">
-                                    {taskSubs.length === 0 ? (
-                                      <p className="text-xs text-slate-500 italic">No subtasks.</p>
-                                    ) : (
-                                      taskSubs.map(sub => (
-                                        <div 
-                                          key={sub.id} 
-                                          onClick={(e) => { e.stopPropagation(); setOpenSubtaskId(sub.id!); }}
-                                          className="flex items-start justify-between gap-3 p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer border border-transparent hover:border-slate-200 dark:hover:border-slate-700 transition-all group/sub"
-                                        >
-                                          <div className="min-w-0 flex-1">
-                                            <p className={`text-[13px] font-medium truncate group-hover/sub:text-indigo-600 transition-colors ${sub.status === 'completed' ? 'line-through text-slate-400' : 'text-slate-700 dark:text-slate-300'}`}>
-                                              {sub.title}
-                                            </p>
-                                          </div>
-                                          <div className="flex-shrink-0 flex items-center gap-2">
-                                            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${
-                                              sub.status === 'completed' ? 'bg-emerald-100 text-emerald-700' : 
-                                              sub.status === 'in_progress' ? 'bg-blue-100 text-blue-700' : 
-                                              sub.status === 'pending_approval' ? 'bg-purple-100 text-purple-700' : 'bg-slate-100 text-slate-600'
-                                            }`}>
-                                              {sub.status.replace('_', ' ')}
-                                            </span>
-                                          </div>
-                                        </div>
-                                      ))
-                                    )}
-                                  </div>
-                                </motion.div>
-                              )}
-                            </AnimatePresence>
-                          </div>
-                        );
-                      })}
+                  <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-100 dark:border-slate-800 flex-wrap gap-2">
+                    <h3 className="font-bold text-lg flex items-center gap-2">
+                      <Clock className="w-5 h-5 text-indigo-500" /> Tasks Dashboard
+                    </h3>
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800/80 p-0.5 rounded-xl">
+                        {[
+                          { id: 'pending', label: 'Pending', count: data.pendingSiteTasks.length, icon: CheckSquare, activeColor: 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 font-bold shadow-sm' },
+                          { id: 'approval', label: 'Approval', count: data.approvalSiteTasks.length, icon: ShieldAlert, activeColor: 'bg-white dark:bg-slate-700 text-amber-600 dark:text-amber-400 font-bold shadow-sm' },
+                          { id: 'completed', label: 'Completed', count: data.completedSiteTasks.length, icon: CheckCircle2, activeColor: 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 font-bold shadow-sm' },
+                        ].map(subTab => (
+                          <button
+                            key={subTab.id}
+                            type="button"
+                            onClick={() => setTaskSubTab(subTab.id as any)}
+                            className={cn(
+                              "flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all border-0 cursor-pointer whitespace-nowrap",
+                              taskSubTab === subTab.id
+                                ? subTab.activeColor
+                                : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                            )}
+                          >
+                            <subTab.icon className="w-3.5 h-3.5" />
+                            <span>{subTab.label}</span>
+                            <span className={cn(
+                              "text-[10px] px-1.5 py-0.5 rounded-full shrink-0 font-extrabold",
+                              taskSubTab === subTab.id
+                                ? (subTab.id === 'pending' ? 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300' :
+                                   subTab.id === 'approval' ? 'bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300' :
+                                   'bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300')
+                                : "bg-slate-200/60 dark:bg-slate-700 text-slate-600 dark:text-slate-400"
+                            )}>
+                              {subTab.count}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                      <Button
+                        onClick={() => setShowAddTaskForm(!showAddTaskForm)}
+                        size="sm"
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg h-7 px-2.5 flex items-center gap-1 text-[11px] font-bold cursor-pointer"
+                      >
+                        <Plus className="w-3 h-3" />
+                        <span>Add Task</span>
+                      </Button>
                     </div>
                   </div>
-                )}
+
+                  {/* Inline Task Form */}
+                  {showAddTaskForm && (
+                    <div className="mb-6 p-4 rounded-xl border border-indigo-100 dark:border-indigo-900/50 bg-indigo-50/30 dark:bg-indigo-950/10 space-y-4 animate-in slide-in-from-top duration-200">
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-bold text-sm text-indigo-950 dark:text-indigo-200">Create New Site Task</h4>
+                        <button
+                          type="button"
+                          onClick={() => setShowAddTaskForm(false)}
+                          className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 bg-transparent border-0 cursor-pointer"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+
+                      <form onSubmit={handleCreateTaskSubmit} className="space-y-3">
+                        <div>
+                          <label className="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1 uppercase tracking-wider">Task Title *</label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="What needs to be done?"
+                            value={taskTitle}
+                            onChange={e => setTaskTitle(e.target.value)}
+                            className={cn(
+                              "w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500",
+                              isDark ? "bg-slate-800 border-slate-600 text-white placeholder:text-slate-500" : "bg-white border-slate-200 text-slate-800 placeholder:text-slate-400"
+                            )}
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1 uppercase tracking-wider">Description</label>
+                          <textarea
+                            placeholder="Provide details about the task..."
+                            value={taskDesc}
+                            onChange={e => setTaskDesc(e.target.value)}
+                            rows={2}
+                            className={cn(
+                              "w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none",
+                              isDark ? "bg-slate-800 border-slate-600 text-white placeholder:text-slate-500" : "bg-white border-slate-200 text-slate-800 placeholder:text-slate-400"
+                            )}
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1 uppercase tracking-wider">Assignee(s)</label>
+                            <div className={cn(
+                              "w-full rounded-lg border p-1.5 overflow-y-auto h-24 space-y-0.5 focus-within:ring-2 focus-within:ring-indigo-500",
+                              isDark ? "bg-slate-800 border-slate-600 text-white" : "bg-white border-slate-200 text-slate-800"
+                            )}>
+                              {users.filter(u => u.isActive !== false).map(u => {
+                                const isChecked = taskAssignees.includes(u.id);
+                                return (
+                                  <label
+                                    key={u.id}
+                                    className="flex items-center justify-between px-2 py-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700/50 cursor-pointer transition-colors text-xs"
+                                  >
+                                    <span>{u.name || u.email}</span>
+                                    <input
+                                      type="checkbox"
+                                      checked={isChecked}
+                                      onChange={() => {
+                                        if (isChecked) {
+                                          setTaskAssignees(taskAssignees.filter(id => id !== u.id));
+                                        } else {
+                                          setTaskAssignees([...taskAssignees, u.id]);
+                                        }
+                                      }}
+                                      className="h-3.5 w-3.5 rounded border-slate-300 dark:border-slate-600 text-indigo-600 focus:ring-indigo-500 cursor-pointer ml-2"
+                                    />
+                                  </label>
+                                );
+                              })}
+                            </div>
+                            <p className="text-[10px] text-slate-400 mt-1">Select one or more assignees.</p>
+                          </div>
+
+                          <div className="space-y-3">
+                            <div>
+                              <label className="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1 uppercase tracking-wider">Deadline</label>
+                              <input
+                                type="date"
+                                value={taskDeadline}
+                                onChange={e => setTaskDeadline(e.target.value)}
+                                className={cn(
+                                  "w-full rounded-lg border px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500",
+                                  isDark ? "bg-slate-800 border-slate-600 text-white" : "bg-white border-slate-200 text-slate-800"
+                                )}
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1 uppercase tracking-wider">Priority</label>
+                              <div className="flex gap-2">
+                                {(['low', 'medium', 'high'] as const).map(p => (
+                                  <button
+                                    key={p}
+                                    type="button"
+                                    onClick={() => setTaskPriority(p)}
+                                    className={cn(
+                                      "flex-1 py-1.5 px-2 text-xs font-semibold rounded-lg border capitalize transition-all cursor-pointer",
+                                      taskPriority === p
+                                        ? p === 'low'
+                                          ? "bg-slate-100 border-slate-300 text-slate-800 dark:bg-slate-800 dark:border-slate-600 dark:text-white"
+                                          : p === 'medium'
+                                          ? "bg-amber-50 border-amber-300 text-amber-800 dark:bg-amber-950/20 dark:border-amber-800 dark:text-amber-300"
+                                          : "bg-rose-50 border-rose-300 text-rose-800 dark:bg-rose-950/20 dark:border-rose-800 dark:text-rose-300"
+                                        : isDark
+                                        ? "bg-slate-800/40 border-slate-700 text-slate-400 hover:bg-slate-800"
+                                        : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                                    )}
+                                  >
+                                    {p}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="border-t border-slate-100 dark:border-slate-850/80 pt-3">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                id="task-approval-toggle"
+                                checked={taskRequiresApproval}
+                                onChange={e => setTaskRequiresApproval(e.target.checked)}
+                                className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                              />
+                              <label htmlFor="task-approval-toggle" className="text-xs font-semibold text-slate-700 dark:text-slate-300 cursor-pointer">
+                                Requires Completion Approval
+                              </label>
+                            </div>
+
+                            {taskRequiresApproval && (
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-slate-500 font-medium">Approver:</span>
+                                  <select
+                                    value={taskApprover}
+                                    onChange={e => setTaskApprover(e.target.value)}
+                                    className={cn(
+                                      "rounded-lg border px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500",
+                                      isDark ? "bg-slate-800 border-slate-600 text-white" : "bg-white border-slate-200 text-slate-800"
+                                    )}
+                                  >
+                                    <option value="">Select User</option>
+                                    {users.filter(u => u.isActive !== false).map(u => (
+                                      <option key={u.id} value={u.id}>{u.name || u.email}</option>
+                                    ))}
+                                  </select>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex gap-2 pt-2">
+                          <Button
+                            type="submit"
+                            disabled={isSubmittingTask}
+                            className="bg-indigo-600 hover:bg-indigo-700 text-white flex-1 rounded-xl h-9 text-xs font-bold"
+                          >
+                            {isSubmittingTask ? 'Creating...' : 'Create Task'}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setShowAddTaskForm(false)}
+                            className="rounded-xl h-9 text-xs px-4"
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      </form>
+                    </div>
+                  )}
+
+                  {/* Task list based on tab */}
+                  {taskSubTab === 'pending' && (
+                    <div className="space-y-1 animate-in fade-in duration-200">
+                      {data.pendingSiteTasks.length > 0 ? (
+                        <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                          {data.pendingSiteTasks.map(task => renderTaskRow(task, 'pending'))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-10 flex flex-col items-center">
+                          <CheckCircle2 className="w-10 h-10 text-emerald-500 mb-2 opacity-80" />
+                          <p className="text-slate-500 font-medium text-sm">All pending tasks completed!</p>
+                          <p className="text-slate-400 text-xs mt-0.5">There are no active or pending tasks for this site.</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {taskSubTab === 'approval' && (
+                    <div className="space-y-1 animate-in fade-in duration-200">
+                      {data.approvalSiteTasks.length > 0 ? (
+                        <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                          {data.approvalSiteTasks.map(task => renderTaskRow(task, 'approval'))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-10 flex flex-col items-center">
+                          <ShieldCheck className="w-10 h-10 text-indigo-500 mb-2 opacity-80" />
+                          <p className="text-slate-500 font-medium text-sm">No tasks pending approval</p>
+                          <p className="text-slate-400 text-xs mt-0.5">Everything is up to date and verified.</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {taskSubTab === 'completed' && (
+                    <div className="space-y-1 animate-in fade-in duration-200">
+                      {data.completedSiteTasks.length > 0 ? (
+                        <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                          {data.completedSiteTasks.map(task => renderTaskRow(task, 'completed'))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-10 flex flex-col items-center">
+                          <Clock className="w-10 h-10 text-slate-400 mb-2 opacity-60" />
+                          <p className="text-slate-500 font-medium text-sm">No completed tasks yet</p>
+                          <p className="text-slate-400 text-xs mt-0.5">Tasks will appear here once they are finished.</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
 
                 <div className={card}>
                   <div className="flex items-center justify-between mb-4">

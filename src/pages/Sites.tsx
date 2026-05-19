@@ -364,7 +364,41 @@ export function Sites() {
   const addPendingSite = useAppStore((s) => s.addPendingSite);
   const setPendingSites = useAppStore((s) => s.setPendingSites);
   const updatePendingSite = useAppStore((s) => s.updatePendingSite);
+  const deletePendingSite = useAppStore((s) => s.deletePendingSite);
+  const mainTasks = useAppStore((s) => (s as any).mainTasks ?? []);
   const { createMainTask } = useAppData();
+
+  const handleDeletePending = async (site: SiteQuestionnaire) => {
+    // Check for linked comm logs
+    const linkedLogs = commLogs.filter(l =>
+      l.client?.toLowerCase().trim() === site.clientName?.toLowerCase().trim() &&
+      (l.siteId === site.id || l.siteName?.toLowerCase().trim() === site.siteName?.toLowerCase().trim())
+    );
+    // Check for linked tasks
+    const linkedTasks = mainTasks.filter((t: any) =>
+      (t.title?.toLowerCase().includes(site.siteName?.toLowerCase())) ||
+      (t.description?.toLowerCase().includes(site.siteName?.toLowerCase()))
+    );
+
+    if (linkedLogs.length > 0 || linkedTasks.length > 0) {
+      const parts: string[] = [];
+      if (linkedTasks.length > 0) parts.push(`${linkedTasks.length} task(s)`);
+      if (linkedLogs.length > 0) parts.push(`${linkedLogs.length} comm log(s)`);
+      const ok = await showConfirm(
+        `"${site.siteName}" has linked ${parts.join(' and ')}. These will NOT be deleted. Are you sure you want to permanently remove this pending onboarding record?`,
+        { variant: 'danger', confirmLabel: 'Delete Onboarding', cancelLabel: 'Keep It' }
+      );
+      if (!ok) return;
+    } else {
+      const ok = await showConfirm(
+        `Permanently delete the pending onboarding for "${site.siteName}"? This cannot be undone.`,
+        { variant: 'danger', confirmLabel: 'Delete', cancelLabel: 'Cancel' }
+      );
+      if (!ok) return;
+    }
+    deletePendingSite(site.id);
+    toast.success(`Onboarding for "${site.siteName}" deleted.`);
+  };
 
   const [sortField, setSortField] = useState<'client' | 'name' | 'startDate' | 'endDate' | 'status'>('client');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
@@ -1482,11 +1516,18 @@ export function Sites() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right" onClick={e => e.stopPropagation()}>
-                        {canEditSite && (
-                          <Button variant="ghost" size="sm" className="text-slate-400 hover:text-indigo-600 hover:bg-slate-50" onClick={() => navigate(`/sites/onboarding/${site.id}`)}>
-                            <Eye className="h-4 w-4 mr-2" /> View Form
-                          </Button>
-                        )}
+                        <div className="flex items-center justify-end gap-1">
+                          {canEditSite && (
+                            <Button variant="ghost" size="sm" className="text-slate-400 hover:text-indigo-600 hover:bg-slate-50" onClick={() => navigate(`/sites/onboarding/${site.id}`)}>
+                              <Eye className="h-4 w-4 mr-2" /> View Form
+                            </Button>
+                          )}
+                          {canDeleteSite && (
+                            <Button variant="ghost" size="sm" className="text-slate-400 hover:text-rose-600 hover:bg-rose-50" onClick={() => handleDeletePending(site)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -1542,7 +1583,12 @@ export function Sites() {
                         })}
                       </div>
 
-                      <div className="pt-2 flex justify-end">
+                      <div className="pt-2 flex items-center justify-between">
+                        {canDeleteSite && (
+                          <Button variant="ghost" size="sm" className="h-7 text-xs text-rose-400 hover:text-rose-600 hover:bg-rose-50 font-semibold" onClick={(e) => { e.stopPropagation(); handleDeletePending(site); }}>
+                            <Trash2 className="h-3 w-3 mr-1.5" /> Delete
+                          </Button>
+                        )}
                         {canEditSite && (
                           <Button variant="ghost" size="sm" className="h-7 text-xs text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 font-semibold" onClick={(e) => { e.stopPropagation(); navigate(`/sites/onboarding/${site.id}`); }}>
                             <Eye className="h-3 w-3 mr-1.5" /> View Form

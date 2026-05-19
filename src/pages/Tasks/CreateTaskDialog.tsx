@@ -22,6 +22,7 @@ export function CreateTaskDialog({ onClose, onSubmit, users, currentUserId, team
   const { addReminder, createMainTask } = useAppData();
   const clientProfiles = useAppStore(s => s.clientProfiles);
   const sites = useAppStore(s => s.sites);
+  const activeUsers = users.filter(u => u.isActive !== false);
 
   const [title, setTitle] = useState("");
   const [description, setDesc] = useState("");
@@ -189,16 +190,16 @@ export function CreateTaskDialog({ onClose, onSubmit, users, currentUserId, team
                   <div className="absolute top-full left-0 mt-2 min-w-full w-max max-w-[350px] max-h-[220px] overflow-y-auto bg-card border border-border rounded-xl shadow-xl z-[101] py-1 hide-scrollbar">
                     <label className="flex items-center gap-2.5 px-3 py-2 cursor-pointer hover:bg-muted transition-colors w-full border-b border-border">
                       <input type="checkbox"
-                        checked={assignedTo.length === users.length && users.length > 0}
+                        checked={assignedTo.length === activeUsers.length && activeUsers.length > 0}
                         onChange={(e) => {
-                          if (e.target.checked) setAssignedTo(users.map(u => u.id));
+                          if (e.target.checked) setAssignedTo(activeUsers.map(u => u.id));
                           else setAssignedTo([]);
                         }}
                         className="w-3.5 h-3.5 rounded border-border text-primary focus:ring-primary/20"
                       />
                       <span className="text-sm font-semibold text-foreground whitespace-normal leading-tight">All staff</span>
                     </label>
-                    {users.map(u => (
+                    {activeUsers.map(u => (
                       <label key={u.id} className="flex items-center gap-2.5 px-3 py-2 cursor-pointer hover:bg-muted transition-colors w-full">
                         <input type="checkbox"
                           checked={assignedTo.includes(u.id)}
@@ -259,7 +260,7 @@ export function CreateTaskDialog({ onClose, onSubmit, users, currentUserId, team
                   className="w-full px-3 py-1.5 rounded-lg border border-border bg-background text-xs focus:outline-none focus:ring-2 focus:ring-primary/20"
                 >
                   <option value="">Choose an approver...</option>
-                  {users.map(u => (
+                  {activeUsers.map(u => (
                     <option key={u.id} value={u.id}>{u.name}</option>
                   ))}
                 </select>
@@ -366,7 +367,7 @@ export function CreateTaskDialog({ onClose, onSubmit, users, currentUserId, team
                               <>
                                 <div className="fixed inset-0 z-[100]" onClick={() => setOpenSubDropdown(null)} />
                                 <div className="absolute top-full left-0 mt-1 min-w-[200px] w-max max-w-[350px] max-h-[200px] overflow-y-auto bg-card border border-border rounded-lg shadow-xl z-[101] py-1 hide-scrollbar">
-                                  {users.map(u => (
+                                  {activeUsers.map(u => (
                                     <label key={u.id} className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted transition-colors">
                                       <input type="checkbox"
                                         checked={sub.assignedTo.includes(u.id)}
@@ -409,7 +410,7 @@ export function CreateTaskDialog({ onClose, onSubmit, users, currentUserId, team
                                 className="w-full px-2 py-1 rounded-lg border border-border bg-background text-[11px] focus:outline-none focus:ring-2 focus:ring-primary/20"
                               >
                                 <option value="">Choose an approver...</option>
-                                {users.map(u => (
+                                {activeUsers.map(u => (
                                   <option key={u.id} value={u.id}>{u.name}</option>
                                 ))}
                               </select>

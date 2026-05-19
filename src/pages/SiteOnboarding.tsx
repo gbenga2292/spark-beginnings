@@ -242,6 +242,7 @@ export function SiteOnboarding() {
       }
     } else if (isNew && hasLoadedInitial !== 'new') {
       const linked = location.state?.linkedSite;
+      const prefillClient = location.state?.prefillClient as string | undefined;
       if (linked) {
         const newActive = {
           ...blankForm(),
@@ -254,7 +255,7 @@ export function SiteOnboarding() {
         setForm(newActive);
         setInitialForm(newActive);
       } else {
-        const blank = { ...blankForm(), id: generateId() };
+        const blank = { ...blankForm(), id: generateId(), ...(prefillClient ? { clientName: prefillClient } : {}) };
         setForm(blank);
         setInitialForm(blank);
       }

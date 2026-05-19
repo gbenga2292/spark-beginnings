@@ -1306,7 +1306,7 @@ function CommLogTaskDialog({ open, onClose, initialTitle, initialDescription, pa
                   >
                     <span className={cn('text-sm italic', isDark ? 'text-slate-400' : 'text-slate-500')}>— Clear Selection —</span>
                   </div>
-                  {users.map((u: any) => {
+                  {users.filter((u: any) => u.isActive !== false).map((u: any) => {
                     const isSelected = assignee.includes(u.id);
                     return (
                       <div
