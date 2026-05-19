@@ -10,7 +10,7 @@ import {
   Activity, MapPin, Download, Calendar, BarChart2, Wallet, 
   CreditCard, MessageSquare, ShieldAlert, FileText, LayoutDashboard,
   ClipboardCheck, TrendingDown, TrendingUp, X, Printer, Search, History,
-  Lock
+  Lock, SlidersHorizontal
 } from 'lucide-react';
 import { useUserStore } from '@/src/store/userStore';
 import { Badge } from '@/src/components/ui/badge';
@@ -55,6 +55,7 @@ export function WeeklyReport() {
 
   const [showPreview, setShowPreview] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [showFiltersDropdown, setShowFiltersDropdown] = useState(false);
 
   // ── Permissions ───────────────────────────────────────
   const currentUser = useUserStore(s => s.users.find(u => u.id === s.currentUserId) || null);
@@ -290,45 +291,87 @@ export function WeeklyReport() {
           </Button>
         </>
       ) : (
-        <>
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-            <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-lg p-0.5 sm:p-1 gap-1 border border-slate-200 dark:border-slate-700">
-              {(['weekly', 'monthly'] as const).map(mode => (
-                <button key={mode} onClick={() => setReportMode(mode)}
-                  className={cn("px-2 sm:px-3 py-1 sm:py-1.5 rounded-md sm:rounded-lg text-[10px] sm:text-[11px] font-bold uppercase tracking-wider transition-all duration-150 flex-1",
-                    reportMode === mode ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-sm border border-slate-200 dark:border-slate-700" : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200")}>
-                  {mode.slice(0, 1)}<span className="hidden sm:inline">{mode.slice(1)}</span>
-                </button>
-              ))}
-            </div>
-            <div className="flex items-center gap-1 bg-white dark:bg-slate-900 rounded-lg sm:rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex-1 justify-between sm:justify-start">
-              <button onClick={() => setAnchor(a => reportMode === 'monthly' ? subMonths(a, 1) : subWeeks(a, 1))} className="h-8 w-8 sm:h-9 sm:w-9 flex items-center justify-center text-slate-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30 active:scale-90 transition-all duration-100 border-r border-slate-100 dark:border-slate-800 shrink-0">
-                <ChevronLeft className="h-4 w-4" />
-              </button>
-              <div className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 min-w-[120px] sm:min-w-[170px] justify-center flex-1">
-                <span className="h-1.5 w-1.5 sm:h-2 sm:w-2 rounded-full bg-blue-500 animate-pulse shrink-0" />
-                <span className="text-[10px] sm:text-[12px] font-bold text-slate-800 dark:text-slate-100 tracking-tight text-center whitespace-nowrap">{reportLabel}</span>
-              </div>
-              <button onClick={() => setAnchor(a => reportMode === 'monthly' ? addMonths(a, 1) : addWeeks(a, 1))} className="h-8 w-8 sm:h-9 sm:w-9 flex items-center justify-center text-slate-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30 active:scale-90 transition-all duration-100 border-l border-slate-100 dark:border-slate-800 shrink-0">
-                <ChevronRight className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="flex items-center gap-2 mt-1 sm:mt-0">
-              <button onClick={() => setAnchor(new Date())} className="h-8 sm:h-9 px-3 sm:px-3 text-[10px] sm:text-[11px] font-bold text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg sm:rounded-xl hover:bg-blue-50 dark:hover:bg-blue-950/30 hover:text-blue-600 hover:border-blue-200 transition-all shadow-sm whitespace-nowrap">Today</button>
-              <Button variant="outline" size="sm" onClick={handleExportXLSX} className="h-8 sm:h-9 px-3 gap-1.5 border-slate-200 bg-white text-slate-600 hover:bg-slate-50 shadow-sm shrink-0" title="Export Excel">
-                <Download className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-indigo-500" />
-                <span className="text-[10px] sm:text-xs font-semibold">Export</span>
-              </Button>
-              <Button size="sm" onClick={() => setShowPreview(true)} className="h-8 sm:h-9 px-3 gap-1.5 bg-slate-900 hover:bg-black text-white shadow-lg shadow-slate-200 shrink-0" title="View PDF Report">
-                <FileText className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                <span className="text-[10px] sm:text-xs font-semibold">Preview</span>
-              </Button>
-            </div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={handleExportXLSX} className="h-8 sm:h-9 px-3 gap-1.5 border-slate-200 bg-white text-slate-600 hover:bg-slate-50 shadow-sm shrink-0" title="Export Excel">
+            <Download className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-indigo-500" />
+            <span className="text-[10px] sm:text-xs font-semibold">Export</span>
+          </Button>
+          <Button size="sm" onClick={() => { setShowPreview(true); setShowFiltersDropdown(false); }} className="h-8 sm:h-9 px-3 gap-1.5 bg-slate-900 hover:bg-black text-white shadow-lg shadow-slate-200 shrink-0" title="View PDF Report">
+            <FileText className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+            <span className="text-[10px] sm:text-xs font-semibold">Preview</span>
+          </Button>
+          
+          <div className="relative shrink-0">
+            <button
+              onClick={() => setShowFiltersDropdown(!showFiltersDropdown)}
+              className={cn(
+                "h-8 sm:h-9 px-3 gap-1.5 bg-white dark:bg-slate-900 border rounded-lg sm:rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-all shadow-sm flex items-center text-slate-600 dark:text-slate-300 font-bold text-[10px] sm:text-xs",
+                showFiltersDropdown ? "border-indigo-500 text-indigo-600 ring-2 ring-indigo-500/10" : "border-slate-200 dark:border-slate-700"
+              )}
+              title="Toggle Filters"
+            >
+              <SlidersHorizontal className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-indigo-500" />
+              <span>Filters</span>
+            </button>
+
+            {showFiltersDropdown && (
+              <>
+                <div 
+                  className="fixed inset-0 z-30" 
+                  onClick={() => setShowFiltersDropdown(false)} 
+                />
+                <div className="absolute right-0 top-full mt-2 z-40 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl p-4 min-w-[280px] w-80 space-y-4 animate-in fade-in slide-in-from-top-2 duration-150 text-left">
+                  <div>
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block mb-2">Report Type</label>
+                    <div className="grid grid-cols-2 bg-slate-100 dark:bg-slate-800 rounded-xl p-1 gap-1 border border-slate-200 dark:border-slate-700">
+                      {(['weekly', 'monthly'] as const).map(mode => (
+                        <button key={mode} onClick={() => setReportMode(mode)}
+                          className={cn("py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all duration-150 flex-1",
+                            reportMode === mode ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-sm border border-slate-200 dark:border-slate-700" : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200")}>
+                          {mode}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block mb-2">Select Date Period</label>
+                    <div className="flex items-center bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 shadow-inner overflow-hidden justify-between">
+                      <button onClick={() => setAnchor(a => reportMode === 'monthly' ? subMonths(a, 1) : subWeeks(a, 1))} className="h-9 w-9 flex items-center justify-center text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/30 active:scale-95 transition-all">
+                        <ChevronLeft className="h-4 w-4" />
+                      </button>
+                      <div className="flex items-center gap-1.5 px-1 justify-center flex-1 min-w-0">
+                        <span className="h-1.5 w-1.5 rounded-full bg-indigo-500 shrink-0" />
+                        <span className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate text-center leading-none">{reportLabel}</span>
+                      </div>
+                      <button onClick={() => setAnchor(a => reportMode === 'monthly' ? addMonths(a, 1) : addWeeks(a, 1))} className="h-9 w-9 flex items-center justify-center text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/30 active:scale-95 transition-all">
+                        <ChevronRight className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2 pt-1.5 border-t border-slate-100 dark:border-slate-800">
+                    <button 
+                      onClick={() => setAnchor(new Date())} 
+                      className="flex-1 h-9 text-xs font-bold text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-indigo-50 dark:hover:bg-indigo-950/30 hover:text-indigo-600 transition-all shadow-sm"
+                    >
+                      Today
+                    </button>
+                    <button 
+                      onClick={() => setShowFiltersDropdown(false)} 
+                      className="flex-1 h-9 text-xs font-bold text-white bg-slate-900 dark:bg-slate-100 dark:text-slate-900 rounded-xl hover:opacity-90 transition-all shadow-sm"
+                    >
+                      Done
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
-        </>
+        </div>
       )}
     </div>,
-    [reportLabel, reportMode, showPreview]
+    [reportLabel, reportMode, showPreview, showFiltersDropdown]
   );
 
   async function generateProfessionalPDF(mode: 'download') {

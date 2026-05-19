@@ -110,16 +110,6 @@ export function SiteTransactionsView({ site, onBack }: SiteTransactionsViewProps
     'Transactions',
     site.name,
     <div className="flex items-center gap-1 sm:gap-2">
-      <Button
-        variant="outline"
-        size="icon"
-        className="h-8 w-8 sm:h-9 sm:w-auto sm:px-3 sm:gap-2"
-        onClick={onBack}
-      >
-        <ArrowLeft className="h-4 w-4" />
-        <span className="hidden sm:inline">Back</span>
-      </Button>
-
       {/* 3-dot filter menu */}
       <div className="relative" ref={menuRef}>
         <Button
@@ -176,7 +166,8 @@ export function SiteTransactionsView({ site, onBack }: SiteTransactionsViewProps
         )}
       </div>
     </div>,
-    [site.name, filterType, searchQuery, menuOpen, onBack, activeFilters]
+    [site.name, filterType, searchQuery, menuOpen, activeFilters, onBack],
+    onBack
   );
 
   return (

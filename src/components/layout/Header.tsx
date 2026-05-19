@@ -394,30 +394,31 @@ export function Header({ onMenuClick }: HeaderProps) {
           </Button>
         )}
 
-        <div className="flex flex-col min-w-0 transition-all duration-300">
-          <div className="flex items-center gap-2">
-            {showBackButton && (
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                onClick={() => typeof showBackButton === 'function' ? showBackButton() : navigate(-1)} 
-                className={`h-7 w-7 rounded-lg -ml-1 transition-all ${
-                  isDark ? 'text-slate-400 hover:bg-slate-800' : 'text-slate-500 hover:bg-slate-100'
-                }`}
-              >
-                <ArrowLeft className="h-4 w-4" />
-              </Button>
-            )}
-            <h1 className={`text-[14px] sm:text-base md:text-lg font-bold tracking-tight line-clamp-2 sm:truncate leading-tight ${
-              isDark ? 'text-slate-100' : 'text-slate-900'
-            }`}>
-              {title || 'Dashboard'}
-            </h1>
-          </div>
+        {showBackButton && (
+          <Button 
+            variant="outline" 
+            size="icon" 
+            onClick={() => typeof showBackButton === 'function' ? showBackButton() : navigate(-1)} 
+            className={`h-9 w-9 rounded-xl shrink-0 transition-all ${
+              isDark 
+                ? 'text-slate-300 border-slate-700/80 hover:bg-slate-800 hover:text-white bg-slate-900' 
+                : 'text-slate-700 border-slate-200 hover:bg-slate-50 bg-white'
+            }`}
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+        )}
+
+        <div className="flex flex-col min-w-0 transition-all duration-300 justify-center">
+          <h1 className={`text-[14px] sm:text-base md:text-lg font-bold tracking-tight line-clamp-2 sm:truncate leading-tight ${
+            isDark ? 'text-slate-100' : 'text-slate-900'
+          }`}>
+            {title || 'Dashboard'}
+          </h1>
           {subtitle && (
             <p className={`text-[10px] line-clamp-2 sm:truncate leading-tight font-medium mt-0.5 ${
               isDark ? 'text-slate-400' : 'text-slate-500'
-            } ${showBackButton ? 'ml-8' : ''}`}>
+            }`}>
               {subtitle}
             </p>
           )}

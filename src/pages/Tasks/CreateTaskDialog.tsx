@@ -9,23 +9,40 @@ import { PRIORITY_ORDER, PRIORITY_CONFIG } from "@/src/components/tasks/TasksSha
 
 interface CreateTaskDialogProps {
   onClose: () => void;
-  onSubmit: (task: Omit<MainTask, "id" | "createdAt" | "updatedAt">, subs: Omit<SubTask, "id" | "mainTaskId" | "createdAt" | "updatedAt">[]) => void;
+  onSubmit?: (task: Omit<MainTask, "id" | "createdAt" | "updatedAt">, subs: Omit<SubTask, "id" | "mainTaskId" | "createdAt" | "updatedAt">[]) => void;
   users: AppUser[];
   currentUserId: string;
   teamId: string;
   workspaceId?: string;
   isPersonal?: boolean;
   isExternalHr?: boolean;
+  initialTitle?: string;
+  initialDescription?: string;
+  initialClientId?: string;
+  initialSiteId?: string;
 }
 
-export function CreateTaskDialog({ onClose, onSubmit, users, currentUserId, teamId, workspaceId, isPersonal, isExternalHr }: CreateTaskDialogProps) {
+export function CreateTaskDialog({
+  onClose,
+  onSubmit,
+  users,
+  currentUserId,
+  teamId,
+  workspaceId,
+  isPersonal,
+  isExternalHr,
+  initialTitle = "",
+  initialDescription = "",
+  initialClientId = "",
+  initialSiteId = ""
+}: CreateTaskDialogProps) {
   const { addReminder, createMainTask } = useAppData();
   const clientProfiles = useAppStore(s => s.clientProfiles);
   const sites = useAppStore(s => s.sites);
   const activeUsers = users.filter(u => u.isActive !== false);
 
-  const [title, setTitle] = useState("");
-  const [description, setDesc] = useState("");
+  const [title, setTitle] = useState(initialTitle);
+  const [description, setDesc] = useState(initialDescription);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [assignedTo, setAssignedTo] = useState<string[]>([]);
   const [deadline, setDeadline] = useState("");
@@ -38,9 +55,9 @@ export function CreateTaskDialog({ onClose, onSubmit, users, currentUserId, team
   const [subtasks, setSubs] = useState<{ title: string; assignedTo: string[]; deadline: string; deadlineTime: string; priority: TaskPriority | undefined; requiresApproval: boolean; approverId?: string }[]>([]);
 
   // ── Tag to Site state ─────────────────────────────────────────────────────
-  const [tagToSite, setTagToSite] = useState(false);
-  const [clientId, setClientId] = useState<string>("");
-  const [siteId, setSiteId] = useState<string>("");
+  const [tagToSite, setTagToSite] = useState(!!(initialClientId || initialSiteId));
+  const [clientId, setClientId] = useState<string>(initialClientId);
+  const [siteId, setSiteId] = useState<string>(initialSiteId);
 
   // ── Reminder state ────────────────────────────────────────────────────────
   const [enableReminder, setEnableReminder] = useState(false);

@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useAppStore, Site } from '@/src/store/appStore';
 import { useOperations } from '../contexts/OperationsContext';
 import { 
-  Plus, MapPin, Building2, Search, Eye, Package, FileText,
+  Plus, MapPin, Building2, Search, MoreVertical, Package, FileText,
   Info, Calendar, Phone, User, Activity, ChevronDown, ListFilter
 } from 'lucide-react';
 import { Card, CardContent } from '@/src/components/ui/card';
@@ -121,20 +121,34 @@ export function SiteManager() {
             <Card key={site.id} className="border-border shadow-sm hover:shadow-md transition-all bg-card group overflow-hidden rounded-xl">
               <CardContent className="p-5">
                 <div className="flex items-start justify-between mb-4">
-                  <div className="flex gap-3 items-center">
+                  <div className="flex gap-3 min-w-0 flex-1">
                     <div className="h-10 w-10 rounded-lg bg-blue-50 dark:bg-blue-950/50 flex items-center justify-center shrink-0">
                       <MapPin className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                     </div>
-                    <div className="overflow-hidden">
-                      <h3 className="text-base font-bold text-foreground uppercase truncate leading-tight" title={site.name}>{site.name}</h3>
-                      <div className="flex items-center gap-1.5 mt-0.5 font-medium text-muted-foreground text-sm">
-                        <Building2 className="h-3.5 w-3.5" /> <span className="truncate" title={site.client}>{site.client}</span>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="text-base font-bold text-foreground uppercase truncate leading-tight mb-1.5" title={site.name}>{site.name}</h3>
+                      <div className="flex items-center gap-2 font-medium text-muted-foreground text-xs">
+                        <Badge 
+                          variant="outline" 
+                          className={cn(
+                            "text-[9px] uppercase font-bold shrink-0 px-1.5 py-0 rounded-full border", 
+                            site.status === 'Ended' 
+                              ? 'text-muted-foreground border-border' 
+                              : site.status === 'Active' 
+                                ? 'text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-900/50 bg-blue-50/50 dark:bg-blue-950/20' 
+                                : 'text-orange-500 dark:text-orange-400 border-orange-200 dark:border-orange-900/50 bg-orange-50/50 dark:bg-orange-950/20'
+                          )}
+                        >
+                          {site.status}
+                        </Badge>
+                        <span className="text-slate-300 dark:text-slate-700 shrink-0">•</span>
+                        <div className="flex items-center gap-1 min-w-0">
+                          <Building2 className="h-3.5 w-3.5 text-muted-foreground/80 shrink-0" />
+                          <span className="truncate text-sm font-semibold text-muted-foreground" title={site.client}>{site.client}</span>
+                        </div>
                       </div>
                     </div>
                   </div>
-                  <Badge variant="outline" className={cn("text-[10px] uppercase font-bold shrink-0 ml-2 px-2.5 py-0.5 rounded-full border", site.status === 'Ended' ? 'text-muted-foreground border-border' : site.status === 'Active' ? 'text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-900/50 bg-blue-50/50 dark:bg-blue-950/20' : 'text-orange-500 dark:text-orange-400 border-orange-200 dark:border-orange-900/50 bg-orange-50/50 dark:bg-orange-950/20')}>
-                    {site.status}
-                  </Badge>
                 </div>
 
                 <div className="mb-4 text-sm text-muted-foreground leading-relaxed min-h-[40px] line-clamp-2">
@@ -155,7 +169,7 @@ export function SiteManager() {
                   <div className="flex justify-end">
                     <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-muted-foreground hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all"
                       onClick={(e) => { e.stopPropagation(); setInventorySite({ site, q: q || null }); }}>
-                      <Eye className="h-4 w-4" />
+                      <MoreVertical className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>

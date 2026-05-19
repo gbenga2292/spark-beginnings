@@ -15,6 +15,8 @@ import { Badge } from '@/src/components/ui/badge';
 import { useTheme } from '@/src/hooks/useTheme';
 import { cn } from '@/src/lib/utils';
 import { useAppStore, Site, ClientProfile } from '@/src/store/appStore';
+import { useUserStore } from '@/src/store/userStore';
+import { useAuth } from '@/src/hooks/useAuth';
 import { useAppData, deriveMainTaskStatus } from '@/src/contexts/AppDataContext';
 import { useOperations } from '@/src/contexts/OperationsContext';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
@@ -22,6 +24,7 @@ import { parseISO } from 'date-fns';
 import { normalizeDate } from '@/src/lib/dateUtils';
 import { Site360View } from './Site360View';
 import { ClientContactsPanel } from './ClientContactsPanel';
+import { CreateTaskDialog } from './Tasks/CreateTaskDialog';
 
 type TabType = 'overview' | 'contacts' | 'financials' | 'operations' | 'activity' | 'tasks' | 'onboarding';
 
@@ -29,6 +32,9 @@ export function Client360() {
   const { isDark } = useTheme();
   
   // Connect to global stores
+  const { user: authUser } = useAuth();
+  const currentUser = useUserStore(s => s.users.find(u => u.id === s.currentUserId));
+  const activeUserName = currentUser?.name || authUser?.user_metadata?.name || authUser?.email || 'Admin';
   const sites = useAppStore(s => s.sites);
   const invoices = useAppStore(s => s.invoices);
   const payments = useAppStore(s => s.payments);
@@ -44,7 +50,9 @@ export function Client360() {
   const addClientProfile = useAppStore(s => s.addClientProfile);
   const pendingSites = useAppStore(s => s.pendingSites);
   const deletePendingSite = useAppStore(s => s.deletePendingSite);
-  const { mainTasks, subtasks } = useAppData();
+  const addCommLog = useAppStore(s => s.addCommLog);
+  const addPendingSite = useAppStore(s => s.addPendingSite);
+  const { mainTasks, subtasks, users } = useAppData();
   const { dailyMachineLogs, assets, waybills } = useOperations();
   const navigate = useNavigate();
 
@@ -55,6 +63,27 @@ export function Client360() {
   const [clientEditForm, setClientEditForm] = useState<Partial<ClientProfile>>({});
   const [siteEditForm, setSiteEditForm] = useState<Partial<Site>>({});
   const [showContactsPanel, setShowContactsPanel] = useState(false);
+  const [commDialogOpen, setCommDialogOpen] = useState(false);
+  const [commForm, setCommForm] = useState({
+    subject: '',
+    notes: '',
+    direction: 'Outgoing' as 'Incoming' | 'Outgoing',
+    channel: 'Email' as 'Email' | 'Phone' | 'WhatsApp' | 'In-Person' | 'Official Letter',
+    siteOption: '',
+    newSiteName: '',
+    contactPerson: '',
+    outcome: '',
+    followUpDate: '',
+    createTask: false,
+  });
+  const [isManualContact, setIsManualContact] = useState(false);
+  const [taskDialog, setTaskDialog] = useState<{
+    open: boolean;
+    title: string;
+    description: string;
+    clientId?: string;
+    siteId?: string;
+  }>({ open: false, title: '', description: '' });
 
   // Pending Onboarding: delete with guard
   const handleDeletePendingOnboarding = async (site: { id: string; siteName: string; clientName: string }) => {
@@ -104,13 +133,229 @@ export function Client360() {
     );
   }, [pendingSites, selectedClient]);
   const [activeTab, setActiveTab] = useState<TabType>('overview');
+  const [activitySubTab, setActivitySubTab] = useState<'history' | 'onboarding'>('history');
+  const [sitesSubTab, setSitesSubTab] = useState<'portfolio' | 'onboarding'>('portfolio');
   const [filterMonth, setFilterMonth] = useState<string>('all');
   const [filterYear, setFilterYear] = useState<string>('all');
   const [isChatCollapsed, setIsChatCollapsed] = useState(true);
   const [showFilterMenu, setShowFilterMenu] = useState(false);
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
+  const [expandedLogs, setExpandedLogs] = useState<Set<string>>(new Set());
   const [openSubtaskId, setOpenSubtaskId] = useState<string | null>(null);
   const [taskSubTab, setTaskSubTab] = useState<'pending' | 'approval' | 'completed'>('pending');
+
+  const handleSaveComm = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!commForm.notes.trim()) {
+      toast.error('Please enter notes');
+      return;
+    }
+    
+    let resolvedSiteId: string | undefined = undefined;
+    let resolvedSiteName: string | undefined = undefined;
+    let isNewOnboarding = false;
+
+    if (commForm.siteOption === 'NEW_ONBOARDING') {
+      if (!commForm.newSiteName.trim()) {
+        toast.error('Please enter the proposed site name');
+        return;
+      }
+      resolvedSiteName = commForm.newSiteName.trim();
+      isNewOnboarding = true;
+    } else if (commForm.siteOption) {
+      const existing = clientData?.clientSites.find((s: any) => s.id === commForm.siteOption);
+      if (existing) {
+        resolvedSiteId = existing.id;
+        resolvedSiteName = existing.name;
+      }
+    }
+
+    const commLogId = Math.random().toString(36).substr(2, 9);
+    
+    // Map custom UI channels to store union type ("Call" | "Email" | "WhatsApp" | "Meeting" | "SMS" | "Visit" | "Other")
+    const mappedChannel = (() => {
+      switch (commForm.channel) {
+        case 'Phone': return 'Call';
+        case 'In-Person': return 'Visit';
+        case 'Official Letter': return 'Other';
+        case 'Email': return 'Email';
+        case 'WhatsApp': return 'WhatsApp';
+        default: return 'Other';
+      }
+    })();
+
+    // Save communication log
+    addCommLog({
+      id: commLogId,
+      date: new Date().toISOString().split('T')[0],
+      direction: commForm.direction,
+      channel: mappedChannel,
+      contactType: 'Client',
+      client: selectedClient,
+      siteId: resolvedSiteId,
+      siteName: resolvedSiteName,
+      contactPerson: commForm.contactPerson.trim() || undefined,
+      subject: commForm.subject.trim() || undefined,
+      notes: commForm.notes,
+      outcome: commForm.outcome.trim() || undefined,
+      followUpDate: commForm.followUpDate || undefined,
+      followUpDone: false,
+      loggedBy: activeUserName,
+      createdAt: new Date().toISOString(),
+      isInternal: false,
+    });
+
+    // If new site onboarding, automatically trigger it
+    if (isNewOnboarding && resolvedSiteName) {
+      const pendingSiteId = crypto.randomUUID();
+      addPendingSite({
+        id: pendingSiteId,
+        clientName: selectedClient,
+        siteName: resolvedSiteName,
+        status: 'Pending',
+        phase1: {
+          isNewSite: true,
+          isNewClient: false,
+          whatIsBeingBuilt: '',
+          excavationDepthMeters: '',
+          siteLength: '',
+          siteWidth: '',
+          timelineStartDate: '',
+          geotechnicalReportAvailable: false,
+          hydrogeologicalDataAvailable: false,
+          completed: false
+        },
+        phase2: {
+          siteVisited: false,
+          walkthroughCompleted: false,
+          knownObstacles: '',
+          dischargeLocation: '',
+          dieselSupplyStrategy: '',
+          completed: false
+        },
+        phase3: {
+          dewateringMethods: [],
+          totalWellpointsRequired: '',
+          totalHeadersRequired: '',
+          totalPumpsRequired: '',
+          expectedDailyDieselUsage: '',
+          completed: false
+        },
+        phase4: {
+          quotationSent: false,
+          clientFeedbackReceived: false,
+          proposalAccepted: false,
+          clientTaxStatus: '',
+          scopeOfWorkSummary: '',
+          scopeExclusionsSummary: '',
+          timelineConfirmed: false,
+          permittingResponsibilityOutlined: false,
+          tinProvided: false,
+          completed: false
+        },
+        phase5: {
+          safetyPlanIntegrated: false,
+          stage1AdvanceReceived: false,
+          stage2InstallationComplete: false,
+          stage2FirstInvoiceIssued: false,
+          stage3TimelyBilling: false,
+          stage4DemobilizationComplete: false,
+          stage4FinalInvoiceIssued: false,
+          actualEndDate: '',
+          completed: false
+        },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+      toast.success(`Communication logged & onboarding initiated for site "${resolvedSiteName}"!`);
+      // Automatically switch to the onboarding sub-tab to see the new card
+      setActiveTab('operations');
+      setSitesSubTab('onboarding');
+    } else {
+      toast.success('Communication logged successfully!');
+    }
+
+    if (commForm.createTask) {
+      const initialTitle = commForm.subject.trim() || `Follow-up: ${commForm.channel} with ${selectedClient}`;
+      
+      const buildTaskDescriptionLocal = () => {
+        const lines: string[] = [];
+        const dir = commForm.direction === 'Incoming' ? 'Received' : 'Made';
+        const date = new Date().toISOString().split('T')[0];
+        const who = commForm.contactPerson ? ` with ${commForm.contactPerson}` : '';
+        const via = commForm.channel;
+        const clientPart = ` — ${selectedClient}`;
+        const sitePart = resolvedSiteName ? ` / ${resolvedSiteName}` : '';
+
+        lines.push(
+          `${dir} a ${via} communication${clientPart}${sitePart}${who} on ${date}.`,
+          '',
+        );
+
+        if (commForm.notes) {
+          lines.push('📋 Notes:', commForm.notes, '');
+        }
+        if (commForm.outcome) {
+          lines.push('✅ Outcome / Next Steps:', commForm.outcome, '');
+        }
+        if (commForm.followUpDate) {
+          lines.push(`🔔 Follow-up scheduled: ${commForm.followUpDate}`);
+        }
+
+        return lines.join('\n').trim();
+      };
+
+      const matchedClient = clientProfiles.find(
+        c => c.name.trim().toLowerCase() === selectedClient.trim().toLowerCase()
+      );
+
+      setTaskDialog({
+        open: true,
+        title: initialTitle,
+        description: buildTaskDescriptionLocal(),
+        clientId: matchedClient?.id || "",
+        siteId: resolvedSiteId || "",
+      });
+    }
+
+    setCommDialogOpen(false);
+    // Reset form
+    setCommForm({
+      subject: '',
+      notes: '',
+      direction: 'Outgoing',
+      channel: 'Email',
+      siteOption: '',
+      newSiteName: '',
+      contactPerson: '',
+      outcome: '',
+      followUpDate: '',
+      createTask: false,
+    });
+  };
+
+  useEffect(() => {
+    if (!commDialogOpen) {
+      setIsManualContact(false);
+    }
+  }, [commDialogOpen]);
+
+  const activeClientContacts = useMemo(() => {
+    const clientStr = (selectedClient || '').trim().toLowerCase();
+    const uniqueContacts = new Map<string, typeof clientContacts[0]>();
+    clientContacts.forEach(c => {
+      if (c.isActive && (c.clientName || '').trim().toLowerCase() === clientStr) {
+        const lower = c.name.trim().toLowerCase();
+        if (!uniqueContacts.has(lower)) {
+          uniqueContacts.set(lower, c);
+        }
+      }
+    });
+    return Array.from(uniqueContacts.values());
+  }, [clientContacts, selectedClient]);
+
+  const hasAnyOptions = activeClientContacts.length > 0;
+  const isKnownOption = (name: string) => activeClientContacts.some(c => c.name.trim().toLowerCase() === name.trim().toLowerCase());
 
   const clientData = useMemo(() => {
     if (!selectedClient) return null;
@@ -688,87 +933,85 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
               <div className="max-w-6xl mx-auto space-y-4 animate-in fade-in duration-500">
 
 
-
-            
-            {/* AI Intelligence Assistant Chat */}
-            <div className={cn("bg-gradient-to-br from-indigo-900 to-slate-900 rounded-2xl shadow-lg relative overflow-hidden group border border-indigo-700/50 flex flex-col transition-all duration-300", isChatCollapsed ? "h-auto" : "h-[350px]")}>
-              <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none"><Sparkles className="w-48 h-48" /></div>
-              
-              <div className="flex items-center justify-between p-4 border-b border-indigo-800/50 relative z-10 shrink-0 cursor-pointer hover:bg-indigo-800/20 transition-colors" onClick={() => setIsChatCollapsed(!isChatCollapsed)}>
-                <div className="flex items-center gap-2">
-                  <div className="p-1.5 bg-indigo-500/20 rounded-lg"><Sparkles className="w-4 h-4 text-indigo-300" /></div>
-                  <span className="text-sm font-bold uppercase tracking-wider text-indigo-200">Decision Intelligence Assistant</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  {!isChatCollapsed && messages.length === 0 && (
-                    <div className="flex items-center gap-1.5">
-                      <Button onClick={(e) => { e.stopPropagation(); sendChatMessage(true); }} disabled={isGeneratingBrief} size="sm" className="bg-indigo-600 hover:bg-indigo-500 text-white border-0 h-8 text-xs px-2 sm:px-3">
-                        {isGeneratingBrief ? <RefreshCcw className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5 sm:mr-1.5" />}
-                        <span className="hidden sm:inline">{isGeneratingBrief ? 'Analyzing...' : 'Generate Brief'}</span>
-                      </Button>
-                    </div>
-                  )}
-                  <Button variant="ghost" size="sm" className="text-indigo-200 hover:text-white hover:bg-indigo-800/50 h-8 w-8 p-0" onClick={(e) => { e.stopPropagation(); setIsChatCollapsed(!isChatCollapsed); }}>
-                    {isChatCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
-                  </Button>
-                </div>
-              </div>
-              
-              {!isChatCollapsed && (
-                <>
-                  <div className="flex-1 overflow-y-auto p-4 space-y-4 style-scroll relative z-10">
-                    {messages.length === 0 && !isGeneratingBrief && (
-                       <p className="text-sm text-indigo-300 italic text-center mt-8">Click "Generate Brief" or ask a question to analyze {selectedClient}'s data.</p>
-                    )}
-                    {messages.map((msg, idx) => (
-                      <div key={idx} className={cn("flex w-full", msg.role === 'user' ? "justify-end" : "justify-start")}>
-                        <div className={cn(
-                          "max-w-[85%] rounded-xl p-3 text-sm",
-                          msg.role === 'user' ? "bg-indigo-600 text-white rounded-br-none" : "bg-slate-800/80 text-indigo-50 rounded-bl-none border border-indigo-700/30"
-                        )}>
-                          {msg.content}
-                        </div>
-                      </div>
-                    ))}
-                    {isGeneratingBrief && (
-                      <div className="flex justify-start">
-                        <div className="bg-slate-800/80 text-indigo-200 rounded-xl rounded-bl-none border border-indigo-700/30 p-3 text-sm flex items-center gap-2">
-                          <RefreshCcw className="w-4 h-4 animate-spin" /> Thinking...
-                        </div>
-                      </div>
-                    )}
-                    <div ref={chatEndRef} />
+            {currentUser?.privileges?.clients?.canViewDecisionIntelligence && (
+              <div className={cn("bg-gradient-to-br from-indigo-900 to-slate-900 rounded-2xl shadow-lg relative overflow-hidden group border border-indigo-700/50 flex flex-col transition-all duration-300", isChatCollapsed ? "h-auto" : "h-[350px]")}>
+                <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none"><Sparkles className="w-48 h-48" /></div>
+                
+                <div className="flex items-center justify-between p-4 border-b border-indigo-800/50 relative z-10 shrink-0 cursor-pointer hover:bg-indigo-800/20 transition-colors" onClick={() => setIsChatCollapsed(!isChatCollapsed)}>
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 bg-indigo-500/20 rounded-lg"><Sparkles className="w-4 h-4 text-indigo-300" /></div>
+                    <span className="text-sm font-bold uppercase tracking-wider text-indigo-200">Decision Intelligence Assistant</span>
                   </div>
-
-                  <div className="p-3 bg-slate-900/80 border-t border-indigo-800/50 shrink-0 relative z-10 flex items-center gap-2">
-                    <input 
-                      type="text" 
-                      value={chatInput} 
-                      onChange={(e) => setChatInput(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && sendChatMessage()}
-                      placeholder="Ask about invoices, staff, or machines..." 
-                      className="flex-1 bg-slate-800 border border-slate-700 text-white placeholder:text-slate-400 text-sm rounded-lg h-9 px-3 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                    />
-                    <Button size="icon" onClick={() => sendChatMessage()} disabled={!chatInput.trim() || isGeneratingBrief} className="h-9 w-9 bg-indigo-600 hover:bg-indigo-500 shrink-0">
-                      <Send className="w-4 h-4" />
+                  <div className="flex items-center gap-1.5">
+                    {!isChatCollapsed && messages.length === 0 && (
+                      <div className="flex items-center gap-1.5">
+                        <Button onClick={(e) => { e.stopPropagation(); sendChatMessage(true); }} disabled={isGeneratingBrief} size="sm" className="bg-indigo-600 hover:bg-indigo-500 text-white border-0 h-8 text-xs px-2 sm:px-3">
+                          {isGeneratingBrief ? <RefreshCcw className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5 sm:mr-1.5" />}
+                          <span className="hidden sm:inline">{isGeneratingBrief ? 'Analyzing...' : 'Generate Brief'}</span>
+                        </Button>
+                      </div>
+                    )}
+                    <Button variant="ghost" size="sm" className="text-indigo-200 hover:text-white hover:bg-indigo-800/50 h-8 w-8 p-0" onClick={(e) => { e.stopPropagation(); setIsChatCollapsed(!isChatCollapsed); }}>
+                      {isChatCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
                     </Button>
                   </div>
-                </>
-              )}
-            </div>
+                </div>
+                
+                {!isChatCollapsed && (
+                  <>
+                    <div className="flex-1 overflow-y-auto p-4 space-y-4 style-scroll relative z-10">
+                      {messages.length === 0 && !isGeneratingBrief && (
+                         <p className="text-sm text-indigo-300 italic text-center mt-8">Click "Generate Brief" or ask a question to analyze {selectedClient}'s data.</p>
+                      )}
+                      {messages.map((msg, idx) => (
+                        <div key={idx} className={cn("flex w-full", msg.role === 'user' ? "justify-end" : "justify-start")}>
+                          <div className={cn(
+                            "max-w-[85%] rounded-xl p-3 text-sm",
+                            msg.role === 'user' ? "bg-indigo-600 text-white rounded-br-none" : "bg-slate-800/80 text-indigo-50 rounded-bl-none border border-indigo-700/30"
+                          )}>
+                            {msg.content}
+                          </div>
+                        </div>
+                      ))}
+                      {isGeneratingBrief && (
+                        <div className="flex justify-start">
+                          <div className="bg-slate-800/80 text-indigo-200 rounded-xl rounded-bl-none border border-indigo-700/30 p-3 text-sm flex items-center gap-2">
+                            <RefreshCcw className="w-4 h-4 animate-spin" /> Thinking...
+                          </div>
+                        </div>
+                      )}
+                      <div ref={chatEndRef} />
+                    </div>
+
+                    <div className="p-3 bg-slate-900/80 border-t border-indigo-800/50 shrink-0 relative z-10 flex items-center gap-2">
+                      <input 
+                        type="text" 
+                        value={chatInput} 
+                        onChange={(e) => setChatInput(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && sendChatMessage()}
+                        placeholder="Ask about invoices, staff, or machines..." 
+                        className="flex-1 bg-slate-800 border border-slate-700 text-white placeholder:text-slate-400 text-sm rounded-lg h-9 px-3 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      />
+                      <Button size="icon" onClick={() => sendChatMessage()} disabled={!chatInput.trim() || isGeneratingBrief} className="h-9 w-9 bg-indigo-600 hover:bg-indigo-500 shrink-0">
+                        <Send className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
 
             {/* Navigation Tabs */}
             <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 mb-6 gap-4">
               <div className="flex items-center gap-0.5 sm:gap-1 overflow-x-auto style-scroll pb-px flex-1">
                 {[
-                  { id: 'overview', label: 'Overview', icon: Activity },
-                  { id: 'financials', label: 'Financials', icon: DollarSign },
-                  { id: 'operations', label: 'Sites', icon: Briefcase },
-                  { id: 'contacts', label: 'Contacts', icon: Users },
-                  { id: 'activity', label: 'Activity', icon: MessagesSquare },
-                  { id: 'tasks', label: 'Tasks', icon: CheckSquare },
-                  { id: 'onboarding', label: 'Onboarding', icon: Clock }
-                ].map(tab => (
+                  { id: 'overview', label: 'Overview', icon: Activity, show: currentUser?.privileges?.clients?.canView },
+                  { id: 'financials', label: 'Financials', icon: DollarSign, show: currentUser?.privileges?.billing?.canView || currentUser?.privileges?.payments?.canView },
+                  { id: 'operations', label: 'Sites', icon: Briefcase, show: currentUser?.privileges?.sites?.canView },
+                  { id: 'contacts', label: 'Contacts', icon: Users, show: currentUser?.privileges?.clients?.canView },
+                  { id: 'activity', label: 'Communications', icon: MessagesSquare, show: currentUser?.privileges?.commLog?.canView },
+                  { id: 'tasks', label: 'Tasks', icon: CheckSquare, show: currentUser?.privileges?.tasks?.canView || currentUser?.privileges?.tasks?.canViewMyTasks }
+                ].filter(tab => tab.show !== false).map(tab => (
                   <button key={tab.id} onClick={() => setActiveTab(tab.id as TabType)}
                     className={cn(
                       "flex items-center gap-1.5 px-2.5 sm:px-4 py-3 text-xs sm:text-sm font-semibold border-b-2 transition-colors whitespace-nowrap",
@@ -776,15 +1019,23 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                         ? "border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400" 
                         : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
                     )}>
-                    <tab.icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> {tab.label}
+                    <tab.icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> 
+                    <span>{tab.label}</span>
+                    {tab.id === 'operations' && clientPendingSites.length > 0 && (
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500 text-white shrink-0 shadow-sm animate-in scale-in-50 duration-200">
+                        {clientPendingSites.length}
+                      </span>
+                    )}
                   </button>
                 ))}
               </div>
-              <div className="shrink-0 pb-1 pr-1">
-                <Button onClick={openClientEdit} variant="outline" size="sm" className={cn("h-8 text-xs px-2 sm:px-3 font-medium shadow-sm transition-colors", isDark ? "bg-slate-900 border-slate-700 hover:bg-slate-800 text-slate-200" : "bg-white border-slate-200 hover:bg-slate-50 text-slate-700")}>
-                  <Edit2 className="w-3.5 h-3.5 sm:mr-1.5" /><span className="hidden sm:inline">Edit Client</span>
-                </Button>
-              </div>
+              {currentUser?.privileges?.clients?.canEdit && (
+                <div className="shrink-0 pb-1 pr-1">
+                  <Button onClick={openClientEdit} variant="outline" size="sm" className={cn("h-8 text-xs px-2 sm:px-3 font-medium shadow-sm transition-colors", isDark ? "bg-slate-900 border-slate-700 hover:bg-slate-800 text-slate-200" : "bg-white border-slate-200 hover:bg-slate-50 text-slate-700")}>
+                    <Edit2 className="w-3.5 h-3.5 sm:mr-1.5" /><span className="hidden sm:inline">Edit Client</span>
+                  </Button>
+                </div>
+              )}
             </div>
 
             {/* Tab Content */}
@@ -798,14 +1049,14 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                     <div className={cn("p-3 sm:p-5 rounded-2xl border shadow-sm min-w-0", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
                       <p className="text-[10px] sm:text-xs text-slate-500 font-bold uppercase tracking-wider mb-1 flex items-center gap-1.5 truncate"><DollarSign className="w-3.5 h-3.5 shrink-0"/> Total Revenue</p>
                       <p className="text-sm min-[390px]:text-base sm:text-lg md:text-2xl font-black text-emerald-600 truncate" title={`₦${clientData.totalRevenue.toLocaleString()}`}>
-                        ₦{Math.round(clientData.totalRevenue).toLocaleString()}
+                        ₦{currentUser?.privileges?.billing?.canViewAmounts ? Math.round(clientData.totalRevenue).toLocaleString() : '***'}
                       </p>
                     </div>
                     <div className={cn("p-3 sm:p-5 rounded-2xl border shadow-sm flex flex-col justify-between min-w-0", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
                       <div className="min-w-0">
                         <p className="text-[10px] sm:text-xs text-slate-500 font-bold uppercase tracking-wider mb-1 flex items-center gap-1.5 truncate"><AlertTriangle className="w-3.5 h-3.5 shrink-0"/> VAT Deficit</p>
                         <p className={cn("text-sm min-[390px]:text-base sm:text-lg md:text-2xl font-black truncate", clientData.vatDeficit > 0 ? "text-rose-500" : "text-emerald-500")} title={`₦${clientData.vatDeficit.toLocaleString()}`}>
-                          ₦{Math.round(clientData.vatDeficit).toLocaleString()}
+                          ₦{currentUser?.privileges?.billing?.canViewAmounts ? Math.round(clientData.vatDeficit).toLocaleString() : '***'}
                         </p>
                       </div>
                       <p className="text-[10px] sm:text-[11px] text-slate-400 mt-2 font-medium bg-slate-100 dark:bg-slate-800 rounded px-1.5 sm:px-2 py-0.5 sm:py-1 truncate max-w-full block" title={clientData.vatMonthsIncluded.length > 0 ? `Payments include: ${clientData.vatMonthsIncluded.join(', ')}` : 'No VAT payments in this period'}>
@@ -896,14 +1147,14 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                               <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Total Billed Revenue</span>
                               <span className="text-xs text-slate-400">Total amount invoiced to the client</span>
                             </div>
-                            <span className="font-bold text-lg text-indigo-600 dark:text-indigo-400">₦{clientData.totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                            <span className="font-bold text-lg text-indigo-600 dark:text-indigo-400">{currentUser?.privileges?.billing?.canViewAmounts ? `₦${clientData.totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '***'}</span>
                           </div>
                           <div className="flex justify-between items-center pb-3.5 border-b border-slate-100 dark:border-slate-800">
                             <div className="flex flex-col">
                               <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Total Project Costs</span>
                               <span className="text-xs text-slate-400">Expenses logged for this client's sites</span>
                             </div>
-                            <span className="font-bold text-lg text-rose-500">₦{clientData.totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                            <span className="font-bold text-lg text-rose-500">{currentUser?.privileges?.billing?.canViewAmounts ? `₦${clientData.totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '***'}</span>
                           </div>
                         </div>
                       </div>
@@ -922,7 +1173,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                               <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Total Payments Received</span>
                               <span className="text-xs text-slate-400">Cash cleared in bank from this client</span>
                             </div>
-                            <span className="font-bold text-lg text-emerald-600">₦{clientData.paymentsCleared.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                            <span className="font-bold text-lg text-emerald-600">{currentUser?.privileges?.billing?.canViewAmounts ? `₦${clientData.paymentsCleared.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '***'}</span>
                           </div>
                           <div className="flex justify-between items-center pb-3.5 border-b border-slate-100 dark:border-slate-800">
                             <div className="flex flex-col">
@@ -930,7 +1181,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                               <span className="text-xs text-slate-400">Invoiced amount awaiting payment</span>
                             </div>
                             <span className={cn("font-bold text-lg", (clientData.totalRevenue - clientData.paymentsCleared) > 0 ? "text-amber-600 dark:text-amber-400" : "text-slate-500")}>
-                              ₦{(clientData.totalRevenue - clientData.paymentsCleared).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              {currentUser?.privileges?.billing?.canViewAmounts ? `₦${(clientData.totalRevenue - clientData.paymentsCleared).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '***'}
                             </span>
                           </div>
                         </div>
@@ -1081,54 +1332,282 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
 
               {/* OPERATIONS TAB */}
               {activeTab === 'operations' && (
-                <div className="w-full">
-                  <div className={cn("p-6 rounded-2xl border shadow-sm flex flex-col", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
-                    <h3 className="text-lg font-bold mb-4 flex items-center gap-2"><MapPin className="w-5 h-5 text-indigo-500"/> Site Portfolio ({clientData.clientSites.length})</h3>
-                    <div className="space-y-3 flex-1 overflow-y-auto max-h-[400px] style-scroll pr-2">
-                      {clientData.clientSites.map(site => (
-                        <div key={site.id}
-                          className={cn('p-3 rounded-lg border cursor-pointer transition-all hover:border-indigo-400 hover:shadow-md group', isDark ? 'border-slate-800 bg-slate-800/50 hover:bg-slate-800' : 'border-slate-100 bg-slate-50 hover:bg-white')}
-                          onClick={() => setSelectedSite(site)}
+                <div className="space-y-6 w-full animate-in fade-in duration-300">
+                  {/* Secondary Tab Switcher */}
+                  <div className="flex border-b border-slate-200 dark:border-slate-800 mb-2 overflow-x-auto style-scroll pb-px gap-1">
+                    {[
+                      { id: 'portfolio', label: 'Active Sites', count: clientData.clientSites.length, color: 'text-indigo-650 bg-indigo-50 dark:bg-indigo-950/20 dark:text-indigo-400', icon: MapPin },
+                      { id: 'onboarding', label: 'Onboarding Progress', count: clientPendingSites.length, color: 'text-amber-700 bg-amber-50 dark:bg-amber-950/20 dark:text-amber-400', icon: Clock }
+                    ].map(subTab => {
+                      const isActive = sitesSubTab === subTab.id;
+                      return (
+                        <button
+                          key={subTab.id}
+                          onClick={() => setSitesSubTab(subTab.id as any)}
+                          className={cn(
+                            "flex items-center gap-2 px-3.5 py-2.5 text-xs sm:text-sm font-bold border-b-2 transition-all relative shrink-0",
+                            isActive
+                              ? "border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400"
+                              : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                          )}
                         >
-                          <div className="flex justify-between items-center">
-                            <div className="flex items-center gap-2">
-                              <MapPin className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
-                              <span className="font-semibold text-sm">{site.name}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Badge className={site.status === 'Active' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700'}>{site.status}</Badge>
-                              <ChevronRight className="w-4 h-4 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />
-                            </div>
-                          </div>
-                          {site.startDate && <p className="text-xs text-slate-400 mt-1.5 ml-5.5">Since {new Date(site.startDate).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}</p>}
-                        </div>
-                      ))}
-                    </div>
+                          <subTab.icon className={cn("w-4 h-4", isActive ? "text-indigo-600 dark:text-indigo-400" : "text-slate-400")} />
+                          <span>{subTab.label}</span>
+                          <span className={cn(
+                            "text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0",
+                            isActive ? subTab.color : "bg-slate-100 text-slate-650 dark:bg-slate-800 dark:text-slate-400"
+                          )}>
+                            {subTab.count}
+                          </span>
+                        </button>
+                      );
+                    })}
                   </div>
+
+                  {/* Sub-tab: Active Sites */}
+                  {sitesSubTab === 'portfolio' && (
+                    <div className={cn("p-6 rounded-2xl border shadow-sm flex flex-col", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
+                      <h3 className="text-lg font-bold mb-4 flex items-center gap-2"><MapPin className="w-5 h-5 text-indigo-500"/> Site Portfolio ({clientData.clientSites.length})</h3>
+                      <div className="space-y-3 flex-1 overflow-y-auto max-h-[400px] style-scroll pr-2">
+                        {clientData.clientSites.length > 0 ? clientData.clientSites.map(site => (
+                          <div key={site.id}
+                            className={cn('p-3 rounded-lg border cursor-pointer transition-all hover:border-indigo-400 hover:shadow-md group', isDark ? 'border-slate-800 bg-slate-800/50 hover:bg-slate-800' : 'border-slate-100 bg-slate-50 hover:bg-white')}
+                            onClick={() => setSelectedSite(site)}
+                          >
+                            <div className="flex justify-between items-center">
+                              <div className="flex items-center gap-2">
+                                <MapPin className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                                <span className="font-semibold text-sm">{site.name}</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Badge className={site.status === 'Active' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700'}>{site.status}</Badge>
+                                <ChevronRight className="w-4 h-4 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                              </div>
+                            </div>
+                            {site.startDate && <p className="text-xs text-slate-400 mt-1.5 ml-5.5">Since {new Date(site.startDate).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}</p>}
+                          </div>
+                        )) : (
+                          <div className="py-12 flex flex-col items-center justify-center text-center text-slate-500">
+                            <MapPin className="w-12 h-12 text-slate-300 dark:text-slate-700 mb-3" />
+                            <p className="font-semibold text-sm">No Active Sites</p>
+                            <p className="text-xs text-slate-400 mt-1">There are no active sites logged for this client.</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Sub-tab: Onboarding Progress */}
+                  {sitesSubTab === 'onboarding' && (
+                    <div className={cn("p-6 rounded-2xl border shadow-sm", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
+                      <div className="flex justify-between items-center mb-6">
+                        <div>
+                          <h3 className="text-lg font-bold flex items-center gap-2">
+                            <Clock className="w-5 h-5 text-amber-500"/> Site Onboarding Progress
+                          </h3>
+                          <p className="text-xs text-slate-500 mt-0.5">Track multi-phase onboarding workflows for new site proposals.</p>
+                        </div>
+                      </div>
+
+                      {clientPendingSites.length === 0 ? (
+                        <div className="text-center py-12">
+                          <Clock className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                          <h4 className="text-sm font-semibold text-slate-600 dark:text-slate-400">No Pending Onboardings</h4>
+                          <p className="text-xs text-slate-400 mt-1">No pending site onboarding records exist for {selectedClient}.</p>
+                          {currentUser?.privileges?.commLog?.canAdd && (
+                            <Button
+                              onClick={() => {
+                                setActiveTab('activity');
+                                setCommDialogOpen(true);
+                                setCommForm(f => ({ ...f, siteOption: 'NEW_ONBOARDING' }));
+                              }}
+                              className="mt-4 bg-indigo-600 hover:bg-indigo-500 text-white gap-2 text-xs font-bold shadow-sm"
+                              size="sm"
+                            >
+                              <Plus className="w-3.5 h-3.5" /> Log Comm to Start Onboarding
+                            </Button>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 animate-in fade-in duration-300">
+                          {clientPendingSites.map(site => {
+                            const phases = [1,2,3,4,5] as const;
+                            const completedCount = phases.filter(p => !!(site as any)[`phase${p}`]?.completed).length;
+                            return (
+                              <div
+                                key={site.id}
+                                className={cn("rounded-2xl border shadow-sm overflow-hidden flex flex-col transition-all hover:shadow-md", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}
+                              >
+                                <div className="h-1 bg-gradient-to-r from-amber-400 to-orange-400" />
+                                <div className="p-4 flex flex-col gap-3 flex-1">
+                                  <div className="flex items-start justify-between gap-2">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <div className="h-8 w-8 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-100 dark:border-amber-900/30 flex items-center justify-center shrink-0">
+                                        <Clock className="h-4 w-4 text-amber-500" />
+                                      </div>
+                                      <div className="min-w-0">
+                                        <h4 className="text-sm font-bold text-slate-808 dark:text-slate-100 uppercase truncate leading-tight" title={site.siteName}>{site.siteName}</h4>
+                                        <p className="text-[11px] text-slate-500 truncate">{site.createdAt ? new Date(site.createdAt).toLocaleDateString('en-GB') : '—'}</p>
+                                      </div>
+                                    </div>
+                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400 border border-amber-200 dark:border-amber-900/30 whitespace-nowrap shrink-0">
+                                      {completedCount}/5 done
+                                    </span>
+                                  </div>
+
+                                  <div className="grid grid-cols-5 gap-1 bg-slate-50 dark:bg-slate-800/50 rounded-xl p-2 border border-slate-100 dark:border-slate-800">
+                                    {phases.map(phase => {
+                                      const isDone = !!(site as any)[`phase${phase}`]?.completed;
+                                      return (
+                                        <div key={phase} className="flex flex-col items-center gap-1">
+                                          <span className="text-[9px] font-bold text-slate-400">P{phase}</span>
+                                          {isDone
+                                            ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 animate-in zoom-in-50 duration-200" />
+                                            : <Circle className="h-3.5 w-3.5 text-slate-200 dark:text-slate-700" />}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+
+                                  <div className="h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                                    <div
+                                      className="h-full bg-gradient-to-r from-amber-400 to-emerald-500 rounded-full transition-all duration-300"
+                                      style={{ width: `${(completedCount / 5) * 100}%` }}
+                                    />
+                                  </div>
+
+                                  <div className="flex items-center justify-between pt-1">
+                                    {currentUser?.privileges?.sites?.canDeleteSite && (
+                                      <button
+                                        onClick={() => handleDeletePendingOnboarding(site)}
+                                        className="flex items-center gap-1.5 text-[11px] font-bold text-rose-500 hover:text-rose-700 dark:hover:text-rose-450 hover:bg-rose-50 dark:hover:bg-rose-950/20 rounded-lg px-2.5 py-1.5 transition-all"
+                                      >
+                                        <Trash2 className="h-3.5 w-3.5" /> Delete
+                                      </button>
+                                    )}
+                                    <button
+                                      onClick={() => navigate(`/sites/onboarding/${site.id}`)}
+                                      className="flex items-center gap-1.5 text-[11px] font-bold text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/20 rounded-lg px-2.5 py-1.5 transition-all"
+                                    >
+                                      <Eye className="h-3.5 w-3.5" /> View Form
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 
-              {/* ACTIVITY TAB */}
+              {/* COMMUNICATIONS TAB */}
               {activeTab === 'activity' && (
-                <div className={cn("p-6 rounded-2xl border shadow-sm", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
-                  <h3 className="text-lg font-bold mb-6 flex items-center gap-2"><MessagesSquare className="w-5 h-5 text-blue-500"/> Interaction History</h3>
-                  <div className="relative pl-6 border-l-2 border-slate-200 dark:border-slate-700 space-y-6">
-                    {clientData.logs.length > 0 ? clientData.logs.slice(0, 20).map(log => (
-                      <div key={log.id} className="relative">
-                        <div className="absolute -left-[31px] bg-slate-200 dark:bg-slate-700 rounded-full p-1.5">
-                          <MessagesSquare className="w-3.5 h-3.5 text-slate-600 dark:text-slate-300" />
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="font-bold text-sm text-slate-800 dark:text-slate-200">{log.subject || 'Communication'}</span>
-                            <span className="text-xs text-slate-500">{new Date(log.date).toLocaleDateString()}</span>
-                            <Badge variant="outline" className="text-[10px] h-5">{log.channel}</Badge>
+                <div className={cn("p-6 rounded-2xl border shadow-sm animate-in fade-in duration-300", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
+                  <div className="flex justify-between items-center mb-6">
+                    <div>
+                      <h3 className="text-lg font-bold flex items-center gap-2">
+                        <MessagesSquare className="w-5 h-5 text-indigo-500"/> Interaction History
+                      </h3>
+                      <p className="text-xs text-slate-500 mt-0.5">Record client interactions and communication logs.</p>
+                    </div>
+                    {currentUser?.privileges?.commLog?.canAdd && (
+                      <Button 
+                        onClick={() => setCommDialogOpen(true)}
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs h-9 px-3.5 rounded-xl flex items-center gap-1.5 shadow-sm transition-all"
+                      >
+                        <Plus className="w-4 h-4" /> Log Communication
+                      </Button>
+                    )}
+                  </div>
+
+                  <div className="relative pl-6 border-l-2 border-slate-200 dark:border-slate-700 space-y-6 mt-4">
+                    {clientData.logs.length > 0 ? clientData.logs.slice(0, 20).map(log => {
+                      const isExpanded = expandedLogs.has(log.id);
+                      return (
+                        <div key={log.id} className="relative animate-in fade-in slide-in-from-top-1 duration-200">
+                          <div className="absolute -left-[31px] bg-slate-200 dark:bg-slate-700 rounded-full p-1.5 border border-slate-200 dark:border-slate-750">
+                            <MessagesSquare className="w-3.5 h-3.5 text-slate-600 dark:text-slate-300" />
                           </div>
-                          <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">{log.notes}</p>
-                          <p className="text-xs font-medium text-slate-500">Logged by: {log.loggedBy} {log.contactPerson && `• Contacted: ${log.contactPerson}`}</p>
+                          <div className="bg-slate-50/50 dark:bg-slate-805/20 p-4 rounded-xl border border-slate-150/40 dark:border-slate-800">
+                            <div 
+                              className="flex justify-between items-start gap-4 cursor-pointer select-none group"
+                              onClick={() => {
+                                const next = new Set(expandedLogs);
+                                if (next.has(log.id)) {
+                                  next.delete(log.id);
+                                } else {
+                                  next.add(log.id);
+                                }
+                                setExpandedLogs(next);
+                              }}
+                            >
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300">{log.subject || 'No Subject'}</span>
+                                  <span className={cn("text-[9px] px-2 py-0.5 font-bold rounded-full uppercase tracking-wider", 
+                                    log.direction === 'Incoming' ? 'bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950/30 dark:text-blue-405 dark:border-blue-900/50' : 'bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-950/30 dark:text-indigo-405 dark:border-indigo-900/50'
+                                  )}>
+                                    {log.direction}
+                                  </span>
+                                  <span className={cn("text-[9px] px-2 py-0.5 font-bold rounded-full uppercase tracking-wider bg-slate-100 text-slate-650 dark:bg-slate-800 dark:text-slate-400")}>
+                                    {log.channel}
+                                  </span>
+                                  {log.siteName && (
+                                    <span className="text-[10px] text-indigo-650 dark:text-indigo-400 font-semibold bg-indigo-50/60 dark:bg-indigo-950/10 px-2 py-0.5 rounded-lg flex items-center gap-1">
+                                      <MapPin className="w-3 h-3" /> {log.siteName}
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-[11px] text-slate-450 font-medium font-mono">Logged by {log.loggedBy} on {new Date(log.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
+                              </div>
+                              <div className="text-slate-400 group-hover:text-indigo-500 transition-colors p-1 rounded-lg">
+                                {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                              </div>
+                            </div>
+                            <AnimatePresence initial={false}>
+                              {isExpanded && (
+                                <motion.div
+                                  initial={{ height: 0, opacity: 0 }}
+                                  animate={{ height: 'auto', opacity: 1 }}
+                                  exit={{ height: 0, opacity: 0 }}
+                                  transition={{ duration: 0.2 }}
+                                  className="overflow-hidden"
+                                >
+                                  <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800/60 space-y-2 text-xs">
+                                    <p className="text-slate-650 dark:text-slate-350 leading-relaxed font-medium whitespace-pre-wrap">{log.notes}</p>
+                                    {(log.contactPerson || log.outcome) && (
+                                      <div className="grid grid-cols-2 gap-4 mt-2 pt-2 border-t border-dashed border-slate-100 dark:border-slate-800">
+                                        {log.contactPerson && (
+                                          <div>
+                                            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Contact Person</span>
+                                            <span className="font-semibold text-slate-700 dark:text-slate-300">{log.contactPerson}</span>
+                                          </div>
+                                        )}
+                                        {log.outcome && (
+                                          <div>
+                                            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Outcome</span>
+                                            <span className="font-semibold text-slate-750 dark:text-slate-305">{log.outcome}</span>
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
+                          </div>
                         </div>
+                      );
+                    }) : (
+                      <div className="py-12 flex flex-col items-center justify-center text-center text-slate-500">
+                        <MessagesSquare className="w-12 h-12 text-slate-300 dark:text-slate-700 mb-3" />
+                        <p className="font-semibold text-sm">No History Recorded</p>
+                        <p className="text-xs text-slate-400 mt-1">There are no interaction logs recorded for this client yet.</p>
                       </div>
-                    )) : <p className="text-slate-500 text-sm">No communication logs recorded.</p>}
+                    )}
                   </div>
                 </div>
               )}
@@ -1332,118 +1811,13 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                   )}
                 </div>
               )}
-
-              {activeTab === 'onboarding' && (
-                <div className="space-y-4">
-                  {/* Header with Add button */}
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className={cn("text-lg font-bold flex items-center gap-2", isDark ? "text-slate-100" : "text-slate-800")}>
-                        <Clock className="w-5 h-5 text-amber-500" /> Pending Onboardings
-                      </h3>
-                      <p className="text-xs text-slate-500 mt-0.5">
-                        {clientPendingSites.length} pending record{clientPendingSites.length !== 1 ? 's' : ''} for {selectedClient}
-                      </p>
-                    </div>
-                    <Button
-                      onClick={() => navigate('/sites/onboarding/new', { state: { prefillClient: selectedClient } })}
-                      className="bg-indigo-600 hover:bg-indigo-500 text-white gap-2 h-9 text-xs font-semibold shadow-sm"
-                      size="sm"
-                    >
-                      <Plus className="w-3.5 h-3.5" /> Add Onboarding
-                    </Button>
-                  </div>
-
-                  {clientPendingSites.length === 0 ? (
-                    <div className={cn("p-10 rounded-2xl border shadow-sm text-center", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
-                      <Clock className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-                      <h4 className="text-sm font-semibold text-slate-600 dark:text-slate-400">No Pending Onboardings</h4>
-                      <p className="text-xs text-slate-400 mt-1">No onboarding records found for {selectedClient}.</p>
-                      <Button
-                        onClick={() => navigate('/sites/onboarding/new', { state: { prefillClient: selectedClient } })}
-                        className="mt-4 bg-indigo-600 hover:bg-indigo-500 text-white gap-2 text-xs"
-                        size="sm"
-                      >
-                        <Plus className="w-3.5 h-3.5" /> Start New Onboarding
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {clientPendingSites.map(site => {
-                        const phases = [1,2,3,4,5] as const;
-                        const completedCount = phases.filter(p => !!(site as any)[`phase${p}`]?.completed).length;
-                        return (
-                          <div
-                            key={site.id}
-                            className={cn("rounded-2xl border shadow-sm overflow-hidden flex flex-col transition-all hover:shadow-md", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}
-                          >
-                            <div className="h-1 bg-gradient-to-r from-amber-400 to-orange-400" />
-                            <div className="p-4 flex flex-col gap-3 flex-1">
-                              <div className="flex items-start justify-between gap-2">
-                                <div className="flex items-center gap-2 min-w-0">
-                                  <div className="h-8 w-8 rounded-lg bg-amber-50 border border-amber-100 flex items-center justify-center shrink-0">
-                                    <Clock className="h-4 w-4 text-amber-500" />
-                                  </div>
-                                  <div className="min-w-0">
-                                    <h4 className="text-sm font-bold text-slate-800 dark:text-slate-100 uppercase truncate leading-tight" title={site.siteName}>{site.siteName}</h4>
-                                    <p className="text-[11px] text-slate-500 truncate">{site.createdAt ? new Date(site.createdAt).toLocaleDateString('en-GB') : '—'}</p>
-                                  </div>
-                                </div>
-                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 whitespace-nowrap shrink-0">
-                                  {completedCount}/5 done
-                                </span>
-                              </div>
-
-                              <div className="grid grid-cols-5 gap-1 bg-slate-50 dark:bg-slate-800 rounded-xl p-2">
-                                {phases.map(phase => {
-                                  const isDone = !!(site as any)[`phase${phase}`]?.completed;
-                                  return (
-                                    <div key={phase} className="flex flex-col items-center gap-1">
-                                      <span className="text-[9px] font-bold text-slate-400">P{phase}</span>
-                                      {isDone
-                                        ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
-                                        : <Circle className="h-3.5 w-3.5 text-slate-200 dark:text-slate-700" />}
-                                    </div>
-                                  );
-                                })}
-                              </div>
-
-                              <div className="h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
-                                <div
-                                  className="h-full bg-gradient-to-r from-amber-400 to-emerald-500 rounded-full transition-all"
-                                  style={{ width: `${(completedCount / 5) * 100}%` }}
-                                />
-                              </div>
-
-                              <div className="flex items-center justify-between pt-1">
-                                <button
-                                  onClick={() => handleDeletePendingOnboarding(site)}
-                                  className="flex items-center gap-1.5 text-[11px] font-semibold text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg px-2 py-1 transition-colors"
-                                >
-                                  <Trash2 className="h-3 w-3" /> Delete
-                                </button>
-                                <button
-                                  onClick={() => navigate(`/sites/onboarding/${site.id}`)}
-                                  className="flex items-center gap-1.5 text-[11px] font-semibold text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 rounded-lg px-2 py-1 transition-colors"
-                                >
-                                  <Eye className="h-3 w-3" /> View Form
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              )}
-
             </div>
-          </div>
-        ) : null}
+            </div>
+          ) : null}
+        </div>
       </div>
-    </div>
-      )}
+    )}
+
 
       {/* Client Edit Dialog */}
       {clientEditOpen && (
@@ -1493,6 +1867,237 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
         </div>
       )}
 
+      {/* Log Communication Dialog */}
+      {commDialogOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setCommDialogOpen(false)} />
+          <div className={cn('relative z-10 w-full max-w-lg rounded-3xl shadow-2xl p-5 sm:p-6 max-h-[92vh] flex flex-col', isDark ? 'bg-slate-900 border border-slate-700' : 'bg-white border border-slate-200')}>
+            <div className="flex justify-between items-center mb-5 shrink-0">
+              <h2 className="text-lg font-black flex items-center gap-2"><MessagesSquare className="w-5 h-5 text-indigo-600" /> Log Communication</h2>
+              <Button variant="ghost" size="icon" onClick={() => setCommDialogOpen(false)} className="h-8 w-8"><X className="w-4 h-4" /></Button>
+            </div>
+            
+            <form onSubmit={handleSaveComm} className="space-y-4 overflow-y-auto pr-1 flex-1 style-scroll mb-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Direction *</label>
+                  <select 
+                    value={commForm.direction} 
+                    onChange={e => setCommForm(f => ({ ...f, direction: e.target.value as any }))}
+                    className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
+                  >
+                    <option value="Incoming">📥 Incoming</option>
+                    <option value="Outgoing">📤 Outgoing</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Channel *</label>
+                  <select 
+                    value={commForm.channel} 
+                    onChange={e => setCommForm(f => ({ ...f, channel: e.target.value as any }))}
+                    className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
+                  >
+                    <option value="Phone">📞 Phone Call</option>
+                    <option value="WhatsApp">💬 WhatsApp</option>
+                    <option value="Email">✉️ Email</option>
+                    <option value="In-Person">👥 In-Person Visit</option>
+                    <option value="Official Letter">✉️ Official Letter</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Linked To *</label>
+                  <select 
+                    disabled
+                    value="Existing Client" 
+                    className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none cursor-not-allowed opacity-75', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-100 border-slate-200 text-slate-600')}
+                  >
+                    <option value="Existing Client">🏢 Existing Client</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Client *</label>
+                  <select 
+                    disabled
+                    value={selectedClient} 
+                    className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none cursor-not-allowed opacity-75', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-100 border-slate-200 text-slate-600')}
+                  >
+                    <option value={selectedClient}>{selectedClient}</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Site Name — select existing or type a new one *</label>
+                <select 
+                  value={commForm.siteOption} 
+                  onChange={e => setCommForm(f => ({ ...f, siteOption: e.target.value }))}
+                  className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
+                >
+                  <option value="">Select site...</option>
+                  <option value="NEW_ONBOARDING">+ Create new site onboarding...</option>
+                  {clientData?.clientSites?.map((s: any) => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {commForm.siteOption === 'NEW_ONBOARDING' && (
+                <div className="p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/30 rounded-xl space-y-2 animate-in slide-in-from-top-2 duration-250">
+                  <label className="text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 block">Proposed Site Name *</label>
+                  <input 
+                    type="text" 
+                    value={commForm.newSiteName} 
+                    onChange={e => setCommForm(f => ({ ...f, newSiteName: e.target.value }))}
+                    placeholder="e.g. Warri Refinery Site B"
+                    className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500', isDark ? 'bg-slate-800 border-amber-900/40 text-white' : 'bg-white border-amber-200')}
+                  />
+                  <p className="text-[10px] text-amber-500/80 font-semibold leading-normal">
+                    This will automatically create a pending site onboarding record for {selectedClient} inside the Onboarding Progress tab!
+                  </p>
+                </div>
+              )}
+
+              <div>
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Subject</label>
+                <input 
+                  type="text" 
+                  value={commForm.subject} 
+                  onChange={e => setCommForm(f => ({ ...f, subject: e.target.value }))}
+                  placeholder="e.g. Onboarding kickoff, Site update"
+                  className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Notes / Description *</label>
+                <textarea 
+                  value={commForm.notes} 
+                  onChange={e => setCommForm(f => ({ ...f, notes: e.target.value }))}
+                  rows={3} 
+                  required
+                  placeholder="Details of the conversation..."
+                  className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Contact Person</label>
+                  {!hasAnyOptions ? (
+                    <input 
+                      type="text" 
+                      value={commForm.contactPerson} 
+                      onChange={e => setCommForm(f => ({ ...f, contactPerson: e.target.value }))}
+                      placeholder="e.g. Mr. Adeyemi, Site Manager"
+                      className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
+                    />
+                  ) : !isManualContact ? (
+                    <select
+                      value={isKnownOption(commForm.contactPerson) ? (activeClientContacts.find(c => c.name.trim().toLowerCase() === (commForm.contactPerson || '').trim().toLowerCase())?.name || commForm.contactPerson) : (commForm.contactPerson ? '__CUSTOM__' : '')}
+                      onChange={e => {
+                        const val = e.target.value;
+                        if (val === '__ADD_NEW__') {
+                          setIsManualContact(true);
+                          setCommForm(f => ({ ...f, contactPerson: '' }));
+                        } else if (val === '__CUSTOM__') {
+                          // Do nothing
+                        } else {
+                          setCommForm(f => ({ ...f, contactPerson: val }));
+                        }
+                      }}
+                      className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
+                    >
+                      <option value="">Select contact...</option>
+                      {activeClientContacts.map(c => (
+                        <option key={c.id} value={c.name}>
+                          {c.name} {c.position ? `— ${c.position}` : ''}
+                        </option>
+                      ))}
+                      <option value="__ADD_NEW__">+ Type a new contact...</option>
+                      {commForm.contactPerson && !isKnownOption(commForm.contactPerson) && (
+                        <option value="__CUSTOM__">Custom: {commForm.contactPerson}</option>
+                      )}
+                    </select>
+                  ) : (
+                    <div className="flex gap-2">
+                      <input 
+                        type="text" 
+                        autoFocus
+                        value={commForm.contactPerson} 
+                        onChange={e => setCommForm(f => ({ ...f, contactPerson: e.target.value }))}
+                        placeholder="Type contact name..."
+                        className={cn('flex-1 rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
+                      />
+                      <Button 
+                        type="button"
+                        variant="ghost" 
+                        className="h-9 px-2 text-xs font-semibold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl"
+                        onClick={() => {
+                          setIsManualContact(false);
+                          setCommForm(f => ({ ...f, contactPerson: '' }));
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Outcome</label>
+                  <input 
+                    type="text" 
+                    value={commForm.outcome} 
+                    onChange={e => setCommForm(f => ({ ...f, outcome: e.target.value }))}
+                    placeholder="e.g. Move to site next week"
+                    className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Follow-Up Date</label>
+                <input 
+                  type="date" 
+                  value={commForm.followUpDate} 
+                  onChange={e => setCommForm(f => ({ ...f, followUpDate: e.target.value }))}
+                  className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
+                />
+              </div>
+
+              {/* Create Task checkbox */}
+              <label className={cn(
+                'flex items-center gap-2.5 text-sm cursor-pointer select-none px-3 py-2.5 rounded-xl border transition-colors',
+                commForm.createTask
+                  ? (isDark ? 'bg-indigo-950/40 border-indigo-700/80 text-indigo-300' : 'bg-indigo-50 border-indigo-200 text-indigo-700')
+                  : (isDark ? 'border-slate-800 text-slate-400 hover:border-slate-700 bg-slate-900/50' : 'border-slate-200 text-slate-500 hover:border-slate-300 bg-slate-50/50')
+              )}>
+                <input
+                  type="checkbox"
+                  checked={commForm.createTask}
+                  onChange={e => setCommForm(f => ({ ...f, createTask: e.target.checked }))}
+                  className="rounded-lg border-slate-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer"
+                />
+                <Building2 className="w-4 h-4 flex-shrink-0" />
+                <span className="font-semibold">Create a task from this communication log</span>
+                {commForm.createTask && (
+                  <span className={cn('text-xs ml-1 font-medium', isDark ? 'text-indigo-400' : 'text-indigo-500')}>
+                    — task dialog opens after saving
+                  </span>
+                )}
+              </label>
+
+              <div className="flex gap-3 shrink-0 pt-3 border-t border-slate-100 dark:border-slate-800">
+                <Button type="button" variant="outline" onClick={() => setCommDialogOpen(false)} className="flex-1 rounded-xl">Cancel</Button>
+                <Button type="submit" className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl">Save Log</Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       <TaskDetailSheet subtaskId={openSubtaskId} onClose={() => setOpenSubtaskId(null)} />
       {showContactsPanel && (
         <ClientContactsPanel
@@ -1500,6 +2105,19 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
           onClose={() => setShowContactsPanel(false)}
         />
       )}
+      {taskDialog.open && (
+        <CreateTaskDialog
+          onClose={() => setTaskDialog(d => ({ ...d, open: false }))}
+          users={users}
+          currentUserId={currentUser?.id ?? ""}
+          teamId="dcel-team"
+          workspaceId="dcel-team"
+          initialTitle={taskDialog.title}
+          initialDescription={taskDialog.description}
+          initialClientId={taskDialog.clientId}
+          initialSiteId={taskDialog.siteId}
+        />
+      )}
     </>
   );
-}
+}

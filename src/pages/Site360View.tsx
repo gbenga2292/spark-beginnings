@@ -1,6 +1,7 @@
 import { useMemo, useState, useRef, useEffect } from 'react';
 import { parseISO } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 
 import {
   ArrowLeft, MapPin, DollarSign, Activity, Wrench, MessagesSquare,
@@ -16,13 +17,15 @@ import { useAppStore, Site } from '@/src/store/appStore';
 import { useOperations } from '@/src/contexts/OperationsContext';
 import { useAppData, deriveMainTaskStatus } from '@/src/contexts/AppDataContext';
 import { useAuth } from '@/src/hooks/useAuth';
+import { useUserStore } from '@/src/store/userStore';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { InvoiceDetailDialog } from './InvoiceDetailDialog';
 import { Invoice } from '@/src/store/appStore';
 import { ClientContactsPanel } from './ClientContactsPanel';
 import { TaskDetailSheet } from '@/src/components/tasks/TaskDetailSheet';
+import { AddSubtaskInline } from './Tasks/AddSubtaskInline';
 
-type SiteTab = 'financials' | 'operations' | 'maintenance' | 'comms';
+type SiteTab = 'financials' | 'operations' | 'maintenance' | 'comms' | 'tasks';
 
 interface Props {
   site: Site;
@@ -34,8 +37,10 @@ interface Props {
 
 export function Site360View({ site, clientSites, onSiteChange, onBack, onEditSite }: Props) {
   const { isDark } = useTheme();
-  const { createMainTask, users } = useAppData();
-  const { user: currentUser } = useAuth();
+  const { createMainTask, users, addSubtask } = useAppData();
+  const { user: authUser } = useAuth();
+  const currentUser = useUserStore(s => s.users.find(u => u.id === s.currentUserId));
+  const navigate = useNavigate();
   const clientProfiles = useAppStore(s => s.clientProfiles);
   const [showAddTaskForm, setShowAddTaskForm] = useState(false);
   const [taskTitle, setTaskTitle] = useState('');
@@ -77,7 +82,7 @@ export function Site360View({ site, clientSites, onSiteChange, onBack, onEditSit
   const [messages, setMessages] = useState<{ role: 'user' | 'assistant', content: string }[]>([]);
   const [chatInput, setChatInput] = useState('');
   const [isGeneratingBrief, setIsGeneratingBrief] = useState(false);
-  const [isChatCollapsed, setIsChatCollapsed] = useState(false);
+  const [isChatCollapsed, setIsChatCollapsed] = useState(true);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -102,7 +107,7 @@ export function Site360View({ site, clientSites, onSiteChange, onBack, onEditSit
       await createMainTask({
         title: taskTitle.trim(),
         description: taskDesc.trim() || null,
-        createdBy: currentUser?.id,
+        createdBy: authUser?.id,
         teamId: 'dcel-team',
         workspaceId: 'dcel-team',
         assignedTo: taskAssignees.length > 0 ? taskAssignees.join(',') : null,
@@ -300,7 +305,10 @@ export function Site360View({ site, clientSites, onSiteChange, onBack, onEditSit
     });
     const machinesOnSiteCount = assets.filter(a => a.type === 'equipment' && a.requiresLogging && (inventoryMap.get(a.id) || 0) > 0).length;
 
-    const siteMaintAssets = maintenanceAssets.filter(a => a.site?.trim() === site.name.trim());
+    const siteMaintAssets = maintenanceAssets.filter(a => {
+      const aSite = (a.site || '').trim().toLowerCase();
+      return aSite === site.name.trim().toLowerCase() || aSite === site.id.trim().toLowerCase();
+    });
     const siteMaintSessions = maintenanceSessions.filter(s_session =>
       s_session.assets.some(a => siteMaintAssets.some(ma => ma.name === a.assetName))
     );
@@ -399,12 +407,13 @@ export function Site360View({ site, clientSites, onSiteChange, onBack, onEditSit
 
   const card = cn('p-5 rounded-2xl border shadow-sm', isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200');
 
-  const tabs: { id: SiteTab; label: string; icon: React.ElementType }[] = [
-    { id: 'financials', label: 'Financials', icon: DollarSign },
-    { id: 'operations', label: 'Operations', icon: Activity },
-    { id: 'maintenance', label: 'Maintenance', icon: Wrench },
-    { id: 'comms', label: 'Comms & Tasks', icon: MessagesSquare },
-  ];
+  const tabs: { id: SiteTab; label: string; icon: React.ElementType; show?: boolean }[] = [
+    { id: 'financials', label: 'Financials', icon: DollarSign, show: currentUser?.privileges?.billing?.canView || currentUser?.privileges?.payments?.canView },
+    { id: 'operations', label: 'Operations', icon: Activity, show: currentUser?.privileges?.sites?.canView },
+    { id: 'maintenance', label: 'Maintenance', icon: Wrench, show: currentUser?.privileges?.sites?.canView },
+    { id: 'comms', label: 'Comms', icon: MessagesSquare, show: currentUser?.privileges?.commLog?.canView },
+    { id: 'tasks', label: 'Tasks', icon: CheckSquare, show: currentUser?.privileges?.tasks?.canView || currentUser?.privileges?.tasks?.canViewMyTasks },
+  ].filter(tab => tab.show !== false) as { id: SiteTab; label: string; icon: React.ElementType }[];
 
   // AI Chat
   const sendChatMessage = async (isInitialBrief = false) => {
@@ -596,6 +605,10 @@ Answer site-specific questions using this context only. Be concise.`;
                     </div>
                   ))
                 )}
+                
+                <div className="pt-2 border-t border-slate-100 dark:border-slate-800/60 mt-1">
+                  <AddSubtaskInline mainTaskId={task.id} users={users} onAdd={sub => addSubtask(sub)} />
+                </div>
               </div>
             </motion.div>
           )}
@@ -613,8 +626,9 @@ Answer site-specific questions using this context only. Be concise.`;
           {/* ── Hero: AI Assistant + Site Identity side by side ── */}
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 items-stretch">
 
-            {/* AI Chat — wider column (3/5) */}
-            <div className={cn('lg:col-span-3 bg-gradient-to-br from-indigo-900 to-slate-900 rounded-2xl shadow-lg relative overflow-hidden border border-indigo-700/50 flex flex-col transition-all duration-300', isChatCollapsed ? 'h-auto' : 'lg:h-[300px] h-[260px]')}>
+            {/* AI Chat — conditionally shown based on privileges */}
+            {currentUser?.privileges?.sites?.canViewDecisionIntelligence && (
+              <div className={cn('lg:col-span-3 bg-gradient-to-br from-indigo-900 to-slate-900 rounded-2xl shadow-lg relative overflow-hidden border border-indigo-700/50 flex flex-col transition-all duration-300', isChatCollapsed ? 'h-auto' : 'lg:h-[300px] h-[260px]')}>
               <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none"><Sparkles className="w-48 h-48" /></div>
               <div className="flex items-center justify-between p-4 border-b border-indigo-800/50 relative z-10 shrink-0 cursor-pointer hover:bg-indigo-800/20 transition-colors" onClick={() => setIsChatCollapsed(!isChatCollapsed)}>
                 <div className="flex items-center gap-2">
@@ -653,11 +667,13 @@ Answer site-specific questions using this context only. Be concise.`;
                   </div>
                 </>
               )}
-            </div>
+              </div>
+            )}
 
-            {/* Site Identity Card — narrower column (2/5) */}
+            {/* Site Identity Card */}
             <div className={cn(
-              'lg:col-span-2 p-5 rounded-3xl border shadow-sm flex flex-col justify-between transition-all duration-300',
+              currentUser?.privileges?.sites?.canViewDecisionIntelligence ? 'lg:col-span-2' : 'lg:col-span-5',
+              'p-5 rounded-3xl border shadow-sm flex flex-col justify-between transition-all duration-300',
               isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200',
               isChatCollapsed ? 'lg:h-[72px] h-auto justify-center py-3' : 'lg:h-[300px]'
             )}>
@@ -680,7 +696,24 @@ Answer site-specific questions using this context only. Be concise.`;
                             site.status === 'Ended' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-600'
                         )}>{site.status}</Badge>
                         <span className="text-xs text-slate-500 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">VAT: <strong>{site.vat}</strong></span>
-                        {site.startDate && <span className="text-xs text-slate-500 flex items-center gap-1"><Calendar className="w-3 h-3" />Since {new Date(site.startDate).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}</span>}
+                        {site.startDate && (
+                          <span className="text-xs text-slate-500 flex items-center gap-1">
+                            <Calendar className="w-3.5 h-3.5" />
+                            {site.endDate ? (
+                              <span>
+                                {new Date(site.startDate).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })} – {new Date(site.endDate).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}
+                              </span>
+                            ) : (
+                              <span>Since {new Date(site.startDate).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}</span>
+                            )}
+                          </span>
+                        )}
+                        {!site.startDate && site.endDate && (
+                          <span className="text-xs text-slate-500 flex items-center gap-1">
+                            <Calendar className="w-3.5 h-3.5" />
+                            Ended {new Date(site.endDate).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}
+                          </span>
+                        )}
                       </div>
                     )}
                   </div>
@@ -707,47 +740,63 @@ Answer site-specific questions using this context only. Be concise.`;
                     transition={{ duration: 0.3, ease: 'easeInOut' }}
                     className="overflow-hidden"
                   >
-                    <div className="grid grid-cols-2 gap-2 mt-4 pt-1 border-t border-slate-100 dark:border-slate-800/50">
-                      <div className={cn('rounded-xl p-3 transition-colors', isDark ? 'bg-slate-800/50 hover:bg-slate-800' : 'bg-slate-50 hover:bg-slate-100')}>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-2 xl:grid-cols-3 gap-2 mt-4 pt-1 border-t border-slate-100 dark:border-slate-800/50">
+                      <div className={cn('rounded-xl p-2.5 transition-colors', isDark ? 'bg-slate-800/50 hover:bg-slate-800' : 'bg-slate-50 hover:bg-slate-100')}>
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-0.5">Total Billed</p>
+                        <p className="text-sm font-black text-sky-600 truncate">
+                          {currentUser?.privileges?.billing?.canViewAmounts ? `₦${Math.round(data.totalBilled).toLocaleString()}` : '***'}
+                        </p>
+                        <span className="text-[9px] font-semibold text-slate-400 dark:text-slate-500 block truncate">
+                          {data.siteInvoices.length} invoice{data.siteInvoices.length !== 1 ? 's' : ''}
+                        </span>
+                      </div>
+
+                      <div className={cn('rounded-xl p-2.5 transition-colors', isDark ? 'bg-slate-800/50 hover:bg-slate-800' : 'bg-slate-50 hover:bg-slate-100')}>
                         <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-0.5">Unpaid</p>
-                        <p className={cn('text-base font-black truncate', data.outstanding > 0 ? 'text-rose-500' : 'text-emerald-500')}>
-                          ₦{Math.round(data.outstanding).toLocaleString()}
+                        <p className={cn('text-sm font-black truncate', data.outstanding > 0 ? 'text-rose-500' : 'text-emerald-500')}>
+                          {currentUser?.privileges?.billing?.canViewAmounts ? `₦${Math.round(data.outstanding).toLocaleString()}` : '***'}
                         </p>
                       </div>
-                      <div className={cn('rounded-xl p-3 transition-colors', isDark ? 'bg-slate-800/50 hover:bg-slate-800' : 'bg-slate-50 hover:bg-slate-100')}>
+
+                      <div className={cn('rounded-xl p-2.5 transition-colors', isDark ? 'bg-slate-800/50 hover:bg-slate-800' : 'bg-slate-50 hover:bg-slate-100')}>
                         <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-0.5">Pending Tasks</p>
-                        <p className="text-base font-black text-amber-600">{data.siteTasks.length}</p>
+                        <p className="text-sm font-black text-amber-600">{data.siteTasks.length}</p>
                       </div>
-                      <div className={cn('rounded-xl p-3 transition-colors', isDark ? 'bg-slate-800/50 hover:bg-slate-800' : 'bg-slate-50 hover:bg-slate-100')}>
+
+                      <div className={cn('rounded-xl p-2.5 transition-colors', isDark ? 'bg-slate-800/50 hover:bg-slate-800' : 'bg-slate-50 hover:bg-slate-100')}>
                         <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-0.5">Machine Days</p>
-                        <p className="text-base font-black text-indigo-600">{data.machineDays}</p>
+                        <p className="text-sm font-black text-indigo-600">{data.machineDays}</p>
                       </div>
-                      <div className={cn('rounded-xl p-3 transition-colors', isDark ? 'bg-slate-800/50 hover:bg-slate-800' : 'bg-slate-50 hover:bg-slate-100')}>
+
+                      <div className={cn('rounded-xl p-2.5 transition-colors', isDark ? 'bg-slate-800/50 hover:bg-slate-800' : 'bg-slate-50 hover:bg-slate-100')}>
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-0.5">Diesel Used</p>
+                        <p className="text-sm font-black text-amber-600 truncate">
+                          {Math.round(data.totalDiesel).toLocaleString()}L
+                        </p>
+                        <span className="text-[9px] font-semibold text-slate-400 dark:text-slate-500 block truncate">
+                          {data.machineLogs.length} log day{data.machineLogs.length !== 1 ? 's' : ''}
+                        </span>
+                      </div>
+
+                      <div className={cn('rounded-xl p-2.5 transition-colors', isDark ? 'bg-slate-800/50 hover:bg-slate-800' : 'bg-slate-50 hover:bg-slate-100')}>
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-0.5">Maint. Cost</p>
+                        <p className="text-sm font-black text-rose-500 truncate">
+                          {currentUser?.privileges?.billing?.canViewAmounts ? `₦${Math.round(data.totalMaintenanceCost).toLocaleString()}` : '***'}
+                        </p>
+                        <span className="text-[9px] font-semibold text-slate-400 dark:text-slate-500 block truncate">
+                          {data.siteMaintAssets.length} asset{data.siteMaintAssets.length !== 1 ? 's' : ''}
+                        </span>
+                      </div>
+
+                      <div className={cn('rounded-xl p-2.5 transition-colors', isDark ? 'bg-slate-800/50 hover:bg-slate-800' : 'bg-slate-50 hover:bg-slate-100')}>
                         <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-0.5">Contacts</p>
-                        <p className="text-base font-black text-slate-700 dark:text-slate-200">{data.siteContacts.length}</p>
+                        <p className="text-sm font-black text-slate-700 dark:text-slate-200">{data.siteContacts.length}</p>
                       </div>
                     </div>
                   </motion.div>
                 )}
               </AnimatePresence>
             </div>
-          </div>
-
-          {/* Secondary Stats Strip — unique metrics not shown in hero card */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
-            {[
-              { label: 'Total Billed', value: `₦${Math.round(data.totalBilled).toLocaleString()}`, subtext: `${data.siteInvoices.length} invoice${data.siteInvoices.length !== 1 ? 's' : ''}`, color: 'text-sky-600' },
-              { label: 'Diesel Used', value: `${Math.round(data.totalDiesel).toLocaleString()}L`, subtext: `${data.machineLogs.length} log day${data.machineLogs.length !== 1 ? 's' : ''}`, color: 'text-amber-600' },
-              { label: 'Maintenance Cost', value: `₦${Math.round(data.totalMaintenanceCost).toLocaleString()}`, subtext: `${data.siteMaintAssets.length} asset${data.siteMaintAssets.length !== 1 ? 's' : ''} tracked`, color: 'text-rose-500' },
-            ].map(k => (
-              <div key={k.label} className={cn(card, "p-3 sm:p-5 min-w-0 flex flex-col justify-between")}>
-                <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-500 mb-1 truncate">{k.label}</p>
-                <div className="flex flex-col gap-0.5 min-w-0">
-                  <p className={cn('text-sm min-[390px]:text-base sm:text-lg md:text-2xl font-black truncate', k.color)}>{k.value}</p>
-                  {k.subtext && <span className="text-[10px] sm:text-xs font-semibold text-slate-400 dark:text-slate-500 truncate">{k.subtext}</span>}
-                </div>
-              </div>
-            ))}
           </div>
 
           {/* Alerts */}
@@ -782,9 +831,11 @@ Answer site-specific questions using this context only. Be concise.`;
               ))}
             </div>
             <div className="shrink-0 pb-1 pr-1">
-              <Button onClick={() => onEditSite(site)} variant="outline" size="sm" className={cn("h-8 text-xs px-2 sm:px-3 font-medium shadow-sm transition-colors", isDark ? "bg-slate-900 border-slate-700 hover:bg-slate-800 text-slate-200" : "bg-white border-slate-200 hover:bg-slate-50 text-slate-700")}>
-                <Settings2 className="w-3.5 h-3.5 sm:mr-1.5" /><span className="hidden sm:inline">Edit Site</span>
-              </Button>
+              {currentUser?.privileges?.sites?.canEditSite && (
+                <Button onClick={() => onEditSite(site)} variant="outline" size="sm" className={cn("h-8 text-xs px-2 sm:px-3 font-medium shadow-sm transition-colors", isDark ? "bg-slate-900 border-slate-700 hover:bg-slate-800 text-slate-200" : "bg-white border-slate-200 hover:bg-slate-50 text-slate-700")}>
+                  <Settings2 className="w-3.5 h-3.5 sm:mr-1.5" /><span className="hidden sm:inline">Edit Site</span>
+                </Button>
+              )}
             </div>
           </div>
 
@@ -797,10 +848,10 @@ Answer site-specific questions using this context only. Be concise.`;
                 {/* Financial Sub-Tabs */}
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
                   {[
-                    { id: 'invoices', label: 'Invoices', count: data.siteInvoices.length, amount: `₦${Math.round(data.totalBilled).toLocaleString()}`, icon: FileText },
-                    { id: 'payments', label: 'Payments', count: data.sitePayments.length, amount: `₦${Math.round(data.totalReceived).toLocaleString()}`, icon: DollarSign },
-                    { id: 'expenses', label: 'Expenses', count: data.siteCosts.length, amount: `₦${Math.round(data.totalCost).toLocaleString()}`, icon: FileText },
-                    { id: 'vat', label: 'VAT Remitted', count: null, amount: `₦${Math.round(data.periodVatRemitted).toLocaleString()}`, icon: CheckCircle2 },
+                    { id: 'invoices', label: 'Invoices', count: data.siteInvoices.length, amount: currentUser?.privileges?.billing?.canViewAmounts ? `₦${Math.round(data.totalBilled).toLocaleString()}` : '***', icon: FileText },
+                    { id: 'payments', label: 'Payments', count: data.sitePayments.length, amount: currentUser?.privileges?.billing?.canViewAmounts ? `₦${Math.round(data.totalReceived).toLocaleString()}` : '***', icon: DollarSign },
+                    { id: 'expenses', label: 'Expenses', count: data.siteCosts.length, amount: currentUser?.privileges?.billing?.canViewAmounts ? `₦${Math.round(data.totalCost).toLocaleString()}` : '***', icon: FileText },
+                    { id: 'vat', label: 'VAT Remitted', count: null, amount: currentUser?.privileges?.billing?.canViewAmounts ? `₦${Math.round(data.periodVatRemitted).toLocaleString()}` : '***', icon: CheckCircle2 },
                   ].map(t => (
                     <button
                       key={t.id}
@@ -840,7 +891,7 @@ Answer site-specific questions using this context only. Be concise.`;
                       <div className="p-4 rounded-xl bg-white/80 dark:bg-slate-800/80 border border-slate-100 dark:border-slate-700/50 shadow-sm flex flex-col justify-between">
                         <div>
                           <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">VAT Collected (Selected Period)</p>
-                          <p className="text-xl font-black text-sky-600 dark:text-sky-400">₦{data.periodVatCollected.toLocaleString()}</p>
+                          <p className="text-xl font-black text-sky-600 dark:text-sky-400">{currentUser?.privileges?.billing?.canViewAmounts ? `₦${data.periodVatCollected.toLocaleString()}` : '***'}</p>
                           <p className="text-xs text-slate-400 mt-1">Derived from client payments received</p>
                         </div>
                         <div className="mt-3">
@@ -853,7 +904,7 @@ Answer site-specific questions using this context only. Be concise.`;
                       <div className="p-4 rounded-xl bg-white/80 dark:bg-slate-800/80 border border-slate-100 dark:border-slate-700/50 shadow-sm flex flex-col justify-between">
                         <div>
                           <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Prior Unpaid VAT (Brought Forward)</p>
-                          <p className="text-xl font-black text-amber-600 dark:text-amber-400">₦{data.unpaidVatBroughtForward.toLocaleString()}</p>
+                          <p className="text-xl font-black text-amber-600 dark:text-amber-400">{currentUser?.privileges?.billing?.canViewAmounts ? `₦${data.unpaidVatBroughtForward.toLocaleString()}` : '***'}</p>
                           <p className="text-xs text-slate-400 mt-1">Accumulated unpaid VAT from previous periods</p>
                         </div>
                         <div className="mt-3">
@@ -866,8 +917,8 @@ Answer site-specific questions using this context only. Be concise.`;
                       <div className="p-4 rounded-xl bg-white/80 dark:bg-slate-800/80 border border-slate-100 dark:border-slate-700/50 shadow-sm flex flex-col justify-between">
                         <div>
                           <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">VAT Remitted to FIRS (Selected Period)</p>
-                          <p className="text-xl font-black text-emerald-600 dark:text-emerald-400">₦{data.periodVatRemitted.toLocaleString()}</p>
-                          <p className="text-xs text-slate-400 mt-1">Total All-Time Remitted: ₦{data.totalVatRemitted.toLocaleString()}</p>
+                          <p className="text-xl font-black text-emerald-600 dark:text-emerald-400">{currentUser?.privileges?.billing?.canViewAmounts ? `₦${data.periodVatRemitted.toLocaleString()}` : '***'}</p>
+                          <p className="text-xs text-slate-400 mt-1">Total All-Time Remitted: {currentUser?.privileges?.billing?.canViewAmounts ? `₦${data.totalVatRemitted.toLocaleString()}` : '***'}</p>
                         </div>
                         <div className="mt-3">
                           <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 font-semibold text-xs py-1 px-2.5">
@@ -897,7 +948,7 @@ Answer site-specific questions using this context only. Be concise.`;
                                 <p className="text-xs text-slate-500">{inv.date ? new Date(inv.date).toLocaleDateString('en-GB') : '—'} · {inv.billingCycle || 'Custom'}</p>
                               </div>
                               <div className="flex items-center gap-2 shrink-0">
-                                <p className="font-bold text-sm">₦{(inv.totalCharge || inv.amount || 0).toLocaleString()}</p>
+                                <p className="font-bold text-sm">{currentUser?.privileges?.billing?.canViewAmounts ? `₦${(inv.totalCharge || inv.amount || 0).toLocaleString()}` : '***'}</p>
                                 <Badge className={isPaid ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}>{isPaid ? 'Paid' : 'Unpaid'}</Badge>
                               </div>
                             </div>
@@ -917,10 +968,10 @@ Answer site-specific questions using this context only. Be concise.`;
                           <div key={pay.id} className="py-3 flex items-center justify-between gap-3 px-2 hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-xl transition-colors">
                             <div>
                               <p className="font-semibold text-sm">Payment · {pay.date ? pay.date : '—'}</p>
-                              <p className="text-xs text-slate-500">VAT Included: {pay.payVat || 'No'} {pay.vat ? `(₦${pay.vat.toLocaleString()})` : ''}</p>
+                              <p className="text-xs text-slate-500">VAT Included: {pay.payVat || 'No'} {pay.vat ? (currentUser?.privileges?.billing?.canViewAmounts ? `(₦${pay.vat.toLocaleString()})` : '(***)') : ''}</p>
                             </div>
                             <div className="flex items-center gap-3">
-                              <p className="font-bold text-sm text-emerald-600 dark:text-emerald-400">₦{(pay.amount || 0).toLocaleString()}</p>
+                              <p className="font-bold text-sm text-emerald-600 dark:text-emerald-400">{currentUser?.privileges?.billing?.canViewAmounts ? `₦${(pay.amount || 0).toLocaleString()}` : '***'}</p>
                               <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">Received</Badge>
                             </div>
                           </div>
@@ -942,7 +993,7 @@ Answer site-specific questions using this context only. Be concise.`;
                               <p className="text-xs text-slate-500">{cost.date ? cost.date : '—'} · {cost.category} {cost.vendor ? `· ${cost.vendor}` : ''}</p>
                             </div>
                             <div className="flex items-center gap-3">
-                              <p className="font-bold text-sm text-rose-600 dark:text-rose-400">₦{(cost.amount || 0).toLocaleString()}</p>
+                              <p className="font-bold text-sm text-rose-600 dark:text-rose-400">{currentUser?.privileges?.billing?.canViewAmounts ? `₦${(cost.amount || 0).toLocaleString()}` : '***'}</p>
                               <Badge className="bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300">Expense</Badge>
                             </div>
                           </div>
@@ -1116,7 +1167,21 @@ Answer site-specific questions using this context only. Be concise.`;
                 </div>
                 <div className={cn('grid grid-cols-1 lg:grid-cols-2 gap-5')}>
                   <div className={card}>
-                    <h3 className="font-bold mb-4 text-lg flex items-center gap-2"><Wrench className="w-5 h-5 text-amber-500" /> Assets on Site</h3>
+                    <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-100 dark:border-slate-800">
+                      <h3 className="font-bold text-lg flex items-center gap-2">
+                        <Wrench className="w-5 h-5 text-amber-500" /> Assets on Site
+                      </h3>
+                      {currentUser?.privileges?.opsMaintenance?.canAdd && (
+                        <Button
+                          onClick={() => navigate('/operations/maintenance')}
+                          size="sm"
+                          className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg h-7 px-2.5 flex items-center gap-1 text-[11px] font-bold cursor-pointer"
+                        >
+                          <Plus className="w-3 h-3" />
+                          <span>Log Maintenance</span>
+                        </Button>
+                      )}
+                    </div>
                     {data.siteMaintAssets.length > 0 ? data.siteMaintAssets.map(asset => {
                       const color = asset.status === 'ok' ? 'bg-emerald-100 text-emerald-700' : asset.status === 'due_soon' ? 'bg-amber-100 text-amber-700' : asset.status === 'overdue' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-600';
                       return (
@@ -1128,10 +1193,34 @@ Answer site-specific questions using this context only. Be concise.`;
                           <Badge className={cn('text-xs capitalize', color)}>{asset.status.replace('_', ' ')}</Badge>
                         </div>
                       );
-                    }) : <p className="text-slate-500 text-sm text-center py-8">No maintenance assets tracked.</p>}
+                    }) : (
+                      <div className="flex flex-col items-center justify-center py-10 text-center gap-3">
+                        <p className="text-slate-500 text-sm">No maintenance assets tracked.</p>
+                        <Button
+                          onClick={() => navigate('/operations/maintenance')}
+                          size="sm"
+                          variant="outline"
+                          className="border-indigo-200 text-indigo-600 hover:bg-indigo-50 dark:border-indigo-900/60 dark:text-indigo-400 dark:hover:bg-indigo-950/30 text-xs font-bold"
+                        >
+                          Go to Maintenance Manager
+                        </Button>
+                      </div>
+                    )}
                   </div>
                   <div className={card}>
-                    <h3 className="font-bold mb-4 text-lg">Recent Sessions</h3>
+                    <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-100 dark:border-slate-800">
+                      <h3 className="font-bold text-lg">Recent Sessions</h3>
+                      {data.siteMaintSessions.length > 0 && (
+                        <Button
+                          onClick={() => navigate('/operations/maintenance')}
+                          size="sm"
+                          variant="ghost"
+                          className="text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-950/30 text-xs font-bold"
+                        >
+                          View All
+                        </Button>
+                      )}
+                    </div>
                     {data.siteMaintSessions.length > 0 ? data.siteMaintSessions.slice(0, 8).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(session => (
                       <div key={session.id} className={cn('p-3 rounded-xl border mb-3', isDark ? 'bg-slate-800/50 border-slate-700' : 'bg-slate-50 border-slate-200')}>
                         <div className="flex justify-between mb-1">
@@ -1142,15 +1231,29 @@ Answer site-specific questions using this context only. Be concise.`;
                         {session.generalRemark && <p className="text-xs text-slate-400 mt-1">{session.generalRemark}</p>}
                         <p className="text-xs font-bold mt-1 text-rose-500">Cost: ₦{session.assets.reduce((a, x) => a + (x.cost || 0), 0).toLocaleString()}</p>
                       </div>
-                    )) : <p className="text-slate-500 text-sm text-center py-8">No maintenance sessions.</p>}
+                    )) : (
+                      <div className="flex flex-col items-center justify-center py-10 text-center gap-3">
+                        <p className="text-slate-500 text-sm">No maintenance sessions.</p>
+                        {currentUser?.privileges?.opsMaintenance?.canAdd && (
+                          <Button
+                            onClick={() => navigate('/operations/maintenance')}
+                            size="sm"
+                            variant="outline"
+                            className="border-indigo-200 text-indigo-600 hover:bg-indigo-50 dark:border-indigo-900/60 dark:text-indigo-400 dark:hover:bg-indigo-950/30 text-xs font-bold"
+                          >
+                            Log Maintenance Session
+                          </Button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               </>
             )}
 
-            {/* COMMS & TASKS */}
-            {activeTab === 'comms' && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+            {/* TASKS */}
+            {activeTab === 'tasks' && (
+              <div className="max-w-4xl mx-auto">
                 <div className={card}>
                   <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-100 dark:border-slate-800 flex-wrap gap-2">
                     <h3 className="font-bold text-lg flex items-center gap-2">
@@ -1189,14 +1292,16 @@ Answer site-specific questions using this context only. Be concise.`;
                           </button>
                         ))}
                       </div>
-                      <Button
-                        onClick={() => setShowAddTaskForm(!showAddTaskForm)}
-                        size="sm"
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg h-7 px-2.5 flex items-center gap-1 text-[11px] font-bold cursor-pointer"
-                      >
-                        <Plus className="w-3 h-3" />
-                        <span>Add Task</span>
-                      </Button>
+                      {currentUser?.privileges?.tasks?.canCreateTasks && (
+                        <Button
+                          onClick={() => setShowAddTaskForm(!showAddTaskForm)}
+                          size="sm"
+                          className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg h-7 px-2.5 flex items-center gap-1 text-[11px] font-bold cursor-pointer"
+                        >
+                          <Plus className="w-3 h-3" />
+                          <span>Add Task</span>
+                        </Button>
+                      )}
                     </div>
                   </div>
 
@@ -1427,13 +1532,20 @@ Answer site-specific questions using this context only. Be concise.`;
                     </div>
                   )}
                 </div>
+              </div>
+            )}
 
+            {/* COMMS */}
+            {activeTab === 'comms' && (
+              <div className="max-w-4xl mx-auto">
                 <div className={card}>
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="font-bold text-base sm:text-lg flex items-center gap-2"><MessagesSquare className="w-5 h-5 text-blue-500" /> Communication Logs ({data.siteComms.length})</h3>
-                    <Button onClick={() => setShowCommDialog(true)} size="sm" className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-1.5 rounded-xl h-9 px-2.5 sm:px-3 shrink-0">
-                      <Plus className="w-4 h-4" /><span className="hidden sm:inline">Add Log</span>
-                    </Button>
+                    {currentUser?.privileges?.commLog?.canAdd && (
+                      <Button onClick={() => setShowCommDialog(true)} size="sm" className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-1.5 rounded-xl h-9 px-2.5 sm:px-3 shrink-0">
+                        <Plus className="w-4 h-4" /><span className="hidden sm:inline">Add Log</span>
+                      </Button>
+                    )}
                   </div>
                   {data.siteComms.length > 0 ? (
                     <div className="relative pl-5 border-l-2 border-slate-200 dark:border-slate-700 space-y-4">
@@ -1448,61 +1560,6 @@ Answer site-specific questions using this context only. Be concise.`;
                       ))}
                     </div>
                   ) : <p className="text-slate-500 text-sm text-center py-8">No communication logs.</p>}
-
-                  {data.siteContacts.length > 0 && (
-                    <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800">
-                      <div 
-                        className="flex justify-between items-center mb-3 cursor-pointer select-none group"
-                        onClick={() => setIsContactsCollapsed(!isContactsCollapsed)}
-                      >
-                        <h4 className="font-bold flex items-center gap-2 group-hover:text-indigo-600 transition-colors">
-                          <Users className="w-4 h-4 text-indigo-500" /> Site Contacts
-                          {isContactsCollapsed ? <ChevronDown className="w-4 h-4 text-slate-400 ml-1" /> : <ChevronUp className="w-4 h-4 text-slate-400 ml-1" />}
-                        </h4>
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); setShowContactsPanel(true); }}
-                          className="text-xs text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 font-bold flex items-center gap-1 bg-transparent border-0 cursor-pointer"
-                        >
-                          <Pencil className="w-3 h-3" /> Edit Contacts
-                        </button>
-                      </div>
-                      <AnimatePresence initial={false}>
-                        {!isContactsCollapsed && (
-                          <motion.div
-                            initial={{ height: 0, opacity: 0 }}
-                            animate={{ height: 'auto', opacity: 1 }}
-                            exit={{ height: 0, opacity: 0 }}
-                            transition={{ duration: 0.2 }}
-                            className="overflow-hidden"
-                          >
-                            <div className="space-y-3 pt-1">
-                              {data.siteContacts.map(c => (
-                                <div key={c.id} className="py-2 flex justify-between items-center border-b border-slate-50 dark:border-slate-800/40 last:border-b-0">
-                                  <div className="min-w-0 flex-1 pr-3">
-                                    <p className="font-semibold text-sm truncate">
-                                      {c.name} <span className="text-xs text-indigo-500">· {c.position}</span>
-                                    </p>
-                                    <p className="text-xs text-slate-500 truncate mt-0.5">{[c.phone, c.email].filter(Boolean).join(' · ')}</p>
-                                  </div>
-                                  {c.position !== 'Past Contact' && (
-                                    <button
-                                      type="button"
-                                      onClick={() => setShowContactsPanel(true)}
-                                      className="text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800/60 bg-transparent border-0 cursor-pointer shrink-0"
-                                      title="Edit Contact Details"
-                                    >
-                                      <Pencil className="w-3.5 h-3.5" />
-                                    </button>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </div>
-                  )}
                 </div>
               </div>
             )}
@@ -1544,6 +1601,7 @@ Answer site-specific questions using this context only. Be concise.`;
 }
 
 function ExternalCommDialog({ open, onClose, site, contacts = [], onSave }: { open: boolean; onClose: () => void; site: Site; contacts: any[]; onSave: (log: any) => void }) {
+  const { user: authUser } = useAuth();
   const [form, setForm] = useState({
     subject: '',
     notes: '',
@@ -1597,7 +1655,7 @@ function ExternalCommDialog({ open, onClose, site, contacts = [], onSave }: { op
       outcome: form.outcome.trim() || undefined,
       followUpDate: form.followUpDate || undefined,
       followUpDone: false,
-      loggedBy: 'Admin',
+      loggedBy: authUser?.user_metadata?.name || authUser?.email || 'Admin',
       createdAt: new Date().toISOString(),
       isInternal: false,
     });

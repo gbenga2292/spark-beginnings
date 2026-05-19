@@ -197,27 +197,13 @@ export function Sites() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
-  const [activeTab, setActiveTab] = useState<'clients' | 'active' | 'pending'>(
-    (searchParams.get('tab') as any) || 'clients'
-  );
-
-  // Sync tab state to URL so back navigation restores the exact tab
-  useEffect(() => {
-    const currentTab = searchParams.get('tab');
-    if (currentTab !== activeTab) {
-      setSearchParams(prev => {
-        prev.set('tab', activeTab);
-        return prev;
-      }, { replace: true });
-    }
-  }, [activeTab, searchParams, setSearchParams]);
-
-  useEffect(() => {
-    const currentTab = searchParams.get('tab') as 'clients' | 'active' | 'pending';
-    if (currentTab && currentTab !== activeTab) {
-      setActiveTab(currentTab);
-    }
-  }, [searchParams]);
+  const activeTab = (searchParams.get('tab') as 'clients' | 'active' | 'pending') || 'clients';
+  const setActiveTab = (tab: 'clients' | 'active' | 'pending') => {
+    setSearchParams(prev => {
+      prev.set('tab', tab);
+      return prev;
+    }, { replace: true });
+  };
   const [viewMode, setViewMode] = useState<'card' | 'table'>('card');
   const [selectedLogsSiteId, setSelectedLogsSiteId] = useState<string | 'all'>('all');
   const [isAddingSite, setIsAddingSite] = useState(searchParams.get('action') === 'add');
@@ -365,8 +351,7 @@ export function Sites() {
   const setPendingSites = useAppStore((s) => s.setPendingSites);
   const updatePendingSite = useAppStore((s) => s.updatePendingSite);
   const deletePendingSite = useAppStore((s) => s.deletePendingSite);
-  const mainTasks = useAppStore((s) => (s as any).mainTasks ?? []);
-  const { createMainTask } = useAppData();
+  const { mainTasks, createMainTask } = useAppData();
 
   const handleDeletePending = async (site: SiteQuestionnaire) => {
     // Check for linked comm logs
@@ -1357,20 +1342,27 @@ export function Sites() {
                     >
                       <CardContent className="p-5 sm:p-6 pb-4">
                         <div className="flex items-start justify-between mb-3">
-                          <div className="flex gap-3">
+                          <div className="flex gap-3 min-w-0 flex-1">
                             <div className="h-10 w-10 rounded-lg bg-indigo-50 flex items-center justify-center shrink-0">
                               <MapPin className="h-5 w-5 text-indigo-500" />
                             </div>
-                            <div className="overflow-hidden">
-                              <h3 className="text-sm font-bold text-slate-800 uppercase truncate leading-tight" title={site.name}>{site.name}</h3>
-                              <div className="flex items-center gap-1.5 mt-0.5 font-semibold text-slate-500 text-xs">
-                                <Building2 className="h-3 w-3" /> <span className="truncate" title={site.client}>{site.client}</span>
+                            <div className="min-w-0 flex-1">
+                              <h3 className="text-sm font-bold text-slate-800 uppercase truncate leading-tight mb-1.5" title={site.name}>{site.name}</h3>
+                              <div className="flex items-center gap-2 font-semibold text-slate-500 text-xs">
+                                <Badge 
+                                  variant={site.status === 'Ended' ? 'destructive' : site.status === 'Active' ? 'success' : 'secondary'} 
+                                  className="text-[9px] uppercase font-bold px-1.5 py-0 shrink-0"
+                                >
+                                  {site.status}
+                                </Badge>
+                                <span className="text-slate-300 shrink-0">•</span>
+                                <div className="flex items-center gap-1 min-w-0">
+                                  <Building2 className="h-3 w-3 text-slate-400 shrink-0" />
+                                  <span className="truncate" title={site.client}>{site.client}</span>
+                                </div>
                               </div>
                             </div>
                           </div>
-                          <Badge variant={site.status === 'Ended' ? 'destructive' : site.status === 'Active' ? 'success' : 'secondary'} className="text-[10px] uppercase font-bold shrink-0 ml-2">
-                            {site.status}
-                          </Badge>
                         </div>
                         
                         <div className="grid grid-cols-2 gap-3 mb-4 mt-4 text-xs">
@@ -1555,20 +1547,27 @@ export function Sites() {
                   >
                     <CardContent className="p-4 pb-3">
                       <div className="flex items-start justify-between mb-3">
-                        <div className="flex gap-3">
+                        <div className="flex gap-3 min-w-0 flex-1">
                           <div className="h-8 w-8 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0">
                             <Clock className="h-4 w-4 text-slate-400" />
                           </div>
-                          <div className="overflow-hidden">
-                            <h3 className="text-sm font-bold text-slate-800 uppercase truncate leading-tight" title={site.siteName}>{site.siteName}</h3>
-                            <div className="flex items-center gap-1.5 mt-0.5 font-semibold text-slate-500 text-xs">
-                              <Building2 className="h-3 w-3" /> <span className="truncate" title={site.clientName}>{site.clientName}</span>
+                          <div className="min-w-0 flex-1">
+                            <h3 className="text-sm font-bold text-slate-800 uppercase truncate leading-tight mb-1" title={site.siteName}>{site.siteName}</h3>
+                            <div className="flex items-center gap-2 font-semibold text-slate-500 text-xs">
+                              <Badge 
+                                variant={site.status === 'Pending' ? 'outline' : 'success'} 
+                                className={cn("text-[9px] font-bold shrink-0 px-1.5 py-0", site.status === 'Pending' ? 'bg-slate-50 text-slate-500 border-slate-200' : '')}
+                              >
+                                {site.status}
+                              </Badge>
+                              <span className="text-slate-300 shrink-0">•</span>
+                              <div className="flex items-center gap-1 min-w-0">
+                                <Building2 className="h-3 w-3 text-slate-400 shrink-0" />
+                                <span className="truncate" title={site.clientName}>{site.clientName}</span>
+                              </div>
                             </div>
                           </div>
                         </div>
-                        <Badge variant={site.status === 'Pending' ? 'outline' : 'success'} className={`text-[10px] font-bold shrink-0 ml-2 ${site.status === 'Pending' ? 'bg-slate-50 text-slate-500 border-slate-200' : ''}`}>
-                          {site.status}
-                        </Badge>
                       </div>
 
                       <div className="grid grid-cols-5 gap-1 mb-3 bg-slate-50 rounded-md p-2">

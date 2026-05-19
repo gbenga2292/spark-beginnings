@@ -21,6 +21,7 @@ import type { SiteQuestionnaire } from '@/src/types/SiteQuestionnaire';
 import { useAppData, deriveMainTaskStatus } from '@/src/contexts/AppDataContext';
 import { useAuth } from '@/src/hooks/useAuth';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
+import { CreateTaskDialog } from './Tasks/CreateTaskDialog';
 
 // ────────────────────────────────────────────────────────────
 // Helpers
@@ -1097,311 +1098,7 @@ function LogForm({ form, onChange, onSave, onCancel, isEdit, editingId, isDark }
   );
 }
 
-// ────────────────────────────────────────────────────────────
-// CommLogTaskDialog — pre-filled task creator from a comm log
-// ────────────────────────────────────────────────────────────
-interface CommLogTaskDialogProps {
-  open: boolean;
-  onClose: () => void;
-  initialTitle: string;
-  initialDescription: string;
-  parentLogSubject?: string;
-  isDark: boolean;
-}
 
-function CommLogTaskDialog({ open, onClose, initialTitle, initialDescription, parentLogSubject, isDark }: CommLogTaskDialogProps) {
-  const { createMainTask, mainTasks, addSubtask, users } = useAppData();
-  const { user } = useAuth();
-
-  const [title, setTitle] = useState(initialTitle);
-  const [description, setDescription] = useState(initialDescription);
-  const [assignee, setAssignee] = useState<string[]>([]);
-  const [openDropdown, setOpenDropdown] = useState(false);
-  const [deadline, setDeadline] = useState('');
-  const [priority, setPriority] = useState<'low' | 'medium' | 'high'>('medium');
-  const [subtasks, setSubtasks] = useState<{ id: string; title: string }[]>([]);
-  const [newSubtask, setNewSubtask] = useState('');
-  const [saving, setSaving] = useState(false);
-
-  // reset when dialog opens with fresh data
-  const [didInit, setDidInit] = useState(false);
-  if (open && !didInit) {
-    setTitle(initialTitle);
-    setDescription(initialDescription);
-    setSubtasks([]);
-    setNewSubtask('');
-    setAssignee([]);
-    setOpenDropdown(false);
-    setDeadline('');
-    setPriority('medium');
-    setDidInit(true);
-  }
-  if (!open && didInit) setDidInit(false);
-
-  if (!open) return null;
-
-  const handleAddSubtask = () => {
-    const t = newSubtask.trim();
-    if (!t) return;
-    setSubtasks(prev => [...prev, { id: crypto.randomUUID(), title: t }]);
-    setNewSubtask('');
-  };
-
-  const removeSubtask = (id: string) => setSubtasks(prev => prev.filter(s => s.id !== id));
-
-  const handleSubmit = async () => {
-    if (!title.trim()) { toast.error('Task title is required'); return; }
-    setSaving(true);
-    
-    if (parentLogSubject) {
-      // It's a follow-up log, find or create the main task using parentLogSubject
-      const existingMainTask = mainTasks.find(m => m.title.trim().toLowerCase() === parentLogSubject.trim().toLowerCase());
-      
-      const newSubtasks = [
-        {
-          title: title.trim(),
-          description: description.trim(),
-          assignedTo: assignee.length > 0 ? assignee[0] : null,
-          status: 'not_started',
-          deadline: deadline || null,
-          priority,
-        },
-        ...subtasks.map(s => ({
-          title: s.title,
-          description: null,
-          assignedTo: null,
-          status: 'not_started',
-          deadline: null,
-          priority: null,
-        }))
-      ];
-
-      if (existingMainTask) {
-        // Main task exists, add subtasks
-        for (const sub of newSubtasks) {
-          await addSubtask({ ...sub, mainTaskId: existingMainTask.id });
-        }
-        toast.success(`Added follow-up task under "${existingMainTask.title}"`);
-      } else {
-        // Main task does not exist, create it then add subtasks
-        const newMainTask = await createMainTask({
-          title: parentLogSubject.trim(),
-          description: `Automatically created for communication thread: ${parentLogSubject}`,
-          createdBy: user?.id,
-          teamId: 'dcel-team',
-          workspaceId: 'dcel-team',
-          is_project: false,
-          is_hr_task: true,
-        }, []);
-        
-        if (newMainTask) {
-          for (const sub of newSubtasks) {
-            await addSubtask({ ...sub, mainTaskId: newMainTask.id });
-          }
-          toast.success('Main task and follow-up subtasks created');
-        }
-      }
-    } else {
-      // Normal flow (Main log task creation)
-      const subs = subtasks.map(s => ({ title: s.title, status: 'not_started' }));
-        await createMainTask({
-          title: title.trim(),
-          description: description.trim(),
-          createdBy: user?.id,
-          teamId: 'dcel-team',
-          workspaceId: 'dcel-team',
-          assignedTo: assignee.length > 0 ? assignee.join(',') : null,
-          deadline: deadline || null,
-          priority,
-          is_project: false,
-          is_hr_task: true,
-        }, subs);
-    }
-
-    setSaving(false);
-    onClose();
-  };
-
-  const inputCls = cn(
-    'flex h-9 w-full rounded-md border px-3 py-1 text-sm shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500',
-    isDark
-      ? 'bg-slate-800 border-slate-600 text-slate-100 placeholder:text-slate-500'
-      : 'bg-white border-slate-200 text-slate-900 placeholder:text-slate-400'
-  );
-  const labelCls = cn('text-xs font-semibold mb-1', isDark ? 'text-slate-400' : 'text-slate-500');
-  const overlayBg = 'fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4';
-  const cardCls = cn(
-    'relative w-full max-w-xl rounded-2xl border shadow-2xl overflow-hidden flex flex-col max-h-[90vh]',
-    isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'
-  );
-
-  const priorityStyles = {
-    low: { on: 'bg-slate-200 text-slate-700 border-slate-400', off: isDark ? 'border-slate-700 text-slate-500 hover:bg-slate-800' : 'border-slate-200 text-slate-400 hover:bg-slate-50' },
-    medium: { on: 'bg-amber-100 text-amber-700 border-amber-400', off: isDark ? 'border-slate-700 text-slate-500 hover:bg-slate-800' : 'border-slate-200 text-slate-400 hover:bg-slate-50' },
-    high: { on: 'bg-red-100 text-red-700 border-red-400', off: isDark ? 'border-slate-700 text-slate-500 hover:bg-slate-800' : 'border-slate-200 text-slate-400 hover:bg-slate-50' },
-  };
-
-  return (
-    <div className={overlayBg} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className={cardCls}>
-        {/* Header */}
-        <div className={cn('flex items-center justify-between px-5 py-4 border-b flex-shrink-0', isDark ? 'border-slate-700' : 'border-slate-100')}>
-          <div className="flex items-center gap-2">
-            <ClipboardList className={cn('w-5 h-5', isDark ? 'text-indigo-400' : 'text-indigo-600')} />
-            <h2 className={cn('text-base font-semibold', isDark ? 'text-slate-100' : 'text-slate-900')}>Create Task from Communication Log</h2>
-          </div>
-          <button onClick={onClose} className={cn('p-1.5 rounded-lg transition-colors', isDark ? 'text-slate-500 hover:bg-slate-800' : 'text-slate-400 hover:bg-slate-100')}>
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
-        {/* Body */}
-        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
-          {parentLogSubject && (
-            <div className={cn("p-3 rounded-lg border flex items-start gap-2", isDark ? 'bg-indigo-950/30 border-indigo-900/50' : 'bg-indigo-50 border-indigo-100')}>
-              <ClipboardList className="w-5 h-5 text-indigo-500 mt-0.5 flex-shrink-0" />
-              <div className="text-xs">
-                <span className="font-semibold text-indigo-600 dark:text-indigo-400">Threaded Follow-up Task:</span>
-                <p className="text-slate-600 dark:text-slate-300 mt-0.5">This will be added as a subtask under the main conversation task: <strong className="text-indigo-700 dark:text-indigo-300">{parentLogSubject}</strong>. If the main task doesn't exist yet, it will be automatically created.</p>
-              </div>
-            </div>
-          )}
-
-          {/* Title */}
-          <div>
-            <div className={labelCls}>Task Title *</div>
-            <input type="text" value={title} onChange={e => setTitle(e.target.value)} className={inputCls} placeholder="What needs to be done?" />
-          </div>
-
-          {/* Description (narrative) */}
-          <div>
-            <div className={labelCls}>Description <span className="font-normal text-indigo-500">(auto-generated from log — editable)</span></div>
-            <textarea
-              rows={6}
-              value={description}
-              onChange={e => setDescription(e.target.value)}
-              className={cn(inputCls, 'h-auto resize-none font-mono text-xs leading-relaxed')}
-            />
-          </div>
-
-          {/* Assignee + Deadline */}
-          <div className="grid grid-cols-2 gap-3 relative">
-            <div className="relative">
-              <div className={labelCls}>Assign To</div>
-              <div
-                onClick={() => setOpenDropdown(!openDropdown)}
-                className={cn(inputCls, 'cursor-pointer flex items-center justify-between')}
-              >
-                <span className="truncate pr-2">
-                  {assignee.length === 0 ? '— Unassigned —' : `${assignee.length} selected`}
-                </span>
-                <ChevronDown className="w-4 h-4 flex-shrink-0" />
-              </div>
-
-              {openDropdown && (
-                <div className={cn('absolute top-full left-0 mt-1 w-full max-h-[200px] overflow-y-auto rounded-lg border shadow-xl z-50', isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200')}>
-                  <div
-                    onClick={() => { setAssignee([]); setOpenDropdown(false); }}
-                    className={cn('flex items-center gap-2 px-3 py-2 cursor-pointer transition-colors border-b', isDark ? 'hover:bg-slate-700 border-slate-700' : 'hover:bg-slate-50 border-slate-100')}
-                  >
-                    <span className={cn('text-sm italic', isDark ? 'text-slate-400' : 'text-slate-500')}>— Clear Selection —</span>
-                  </div>
-                  {users.filter((u: any) => u.isActive !== false).map((u: any) => {
-                    const isSelected = assignee.includes(u.id);
-                    return (
-                      <div
-                        key={u.id}
-                        onClick={() => setAssignee(p => isSelected ? p.filter(id => id !== u.id) : [...p, u.id])}
-                        className={cn('flex items-center gap-2 px-3 py-2 cursor-pointer transition-colors', isDark ? 'hover:bg-slate-700' : 'hover:bg-slate-50')}
-                      >
-                        <div className={cn('w-4 h-4 rounded border flex items-center justify-center flex-shrink-0', isSelected ? 'bg-indigo-600 border-indigo-600 text-white' : isDark ? 'border-slate-500' : 'border-slate-300')}>
-                          {isSelected && <CheckCircle2 className="w-3 h-3" />}
-                        </div>
-                        <span className={cn('text-sm truncate font-medium', isDark ? 'text-slate-200' : 'text-slate-700')}>{u.name || u.email}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-            <div>
-              <div className={labelCls}>Due Date</div>
-              <input type="date" value={deadline} onChange={e => setDeadline(e.target.value)} className={inputCls} />
-            </div>
-          </div>
-
-          {/* Priority */}
-          <div>
-            <div className={labelCls}>Priority</div>
-            <div className="flex gap-2">
-              {(['low', 'medium', 'high'] as const).map(p => (
-                <button
-                  key={p}
-                  type="button"
-                  onClick={() => setPriority(p)}
-                  className={cn(
-                    'flex-1 py-1.5 rounded-lg text-xs font-semibold capitalize border transition-all',
-                    priority === p ? priorityStyles[p].on : priorityStyles[p].off
-                  )}
-                >
-                  {p}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Subtasks */}
-          <div>
-            <div className={cn('text-xs font-semibold mb-2 flex items-center gap-1.5', isDark ? 'text-slate-400' : 'text-slate-500')}>
-              <ListPlus className="w-3.5 h-3.5" /> Subtasks <span className="font-normal">(optional)</span>
-            </div>
-            {subtasks.length > 0 && (
-              <ul className="space-y-1.5 mb-2">
-                {subtasks.map((s, i) => (
-                  <li key={s.id} className={cn('flex items-center gap-2 text-sm px-3 py-1.5 rounded-lg border', isDark ? 'bg-slate-800 border-slate-700 text-slate-200' : 'bg-slate-50 border-slate-100 text-slate-700')}>
-                    <span className={cn('text-xs', isDark ? 'text-slate-500' : 'text-slate-400')}>{i + 1}.</span>
-                    <span className="flex-1">{s.title}</span>
-                    <button onClick={() => removeSubtask(s.id)} className={cn('transition-colors', isDark ? 'text-slate-600 hover:text-red-400' : 'text-slate-300 hover:text-red-500')}>
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-            <div className="flex gap-2">
-              <input
-                type="text"
-                placeholder="Add a subtask…"
-                value={newSubtask}
-                onChange={e => setNewSubtask(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddSubtask(); } }}
-                className={cn(inputCls, 'flex-1')}
-              />
-              <Button onClick={handleAddSubtask} variant="outline" className="h-9 px-3 gap-1 text-xs">
-                <Plus className="w-3.5 h-3.5" /> Add
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div className={cn('flex gap-2 px-5 py-4 border-t flex-shrink-0', isDark ? 'border-slate-700' : 'border-slate-100')}>
-          <Button
-            onClick={handleSubmit}
-            disabled={saving || !title.trim()}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2 flex-1 disabled:opacity-50"
-          >
-            <ClipboardList className="w-4 h-4" />
-            {saving ? 'Creating…' : `Create Task${subtasks.length > 0 ? ` + ${subtasks.length} subtask${subtasks.length > 1 ? 's' : ''}` : ''}`}
-          </Button>
-          <Button variant="outline" onClick={onClose} className="gap-2">
-            <X className="w-4 h-4" /> Skip
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // ────────────────────────────────────────────────────────────
 // LogCard component
@@ -1676,7 +1373,8 @@ export function CommLog() {
   const addCommLog = useAppStore(s => s.addCommLog);
   const updateCommLog = useAppStore(s => s.updateCommLog);
   const deleteCommLog = useAppStore(s => s.deleteCommLog);
-  const { mainTasks, subtasks } = useAppData();
+  const clientProfiles = useAppStore(s => s.clientProfiles);
+  const { mainTasks, subtasks, users } = useAppData();
 
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -1689,7 +1387,7 @@ export function CommLog() {
   const [expandedClients, setExpandedClients] = useState<Set<string>>(new Set());
 
   // Task-from-log dialog state
-  const [taskDialog, setTaskDialog] = useState<{ open: boolean; title: string; description: string; parentLogSubject?: string }>(
+  const [taskDialog, setTaskDialog] = useState<{ open: boolean; title: string; description: string; parentLogSubject?: string; clientId?: string; siteId?: string }>(
     { open: false, title: '', description: '' }
   );
 
@@ -1888,11 +1586,18 @@ export function CommLog() {
           }
         }
 
+        // Prefill client profile ID matching name form.client
+        const matchedClient = clientProfiles.find(
+          c => c.name.trim().toLowerCase() === form.client.trim().toLowerCase()
+        );
+
         setTaskDialog({
           open: true,
           title: initialTitle,
           description: buildTaskDescription(form),
-          parentLogSubject: parentSubject
+          parentLogSubject: parentSubject,
+          clientId: matchedClient?.id || "",
+          siteId: form.siteId || ""
         });
       }
     }
@@ -1972,14 +1677,19 @@ export function CommLog() {
 
   return (
     <>
-      <CommLogTaskDialog
-        open={taskDialog.open}
-        onClose={() => setTaskDialog(d => ({ ...d, open: false }))}
-        initialTitle={taskDialog.title}
-        initialDescription={taskDialog.description}
-        parentLogSubject={taskDialog.parentLogSubject}
-        isDark={isDark}
-      />
+      {taskDialog.open && (
+        <CreateTaskDialog
+          onClose={() => setTaskDialog(d => ({ ...d, open: false }))}
+          users={users}
+          currentUserId={currentUser?.id ?? ""}
+          teamId="dcel-team"
+          workspaceId="dcel-team"
+          initialTitle={taskDialog.title}
+          initialDescription={taskDialog.description}
+          initialClientId={taskDialog.clientId}
+          initialSiteId={taskDialog.siteId}
+        />
+      )}
       <div className={cn('flex flex-col h-full min-h-0', panelBg)}>
 
         {/* ── Mobile New Log Button ── */}

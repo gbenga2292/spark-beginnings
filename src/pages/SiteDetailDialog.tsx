@@ -87,7 +87,10 @@ export function SiteDetailDialog({ site, filterMonth, filterYear, onClose, onEdi
     const activeDays = machineLogs.filter(l => l.isActive).length;
 
     // Maintenance
-    const siteMaintAssets = maintenanceAssets.filter(a => a.site?.trim() === site.name.trim());
+    const siteMaintAssets = maintenanceAssets.filter(a => {
+      const aSite = (a.site || '').trim().toLowerCase();
+      return aSite === site.name.trim().toLowerCase() || aSite === site.id.trim().toLowerCase();
+    });
     const siteMaintSessions = maintenanceSessions.filter(s_session => {
       const assetNamesInSession = s_session.assets.map(a => a.assetName);
       return assetNamesInSession.some(n => siteMaintAssets.some(a => a.name === n));

@@ -185,9 +185,6 @@ export function SiteInventoryView({ site, questionnaire, onBack }: SiteInventory
     isSubViewActive ? null : site.name,
     questionnaire?.contactPersonPhone ? `Contact: ${questionnaire.contactPersonPhone}` : 'Site Overview',
     <div className="flex items-center gap-1 sm:gap-2">
-      <Button variant="outline" size="icon" className="h-8 w-8 sm:h-9 sm:w-auto sm:px-3 sm:gap-2" onClick={onBack}>
-        <ArrowLeft className="h-4 w-4" /> <span className="hidden sm:inline">Back</span>
-      </Button>
       <Button variant="outline" size="icon" className="h-8 w-8 sm:h-9 sm:w-auto sm:px-3 sm:gap-2" onClick={() => setShowReturnWaybill(true)} title="Return Waybill">
         <RotateCcw className="h-4 w-4" /> <span className="hidden sm:inline">Return</span>
       </Button>
@@ -197,7 +194,9 @@ export function SiteInventoryView({ site, questionnaire, onBack }: SiteInventory
       <Button variant="outline" size="icon" className="h-8 w-8 sm:h-9 sm:w-9" onClick={() => setShowReportDialog(true)} title="Generate Report">
         <FileText className="h-4 w-4" />
       </Button>
-    </div>
+    </div>,
+    [site.name, questionnaire, onBack],
+    onBack
   );
 
   if (showReturnWaybill) {
