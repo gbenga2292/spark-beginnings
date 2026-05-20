@@ -52,7 +52,7 @@ import {
   FolderOpen,
   TrendingUp
 } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { NairaSign } from '@/src/components/ui/naira-sign';
 import { 
   Dialog, 
@@ -101,6 +101,16 @@ const navigation: NavCategory[] = [
       { name: 'Dashboard', href: '/tasks/dashboard', icon: LayoutDashboard, privKey: 'tasks', privField: 'canViewDashboard' },
     ],
   },
+  // ── Client 360 — standalone direct link ──────────────────────────────────
+  {
+    name: 'Client 360',
+    icon: Sparkles,
+    standalone: true,
+    standaloneHref: '/client-360',
+    items: [
+      { name: 'Client 360', href: '/client-360', icon: Sparkles, privKey: 'sites', privField: 'canView' },
+    ],
+  },
   // ── Tasks ────────────────────────────────────────────────────────
   {
     name: 'Tasks',
@@ -108,6 +118,15 @@ const navigation: NavCategory[] = [
     items: [
       { name: 'Task Register', href: '/tasks', icon: ClipboardCheck, privKey: 'tasks', privField: 'canViewMyTasks' },
       { name: 'Reminders', href: '/tasks/reminders', icon: Bell, privKey: 'tasks', privField: 'canViewReminders' },
+    ],
+  },
+  // ── Comms & Journals ──────────────────────────────────────────────────────
+  {
+    name: 'Comms & Journals',
+    icon: MessageSquare,
+    items: [
+      { name: 'External Comms', href: '/comm-log', icon: MessageSquare, privKey: 'commLog', privField: 'canView' },
+      { name: 'Daily Journal', href: '/daily-journal', icon: BookOpen, privKey: 'dailyJournal', privField: 'canView' },
     ],
   },
   // ── HR ───────────────────────────────────────────────────────────────────
@@ -139,16 +158,6 @@ const navigation: NavCategory[] = [
       { name: 'Maintenance', href: '/operations/maintenance', icon: Activity, privKey: 'opsMaintenance', privField: 'canView' },
       { name: 'Vehicles', href: '/operations/vehicles', icon: Truck, privKey: 'opsVehicles', privField: 'canView' },
       { name: 'Sites', href: '/operations/sites', icon: MapPin, privKey: 'opsSites', privField: 'canView' },
-    ],
-  },
-  // ── Clients & Sites ───────────────────────────────────────────────────────
-  {
-    name: 'Clients & Sites',
-    icon: Building2,
-    items: [
-      { name: 'Client 360', href: '/client-360', icon: Sparkles, privKey: 'sites', privField: 'canView' },
-      { name: 'External Comms', href: '/comm-log', icon: MessageSquare, privKey: 'commLog', privField: 'canView' },
-      { name: 'Daily Journal', href: '/daily-journal', icon: BookOpen, privKey: 'dailyJournal', privField: 'canView' },
     ],
   },
   // ── Account ───────────────────────────────────────────────────────────────
@@ -193,6 +202,37 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
   const navigate = useNavigate();
   const [expandedCategories, setExpandedCategories] = useState<string[]>([]);
   const [isCollapsed, setIsCollapsed] = useState(false);
+
+  // Track whether collapse was triggered automatically (non-sidebar page)
+  // vs manually by the user. We only auto-restore on auto-collapse.
+  const autoCollapsedRef = useRef(false);
+
+  // Flat list of all hrefs that appear in the sidebar navigation
+  const allSidebarHrefs = navigation.flatMap(cat =>
+    cat.standaloneHref ? [cat.standaloneHref] : cat.items.map(item => item.href)
+  );
+
+  useEffect(() => {
+    const isOnSidebarPage = allSidebarHrefs.some(href =>
+      location.pathname === href ||
+      (href !== '/' && location.pathname.startsWith(href + '/'))
+    );
+
+    if (!isOnSidebarPage) {
+      // Auto-collapse when on a non-sidebar page
+      if (!isCollapsed) {
+        autoCollapsedRef.current = true;
+        setIsCollapsed(true);
+      }
+    } else {
+      // Restore only if we were the ones who auto-collapsed it
+      if (autoCollapsedRef.current) {
+        autoCollapsedRef.current = false;
+        setIsCollapsed(false);
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname]);
   
   // ── Platform Detection ─────────────────────────────────────────────────
   // We only want to show the APK update UI on the actual Android device.
@@ -409,7 +449,7 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
           <div className="flex items-center">
             {/* Desktop Collapse Toggle */}
             <button
-              onClick={() => setIsCollapsed(!isCollapsed)}
+              onClick={() => { autoCollapsedRef.current = false; setIsCollapsed(!isCollapsed); }}
               className={cn('hidden lg:flex p-1.5 rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors', isDark && 'hover:bg-slate-800 hover:text-slate-300')}
               title={isCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
             >
@@ -427,7 +467,7 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
             {navigation.map((category) => {
               // ── Web Version Category Filtering ────────────────────────────────
               if (IS_LIMITED_WEB_WEB) {
-                const allowedCategories = ['Dashboard', 'Tasks', 'Account', 'Clients & Sites'];
+                const allowedCategories = ['Dashboard', 'Client 360', 'Tasks', 'Account', 'Comms & Journals'];
                 if (!allowedCategories.includes(category.name)) return null;
               }
 

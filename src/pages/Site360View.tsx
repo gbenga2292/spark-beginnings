@@ -816,24 +816,25 @@ Answer site-specific questions using this context only. Be concise.`;
           )}
 
           {/* Tabs */}
-          <div className={cn('flex items-center justify-between border-b mb-6 gap-4', isDark ? 'border-slate-800' : 'border-slate-200')}>
-            <div className="flex items-center gap-1 overflow-x-auto style-scroll pb-px flex-1">
+          <div className={cn('flex items-center justify-between border-b mb-6 gap-2 min-w-0 overflow-hidden', isDark ? 'border-slate-800' : 'border-slate-200')}>
+            <div className="flex items-center gap-0 overflow-x-auto style-scroll pb-px flex-1 min-w-0">
               {tabs.map(tab => (
                 <button key={tab.id} onClick={() => setActiveTab(tab.id)}
                   className={cn(
-                    'flex items-center gap-2 px-4 py-3 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap',
+                    'flex items-center gap-1 min-[480px]:gap-1.5 px-1.5 min-[480px]:px-2.5 sm:px-3.5 py-3 text-xs sm:text-sm font-semibold border-b-2 transition-colors shrink-0',
                     activeTab === tab.id
                       ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400'
                       : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
                   )}>
-                  <tab.icon className="w-4 h-4" /> {tab.label}
+                  <tab.icon className="w-3.5 h-3.5 shrink-0" />
+                  <span className="hidden min-[480px]:inline whitespace-nowrap">{tab.label}</span>
                 </button>
               ))}
             </div>
-            <div className="shrink-0 pb-1 pr-1">
+            <div className="shrink-0 pb-1">
               {currentUser?.privileges?.sites?.canEditSite && (
-                <Button onClick={() => onEditSite(site)} variant="outline" size="sm" className={cn("h-8 text-xs px-2 sm:px-3 font-medium shadow-sm transition-colors", isDark ? "bg-slate-900 border-slate-700 hover:bg-slate-800 text-slate-200" : "bg-white border-slate-200 hover:bg-slate-50 text-slate-700")}>
-                  <Settings2 className="w-3.5 h-3.5 sm:mr-1.5" /><span className="hidden sm:inline">Edit Site</span>
+                <Button onClick={() => onEditSite(site)} variant="outline" size="sm" title="Edit Site" className={cn("h-8 text-xs px-2 font-medium shadow-sm transition-colors flex items-center gap-1", isDark ? "bg-slate-900 border-slate-700 hover:bg-slate-800 text-slate-200" : "bg-white border-slate-200 hover:bg-slate-50 text-slate-700")}>
+                  <Settings2 className="w-3.5 h-3.5 shrink-0" /><span className="hidden min-[600px]:inline">Edit Site</span>
                 </Button>
               )}
             </div>

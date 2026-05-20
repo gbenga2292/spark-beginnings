@@ -332,7 +332,7 @@ export function Payments({ setPreviewModal, searchTerm = '' }: { setPreviewModal
         }
         if (searchTerm) {
             const lowerSearch = searchTerm.toLowerCase();
-            filtered = payments.filter(p => 
+            filtered = filtered.filter(p => 
                 (p.client && p.client.toLowerCase().includes(lowerSearch)) ||
                 (p.site && p.site.toLowerCase().includes(lowerSearch)) ||
                 (p.id && p.id.toLowerCase().includes(lowerSearch))

@@ -10,12 +10,12 @@ import { format } from 'date-fns';
 import { usePayrollCalculator } from '@/src/hooks/usePayrollCalculator';
 import { calculateAttendanceMetrics } from '@/src/lib/attendanceLogic';
 
-export function SiteSummary({ filterYear, filterMonth }: { filterYear?: string, filterMonth?: string } = {}) {
+export function SiteSummary({ filterYears = [], filterMonths = [] }: { filterYears?: string[], filterMonths?: string[] } = {}) {
   const [internalMonth, setInternalMonth] = useState(new Date().getMonth() + 1);
   const [internalYear, setInternalYear] = useState(new Date().getFullYear().toString());
 
-  const selectedMonth = filterMonth && filterMonth !== 'All' ? parseInt(filterMonth, 10) : internalMonth;
-  const selectedYear = filterYear && filterYear !== 'All' ? filterYear : internalYear;
+  const selectedMonth = filterMonths.length > 0 && !filterMonths.includes('All') ? parseInt(filterMonths[0], 10) : internalMonth;
+  const selectedYear = filterYears.length > 0 && !filterYears.includes('All') ? filterYears[0] : internalYear;
 
   const monthValues = useAppStore(s => s.monthValues);
   const attendanceRecords = useAppStore(s => s.attendanceRecords);
@@ -52,10 +52,10 @@ export function SiteSummary({ filterYear, filterMonth }: { filterYear?: string, 
   const results: { name: string; client: string; cost: number; teamSize: number }[] = [];
   let grandTotal = 0;
 
-    const filterAllMonths = filterMonth === 'All';
+    const filterAllMonths = filterMonths.includes('All') || filterMonths.length === 0;
     const monthsToProcess = filterAllMonths 
       ? Array.from({ length: parseInt(selectedYear) === new Date().getFullYear() ? new Date().getMonth() + 1 : 12 }, (_, i) => i + 1)
-      : [selectedMonth];
+      : filterMonths.map(m => parseInt(m, 10)).filter(m => !isNaN(m));
 
     // Build a Master Client Map for accuracy
     const masterSiteMap: Record<string, { client: string; name: string }> = {};

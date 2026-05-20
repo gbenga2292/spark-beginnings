@@ -1,5 +1,5 @@
 import { formatDisplayDate, normalizeDate } from '@/src/lib/dateUtils';
-import { useState, useMemo, useRef, startTransition } from 'react';
+import { useState, useMemo, useRef, startTransition, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/src/components/ui/card';
 import { Button } from '@/src/components/ui/button';
@@ -85,6 +85,7 @@ export function FinancialReports() {
   const [filterYear, setFilterYear] = useState<string>(String(new Date().getFullYear()));
   const [filterMonth, setFilterMonth] = useState<string>('All');
   const [filterClient, setFilterClient] = useState<string>('All');
+  const [priorPeriodLimit, setPriorPeriodLimit] = useState<'none' | 'all' | 'this-year' | 'prev-month' | 'prev-2-months'>('none');
   const [mainTab, setMainTab] = useState<'client-account' | 'payroll-summary' | 'site-summary' | 'ledger-summary'>('client-account');
   const [reportBuilderOpen, setReportBuilderOpen] = useState(false);
   const sitesPriv = usePriv('sites');
@@ -413,73 +414,38 @@ export function FinancialReports() {
   }), [rawPayments, filterYear, filterMonth, filterClient]);
 
   const vatPayments = useMemo(() => rawVatPayments.filter(v => {
-    const normalized = normalizeDate(v.date);
-    const matchY = filterYear === 'All' || (normalized && normalized.startsWith(filterYear));
-    let matchM = filterMonth === 'All';
-    if (!matchM) {
-      if (normalized) {
-        matchM = parseInt(normalized.substring(5, 7), 10) === parseInt(filterMonth, 10);
-      } else if (v.date && v.date.includes('/')) {
-        const parts = v.date.split('/');
-        if (parts.length === 3) matchM = parseInt(parts[1], 10) === parseInt(filterMonth, 10);
+    const matchC = filterClient === 'All' || (v.client || '').trim() === filterClient.trim();
+    if (!matchC) return false;
+
+    let matchY = filterYear === 'All';
+    if (!matchY) {
+      if (v.year) {
+        matchY = v.year === filterYear;
+      } else {
+        const normalized = normalizeDate(v.date);
+        matchY = !!(normalized && normalized.startsWith(filterYear));
       }
     }
-    const matchC = filterClient === 'All' || (v.client || '').trim() === filterClient.trim();
-    return matchY && matchM && matchC;
-  }), [rawVatPayments, filterYear, filterMonth, filterClient]);
 
-  // Core Metrics
-  const globalStats = useMemo(() => {
-    let totalBilled = 0, totalVATInvoiced = 0;
-    invoices.forEach(inv => {
-      totalBilled += (inv.amount || 0);
-      totalVATInvoiced += (inv.vat || 0);
-    });
-
-    let totalCollectedCash = 0, totalWHT = 0, totalDiscount = 0, totalVATCollected = 0;
-    const clientVatMap = new Map<string, number>();
-    
-    // OPTIMIZED: O(1) Site Lookup to prevent O(N*M) loop
-    const siteIndex = new Map<string, any>();
-    sites.forEach(s => siteIndex.set(`${(s.client || '').trim()}|${(s.name || '').trim()}`, s));
-    pendingSites.forEach(ps => {
-      const key = `${(ps.clientName || '').trim()}|${(ps.siteName || '').trim()}`;
-      if (!siteIndex.has(key)) {
-        siteIndex.set(key, { 
-          vat: ps.phase4?.clientTaxStatus?.includes('Add') ? 'Add' : 
-               ps.phase4?.clientTaxStatus?.includes('Yes') ? 'Yes' : 'No' 
-        });
+    let matchM = filterMonth === 'All';
+    if (!matchM) {
+      if (v.month) {
+        const mVal = parseInt(filterMonth, 10);
+        const expectedMonthName = MONTHS_LIST[mVal - 1]?.label || '';
+        matchM = v.month.toLowerCase() === expectedMonthName.toLowerCase();
+      } else {
+        const normalized = normalizeDate(v.date);
+        if (normalized) {
+          matchM = parseInt(normalized.substring(5, 7), 10) === parseInt(filterMonth, 10);
+        } else if (v.date && v.date.includes('/')) {
+          const parts = v.date.split('/');
+          if (parts.length === 3) matchM = parseInt(parts[1], 10) === parseInt(filterMonth, 10);
+        }
       }
-    });
+    }
 
-    payments.forEach(p => {
-      totalCollectedCash += (p.amount || 0);
-      totalWHT += (p.withholdingTax || 0);
-      totalDiscount += (p.discount || 0);
-      
-      const siteKey = `${(p.client || '').trim()}|${(p.site || '').trim()}`;
-      const payVat = p.payVat || siteIndex.get(siteKey)?.vat || 'No';
-      const { vat } = getVatDetails(p.amount || 0, payVat, vatRate, (p as any).damages || 0);
-      
-      if (vat > 0) clientVatMap.set(p.client, (clientVatMap.get(p.client) || 0) + vat);
-      totalVATCollected += (vat || 0);
-    });
-
-    const totalValueCleared = totalCollectedCash + totalWHT + totalDiscount;
-    const totalOutstanding = Math.max(0, totalBilled - totalValueCleared);
-    
-    const vatSources = Array.from(clientVatMap.entries())
-      .map(([client, amount]) => ({ client, amount }))
-      .sort((a, b) => b.amount - a.amount);
-    
-    const totalVATRemitted = vatPayments.reduce((sum, vp) => sum + (vp.amount || 0), 0);
-    const vatDeficit = totalVATCollected - totalVATRemitted;
-    
-    return { totalBilled, totalVATInvoiced, totalCollectedCash, totalValueCleared, totalOutstanding, totalWHT, totalDiscount, totalVATCollected, totalVATRemitted, vatDeficit, vatSources };
-  }, [invoices, payments, vatPayments, sites, vatRate]);
-
-  const collectionRate = globalStats.totalBilled > 0
-    ? Math.round((globalStats.totalValueCleared / globalStats.totalBilled) * 100) : 0;
+    return matchY && matchM;
+  }), [rawVatPayments, filterYear, filterMonth, filterClient]);
 
   // Trend Data
   const trendData = useMemo(() => {
@@ -522,15 +488,54 @@ export function FinancialReports() {
       .slice(0, 10);
   }, [invoices, payments, debtorView]);
 
-  // Balance Brought Forward — net balance from ALL years strictly before filterYear, per client/site key
+  // Balance Brought Forward — net balance from ALL dates strictly before the filtered period (year/month)
   const bfData = useMemo(() => {
     if (filterYear === 'All') return new Map<string, number>();
-    const cutoff = filterYear; // e.g. '2026'
     const bfMap = new Map<string, number>();
+
+    // Determine the cutoff date string (YYYY-MM)
+    let cutoffYM = `${filterYear}-01`;
+    if (filterMonth !== 'All') {
+      const mVal = parseInt(filterMonth, 10);
+      cutoffYM = `${filterYear}-${mVal.toString().padStart(2, '0')}`;
+    }
+
+    const isWithinPriorRange = (dateYM: string) => {
+      if (dateYM >= cutoffYM) return false;
+      if (priorPeriodLimit === 'none') return false;
+      if (priorPeriodLimit === 'all') return true;
+      
+      const currYear = parseInt(filterYear, 10);
+      const currMonth = filterMonth !== 'All' ? parseInt(filterMonth, 10) : 1;
+      const currentMonthValue = currYear * 12 + currMonth;
+
+      const dateYear = parseInt(dateYM.substring(0, 4), 10);
+      const dateMonth = parseInt(dateYM.substring(5, 7), 10);
+      const dateMonthValue = dateYear * 12 + dateMonth;
+      const diff = currentMonthValue - dateMonthValue;
+      
+      if (priorPeriodLimit === 'prev-month') {
+        return diff === 1;
+      }
+      
+      if (priorPeriodLimit === 'prev-2-months') {
+        return diff === 1 || diff === 2;
+      }
+      
+      if (priorPeriodLimit === 'this-year') {
+        const lowerYM = `${currYear}-01`;
+        return dateYM >= lowerYM;
+      }
+      
+      return true;
+    };
 
     rawInvoices.forEach(inv => {
       const normalized = normalizeDate(inv.date);
-      if (!normalized || normalized.substring(0, 4) >= cutoff) return;
+      if (!normalized) return;
+      const dateYM = normalized.substring(0, 7);
+      if (!isWithinPriorRange(dateYM)) return;
+      
       const matchC = filterClient === 'All' || (inv.client || '').trim() === filterClient;
       if (!matchC) return;
       const siteName = (inv.siteName || (inv as any).site || 'Unknown Site').trim();
@@ -541,7 +546,10 @@ export function FinancialReports() {
 
     rawPayments.forEach(pay => {
       const normalized = normalizeDate(pay.date);
-      if (!normalized || normalized.substring(0, 4) >= cutoff) return;
+      if (!normalized) return;
+      const dateYM = normalized.substring(0, 7);
+      if (!isWithinPriorRange(dateYM)) return;
+
       const matchC = filterClient === 'All' || (pay.client || '').trim() === filterClient;
       if (!matchC) return;
       const siteName = (pay.site || 'Unknown Site').trim();
@@ -552,7 +560,199 @@ export function FinancialReports() {
     });
 
     return bfMap;
-  }, [rawInvoices, rawPayments, filterYear, filterClient, summaryTab]);
+  }, [rawInvoices, rawPayments, filterYear, filterMonth, filterClient, summaryTab, priorPeriodLimit]);
+
+  // VAT Brought Forward — VAT liability from prior periods (collected - remitted)
+  const bfVatData = useMemo(() => {
+    const bfVatPaidMap = new Map<string, number>();
+    const bfVatRemittedMap = new Map<string, number>();
+    const bfVatOwedMap = new Map<string, number>();
+
+    if (filterYear === 'All') {
+      return { bfVatPaidMap, bfVatRemittedMap, bfVatOwedMap };
+    }
+
+    // Determine the cutoff date string (YYYY-MM)
+    let cutoffYM = `${filterYear}-01`;
+    if (filterMonth !== 'All') {
+      const mVal = parseInt(filterMonth, 10);
+      cutoffYM = `${filterYear}-${mVal.toString().padStart(2, '0')}`;
+    }
+
+    const isWithinPriorRange = (dateYM: string) => {
+      if (dateYM >= cutoffYM) return false;
+      if (priorPeriodLimit === 'none') return false;
+      if (priorPeriodLimit === 'all') return true;
+      
+      const currYear = parseInt(filterYear, 10);
+      const currMonth = filterMonth !== 'All' ? parseInt(filterMonth, 10) : 1;
+      const currentMonthValue = currYear * 12 + currMonth;
+
+      const dateYear = parseInt(dateYM.substring(0, 4), 10);
+      const dateMonth = parseInt(dateYM.substring(5, 7), 10);
+      const dateMonthValue = dateYear * 12 + dateMonth;
+      const diff = currentMonthValue - dateMonthValue;
+      
+      if (priorPeriodLimit === 'prev-month') {
+        return diff === 1;
+      }
+      
+      if (priorPeriodLimit === 'prev-2-months') {
+        return diff === 1 || diff === 2;
+      }
+      
+      if (priorPeriodLimit === 'this-year') {
+        const lowerYM = `${currYear}-01`;
+        return dateYM >= lowerYM;
+      }
+      
+      return true;
+    };
+
+    // O(1) Site Lookup to prevent O(N*M) loop
+    const siteIndex = new Map<string, any>();
+    sites.forEach(s => siteIndex.set(`${(s.client || '').trim()}|${(s.name || '').trim()}`, s));
+    pendingSites.forEach(ps => {
+      const key = `${(ps.clientName || '').trim()}|${(ps.siteName || '').trim()}`;
+      if (!siteIndex.has(key)) {
+        siteIndex.set(key, { 
+          vat: ps.phase4?.clientTaxStatus?.includes('Add') ? 'Add' : 
+               ps.phase4?.clientTaxStatus?.includes('Yes') ? 'Yes' : 'No' 
+        });
+      }
+    });
+
+    // 1. VAT collected on payments before cutoffYM
+    rawPayments.forEach(pay => {
+      const normalized = normalizeDate(pay.date);
+      if (!normalized) return;
+      const dateYM = normalized.substring(0, 7);
+      if (!isWithinPriorRange(dateYM)) return;
+
+      const matchC = filterClient === 'All' || (pay.client || '').trim() === filterClient.trim();
+      if (!matchC) return;
+      const siteName = (pay.site || 'Unknown Site').trim();
+      const clientName = (pay.client || '').trim();
+      const key = summaryTab === 'client' ? clientName : `${clientName} - ${siteName}`;
+
+      const siteKey = `${clientName}|${siteName}`;
+      const payVatSetting = pay.payVat || siteIndex.get(siteKey)?.vat || 'No';
+      const { vat } = getVatDetails(pay.amount || 0, payVatSetting, vatRate, (pay as any).damages || 0);
+
+      bfVatPaidMap.set(key, (bfVatPaidMap.get(key) || 0) + (vat || 0));
+      bfVatOwedMap.set(key, (bfVatOwedMap.get(key) || 0) + (vat || 0));
+    });
+
+    // 2. VAT remitted before cutoffYM
+    rawVatPayments.forEach(vp => {
+      const matchC = filterClient === 'All' || (vp.client || '').trim() === filterClient.trim();
+      if (!matchC) return;
+
+      let vYear = 0;
+      let vMonthIndex = 1;
+
+      if (vp.year) {
+        vYear = parseInt(vp.year, 10);
+        if (vp.month) {
+          const mLower = vp.month.toLowerCase();
+          const found = MONTHS_LIST.find(m => m.key.toLowerCase() === mLower || m.label.toLowerCase() === mLower);
+          vMonthIndex = found ? found.value : 1;
+        }
+      } else {
+        const normalized = normalizeDate(vp.date);
+        if (normalized) {
+          vYear = parseInt(normalized.substring(0, 4), 10);
+          vMonthIndex = parseInt(normalized.substring(5, 7), 10);
+        } else if (vp.date && vp.date.includes('/')) {
+          const parts = vp.date.split('/');
+          if (parts.length === 3) {
+            vYear = parseInt(parts[2], 10);
+            vMonthIndex = parseInt(parts[1], 10);
+          }
+        }
+      }
+
+      if (vYear === 0) return;
+
+      const dateYM = `${vYear}-${vMonthIndex.toString().padStart(2, '0')}`;
+      if (!isWithinPriorRange(dateYM)) return;
+
+      const clientName = (vp.client || '').trim();
+      const key = clientName; // VAT payments are client-level
+      bfVatRemittedMap.set(key, (bfVatRemittedMap.get(key) || 0) + (vp.amount || 0));
+      bfVatOwedMap.set(key, (bfVatOwedMap.get(key) || 0) - (vp.amount || 0));
+    });
+
+    return { bfVatPaidMap, bfVatRemittedMap, bfVatOwedMap };
+  }, [rawPayments, rawVatPayments, filterYear, filterMonth, filterClient, summaryTab, sites, pendingSites, vatRate, priorPeriodLimit]);
+
+  // Core Metrics
+  const globalStats = useMemo(() => {
+    let totalBilled = 0, totalVATInvoiced = 0;
+    invoices.forEach(inv => {
+      totalBilled += (inv.amount || 0);
+      totalVATInvoiced += (inv.vat || 0);
+    });
+
+    let totalCollectedCash = 0, totalWHT = 0, totalDiscount = 0, totalVATCollected = 0;
+    const clientVatMap = new Map<string, number>();
+    
+    // OPTIMIZED: O(1) Site Lookup to prevent O(N*M) loop
+    const siteIndex = new Map<string, any>();
+    sites.forEach(s => siteIndex.set(`${(s.client || '').trim()}|${(s.name || '').trim()}`, s));
+    pendingSites.forEach(ps => {
+      const key = `${(ps.clientName || '').trim()}|${(ps.siteName || '').trim()}`;
+      if (!siteIndex.has(key)) {
+        siteIndex.set(key, { 
+          vat: ps.phase4?.clientTaxStatus?.includes('Add') ? 'Add' : 
+               ps.phase4?.clientTaxStatus?.includes('Yes') ? 'Yes' : 'No' 
+        });
+      }
+    });
+
+    payments.forEach(p => {
+      totalCollectedCash += (p.amount || 0);
+      totalWHT += (p.withholdingTax || 0);
+      totalDiscount += (p.discount || 0);
+      
+      const siteKey = `${(p.client || '').trim()}|${(p.site || '').trim()}`;
+      const payVat = p.payVat || siteIndex.get(siteKey)?.vat || 'No';
+      const { vat } = getVatDetails(p.amount || 0, payVat, vatRate, (p as any).damages || 0);
+      
+      if (vat > 0) clientVatMap.set(p.client, (clientVatMap.get(p.client) || 0) + vat);
+      totalVATCollected += (vat || 0);
+    });
+
+    if (priorPeriodLimit !== 'none') {
+      bfVatData.bfVatPaidMap.forEach((vat, client) => {
+        if (vat > 0) clientVatMap.set(client, (clientVatMap.get(client) || 0) + vat);
+      });
+    }
+
+    const totalValueCleared = totalCollectedCash + totalWHT + totalDiscount;
+    const totalOutstanding = Math.max(0, totalBilled - totalValueCleared);
+    
+    const vatSources = Array.from(clientVatMap.entries())
+      .map(([client, amount]) => ({ client, amount }))
+      .sort((a, b) => b.amount - a.amount);
+    
+    // Sum of prior periods' values
+    let priorVatPaid = 0;
+    let priorVatRemitted = 0;
+    if (priorPeriodLimit !== 'none') {
+      bfVatData.bfVatPaidMap.forEach(v => { priorVatPaid += v; });
+      bfVatData.bfVatRemittedMap.forEach(v => { priorVatRemitted += v; });
+    }
+
+    const totalVATRemitted = vatPayments.reduce((sum, vp) => sum + (vp.amount || 0), 0) + (priorPeriodLimit !== 'none' ? priorVatRemitted : 0);
+    const totalVATCollectedVal = totalVATCollected + (priorPeriodLimit !== 'none' ? priorVatPaid : 0);
+    const vatDeficit = totalVATCollectedVal - totalVATRemitted;
+    
+    return { totalBilled, totalVATInvoiced, totalCollectedCash, totalValueCleared, totalOutstanding, totalWHT, totalDiscount, totalVATCollected: totalVATCollectedVal, totalVATRemitted, vatDeficit, vatSources };
+  }, [invoices, payments, vatPayments, sites, pendingSites, vatRate, bfVatData, priorPeriodLimit]);
+
+  const collectionRate = globalStats.totalBilled > 0
+    ? Math.round((globalStats.totalValueCleared / globalStats.totalBilled) * 100) : 0;
 
   // Summary Ledger Data
   const summaryData = useMemo(() => {
@@ -572,6 +772,7 @@ export function FinancialReports() {
         withholdingTax: 0, 
         vatInvoiced: 0, 
         vatPaid: 0, 
+        amountForVat: 0,
         vatRemitted: 0 
       });
       rowMap.get(key)!.noOfInvoices += 1;
@@ -606,6 +807,7 @@ export function FinancialReports() {
         withholdingTax: 0, 
         vatInvoiced: 0, 
         vatPaid: 0, 
+        amountForVat: 0,
         vatRemitted: 0 
       });
       
@@ -617,8 +819,9 @@ export function FinancialReports() {
       // Calculate VAT Paid dynamically based on payment amount and site VAT settings
       const siteKey = `${clientName}|${siteName}`;
       const payVatSetting = pay.payVat || siteIndex.get(siteKey)?.vat || 'No';
-      const { vat } = getVatDetails(pay.amount || 0, payVatSetting, vatRate, (pay as any).damages || 0);
+      const { vat, amountForVat } = getVatDetails(pay.amount || 0, payVatSetting, vatRate, (pay as any).damages || 0);
       r.vatPaid += (vat || 0);
+      r.amountForVat += (amountForVat || 0);
     });
 
     // Add VAT Remitted (Payments to FIRS)
@@ -640,13 +843,28 @@ export function FinancialReports() {
         const site = parts.length > 1 ? parts.slice(1).join(' - ') : 'Unknown Site';
         rowMap.set(key, { 
           client, site, key, noOfInvoices: 0, totalInvoices: 0, totalPayment: 0, 
-          discount: 0, withholdingTax: 0, vatInvoiced: 0, vatPaid: 0, vatRemitted: 0 
+          discount: 0, withholdingTax: 0, vatInvoiced: 0, vatPaid: 0, amountForVat: 0, vatRemitted: 0 
         });
       }
     });
 
-    return Array.from(rowMap.values()).map(r => {
+    if (priorPeriodLimit !== 'none') {
+      bfVatData.bfVatOwedMap.forEach((bfVatVal, key) => {
+        if (!rowMap.has(key) && Math.abs(bfVatVal) > 0.01) {
+          const parts = key.split(' - ');
+          const client = parts[0];
+          const site = parts.length > 1 ? parts.slice(1).join(' - ') : 'Unknown Site';
+          rowMap.set(key, { 
+            client, site, key, noOfInvoices: 0, totalInvoices: 0, totalPayment: 0, 
+            discount: 0, withholdingTax: 0, vatInvoiced: 0, vatPaid: 0, amountForVat: 0, vatRemitted: 0 
+          });
+        }
+      });
+    }
+
+    let result = Array.from(rowMap.values()).map(r => {
       const bf = bfData.get(r.key) || 0;
+      const bfVatOwed = bfVatData.bfVatOwedMap.get(r.key) || 0;
       let balance = bf + r.totalInvoices - r.totalPayment - r.discount - r.withholdingTax;
       let status = balance > 0 && r.totalPayment === 0 && r.discount === 0 && r.withholdingTax === 0 && r.totalInvoices === 0 ? 'OWING'
         : balance > 0 && (r.totalPayment > 0 || r.discount > 0 || r.withholdingTax > 0 || bf < 0) ? 'PART PAID'
@@ -659,10 +877,26 @@ export function FinancialReports() {
         status = 'FULLY PAID';
       }
       // VAT Owed represents the company's liability (Collected - Remitted). Negative means overpayment/surplus.
-      const vatOwed = r.vatPaid - r.vatRemitted;
-      return { ...r, bf, balance, status, vatOwed };
-    }).sort((a, b) => a.client.localeCompare(b.client));
-  }, [invoices, payments, vatPayments, summaryTab, bfData]);
+      // If priorPeriodLimit is not 'none', we add the prior periods' outstanding VAT (bfVatOwed).
+      const vatOwed = (priorPeriodLimit !== 'none' ? bfVatOwed : 0) + r.vatPaid - r.vatRemitted;
+      return { ...r, bf, balance, status, vatOwed, bfVatOwed };
+    });
+
+    if (filterMonth !== 'All') {
+      if (priorPeriodLimit !== 'none') {
+        result = result.filter(r => 
+          r.totalInvoices > 0 || 
+          r.totalPayment > 0 || 
+          Math.abs(r.bf) > 0.01 || 
+          Math.abs(r.bfVatOwed) > 0.01
+        );
+      } else {
+        result = result.filter(r => r.totalInvoices > 0 || r.totalPayment > 0);
+      }
+    }
+
+    return result.sort((a, b) => a.client.localeCompare(b.client));
+  }, [invoices, payments, vatPayments, summaryTab, bfData, bfVatData, filterMonth, priorPeriodLimit]);
 
   // VAT Pie
   const vatPieData = useMemo(() => [
@@ -939,15 +1173,16 @@ export function FinancialReports() {
   };
 
   const exportLedgerPdf = () => {
-    const head = [["Client", summaryTab === 'site' ? "Site" : "", filterYear !== 'All' ? "B/F (₦)" : "", "Balance Due (₦)", "Inv. Qty", "Total Invoiced (₦)", "Total Payments (₦)", "WHT (₦)", ...(summaryTab === 'client' ? ["VAT PAID", "VAT REMIT", "VAT OWED"] : []), "Status"].filter(Boolean)];
+    const head = [["Client", summaryTab === 'site' ? "Site" : "", filterYear !== 'All' ? "B/F (₦)" : "", "Inv. Qty", "Total Invoiced (₦)", "Total Payments (₦)", "Balance Due (₦)", "WHT (₦)", ...(summaryTab === 'client' ? ["AMT FOR VAT", "VAT PAID", "VAT REMIT", "VAT OWED"] : []), "Status"].filter(Boolean)];
     const body = summaryData.map(r => [
       r.client, ...(summaryTab === 'site' ? [r.site] : []),
       ...(filterYear !== 'All' ? [(r.bf || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })] : []),
-      (r.balance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
       r.noOfInvoices, (r.totalInvoices || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 
       (r.totalPayment || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+      (r.balance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
       (r.withholdingTax || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
       ...(summaryTab === 'client' ? [
+        (r.amountForVat || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
         (r.vatPaid || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
         (r.vatRemitted || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
         (r.vatOwed || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -1383,7 +1618,7 @@ export function FinancialReports() {
       <div className="flex flex-col flex-1 h-full w-full animate-in fade-in duration-300 gap-6">
 
         {/* ── GLOBAL FILTERS BAR ────────────────────────────────────── */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-100 px-4 py-3">
+        <div className="bg-white rounded-xl shadow-sm border border-slate-100 px-4 py-3 sticky top-0 z-[40]">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-slate-700">
               <Filter className="w-4 h-4 text-indigo-500" />
@@ -1428,9 +1663,24 @@ export function FinancialReports() {
                   {availableClients.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
+              {/* Prior Period Limit Selector */}
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-semibold text-slate-400 uppercase">Prior Period</span>
+                <select
+                  value={priorPeriodLimit}
+                  onChange={e => startTransition(() => setPriorPeriodLimit(e.target.value as any))}
+                  className="h-8 px-2.5 text-sm font-semibold rounded-md border border-slate-200 bg-slate-50 text-slate-700 outline-none focus:ring-2 focus:ring-indigo-400/30 min-w-[135px]"
+                >
+                  <option value="none">None</option>
+                  <option value="prev-month">Previous Month</option>
+                  <option value="prev-2-months">Previous 2 Months</option>
+                  <option value="this-year">This Year's Prior</option>
+                  <option value="all">All Prior</option>
+                </select>
+              </div>
               {/* Reset */}
-              {(filterYear !== 'All' || filterMonth !== 'All' || filterClient !== 'All') && (
-                <button onClick={() => { startTransition(() => { setFilterYear(String(new Date().getFullYear())); setFilterMonth('All'); setFilterClient('All'); }); }}
+              {(filterYear !== 'All' || filterMonth !== 'All' || filterClient !== 'All' || priorPeriodLimit !== 'none') && (
+                <button onClick={() => { startTransition(() => { setFilterYear(String(new Date().getFullYear())); setFilterMonth('All'); setFilterClient('All'); setPriorPeriodLimit('none'); }); }}
                   className="flex items-center gap-1.5 text-xs font-semibold text-rose-500 hover:text-rose-700 px-2 py-1 rounded-md hover:bg-rose-50 transition-colors">
                   <X className="w-3.5 h-3.5" /> Reset
                 </button>
@@ -1465,9 +1715,24 @@ export function FinancialReports() {
                   {availableClients.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
+              {/* Prior Period Limit Selector Mobile */}
+              <div className="flex flex-col gap-1.5">
+                <span className="text-[11px] font-semibold text-slate-400 uppercase">Prior Period</span>
+                <select
+                  value={priorPeriodLimit}
+                  onChange={e => startTransition(() => setPriorPeriodLimit(e.target.value as any))}
+                  className="h-9 px-3 text-sm font-semibold rounded-md border border-slate-200 bg-slate-50 text-slate-700 outline-none w-full"
+                >
+                  <option value="none">None</option>
+                  <option value="prev-month">Previous Month</option>
+                  <option value="prev-2-months">Previous 2 Months</option>
+                  <option value="this-year">This Year's Prior</option>
+                  <option value="all">All Prior</option>
+                </select>
+              </div>
               {/* Reset Mobile */}
-              {(filterYear !== 'All' || filterMonth !== 'All' || filterClient !== 'All') && (
-                <button onClick={() => { startTransition(() => { setFilterYear(String(new Date().getFullYear())); setFilterMonth('All'); setFilterClient('All'); setFiltersOpen(false); }); }}
+              {(filterYear !== 'All' || filterMonth !== 'All' || filterClient !== 'All' || priorPeriodLimit !== 'none') && (
+                <button onClick={() => { startTransition(() => { setFilterYear(String(new Date().getFullYear())); setFilterMonth('All'); setFilterClient('All'); setPriorPeriodLimit('none'); setFiltersOpen(false); }); }}
                   className="flex items-center justify-center gap-1.5 text-sm font-semibold text-rose-500 bg-rose-50 hover:bg-rose-100 rounded-md py-2 transition-colors mt-2">
                   <X className="w-4 h-4" /> Reset Filters
                 </button>
@@ -1856,14 +2121,15 @@ export function FinancialReports() {
                     B/F
                   </TableHead>
                 )}
-                <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-rose-300 px-5 py-4 text-right">Balance Due</TableHead>
                 <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 text-center">Inv. Qty</TableHead>
                 <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 text-right">Total Invoiced</TableHead>
                 <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 text-right">Total Payments</TableHead>
+                <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-rose-300 px-5 py-4 text-right">Balance Due</TableHead>
                 <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 text-right">Discounts</TableHead>
                 <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-indigo-200 px-5 py-4 text-right">WHT</TableHead>
                 {summaryTab === 'client' && (
                   <>
+                    <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-indigo-200 px-5 py-4 text-right">AMT FOR VAT</TableHead>
                     <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-indigo-200 px-5 py-4 text-right">VAT ON PAYMENTS</TableHead>
                     <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-indigo-200 px-5 py-4 text-right">VAT REMIT</TableHead>
                     <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-rose-300 px-5 py-4 text-right">VAT OWED</TableHead>
@@ -1888,18 +2154,19 @@ export function FinancialReports() {
                         : '-'}
                     </TableCell>
                   )}
-                  <TableCell className={`px-5 py-3 text-right font-mono font-bold ${row.balance > 0 ? 'text-rose-600' : row.balance < 0 ? 'text-slate-500' : 'text-emerald-600'}`}>
-                    {row.balance !== 0 ? (row.balance < 0 ? `(${Math.abs(row.balance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})` : row.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })) : '-'}
-                  </TableCell>
                   <TableCell className="px-5 py-3 text-center text-slate-500 font-medium">
                     <div className="bg-slate-100 text-slate-600 rounded-md px-2 py-0.5 inline-block text-[11px] font-bold">{row.noOfInvoices || '0'}</div>
                   </TableCell>
                   <TableCell className="px-5 py-3 text-right font-mono font-medium text-slate-700">{row.totalInvoices ? row.totalInvoices.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
                   <TableCell className="px-5 py-3 text-right font-mono font-medium text-emerald-700 text-xs">{row.totalPayment ? row.totalPayment.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
+                  <TableCell className={`px-5 py-3 text-right font-mono font-bold ${row.balance > 0 ? 'text-rose-600' : row.balance < 0 ? 'text-slate-500' : 'text-emerald-600'}`}>
+                    {row.balance !== 0 ? (row.balance < 0 ? `(${Math.abs(row.balance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})` : row.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })) : '-'}
+                  </TableCell>
                   <TableCell className="px-5 py-3 text-right font-mono text-slate-400 text-xs">{row.discount ? row.discount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
                   <TableCell className="px-5 py-3 text-right font-mono text-indigo-600/70 text-xs">{row.withholdingTax ? row.withholdingTax.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
                   {summaryTab === 'client' && (
                     <>
+                      <TableCell className="px-5 py-3 text-right font-mono text-emerald-600/70 text-xs">{row.amountForVat ? row.amountForVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
                       <TableCell className="px-5 py-3 text-right font-mono text-emerald-600/70 text-xs">{row.vatPaid ? row.vatPaid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
                       <TableCell className="px-5 py-3 text-right font-mono text-sky-600/70 text-xs">{row.vatRemitted ? row.vatRemitted.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
                       <TableCell className={`px-5 py-3 text-right font-mono font-bold text-xs ${row.vatOwed < 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
@@ -1921,6 +2188,15 @@ export function FinancialReports() {
               {summaryData.length > 0 && (() => {
                 const totalBF = summaryData.reduce((sum, r) => sum + (r.bf || 0), 0);
                 const totalBalance = summaryData.reduce((sum, r) => sum + (r.balance || 0), 0);
+                const totalInvoices = summaryData.reduce((sum, r) => sum + (r.totalInvoices || 0), 0);
+                const totalPayment = summaryData.reduce((sum, r) => sum + (r.totalPayment || 0), 0);
+                const totalDiscount = summaryData.reduce((sum, r) => sum + (r.discount || 0), 0);
+                const totalWHT = summaryData.reduce((sum, r) => sum + (r.withholdingTax || 0), 0);
+                const totalAmountForVat = summaryData.reduce((sum, r) => sum + (r.amountForVat || 0), 0);
+                const totalVATPaid = summaryData.reduce((sum, r) => sum + (r.vatPaid || 0), 0);
+                const totalVATRemitted = summaryData.reduce((sum, r) => sum + (r.vatRemitted || 0), 0);
+                const totalVATOwed = summaryData.reduce((sum, r) => sum + (r.vatOwed || 0), 0);
+
                 return (
                   <TableRow className="bg-slate-900 hover:bg-slate-900 border-t-4 border-indigo-500 shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.1)] relative z-10">
                     <TableCell className="sticky left-0 z-20 bg-slate-900 px-5 py-4 font-bold text-slate-200 text-sm tracking-wider uppercase shadow-[2px_0_5px_rgba(0,0,0,0.3)]">Grand Total</TableCell>
@@ -1936,25 +2212,26 @@ export function FinancialReports() {
                           : '-'}
                       </TableCell>
                     )}
+                    <TableCell className="px-5 py-4 text-center font-bold text-slate-300 bg-slate-800/80 rounded-sm">{summaryData.reduce((sum, r) => sum + r.noOfInvoices, 0)}</TableCell>
+                    <TableCell className="px-5 py-4 text-right font-mono font-bold text-slate-200">{totalInvoices.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
+                    <TableCell className="px-5 py-4 text-right font-mono font-bold text-emerald-400">{totalPayment.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
                     <TableCell className="px-5 py-4 text-right font-mono font-bold text-rose-400 bg-rose-950/20">
                       {totalBalance < 0
                         ? `(${Math.abs(totalBalance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`
                         : totalBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </TableCell>
-                    <TableCell className="px-5 py-4 text-center font-bold text-slate-300 bg-slate-800/80 rounded-sm">{summaryData.reduce((sum, r) => sum + r.noOfInvoices, 0)}</TableCell>
-                    <TableCell className="px-5 py-4 text-right font-mono font-bold text-slate-200">{globalStats.totalBilled.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
-                    <TableCell className="px-5 py-4 text-right font-mono font-bold text-emerald-400">{globalStats.totalCollectedCash.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
-                    <TableCell className="px-5 py-4 text-right font-mono font-medium text-slate-400">{globalStats.totalDiscount ? globalStats.totalDiscount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
-                    <TableCell className="px-5 py-4 text-right font-mono font-medium text-indigo-300">{globalStats.totalWHT ? globalStats.totalWHT.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
+                    <TableCell className="px-5 py-4 text-right font-mono font-medium text-slate-400">{totalDiscount ? totalDiscount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
+                    <TableCell className="px-5 py-4 text-right font-mono font-medium text-indigo-300">{totalWHT ? totalWHT.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
                     {summaryTab === 'client' && (
                       <>
-                        <TableCell className="px-5 py-4 text-right font-mono font-medium text-emerald-400">{globalStats.totalVATCollected ? globalStats.totalVATCollected.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
-                        <TableCell className="px-5 py-4 text-right font-mono font-medium text-sky-400">{globalStats.totalVATRemitted ? globalStats.totalVATRemitted.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
-                        <TableCell className={`px-5 py-4 text-right font-mono font-bold text-xs ${globalStats.vatDeficit < 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                          {globalStats.vatDeficit !== 0 
-                            ? (globalStats.vatDeficit < 0 
-                                ? `(${Math.abs(globalStats.vatDeficit).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})` 
-                                : globalStats.vatDeficit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })) 
+                        <TableCell className="px-5 py-4 text-right font-mono font-medium text-emerald-400">{totalAmountForVat ? totalAmountForVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
+                        <TableCell className="px-5 py-4 text-right font-mono font-medium text-emerald-400">{totalVATPaid ? totalVATPaid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
+                        <TableCell className="px-5 py-4 text-right font-mono font-medium text-sky-400">{totalVATRemitted ? totalVATRemitted.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
+                        <TableCell className={`px-5 py-4 text-right font-mono font-bold text-xs ${totalVATOwed < 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                          {totalVATOwed !== 0 
+                            ? (totalVATOwed < 0 
+                                ? `(${Math.abs(totalVATOwed).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})` 
+                                : totalVATOwed.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })) 
                             : '-'}
                         </TableCell>
                       </>

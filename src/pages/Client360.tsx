@@ -25,6 +25,7 @@ import { normalizeDate } from '@/src/lib/dateUtils';
 import { Site360View } from './Site360View';
 import { ClientContactsPanel } from './ClientContactsPanel';
 import { CreateTaskDialog } from './Tasks/CreateTaskDialog';
+import { InvoiceDetailDialog } from './InvoiceDetailDialog';
 
 type TabType = 'overview' | 'contacts' | 'financials' | 'operations' | 'activity' | 'tasks' | 'onboarding';
 
@@ -648,6 +649,8 @@ export function Client360() {
   const [expandedLogs, setExpandedLogs] = useState<Set<string>>(new Set());
   const [openSubtaskId, setOpenSubtaskId] = useState<string | null>(null);
   const [taskSubTab, setTaskSubTab] = useState<'pending' | 'approval' | 'completed'>('pending');
+  const [selectedInvoiceForDetail, setSelectedInvoiceForDetail] = useState<any>(null);
+  const [financialsSubTab, setFinancialsSubTab] = useState<'invoices' | 'payments'>('invoices');
 
   // ── Global Header Search Navigation Handler ──────────────────────────────
   const handleSearchNavigation = (result: any) => {
@@ -1171,9 +1174,39 @@ export function Client360() {
 
     healthScore = Math.max(0, Math.min(100, healthScore));
 
+    const rawClientInvoices = invoices.filter(i => i.client?.trim() === selectedClient);
+    const latestInvoicesBySite = new Map();
+    rawClientInvoices.forEach(inv => {
+      const siteIdKey = inv.siteId || inv.siteName || 'unknown';
+      const existing = latestInvoicesBySite.get(siteIdKey);
+      if (!existing) {
+        latestInvoicesBySite.set(siteIdKey, inv);
+      } else {
+        const existingDate = inv.date ? new Date(normalizeDate(inv.date)).getTime() : 0;
+        const newDate = existing.date ? new Date(normalizeDate(existing.date)).getTime() : 0;
+        if (existingDate > newDate) {
+          latestInvoicesBySite.set(siteIdKey, inv);
+        }
+      }
+    });
+
+    const clientInvoices = Array.from(latestInvoicesBySite.values()).map(inv => {
+      const site = clientSites.find(s => s.id === inv.siteId || s.name === inv.siteName);
+      let nextBillingDate = null;
+      let siteStatus = site?.status || 'Ended'; 
+      if (siteStatus !== 'Ended' && (inv.dueDate || inv.date)) {
+        const d = new Date(normalizeDate(inv.dueDate || inv.date));
+        if (!isNaN(d.getTime())) {
+          d.setDate(d.getDate() + 1);
+          nextBillingDate = d.toISOString().split('T')[0];
+        }
+      }
+      return { ...inv, nextBillingDate, siteStatus };
+    }).filter(inv => inv.siteStatus !== 'Ended');
+
     return {
       clientSites, activeSites: activeSites.length, totalSites: clientSites.length,
-      clientInvoices: invoices.filter(i => i.client?.trim() === selectedClient),
+      clientInvoices,
       vatDeficit, paymentsCleared, totalRevenue, totalCost, profit: totalRevenue - totalCost,
       paymentsWithVatStatus,
       pendingTasks, completedTasks, approvalTasks, contacts, logs, 
@@ -1574,8 +1607,8 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
             )}
 
             {/* Navigation Tabs */}
-            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 mb-6 gap-4">
-              <div className="flex items-center gap-0.5 sm:gap-1 overflow-x-auto style-scroll pb-px flex-1">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 mb-6 gap-2 min-w-0 overflow-hidden">
+              <div className="flex items-center gap-0 overflow-x-auto style-scroll pb-px flex-1 min-w-0">
                 {[
                   { id: 'overview', label: 'Overview', icon: Activity, show: currentUser?.privileges?.clients?.canView },
                   { id: 'financials', label: 'Financials', icon: DollarSign, show: currentUser?.privileges?.billing?.canView || currentUser?.privileges?.payments?.canView },
@@ -1586,13 +1619,13 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                 ].filter(tab => tab.show !== false).map(tab => (
                   <button key={tab.id} onClick={() => setActiveTab(tab.id as TabType)}
                     className={cn(
-                      "flex items-center gap-1.5 px-2.5 sm:px-4 py-3 text-xs sm:text-sm font-semibold border-b-2 transition-colors whitespace-nowrap",
+                      "flex items-center gap-1 min-[480px]:gap-1.5 px-1.5 min-[480px]:px-2.5 sm:px-3.5 py-3 text-xs sm:text-sm font-semibold border-b-2 transition-colors shrink-0",
                       activeTab === tab.id 
                         ? "border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400" 
                         : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
                     )}>
-                    <tab.icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> 
-                    <span>{tab.label}</span>
+                    <tab.icon className="w-3.5 h-3.5 shrink-0" /> 
+                    <span className="hidden min-[480px]:inline whitespace-nowrap">{tab.label}</span>
                     {tab.id === 'operations' && clientPendingSites.length > 0 && (
                       <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500 text-white shrink-0 shadow-sm animate-in scale-in-50 duration-200">
                         {clientPendingSites.length}
@@ -1601,25 +1634,25 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                   </button>
                 ))}
               </div>
-              <div className="flex items-center gap-1.5 shrink-0 pb-1 pr-1">
+              <div className="flex items-center gap-1 shrink-0 pb-1">
                 {currentUser?.privileges?.sites?.canView && (
                   <Button 
                     onClick={() => navigate('/sites')} 
                     variant="outline" 
                     size="sm" 
                     className={cn(
-                      "h-8 text-xs px-2 sm:px-3 font-medium shadow-sm transition-colors flex items-center gap-1.5", 
+                      "h-8 text-xs px-2 font-medium shadow-sm transition-colors flex items-center gap-1", 
                       isDark ? "bg-slate-900 border-slate-700 hover:bg-slate-800 text-slate-200" : "bg-white border-slate-200 hover:bg-slate-50 text-slate-700"
                     )}
+                    title="Client Overview"
                   >
-                    <MapPin className="w-3.5 h-3.5 text-indigo-500" />
-                    <span className="hidden sm:inline">Client Overview</span>
-                    <span className="sm:hidden">Overview</span>
+                    <MapPin className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                    <span className="hidden min-[600px]:inline">Client Overview</span>
                   </Button>
                 )}
                 {currentUser?.privileges?.clients?.canEdit && (
-                  <Button onClick={openClientEdit} variant="outline" size="sm" className={cn("h-8 text-xs px-2 sm:px-3 font-medium shadow-sm transition-colors", isDark ? "bg-slate-900 border-slate-700 hover:bg-slate-800 text-slate-200" : "bg-white border-slate-200 hover:bg-slate-50 text-slate-700")}>
-                    <Edit2 className="w-3.5 h-3.5 sm:mr-1.5" /><span className="hidden sm:inline">Edit Client</span>
+                  <Button onClick={openClientEdit} variant="outline" size="sm" className={cn("h-8 text-xs px-2 font-medium shadow-sm transition-colors flex items-center gap-1", isDark ? "bg-slate-900 border-slate-700 hover:bg-slate-800 text-slate-200" : "bg-white border-slate-200 hover:bg-slate-50 text-slate-700")} title="Edit Client">
+                    <Edit2 className="w-3.5 h-3.5 shrink-0" /><span className="hidden min-[600px]:inline">Edit Client</span>
                   </Button>
                 )}
               </div>
@@ -1777,7 +1810,120 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                     </div>
                   </div>
 
+                  {/* Secondary Tab Switcher */}
+                  <div className="flex border-b border-slate-200 dark:border-slate-800 mb-2 overflow-x-auto style-scroll pb-px gap-1">
+                    {[
+                      { id: 'invoices', label: 'Invoice Issuance Registry', icon: FileText },
+                      { id: 'payments', label: 'Payments & VAT Settlement Registry', icon: CheckCircle2 }
+                    ].map(subTab => {
+                      const isActive = financialsSubTab === subTab.id;
+                      return (
+                        <button
+                          key={subTab.id}
+                          onClick={() => setFinancialsSubTab(subTab.id as any)}
+                          className={cn(
+                            "flex items-center gap-2 px-3.5 py-2.5 text-xs sm:text-sm font-bold border-b-2 transition-all relative shrink-0",
+                            isActive
+                              ? "border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400"
+                              : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                          )}
+                        >
+                          <subTab.icon className={cn("w-4 h-4", isActive ? "text-indigo-600 dark:text-indigo-400" : "text-slate-400")} />
+                          <span>{subTab.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Invoices Registry */}
+                  {financialsSubTab === 'invoices' && (
+                    <div className={cn("p-6 rounded-3xl border shadow-sm", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                      <div>
+                        <h3 className="text-lg font-bold flex items-center gap-2">
+                          <FileText className="w-5 h-5 text-indigo-500" />
+                          Invoice Issuance Registry
+                        </h3>
+                        <p className="text-xs text-slate-500 mt-1">
+                          Registry of all invoices sent to this client and upcoming billing schedules.
+                        </p>
+                      </div>
+                    </div>
+
+                    {clientData.clientInvoices && clientData.clientInvoices.length > 0 ? (
+                      <div className="overflow-x-auto style-scroll rounded-xl border border-slate-100 dark:border-slate-800">
+                        <table className="w-full text-left text-xs border-collapse min-w-[640px]">
+                          <thead>
+                            <tr className={cn("border-b font-bold text-slate-500 uppercase tracking-wider text-[10px]", isDark ? "bg-slate-800/40 border-slate-800" : "bg-slate-50 border-slate-100")}>
+                              <th className="p-3">Invoice No</th>
+                              <th className="p-3">Date Sent</th>
+                              <th className="p-3">Site</th>
+                              <th className="p-3 text-right">Duration</th>
+                              <th className="p-3 text-right">Amount</th>
+                              <th className="p-3 text-center">Status</th>
+                              <th className="p-3 text-center">Due Date</th>
+                              <th className="p-3 text-center">Next Billing Date</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                            {clientData.clientInvoices.map((inv, idx) => (
+                              <tr key={inv.id || idx} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors cursor-pointer" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedInvoiceForDetail(inv); }}>
+                                <td className="p-3 font-medium text-slate-900 dark:text-white">
+                                  {inv.invoiceNumber || '-'}
+                                </td>
+                                <td className="p-3 text-slate-650 dark:text-slate-350">
+                                  {inv.date ? new Date(normalizeDate(inv.date)).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
+                                </td>
+                                <td className="p-3 font-semibold text-slate-700 dark:text-slate-300">
+                                  {inv.siteName || '-'}
+                                </td>
+                                <td className="p-3 text-right text-slate-650 dark:text-slate-350">
+                                  {inv.duration ? `${inv.duration} days` : '—'}
+                                </td>
+                                <td className="p-3 text-right font-bold text-slate-850 dark:text-slate-150">
+                                  ₦{(inv.totalCharge || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </td>
+                                <td className="p-3 text-center">
+                                  <Badge variant="outline" className={cn(
+                                    "text-[9px] sm:text-[10px] px-1.5 py-0.5",
+                                    inv.status === 'Paid' ? 'text-emerald-600 bg-emerald-50 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-900' :
+                                    inv.status === 'Overdue' ? 'text-rose-600 bg-rose-50 border-rose-200 dark:bg-rose-950/30 dark:text-rose-400 dark:border-rose-900' :
+                                    'text-amber-600 bg-amber-50 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-900'
+                                  )}>
+                                    {inv.status}
+                                  </Badge>
+                                </td>
+                                <td className="p-3 text-center text-slate-650 dark:text-slate-350">
+                                  {inv.dueDate ? new Date(normalizeDate(inv.dueDate)).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
+                                </td>
+                                <td className="p-3 text-center font-medium">
+                                  {inv.siteStatus === 'Ended' ? (
+                                    <span className="text-slate-400 italic text-[10px]">Site Ended</span>
+                                  ) : inv.nextBillingDate ? (
+                                    <span className="text-indigo-600 dark:text-indigo-400 font-bold">
+                                      {new Date(inv.nextBillingDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                    </span>
+                                  ) : (
+                                    <span className="text-slate-400">—</span>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <div className="py-12 flex flex-col items-center justify-center text-center text-slate-500">
+                        <FileText className="w-12 h-12 text-slate-300 dark:text-slate-700 mb-3" />
+                        <p className="font-semibold text-sm">No Invoices Sent</p>
+                        <p className="text-xs text-slate-400 mt-1">No invoices have been recorded for this client within the selected filter period.</p>
+                      </div>
+                    )}
+                  </div>
+                  )}
+
                   {/* Payments & VAT Settlement Registry */}
+                  {financialsSubTab === 'payments' && (
                   <div className={cn("p-6 rounded-3xl border shadow-sm", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
                       <div>
@@ -1862,6 +2008,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                       </div>
                     )}
                   </div>
+                  )}
                 </div>
               )}
 
@@ -2692,6 +2839,15 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
           onClose={() => setShowContactsPanel(false)}
         />
       )}
+      <InvoiceDetailDialog
+        invoice={selectedInvoiceForDetail}
+        invoiceList={clientData?.clientInvoices || []}
+        open={!!selectedInvoiceForDetail}
+        onClose={() => setSelectedInvoiceForDetail(null)}
+        onNavigate={(inv) => setSelectedInvoiceForDetail(inv)}
+        onEdit={(inv) => { /* handle edit if needed */ }}
+        onPrint={(inv) => { /* handle print if needed */ }}
+      />
       {taskDialog.open && (
         <CreateTaskDialog
           onClose={() => setTaskDialog(d => ({ ...d, open: false }))}

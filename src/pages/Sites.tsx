@@ -942,7 +942,9 @@ export function Sites() {
 
     </div>,
     [canAddSite, canImport, canExport, selectedClient?.name],
-    selectedClient ? () => navigate(`/client-360?client=${encodeURIComponent(selectedClient.name)}`) : undefined
+    selectedClient
+      ? () => navigate(`/client-360?client=${encodeURIComponent(selectedClient.name)}`)
+      : () => navigate('/client-360')
   );
 
   return (
