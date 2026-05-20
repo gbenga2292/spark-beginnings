@@ -613,6 +613,10 @@ export function Ledger() {
     return data;
   }, [filteredEntries, sortField, sortOrder]);
 
+  const filteredTotal = useMemo(() => {
+    return filteredEntries.reduce((sum, entry) => sum + (Number(entry.amount) || 0), 0);
+  }, [filteredEntries]);
+
   const handleExport = async (mode: 'bare' | 'detailed' = 'detailed') => {
     if (!priv?.canExport) return;
     let data: any[];
@@ -1370,17 +1374,30 @@ export function Ledger() {
               </div>
             </div>
 
-            {search.trim() && (
-              <div className="flex items-center gap-2 py-1.5 px-3 bg-indigo-50/50 rounded-lg border border-indigo-100 w-fit">
-                <Search className="h-3 w-3 text-indigo-500" />
-                <span className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider">
-                  Results for: <span className="text-slate-900">{search}</span>
-                </span>
-                <button onClick={() => setSearch('')} className="ml-1 text-indigo-400 hover:text-indigo-600 flex items-center justify-center p-0.5 rounded hover:bg-indigo-100/50 transition-colors">
-                  <X className="h-3 w-3" />
-                </button>
+            <div className="flex flex-wrap items-center justify-between gap-4 mt-2">
+              <div>
+                {search.trim() && (
+                  <div className="flex items-center gap-2 py-1.5 px-3 bg-indigo-50/50 rounded-lg border border-indigo-100 w-fit">
+                    <Search className="h-3 w-3 text-indigo-500" />
+                    <span className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider">
+                      Results for: <span className="text-slate-900">{search}</span>
+                    </span>
+                    <button onClick={() => setSearch('')} className="ml-1 text-indigo-400 hover:text-indigo-600 flex items-center justify-center p-0.5 rounded hover:bg-indigo-100/50 transition-colors">
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                )}
               </div>
-            )}
+              
+              <div className="flex items-center gap-2 py-1.5 px-3 bg-indigo-50/80 rounded-lg border border-indigo-100 shadow-sm backdrop-blur-sm ml-auto">
+                <span className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider">
+                  Filtered Total:
+                </span>
+                <span className="text-xs font-extrabold text-indigo-900 tabular-nums">
+                  ₦{filteredTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
+            </div>
           </CardHeader>
           <CardContent className="p-0">
             <div className="overflow-x-auto">

@@ -7,7 +7,7 @@ import { Input } from '@/src/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
 import { Badge } from '@/src/components/ui/badge';
 import { Dialog, DialogFooter } from '@/src/components/ui/dialog';
-import { Search, Plus, MapPin, Building2, X, Save, Pencil, Trash2, Download, Upload, CheckCircle2, Circle, Eye, FileText, MoreVertical, Clock, LayoutGrid, List, ArrowUpDown, ChevronUp, ChevronDown, MessageSquare, BookOpen, Calendar, Phone, Mail, Car, MessageCircle, Users, ArrowLeft, Check, Bell, UserCheck, UserCircle, Briefcase } from 'lucide-react';
+import { Search, Plus, MapPin, Building2, X, Save, Pencil, Trash2, Download, Upload, CheckCircle2, Circle, Eye, FileText, MoreVertical, Clock, LayoutGrid, List, ArrowUpDown, ChevronUp, ChevronDown, MessageSquare, BookOpen, Calendar, Phone, Mail, Car, MessageCircle, Users, ArrowLeft, Check, Bell, UserCheck, UserCircle, Briefcase, Sparkles } from 'lucide-react';
 import { useAppStore, Site } from '@/src/store/appStore';
 import { toast, showConfirm } from '@/src/components/ui/toast';
 import { SiteQuestionnaire } from '@/src/types/SiteQuestionnaire';
@@ -941,7 +941,8 @@ export function Sites() {
       )}
 
     </div>,
-    [canAddSite, canImport, canExport]
+    [canAddSite, canImport, canExport, selectedClient?.name],
+    selectedClient ? () => navigate(`/client-360?client=${encodeURIComponent(selectedClient.name)}`) : undefined
   );
 
   return (
@@ -953,10 +954,20 @@ export function Sites() {
         {/* Unified Header with Tabs and Search */}
         <div className="border-b border-slate-100 p-4 sm:p-5 flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center bg-slate-50/50">
           {selectedClient ? (
-            <div className="flex items-center gap-4">
-              <Button variant="outline" size="sm" onClick={() => navigate('/sites')}>
-                <ArrowLeft className="w-4 h-4 mr-2" /> Back
-              </Button>
+            <div className="flex items-center gap-4 flex-wrap">
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={() => navigate('/sites')}>
+                  <ArrowLeft className="w-4 h-4 mr-2" /> Back
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-indigo-200 text-indigo-700 bg-indigo-50/50 hover:bg-indigo-100 font-semibold"
+                  onClick={() => navigate(`/client-360?client=${encodeURIComponent(selectedClient.name)}`)}
+                >
+                  <Sparkles className="w-4 h-4 mr-2 text-indigo-600 dark:text-indigo-400" /> Client 360
+                </Button>
+              </div>
               <div className="flex items-center gap-2 text-sm">
                  <span className="text-slate-500">Managing sites for:</span>
                  <Badge variant="secondary" className="px-3 py-1 font-bold bg-indigo-50 text-indigo-700 border-indigo-200">

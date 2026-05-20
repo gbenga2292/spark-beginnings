@@ -147,7 +147,6 @@ const navigation: NavCategory[] = [
     icon: Building2,
     items: [
       { name: 'Client 360', href: '/client-360', icon: Sparkles, privKey: 'sites', privField: 'canView' },
-      { name: 'Client Overview', href: '/sites', icon: MapPin, privKey: 'sites', privField: 'canView' },
       { name: 'External Comms', href: '/comm-log', icon: MessageSquare, privKey: 'commLog', privField: 'canView' },
       { name: 'Daily Journal', href: '/daily-journal', icon: BookOpen, privKey: 'dailyJournal', privField: 'canView' },
     ],
@@ -202,7 +201,7 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
   const isElectron = !!(window as any).electronAPI?.isElectron;
 
   // ── Android Auto-Update Logic (mobile-only) ────────────────────────────
-  const CURRENT_VERSION = '1.5.3'; // Matches package.json
+  const CURRENT_VERSION = '1.6.0'; // Matches package.json
   const UPDATE_SERVER_URL = import.meta.env.VITE_UPDATE_SERVER_URL || 'https://dewaterconstruct.com/app-updates';
   
   const [updateInfo, setUpdateInfo] = useState<{ version: string; url: string; notes: string } | null>(null);

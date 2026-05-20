@@ -6,7 +6,7 @@ import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Label } from '@/src/components/ui/label';
 import { Textarea } from '@/src/components/ui/textarea';
-import { cn } from '@/src/lib/utils';
+import { cn, formatUnit } from '@/src/lib/utils';
 import { toast } from 'sonner';
 
 interface ConsumableDetailViewProps {
@@ -28,12 +28,14 @@ export function ConsumableDetailView({ item, site, logs, onBack }: ConsumableDet
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [quantity, setQuantity] = useState('');
   const [usedBy, setUsedBy] = useState('');
+  const [customUsedBy, setCustomUsedBy] = useState('');
   const [notes, setNotes] = useState('');
   const [usedFor, setUsedFor] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!quantity || !usedBy) {
+    const finalUsedBy = usedBy === 'custom' ? customUsedBy : usedBy;
+    if (!quantity || !finalUsedBy) {
       toast.error('Please fill in quantity and who used it.');
       return;
     }
@@ -57,7 +59,7 @@ export function ConsumableDetailView({ item, site, logs, onBack }: ConsumableDet
       siteName: site.name,
       date,
       quantityUsed: qty,
-      usedBy,
+      usedBy: finalUsedBy,
       usedFor,
       notes,
       loggedBy: 'Current User', // Should come from auth/userStore ideally
@@ -70,6 +72,7 @@ export function ConsumableDetailView({ item, site, logs, onBack }: ConsumableDet
     // Reset form
     setQuantity('');
     setUsedBy('');
+    setCustomUsedBy('');
     setNotes('');
     setUsedFor('');
     setActiveTab('history');
@@ -102,7 +105,7 @@ export function ConsumableDetailView({ item, site, logs, onBack }: ConsumableDet
           <div className="text-right">
             <p className="text-xs text-slate-500">Available on Site</p>
             <p className="text-lg font-bold text-slate-800 dark:text-slate-200">
-              {item.quantity} <span className="text-xs font-normal text-slate-400">{item.unit || 'pcs'}</span>
+              {item.quantity} <span className="text-xs font-normal text-slate-400">{formatUnit(item.unit)}</span>
             </p>
           </div>
         </div>
@@ -187,7 +190,7 @@ export function ConsumableDetailView({ item, site, logs, onBack }: ConsumableDet
                     </div>
                     <div className="space-y-2">
                       <Label className="text-slate-700 dark:text-slate-300 flex items-center gap-2">
-                        <Activity className="h-4 w-4 text-slate-400" /> Quantity Used ({item.unit || 'pcs'})
+                        <Activity className="h-4 w-4 text-slate-400" /> Quantity Used ({formatUnit(item.unit)})
                       </Label>
                       <Input
                         type="number"
@@ -220,7 +223,17 @@ export function ConsumableDetailView({ item, site, logs, onBack }: ConsumableDet
                             {emp.firstname} {emp.surname} - {emp.position}
                           </option>
                         ))}
+                        <option value="custom">Other (Type Name...)</option>
                       </select>
+                      {usedBy === 'custom' && (
+                        <Input
+                          placeholder="Type person's name..."
+                          value={customUsedBy}
+                          onChange={(e) => setCustomUsedBy(e.target.value)}
+                          required
+                          className="h-11 mt-2"
+                        />
+                      )}
                     </div>
                     <div className="space-y-2">
                       <Label className="text-slate-700 dark:text-slate-300 flex items-center gap-2">
@@ -292,7 +305,7 @@ export function ConsumableDetailView({ item, site, logs, onBack }: ConsumableDet
                           <div className="flex justify-between items-start mb-1">
                             <div>
                               <p className="font-semibold text-slate-800 dark:text-slate-200 text-sm">
-                                {log.usedBy} <span className="text-slate-400 font-normal">used</span> {log.quantityUsed} <span className="text-slate-400 font-normal">{item.unit || 'pcs'}</span>
+                                {log.usedBy} <span className="text-slate-400 font-normal">used</span> {log.quantityUsed} <span className="text-slate-400 font-normal">{formatUnit(item.unit)}</span>
                               </p>
                               {log.usedFor && (
                                 <p className="text-xs text-slate-500 mt-0.5 font-medium">Task: {log.usedFor}</p>
@@ -324,7 +337,7 @@ export function ConsumableDetailView({ item, site, logs, onBack }: ConsumableDet
                       <Layers className="h-6 w-6" />
                     </div>
                     <p className="text-xs text-slate-500 font-medium uppercase tracking-wider mb-1">Currently Available</p>
-                    <p className="text-2xl font-bold text-slate-800 dark:text-white">{item.quantity} <span className="text-sm font-normal text-slate-400">{item.unit || 'pcs'}</span></p>
+                    <p className="text-2xl font-bold text-slate-800 dark:text-white">{item.quantity} <span className="text-sm font-normal text-slate-400">{formatUnit(item.unit)}</span></p>
                   </div>
                   
                   <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-6 flex flex-col items-center justify-center text-center shadow-sm">
@@ -332,7 +345,7 @@ export function ConsumableDetailView({ item, site, logs, onBack }: ConsumableDet
                       <Activity className="h-6 w-6" />
                     </div>
                     <p className="text-xs text-slate-500 font-medium uppercase tracking-wider mb-1">Total Consumed</p>
-                    <p className="text-2xl font-bold text-slate-800 dark:text-white">{totalUsed} <span className="text-sm font-normal text-slate-400">{item.unit || 'pcs'}</span></p>
+                    <p className="text-2xl font-bold text-slate-800 dark:text-white">{totalUsed} <span className="text-sm font-normal text-slate-400">{formatUnit(item.unit)}</span></p>
                   </div>
                   
                   <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-6 flex flex-col items-center justify-center text-center shadow-sm">

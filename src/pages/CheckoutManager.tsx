@@ -4,7 +4,7 @@ import {
   ArrowRightLeft, Search, Clock, Package, CheckCircle2,
   ChevronRight, User, ShieldCheck
 } from 'lucide-react';
-import { cn } from '@/src/lib/utils';
+import { cn, formatUnit } from '@/src/lib/utils';
 import { useTheme } from '@/src/hooks/useTheme';
 
 import { Card, CardContent } from '@/src/components/ui/card';
@@ -234,7 +234,7 @@ export function CheckoutManager() {
                       </div>
                       <div className="space-y-1">
                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Quantity</p>
-                        <p className="text-sm font-bold text-slate-700 dark:text-slate-200">{quantity} {selectedAsset.unitOfMeasurement}</p>
+                        <p className="text-sm font-bold text-slate-700 dark:text-slate-200">{quantity} {formatUnit(selectedAsset.unitOfMeasurement)}</p>
                       </div>
                       <div className="space-y-1">
                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Employee</p>

@@ -37,12 +37,12 @@ export function WaybillDetailView({ waybill, onClose }: WaybillDetailViewProps) 
     } catch (_) { /* skip if logo fails */ }
 
     // Title
-    doc.setFontSize(18);
+    doc.setFontSize(19);
     doc.setFont('times', 'bold');
     doc.text(waybill.type === 'waybill' ? 'WAYBILL' : 'RETURNS', 105, 34, { align: 'center' });
 
     // Details
-    doc.setFontSize(10);
+    doc.setFontSize(11);
     doc.setFont('times', 'normal');
     doc.text(`Waybill No: REF-${waybill.id.substring(0, 8).toUpperCase()}`, 20, 48);
     doc.text(`Date: ${formatDisplayDate(waybill.issueDate)}`, 20, 55);
@@ -58,19 +58,44 @@ export function WaybillDetailView({ waybill, onClose }: WaybillDetailViewProps) 
     doc.text(subtitleLines, 105, 82, { align: 'center' });
 
     doc.setFont('times', 'normal');
-    let yPos = 95 + (subtitleLines.length - 1) * 6;
+    doc.setFontSize(11);
+    let yPos = 95 + (subtitleLines.length - 1) * 7;
 
-    waybill.items.forEach((item, index) => {
-      doc.text(`${index + 1}. ${item.assetName} (${item.quantity})`, 25, yPos);
-      yPos += 7;
-    });
+    const items = waybill.items;
+    const splitThreshold = 12;
+    const useTwoColumns = items.length > splitThreshold;
+
+    if (useTwoColumns) {
+      const halfLength = Math.ceil(items.length / 2);
+      const col1 = items.slice(0, halfLength);
+      const col2 = items.slice(halfLength);
+
+      let yPosCol1 = yPos;
+      let yPosCol2 = yPos;
+
+      col1.forEach((item, index) => {
+        doc.text(`${index + 1}. ${item.assetName} (${item.quantity})`, 25, yPosCol1);
+        yPosCol1 += 8;
+      });
+
+      col2.forEach((item, index) => {
+        const actualIndex = halfLength + index + 1;
+        doc.text(`${actualIndex}. ${item.assetName} (${item.quantity})`, 115, yPosCol2);
+        yPosCol2 += 8;
+      });
+    } else {
+      items.forEach((item, index) => {
+        doc.text(`${index + 1}. ${item.assetName} (${item.quantity})`, 25, yPos);
+        yPos += 8;
+      });
+    }
 
     // Signature
     doc.line(20, 262, 100, 262);
     doc.setFont('times', 'bold');
-    doc.setFontSize(10);
+    doc.setFontSize(11);
     doc.text('Signed', 20, 267);
-    doc.setFontSize(8);
+    doc.setFontSize(9);
     doc.setFont('times', 'italic');
     doc.text('Dewatering Construction Etc Limited', 20, 273);
 

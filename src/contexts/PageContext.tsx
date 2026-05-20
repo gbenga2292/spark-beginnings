@@ -2,17 +2,17 @@ import { createContext, useContext, useState, ReactNode, useEffect, useRef, useM
 
 // State definition
 interface PageState {
-  title: string;
+  title: ReactNode;
   headerButtons: ReactNode | null;
-  subtitle: string;
+  subtitle: ReactNode;
   showBackButton: boolean | (() => void);
 }
 
 // Dispatch definition
 interface PageDispatch {
-  setTitle: (title: string) => void;
+  setTitle: (title: ReactNode) => void;
   setHeaderButtons: (buttons: ReactNode | null) => void;
-  setSubtitle: (subtitle: string) => void;
+  setSubtitle: (subtitle: ReactNode) => void;
   setShowBackButton: (show: boolean | (() => void)) => void;
 }
 
@@ -20,8 +20,8 @@ const PageStateContext = createContext<PageState | undefined>(undefined);
 const PageDispatchContext = createContext<PageDispatch | undefined>(undefined);
 
 export function PageProvider({ children }: { children: ReactNode }) {
-  const [title, setTitle] = useState('');
-  const [subtitle, setSubtitle] = useState('');
+  const [title, setTitle] = useState<ReactNode>('');
+  const [subtitle, setSubtitle] = useState<ReactNode>('');
   const [headerButtons, setHeaderButtons] = useState<ReactNode | null>(null);
   const [showBackButton, setShowBackButton] = useState<boolean | (() => void)>(false);
 
@@ -57,8 +57,8 @@ export function usePage() {
 let _generation = 0;
 
 export function useSetPageTitle(
-  title: string | null,
-  subtitle: string = '',
+  title: ReactNode | null,
+  subtitle: ReactNode = '',
   buttons: ReactNode | null = null,
   deps: any[] = [],
   showBackButton: boolean | (() => void) = false

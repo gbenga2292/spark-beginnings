@@ -55,7 +55,7 @@ export function SiteManager() {
   const getSiteStats = (siteId: string) => {
     const siteWaybills = waybills.filter(w => 
       (w.siteName ?? '').toLowerCase().includes(siteId.toLowerCase()) && 
-      w.status !== 'outstanding'
+      (w.status !== 'outstanding' || w.type === 'return')
     );
     const uniqueItemsCount = new Set(siteWaybills.flatMap(w => w.items.map(i => i.assetId))).size;
     return { waybills: siteWaybills.length, items: uniqueItemsCount };
@@ -68,6 +68,10 @@ export function SiteManager() {
         questionnaire={inventorySite.q}
         onBack={() => {
           setInventorySite(null);
+        }}
+        onSiteChange={(newSite) => {
+          const newQ = pendingSites.find(ps => ps.siteName === newSite.name || ps.siteId === newSite.id) || null;
+          setInventorySite({ site: newSite, q: newQ });
         }}
       />
     );

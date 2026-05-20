@@ -40,7 +40,7 @@ export function SiteTransactionsView({ site, onBack }: SiteTransactionsViewProps
   const siteWaybills = useMemo(() =>
     waybills.filter(w =>
       (w.siteName?.toLowerCase() === site.name.toLowerCase() || w.siteId === site.id) &&
-      w.status !== 'outstanding'
+      (w.status !== 'outstanding' || w.type === 'return')
     ),
     [waybills, site]
   );

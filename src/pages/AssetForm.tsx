@@ -121,7 +121,13 @@ export function AssetForm({ onClose, assetToEdit }: AssetFormProps) {
             <div>
               <label className={labelCls}>Unit of Measurement <span className="text-red-400">*</span></label>
               <div className="relative">
-                <select value={unitOfMeasurement} onChange={e => setUnit(e.target.value)} className={selectCls}>
+                <select value={unitOfMeasurement === 'pcs - Pieces' || unitOfMeasurement === 'kg - Kilograms' || unitOfMeasurement === 'lit - Liters' || unitOfMeasurement === 'meters - Meters' ? unitOfMeasurement : 'custom'} onChange={e => {
+                  if (e.target.value !== 'custom') {
+                    setUnit(e.target.value);
+                  } else {
+                    setUnit('');
+                  }
+                }} className={selectCls}>
                   <option value="pcs - Pieces">pcs - Pieces</option>
                   <option value="kg - Kilograms">kg - Kilograms</option>
                   <option value="lit - Liters">lit - Liters</option>
@@ -130,6 +136,16 @@ export function AssetForm({ onClose, assetToEdit }: AssetFormProps) {
                 </select>
                 <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
               </div>
+              {(!['pcs - Pieces', 'kg - Kilograms', 'lit - Liters', 'meters - Meters'].includes(unitOfMeasurement)) && (
+                <div className="mt-2">
+                  <input
+                    value={unitOfMeasurement}
+                    onChange={e => setUnit(e.target.value)}
+                    placeholder="Enter custom unit (e.g. rolls)"
+                    className={inputCls}
+                  />
+                </div>
+              )}
               <p className="text-[10px] text-amber-500 font-semibold flex items-center gap-1 mt-1.5">
                 <Lightbulb className="h-3 w-3 fill-amber-400/30" /> Select from list or type custom
               </p>

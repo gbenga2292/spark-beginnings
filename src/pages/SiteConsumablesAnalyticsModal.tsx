@@ -3,6 +3,7 @@ import { Button } from '@/src/components/ui/button';
 import { Activity, Layers, User, TrendingUp, BarChart3, Clock } from 'lucide-react';
 import { ConsumableUsageLog } from '@/src/types/operations';
 import { Site } from '@/src/store/appStore';
+import { formatUnit } from '@/src/lib/utils';
 
 interface SiteItem {
   assetId: string;
@@ -109,7 +110,7 @@ export function SiteConsumablesAnalyticsModal({ isOpen, onClose, site, consumabl
                   <div className="space-y-4">
                     {topItems.map(([name, qty], index) => {
                       // find unit
-                      const unit = consumables.find(c => c.assetName === name)?.unit || 'pcs';
+                      const unit = formatUnit(consumables.find(c => c.assetName === name)?.unit);
                       // simple progress bar relative to max
                       const maxQty = topItems[0][1];
                       const width = `${Math.max(5, (qty / maxQty) * 100)}%`;
@@ -193,7 +194,7 @@ export function SiteConsumablesAnalyticsModal({ isOpen, onClose, site, consumabl
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                     {logs.slice().sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 10).map(log => {
-                      const unit = consumables.find(c => c.assetId === log.assetId)?.unit || 'pcs';
+                      const unit = formatUnit(consumables.find(c => c.assetId === log.assetId)?.unit);
                       return (
                         <tr key={log.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
                           <td className="px-5 py-3 whitespace-nowrap text-slate-600 dark:text-slate-400">

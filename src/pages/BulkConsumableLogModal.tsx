@@ -8,6 +8,7 @@ import { Textarea } from '@/src/components/ui/textarea';
 import { Calendar, User, Info, AlignLeft, PackageCheck, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { ConsumableUsageLog } from '@/src/types/operations';
+import { formatUnit } from '@/src/lib/utils';
 
 interface SiteItem {
   assetId: string;
@@ -29,6 +30,7 @@ export function BulkConsumableLogModal({ isOpen, onClose, site, consumables }: B
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
   const [usedBy, setUsedBy] = useState('');
+  const [customUsedBy, setCustomUsedBy] = useState('');
   const [usedFor, setUsedFor] = useState('');
   const [notes, setNotes] = useState('');
 
@@ -76,8 +78,9 @@ export function BulkConsumableLogModal({ isOpen, onClose, site, consumables }: B
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!usedBy) {
-      toast.error('Please select who used the items.');
+    const finalUsedBy = usedBy === 'custom' ? customUsedBy : usedBy;
+    if (!finalUsedBy) {
+      toast.error('Please select or enter who used the items.');
       return;
     }
 
@@ -120,7 +123,7 @@ export function BulkConsumableLogModal({ isOpen, onClose, site, consumables }: B
         siteName: site.name,
         date: logDate,
         quantityUsed: quantities[item.assetId],
-        usedBy,
+        usedBy: finalUsedBy,
         usedFor,
         notes,
         loggedBy: 'Current User',
@@ -134,6 +137,7 @@ export function BulkConsumableLogModal({ isOpen, onClose, site, consumables }: B
     // Reset form
     setQuantities({});
     setUsedBy('');
+    setCustomUsedBy('');
     setUsedFor('');
     setNotes('');
     onClose();
@@ -208,7 +212,17 @@ export function BulkConsumableLogModal({ isOpen, onClose, site, consumables }: B
                       {emp.firstname} {emp.surname} - {emp.position}
                     </option>
                   ))}
+                  <option value="custom">Other (Type Name...)</option>
                 </select>
+                {usedBy === 'custom' && (
+                  <Input
+                    placeholder="Type person's name..."
+                    value={customUsedBy}
+                    onChange={(e) => setCustomUsedBy(e.target.value)}
+                    required
+                    className="h-10 text-sm mt-2"
+                  />
+                )}
               </div>
 
               <div className="space-y-1.5 md:col-span-2">
@@ -237,7 +251,7 @@ export function BulkConsumableLogModal({ isOpen, onClose, site, consumables }: B
                     <div key={item.assetId} className="flex items-center justify-between p-3 sm:px-4 bg-white dark:bg-slate-950 hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors">
                       <div>
                         <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">{item.assetName}</p>
-                        <p className="text-xs text-slate-500">Available: {item.quantity} {item.unit || 'pcs'}</p>
+                        <p className="text-xs text-slate-500">Available: {item.quantity} {formatUnit(item.unit)}</p>
                       </div>
                       <div className="flex items-center gap-2">
                         <Label className="text-xs font-medium text-slate-400">Used Qty:</Label>

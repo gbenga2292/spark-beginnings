@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef, ChangeEvent } from 'react';
 import { useAppStore, DailyJournal as DailyJournalType, SiteJournalEntry } from '@/src/store/appStore';
 import { useUserStore } from '@/src/store/userStore';
-import { generateId, cn } from '@/src/lib/utils';
+import { generateId, cn, formatUnit } from '@/src/lib/utils';
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/src/components/ui/dialog';
@@ -413,7 +413,7 @@ function SiteLogCard({
                         <div>
                           <p className="text-sm font-bold text-slate-800 dark:text-slate-200">{c.assetName}</p>
                           <p className="text-[10px] text-slate-500 flex items-center gap-1 mt-0.5">
-                            {hasLog ? <><CheckCircle2 className="h-3 w-3 text-emerald-500"/> Logged for {formatDateDisplay(formDate)}</> : <><AlertTriangle className="h-3 w-3 text-amber-500"/> Available: {c.quantity} {c.unit}</>}
+                            {hasLog ? <><CheckCircle2 className="h-3 w-3 text-emerald-500"/> Logged for {formatDateDisplay(formDate)}</> : <><AlertTriangle className="h-3 w-3 text-amber-500"/> Available: {c.quantity} {formatUnit(c.unit)}</>}
                           </p>
                         </div>
                       </div>

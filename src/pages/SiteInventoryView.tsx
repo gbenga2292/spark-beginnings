@@ -5,13 +5,15 @@ import { SiteQuestionnaire } from '@/src/types/SiteQuestionnaire';
 import {
   ArrowLeft, Package, Wrench, Layers, Truck, Activity,
   MapPin, Building2, User, Phone, Calendar, Info, X,
-  FileText, ArrowRightLeft, RotateCcw, ChevronRight, BarChart2, ClipboardList
+  FileText, ArrowRightLeft, RotateCcw, ChevronRight, BarChart2, ClipboardList, Eye
 } from 'lucide-react';
 import { Badge } from '@/src/components/ui/badge';
 import { Button } from '@/src/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/src/components/ui/dialog';
-import { cn } from '@/src/lib/utils';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/src/components/ui/dropdown-menu';
+import { cn, formatUnit } from '@/src/lib/utils';
 import { formatDisplayDate } from '@/src/lib/dateUtils';
+import { filterOperationalSites } from '@/src/lib/siteUtils';
 import { ConsumableUsageLog } from '@/src/types/operations';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { WaybillForm } from './WaybillForm';
@@ -23,11 +25,13 @@ import { BulkConsumableLogModal } from './BulkConsumableLogModal';
 import { SiteConsumablesAnalyticsModal } from './SiteConsumablesAnalyticsModal';
 import { BulkMachineLogModal } from './BulkMachineLogModal';
 import { SiteMachineAnalyticsModal } from './SiteMachineAnalyticsModal';
+import { WaybillDetailView } from './WaybillDetailView';
 
 interface SiteInventoryViewProps {
   site: Site;
   questionnaire: SiteQuestionnaire | null;
   onBack: () => void;
+  onSiteChange?: (site: Site) => void;
 }
 
 type TabId = 'materials' | 'machines' | 'consumables' | 'waybills';
@@ -39,10 +43,14 @@ interface SiteItem {
   unit?: string;
   type?: string;
   lastUpdated?: string;
+  pendingReturnQuantity?: number;
 }
 
-export function SiteInventoryView({ site, questionnaire, onBack }: SiteInventoryViewProps) {
+export function SiteInventoryView({ site, questionnaire, onBack, onSiteChange }: SiteInventoryViewProps) {
   const { waybills, assets, maintenanceAssets, dailyMachineLogs } = useOperations();
+  const allSites = useAppStore(s => s.sites);
+  const activeSites = filterOperationalSites(allSites).filter(s => s.status === 'Active');
+  
   const [activeTab, setActiveTab] = useState<TabId>('materials');
   const [showReturnWaybill, setShowReturnWaybill] = useState(false);
   const [showTransactions, setShowTransactions] = useState(false);
@@ -53,6 +61,7 @@ export function SiteInventoryView({ site, questionnaire, onBack }: SiteInventory
   const [showConsumablesAnalytics, setShowConsumablesAnalytics] = useState(false);
   const [showMachineBulkLog, setShowMachineBulkLog] = useState(false);
   const [showMachineAnalytics, setShowMachineAnalytics] = useState(false);
+  const [viewingWaybill, setViewingWaybill] = useState<any | null>(null);
 
   const { consumableLogs, addConsumableLogs } = useAppStore();
 
@@ -60,7 +69,7 @@ export function SiteInventoryView({ site, questionnaire, onBack }: SiteInventory
   const siteWaybills = waybills.filter(w =>
     (w.siteName?.toLowerCase() === site.name.toLowerCase() ||
     w.siteId === site.id) &&
-    w.status !== 'outstanding'
+    (w.status !== 'outstanding' || w.type === 'return')
   );
 
   // Build site inventory by aggregating all waybill items
@@ -82,19 +91,24 @@ export function SiteInventoryView({ site, questionnaire, onBack }: SiteInventory
             unit: assetMeta?.unitOfMeasurement || 'pcs',
             type: assetMeta?.type || 'non-consumable',
             lastUpdated: wb.issueDate,
+            pendingReturnQuantity: 0,
           });
         }
       });
     });
 
-  // Subtract returns
+  // Subtract returns and track pending returns
   siteWaybills
     .filter(w => w.type === 'return')
     .forEach(wb => {
       wb.items.forEach(item => {
         const existing = inventoryMap.get(item.assetId);
         if (existing) {
-          existing.quantity = Math.max(0, existing.quantity - item.quantity);
+          if (wb.status === 'return_completed') {
+            existing.quantity = Math.max(0, existing.quantity - item.quantity);
+          } else {
+            existing.pendingReturnQuantity = (existing.pendingReturnQuantity || 0) + item.quantity;
+          }
         }
       });
     });
@@ -179,10 +193,37 @@ export function SiteInventoryView({ site, questionnaire, onBack }: SiteInventory
     !currentMachines.find(c => c.id === a.id)
   );
 
-  const isSubViewActive = showReturnWaybill || selectedMachine || selectedConsumable || showTransactions;
+  const isSubViewActive = showReturnWaybill || selectedMachine || selectedConsumable || showTransactions || viewingWaybill;
+
+  const pageTitle = isSubViewActive ? null : (
+    onSiteChange ? (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button className="flex items-center gap-1.5 hover:opacity-80 transition-opacity focus:outline-none -ml-1 px-1 rounded">
+            <span>{site.name}</span>
+            <ChevronRight className="h-4 w-4 rotate-90 opacity-50" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="w-[280px] max-h-[300px] overflow-y-auto">
+          {activeSites.map((s) => (
+            <DropdownMenuItem
+              key={s.id}
+              onClick={() => onSiteChange(s)}
+              className={cn(
+                "flex items-center py-2.5 px-3",
+                s.id === site.id && "bg-slate-100 dark:bg-slate-800"
+              )}
+            >
+              <span className="font-medium text-sm">{s.client} - {s.name}</span>
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    ) : site.name
+  );
 
   useSetPageTitle(
-    isSubViewActive ? null : site.name,
+    pageTitle,
     questionnaire?.contactPersonPhone ? `Contact: ${questionnaire.contactPersonPhone}` : 'Site Overview',
     <div className="flex items-center gap-1 sm:gap-2">
       <Button variant="outline" size="icon" className="h-8 w-8 sm:h-9 sm:w-auto sm:px-3 sm:gap-2" onClick={() => setShowReturnWaybill(true)} title="Return Waybill">
@@ -195,7 +236,7 @@ export function SiteInventoryView({ site, questionnaire, onBack }: SiteInventory
         <FileText className="h-4 w-4" />
       </Button>
     </div>,
-    [site.name, questionnaire, onBack],
+    [site.name, questionnaire, onBack, onSiteChange, activeSites.length],
     onBack
   );
 
@@ -237,6 +278,15 @@ export function SiteInventoryView({ site, questionnaire, onBack }: SiteInventory
       <SiteTransactionsView
         site={site}
         onBack={() => setShowTransactions(false)}
+      />
+    );
+  }
+
+  if (viewingWaybill) {
+    return (
+      <WaybillDetailView
+        waybill={viewingWaybill}
+        onClose={() => setViewingWaybill(null)}
       />
     );
   }
@@ -333,14 +383,24 @@ export function SiteInventoryView({ site, questionnaire, onBack }: SiteInventory
                         <Package className="h-4 w-4" />
                       </div>
                       <div>
-                        <p className="text-sm font-semibold text-slate-800 dark:text-white">{item.assetName}</p>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="text-sm font-semibold text-slate-800 dark:text-white">{item.assetName}</p>
+                          {item.pendingReturnQuantity && item.pendingReturnQuantity > 0 && (
+                            <Badge 
+                              variant="outline" 
+                              className="bg-amber-50 dark:bg-amber-950/20 text-amber-600 dark:text-amber-400 border-amber-200/60 dark:border-amber-900/50 font-bold px-1.5 py-0 text-[10px] rounded shrink-0"
+                            >
+                              Pending Return: {item.pendingReturnQuantity}
+                            </Badge>
+                          )}
+                        </div>
                         <p className="text-xs text-slate-400 capitalize">{item.type || 'non-consumable'}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-6 text-right">
                       <div>
                         <p className="text-sm font-bold text-slate-700 dark:text-slate-200">
-                          {item.quantity} <span className="text-slate-400 font-normal text-xs">{item.unit || 'pcs'}</span>
+                          {item.quantity} <span className="text-slate-400 font-normal text-xs">{formatUnit(item.unit)}</span>
                         </p>
                         {item.lastUpdated && (
                           <p className="text-[10px] text-slate-400">
@@ -396,6 +456,8 @@ export function SiteInventoryView({ site, questionnaire, onBack }: SiteInventory
                           {currentMachines.map(machine => {
                             const mAsset = maintenanceAssets.find(ma => ma.id === machine.id);
                             const machineLogCount = dailyMachineLogs.filter(l => l.assetId === machine.id && l.siteId === site.id).length;
+                            const inventoryItem = allItems.find(i => i.assetId === machine.id);
+                            const isPendingReturn = inventoryItem?.pendingReturnQuantity && inventoryItem.pendingReturnQuantity > 0;
                             return (
                               <div
                                 key={machine.id}
@@ -407,7 +469,17 @@ export function SiteInventoryView({ site, questionnaire, onBack }: SiteInventory
                                     <Wrench className="h-5 w-5" />
                                   </div>
                                   <div className="flex-1 min-w-0">
-                                    <h4 className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{machine.name}</h4>
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <h4 className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{machine.name}</h4>
+                                      {isPendingReturn && (
+                                        <Badge 
+                                          variant="outline" 
+                                          className="bg-amber-50 dark:bg-amber-950/20 text-amber-600 dark:text-amber-400 border-amber-200/60 dark:border-amber-900/50 font-bold px-1.5 py-0 text-[10px] rounded shrink-0"
+                                        >
+                                          Pending Return: {inventoryItem.pendingReturnQuantity}
+                                        </Badge>
+                                      )}
+                                    </div>
                                   </div>
                                   {mAsset && (
                                     <Badge
@@ -554,7 +626,17 @@ export function SiteInventoryView({ site, questionnaire, onBack }: SiteInventory
                               <Layers className="h-5 w-5" />
                             </div>
                             <div className="flex-1 min-w-0">
-                              <h4 className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{item.assetName}</h4>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <h4 className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{item.assetName}</h4>
+                                {item.pendingReturnQuantity && item.pendingReturnQuantity > 0 && (
+                                  <Badge 
+                                    variant="outline" 
+                                    className="bg-amber-50 dark:bg-amber-950/20 text-amber-600 dark:text-amber-400 border-amber-200/60 dark:border-amber-900/50 font-bold px-1.5 py-0 text-[10px] rounded shrink-0"
+                                  >
+                                    Pending Return: {item.pendingReturnQuantity}
+                                  </Badge>
+                                )}
+                              </div>
                               <p className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Consumable</p>
                             </div>
                           </div>
@@ -562,11 +644,11 @@ export function SiteInventoryView({ site, questionnaire, onBack }: SiteInventory
                           <div className="p-4 grid grid-cols-3 divide-x divide-slate-100 dark:divide-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
                             <div className="flex flex-col items-center justify-center px-2">
                               <p className="text-xs text-slate-500 mb-1">At Site</p>
-                              <p className="text-sm font-bold text-slate-800 dark:text-slate-200">{item.quantity} <span className="text-[10px] font-normal text-slate-400">{item.unit || 'pcs'}</span></p>
+                              <p className="text-sm font-bold text-slate-800 dark:text-slate-200">{item.quantity} <span className="text-[10px] font-normal text-slate-400">{formatUnit(item.unit)}</span></p>
                             </div>
                             <div className="flex flex-col items-center justify-center px-2">
                               <p className="text-xs text-slate-500 mb-1">Total Used</p>
-                              <p className="text-sm font-bold text-slate-800 dark:text-slate-200">{totalUsed} <span className="text-[10px] font-normal text-slate-400">{item.unit || 'pcs'}</span></p>
+                              <p className="text-sm font-bold text-slate-800 dark:text-slate-200">{totalUsed} <span className="text-[10px] font-normal text-slate-400">{formatUnit(item.unit)}</span></p>
                             </div>
                             <div className="flex flex-col items-center justify-center px-2">
                               <p className="text-xs text-slate-500 mb-1">Usage Count</p>
@@ -651,7 +733,16 @@ export function SiteInventoryView({ site, questionnaire, onBack }: SiteInventory
                         </p>
                       </div>
                     </div>
-                    <ChevronRight className="h-4 w-4 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-slate-500 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-full"
+                        onClick={() => setViewingWaybill(wb)}
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>

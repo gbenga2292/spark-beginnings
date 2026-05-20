@@ -5,7 +5,7 @@ import {
   X, Plus, Trash2, Truck, FileText, GripVertical,
   MapPin, Package, Search, CheckCircle2, ChevronDown
 } from 'lucide-react';
-import { cn } from '@/src/lib/utils';
+import { cn, formatUnit } from '@/src/lib/utils';
 import { WaybillType, Waybill } from '../types/operations';
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
@@ -394,7 +394,7 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
                                 ) : matched ? (
                                   <div className="flex flex-col justify-center">
                                     <span className="text-sm font-medium text-slate-800 dark:text-slate-200 truncate">{matched.name}</span>
-                                    <span className="text-xs text-slate-500">Available: {matched.availableQuantity} {matched.unitOfMeasurement}</span>
+                                    <span className="text-xs text-slate-500">Available: {matched.availableQuantity} {formatUnit(matched.unitOfMeasurement)}</span>
                                   </div>
                                 ) : (
                                   <div className="text-sm font-medium text-rose-500 flex items-center h-full">No match found</div>
@@ -465,7 +465,7 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
                               >
                                 <option value="">Select asset</option>
                                 {assets.map(a => (
-                                  <option key={a.id} value={a.id}>{a.name} ({a.availableQuantity} {a.unitOfMeasurement})</option>
+                                  <option key={a.id} value={a.id}>{a.name} ({a.availableQuantity} {formatUnit(a.unitOfMeasurement)})</option>
                                 ))}
                               </select>
                               <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
@@ -486,7 +486,7 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
                           <div className="space-y-1.5 sm:col-span-3">
                             <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Available</Label>
                             <div className="h-10 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-100/50 dark:bg-slate-900 flex items-center px-3 text-sm font-bold text-slate-500 cursor-not-allowed">
-                              {selectedAsset ? `${selectedAsset.availableQuantity} ${selectedAsset.unitOfMeasurement}` : '-'}
+                              {selectedAsset ? `${selectedAsset.availableQuantity} ${formatUnit(selectedAsset.unitOfMeasurement)}` : '-'}
                             </div>
                           </div>
                         </div>

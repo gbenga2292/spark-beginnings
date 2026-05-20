@@ -7,7 +7,7 @@ import {
   ChevronsUpDown, ChevronUp, ChevronDown as ChevronDownIcon,
   Download,
 } from 'lucide-react';
-import { cn } from '@/src/lib/utils';
+import { cn, formatUnit } from '@/src/lib/utils';
 import { Asset, AssetCategory } from '../types/operations';
 import { AssetForm } from './AssetForm';
 import { RestockModal } from './RestockModal';
@@ -56,7 +56,7 @@ function DescriptionDialog({ asset, onClose }: { asset: Asset; onClose: () => vo
               { label: 'Type', value: asset.type },
               { label: 'Location', value: asset.location || 'Not set' },
               { label: 'Condition', value: asset.condition },
-              { label: 'Unit', value: asset.unitOfMeasurement },
+              { label: 'Unit', value: formatUnit(asset.unitOfMeasurement) },
               { label: 'Status', value: asset.status },
             ].map(({ label, value }) => (
               <div key={label} className="rounded-xl bg-muted/40 p-3 border border-border">
@@ -444,7 +444,7 @@ export function AssetManager() {
 
                     {/* Total Stock */}
                     <td className="px-2 py-3 text-center">
-                      <span className="font-bold text-blue-600 dark:text-blue-400 text-sm">{asset.quantity}</span><span className="text-[10px] text-slate-400 ml-1">{asset.unitOfMeasurement}</span>
+                      <span className="font-bold text-blue-600 dark:text-blue-400 text-sm">{asset.quantity}</span><span className="text-[10px] text-slate-400 ml-1">{formatUnit(asset.unitOfMeasurement)}</span>
                     </td>
 
                     {/* Reserved */}

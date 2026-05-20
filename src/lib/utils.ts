@@ -27,3 +27,13 @@ export function isValidUUID(id: string): boolean {
  * Controlled via VITE_WEB_VERSION environment variable.
  */
 export const IS_LIMITED_WEB_WEB = import.meta.env.VITE_WEB_VERSION === 'true';
+
+export function formatUnit(unit?: string): string {
+  if (!unit) return 'pcs';
+  const lower = unit.toLowerCase().trim();
+  if (lower.startsWith('pcs') || lower.includes('piece')) return 'pcs';
+  if (lower.startsWith('kg') || lower.includes('kilogram')) return 'kg';
+  if (lower.startsWith('lit') || lower.includes('liter')) return 'lit';
+  if (lower.startsWith('meter') || lower === 'm') return 'm';
+  return unit;
+}

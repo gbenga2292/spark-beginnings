@@ -3,7 +3,7 @@ import { useOperations } from '../contexts/OperationsContext';
 import { Package, Truck, ArrowRightLeft, AlertCircle, TrendingUp, Clock, Wrench, HardHat } from 'lucide-react';
 import { Badge } from '@/src/components/ui/badge';
 import { useTheme } from '@/src/hooks/useTheme';
-import { cn } from '@/src/lib/utils';
+import { cn, formatUnit } from '@/src/lib/utils';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { isInternalSite } from '@/src/lib/siteUtils';
 import { AssetForm } from './AssetForm';
@@ -218,7 +218,7 @@ export function Dashboard() {
                   <div>
                     <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">{a.name}</p>
                     <p className="text-xs text-orange-600 dark:text-orange-400 font-medium">Low stock alert</p>
-                    <p className="text-xs text-slate-500 mt-1">Available: {a.availableQuantity} {a.unitOfMeasurement}</p>
+                    <p className="text-xs text-slate-500 mt-1">Available: {a.availableQuantity} {formatUnit(a.unitOfMeasurement)}</p>
                   </div>
                 </div>
               </div>

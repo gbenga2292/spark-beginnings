@@ -7,7 +7,7 @@ import { Input } from '@/src/components/ui/input';
 import { Label } from '@/src/components/ui/label';
 import { toast } from '@/src/components/ui/toast';
 import { Circle, CheckCircle2, ChevronDown, Package } from 'lucide-react';
-import { cn } from '@/src/lib/utils';
+import { cn, formatUnit } from '@/src/lib/utils';
 import { getPositionIndex } from '@/src/lib/hierarchy';
 
 export interface SiteItem {
@@ -17,6 +17,7 @@ export interface SiteItem {
   unit?: string;
   type?: string;
   lastUpdated?: string;
+  pendingReturnQuantity?: number;
 }
 
 interface CreateReturnWaybillProps {
@@ -42,6 +43,21 @@ export function CreateReturnWaybill({ site, inventoryItems, onBack }: CreateRetu
   // Key: assetId, Value: quantity to return
   const [selectedItems, setSelectedItems] = useState<Record<string, number>>({});
 
+  const returnableItems = inventoryItems.filter(i => (i.quantity - (i.pendingReturnQuantity || 0)) > 0);
+  const allSelected = returnableItems.length > 0 && returnableItems.every(i => !!selectedItems[i.assetId]);
+
+  const toggleSelectAll = () => {
+    if (allSelected) {
+      setSelectedItems({});
+    } else {
+      const nextSelected: Record<string, number> = {};
+      returnableItems.forEach(item => {
+        nextSelected[item.assetId] = item.quantity - (item.pendingReturnQuantity || 0);
+      });
+      setSelectedItems(nextSelected);
+    }
+  };
+
   const driverOptions = employees
     .filter(e => e.status === 'Active' || e.status === 'On Leave')
     .sort((a, b) => {
@@ -65,7 +81,7 @@ export function CreateReturnWaybill({ site, inventoryItems, onBack }: CreateRetu
       if (copy[item.assetId]) {
         delete copy[item.assetId];
       } else {
-        copy[item.assetId] = item.quantity; // default to returning all
+        copy[item.assetId] = item.quantity - (item.pendingReturnQuantity || 0); // default to returning all available
       }
       return copy;
     });
@@ -210,14 +226,36 @@ export function CreateReturnWaybill({ site, inventoryItems, onBack }: CreateRetu
 
           {/* Materials */}
           <div className="space-y-4 pt-2">
-            <h3 className="text-[15px] font-bold text-slate-800">Select Materials to Return</h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-[15px] font-bold text-slate-800">Select Materials to Return</h3>
+              {returnableItems.length > 0 && (
+                <button
+                  type="button"
+                  onClick={toggleSelectAll}
+                  className="flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:text-blue-800 transition-colors select-none"
+                >
+                  {allSelected ? (
+                    <>
+                      <CheckCircle2 className="h-4 w-4" />
+                      Deselect All
+                    </>
+                  ) : (
+                    <>
+                      <Circle className="h-4 w-4 text-blue-600" />
+                      Select All
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
             <div className="space-y-3">
-              {inventoryItems.filter(i => i.quantity > 0).length === 0 ? (
+              {inventoryItems.filter(i => (i.quantity - (i.pendingReturnQuantity || 0)) > 0).length === 0 ? (
                 <div className="p-8 text-center border-2 border-dashed border-slate-100 rounded-xl">
                   <p className="text-slate-400 font-medium">No returnable materials currently logged at this site.</p>
                 </div>
-              ) : inventoryItems.filter(i => i.quantity > 0).map(item => {
+              ) : inventoryItems.filter(i => (i.quantity - (i.pendingReturnQuantity || 0)) > 0).map(item => {
                 const isSelected = !!selectedItems[item.assetId];
+                const availableToReturn = item.quantity - (item.pendingReturnQuantity || 0);
                 return (
                   <label 
                     key={item.assetId} 
@@ -234,7 +272,10 @@ export function CreateReturnWaybill({ site, inventoryItems, onBack }: CreateRetu
                       </div>
                       <div onClick={() => toggleItem(item)}>
                         <p className="text-sm font-bold text-slate-800">{item.assetName}</p>
-                        <p className="text-xs font-medium text-slate-500">At Site: {item.quantity} {item.unit || 'pcs'}</p>
+                        <p className="text-xs font-medium text-slate-500">
+                          At Site: {item.quantity} {formatUnit(item.unit)}
+                          {item.pendingReturnQuantity && item.pendingReturnQuantity > 0 ? ` (${item.pendingReturnQuantity} pending return)` : ''}
+                        </p>
                       </div>
                     </div>
                     {isSelected && (
@@ -243,9 +284,9 @@ export function CreateReturnWaybill({ site, inventoryItems, onBack }: CreateRetu
                         <Input
                           type="number"
                           min={1}
-                          max={item.quantity}
+                          max={availableToReturn}
                           value={selectedItems[item.assetId] || 1}
-                          onChange={(e) => updateItemReturnQty(item.assetId, parseInt(e.target.value) || 1, item.quantity)}
+                          onChange={(e) => updateItemReturnQty(item.assetId, parseInt(e.target.value) || 1, availableToReturn)}
                           className="w-20 h-9 font-bold text-center"
                         />
                       </div>
