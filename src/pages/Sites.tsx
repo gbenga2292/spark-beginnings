@@ -500,7 +500,7 @@ export function Sites() {
     const nameLow = selectedClientName.trim().toLowerCase();
     return commLogs
       .filter(l => {
-        if (l.client.trim().toLowerCase() !== nameLow) return false;
+        if (l.client?.trim().toLowerCase() !== nameLow) return false;
         if (selectedLogsSiteId !== 'all' && l.siteId !== selectedLogsSiteId) return false;
         return true;
       })
