@@ -1105,7 +1105,7 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
           </div>
 
           {/* RIGHT: Updates Panel */}
-          <div className={`w-full xl:w-[400px] 2xl:w-[520px] flex-shrink-0 bg-white dark:bg-slate-900 border-t xl:border-t-0 xl:border-l border-border dark:border-slate-800 flex-col xl:overflow-hidden min-h-[600px] xl:min-h-0 ${showUpdatesOnMobile ? 'flex' : 'hidden xl:flex'}`}>
+          <div className={`w-full xl:w-[400px] 2xl:w-[520px] bg-white dark:bg-slate-900 border-t xl:border-t-0 xl:border-l border-border dark:border-slate-800 flex-col overflow-hidden h-full xl:flex-shrink-0 ${showUpdatesOnMobile ? 'flex flex-1 xl:flex-initial' : 'hidden xl:flex'}`}>
             <div className="flex bg-slate-50 dark:bg-[#111827] border-b border-border dark:border-slate-800" style={{ flexShrink: 0 }}>
               <button
                 onClick={() => setShowUpdatesOnMobile(false)}

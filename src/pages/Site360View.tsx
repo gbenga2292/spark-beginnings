@@ -103,7 +103,7 @@ export function Site360View({ site, clientSites, onSiteChange, onBack, onEditSit
 
   useEffect(() => {
     if (messages.length > 0) {
-      chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      chatEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
   }, [messages]);
 
@@ -636,7 +636,7 @@ Answer site-specific questions using this context only. Be concise.`;
   return (
     <div className="flex flex-col h-full min-h-0 overflow-hidden bg-slate-50 dark:bg-slate-950">
       <div ref={containerRef} className="flex-1 overflow-y-auto p-2 sm:p-4 lg:p-6 style-scroll">
-        <div className="max-w-6xl mx-auto space-y-4 animate-in fade-in duration-500">
+        <div className="max-w-6xl mx-auto space-y-4">
 
 
           {/* ── Hero: AI Assistant + Site Identity side by side ── */}
@@ -833,11 +833,11 @@ Answer site-specific questions using this context only. Be concise.`;
 
           {/* Tabs */}
           <div className={cn('flex items-center justify-between border-b mb-6 gap-2 min-w-0 overflow-hidden', isDark ? 'border-slate-800' : 'border-slate-200')}>
-            <div className="flex items-center gap-0 overflow-x-auto style-scroll pb-px flex-1 min-w-0">
+            <div className="flex items-center gap-1 overflow-x-auto style-scroll pb-px flex-1 min-w-0">
               {tabs.map(tab => (
                 <button key={tab.id} onClick={() => setActiveTab(tab.id)}
                   className={cn(
-                    'flex items-center gap-1 min-[480px]:gap-1.5 px-1.5 min-[480px]:px-2.5 sm:px-3.5 py-3 text-xs sm:text-sm font-semibold border-b-2 transition-colors shrink-0',
+                    'flex items-center gap-1.5 min-[480px]:gap-1.5 px-3 min-[480px]:px-3.5 sm:px-4 py-3 text-xs sm:text-sm font-semibold border-b-2 transition-colors shrink-0',
                     activeTab === tab.id
                       ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400'
                       : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
@@ -857,11 +857,11 @@ Answer site-specific questions using this context only. Be concise.`;
           </div>
 
           {/* Tab Content */}
-          <div className="animate-in fade-in duration-300 space-y-5">
+          <div className="space-y-5">
 
             {/* FINANCIALS */}
             {activeTab === 'financials' && (
-              <>
+              <div className="animate-in fade-in zoom-in-[0.98] duration-200 ease-out space-y-5">
                 {/* Financial Sub-Tabs */}
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
                   {[
@@ -900,7 +900,7 @@ Answer site-specific questions using this context only. Be concise.`;
 
                 {/* Tab Content */}
                 {finTab === 'vat' && (
-                  <div className={cn(card, "bg-gradient-to-br from-indigo-50/50 via-white to-purple-50/50 dark:from-indigo-950/20 dark:via-slate-900 dark:to-purple-950/20 border-indigo-100 dark:border-indigo-900/50 animate-in fade-in duration-200")}>
+                  <div className={cn(card, "bg-gradient-to-br from-indigo-50/50 via-white to-purple-50/50 dark:from-indigo-950/20 dark:via-slate-900 dark:to-purple-950/20 border-indigo-100 dark:border-indigo-900/50")}>
                     <h3 className="font-bold mb-4 flex items-center gap-2 text-lg text-indigo-950 dark:text-indigo-300">
                       <CheckCircle2 className="w-5 h-5 text-indigo-500" /> VAT Intelligence & Compliance
                     </h3>
@@ -948,7 +948,7 @@ Answer site-specific questions using this context only. Be concise.`;
                 )}
 
                 {finTab === 'invoices' && (
-                  <div className={cn(card, "animate-in fade-in duration-200")}>
+                  <div className={cn(card, "")}>
                     <h3 className="font-bold mb-4 flex items-center gap-2 text-lg"><FileText className="w-5 h-5 text-indigo-500" /> Invoices ({data.siteInvoices.length})</h3>
                     {data.siteInvoices.length > 0 ? (
                       <div className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -977,7 +977,7 @@ Answer site-specific questions using this context only. Be concise.`;
                 )}
 
                 {finTab === 'payments' && (
-                  <div className={cn(card, "animate-in fade-in duration-200")}>
+                  <div className={cn(card, "")}>
                     <h3 className="font-bold mb-4 flex items-center gap-2 text-lg"><DollarSign className="w-5 h-5 text-emerald-500" /> Payments Received ({data.sitePayments.length})</h3>
                     {data.sitePayments.length > 0 ? (
                       <div className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -999,7 +999,7 @@ Answer site-specific questions using this context only. Be concise.`;
                 )}
 
                 {finTab === 'expenses' && (
-                  <div className={cn(card, "animate-in fade-in duration-200")}>
+                  <div className={cn(card, "")}>
                     <h3 className="font-bold mb-4 flex items-center gap-2 text-lg"><FileText className="w-5 h-5 text-rose-500" /> Site Expenses ({data.siteCosts.length})</h3>
                     {data.siteCosts.length > 0 ? (
                       <div className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -1019,12 +1019,12 @@ Answer site-specific questions using this context only. Be concise.`;
                     ) : <p className="text-slate-500 text-sm text-center py-8">No expenses recorded for this site in the selected period.</p>}
                   </div>
                 )}
-              </>
+              </div>
             )}
 
             {/* OPERATIONS */}
             {activeTab === 'operations' && (
-              <>
+              <div className="animate-in fade-in zoom-in-[0.98] duration-200 ease-out space-y-5">
 
                 <div className={card}>
                   <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-100 dark:border-slate-800 flex-wrap gap-2">
@@ -1067,7 +1067,7 @@ Answer site-specific questions using this context only. Be concise.`;
 
                   {/* Operational Sub-Tabs Content */}
                   {operationsSubTab === 'logs' && (
-                    <div className="space-y-1 animate-in fade-in duration-200">
+                    <div className="space-y-1">
                       {data.machineLogs.length > 0 ? (
                         <div className="divide-y divide-slate-100 dark:divide-slate-800">
                           {data.machineLogs.slice().sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(log => (
@@ -1098,7 +1098,7 @@ Answer site-specific questions using this context only. Be concise.`;
                   )}
 
                   {operationsSubTab === 'materials' && (
-                    <div className="space-y-1 animate-in fade-in duration-200">
+                    <div className="space-y-1">
                       {data.materialsOnSite.length > 0 ? (
                         <div className="divide-y divide-slate-100 dark:divide-slate-800">
                           {data.materialsOnSite.map(item => (
@@ -1126,7 +1126,7 @@ Answer site-specific questions using this context only. Be concise.`;
                   )}
 
                   {operationsSubTab === 'waybills' && (
-                    <div className="space-y-1 animate-in fade-in duration-200">
+                    <div className="space-y-1">
                       {data.siteWaybills.length > 0 ? (
                         <div className="divide-y divide-slate-100 dark:divide-slate-800">
                           {data.siteWaybills.map(wb => (
@@ -1164,12 +1164,12 @@ Answer site-specific questions using this context only. Be concise.`;
                     </div>
                   )}
                 </div>
-              </>
+              </div>
             )}
 
             {/* MAINTENANCE */}
             {activeTab === 'maintenance' && (
-              <>
+              <div className="animate-in fade-in zoom-in-[0.98] duration-200 ease-out space-y-5">
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
                   {[
                     { label: 'Assets Tracked', value: data.siteMaintAssets.length, color: 'text-indigo-600' },
@@ -1265,12 +1265,12 @@ Answer site-specific questions using this context only. Be concise.`;
                     )}
                   </div>
                 </div>
-              </>
+              </div>
             )}
 
             {/* TASKS */}
             {activeTab === 'tasks' && (
-              <div className="max-w-4xl mx-auto">
+              <div className="animate-in fade-in zoom-in-[0.98] duration-200 ease-out space-y-5">
                 <div className={card}>
                   <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-100 dark:border-slate-800 flex-wrap gap-2">
                     <h3 className="font-bold text-lg flex items-center gap-2">
@@ -1502,7 +1502,7 @@ Answer site-specific questions using this context only. Be concise.`;
 
                   {/* Task list based on tab */}
                   {taskSubTab === 'pending' && (
-                    <div className="space-y-1 animate-in fade-in duration-200">
+                    <div className="space-y-1">
                       {data.pendingSiteTasks.length > 0 ? (
                         <div className="divide-y divide-slate-100 dark:divide-slate-800">
                           {data.pendingSiteTasks.map(task => renderTaskRow(task, 'pending'))}
@@ -1518,7 +1518,7 @@ Answer site-specific questions using this context only. Be concise.`;
                   )}
 
                   {taskSubTab === 'approval' && (
-                    <div className="space-y-1 animate-in fade-in duration-200">
+                    <div className="space-y-1">
                       {data.approvalSiteTasks.length > 0 ? (
                         <div className="divide-y divide-slate-100 dark:divide-slate-800">
                           {data.approvalSiteTasks.map(task => renderTaskRow(task, 'approval'))}
@@ -1534,7 +1534,7 @@ Answer site-specific questions using this context only. Be concise.`;
                   )}
 
                   {taskSubTab === 'completed' && (
-                    <div className="space-y-1 animate-in fade-in duration-200">
+                    <div className="space-y-1">
                       {data.completedSiteTasks.length > 0 ? (
                         <div className="divide-y divide-slate-100 dark:divide-slate-800">
                           {data.completedSiteTasks.map(task => renderTaskRow(task, 'completed'))}
@@ -1554,7 +1554,7 @@ Answer site-specific questions using this context only. Be concise.`;
 
             {/* COMMS */}
             {activeTab === 'comms' && (
-              <div className="max-w-4xl mx-auto">
+              <div className="animate-in fade-in zoom-in-[0.98] duration-200 ease-out space-y-5">
                 <div className={card}>
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="font-bold text-base sm:text-lg flex items-center gap-2"><MessagesSquare className="w-5 h-5 text-blue-500" /> Communication Logs ({data.siteComms.length})</h3>
@@ -1583,7 +1583,7 @@ Answer site-specific questions using this context only. Be concise.`;
 
             {/* CONTACTS */}
             {activeTab === 'contacts' && (
-              <div className="max-w-4xl mx-auto">
+              <div className="animate-in fade-in zoom-in-[0.98] duration-200 ease-out space-y-5">
                 <div className={card}>
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="font-bold text-base sm:text-lg flex items-center gap-2"><Users className="w-5 h-5 text-indigo-500" /> Site Contacts ({data.siteContacts.length})</h3>
@@ -1734,7 +1734,7 @@ function ExternalCommDialog({ open, onClose, site, contacts = [], onSave }: { op
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xl max-w-lg w-full overflow-hidden flex flex-col max-h-[90vh]">
         <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-900/50">
           <div>

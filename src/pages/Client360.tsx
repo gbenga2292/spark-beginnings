@@ -781,7 +781,7 @@ export function Client360() {
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }, [messages]);
 
   const sendChatMessage = async (isInitialBrief = false) => {
@@ -1063,7 +1063,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
           {/* Main Content Area */}
           <div className="flex-1 overflow-y-auto p-2 sm:p-4 lg:p-6 style-scroll">
             {clientData ? (
-              <div className="max-w-6xl mx-auto space-y-4 animate-in fade-in duration-500">
+              <div className="max-w-6xl mx-auto space-y-4">
 
 
             {currentUser?.privileges?.clients?.canViewDecisionIntelligence && (
@@ -1136,7 +1136,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
 
             {/* Navigation Tabs */}
             <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 mb-6 gap-2 min-w-0 overflow-hidden">
-              <div className="flex items-center gap-0 overflow-x-auto style-scroll pb-px flex-1 min-w-0">
+              <div className="flex items-center gap-1 overflow-x-auto style-scroll pb-px flex-1 min-w-0">
                 {[
                   { id: 'overview', label: 'Overview', icon: Activity, show: currentUser?.privileges?.clients?.canView },
                   { id: 'financials', label: 'Financials', icon: DollarSign, show: currentUser?.privileges?.billing?.canView || currentUser?.privileges?.payments?.canView },
@@ -1147,7 +1147,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                 ].filter(tab => tab.show !== false).map(tab => (
                   <button key={tab.id} onClick={() => setActiveTab(tab.id as TabType)}
                     className={cn(
-                      "flex items-center gap-1 min-[480px]:gap-1.5 px-1.5 min-[480px]:px-2.5 sm:px-3.5 py-3 text-xs sm:text-sm font-semibold border-b-2 transition-colors shrink-0",
+                      "flex items-center gap-1.5 min-[480px]:gap-1.5 px-3 min-[480px]:px-3.5 sm:px-4 py-3 text-xs sm:text-sm font-semibold border-b-2 transition-colors shrink-0",
                       activeTab === tab.id 
                         ? "border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400" 
                         : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
@@ -1183,11 +1183,11 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
             </div>
 
             {/* Tab Content */}
-            <div className="animate-in fade-in duration-300">
+            <div className="">
               
               {/* OVERVIEW TAB */}
               {activeTab === 'overview' && (
-                <div className="space-y-6">
+                <div className="space-y-6 animate-in fade-in zoom-in-[0.98] duration-200 ease-out">
                   {/* KPI Cards */}
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                     <div className={cn("p-3 sm:p-5 rounded-2xl border shadow-sm min-w-0", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
@@ -1279,7 +1279,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
 
               {/* FINANCIALS TAB */}
               {activeTab === 'financials' && (
-                <div className="space-y-6">
+                <div className="space-y-6 animate-in fade-in zoom-in-[0.98] duration-200 ease-out">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {/* Revenue & Profit (Accrual Basis) */}
                     <div className={cn("p-6 rounded-3xl border shadow-sm flex flex-col justify-between", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
@@ -1464,7 +1464,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                     {clientData.paymentsWithVatStatus && clientData.paymentsWithVatStatus.length > 0 ? (() => {
                       const allVatPayments = [...clientData.paymentsWithVatStatus]
                         .filter(p => p.payVat !== 'No')
-                        .sort((a, b) => new Date(normalizeDate(b.date) || b.date).getTime() - new Date(normalizeDate(a.date) || a.date).getTime());
+                        .sort((a, b) => new Date(normalizeDate(a.date) || a.date).getTime() - new Date(normalizeDate(b.date) || b.date).getTime());
                       const filteredPayments = hideFullySettled
                         ? allVatPayments.filter(p => p.settlementStatus !== 'Fully Settled')
                         : allVatPayments;
@@ -1641,7 +1641,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
 
               {/* CONTACTS TAB */}
               {activeTab === 'contacts' && (
-                <div className="space-y-4 col-span-full">
+                <div className="space-y-4 col-span-full animate-in fade-in zoom-in-[0.98] duration-200 ease-out">
                   <div className="flex justify-between items-center bg-slate-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-slate-100 dark:border-slate-800">
                     <div>
                       <h3 className="text-base font-bold text-slate-800 dark:text-slate-200">Contacts Directory</h3>
@@ -1693,7 +1693,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
 
               {/* OPERATIONS TAB */}
               {activeTab === 'operations' && (
-                <div className="space-y-6 w-full animate-in fade-in duration-300">
+                <div className="space-y-6 w-full animate-in fade-in zoom-in-[0.98] duration-200 ease-out">
                   {/* Secondary Tab Switcher */}
                   <div className="flex border-b border-slate-200 dark:border-slate-800 mb-2 overflow-x-auto style-scroll pb-px gap-1">
                     {[
@@ -1790,7 +1790,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                           )}
                         </div>
                       ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 animate-in fade-in duration-300">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                           {clientPendingSites.map(site => {
                             const phases = [1,2,3,4,5] as const;
                             const completedCount = phases.filter(p => !!(site as any)[`phase${p}`]?.completed).length;
@@ -1866,7 +1866,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
 
               {/* COMMUNICATIONS TAB */}
               {activeTab === 'activity' && (
-                <div className={cn("p-6 rounded-2xl border shadow-sm animate-in fade-in duration-300", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
+                <div className={cn("p-6 rounded-2xl border shadow-sm animate-in fade-in zoom-in-[0.98] duration-200 ease-out", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
                   <div className="flex justify-between items-center mb-6">
                     <div>
                       <h3 className="text-lg font-bold flex items-center gap-2">
@@ -1975,7 +1975,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
 
               {/* TASKS TAB */}
               {activeTab === 'tasks' && (
-                <div className="space-y-4">
+                <div className="space-y-4 animate-in fade-in zoom-in-[0.98] duration-200 ease-out">
                   {/* Secondary Tab Switcher */}
                   <div className="flex border-b border-slate-200 dark:border-slate-800 mb-2 overflow-x-auto style-scroll pb-px gap-1">
                     {[
@@ -2010,7 +2010,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
 
                   {/* Tab Contents */}
                   {taskSubTab === 'pending' && (
-                    <div className={cn("p-4 sm:p-6 rounded-2xl border shadow-sm animate-in fade-in duration-300", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
+                    <div className={cn("p-4 sm:p-6 rounded-2xl border shadow-sm", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
                       <div className="flex items-center justify-between mb-4">
                         <h3 className="font-bold text-lg flex items-center gap-2">
                           <CheckSquare className="w-5 h-5 text-indigo-500" /> Pending Tasks ({clientData.pendingTasks.length})
@@ -2065,7 +2065,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                   )}
 
                   {taskSubTab === 'approval' && (
-                    <div className={cn("p-4 sm:p-6 rounded-2xl border shadow-sm animate-in fade-in duration-300", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
+                    <div className={cn("p-4 sm:p-6 rounded-2xl border shadow-sm", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
                       <div className="flex items-center justify-between mb-4">
                         <h3 className="font-bold text-lg flex items-center gap-2">
                           <ShieldAlert className="w-5 h-5 text-amber-500" /> Pending Approvals ({clientData.approvalTasks.length})
@@ -2120,7 +2120,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                   )}
 
                   {taskSubTab === 'completed' && (
-                    <div className={cn("p-4 sm:p-6 rounded-2xl border shadow-sm animate-in fade-in duration-300", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
+                    <div className={cn("p-4 sm:p-6 rounded-2xl border shadow-sm", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
                       <div className="flex items-center justify-between mb-4">
                         <h3 className="font-bold text-lg flex items-center gap-2">
                           <CheckCircle2 className="w-5 h-5 text-emerald-500" /> Completed Tasks ({clientData.completedTasks.length})
@@ -2184,7 +2184,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
 
       {/* Site Edit Dialog */}
       {siteEditTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setSiteEditTarget(null)} />
           <div className={cn('relative z-10 w-full max-w-md rounded-3xl shadow-2xl p-5 sm:p-6 max-h-[90vh] flex flex-col', isDark ? 'bg-slate-900 border border-slate-700' : 'bg-white border border-slate-200')}>
             <div className="flex justify-between items-center mb-5 shrink-0">
@@ -2207,7 +2207,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
 
       {/* Log Communication Dialog */}
       {commDialogOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setCommDialogOpen(false)} />
           <div className={cn('relative z-10 w-full max-w-lg rounded-3xl shadow-2xl p-5 sm:p-6 max-h-[92vh] flex flex-col', isDark ? 'bg-slate-900 border border-slate-700' : 'bg-white border border-slate-200')}>
             <div className="flex justify-between items-center mb-5 shrink-0">

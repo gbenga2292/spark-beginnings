@@ -8,8 +8,6 @@
 	<string>automatic</string>
 	<key>stripSwiftSymbols</key>
 	<true/>
-	<key>teamID</key>
-	<string></string>
 	<key>provisioningProfiles</key>
 	<dict/>
 </dict>

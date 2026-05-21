@@ -166,6 +166,41 @@ function AppContent() {
     return () => window.removeEventListener('electron-navigate', handler);
   }, [navigate]);
 
+  // Handle Android hardware back button
+  useEffect(() => {
+    let listener: any;
+    import('@capacitor/app').then(({ App }) => {
+      App.addListener('backButton', () => {
+        const hash = window.location.hash;
+        const path = hash.replace(/^#/, '').split('?')[0];
+        
+        // Define root paths where back button should exit the app
+        const rootPaths = [
+          '/', '/login', '/tasks/dashboard', '/client-360', '/tasks', '/tasks/reminders',
+          '/comm-log', '/daily-journal', '/hr-dashboard', '/attendance', '/employees',
+          '/onboarding', '/leaves', '/salary-loans', '/hmo', '/evaluations', '/interviews',
+          '/performance-conduct', '/operations', '/operations/assets', '/operations/waybills',
+          '/operations/checkout', '/operations/maintenance', '/operations/vehicles', '/operations/sites',
+          '/client-accounts', '/payroll', '/beneficiaries', '/ledger', '/company-expenses',
+          '/reports', '/financial-reports', '/tasks/reports', '/weekly-report', '/users',
+          '/settings', '/activity-log', '/profile'
+        ];
+        
+        if (rootPaths.includes(path) || path === '') {
+          App.exitApp();
+        } else {
+          window.history.back();
+        }
+      }).then(l => listener = l);
+    }).catch(() => {
+      // Ignore if @capacitor/app isn't available
+    });
+    
+    return () => {
+      if (listener) listener.remove();
+    };
+  }, []);
+
   return (
     <Routes>
       <Route path="/login" element={<Login />} />

@@ -50,8 +50,7 @@ jobs:
             -scheme App \
             -configuration Release \
             -derivedDataPath build \
-            -arch arm64 \
-            build
+            clean build
 
       - name: Create IPA
         working-directory: ios/App
@@ -61,19 +60,21 @@ jobs:
             -scheme App \
             -configuration Release \
             -derivedDataPath build \
-            -arch arm64 \
             -allowProvisioningUpdates \
             archive \
             -archivePath build/App.xcarchive
 
       - name: Export IPA
         working-directory: ios/App
+        env:
+          DEVELOPMENT_TEAM: ${{ secrets.APPLE_DEVELOPMENT_TEAM_ID }}
         run: |
           xcodebuild \
             -exportArchive \
             -archivePath build/App.xcarchive \
             -exportOptionsPlist ExportOptions.plist \
-            -exportPath build/ipa
+            -exportPath build/ipa \
+            -allowProvisioningUpdates
 
       - name: Upload IPA as artifact
         uses: actions/upload-artifact@v4
