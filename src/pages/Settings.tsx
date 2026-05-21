@@ -63,7 +63,7 @@ const DEFAULT_BACKUP_SETTINGS: BackupSettings = {
 
 export function Settings() {
   const [activeTab, setActiveTab] = useState('general');
-  const [appVersion, setAppVersion] = useState((packageJson as any).version || '1.6.0');
+  const [appVersion, setAppVersion] = useState((packageJson as any).version || '1.6.1');
   const [isChecking, setIsChecking] = useState(false);
   const isElectron = ((window as any).electronAPI as any)?.isElectron as boolean | undefined;
   const isAndroidNative = Capacitor.getPlatform() === 'android';
@@ -101,7 +101,7 @@ export function Settings() {
     if (isElectron && ((window as any).electronAPI as any)?.getVersion) {
       ((window as any).electronAPI as any).getVersion().then((v: string) => setAppVersion(v)).catch(console.error);
     } else if (isAndroidNative) {
-      setAppVersion('1.6.0');
+      setAppVersion('1.6.1');
     }
   }, [isElectron, isAndroidNative]);
 
@@ -441,7 +441,7 @@ export function Settings() {
     } else if (isAndroidNative) {
       setIsChecking(true);
       try {
-        const CURRENT_VERSION = '1.6.0';
+        const CURRENT_VERSION = '1.6.1';
         const UPDATE_SERVER_URL = import.meta.env.VITE_UPDATE_SERVER_URL || 'https://dewaterconstruct.com/app-updates';
         const response = await CapacitorHttp.get({
           url: `${UPDATE_SERVER_URL}/version.json?t=${Date.now()}`,
