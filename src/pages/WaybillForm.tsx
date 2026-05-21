@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useOperations } from '../contexts/OperationsContext';
 import { useAppStore } from '@/src/store/appStore';
 import { 
@@ -33,11 +33,9 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
 
   const [purpose, setPurpose] = useState('Operational Activities');
   const [siteName, setSiteName] = useState(editWaybill?.siteName || prefillSiteName);
-  const isKnownDriver = (name: string) => !name || uniqueDrivers.includes(name);
   const [driverName, setDriverName] = useState(editWaybill?.driverName || '');
-  const [driverIsCustom, setDriverIsCustom] = useState(
-    !!editWaybill?.driverName && !isKnownDriver(editWaybill.driverName)
-  );
+  // driverIsCustom is initialised lazily so it can reference uniqueDrivers safely
+  const [driverIsCustom, setDriverIsCustom] = useState(false);
   const [vehicleName, setVehicleName] = useState(editWaybill?.vehicle || '');
   const [service, setService] = useState('Dewatering');
   const [expectedReturnDate, setExpectedReturnDate] = useState('');
@@ -65,6 +63,17 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
     .map(e => `${e.firstname} ${e.surname}`);
   
   const uniqueDrivers = Array.from(new Set(driverOptions));
+
+  // Derived: if the saved driverName is not in the list, treat it as custom
+  const isKnownDriver = (name: string) => !name || uniqueDrivers.includes(name);
+
+  // On mount: if editing and driver name is not in the list, show the custom input
+  useEffect(() => {
+    if (editWaybill?.driverName && !isKnownDriver(editWaybill.driverName)) {
+      setDriverIsCustom(true);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const vehicleOptions = vehicles.map(v => v.name);
   const siteOptions = sites.map(s => s.name);

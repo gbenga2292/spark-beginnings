@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 
 import {
-  ArrowLeft, MapPin, DollarSign, Activity, Wrench, MessagesSquare,
+  Building2, ArrowLeft, MapPin, DollarSign, Activity, Wrench, MessagesSquare,
   AlertTriangle, Clock, Fuel, Calendar, FileText, Users, Settings2,
   ChevronDown, Sparkles, RefreshCcw, Send, ChevronUp, Filter, CheckCircle2, Plus, Pencil, ChevronRight,
   CheckSquare, ShieldAlert, ShieldCheck, ClipboardList, Package, Truck, X, Phone, Mail
@@ -24,6 +24,7 @@ import { Invoice } from '@/src/store/appStore';
 import { ClientContactsPanel } from './ClientContactsPanel';
 import { TaskDetailSheet } from '@/src/components/tasks/TaskDetailSheet';
 import { AddSubtaskInline } from './Tasks/AddSubtaskInline';
+import { GlobalSearch } from '@/src/components/common/GlobalSearch';
 
 type SiteTab = 'financials' | 'operations' | 'maintenance' | 'comms' | 'tasks' | 'contacts';
 
@@ -40,6 +41,20 @@ export function Site360View({ site, clientSites, onSiteChange, onBack, onEditSit
   const { createMainTask, users, addSubtask } = useAppData();
   const { user: authUser } = useAuth();
   const currentUser = useUserStore(s => s.users.find(u => u.id === s.currentUserId));
+  const allSites = useAppStore(s => s.sites);
+  const allClients = useMemo(() => {
+    const names = new Set<string>();
+    allSites.forEach(s => { 
+      const name = s.client?.trim();
+      if (name && name.toUpperCase() !== 'DCEL') names.add(name); 
+    });
+    return Array.from(names).sort();
+  }, [allSites]);
+
+  const handleSearchNavigation = (result: any) => {
+    navigate(`/client-360?client=${encodeURIComponent(result.clientName)}&tab=${result.tab}`);
+  };
+
   const navigate = useNavigate();
   const clientProfiles = useAppStore(s => s.clientProfiles);
   const [showAddTaskForm, setShowAddTaskForm] = useState(false);
@@ -448,15 +463,17 @@ Answer site-specific questions using this context only. Be concise.`;
 
   // Header actions with Filters dropdown and Site Selector
   const headerActions = (
-    <div className="flex items-center gap-2">
+    <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2 w-full justify-end">
+      <GlobalSearch isDark={isDark} allClients={allClients} onSelectResult={handleSearchNavigation} />
+      <div className="flex items-center gap-2">
       <div className="relative">
         <Button
           variant="outline"
           size="sm"
           onClick={() => setShowFilters(!showFilters)}
-          className={cn("h-8 gap-1.5 px-3 text-xs font-semibold relative", isDark ? "border-slate-700 hover:bg-slate-800 text-slate-300" : "border-slate-300 hover:bg-slate-100 text-slate-700")}
+          className={cn("h-8 w-8 p-0 flex items-center justify-center relative shrink-0", isDark ? "border-slate-700 hover:bg-slate-800 text-slate-300" : "border-slate-300 hover:bg-slate-100 text-slate-700")}
         >
-          <Filter className="w-3.5 h-3.5" /> Filter
+          <Filter className="w-3.5 h-3.5" />
           {(filterMonth !== 'all' || filterYear !== 'all') && (
             <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-indigo-500 rounded-full border-2 border-white dark:border-slate-950" />
           )}
@@ -482,21 +499,22 @@ Answer site-specific questions using this context only. Be concise.`;
         )}
       </div>
 
-      <div className={cn('flex items-center gap-2 px-3 py-1.5 rounded-lg border shadow-sm transition-colors', isDark ? 'bg-slate-900 border-slate-700 hover:border-indigo-500' : 'bg-white border-slate-200 hover:border-indigo-300')}>
-        <MapPin className="w-4 h-4 text-indigo-600 shrink-0" />
-        <div className="relative">
+      <div className={cn('flex items-center gap-1.5 px-2 py-1 h-8 rounded-lg border shadow-sm transition-colors', isDark ? 'bg-slate-900 border-slate-700 hover:border-indigo-500' : 'bg-white border-slate-200 hover:border-indigo-300')}>
+        <Building2 className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+        <div className="relative flex items-center">
           <select
             value={site.id}
             onChange={e => {
               const selected = clientSites.find(s => s.id === e.target.value);
               if (selected) onSiteChange(selected);
             }}
-            className={cn('appearance-none bg-transparent font-bold text-sm pr-6 focus:outline-none cursor-pointer max-w-[200px] truncate', isDark ? 'text-white' : 'text-slate-900')}
+            className={cn('appearance-none bg-transparent font-bold text-xs pr-5 focus:outline-none cursor-pointer max-w-[120px] sm:max-w-[150px] truncate', isDark ? 'text-white' : 'text-slate-900')}
           >
             {clientSites.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
-          <ChevronDown className="w-4 h-4 absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400" />
+          <ChevronDown className="w-3.5 h-3.5 absolute right-0 pointer-events-none text-slate-400" />
         </div>
+      </div>
       </div>
     </div>
   );

@@ -413,9 +413,6 @@ export function SiteOnboarding() {
 
   const headerActions = (
     <div className="flex items-center gap-2">
-      <Button variant="ghost" size="sm" onClick={handleBack} className="text-slate-500 mr-2">
-        <ArrowLeft className="h-4 w-4 mr-1" /> Back
-      </Button>
       {!isNew && (
         <>
           {form.status === 'Active' && projects.some(p => p.name === form.siteName || p.id === form.siteName || p.title === form.siteName) ? (
@@ -446,7 +443,8 @@ export function SiteOnboarding() {
     isNew ? 'New Site Onboarding' : `Site Onboarding — ${form.siteName}`,
     isNew ? 'Start a new project inquiry' : `${form.status === 'Active' ? 'Site Active' : 'Activation Pending'} • Fill all phases. Activation unlocks at Phase 4.`,
     headerActions,
-    [form.siteName, form.status, canActivate, isNew, form]
+    [form.siteName, form.status, canActivate, isNew, form],
+    handleBack
   );
 
   const completedCount = [1, 2, 3, 4, 5].filter(p => (form as any)[`phase${p}`].completed).length;

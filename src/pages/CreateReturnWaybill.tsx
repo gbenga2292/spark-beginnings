@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { useOperations } from '../contexts/OperationsContext';
 import { useAppStore, Site } from '@/src/store/appStore';
@@ -6,7 +6,7 @@ import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Label } from '@/src/components/ui/label';
 import { toast } from '@/src/components/ui/toast';
-import { Circle, CheckCircle2, ChevronDown, Package } from 'lucide-react';
+import { Circle, CheckCircle2, ChevronDown, Package, Search } from 'lucide-react';
 import { cn, formatUnit } from '@/src/lib/utils';
 import { getPositionIndex } from '@/src/lib/hierarchy';
 
@@ -34,11 +34,25 @@ export function CreateReturnWaybill({ site, inventoryItems, onBack }: CreateRetu
 
   const [purpose, setPurpose] = useState('Material Return');
   const [driverName, setDriverName] = useState('');
+  const [driverSearch, setDriverSearch] = useState('');
+  const [driverDropdownOpen, setDriverDropdownOpen] = useState(false);
+  const driverComboRef = useRef<HTMLDivElement>(null);
   const [vehicleName, setVehicleName] = useState('');
   const [service, setService] = useState('Dewatering');
   const [expectedReturnDate, setExpectedReturnDate] = useState('');
   const [returnTo, setReturnTo] = useState('Office');
   const [addSignature, setAddSignature] = useState(false);
+
+  // Close driver dropdown on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (driverComboRef.current && !driverComboRef.current.contains(e.target as Node)) {
+        setDriverDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
   // Key: assetId, Value: quantity to return
   const [selectedItems, setSelectedItems] = useState<Record<string, number>>({});
@@ -73,6 +87,12 @@ export function CreateReturnWaybill({ site, inventoryItems, onBack }: CreateRetu
     .map(e => `${e.firstname} ${e.surname}`);
 
   const uniqueDrivers = Array.from(new Set(driverOptions));
+
+  // Filtered list based on what the user has typed
+  const filteredDrivers = uniqueDrivers.filter(d =>
+    d.toLowerCase().includes(driverSearch.toLowerCase())
+  );
+
   const vehicleOptions = vehicles.map(v => v.name);
 
   const toggleItem = (item: SiteItem) => {
@@ -161,16 +181,72 @@ export function CreateReturnWaybill({ site, inventoryItems, onBack }: CreateRetu
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
               <Label className="text-xs font-bold text-slate-700">Driver *</Label>
-              <div className="relative">
-                <select
-                  value={driverName}
-                  onChange={e => setDriverName(e.target.value)}
-                  className="w-full h-11 rounded-xl border border-slate-200 bg-slate-50/50 px-4 text-sm font-semibold text-slate-800 transition-colors focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 appearance-none"
-                >
-                  <option value="">Select Driver</option>
-                  {uniqueDrivers.map(d => <option key={d} value={d}>{d}</option>)}
-                </select>
-                <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+              <div className="relative" ref={driverComboRef}>
+                {/* Combobox input — shows selected name or lets user type */}
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+                  <input
+                    type="text"
+                    placeholder="Select or type driver name…"
+                    value={driverDropdownOpen ? driverSearch : driverName}
+                    onFocus={() => {
+                      setDriverSearch(driverName);
+                      setDriverDropdownOpen(true);
+                    }}
+                    onChange={e => {
+                      setDriverSearch(e.target.value);
+                      setDriverName(e.target.value);
+                      setDriverDropdownOpen(true);
+                    }}
+                    onBlur={() => {
+                      // small delay so click on option registers first
+                      setTimeout(() => setDriverDropdownOpen(false), 150);
+                    }}
+                    className="w-full h-11 rounded-xl border border-slate-200 bg-slate-50/50 pl-9 pr-10 text-sm font-semibold text-slate-800 transition-colors focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                  />
+                  <ChevronDown
+                    className={cn(
+                      "absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 cursor-pointer transition-transform",
+                      driverDropdownOpen && "rotate-180"
+                    )}
+                    onMouseDown={e => {
+                      e.preventDefault();
+                      setDriverDropdownOpen(prev => !prev);
+                      if (!driverDropdownOpen) setDriverSearch('');
+                    }}
+                  />
+                </div>
+
+                {/* Dropdown list */}
+                {driverDropdownOpen && (
+                  <div className="absolute z-50 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden">
+                    <div className="max-h-52 overflow-y-auto">
+                      {filteredDrivers.length === 0 ? (
+                        <div className="px-4 py-3 text-xs text-slate-400 font-medium">
+                          No match — "{driverSearch}" will be used as the driver name.
+                        </div>
+                      ) : (
+                        filteredDrivers.map(d => (
+                          <button
+                            key={d}
+                            type="button"
+                            onMouseDown={() => {
+                              setDriverName(d);
+                              setDriverSearch(d);
+                              setDriverDropdownOpen(false);
+                            }}
+                            className={cn(
+                              "w-full text-left px-4 py-2.5 text-sm font-semibold transition-colors hover:bg-blue-50 hover:text-blue-700",
+                              driverName === d ? "bg-blue-50 text-blue-700" : "text-slate-800"
+                            )}
+                          >
+                            {d}
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
             

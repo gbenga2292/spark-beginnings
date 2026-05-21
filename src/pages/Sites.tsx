@@ -1525,12 +1525,7 @@ export function Sites() {
                   {filteredPendingSites.map(site => (
                     <TableRow 
                       key={site.id} 
-                      className="hover:bg-slate-50/50 transition-colors cursor-pointer"
-                      onClick={() => {
-                        if (!selectedClientName) {
-                          navigate(`/sites?client=${encodeURIComponent(site.clientName)}`);
-                        }
-                      }}
+                      className="hover:bg-slate-50/50 transition-colors"
                     >
                       <TableCell className="font-bold text-slate-900">{site.clientName}</TableCell>
                       <TableCell className="font-medium text-slate-600">{site.siteName}</TableCell>
@@ -1578,12 +1573,7 @@ export function Sites() {
                 {filteredPendingSites.map(site => (
                   <Card 
                     key={site.id} 
-                    className="border-slate-200 shadow-sm hover:shadow-md transition-all bg-white group overflow-hidden cursor-pointer"
-                    onClick={() => {
-                      if (!selectedClientName) {
-                        navigate(`/sites?client=${encodeURIComponent(site.clientName)}`);
-                      }
-                    }}
+                    className="border-slate-200 shadow-sm hover:shadow-md transition-all bg-white group overflow-hidden"
                   >
                     <CardContent className="p-4 pb-3">
                       <div className="flex items-start justify-between mb-3">
