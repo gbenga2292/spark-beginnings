@@ -1,5 +1,5 @@
 import { formatDisplayDate, normalizeDate } from '@/src/lib/dateUtils';
-import { useState, useMemo, useRef, startTransition, useCallback } from 'react';
+import React, { useState, useMemo, useRef, startTransition, useCallback, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/src/components/ui/card';
 import { Button } from '@/src/components/ui/button';
@@ -11,6 +11,7 @@ import {
   Eye, Save, Trash2, XCircle, Maximize2, Minimize2
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/src/components/ui/dialog';
+import { Checkbox } from '@/src/components/ui/checkbox';
 import { NairaSign } from '@/src/components/ui/naira-sign';
 import { useAppStore } from '@/src/store/appStore';
 import { toast } from '@/src/components/ui/toast';
@@ -30,11 +31,15 @@ import { AccountsReportBuilder } from '@/src/components/financial/AccountsReport
 const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
 const MONTHS_LIST = [
-  { value: 1, label: 'January' }, { value: 2, label: 'February' }, { value: 3, label: 'March' },
-  { value: 4, label: 'April' }, { value: 5, label: 'May' }, { value: 6, label: 'June' },
-  { value: 7, label: 'July' }, { value: 8, label: 'August' }, { value: 9, label: 'September' },
-  { value: 10, label: 'October' }, { value: 11, label: 'November' }, { value: 12, label: 'December' },
+  { label: 'January', value: 1, key: 'jan' }, { label: 'February', value: 2, key: 'feb' },
+  { label: 'March', value: 3, key: 'mar' }, { label: 'April', value: 4, key: 'apr' },
+  { label: 'May', value: 5, key: 'may' }, { label: 'June', value: 6, key: 'jun' },
+  { label: 'July', value: 7, key: 'jul' }, { label: 'August', value: 8, key: 'aug' },
+  { label: 'September', value: 9, key: 'sep' }, { label: 'October', value: 10, key: 'oct' },
+  { label: 'November', value: 11, key: 'nov' }, { label: 'December', value: 12, key: 'dec' },
 ];
+
+const MONTH_NAMES = MONTHS_LIST.map(m => m.label);
 
 const getBase64ImageFromUrl = async (imageUrl: string) => {
   const res = await fetch(imageUrl);
@@ -46,6 +51,172 @@ const getBase64ImageFromUrl = async (imageUrl: string) => {
     reader.readAsDataURL(blob);
   });
 };
+
+// ── Compact checkbox-dropdown components for filter bar ──────────────────────
+
+function YearDropdown({
+  availableYears,
+  selectedYears,
+  filterYear,
+  onToggleYear,
+  onSelectAll,
+  yearDisplayLabel,
+}: {
+  availableYears: string[];
+  selectedYears: string[];
+  filterYear: string;
+  onToggleYear: (y: string) => void;
+  onSelectAll: () => void;
+  yearDisplayLabel: string;
+}) {
+  const [open, setOpen] = React.useState(false);
+  const [pos, setPos] = React.useState({ top: 0, left: 0 });
+  const btnRef = React.useRef<HTMLButtonElement>(null);
+  const panelRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (
+        btnRef.current && !btnRef.current.contains(e.target as Node) &&
+        panelRef.current && !panelRef.current.contains(e.target as Node)
+      ) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const toggle = () => {
+    if (!open && btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect();
+      setPos({ top: r.bottom + 6, left: r.left });
+    }
+    setOpen(o => !o);
+  };
+
+  const isAll = filterYear === 'All';
+
+  return (
+    <div className="relative shrink-0">
+      <button
+        ref={btnRef}
+        onClick={toggle}
+        className={`flex items-center gap-1.5 h-7 px-2.5 rounded-lg border text-[11px] font-semibold transition-all whitespace-nowrap ${
+          isAll
+            ? 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-white'
+            : 'border-indigo-300 bg-indigo-50 text-indigo-700'
+        }`}
+      >
+        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-0.5">Year</span>
+        {yearDisplayLabel}
+        <svg className={`w-3 h-3 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+      </button>
+
+      {open && createPortal(
+        <div
+          ref={panelRef}
+          style={{ position: 'fixed', top: pos.top, left: pos.left, zIndex: 9999 }}
+          className="bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 min-w-[140px] animate-in fade-in slide-in-from-top-1 duration-150"
+        >
+          <label className="flex items-center gap-2.5 px-3 py-1.5 hover:bg-slate-50 cursor-pointer group">
+            <input type="checkbox" checked={isAll} onChange={onSelectAll} className="w-3.5 h-3.5 rounded accent-indigo-600 cursor-pointer" />
+            <span className="text-[11px] font-semibold text-slate-700 group-hover:text-indigo-600 transition-colors">All Years</span>
+          </label>
+          <div className="mx-3 my-1 border-t border-slate-100" />
+          {availableYears.map(year => (
+            <label key={year} className="flex items-center gap-2.5 px-3 py-1.5 hover:bg-slate-50 cursor-pointer group">
+              <input type="checkbox" checked={selectedYears.includes(year) && !isAll} onChange={() => onToggleYear(year)} className="w-3.5 h-3.5 rounded accent-indigo-600 cursor-pointer" />
+              <span className="text-[11px] font-semibold text-slate-700 group-hover:text-indigo-600 transition-colors">{year}</span>
+            </label>
+          ))}
+        </div>,
+        document.body
+      )}
+    </div>
+  );
+}
+
+function MonthDropdown({
+  monthsList,
+  selectedMonths,
+  filterMonth,
+  onToggleMonth,
+  onSelectAll,
+  monthDisplayLabel,
+}: {
+  monthsList: { value: number; label: string; key: string }[];
+  selectedMonths: number[];
+  filterMonth: string;
+  onToggleMonth: (val: number) => void;
+  onSelectAll: () => void;
+  monthDisplayLabel: string;
+}) {
+  const [open, setOpen] = React.useState(false);
+  const [pos, setPos] = React.useState({ top: 0, left: 0 });
+  const btnRef = React.useRef<HTMLButtonElement>(null);
+  const panelRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (
+        btnRef.current && !btnRef.current.contains(e.target as Node) &&
+        panelRef.current && !panelRef.current.contains(e.target as Node)
+      ) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const toggle = () => {
+    if (!open && btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect();
+      setPos({ top: r.bottom + 6, left: r.left });
+    }
+    setOpen(o => !o);
+  };
+
+  const isAll = filterMonth === 'All';
+
+  return (
+    <div className="relative shrink-0">
+      <button
+        ref={btnRef}
+        onClick={toggle}
+        className={`flex items-center gap-1.5 h-7 px-2.5 rounded-lg border text-[11px] font-semibold transition-all whitespace-nowrap ${
+          isAll
+            ? 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-white'
+            : 'border-indigo-300 bg-indigo-50 text-indigo-700'
+        }`}
+      >
+        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-0.5">Month</span>
+        {monthDisplayLabel}
+        <svg className={`w-3 h-3 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+      </button>
+
+      {open && createPortal(
+        <div
+          ref={panelRef}
+          style={{ position: 'fixed', top: pos.top, left: pos.left, zIndex: 9999 }}
+          className="bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 min-w-[150px] max-h-72 overflow-y-auto animate-in fade-in slide-in-from-top-1 duration-150"
+        >
+          <label className="flex items-center gap-2.5 px-3 py-1.5 hover:bg-slate-50 cursor-pointer group">
+            <input type="checkbox" checked={isAll} onChange={onSelectAll} className="w-3.5 h-3.5 rounded accent-indigo-600 cursor-pointer" />
+            <span className="text-[11px] font-semibold text-slate-700 group-hover:text-indigo-600 transition-colors">All Months</span>
+          </label>
+          <div className="mx-3 my-1 border-t border-slate-100" />
+          {monthsList.map(m => (
+            <label key={m.value} className="flex items-center gap-2.5 px-3 py-1.5 hover:bg-slate-50 cursor-pointer group">
+              <input type="checkbox" checked={selectedMonths.includes(m.value) && !isAll} onChange={() => onToggleMonth(m.value)} className="w-3.5 h-3.5 rounded accent-indigo-600 cursor-pointer" />
+              <span className="text-[11px] font-semibold text-slate-700 group-hover:text-indigo-600 transition-colors">{m.label}</span>
+            </label>
+          ))}
+        </div>,
+        document.body
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 export function FinancialReports() {
   const priv = usePriv('financialReports');
@@ -156,15 +327,6 @@ export function FinancialReports() {
 
   const currentYear = new Date().getFullYear();
   const years = [currentYear, currentYear - 1, currentYear - 2];
-
-  const MONTHS_LIST = [
-    { label: 'January', value: 1, key: 'jan' }, { label: 'February', value: 2, key: 'feb' },
-    { label: 'March', value: 3, key: 'mar' }, { label: 'April', value: 4, key: 'apr' },
-    { label: 'May', value: 5, key: 'may' }, { label: 'June', value: 6, key: 'jun' },
-    { label: 'July', value: 7, key: 'jul' }, { label: 'August', value: 8, key: 'aug' },
-    { label: 'September', value: 9, key: 'sep' }, { label: 'October', value: 10, key: 'oct' },
-    { label: 'November', value: 11, key: 'nov' }, { label: 'December', value: 12, key: 'dec' },
-  ];
 
   const { calculatePayrollForMonth, MONTHS } = usePayrollCalculator();
 
@@ -337,7 +499,7 @@ export function FinancialReports() {
     });
   }, [proratedMonthsPayroll, MONTHS]);
 
-  const [summaryTab, setSummaryTab] = useState<'client' | 'site'>('client');
+  const [summaryTab, setSummaryTab] = useState<'client' | 'site' | 'vat'>('client');
   const [debtorView, setDebtorView] = useState<'client' | 'site'>('client');
   const [selectedFields, setSelectedFields] = useState<string[]>([]);
   const [exportMessage, setExportMessage] = useState<string | null>(null);
@@ -381,37 +543,73 @@ export function FinancialReports() {
     return Array.from(clientSet).sort();
   }, [sites, rawInvoices, rawPayments]);
 
+  const selectedYears = useMemo(() => {
+    if (filterYear === 'All') return availableYears;
+    if (!filterYear) return [];
+    return filterYear.split(',').map((year) => year.trim()).filter(Boolean);
+  }, [filterYear, availableYears]);
+
+  const selectedMonths = useMemo(() => {
+    if (filterMonth === 'All') return MONTHS_LIST.map(m => m.value);
+    if (!filterMonth) return [];
+    return filterMonth
+      .split(',')
+      .map((month) => parseInt(month, 10))
+      .filter((value) => !Number.isNaN(value) && value >= 1 && value <= 12);
+  }, [filterMonth]);
+
+  const yearMatches = (yearStr: string) => selectedYears.includes(yearStr);
+  const monthMatches = (monthValue: number) => selectedMonths.includes(monthValue);
+
+  const yearDisplayLabel = filterYear === 'All'
+    ? 'All Years'
+    : selectedYears.length === 0
+      ? '0 selected'
+      : selectedYears.length === 1
+        ? selectedYears[0]
+        : `${selectedYears.length} selected`;
+
+  const monthDisplayLabel = filterMonth === 'All'
+    ? 'All Months'
+    : selectedMonths.length === 0
+      ? '0 selected'
+      : selectedMonths.length === 1
+        ? MONTHS_LIST.find(m => m.value === selectedMonths[0])?.label || '0 selected'
+        : `${selectedMonths.length} selected`;
+
   const invoices = useMemo(() => rawInvoices.filter(i => {
     const normalized = normalizeDate(i.date);
-    const matchY = filterYear === 'All' || (normalized && normalized.startsWith(filterYear));
-    let matchM = filterMonth === 'All';
-    if (!matchM) {
-      if (normalized) {
-        matchM = parseInt(normalized.substring(5, 7), 10) === parseInt(filterMonth, 10);
-      } else if (i.date && i.date.includes('/')) {
-        const parts = i.date.split('/');
-        if (parts.length === 3) matchM = parseInt(parts[1], 10) === parseInt(filterMonth, 10);
+    let matchY = normalized ? yearMatches(normalized.substring(0, 4)) : false;
+    let matchM = normalized ? monthMatches(parseInt(normalized.substring(5, 7), 10)) : false;
+
+    if (!normalized && i.date && i.date.includes('/')) {
+      const parts = i.date.split('/');
+      if (parts.length === 3) {
+        matchM = monthMatches(parseInt(parts[1], 10));
+        matchY = yearMatches(parts[2]);
       }
     }
+
     const matchC = filterClient === 'All' || (i.client || '').trim() === filterClient.trim();
     return matchY && matchM && matchC;
-  }), [rawInvoices, filterYear, filterMonth, filterClient]);
+  }), [rawInvoices, filterYear, filterMonth, filterClient, availableYears]);
 
   const payments = useMemo(() => rawPayments.filter(p => {
     const normalized = normalizeDate(p.date);
-    const matchY = filterYear === 'All' || (normalized && normalized.startsWith(filterYear));
-    let matchM = filterMonth === 'All';
-    if (!matchM) {
-      if (normalized) {
-        matchM = parseInt(normalized.substring(5, 7), 10) === parseInt(filterMonth, 10);
-      } else if (p.date && p.date.includes('/')) {
-        const parts = p.date.split('/');
-        if (parts.length === 3) matchM = parseInt(parts[1], 10) === parseInt(filterMonth, 10);
+    let matchY = normalized ? yearMatches(normalized.substring(0, 4)) : false;
+    let matchM = normalized ? monthMatches(parseInt(normalized.substring(5, 7), 10)) : false;
+
+    if (!normalized && p.date && p.date.includes('/')) {
+      const parts = p.date.split('/');
+      if (parts.length === 3) {
+        matchY = yearMatches(parts[2]);
+        matchM = monthMatches(parseInt(parts[1], 10));
       }
     }
+
     const matchC = filterClient === 'All' || (p.client || '').trim() === filterClient.trim();
     return matchY && matchM && matchC;
-  }), [rawPayments, filterYear, filterMonth, filterClient]);
+  }), [rawPayments, filterYear, filterMonth, filterClient, availableYears]);
 
   const vatPayments = useMemo(() => rawVatPayments.filter(v => {
     const matchC = filterClient === 'All' || (v.client || '').trim() === filterClient.trim();
@@ -420,32 +618,39 @@ export function FinancialReports() {
     let matchY = filterYear === 'All';
     if (!matchY) {
       if (v.year) {
-        matchY = v.year === filterYear;
+        matchY = selectedYears.includes(v.year);
       } else {
         const normalized = normalizeDate(v.date);
-        matchY = !!(normalized && normalized.startsWith(filterYear));
+        if (normalized) {
+          matchY = yearMatches(normalized.substring(0, 4));
+        } else if (v.date && v.date.includes('/')) {
+          const parts = v.date.split('/');
+          if (parts.length === 3) matchY = yearMatches(parts[2]);
+        }
       }
     }
 
     let matchM = filterMonth === 'All';
     if (!matchM) {
       if (v.month) {
-        const mVal = parseInt(filterMonth, 10);
-        const expectedMonthName = MONTHS_LIST[mVal - 1]?.label || '';
-        matchM = v.month.toLowerCase() === expectedMonthName.toLowerCase();
+        const found = MONTHS_LIST.find(m =>
+          m.key.toLowerCase() === v.month.toLowerCase() ||
+          m.label.toLowerCase() === v.month.toLowerCase()
+        );
+        matchM = found ? monthMatches(found.value) : false;
       } else {
         const normalized = normalizeDate(v.date);
         if (normalized) {
-          matchM = parseInt(normalized.substring(5, 7), 10) === parseInt(filterMonth, 10);
+          matchM = monthMatches(parseInt(normalized.substring(5, 7), 10));
         } else if (v.date && v.date.includes('/')) {
           const parts = v.date.split('/');
-          if (parts.length === 3) matchM = parseInt(parts[1], 10) === parseInt(filterMonth, 10);
+          if (parts.length === 3) matchM = monthMatches(parseInt(parts[1], 10));
         }
       }
     }
 
     return matchY && matchM;
-  }), [rawVatPayments, filterYear, filterMonth, filterClient]);
+  }), [rawVatPayments, filterYear, filterMonth, filterClient, selectedYears, availableYears]);
 
   // Trend Data
   const trendData = useMemo(() => {
@@ -494,20 +699,17 @@ export function FinancialReports() {
     const bfMap = new Map<string, number>();
 
     // Determine the cutoff date string (YYYY-MM)
-    let cutoffYM = `${filterYear}-01`;
-    if (filterMonth !== 'All') {
-      const mVal = parseInt(filterMonth, 10);
-      cutoffYM = `${filterYear}-${mVal.toString().padStart(2, '0')}`;
-    }
+    const minYear = filterYear === 'All' ? new Date().getFullYear() : Math.min(...filterYear.split(',').map(y => parseInt(y.trim(), 10)).filter(y => !isNaN(y)));
+    const minMonth = filterMonth === 'All' ? 1 : Math.min(...filterMonth.split(',').map(m => parseInt(m.trim(), 10)).filter(m => !isNaN(m)));
+    
+    let cutoffYM = `${minYear}-${minMonth.toString().padStart(2, '0')}`;
 
     const isWithinPriorRange = (dateYM: string) => {
       if (dateYM >= cutoffYM) return false;
       if (priorPeriodLimit === 'none') return false;
       if (priorPeriodLimit === 'all') return true;
       
-      const currYear = parseInt(filterYear, 10);
-      const currMonth = filterMonth !== 'All' ? parseInt(filterMonth, 10) : 1;
-      const currentMonthValue = currYear * 12 + currMonth;
+      const currentMonthValue = minYear * 12 + minMonth;
 
       const dateYear = parseInt(dateYM.substring(0, 4), 10);
       const dateMonth = parseInt(dateYM.substring(5, 7), 10);
@@ -523,7 +725,7 @@ export function FinancialReports() {
       }
       
       if (priorPeriodLimit === 'this-year') {
-        const lowerYM = `${currYear}-01`;
+        const lowerYM = `${minYear}-01`;
         return dateYM >= lowerYM;
       }
       
@@ -540,7 +742,7 @@ export function FinancialReports() {
       if (!matchC) return;
       const siteName = (inv.siteName || (inv as any).site || 'Unknown Site').trim();
       const clientName = (inv.client || '').trim();
-      const key = summaryTab === 'client' ? clientName : `${clientName} - ${siteName}`;
+      const key = (summaryTab === 'client' || summaryTab === 'vat') ? clientName : `${clientName} - ${siteName}`;
       bfMap.set(key, (bfMap.get(key) || 0) + (inv.amount || 0));
     });
 
@@ -554,7 +756,7 @@ export function FinancialReports() {
       if (!matchC) return;
       const siteName = (pay.site || 'Unknown Site').trim();
       const clientName = (pay.client || '').trim();
-      const key = summaryTab === 'client' ? clientName : `${clientName} - ${siteName}`;
+      const key = (summaryTab === 'client' || summaryTab === 'vat') ? clientName : `${clientName} - ${siteName}`;
       const cleared = (pay.amount || 0) + (pay.withholdingTax || 0) + (pay.discount || 0);
       bfMap.set(key, (bfMap.get(key) || 0) - cleared);
     });
@@ -573,20 +775,17 @@ export function FinancialReports() {
     }
 
     // Determine the cutoff date string (YYYY-MM)
-    let cutoffYM = `${filterYear}-01`;
-    if (filterMonth !== 'All') {
-      const mVal = parseInt(filterMonth, 10);
-      cutoffYM = `${filterYear}-${mVal.toString().padStart(2, '0')}`;
-    }
+    const minYear = filterYear === 'All' ? new Date().getFullYear() : Math.min(...filterYear.split(',').map(y => parseInt(y.trim(), 10)).filter(y => !isNaN(y)));
+    const minMonth = filterMonth === 'All' ? 1 : Math.min(...filterMonth.split(',').map(m => parseInt(m.trim(), 10)).filter(m => !isNaN(m)));
+    
+    let cutoffYM = `${minYear}-${minMonth.toString().padStart(2, '0')}`;
 
     const isWithinPriorRange = (dateYM: string) => {
       if (dateYM >= cutoffYM) return false;
       if (priorPeriodLimit === 'none') return false;
       if (priorPeriodLimit === 'all') return true;
       
-      const currYear = parseInt(filterYear, 10);
-      const currMonth = filterMonth !== 'All' ? parseInt(filterMonth, 10) : 1;
-      const currentMonthValue = currYear * 12 + currMonth;
+      const currentMonthValue = minYear * 12 + minMonth;
 
       const dateYear = parseInt(dateYM.substring(0, 4), 10);
       const dateMonth = parseInt(dateYM.substring(5, 7), 10);
@@ -602,7 +801,7 @@ export function FinancialReports() {
       }
       
       if (priorPeriodLimit === 'this-year') {
-        const lowerYM = `${currYear}-01`;
+        const lowerYM = `${minYear}-01`;
         return dateYM >= lowerYM;
       }
       
@@ -633,7 +832,7 @@ export function FinancialReports() {
       if (!matchC) return;
       const siteName = (pay.site || 'Unknown Site').trim();
       const clientName = (pay.client || '').trim();
-      const key = summaryTab === 'client' ? clientName : `${clientName} - ${siteName}`;
+      const key = (summaryTab === 'client' || summaryTab === 'vat') ? clientName : `${clientName} - ${siteName}`;
 
       const siteKey = `${clientName}|${siteName}`;
       const payVatSetting = pay.payVat || siteIndex.get(siteKey)?.vat || 'No';
@@ -760,7 +959,7 @@ export function FinancialReports() {
     invoices.forEach(inv => {
       const siteName = (inv.siteName || (inv as any).site || 'Unknown Site').trim();
       const clientName = (inv.client || '').trim();
-      const key = summaryTab === 'client' ? clientName : `${clientName} - ${siteName}`;
+      const key = (summaryTab === 'client' || summaryTab === 'vat') ? clientName : `${clientName} - ${siteName}`;
       if (!rowMap.has(key)) rowMap.set(key, { 
         client: clientName, 
         site: siteName, 
@@ -795,7 +994,7 @@ export function FinancialReports() {
     payments.forEach(pay => {
       const siteName = (pay.site || 'Unknown Site').trim();
       const clientName = (pay.client || '').trim();
-      const key = summaryTab === 'client' ? clientName : `${clientName} - ${siteName}`;
+      const key = (summaryTab === 'client' || summaryTab === 'vat') ? clientName : `${clientName} - ${siteName}`;
       if (!rowMap.has(key)) rowMap.set(key, { 
         client: clientName, 
         site: siteName, 
@@ -827,7 +1026,7 @@ export function FinancialReports() {
     // Add VAT Remitted (Payments to FIRS)
     vatPayments.forEach(vp => {
       const clientName = (vp.client || '').trim();
-      if (summaryTab === 'client') {
+      if (summaryTab === 'client' || summaryTab === 'vat') {
         const key = clientName;
         if (rowMap.has(key)) {
           rowMap.get(key)!.vatRemitted += (vp.amount || 0);
@@ -1615,134 +1814,10 @@ export function FinancialReports() {
           <CheckCircle2 className="h-5 w-5" />{exportMessage}
         </div>
       )}
-      <div className="flex flex-col flex-1 h-full w-full animate-in fade-in duration-300 gap-6">
-
-        {/* ── GLOBAL FILTERS BAR ────────────────────────────────────── */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-100 px-4 py-3 sticky top-0 z-[40]">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-slate-700">
-              <Filter className="w-4 h-4 text-indigo-500" />
-              <span className="text-xs font-bold uppercase tracking-wide">Report Filters</span>
-            </div>
-            {/* Mobile Toggle */}
-            <Button
-              variant="ghost"
-              size="sm"
-              className="md:hidden flex items-center gap-2 text-slate-500"
-              onClick={() => setFiltersOpen(!filtersOpen)}
-            >
-              <Filter className="w-4 h-4" />
-              {filtersOpen ? 'Hide' : 'Options'}
-            </Button>
-            {/* Desktop Reset - Hidden on mobile */}
-            <div className="hidden md:flex flex-wrap items-center gap-3">
-              {/* Year */}
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] font-semibold text-slate-400 uppercase">Year</span>
-                <select value={filterYear} onChange={e => startTransition(() => setFilterYear(e.target.value))}
-                  className="h-8 px-2.5 text-sm font-semibold rounded-md border border-slate-200 bg-slate-50 text-slate-700 outline-none focus:ring-2 focus:ring-indigo-400/30 min-w-[110px]">
-                  <option value="All">All Years</option>
-                  {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
-                </select>
-              </div>
-              {/* Month */}
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] font-semibold text-slate-400 uppercase">Month</span>
-                <select value={filterMonth} onChange={e => startTransition(() => setFilterMonth(e.target.value))}
-                  className="h-8 px-2.5 text-sm font-semibold rounded-md border border-slate-200 bg-slate-50 text-slate-700 outline-none focus:ring-2 focus:ring-indigo-400/30 min-w-[130px]">
-                  <option value="All">All Months</option>
-                  {MONTHS_LIST.map(m => <option key={m.value} value={String(m.value)}>{m.label}</option>)}
-                </select>
-              </div>
-              {/* Client */}
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] font-semibold text-slate-400 uppercase">Client</span>
-                <select value={filterClient} onChange={e => startTransition(() => setFilterClient(e.target.value))}
-                  className="h-8 px-2.5 text-sm font-semibold rounded-md border border-slate-200 bg-slate-50 text-slate-700 outline-none focus:ring-2 focus:ring-indigo-400/30 min-w-[140px]">
-                  <option value="All">All Clients</option>
-                  {availableClients.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
-              </div>
-              {/* Prior Period Limit Selector */}
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] font-semibold text-slate-400 uppercase">Prior Period</span>
-                <select
-                  value={priorPeriodLimit}
-                  onChange={e => startTransition(() => setPriorPeriodLimit(e.target.value as any))}
-                  className="h-8 px-2.5 text-sm font-semibold rounded-md border border-slate-200 bg-slate-50 text-slate-700 outline-none focus:ring-2 focus:ring-indigo-400/30 min-w-[135px]"
-                >
-                  <option value="none">None</option>
-                  <option value="prev-month">Previous Month</option>
-                  <option value="prev-2-months">Previous 2 Months</option>
-                  <option value="this-year">This Year's Prior</option>
-                  <option value="all">All Prior</option>
-                </select>
-              </div>
-              {/* Reset */}
-              {(filterYear !== 'All' || filterMonth !== 'All' || filterClient !== 'All' || priorPeriodLimit !== 'none') && (
-                <button onClick={() => { startTransition(() => { setFilterYear(String(new Date().getFullYear())); setFilterMonth('All'); setFilterClient('All'); setPriorPeriodLimit('none'); }); }}
-                  className="flex items-center gap-1.5 text-xs font-semibold text-rose-500 hover:text-rose-700 px-2 py-1 rounded-md hover:bg-rose-50 transition-colors">
-                  <X className="w-3.5 h-3.5" /> Reset
-                </button>
-              )}
-            </div>
-          </div>
-          
-          {/* Mobile Filter Panel */}
-          {filtersOpen && (
-            <div className="md:hidden mt-4 pt-4 border-t border-slate-100 flex flex-col gap-4">
-              <div className="flex flex-col gap-1.5">
-                <span className="text-[11px] font-semibold text-slate-400 uppercase">Year</span>
-                <select value={filterYear} onChange={e => startTransition(() => setFilterYear(e.target.value))}
-                  className="h-9 px-3 text-sm font-semibold rounded-md border border-slate-200 bg-slate-50 text-slate-700 outline-none w-full">
-                  <option value="All">All Years</option>
-                  {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
-                </select>
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <span className="text-[11px] font-semibold text-slate-400 uppercase">Month</span>
-                <select value={filterMonth} onChange={e => startTransition(() => setFilterMonth(e.target.value))}
-                  className="h-9 px-3 text-sm font-semibold rounded-md border border-slate-200 bg-slate-50 text-slate-700 outline-none w-full">
-                  <option value="All">All Months</option>
-                  {MONTHS_LIST.map(m => <option key={m.value} value={String(m.value)}>{m.label}</option>)}
-                </select>
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <span className="text-[11px] font-semibold text-slate-400 uppercase">Client</span>
-                <select value={filterClient} onChange={e => startTransition(() => setFilterClient(e.target.value))}
-                  className="h-9 px-3 text-sm font-semibold rounded-md border border-slate-200 bg-slate-50 text-slate-700 outline-none w-full">
-                  <option value="All">All Clients</option>
-                  {availableClients.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
-              </div>
-              {/* Prior Period Limit Selector Mobile */}
-              <div className="flex flex-col gap-1.5">
-                <span className="text-[11px] font-semibold text-slate-400 uppercase">Prior Period</span>
-                <select
-                  value={priorPeriodLimit}
-                  onChange={e => startTransition(() => setPriorPeriodLimit(e.target.value as any))}
-                  className="h-9 px-3 text-sm font-semibold rounded-md border border-slate-200 bg-slate-50 text-slate-700 outline-none w-full"
-                >
-                  <option value="none">None</option>
-                  <option value="prev-month">Previous Month</option>
-                  <option value="prev-2-months">Previous 2 Months</option>
-                  <option value="this-year">This Year's Prior</option>
-                  <option value="all">All Prior</option>
-                </select>
-              </div>
-              {/* Reset Mobile */}
-              {(filterYear !== 'All' || filterMonth !== 'All' || filterClient !== 'All' || priorPeriodLimit !== 'none') && (
-                <button onClick={() => { startTransition(() => { setFilterYear(String(new Date().getFullYear())); setFilterMonth('All'); setFilterClient('All'); setPriorPeriodLimit('none'); setFiltersOpen(false); }); }}
-                  className="flex items-center justify-center gap-1.5 text-sm font-semibold text-rose-500 bg-rose-50 hover:bg-rose-100 rounded-md py-2 transition-colors mt-2">
-                  <X className="w-4 h-4" /> Reset Filters
-                </button>
-              )}
-            </div>
-          )}
-        </div>
+      <div className="-mt-2 -mx-2 md:-mx-6 flex flex-col animate-in fade-in duration-300">
 
         {/* Tab switcher - compact implementation */}
-        <div className="flex bg-white p-2 rounded-xl shadow-sm border border-slate-100 items-center overflow-x-auto no-scrollbar gap-2">
+        <div className="flex bg-white p-2 mb-4 rounded-xl shadow-sm border border-slate-100 items-center overflow-x-auto no-scrollbar gap-2">
           <div className="flex gap-1">
             {[
               { id: 'client-account', label: 'Client Account', icon: Landmark },
@@ -1771,9 +1846,169 @@ export function FinancialReports() {
           </div>
         </div>
 
+        {/* ── Filter bar: flush full-width sticky strip right under header ── */}
+        <div className="bg-white/90 backdrop-blur-sm shadow-sm border-y border-slate-200 px-4 md:px-8 py-4 mb-6 sticky top-0 z-[40] transition-shadow hover:shadow-md">
+          <div className="max-w-7xl mx-auto flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center justify-center w-7 h-7 rounded-md bg-indigo-50 text-indigo-600 border border-indigo-100">
+                <Filter className="w-3.5 h-3.5" />
+              </div>
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600">Report Filters</span>
+            </div>
+            
+            {/* Mobile Toggle */}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="md:hidden flex items-center gap-2 h-7 px-2.5 text-[11px] font-semibold text-slate-500 bg-slate-50 border border-slate-200"
+              onClick={() => setFiltersOpen(!filtersOpen)}
+            >
+              <Filter className="w-3.5 h-3.5" />
+              {filtersOpen ? 'Hide' : 'Options'}
+            </Button>
+            
+            {/* Desktop Filters */}
+            <div className="hidden md:flex items-center gap-4">
+              <YearDropdown
+                availableYears={availableYears}
+                selectedYears={selectedYears}
+                filterYear={filterYear}
+                onToggleYear={(y) => {
+                  startTransition(() => {
+                    const next = filterYear === 'All' ? [y] : selectedYears.includes(y) ? selectedYears.filter(x => x !== y) : [...selectedYears, y];
+                    setFilterYear(next.length === 0 ? 'All' : next.join(','));
+                  });
+                }}
+                onSelectAll={() => startTransition(() => setFilterYear('All'))}
+                yearDisplayLabel={yearDisplayLabel}
+              />
+              <div className="w-px h-4 bg-slate-200" />
+              <MonthDropdown
+                monthsList={MONTHS_LIST}
+                selectedMonths={selectedMonths}
+                filterMonth={filterMonth}
+                onToggleMonth={(m) => {
+                  startTransition(() => {
+                    const next = filterMonth === 'All' ? [m] : selectedMonths.includes(m) ? selectedMonths.filter(x => x !== m) : [...selectedMonths, m];
+                    setFilterMonth(next.length === 0 ? 'All' : next.join(','));
+                  });
+                }}
+                onSelectAll={() => startTransition(() => setFilterMonth('All'))}
+                monthDisplayLabel={monthDisplayLabel}
+              />
+              <div className="w-px h-4 bg-slate-200" />
+              <div className="flex items-center gap-1.5 shrink-0">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Client</span>
+                <select value={filterClient} onChange={e => startTransition(() => setFilterClient(e.target.value))}
+                  className="h-7 px-2 text-[11px] font-semibold rounded-lg border border-slate-200 bg-white text-slate-700 outline-none focus:ring-2 focus:ring-indigo-400/30 max-w-[140px] cursor-pointer hover:bg-slate-50 transition-colors">
+                  <option value="All">All Clients</option>
+                  {availableClients.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              <div className="w-px h-4 bg-slate-200" />
+              <div className="flex items-center gap-1.5 shrink-0">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Prior</span>
+                <select
+                  value={priorPeriodLimit}
+                  onChange={e => startTransition(() => setPriorPeriodLimit(e.target.value as any))}
+                  className="h-7 px-2 text-[11px] font-semibold rounded-lg border border-slate-200 bg-white text-slate-700 outline-none focus:ring-2 focus:ring-indigo-400/30 min-w-[120px] cursor-pointer hover:bg-slate-50 transition-colors"
+                >
+                  <option value="none">None</option>
+                  <option value="prev-month">Prev Month</option>
+                  <option value="prev-2-months">Prev 2 Months</option>
+                  <option value="this-year">This Year's Prior</option>
+                  <option value="all">All Prior</option>
+                </select>
+              </div>
+              
+              {/* Reset Desktop */}
+              {(filterYear !== 'All' || filterMonth !== 'All' || filterClient !== 'All' || priorPeriodLimit !== 'none') && (
+                <>
+                  <div className="w-px h-4 bg-slate-200" />
+                  <button onClick={() => { startTransition(() => { setFilterYear(String(new Date().getFullYear())); setFilterMonth('All'); setFilterClient('All'); setPriorPeriodLimit('none'); }); }}
+                    className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-rose-500 hover:text-rose-700 px-2 py-1 rounded-md hover:bg-rose-50 transition-colors">
+                    <X className="w-3.5 h-3.5" /> Reset
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+          
+          {/* Mobile Filter Panel */}
+          {filtersOpen && (
+            <div className="md:hidden mt-3 pt-3 border-t border-slate-100 flex flex-col gap-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Year</span>
+                  <YearDropdown
+                    availableYears={availableYears}
+                    selectedYears={selectedYears}
+                    filterYear={filterYear}
+                    onToggleYear={(y) => {
+                      startTransition(() => {
+                        const next = filterYear === 'All' ? [y] : selectedYears.includes(y) ? selectedYears.filter(x => x !== y) : [...selectedYears, y];
+                        setFilterYear(next.length === 0 ? 'All' : next.join(','));
+                      });
+                    }}
+                    onSelectAll={() => startTransition(() => setFilterYear('All'))}
+                    yearDisplayLabel={yearDisplayLabel}
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Month</span>
+                  <MonthDropdown
+                    monthsList={MONTHS_LIST}
+                    selectedMonths={selectedMonths}
+                    filterMonth={filterMonth}
+                    onToggleMonth={(m) => {
+                      startTransition(() => {
+                        const next = filterMonth === 'All' ? [m] : selectedMonths.includes(m) ? selectedMonths.filter(x => x !== m) : [...selectedMonths, m];
+                        setFilterMonth(next.length === 0 ? 'All' : next.join(','));
+                      });
+                    }}
+                    onSelectAll={() => startTransition(() => setFilterMonth('All'))}
+                    monthDisplayLabel={monthDisplayLabel}
+                  />
+                </div>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Client</span>
+                <select value={filterClient} onChange={e => startTransition(() => setFilterClient(e.target.value))}
+                  className="h-8 px-2 text-[11px] font-semibold rounded-md border border-slate-200 bg-slate-50 text-slate-700 outline-none w-full focus:ring-2 focus:ring-indigo-400/30">
+                  <option value="All">All Clients</option>
+                  {availableClients.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Prior Period</span>
+                <select
+                  value={priorPeriodLimit}
+                  onChange={e => startTransition(() => setPriorPeriodLimit(e.target.value as any))}
+                  className="h-8 px-2 text-[11px] font-semibold rounded-md border border-slate-200 bg-slate-50 text-slate-700 outline-none w-full focus:ring-2 focus:ring-indigo-400/30"
+                >
+                  <option value="none">None</option>
+                  <option value="prev-month">Previous Month</option>
+                  <option value="prev-2-months">Previous 2 Months</option>
+                  <option value="this-year">This Year's Prior</option>
+                  <option value="all">All Prior</option>
+                </select>
+              </div>
+              {/* Reset Mobile */}
+              {(filterYear !== 'All' || filterMonth !== 'All' || filterClient !== 'All' || priorPeriodLimit !== 'none') && (
+                <button onClick={() => { startTransition(() => { setFilterYear(String(new Date().getFullYear())); setFilterMonth('All'); setFilterClient('All'); setPriorPeriodLimit('none'); setFiltersOpen(false); }); }}
+                  className="flex items-center justify-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-rose-500 bg-rose-50 hover:bg-rose-100 rounded-md py-2 transition-colors mt-1 border border-rose-100">
+                  <X className="w-3.5 h-3.5" /> Reset Filters
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
+        
+
 
       {mainTab === 'site-summary' ? (
-        <SiteSummary filterYear={filterYear} filterMonth={filterMonth} />
+        <SiteSummary filterYears={filterYear === 'All' ? ['All'] : selectedYears} filterMonths={filterMonth === 'All' ? ['All'] : selectedMonths.map(String)} />
       ) : mainTab === 'ledger-summary' ? (
         /* ─────────────────────────────────────────────────────────────
            LEDGER SUMMARY TAB — monthly breakdown of ledger expenses
@@ -2095,6 +2330,7 @@ export function FinancialReports() {
           <div className="flex px-5 gap-6 border-b border-slate-200">
             <button className={`pb-3 text-sm font-semibold transition-all border-b-2 ${summaryTab === 'client' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-700'}`} onClick={() => setSummaryTab('client')}>Client Summary</button>
             <button className={`pb-3 text-sm font-semibold transition-all border-b-2 ${summaryTab === 'site' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-700'}`} onClick={() => setSummaryTab('site')}>Site Summary</button>
+            <button className={`pb-3 text-sm font-semibold transition-all border-b-2 ${summaryTab === 'vat' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-700'}`} onClick={() => setSummaryTab('vat')}>VAT Summary</button>
           </div>
         </CardHeader>
         
@@ -2116,26 +2352,37 @@ export function FinancialReports() {
               <TableRow className="hover:bg-slate-900 border-b border-indigo-500/50">
                 <TableHead className="sticky left-0 z-30 bg-slate-900 font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 w-[180px] shadow-[2px_0_5px_rgba(0,0,0,0.3)]">Client</TableHead>
                 {summaryTab === 'site' && <TableHead className="sticky left-[180px] z-30 bg-slate-900 font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 w-[160px] shadow-[2px_0_5px_rgba(0,0,0,0.3)] border-l border-slate-700/50">Site</TableHead>}
-                {filterYear !== 'All' && (
+                {summaryTab !== 'vat' && filterYear !== 'All' && (
                   <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-amber-300 px-5 py-4 text-right" title="Balance carried over from previous years">
                     B/F
                   </TableHead>
                 )}
-                <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 text-center">Inv. Qty</TableHead>
-                <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 text-right">Total Invoiced</TableHead>
-                <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 text-right">Total Payments</TableHead>
-                <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-rose-300 px-5 py-4 text-right">Balance Due</TableHead>
-                <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 text-right">Discounts</TableHead>
-                <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-indigo-200 px-5 py-4 text-right">WHT</TableHead>
-                {summaryTab === 'client' && (
+                {summaryTab !== 'vat' && (
+                  <>
+                    <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 text-center">Inv. Qty</TableHead>
+                    <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 text-right">Total Invoiced</TableHead>
+                  </>
+                )}
+                <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 text-right">{summaryTab === 'vat' ? 'Payment Made' : 'Total Payments'}</TableHead>
+                {summaryTab !== 'vat' && (
+                  <>
+                    <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-rose-300 px-5 py-4 text-right">Balance Due</TableHead>
+                    <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 text-right">Discounts</TableHead>
+                    <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-indigo-200 px-5 py-4 text-right">WHT</TableHead>
+                  </>
+                )}
+                {summaryTab === 'vat' && (
                   <>
                     <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-indigo-200 px-5 py-4 text-right">AMT FOR VAT</TableHead>
                     <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-indigo-200 px-5 py-4 text-right">VAT ON PAYMENTS</TableHead>
                     <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-indigo-200 px-5 py-4 text-right">VAT REMIT</TableHead>
+                    <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-indigo-200 px-5 py-4 text-right">AMT FOR VAT (OWED)</TableHead>
                     <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-rose-300 px-5 py-4 text-right">VAT OWED</TableHead>
                   </>
                 )}
-                <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 text-center">Health</TableHead>
+                {summaryTab !== 'vat' && (
+                  <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 text-center">Health</TableHead>
+                )}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -2143,7 +2390,7 @@ export function FinancialReports() {
                 <TableRow key={i} className={`hover:bg-indigo-50/40 transition-colors border-b border-slate-100 ${i % 2 === 0 ? 'bg-white' : 'bg-slate-50/30'}`}>
                   <TableCell className={`sticky left-0 z-10 px-5 py-3 font-semibold text-slate-700 border-r border-slate-100 shadow-[1px_0_3px_rgba(0,0,0,0.05)] ${i % 2 === 0 ? 'bg-white' : 'bg-[#fcfdfe]'}`}>{row.client}</TableCell>
                   {summaryTab === 'site' && <TableCell className={`sticky left-[180px] z-10 px-5 py-3 text-slate-500 font-medium border-r border-slate-100 shadow-[1px_0_3px_rgba(0,0,0,0.05)] ${i % 2 === 0 ? 'bg-white' : 'bg-[#fcfdfe]'}`}>{row.site}</TableCell>}
-                  {filterYear !== 'All' && (
+                  {summaryTab !== 'vat' && filterYear !== 'All' && (
                     <TableCell className={`px-5 py-3 text-right font-mono font-semibold ${
                       !row.bf || row.bf === 0 ? 'text-slate-300' : row.bf > 0 ? 'text-amber-600' : 'text-emerald-600'
                     }`}>
@@ -2154,35 +2401,46 @@ export function FinancialReports() {
                         : '-'}
                     </TableCell>
                   )}
-                  <TableCell className="px-5 py-3 text-center text-slate-500 font-medium">
-                    <div className="bg-slate-100 text-slate-600 rounded-md px-2 py-0.5 inline-block text-[11px] font-bold">{row.noOfInvoices || '0'}</div>
-                  </TableCell>
-                  <TableCell className="px-5 py-3 text-right font-mono font-medium text-slate-700">{row.totalInvoices ? row.totalInvoices.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
+                  {summaryTab !== 'vat' && (
+                    <>
+                      <TableCell className="px-5 py-3 text-center text-slate-500 font-medium">
+                        <div className="bg-slate-100 text-slate-600 rounded-md px-2 py-0.5 inline-block text-[11px] font-bold">{row.noOfInvoices || '0'}</div>
+                      </TableCell>
+                      <TableCell className="px-5 py-3 text-right font-mono font-medium text-slate-700">{row.totalInvoices ? row.totalInvoices.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
+                    </>
+                  )}
                   <TableCell className="px-5 py-3 text-right font-mono font-medium text-emerald-700 text-xs">{row.totalPayment ? row.totalPayment.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
-                  <TableCell className={`px-5 py-3 text-right font-mono font-bold ${row.balance > 0 ? 'text-rose-600' : row.balance < 0 ? 'text-slate-500' : 'text-emerald-600'}`}>
-                    {row.balance !== 0 ? (row.balance < 0 ? `(${Math.abs(row.balance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})` : row.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })) : '-'}
-                  </TableCell>
-                  <TableCell className="px-5 py-3 text-right font-mono text-slate-400 text-xs">{row.discount ? row.discount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
-                  <TableCell className="px-5 py-3 text-right font-mono text-indigo-600/70 text-xs">{row.withholdingTax ? row.withholdingTax.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
-                  {summaryTab === 'client' && (
+                  {summaryTab !== 'vat' && (
+                    <>
+                      <TableCell className={`px-5 py-3 text-right font-mono font-bold ${row.balance > 0 ? 'text-rose-600' : row.balance < 0 ? 'text-slate-500' : 'text-emerald-600'}`}>
+                        {row.balance !== 0 ? (row.balance < 0 ? `(${Math.abs(row.balance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})` : row.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })) : '-'}
+                      </TableCell>
+                      <TableCell className="px-5 py-3 text-right font-mono text-slate-400 text-xs">{row.discount ? row.discount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
+                      <TableCell className="px-5 py-3 text-right font-mono text-indigo-600/70 text-xs">{row.withholdingTax ? row.withholdingTax.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
+                    </>
+                  )}
+                  {summaryTab === 'vat' && (
                     <>
                       <TableCell className="px-5 py-3 text-right font-mono text-emerald-600/70 text-xs">{row.amountForVat ? row.amountForVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
                       <TableCell className="px-5 py-3 text-right font-mono text-emerald-600/70 text-xs">{row.vatPaid ? row.vatPaid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
                       <TableCell className="px-5 py-3 text-right font-mono text-sky-600/70 text-xs">{row.vatRemitted ? row.vatRemitted.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
+                      <TableCell className="px-5 py-3 text-right font-mono text-rose-600/70 text-xs">{row.vatOwed !== 0 && vatRate > 0 ? ((row.vatOwed / (vatRate / 100)) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
                       <TableCell className={`px-5 py-3 text-right font-mono font-bold text-xs ${row.vatOwed < 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
                         {row.vatOwed !== 0 ? (row.vatOwed < 0 ? `(${Math.abs(row.vatOwed).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})` : row.vatOwed.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })) : '-'}
                       </TableCell>
                     </>
                   )}
-                  <TableCell className="px-5 py-3 text-center">
-                    <span className={`inline-flex items-center justify-center px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wide uppercase shadow-sm
-                      ${row.status === 'OWING' ? 'bg-rose-100 border border-rose-200 text-rose-700' :
-                        row.status === 'PART PAID' ? 'bg-amber-100 border border-amber-200 text-amber-700' :
-                          row.status === 'OVER PAID' ? 'bg-indigo-100 border border-indigo-200 text-indigo-700' :
-                            row.status === 'FULLY PAID' ? 'bg-emerald-100 border border-emerald-200 text-emerald-700' : 'bg-slate-100 text-slate-400'}`}>
-                      {row.status}
-                    </span>
-                  </TableCell>
+                  {summaryTab !== 'vat' && (
+                    <TableCell className="px-5 py-3 text-center">
+                      <span className={`inline-flex items-center justify-center px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wide uppercase shadow-sm
+                        ${row.status === 'OWING' ? 'bg-rose-100 border border-rose-200 text-rose-700' :
+                          row.status === 'PART PAID' ? 'bg-amber-100 border border-amber-200 text-amber-700' :
+                            row.status === 'OVER PAID' ? 'bg-indigo-100 border border-indigo-200 text-indigo-700' :
+                              row.status === 'FULLY PAID' ? 'bg-emerald-100 border border-emerald-200 text-emerald-700' : 'bg-slate-100 text-slate-400'}`}>
+                        {row.status}
+                      </span>
+                    </TableCell>
+                  )}
                 </TableRow>
               ))}
               {summaryData.length > 0 && (() => {
@@ -2201,33 +2459,42 @@ export function FinancialReports() {
                   <TableRow className="bg-slate-900 hover:bg-slate-900 border-t-4 border-indigo-500 shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.1)] relative z-10">
                     <TableCell className="sticky left-0 z-20 bg-slate-900 px-5 py-4 font-bold text-slate-200 text-sm tracking-wider uppercase shadow-[2px_0_5px_rgba(0,0,0,0.3)]">Grand Total</TableCell>
                     {summaryTab === 'site' && <TableCell className="sticky left-[180px] z-20 bg-slate-900 px-5 py-4 shadow-[2px_0_5px_rgba(0,0,0,0.3)]"></TableCell>}
-                    {filterYear !== 'All' && (
+                    {summaryTab !== 'vat' && filterYear !== 'All' && (
                       <TableCell className={`px-5 py-4 text-right font-mono font-bold ${
-                        totalBF === 0 ? 'text-slate-400' : totalBF > 0 ? 'text-amber-400' : 'text-emerald-400'
+                        !totalBF || totalBF === 0 ? 'text-slate-400' : totalBF > 0 ? 'text-amber-400' : 'text-emerald-400'
                       }`}>
-                        {totalBF !== 0
+                        {totalBF && totalBF !== 0
                           ? (totalBF < 0
                             ? `(${Math.abs(totalBF).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`
                             : totalBF.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }))
                           : '-'}
                       </TableCell>
                     )}
-                    <TableCell className="px-5 py-4 text-center font-bold text-slate-300 bg-slate-800/80 rounded-sm">{summaryData.reduce((sum, r) => sum + r.noOfInvoices, 0)}</TableCell>
-                    <TableCell className="px-5 py-4 text-right font-mono font-bold text-slate-200">{totalInvoices.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
-                    <TableCell className="px-5 py-4 text-right font-mono font-bold text-emerald-400">{totalPayment.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
-                    <TableCell className="px-5 py-4 text-right font-mono font-bold text-rose-400 bg-rose-950/20">
-                      {totalBalance < 0
-                        ? `(${Math.abs(totalBalance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`
-                        : totalBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </TableCell>
-                    <TableCell className="px-5 py-4 text-right font-mono font-medium text-slate-400">{totalDiscount ? totalDiscount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
-                    <TableCell className="px-5 py-4 text-right font-mono font-medium text-indigo-300">{totalWHT ? totalWHT.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
-                    {summaryTab === 'client' && (
+                    {summaryTab !== 'vat' && (
                       <>
-                        <TableCell className="px-5 py-4 text-right font-mono font-medium text-emerald-400">{totalAmountForVat ? totalAmountForVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
-                        <TableCell className="px-5 py-4 text-right font-mono font-medium text-emerald-400">{totalVATPaid ? totalVATPaid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
-                        <TableCell className="px-5 py-4 text-right font-mono font-medium text-sky-400">{totalVATRemitted ? totalVATRemitted.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
-                        <TableCell className={`px-5 py-4 text-right font-mono font-bold text-xs ${totalVATOwed < 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                        <TableCell className="bg-slate-900 px-5 py-4 text-center font-bold text-slate-300 bg-slate-800/80 rounded-sm">{summaryData.reduce((sum, r) => sum + r.noOfInvoices, 0)}</TableCell>
+                        <TableCell className="bg-slate-900 px-5 py-4 text-right font-mono font-bold text-slate-200">{totalInvoices.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
+                      </>
+                    )}
+                    <TableCell className="bg-slate-900 px-5 py-4 text-right font-mono font-bold text-emerald-400">{totalPayment.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
+                    {summaryTab !== 'vat' && (
+                      <>
+                        <TableCell className="bg-slate-900 px-5 py-4 text-right font-mono font-bold text-rose-400 bg-rose-950/20">
+                          {totalBalance < 0
+                            ? `(${Math.abs(totalBalance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`
+                            : totalBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </TableCell>
+                        <TableCell className="bg-slate-900 px-5 py-4 text-right font-mono font-medium text-slate-400">{totalDiscount ? totalDiscount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
+                        <TableCell className="bg-slate-900 px-5 py-4 text-right font-mono font-medium text-indigo-300">{totalWHT ? totalWHT.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
+                      </>
+                    )}
+                    {summaryTab === 'vat' && (
+                      <>
+                        <TableCell className="bg-slate-900 px-5 py-4 text-right font-mono font-medium text-emerald-400">{totalAmountForVat ? totalAmountForVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
+                        <TableCell className="bg-slate-900 px-5 py-4 text-right font-mono font-medium text-emerald-400">{totalVATPaid ? totalVATPaid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
+                        <TableCell className="bg-slate-900 px-5 py-4 text-right font-mono font-medium text-sky-400">{totalVATRemitted ? totalVATRemitted.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
+                        <TableCell className="bg-slate-900 px-5 py-4 text-right font-mono font-medium text-rose-400">{totalVATOwed !== 0 && vatRate > 0 ? ((totalVATOwed / (vatRate / 100)) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
+                        <TableCell className={`bg-slate-900 px-5 py-4 text-right font-mono font-bold text-xs ${totalVATOwed < 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                           {totalVATOwed !== 0 
                             ? (totalVATOwed < 0 
                                 ? `(${Math.abs(totalVATOwed).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})` 
@@ -2236,7 +2503,9 @@ export function FinancialReports() {
                         </TableCell>
                       </>
                     )}
-                    <TableCell className="px-5 py-4"></TableCell>
+                    {summaryTab !== 'vat' && (
+                      <TableCell className="bg-slate-900 px-5 py-4"></TableCell>
+                    )}
                   </TableRow>
                 );
               })()}

@@ -7,8 +7,8 @@ import { Input } from '@/src/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
 import { Badge } from '@/src/components/ui/badge';
 import { Dialog, DialogFooter } from '@/src/components/ui/dialog';
-import { Search, Plus, MapPin, Building2, X, Save, Pencil, Trash2, Download, Upload, CheckCircle2, Circle, Eye, FileText, MoreVertical, Clock, LayoutGrid, List, ArrowUpDown, ChevronUp, ChevronDown, MessageSquare, BookOpen, Calendar, Phone, Mail, Car, MessageCircle, Users, ArrowLeft, Check, Bell, UserCheck, UserCircle, Briefcase, Sparkles } from 'lucide-react';
-import { useAppStore, Site } from '@/src/store/appStore';
+import { Search, Plus, MapPin, Building2, X, Save, Pencil, Trash2, Download, Upload, CheckCircle2, Circle, Eye, FileText, MoreVertical, Clock, LayoutGrid, List, ArrowUpDown, ChevronUp, ChevronDown, MessageSquare, BookOpen, Calendar, Phone, Mail, Car, MessageCircle, Users, ArrowLeft, Check, Bell, UserCheck, UserCircle, Briefcase, Sparkles, Edit2 } from 'lucide-react';
+import { useAppStore, Site, ClientProfile } from '@/src/store/appStore';
 import { toast, showConfirm } from '@/src/components/ui/toast';
 import { SiteQuestionnaire } from '@/src/types/SiteQuestionnaire';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
@@ -213,7 +213,35 @@ export function Sites() {
   const [addError, setAddError] = useState('');
   const [narrativeSite, setNarrativeSite] = useState<{ site: any; q: SiteQuestionnaire | null } | null>(null);
   const [contactsFor, setContactsFor] = useState<string | null>(null);
+  const [clientEditOpen, setClientEditOpen] = useState(false);
+  const [clientEditForm, setClientEditForm] = useState<Partial<ClientProfile>>({});
 
+  const openClientEdit = () => {
+    if (!selectedClientName) return;
+    const profile = clientProfiles.find(p => p.name?.trim().toLowerCase() === selectedClientName?.trim().toLowerCase());
+    setClientEditForm(profile ? { ...profile } : { name: selectedClientName });
+    setClientEditOpen(true);
+  };
+
+  const saveClientEdit = () => {
+    if (!selectedClientName) return;
+    const profile = clientProfiles.find(p => p.name?.trim().toLowerCase() === selectedClientName?.trim().toLowerCase());
+    if (profile && clientEditForm.id) {
+      updateClientProfile(profile.id, clientEditForm);
+    } else {
+      const newProfile: ClientProfile = {
+        id: crypto.randomUUID(),
+        name: selectedClientName,
+        tinNumber: clientEditForm.tinNumber,
+        address: clientEditForm.address,
+        mainContactPerson: clientEditForm.mainContactPerson,
+        contactPhone: clientEditForm.contactPhone,
+        startDate: clientEditForm.startDate || new Date().toISOString().split('T')[0],
+      };
+      addClientProfile(newProfile);
+    }
+    setClientEditOpen(false);
+  };
 
   const buildNarrative = (site: any, q: SiteQuestionnaire | null): string => {
     const lines: string[] = [];
@@ -920,7 +948,7 @@ export function Sites() {
   };
 
   useSetPageTitle(
-    selectedClient ? `${selectedClient.name} Sites` : 'Sites Management',
+    selectedClient ? `${selectedClient.name} Sites` : 'Clients Management',
     selectedClient ? `Manage sites, view communications and details for ${selectedClient.name}` : 'Manage project sites, clients, and technical onboarding summaries',
     <div className="flex items-center gap-2 md:gap-3">
       {canImport && (
@@ -960,14 +988,6 @@ export function Sites() {
               <div className="flex items-center gap-2">
                 <Button variant="outline" size="sm" onClick={() => navigate('/sites')}>
                   <ArrowLeft className="w-4 h-4 mr-2" /> Back
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="border-indigo-200 text-indigo-700 bg-indigo-50/50 hover:bg-indigo-100 font-semibold"
-                  onClick={() => navigate(`/client-360?client=${encodeURIComponent(selectedClient.name)}`)}
-                >
-                  <Sparkles className="w-4 h-4 mr-2 text-indigo-600 dark:text-indigo-400" /> Client 360
                 </Button>
               </div>
               <div className="flex items-center gap-2 text-sm">
@@ -1043,20 +1063,27 @@ export function Sites() {
                 </div>
                 
                 {selectedClient && (
-                  <Button
-                    variant="outline"
-                    className="h-9 border-indigo-200 text-indigo-700 bg-indigo-50/50 hover:bg-indigo-100 font-semibold flex items-center gap-2"
-                    onClick={() => setContactsFor(selectedClient.name)}
-                  >
-                    <UserCheck className="w-4 h-4" />
-                    <span className="text-xs sm:text-sm">Client Contacts</span>
-                    {(() => {
-                      const count = clientContacts.filter(c => c.clientName === selectedClient.name).length;
-                      return count > 0 ? (
-                        <span className="bg-indigo-200 text-indigo-800 text-[10px] px-1.5 py-0.5 rounded-full font-bold ml-1">{count}</span>
-                      ) : null;
-                    })()}
-                  </Button>
+                  <>
+                    <Button
+                      variant="outline"
+                      className="h-9 border-indigo-200 text-indigo-700 bg-indigo-50/50 hover:bg-indigo-100 font-semibold flex items-center gap-2"
+                      onClick={() => setContactsFor(selectedClient.name)}
+                    >
+                      <UserCheck className="w-4 h-4" />
+                      <span className="text-xs sm:text-sm">Client Contacts</span>
+                      {(() => {
+                        const count = clientContacts.filter(c => c.clientName === selectedClient.name).length;
+                        return count > 0 ? (
+                          <span className="bg-indigo-200 text-indigo-800 text-[10px] px-1.5 py-0.5 rounded-full font-bold ml-1">{count}</span>
+                        ) : null;
+                      })()}
+                    </Button>
+                    {currentUser?.privileges?.clients?.canEdit && (
+                      <Button onClick={openClientEdit} variant="outline" className="h-9 border-slate-200 text-slate-700 bg-white hover:bg-slate-50 font-semibold flex items-center gap-2 shadow-sm" title="Edit Client">
+                        <Edit2 className="w-4 h-4 text-indigo-500" /><span className="text-xs sm:text-sm">Edit Client</span>
+                      </Button>
+                    )}
+                  </>
                 )}
               </>
             )}
@@ -1726,6 +1753,31 @@ export function Sites() {
               >
                 Close Summary
               </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Client Edit Dialog */}
+      {clientEditOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setClientEditOpen(false)} />
+          <div className="relative z-10 w-full max-w-md rounded-3xl shadow-2xl p-5 sm:p-6 max-h-[90vh] flex flex-col bg-white border border-slate-200">
+            <div className="flex justify-between items-center mb-5 shrink-0">
+              <h2 className="text-lg font-black flex items-center gap-2"><Edit2 className="w-5 h-5 text-indigo-600" /> Edit Client</h2>
+              <Button variant="ghost" size="icon" onClick={() => setClientEditOpen(false)} className="h-8 w-8"><X className="w-4 h-4" /></Button>
+            </div>
+            <div className="space-y-4 overflow-y-auto pr-1 flex-1 style-scroll mb-4 text-left">
+              <div><label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Client Name</label><input value={clientEditForm.name || ''} readOnly disabled className="w-full rounded-xl border px-3 py-2 text-sm focus:outline-none cursor-not-allowed opacity-70 bg-slate-100 border-slate-200 text-slate-500" /></div>
+              <div><label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">TIN Number</label><input value={clientEditForm.tinNumber || ''} readOnly disabled placeholder="Optional" className="w-full rounded-xl border px-3 py-2 text-sm focus:outline-none cursor-not-allowed opacity-70 bg-slate-100 border-slate-200 text-slate-500" /></div>
+              <div><label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Address</label><textarea value={clientEditForm.address || ''} onChange={e => setClientEditForm(f => ({ ...f, address: e.target.value }))} rows={2} placeholder="e.g. 5 Marina Road, Lagos Island" className="w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none bg-slate-50 border-slate-200 text-slate-900" /></div>
+              <div><label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Main Contact Person</label><input value={clientEditForm.mainContactPerson || ''} onChange={e => setClientEditForm(f => ({ ...f, mainContactPerson: e.target.value }))} placeholder="e.g. John Doe" className="w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50 border-slate-200 text-slate-900" /></div>
+              <div><label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Contact Phone Number</label><input value={clientEditForm.contactPhone || ''} onChange={e => setClientEditForm(f => ({ ...f, contactPhone: e.target.value }))} placeholder="e.g. +234 801 234 5678" className="w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50 border-slate-200 text-slate-900" /></div>
+              <div><label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Start Date</label><input type="date" value={clientEditForm.startDate || ''} readOnly disabled className="w-full rounded-xl border px-3 py-2 text-sm focus:outline-none cursor-not-allowed opacity-70 bg-slate-100 border-slate-200 text-slate-500" /></div>
+            </div>
+            <div className="flex gap-3 shrink-0 pt-3 border-t border-slate-100">
+              <Button variant="outline" onClick={() => setClientEditOpen(false)} className="flex-1 rounded-xl">Cancel</Button>
+              <Button onClick={saveClientEdit} className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl">Save Changes</Button>
             </div>
           </div>
         </div>

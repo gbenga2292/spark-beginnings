@@ -7,7 +7,7 @@ import {
   ArrowLeft, MapPin, DollarSign, Activity, Wrench, MessagesSquare,
   AlertTriangle, Clock, Fuel, Calendar, FileText, Users, Settings2,
   ChevronDown, Sparkles, RefreshCcw, Send, ChevronUp, Filter, CheckCircle2, Plus, Pencil, ChevronRight,
-  CheckSquare, ShieldAlert, ShieldCheck, ClipboardList, Package, Truck, X
+  CheckSquare, ShieldAlert, ShieldCheck, ClipboardList, Package, Truck, X, Phone, Mail
 } from 'lucide-react';
 import { Badge } from '@/src/components/ui/badge';
 import { Button } from '@/src/components/ui/button';
@@ -25,7 +25,7 @@ import { ClientContactsPanel } from './ClientContactsPanel';
 import { TaskDetailSheet } from '@/src/components/tasks/TaskDetailSheet';
 import { AddSubtaskInline } from './Tasks/AddSubtaskInline';
 
-type SiteTab = 'financials' | 'operations' | 'maintenance' | 'comms' | 'tasks';
+type SiteTab = 'financials' | 'operations' | 'maintenance' | 'comms' | 'tasks' | 'contacts';
 
 interface Props {
   site: Site;
@@ -347,17 +347,14 @@ export function Site360View({ site, clientSites, onSiteChange, onBack, onEditSit
       (l.siteId === site.id || l.siteName?.trim() === site.name.trim()) && isWithinFilter(l.date)
     ).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-    // 1. Get contacts registered under this client
+    // 1. Get contacts registered under this client that are linked to this site
     const registeredContacts = clientContacts.filter(c =>
-      c.clientName?.trim().toLowerCase() === site.client?.trim().toLowerCase()
+      c.clientName?.trim().toLowerCase() === (site.client || site.name).trim().toLowerCase() &&
+      (c.siteIds?.includes(site.id) || c.siteNames?.includes(site.name))
     );
 
-    // 2. Extract any other contact names mentioned in the client's past communication logs
-    const clientComms = commLogs.filter(l =>
-      l.client?.trim().toLowerCase() === site.client?.trim().toLowerCase() ||
-      l.client?.trim().toLowerCase() === site.name?.trim().toLowerCase()
-    );
-    const pastCommNames = Array.from(new Set(clientComms.map(l => l.contactPerson).filter(Boolean)));
+    // 2. Extract any other contact names mentioned in this site's past communication logs
+    const pastCommNames = Array.from(new Set(siteComms.map(l => l.contactPerson).filter(Boolean)));
 
     // 3. Merge them uniquely
     const mergedContactsMap = new Map<string, { id: string; name: string; position?: string; phone?: string; email?: string }>();
@@ -413,6 +410,7 @@ export function Site360View({ site, clientSites, onSiteChange, onBack, onEditSit
     { id: 'maintenance', label: 'Maintenance', icon: Wrench, show: currentUser?.privileges?.sites?.canView },
     { id: 'comms', label: 'Comms', icon: MessagesSquare, show: currentUser?.privileges?.commLog?.canView },
     { id: 'tasks', label: 'Tasks', icon: CheckSquare, show: currentUser?.privileges?.tasks?.canView || currentUser?.privileges?.tasks?.canViewMyTasks },
+    { id: 'contacts', label: 'Contacts', icon: Users, show: currentUser?.privileges?.clients?.canView },
   ].filter(tab => tab.show !== false) as { id: SiteTab; label: string; icon: React.ElementType }[];
 
   // AI Chat
@@ -1561,6 +1559,49 @@ Answer site-specific questions using this context only. Be concise.`;
                       ))}
                     </div>
                   ) : <p className="text-slate-500 text-sm text-center py-8">No communication logs.</p>}
+                </div>
+              </div>
+            )}
+
+            {/* CONTACTS */}
+            {activeTab === 'contacts' && (
+              <div className="max-w-4xl mx-auto">
+                <div className={card}>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="font-bold text-base sm:text-lg flex items-center gap-2"><Users className="w-5 h-5 text-indigo-500" /> Site Contacts ({data.siteContacts.length})</h3>
+                    {currentUser?.privileges?.clients?.canEdit && (
+                      <Button onClick={() => setShowContactsPanel(true)} size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white flex items-center gap-1.5 rounded-xl h-9 px-2.5 sm:px-3 shrink-0">
+                        <Plus className="w-4 h-4" /><span className="hidden sm:inline">Manage Contacts</span>
+                      </Button>
+                    )}
+                  </div>
+                  {data.siteContacts.length > 0 ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {data.siteContacts.map(contact => (
+                        <div key={contact.id} className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
+                          <h4 className="font-semibold text-sm text-slate-800 dark:text-slate-200">{contact.name}</h4>
+                          {contact.position && <p className="text-xs text-slate-500 mt-0.5">{contact.position}</p>}
+                          <div className="mt-3 space-y-2">
+                            {contact.phone && (
+                              <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
+                                <Phone className="w-3.5 h-3.5 shrink-0" />
+                                <span>{contact.phone}</span>
+                              </div>
+                            )}
+                            {contact.email && (
+                              <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
+                                <Mail className="w-3.5 h-3.5 shrink-0" />
+                                <span>{contact.email}</span>
+                              </div>
+                            )}
+                            {!contact.phone && !contact.email && (
+                              <p className="text-xs text-slate-400 italic">No contact details</p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : <p className="text-slate-500 text-sm text-center py-8">No contacts found for this site.</p>}
                 </div>
               </div>
             )}

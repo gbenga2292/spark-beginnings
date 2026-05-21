@@ -506,9 +506,7 @@ export function Client360() {
 
   // Dialog state
   const [selectedSite, setSelectedSite] = useState<Site | null>(null);
-  const [clientEditOpen, setClientEditOpen] = useState(false);
   const [siteEditTarget, setSiteEditTarget] = useState<Site | null>(null);
-  const [clientEditForm, setClientEditForm] = useState<Partial<ClientProfile>>({});
   const [siteEditForm, setSiteEditForm] = useState<Partial<Site>>({});
   const [showContactsPanel, setShowContactsPanel] = useState(false);
   const [commDialogOpen, setCommDialogOpen] = useState(false);
@@ -1478,31 +1476,6 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
   }
 
   // â”€â”€ Handlers for edit dialogs â”€â”€
-  const openClientEdit = () => {
-    const profile = clientProfiles.find(p => p.name.trim() === selectedClient);
-    setClientEditForm(profile ? { ...profile } : { name: selectedClient });
-    setClientEditOpen(true);
-  };
-
-  const saveClientEdit = () => {
-    const profile = clientProfiles.find(p => p.name.trim() === selectedClient);
-    if (profile && clientEditForm.id) {
-      updateClientProfile(profile.id, clientEditForm);
-    } else {
-      const newProfile: ClientProfile = {
-        id: crypto.randomUUID(),
-        name: selectedClient,
-        tinNumber: clientEditForm.tinNumber,
-        address: clientEditForm.address,
-        mainContactPerson: clientEditForm.mainContactPerson,
-        contactPhone: clientEditForm.contactPhone,
-        startDate: clientEditForm.startDate || new Date().toISOString().split('T')[0],
-      };
-      addClientProfile(newProfile);
-    }
-    setClientEditOpen(false);
-  };
-
   const openSiteEdit = (site: Site) => {
     setSiteEditForm({ ...site });
     setSiteEditTarget(site);
@@ -1612,7 +1585,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                 {[
                   { id: 'overview', label: 'Overview', icon: Activity, show: currentUser?.privileges?.clients?.canView },
                   { id: 'financials', label: 'Financials', icon: DollarSign, show: currentUser?.privileges?.billing?.canView || currentUser?.privileges?.payments?.canView },
-                  { id: 'operations', label: 'Sites', icon: Briefcase, show: currentUser?.privileges?.sites?.canView },
+                  { id: 'operations', label: 'Site 360', icon: Briefcase, show: currentUser?.privileges?.sites?.canView },
                   { id: 'contacts', label: 'Contacts', icon: Users, show: currentUser?.privileges?.clients?.canView },
                   { id: 'activity', label: 'Communications', icon: MessagesSquare, show: currentUser?.privileges?.commLog?.canView },
                   { id: 'tasks', label: 'Tasks', icon: CheckSquare, show: currentUser?.privileges?.tasks?.canView || currentUser?.privileges?.tasks?.canViewMyTasks }
@@ -1650,11 +1623,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                     <span className="hidden min-[600px]:inline">Client Overview</span>
                   </Button>
                 )}
-                {currentUser?.privileges?.clients?.canEdit && (
-                  <Button onClick={openClientEdit} variant="outline" size="sm" className={cn("h-8 text-xs px-2 font-medium shadow-sm transition-colors flex items-center gap-1", isDark ? "bg-slate-900 border-slate-700 hover:bg-slate-800 text-slate-200" : "bg-white border-slate-200 hover:bg-slate-50 text-slate-700")} title="Edit Client">
-                    <Edit2 className="w-3.5 h-3.5 shrink-0" /><span className="hidden min-[600px]:inline">Edit Client</span>
-                  </Button>
-                )}
+
               </div>
             </div>
 
@@ -2553,30 +2522,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
     )}
 
 
-      {/* Client Edit Dialog */}
-      {clientEditOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setClientEditOpen(false)} />
-          <div className={cn('relative z-10 w-full max-w-md rounded-3xl shadow-2xl p-5 sm:p-6 max-h-[90vh] flex flex-col', isDark ? 'bg-slate-900 border border-slate-700' : 'bg-white border border-slate-200')}>
-            <div className="flex justify-between items-center mb-5 shrink-0">
-              <h2 className="text-lg font-black flex items-center gap-2"><Edit2 className="w-5 h-5 text-indigo-600" /> Edit Client</h2>
-              <Button variant="ghost" size="icon" onClick={() => setClientEditOpen(false)} className="h-8 w-8"><X className="w-4 h-4" /></Button>
-            </div>
-            <div className="space-y-4 overflow-y-auto pr-1 flex-1 style-scroll mb-4">
-              <div><label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Client Name</label><input value={clientEditForm.name || ''} readOnly disabled className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none cursor-not-allowed opacity-70', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-100 border-slate-200 text-slate-500')} /></div>
-              <div><label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">TIN Number</label><input value={clientEditForm.tinNumber || ''} readOnly disabled placeholder="Optional" className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none cursor-not-allowed opacity-70', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-100 border-slate-200 text-slate-500')} /></div>
-              <div><label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Address</label><textarea value={clientEditForm.address || ''} onChange={e => setClientEditForm(f => ({ ...f, address: e.target.value }))} rows={2} placeholder="e.g. 5 Marina Road, Lagos Island" className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')} /></div>
-              <div><label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Main Contact Person</label><input value={clientEditForm.mainContactPerson || ''} onChange={e => setClientEditForm(f => ({ ...f, mainContactPerson: e.target.value }))} placeholder="e.g. John Doe" className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')} /></div>
-              <div><label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Contact Phone Number</label><input value={clientEditForm.contactPhone || ''} onChange={e => setClientEditForm(f => ({ ...f, contactPhone: e.target.value }))} placeholder="e.g. +234 801 234 5678" className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')} /></div>
-              <div><label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Start Date</label><input type="date" value={clientEditForm.startDate || ''} readOnly disabled className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none cursor-not-allowed opacity-70', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-100 border-slate-200 text-slate-500')} /></div>
-            </div>
-            <div className="flex gap-3 shrink-0 pt-3 border-t border-slate-100 dark:border-slate-800">
-              <Button variant="outline" onClick={() => setClientEditOpen(false)} className="flex-1 rounded-xl">Cancel</Button>
-              <Button onClick={saveClientEdit} className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl">Save Changes</Button>
-            </div>
-          </div>
-        </div>
-      )}
+
 
       {/* Site Edit Dialog */}
       {siteEditTarget && (

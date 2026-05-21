@@ -62,33 +62,20 @@ export function WaybillDetailView({ waybill, onClose }: WaybillDetailViewProps) 
     let yPos = 95 + (subtitleLines.length - 1) * 7;
 
     const items = waybill.items;
-    const splitThreshold = 12;
-    const useTwoColumns = items.length > splitThreshold;
+    const maxItemsPerColumn = 20;
 
-    if (useTwoColumns) {
-      const halfLength = Math.ceil(items.length / 2);
-      const col1 = items.slice(0, halfLength);
-      const col2 = items.slice(halfLength);
+    let yPosCol1 = yPos;
+    let yPosCol2 = yPos;
 
-      let yPosCol1 = yPos;
-      let yPosCol2 = yPos;
-
-      col1.forEach((item, index) => {
+    items.forEach((item, index) => {
+      if (index < maxItemsPerColumn) {
         doc.text(`${index + 1}. ${item.assetName} (${item.quantity})`, 25, yPosCol1);
         yPosCol1 += 8;
-      });
-
-      col2.forEach((item, index) => {
-        const actualIndex = halfLength + index + 1;
-        doc.text(`${actualIndex}. ${item.assetName} (${item.quantity})`, 115, yPosCol2);
+      } else {
+        doc.text(`${index + 1}. ${item.assetName} (${item.quantity})`, 115, yPosCol2);
         yPosCol2 += 8;
-      });
-    } else {
-      items.forEach((item, index) => {
-        doc.text(`${index + 1}. ${item.assetName} (${item.quantity})`, 25, yPos);
-        yPos += 8;
-      });
-    }
+      }
+    });
 
     // Signature
     doc.line(20, 262, 100, 262);

@@ -33,7 +33,11 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
 
   const [purpose, setPurpose] = useState('Operational Activities');
   const [siteName, setSiteName] = useState(editWaybill?.siteName || prefillSiteName);
+  const isKnownDriver = (name: string) => !name || uniqueDrivers.includes(name);
   const [driverName, setDriverName] = useState(editWaybill?.driverName || '');
+  const [driverIsCustom, setDriverIsCustom] = useState(
+    !!editWaybill?.driverName && !isKnownDriver(editWaybill.driverName)
+  );
   const [vehicleName, setVehicleName] = useState(editWaybill?.vehicle || '');
   const [service, setService] = useState('Dewatering');
   const [expectedReturnDate, setExpectedReturnDate] = useState('');
@@ -215,15 +219,33 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
                 <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Driver Name *</Label>
                 <div className="relative">
                   <select
-                    value={driverName}
-                    onChange={e => setDriverName(e.target.value)}
+                    value={driverIsCustom ? '__custom__' : driverName}
+                    onChange={e => {
+                      if (e.target.value === '__custom__') {
+                        setDriverIsCustom(true);
+                        setDriverName('');
+                      } else {
+                        setDriverIsCustom(false);
+                        setDriverName(e.target.value);
+                      }
+                    }}
                     className="w-full h-10 rounded-xl border border-border bg-background px-3 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 appearance-none"
                   >
                     <option value="">Select Driver</option>
                     {uniqueDrivers.map(d => <option key={d} value={d}>{d}</option>)}
+                    <option value="__custom__">— Type driver name manually —</option>
                   </select>
                   <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
                 </div>
+                {driverIsCustom && (
+                  <Input
+                    autoFocus
+                    placeholder="Enter driver name…"
+                    value={driverName}
+                    onChange={e => setDriverName(e.target.value)}
+                    className="h-10 rounded-xl border-border bg-background text-sm font-medium"
+                  />
+                )}
               </div>
 
               {/* Vehicle */}

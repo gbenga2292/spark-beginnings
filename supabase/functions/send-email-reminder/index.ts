@@ -1,8 +1,10 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 
-// Hardcoded API Key to avoid manual dashboard configuration
-const RESEND_API_KEY = "re_gmEpsxh9_4HguGX9HZswyuZCVHizC7dZJ";
+const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')
+if (!RESEND_API_KEY) {
+  throw new Error('Missing RESEND_API_KEY environment variable')
+}
 
 // System injected Postgres vars
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
