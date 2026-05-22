@@ -531,6 +531,7 @@ export interface PendingInvoice {
   printLayout?: any;
   historyLog?: any[];
   machineConfigs?: { qt: number, rate: number, duration: number }[];
+  countOffDays?: boolean;
 }
 
 export interface Invoice {
@@ -569,6 +570,7 @@ export interface Invoice {
   machineConfigs?: { qt: number, rate: number, duration: number }[];
   /** Asset IDs of machines whose logs count against this invoice's duration */
   linkedAssetIds?: string[];
+  countOffDays?: boolean;
 }
 
 export interface SalaryAdvance {

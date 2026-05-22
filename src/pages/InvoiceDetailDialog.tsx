@@ -46,8 +46,74 @@ function fmt(n: number): string {
 export function InvoiceDetailDialog({ invoice, invoiceList, open, onClose, onNavigate, onEdit, onPrint }: InvoiceDetailDialogProps) {
   const { maintenanceAssets, dailyMachineLogs, waybills, assets } = useOperations();
   const payments = useAppStore(state => state.payments);
+  const sites = useAppStore(state => state.sites);
 
   const inv = invoice as any;
+
+  const liveEndDate = useMemo(() => {
+    if (!invoice) return '';
+    const startDateStr = inv.startDate || invoice.date;
+    const duration = invoice.duration ?? 0;
+    const linkedAssets = inv.linkedAssetIds || [];
+
+    if (!startDateStr || duration <= 0) return inv.endDate || invoice.dueDate || '';
+
+    // If countOffDays is not false, use standard date calculation
+    if (inv.countOffDays !== false) {
+      const start = new Date(startDateStr);
+      if (isNaN(start.getTime())) return inv.endDate || invoice.dueDate || '';
+      start.setDate(start.getDate() + duration - 1);
+      return start.toISOString().split('T')[0];
+    }
+
+    // Dynamic end-date calculation when countOffDays is false
+    const start = new Date(startDateStr);
+    if (isNaN(start.getTime())) return inv.endDate || invoice.dueDate || '';
+
+    const siteName = (inv.site || invoice.siteName || '').trim();
+    const clientName = (invoice.client || '').trim();
+    const realSite = sites.find(s => s.name === siteName && s.client === clientName) || 
+                     sites.find(s => s.name === clientName && s.client === siteName);
+    const siteId = realSite?.id;
+
+    if (!siteId) {
+      const startCopy = new Date(start);
+      startCopy.setDate(startCopy.getDate() + duration - 1);
+      return startCopy.toISOString().split('T')[0];
+    }
+
+    let daysCounted = 0;
+    let currentDate = new Date(start);
+
+    while (daysCounted < duration) {
+      const dateStr = currentDate.toISOString().split('T')[0];
+      const logsForDate = dailyMachineLogs.filter(l => l.siteId === siteId && l.date === dateStr);
+
+      let dayContribution = 1.0;
+      if (logsForDate.length > 0) {
+        const relevantLogs = linkedAssets && linkedAssets.length > 0
+          ? logsForDate.filter(l => linkedAssets.includes(l.assetId))
+          : logsForDate;
+
+        if (relevantLogs.length > 0) {
+          const contributions = relevantLogs.map(l => {
+            const status = l.operationalDay ?? (l.isActive ? 'full' : 'none');
+            if (status === 'full') return 1.0;
+            if (status === 'half') return 0.5;
+            return 0.0;
+          });
+          dayContribution = Math.min(...contributions);
+        }
+      }
+
+      daysCounted += dayContribution;
+      if (daysCounted < duration) {
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
+    }
+
+    return currentDate.toISOString().split('T')[0];
+  }, [invoice, dailyMachineLogs, sites]);
 
   // Navigation
   const currentIndex = invoiceList.findIndex(i => i.id === invoice?.id);
@@ -223,7 +289,7 @@ export function InvoiceDetailDialog({ invoice, invoiceList, open, onClose, onNav
             <SectionTitle icon={<Calendar className="h-4 w-4" />} title="Period & Summary" />
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
               <StatCard label="Start Date" value={formatDisplayDate(inv.startDate || invoice.date)} />
-              <StatCard label="End Date" value={formatDisplayDate(inv.endDate || invoice.dueDate)} />
+              <StatCard label="End Date" value={formatDisplayDate(liveEndDate || inv.endDate || invoice.dueDate)} />
               <StatCard label="Duration" value={`${invoice.duration ?? 0} Days`} highlight />
               <StatCard label="Billing Cycle" value={invoice.billingCycle ?? '—'} />
             </div>

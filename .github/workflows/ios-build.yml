@@ -67,7 +67,7 @@ jobs:
       - name: Export IPA
         working-directory: ios/App
         env:
-          DEVELOPMENT_TEAM: ${{ secrets.APPLE_DEVELOPMENT_TEAM_ID }}
+          DEVELOPMENT_TEAM: ${{ 3232323}}
         run: |
           xcodebuild \
             -exportArchive \

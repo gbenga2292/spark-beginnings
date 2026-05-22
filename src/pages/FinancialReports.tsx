@@ -956,28 +956,30 @@ export function FinancialReports() {
   // Summary Ledger Data
   const summaryData = useMemo(() => {
     const rowMap = new Map<string, any>();
-    invoices.forEach(inv => {
-      const siteName = (inv.siteName || (inv as any).site || 'Unknown Site').trim();
-      const clientName = (inv.client || '').trim();
-      const key = (summaryTab === 'client' || summaryTab === 'vat') ? clientName : `${clientName} - ${siteName}`;
-      if (!rowMap.has(key)) rowMap.set(key, { 
-        client: clientName, 
-        site: siteName, 
-        key, 
-        noOfInvoices: 0, 
-        totalInvoices: 0, 
-        totalPayment: 0, 
-        discount: 0, 
-        withholdingTax: 0, 
-        vatInvoiced: 0, 
-        vatPaid: 0, 
-        amountForVat: 0,
-        vatRemitted: 0 
+    if (summaryTab !== 'vat') {
+      invoices.forEach(inv => {
+        const siteName = (inv.siteName || (inv as any).site || 'Unknown Site').trim();
+        const clientName = (inv.client || '').trim();
+        const key = ((summaryTab as 'client' | 'site') === 'client') ? clientName : `${clientName} - ${siteName}`;
+        if (!rowMap.has(key)) rowMap.set(key, { 
+          client: clientName, 
+          site: siteName, 
+          key, 
+          noOfInvoices: 0, 
+          totalInvoices: 0, 
+          totalPayment: 0, 
+          discount: 0, 
+          withholdingTax: 0, 
+          vatInvoiced: 0, 
+          vatPaid: 0, 
+          amountForVat: 0,
+          vatRemitted: 0 
+        });
+        rowMap.get(key)!.noOfInvoices += 1;
+        rowMap.get(key)!.totalInvoices += (inv.amount || 0);
+        rowMap.get(key)!.vatInvoiced += (inv.vat || 0);
       });
-      rowMap.get(key)!.noOfInvoices += 1;
-      rowMap.get(key)!.totalInvoices += (inv.amount || 0);
-      rowMap.get(key)!.vatInvoiced += (inv.vat || 0);
-    });
+    }
     // O(1) Site Lookup to prevent O(N*M) loop - consistent with globalStats
     const siteIndex = new Map<string, any>();
     sites.forEach(s => siteIndex.set(`${(s.client || '').trim()}|${(s.name || '').trim()}`, s));
@@ -1007,6 +1009,7 @@ export function FinancialReports() {
         vatInvoiced: 0, 
         vatPaid: 0, 
         amountForVat: 0,
+        vatPolicy: 'No',
         vatRemitted: 0 
       });
       
@@ -1019,6 +1022,11 @@ export function FinancialReports() {
       const siteKey = `${clientName}|${siteName}`;
       const payVatSetting = pay.payVat || siteIndex.get(siteKey)?.vat || 'No';
       const { vat, amountForVat } = getVatDetails(pay.amount || 0, payVatSetting, vatRate, (pay as any).damages || 0);
+      if (r.vatPolicy === 'No') {
+        r.vatPolicy = payVatSetting;
+      } else if (r.vatPolicy !== payVatSetting) {
+        r.vatPolicy = 'Mixed';
+      }
       r.vatPaid += (vat || 0);
       r.amountForVat += (amountForVat || 0);
     });
@@ -1042,7 +1050,7 @@ export function FinancialReports() {
         const site = parts.length > 1 ? parts.slice(1).join(' - ') : 'Unknown Site';
         rowMap.set(key, { 
           client, site, key, noOfInvoices: 0, totalInvoices: 0, totalPayment: 0, 
-          discount: 0, withholdingTax: 0, vatInvoiced: 0, vatPaid: 0, amountForVat: 0, vatRemitted: 0 
+          discount: 0, withholdingTax: 0, vatInvoiced: 0, vatPaid: 0, amountForVat: 0, vatPolicy: 'No', vatRemitted: 0 
         });
       }
     });
@@ -1055,7 +1063,7 @@ export function FinancialReports() {
           const site = parts.length > 1 ? parts.slice(1).join(' - ') : 'Unknown Site';
           rowMap.set(key, { 
             client, site, key, noOfInvoices: 0, totalInvoices: 0, totalPayment: 0, 
-            discount: 0, withholdingTax: 0, vatInvoiced: 0, vatPaid: 0, amountForVat: 0, vatRemitted: 0 
+            discount: 0, withholdingTax: 0, vatInvoiced: 0, vatPaid: 0, amountForVat: 0, vatPolicy: 'No', vatRemitted: 0 
           });
         }
       });
@@ -1070,13 +1078,11 @@ export function FinancialReports() {
         : balance > 0 ? 'OWING'
         : balance === 0 && (r.totalInvoices > 0 || bf !== 0) ? 'FULLY PAID'
         : balance < 0 ? 'OVER PAID' : '-';
-        
+
       if (balance < 0) {
         balance = 0;
         status = 'FULLY PAID';
       }
-      // VAT Owed represents the company's liability (Collected - Remitted). Negative means overpayment/surplus.
-      // If priorPeriodLimit is not 'none', we add the prior periods' outstanding VAT (bfVatOwed).
       const vatOwed = (priorPeriodLimit !== 'none' ? bfVatOwed : 0) + r.vatPaid - r.vatRemitted;
       return { ...r, bf, balance, status, vatOwed, bfVatOwed };
     });
@@ -1092,6 +1098,17 @@ export function FinancialReports() {
       } else {
         result = result.filter(r => r.totalInvoices > 0 || r.totalPayment > 0);
       }
+    }
+
+    if (summaryTab === 'vat') {
+      result = result.filter(r => 
+        (r.totalPayment > 0 ||
+         Math.abs(r.vatPaid) > 0.01 ||
+         Math.abs(r.amountForVat) > 0.01 ||
+         Math.abs(r.vatRemitted) > 0.01 ||
+         Math.abs(r.vatOwed) > 0.01) &&
+        r.vatPolicy && r.vatPolicy !== 'No'
+      );
     }
 
     return result.sort((a, b) => a.client.localeCompare(b.client));
@@ -2351,6 +2368,7 @@ export function FinancialReports() {
             <TableHeader className="bg-slate-900 sticky top-0 z-20 shadow-md">
               <TableRow className="hover:bg-slate-900 border-b border-indigo-500/50">
                 <TableHead className="sticky left-0 z-30 bg-slate-900 font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 w-[180px] shadow-[2px_0_5px_rgba(0,0,0,0.3)]">Client</TableHead>
+                {summaryTab === 'vat' && <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 text-left">VAT Policy</TableHead>}
                 {summaryTab === 'site' && <TableHead className="sticky left-[180px] z-30 bg-slate-900 font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 w-[160px] shadow-[2px_0_5px_rgba(0,0,0,0.3)] border-l border-slate-700/50">Site</TableHead>}
                 {summaryTab !== 'vat' && filterYear !== 'All' && (
                   <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-amber-300 px-5 py-4 text-right" title="Balance carried over from previous years">
@@ -2389,6 +2407,7 @@ export function FinancialReports() {
               {summaryData.map((row, i) => (
                 <TableRow key={i} className={`hover:bg-indigo-50/40 transition-colors border-b border-slate-100 ${i % 2 === 0 ? 'bg-white' : 'bg-slate-50/30'}`}>
                   <TableCell className={`sticky left-0 z-10 px-5 py-3 font-semibold text-slate-700 border-r border-slate-100 shadow-[1px_0_3px_rgba(0,0,0,0.05)] ${i % 2 === 0 ? 'bg-white' : 'bg-[#fcfdfe]'}`}>{row.client}</TableCell>
+                  {summaryTab === 'vat' && <TableCell className={`px-5 py-3 text-slate-500 font-medium ${i % 2 === 0 ? 'bg-white' : 'bg-[#fcfdfe]'}`}>{row.vatPolicy || 'No'}</TableCell>}
                   {summaryTab === 'site' && <TableCell className={`sticky left-[180px] z-10 px-5 py-3 text-slate-500 font-medium border-r border-slate-100 shadow-[1px_0_3px_rgba(0,0,0,0.05)] ${i % 2 === 0 ? 'bg-white' : 'bg-[#fcfdfe]'}`}>{row.site}</TableCell>}
                   {summaryTab !== 'vat' && filterYear !== 'All' && (
                     <TableCell className={`px-5 py-3 text-right font-mono font-semibold ${
@@ -2458,6 +2477,7 @@ export function FinancialReports() {
                 return (
                   <TableRow className="bg-slate-900 hover:bg-slate-900 border-t-4 border-indigo-500 shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.1)] relative z-10">
                     <TableCell className="sticky left-0 z-20 bg-slate-900 px-5 py-4 font-bold text-slate-200 text-sm tracking-wider uppercase shadow-[2px_0_5px_rgba(0,0,0,0.3)]">Grand Total</TableCell>
+                    {summaryTab === 'vat' && <TableCell className="bg-slate-900 px-5 py-4"></TableCell>}
                     {summaryTab === 'site' && <TableCell className="sticky left-[180px] z-20 bg-slate-900 px-5 py-4 shadow-[2px_0_5px_rgba(0,0,0,0.3)]"></TableCell>}
                     {summaryTab !== 'vat' && filterYear !== 'All' && (
                       <TableCell className={`px-5 py-4 text-right font-mono font-bold ${

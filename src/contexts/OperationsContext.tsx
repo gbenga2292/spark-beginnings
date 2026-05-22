@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import {
   Asset, Waybill, AssetCategory, AssetType, AssetStatus, WaybillStatus, WaybillType, 
   Checkout, MaintenanceAsset, MaintenanceSession, MaintenanceLogType, ServiceStatus,
-  Vehicle, VehicleTripLeg, VehicleDocumentType, DailyMachineLog
+  Vehicle, VehicleTripLeg, VehicleDocumentType, DailyMachineLog, AssetPumpDate
 } from '../types/operations';
 import { supabase } from '@/src/integrations/supabase/client';
 import { useAppStore } from '../store/appStore';
@@ -66,6 +66,8 @@ interface OperationsContextType {
   // Daily Machine Logs
   logDailyActivity: (log: Omit<DailyMachineLog, 'id' | 'created_at'>) => Promise<void>;
   deleteDailyLog: (logId: string) => Promise<void>;
+  sitePumpDates: AssetPumpDate[];
+  persistSitePumpDates: (assetId: string, siteId: string, pumpStartDate: string, pumpStopDate: string | null) => Promise<void>;
 }
 
 const OperationsContext = createContext<OperationsContextType | undefined>(undefined);
@@ -83,6 +85,7 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
   const [checkouts, setCheckouts] = useState<Checkout[]>(initialCheckouts);
   const [maintenanceSessions, setMaintenanceSessions] = useState<MaintenanceSession[]>([]);
   const [dailyMachineLogs, setDailyMachineLogs] = useState<DailyMachineLog[]>([]);
+  const [sitePumpDates, setSitePumpDates] = useState<AssetPumpDate[]>([]);
 
   const { 
     vehicles, 
@@ -182,13 +185,15 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
           { data: dbWaybills }, 
           { data: dbCheckouts }, 
           { data: dbMaintenance },
-          { data: dbDailyLogs }
+          { data: dbDailyLogs },
+          { data: dbPumpDates }
         ] = await Promise.all([
           supabase.from('operations_assets').select('*'),
           supabase.from('operations_waybills').select('*'),
           supabase.from('operations_checkouts').select('*'),
           supabase.from('operations_maintenance').select('*'),
-          supabase.from('operations_daily_logs').select('*')
+          supabase.from('operations_daily_logs').select('*'),
+          supabase.from('operations_site_pump_dates').select('*')
         ]);
 
         if (dbAssets) {
@@ -226,6 +231,17 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
               created_at: a.created_at
             };
           }));
+        }
+
+        if (dbPumpDates) {
+          setSitePumpDates(dbPumpDates.map((p: any) => ({
+            id: p.id,
+            assetId: p.asset_id,
+            siteId: p.site_id,
+            pumpStartDate: p.pump_start_date,
+            pumpStopDate: p.pump_stop_date,
+            created_at: p.created_at
+          })));
         }
 
         if (dbWaybills) {
@@ -934,6 +950,54 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
     };
   };
 
+  const persistSitePumpDates = async (assetId: string, siteId: string, pumpStartDate: string, pumpStopDate: string | null) => {
+    try {
+      const existing = sitePumpDates.find(p => p.assetId === assetId && p.siteId === siteId);
+      const id = existing?.id || crypto.randomUUID();
+
+      const payload = {
+        id,
+        asset_id: assetId,
+        site_id: siteId,
+        pump_start_date: pumpStartDate,
+        pump_stop_date: pumpStopDate
+      };
+
+      const { data, error } = await supabase
+        .from('operations_site_pump_dates')
+        .upsert(payload, { onConflict: 'asset_id,site_id' })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      const newDateRecord: AssetPumpDate = {
+        id: data.id,
+        assetId: data.asset_id,
+        siteId: data.site_id,
+        pumpStartDate: data.pump_start_date,
+        pumpStopDate: data.pump_stop_date,
+        created_at: data.created_at
+      };
+
+      setSitePumpDates(prev => {
+        const index = prev.findIndex(p => p.assetId === assetId && p.siteId === siteId);
+        if (index >= 0) {
+          const updated = [...prev];
+          updated[index] = newDateRecord;
+          return updated;
+        }
+        return [...prev, newDateRecord];
+      });
+
+      toast.success('Pump dates saved successfully');
+    } catch (error: any) {
+      console.error('Error persisting site pump dates:', error);
+      toast.error(`Failed to save pump dates: ${error.message || 'Unknown error'}`);
+      throw error;
+    }
+  };
+
   return (
     <OperationsContext.Provider value={{
       assets,
@@ -942,6 +1006,8 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
       maintenanceAssets,
       maintenanceSessions,
       dailyMachineLogs,
+      sitePumpDates,
+      persistSitePumpDates,
       addAsset,
       bulkAddAssets,
       updateAsset,

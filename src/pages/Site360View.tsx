@@ -293,6 +293,27 @@ export function Site360View({ site, clientSites, onSiteChange, onBack, onEditSit
     const totalDiesel = machineLogs.reduce((a, l) => a + (l.dieselUsage || 0), 0);
     const activeDays = machineLogs.filter(l => l.isActive).length;
 
+    const machineDaysBreakdown = Array.from(machineLogs.reduce((acc, l) => {
+      const asset = l.assetName || 'Unknown Machine';
+      if (!acc.has(asset)) {
+        acc.set(asset, { name: asset, active: 0, off: 0, total: 0 });
+      }
+      const stats = acc.get(asset)!;
+      let dayVal = 0;
+      if (l.operationalDay === 'half') dayVal = 0.5;
+      else if (l.operationalDay === 'full') dayVal = 1;
+      else if (l.operationalDay === 'none') dayVal = 0;
+      else dayVal = l.isActive ? 1 : 0;
+
+      stats.total += dayVal;
+      if (dayVal > 0) {
+        stats.active += 1; // Count as an active day occurrence
+      } else if (l.operationalDay === 'none' || !l.isActive) {
+        stats.off += 1;
+      }
+      return acc;
+    }, new Map<string, { name: string; active: number; off: number; total: number }>()).values());
+
     const machineDays = machineLogs.reduce((sum, l) => {
       if (l.operationalDay === 'half') return sum + 0.5;
       if (l.operationalDay === 'none') return sum + 0;
@@ -409,7 +430,7 @@ export function Site360View({ site, clientSites, onSiteChange, onBack, onEditSit
     return {
       siteInvoices, sitePayments, siteCosts, totalBilled, totalReceived, outstanding, vatGenerated, totalCost,
       periodVatCollected, unpaidVatBroughtForward, periodVatRemitted, totalVatRemitted,
-      machineLogs, totalDiesel, activeDays, machineDays, activeMachinesCount, machinesOnSiteCount,
+      machineLogs, totalDiesel, activeDays, machineDays, machineDaysBreakdown, activeMachinesCount, machinesOnSiteCount,
       siteWaybills, materialsOnSite: assets.filter(a => (inventoryMap.get(a.id) || 0) > 0).map(a => ({ ...a, quantity: inventoryMap.get(a.id) || 0 })),
       siteMaintAssets, siteMaintSessions, totalMaintenanceCost,
       siteTasks, pendingSiteTasks, approvalSiteTasks, completedSiteTasks, siteComms, siteContacts, alerts,
@@ -782,6 +803,15 @@ Answer site-specific questions using this context only. Be concise.`;
                       <div className={cn('rounded-xl p-2.5 transition-colors', isDark ? 'bg-slate-800/50 hover:bg-slate-800' : 'bg-slate-50 hover:bg-slate-100')}>
                         <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-0.5">Machine Days</p>
                         <p className="text-sm font-black text-indigo-600">{data.machineDays}</p>
+                        {data.machineDaysBreakdown.length > 0 && (
+                          <div className="mt-1 flex flex-col gap-0.5 max-h-24 overflow-y-auto pr-1">
+                            {data.machineDaysBreakdown.map((m, idx) => (
+                              <div key={idx} className="text-[9px] text-slate-500 dark:text-slate-400 leading-tight">
+                                <span className="font-semibold text-slate-700 dark:text-slate-300">{m.name}:</span> {m.total}d ({m.active} active, {m.off} off)
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
 
                       <div className={cn('rounded-xl p-2.5 transition-colors', isDark ? 'bg-slate-800/50 hover:bg-slate-800' : 'bg-slate-50 hover:bg-slate-100')}>

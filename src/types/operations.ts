@@ -39,6 +39,15 @@ export interface Asset {
   created_at?: string;
 }
 
+export interface AssetPumpDate {
+  id: string;
+  assetId: string;
+  siteId: string;
+  pumpStartDate: string;
+  pumpStopDate: string | null;
+  created_at?: string;
+}
+
 export type WaybillStatus = 
   | 'outstanding' 
   | 'sent_to_site' 

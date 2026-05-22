@@ -37,7 +37,7 @@ interface DailyLogManagerProps {
 }
 
 export function DailyLogManager({ assetId, assetName, siteId, siteName, initialDate, isEmbedded, onBack }: DailyLogManagerProps) {
-  const { dailyMachineLogs, logDailyActivity, deleteDailyLog, waybills } = useOperations();
+  const { dailyMachineLogs, logDailyActivity, deleteDailyLog, waybills, sitePumpDates } = useOperations();
   const { employees, attendanceRecords } = useAppStore();
   const currentUser = useUserStore(s => s.users.find(u => u.id === s.currentUserId));
   
@@ -192,6 +192,21 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [dailyMachineLogs, assetId, siteId]);
 
+  // Derive effective pump start/stop dates
+  // Configured pump dates override the automatic fallback from earliest log
+  const pumpDateConfig = useMemo(() => {
+    const configured = sitePumpDates?.find(p => p.assetId === assetId && p.siteId === siteId);
+    const earliestLogDate = logs.length > 0
+      ? logs.reduce((acc, log) => log.date < acc ? log.date : acc, logs[0].date)
+      : null;
+
+    const effectiveStart = configured?.pumpStartDate || earliestLogDate || null;
+    const effectiveStop = configured?.pumpStopDate || null;
+    const isConfigured = !!configured?.pumpStartDate;
+
+    return { effectiveStart, effectiveStop, isConfigured, configured };
+  }, [sitePumpDates, assetId, siteId, logs]);
+
   const filteredLogs = useMemo(() => {
     return logs.filter(l => {
       const d = new Date(l.date);
@@ -318,6 +333,22 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
       if (futureDates.length > 0) {
         toast.error('Cannot log activity for future dates.');
         return;
+      }
+
+      // Validate against configured pump date range
+      if (pumpDateConfig.effectiveStart) {
+        const beforeRange = datesToLog.filter(d => d < pumpDateConfig.effectiveStart!);
+        if (beforeRange.length > 0) {
+          toast.error(`Cannot log before pump start date (${new Date(pumpDateConfig.effectiveStart).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}).`);
+          return;
+        }
+      }
+      if (pumpDateConfig.effectiveStop) {
+        const afterRange = datesToLog.filter(d => d > pumpDateConfig.effectiveStop!);
+        if (afterRange.length > 0) {
+          toast.error(`Cannot log after pump stop date (${new Date(pumpDateConfig.effectiveStop).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}).`);
+          return;
+        }
       }
 
       // Filter out dates that already have a log (when not editing)
@@ -618,6 +649,34 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
           <div className="max-w-4xl mx-auto pb-20 animate-in fade-in slide-in-from-bottom-4 duration-500">
             <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden rounded-lg">
               <div className="p-6 space-y-6">
+                {/* Pump Range Info Bar */}
+                {pumpDateConfig.effectiveStart && (
+                  <div className={cn(
+                    "flex items-center gap-2 px-4 py-2.5 rounded-lg border text-xs",
+                    pumpDateConfig.isConfigured
+                      ? "bg-blue-50/80 dark:bg-blue-950/20 border-blue-200/60 dark:border-blue-900/40"
+                      : "bg-amber-50/80 dark:bg-amber-950/20 border-amber-200/60 dark:border-amber-900/40"
+                  )}>
+                    <Calendar className={cn("h-3.5 w-3.5 shrink-0", pumpDateConfig.isConfigured ? "text-blue-500" : "text-amber-500")} />
+                    <div className="flex-1 min-w-0">
+                      <span className={cn("font-semibold", pumpDateConfig.isConfigured ? "text-blue-700 dark:text-blue-300" : "text-amber-700 dark:text-amber-300")}>
+                        {pumpDateConfig.isConfigured ? 'Configured Pump Range: ' : 'Auto-detected Range: '}
+                      </span>
+                      <span className="font-medium text-slate-700 dark:text-slate-300">
+                        {new Date(pumpDateConfig.effectiveStart).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        {pumpDateConfig.effectiveStop
+                          ? ` — ${new Date(pumpDateConfig.effectiveStop).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`
+                          : ' — Ongoing'}
+                      </span>
+                    </div>
+                    {!pumpDateConfig.isConfigured && (
+                      <Badge variant="outline" className="bg-amber-50 text-amber-600 dark:bg-amber-950/30 dark:text-amber-400 border-amber-200/50 text-[9px] font-bold px-1.5 py-0 rounded shrink-0">
+                        Fallback
+                      </Badge>
+                    )}
+                  </div>
+                )}
+
                 {/* Date Range + Day Type + Diesel */}
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                   {/* Start Date */}
@@ -629,8 +688,11 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
                       <Calendar className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
                       <Input 
                         type="date" 
-                        value={date} 
-                        max={new Date().toISOString().split('T')[0]}
+                        value={date}
+                        min={pumpDateConfig.effectiveStart || undefined}
+                        max={pumpDateConfig.effectiveStop
+                          ? (pumpDateConfig.effectiveStop < new Date().toISOString().split('T')[0] ? pumpDateConfig.effectiveStop : new Date().toISOString().split('T')[0])
+                          : new Date().toISOString().split('T')[0]}
                         onChange={e => { setDate(e.target.value); if (endDate && e.target.value > endDate) setEndDate(''); }}
                         className="pl-9 h-10 border-slate-200 dark:border-slate-700 rounded-md focus:ring-2 focus:ring-blue-500"
                       />
@@ -647,7 +709,9 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
                           type="date" 
                           value={endDate} 
                           min={date}
-                          max={new Date().toISOString().split('T')[0]}
+                          max={pumpDateConfig.effectiveStop
+                            ? (pumpDateConfig.effectiveStop < new Date().toISOString().split('T')[0] ? pumpDateConfig.effectiveStop : new Date().toISOString().split('T')[0])
+                            : new Date().toISOString().split('T')[0]}
                           onChange={e => setEndDate(e.target.value)}
                           className="pl-9 h-10 border-slate-200 dark:border-slate-700 rounded-md focus:ring-2 focus:ring-blue-500"
                         />
@@ -1020,14 +1084,17 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
                     const opDay = hasLog ? (hasLog.operationalDay ?? (hasLog.isActive ? 'full' : 'none')) : null;
                     const todayStr = new Date().toISOString().split('T')[0];
                     const isFuture = dateStr > todayStr;
+                    const isOutsidePumpRange = !!((pumpDateConfig.effectiveStart && dateStr < pumpDateConfig.effectiveStart) ||
+                                                (pumpDateConfig.effectiveStop && dateStr > pumpDateConfig.effectiveStop));
+                    const isDisabled = isFuture || isOutsidePumpRange;
 
                     days.push(
                       <div 
                         key={i} 
                         className={cn(
                           "h-24 rounded-3xl border p-3 flex flex-col justify-between transition-all group relative overflow-hidden",
-                          isFuture 
-                            ? "bg-slate-100/10 border-slate-100/50 dark:bg-slate-900/10 dark:border-slate-800/30 opacity-40 cursor-not-allowed select-none"
+                          isDisabled 
+                            ? "bg-slate-100/10 border-slate-100/50 dark:bg-slate-900/10 dark:border-slate-800/30 opacity-40 pointer-events-none select-none"
                             : cn(
                                 opDay === 'full' ? "bg-emerald-50/60 border-emerald-100 dark:bg-emerald-900/10 dark:border-emerald-900/20" :
                                 opDay === 'half' ? "bg-amber-50/60 border-amber-100 dark:bg-amber-900/10 dark:border-amber-900/20" :
@@ -1037,7 +1104,7 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
                               )
                         )}
                         onClick={() => {
-                          if (isFuture) return;
+                          if (isDisabled) return;
                           if (hasLog) {
                             editLog(hasLog);
                           } else {
@@ -1049,7 +1116,7 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
                       >
                         <span className={cn(
                           "text-sm font-bold",
-                          isFuture ? "text-slate-300 dark:text-slate-700" :
+                          isDisabled ? "text-slate-300 dark:text-slate-700" :
                           opDay === 'full' ? "text-emerald-700" :
                           opDay === 'half' ? "text-amber-600" :
                           opDay === 'none' ? "text-rose-500" :
@@ -1079,7 +1146,7 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
                         </div>
 
                         {/* Hover Overlay */}
-                        {!isFuture && (
+                        {!isDisabled && (
                           <div 
                             className="absolute inset-0 bg-white/80 dark:bg-slate-900/80 backdrop-blur-[1.5px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer px-2 text-center"
                           >

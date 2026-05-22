@@ -18,6 +18,7 @@ import { NumericFormat } from 'react-number-format';
 import { supabase } from '@/src/integrations/supabase/client';
 import { InvoiceRuntimeTracker } from './InvoiceRuntimeTracker';
 import { InvoiceDetailDialog } from './InvoiceDetailDialog';
+import { useOperations } from '@/src/contexts/OperationsContext';
 
 export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
   const sites = useAppStore((state) => state.sites);
@@ -62,6 +63,7 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
   const payments = useAppStore(state => state.payments);
   const ledgerBanks = useAppStore(state => state.ledgerBanks);
   const ledgerBeneficiaryBanks = useAppStore(state => state.ledgerBeneficiaryBanks);
+  const { dailyMachineLogs } = useOperations();
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [printInvoiceTarget, setPrintInvoiceTarget] = useState<Invoice | PendingInvoice | null>(null);
@@ -117,6 +119,7 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
     createReminder: true,
     sendEmailNotification: true,
     vatInc: 'No' as 'Yes' | 'No' | 'Add',
+    countOffDays: true,
   };
   const [form, setForm] = useState(initialForm);
 
@@ -267,13 +270,57 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
       ? Math.max(...activeCfgs.map(r => parseFloat(r.duration) || 0))
       : (parseFloat(input.duration) || 0);
 
+    const siteName = (input.site || input.siteName || '').trim();
+    const clientName = (input.client || '').trim();
+
+    let siteObj = siteRegistry.find(s => s.name === siteName && s.client === clientName);
+    if (!siteObj) {
+      siteObj = siteRegistry.find(s => s.name === clientName && s.client === siteName);
+    }
+    const realSite = sites.find(s => s.name === siteName && s.client === clientName) || sites.find(s => s.name === clientName && s.client === siteName);
+    const siteId = realSite?.id;
+
     let startDate = normalizeDate(input.startDate || input.date);
     let endDate = '';
     if (startDate && maxDuration > 0) {
       const start = new Date(startDate);
       if (!isNaN(start.getTime())) {
-        start.setDate(start.getDate() + maxDuration - 1);
-        endDate = start.toISOString().split('T')[0];
+        if (input.countOffDays === false && siteId) {
+          let daysCounted = 0;
+          let currentDate = new Date(start);
+          const linkedAssets = input.linkedAssetIds || [];
+
+          while (daysCounted < maxDuration) {
+            const dateStr = currentDate.toISOString().split('T')[0];
+            const logsForDate = dailyMachineLogs.filter(l => l.siteId === siteId && l.date === dateStr);
+            
+            let dayContribution = 1.0;
+            if (logsForDate.length > 0) {
+              const relevantLogs = linkedAssets && linkedAssets.length > 0 
+                ? logsForDate.filter(l => linkedAssets.includes(l.assetId))
+                : logsForDate;
+              
+              if (relevantLogs.length > 0) {
+                const contributions = relevantLogs.map(l => {
+                  const status = l.operationalDay ?? (l.isActive ? 'full' : 'none');
+                  if (status === 'full') return 1.0;
+                  if (status === 'half') return 0.5;
+                  return 0.0;
+                });
+                dayContribution = Math.min(...contributions);
+              }
+            }
+
+            daysCounted += dayContribution;
+            if (daysCounted < maxDuration) {
+              currentDate.setDate(currentDate.getDate() + 1);
+            }
+          }
+          endDate = currentDate.toISOString().split('T')[0];
+        } else {
+          start.setDate(start.getDate() + maxDuration - 1);
+          endDate = start.toISOString().split('T')[0];
+        }
       }
     } else if (input.endDate || input.dueDate) {
       endDate = normalizeDate(input.endDate || input.dueDate);
@@ -290,13 +337,6 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
     const otherCosts = damages;
     const totalCost = rentalCost + dieselCost + techniciansCost + instMobDemob + otherCosts;
 
-    const siteName = (input.site || input.siteName || '').trim();
-    const clientName = (input.client || '').trim();
-
-    let siteObj = siteRegistry.find(s => s.name === siteName && s.client === clientName);
-    if (!siteObj) {
-      siteObj = siteRegistry.find(s => s.name === clientName && s.client === siteName);
-    }
     const vatInc = siteObj ? siteObj.vat : (input.vatInc || 'No');
 
     let vat = 0;
@@ -326,6 +366,7 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
       invoiceNo: input.invoiceNo || input.invoiceNumber || '',
       client: clientName, site: siteName,
       machineConfigs: machineConfigsOut,
+      countOffDays: input.countOffDays ?? true,
     };
   };
 
@@ -384,6 +425,7 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
         totalCharge: data.totalCharge,
         totalExclusiveOfVat: data.totalExclusiveOfVat,
         machineConfigs: data.machineConfigs,
+        countOffDays: data.countOffDays,
       };
 
       if (movingFromQuotationToActive) {
@@ -458,6 +500,7 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
       mobDemob: 'mobDemob' in inv ? String(inv.mobDemob ?? 0) : '0',
       installation: 'installation' in inv ? String(inv.installation ?? 0) : '0',
       damages: 'damages' in inv ? String(inv.damages ?? 0) : '0',
+      countOffDays: 'countOffDays' in inv ? (inv.countOffDays ?? true) : true,
       createReminder: false,
       sendEmailNotification: true,
     });
@@ -583,6 +626,7 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
       mobDemob: '0', // Usually mob/demob is one-time, but user can re-input
       installation: '0',
       damages: '0',
+      countOffDays: inv.countOffDays ?? true,
       createReminder: true,
       sendEmailNotification: true,
     });
@@ -1545,7 +1589,13 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
                         </TableCell>
                         <TableCell className="px-4 py-3 text-right text-slate-600">
                           <div className="font-medium text-slate-800">{inv.duration || 0} Days</div>
-                          <div className="text-slate-500 text-xs">{formatDisplayDate(inv.startDate || inv.date)} - {formatDisplayDate(inv.endDate || inv.dueDate)}</div>
+                          <div className="text-slate-500 text-xs">
+                            {(() => {
+                              const liveDetails = calculateFullInvoiceData(inv, inv.machineConfigs);
+                              const displayEndDate = liveDetails.endDate || inv.endDate || inv.dueDate;
+                              return `${formatDisplayDate(inv.startDate || inv.date)} - ${formatDisplayDate(displayEndDate)}`;
+                            })()}
+                          </div>
                         </TableCell>
                         <TableCell className="px-4 py-3 text-right text-slate-600">
                           <div><span className="text-slate-400">Rent:</span> {priv?.canViewAmounts === false ? '***' : (inv.rentalCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
@@ -1739,7 +1789,13 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
                     <div className="p-3 pl-4 grid grid-cols-2 gap-y-2 text-xs">
                       <div>
                         <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wide">Dates</p>
-                        <p className="font-medium text-slate-600 truncate">{formatDisplayDate(inv.startDate || inv.date)} - {formatDisplayDate(inv.endDate || inv.dueDate)}</p>
+                        <p className="font-medium text-slate-600 truncate">
+                          {(() => {
+                            const liveDetails = calculateFullInvoiceData(inv, inv.machineConfigs);
+                            const displayEndDate = liveDetails.endDate || inv.endDate || inv.dueDate;
+                            return `${formatDisplayDate(inv.startDate || inv.date)} - ${formatDisplayDate(displayEndDate)}`;
+                          })()}
+                        </p>
                       </div>
                       <div className="text-right">
                         <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wide">Duration</p>
@@ -1844,9 +1900,13 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
                 </div>
 
                 <div className="grid grid-cols-1 gap-5">
-                  <div className="space-y-1.5">
+                  <div className="space-y-1.5 flex flex-col justify-end">
                     <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Start Date</label>
                     <Input type="date" value={form.startDate} onChange={e => handleChange('startDate', e.target.value)} className="bg-slate-50 h-11" />
+                    <label className="flex items-center gap-2 mt-2 cursor-pointer">
+                      <input type="checkbox" checked={!!form.countOffDays} onChange={e => handleChange('countOffDays', e.target.checked)} className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
+                      <span className="text-[11px] font-medium text-slate-600">Count off-days as billed days</span>
+                    </label>
                   </div>
                 </div>
 

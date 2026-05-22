@@ -5,7 +5,8 @@ import { SiteQuestionnaire } from '@/src/types/SiteQuestionnaire';
 import {
   ArrowLeft, Package, Wrench, Layers, Truck, Activity,
   MapPin, Building2, User, Phone, Calendar, Info, X,
-  FileText, ArrowRightLeft, RotateCcw, ChevronRight, BarChart2, ClipboardList, Eye
+  FileText, ArrowRightLeft, RotateCcw, ChevronRight, BarChart2, ClipboardList, Eye, Settings,
+  AlertTriangle
 } from 'lucide-react';
 import { Badge } from '@/src/components/ui/badge';
 import { Button } from '@/src/components/ui/button';
@@ -47,7 +48,7 @@ interface SiteItem {
 }
 
 export function SiteInventoryView({ site, questionnaire, onBack, onSiteChange }: SiteInventoryViewProps) {
-  const { waybills, assets, maintenanceAssets, dailyMachineLogs } = useOperations();
+  const { waybills, assets, maintenanceAssets, dailyMachineLogs, sitePumpDates, persistSitePumpDates } = useOperations();
   const allSites = useAppStore(s => s.sites);
   const activeSites = filterOperationalSites(allSites).filter(s => s.status === 'Active');
   
@@ -62,6 +63,50 @@ export function SiteInventoryView({ site, questionnaire, onBack, onSiteChange }:
   const [showMachineBulkLog, setShowMachineBulkLog] = useState(false);
   const [showMachineAnalytics, setShowMachineAnalytics] = useState(false);
   const [viewingWaybill, setViewingWaybill] = useState<any | null>(null);
+
+  // States for configuring pump dates
+  const [isConfiguringPumpDates, setIsConfiguringPumpDates] = useState(false);
+  const [configuringMachine, setConfiguringMachine] = useState<{ id: string, name: string } | null>(null);
+  const [modalStartDate, setModalStartDate] = useState('');
+  const [modalStopDate, setModalStopDate] = useState('');
+  const [modalError, setModalError] = useState<string | null>(null);
+
+  const handleOpenPumpDatesModal = (machine: { id: string, name: string }) => {
+    const existing = sitePumpDates?.find(p => p.assetId === machine.id && p.siteId === site.id);
+    setConfiguringMachine(machine);
+    setModalStartDate(existing?.pumpStartDate || '');
+    setModalStopDate(existing?.pumpStopDate || '');
+    setModalError(null);
+    setIsConfiguringPumpDates(true);
+  };
+
+  const handleSavePumpDates = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!configuringMachine) return;
+
+    if (modalStopDate && !modalStartDate) {
+      setModalError('Start Date is required if Stop Date is set.');
+      return;
+    }
+
+    if (modalStartDate && modalStopDate && modalStopDate < modalStartDate) {
+      setModalError('Stop Date cannot be before Start Date.');
+      return;
+    }
+
+    try {
+      await persistSitePumpDates(
+        configuringMachine.id,
+        site.id,
+        modalStartDate,
+        modalStopDate || null
+      );
+      setIsConfiguringPumpDates(false);
+      setConfiguringMachine(null);
+    } catch (err) {
+      // Error handled in persistSitePumpDates
+    }
+  };
 
   const { consumableLogs, addConsumableLogs } = useAppStore();
 
@@ -458,61 +503,128 @@ export function SiteInventoryView({ site, questionnaire, onBack, onSiteChange }:
                             const machineLogCount = dailyMachineLogs.filter(l => l.assetId === machine.id && l.siteId === site.id).length;
                             const inventoryItem = allItems.find(i => i.assetId === machine.id);
                             const isPendingReturn = inventoryItem?.pendingReturnQuantity && inventoryItem.pendingReturnQuantity > 0;
+
+                            const configured = sitePumpDates?.find(p => p.assetId === machine.id && p.siteId === site.id);
+                            const machineLogs = dailyMachineLogs.filter(l => l.assetId === machine.id && l.siteId === site.id);
+                            const earliestLogDate = machineLogs.length > 0
+                              ? machineLogs.reduce((acc, log) => log.date < acc ? log.date : acc, machineLogs[0].date)
+                              : null;
+
+                            const isFallback = !configured?.pumpStartDate;
+                            const pumpStart = configured?.pumpStartDate || earliestLogDate;
+                            const pumpStop = configured?.pumpStopDate || null;
+
+                            const formattedRangeText = pumpStart
+                              ? `${formatDisplayDate(pumpStart)} ${pumpStop ? `to ${formatDisplayDate(pumpStop)}` : '(No Stop Date)'}`
+                              : 'Not configured';
+
+                            // Warn if historical logs exist outside this range
+                            const hasLogsOutsideRange = machineLogs.some(log => {
+                              if (pumpStart && log.date < pumpStart) return true;
+                              if (pumpStop && log.date > pumpStop) return true;
+                              return false;
+                            });
+
                             return (
                               <div
                                 key={machine.id}
-                                className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow"
+                                className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between"
                               >
-                                {/* Card Header */}
-                                <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center gap-3">
-                                  <div className="h-10 w-10 rounded-lg bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center text-blue-600 shrink-0">
-                                    <Wrench className="h-5 w-5" />
+                                <div>
+                                  {/* Card Header */}
+                                  <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center gap-3">
+                                    <div className="h-10 w-10 rounded-lg bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center text-blue-600 shrink-0">
+                                      <Wrench className="h-5 w-5" />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <h4 className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{machine.name}</h4>
+                                        {isPendingReturn && (
+                                          <Badge 
+                                            variant="outline" 
+                                            className="bg-amber-50 dark:bg-amber-950/20 text-amber-600 dark:text-amber-400 border-amber-200/60 dark:border-amber-900/50 font-bold px-1.5 py-0 text-[10px] rounded shrink-0"
+                                          >
+                                            Pending Return: {inventoryItem.pendingReturnQuantity}
+                                          </Badge>
+                                        )}
+                                      </div>
+                                    </div>
+                                    {mAsset && (
+                                      <Badge
+                                        variant="outline"
+                                        className={cn(
+                                          "text-[10px] font-bold px-2 py-0.5 shrink-0",
+                                          mAsset.status === 'ok' ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
+                                          mAsset.status === 'due_soon' ? "bg-amber-50 text-amber-700 border-amber-200" :
+                                          "bg-rose-50 text-rose-700 border-rose-200"
+                                        )}
+                                      >
+                                        {mAsset.status.replace('_', ' ')}
+                                      </Badge>
+                                    )}
                                   </div>
-                                  <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                      <h4 className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{machine.name}</h4>
-                                      {isPendingReturn && (
-                                        <Badge 
-                                          variant="outline" 
-                                          className="bg-amber-50 dark:bg-amber-950/20 text-amber-600 dark:text-amber-400 border-amber-200/60 dark:border-amber-900/50 font-bold px-1.5 py-0 text-[10px] rounded shrink-0"
-                                        >
-                                          Pending Return: {inventoryItem.pendingReturnQuantity}
-                                        </Badge>
-                                      )}
+
+                                  {/* Stats row */}
+                                  <div className="p-4 grid grid-cols-3 divide-x divide-slate-100 dark:divide-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
+                                    <div className="flex flex-col items-center justify-center px-2">
+                                      <p className="text-xs text-slate-500 mb-1">Next Service</p>
+                                      <p className="text-[11px] font-bold text-slate-800 dark:text-slate-200 text-center">
+                                        {mAsset ? new Date(mAsset.nextServiceDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '—'}
+                                      </p>
+                                    </div>
+                                    <div className="flex flex-col items-center justify-center px-2">
+                                      <p className="text-xs text-slate-500 mb-1">Interval</p>
+                                      <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
+                                        {mAsset ? `${mAsset.serviceIntervalMonths}mo` : '—'}
+                                      </p>
+                                    </div>
+                                    <div className="flex flex-col items-center justify-center px-2">
+                                      <p className="text-xs text-slate-500 mb-1">Log Days</p>
+                                      <p className="text-sm font-bold text-slate-800 dark:text-slate-200">{machineLogCount}</p>
                                     </div>
                                   </div>
-                                  {mAsset && (
-                                    <Badge
-                                      variant="outline"
-                                      className={cn(
-                                        "text-[10px] font-bold px-2 py-0.5 shrink-0",
-                                        mAsset.status === 'ok' ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
-                                        mAsset.status === 'due_soon' ? "bg-amber-50 text-amber-700 border-amber-200" :
-                                        "bg-rose-50 text-rose-700 border-rose-200"
-                                      )}
-                                    >
-                                      {mAsset.status.replace('_', ' ')}
-                                    </Badge>
-                                  )}
-                                </div>
 
-                                {/* Stats row */}
-                                <div className="p-4 grid grid-cols-3 divide-x divide-slate-100 dark:divide-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
-                                  <div className="flex flex-col items-center justify-center px-2">
-                                    <p className="text-xs text-slate-500 mb-1">Next Service</p>
-                                    <p className="text-[11px] font-bold text-slate-800 dark:text-slate-200 text-center">
-                                      {mAsset ? new Date(mAsset.nextServiceDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '—'}
-                                    </p>
-                                  </div>
-                                  <div className="flex flex-col items-center justify-center px-2">
-                                    <p className="text-xs text-slate-500 mb-1">Interval</p>
-                                    <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
-                                      {mAsset ? `${mAsset.serviceIntervalMonths}mo` : '—'}
-                                    </p>
-                                  </div>
-                                  <div className="flex flex-col items-center justify-center px-2">
-                                    <p className="text-xs text-slate-500 mb-1">Log Days</p>
-                                    <p className="text-sm font-bold text-slate-800 dark:text-slate-200">{machineLogCount}</p>
+                                  {/* Pump Range Info Box */}
+                                  <div className="px-4 py-2.5 border-t border-slate-100 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-900/30 text-xs flex items-center justify-between">
+                                    <div className="flex items-center gap-1.5 text-slate-600 dark:text-slate-400 min-w-0 flex-1 mr-2">
+                                      <Calendar className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                                      <div className="flex flex-col min-w-0">
+                                        <span className="font-semibold text-[9px] text-slate-400 uppercase tracking-wider">Pump Range</span>
+                                        <span className="font-medium text-slate-700 dark:text-slate-300 truncate" title={formattedRangeText}>
+                                          {formattedRangeText}
+                                        </span>
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-1 shrink-0">
+                                      {hasLogsOutsideRange && (
+                                        <Badge 
+                                          variant="outline" 
+                                          className="bg-rose-50 text-rose-700 dark:bg-rose-950/20 dark:text-rose-400 border-rose-200/50 text-[9px] font-bold px-1 py-0 rounded flex items-center gap-0.5"
+                                          title="Warning: Historical daily logs exist outside the configured pump date range."
+                                        >
+                                          <AlertTriangle className="h-2.5 w-2.5 shrink-0" />
+                                          Log Conflict
+                                        </Badge>
+                                      )}
+                                      {isFallback && pumpStart && (
+                                        <Badge 
+                                          variant="outline" 
+                                          className="bg-amber-50 text-amber-700 dark:bg-amber-950/20 dark:text-amber-400 border-amber-200/50 text-[9px] font-bold px-1 py-0 rounded"
+                                          title={`Fallback to earliest log date: ${pumpStart}`}
+                                        >
+                                          Fallback
+                                        </Badge>
+                                      )}
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-7 w-7 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-blue-600 text-slate-400"
+                                        onClick={() => handleOpenPumpDatesModal({ id: machine.id, name: machine.name })}
+                                        title="Configure Pump Dates"
+                                      >
+                                        <Settings className="h-3.5 w-3.5" />
+                                      </Button>
+                                    </div>
                                   </div>
                                 </div>
 
@@ -810,6 +922,77 @@ export function SiteInventoryView({ site, questionnaire, onBack, onSiteChange }:
         site={site}
         machines={[...currentMachines, ...historyMachines].map(m => ({ id: m.id, name: m.name }))}
       />
+
+      {/* Configure Pump Dates Dialog */}
+      <Dialog open={isConfiguringPumpDates} onOpenChange={setIsConfiguringPumpDates}>
+        <DialogContent className="sm:max-w-[425px] p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl">
+          <DialogHeader className="mb-4">
+            <DialogTitle className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <Settings className="h-5 w-5 text-blue-500" />
+              Configure Pump Dates
+            </DialogTitle>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+              Set the pump operation window for <span className="font-semibold text-slate-800 dark:text-slate-200">{configuringMachine?.name}</span> on <span className="font-semibold text-slate-800 dark:text-slate-200">{site.name}</span>.
+            </p>
+          </DialogHeader>
+          
+          <form onSubmit={handleSavePumpDates} className="space-y-4">
+            {modalError && (
+              <div className="p-3 text-xs bg-rose-50 dark:bg-rose-950/20 text-rose-600 dark:text-rose-400 rounded-lg border border-rose-200 dark:border-rose-900/50 font-medium">
+                {modalError}
+              </div>
+            )}
+            
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-600 dark:text-slate-400">
+                Pump Start Date <span className="text-rose-500">*</span>
+              </label>
+              <input
+                type="date"
+                required
+                value={modalStartDate}
+                onChange={(e) => setModalStartDate(e.target.value)}
+                className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <p className="text-[10px] text-slate-400">
+                Determines the earliest date daily logs can be recorded.
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-600 dark:text-slate-400">
+                Pump Stop Date (Optional)
+              </label>
+              <input
+                type="date"
+                value={modalStopDate}
+                onChange={(e) => setModalStopDate(e.target.value)}
+                className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <p className="text-[10px] text-slate-400">
+                Determines the last date daily logs can be recorded. Leave empty for ongoing operations.
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setIsConfiguringPumpDates(false)}
+                className="text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                Save Configuration
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

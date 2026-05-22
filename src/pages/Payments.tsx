@@ -17,7 +17,7 @@ const getVatDetails = (amount: number, payVat: string, vatRate: number, damages:
     const vat = payVat === 'Add' ? Math.round(((baseAmount * 7.5) / 107.5) * 100) / 100 
               : payVat === 'Yes' ? Math.round(((baseAmount / (100 + vatRate)) * vatRate) * 100) / 100 
               : 0;
-    const amountForVat = payVat !== 'No' ? baseAmount - vat : baseAmount;
+    const amountForVat = payVat !== 'No' && vat > 0 ? baseAmount - vat : 0;
     return { vat, amountForVat };
 };
 
