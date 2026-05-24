@@ -686,7 +686,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
             return;
         }
         if (data) {
-            setSubtasks(prev => [...prev, data]);
+            setSubtasks(prev => [...prev, mapSubtaskToCamel(data)]);
             const mainId = data.mainTaskId || data.main_task_id;
             // Ensure main task is restored too
             if (mainId) {
@@ -903,7 +903,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                                 mainTaskId,
                                 deadline: deadline.toISOString(),
                             }).select().single();
-                            if (hodSub) setSubtasks(prev => [...prev, hodSub]);
+                            if (hodSub) setSubtasks(prev => [...prev, mapSubtaskToCamel(hodSub)]);
 
                             appStore.updateLeave(meta.refId, {
                                 approvalStatus: 'Pending',
@@ -930,7 +930,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                                 mainTaskId,
                                 deadline: deadline.toISOString(),
                             }).select().single();
-                            if (mgmtSub) setSubtasks(prev => [...prev, mgmtSub]);
+                            if (mgmtSub) setSubtasks(prev => [...prev, mapSubtaskToCamel(mgmtSub)]);
 
                             appStore.updateLeave(meta.refId, {
                                 workflowStep: 3,
@@ -955,7 +955,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                                 mainTaskId,
                                 deadline: deadline.toISOString(),
                             }).select().single();
-                            if (hrSub) setSubtasks(prev => [...prev, hrSub]);
+                            if (hrSub) setSubtasks(prev => [...prev, mapSubtaskToCamel(hrSub)]);
 
                             appStore.updateLeave(meta.refId, {
                                 workflowStep: 4,
@@ -1255,7 +1255,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                 if (prev.some(r => r.id === camel.id)) return prev;
                 return [...prev, camel];
             });
-            if (data.send_email) {
+            if (data.send_email && !data.title?.startsWith('[Invoice]')) {
                 supabase.functions.invoke('send-email-reminder', { body: data }).catch(console.error);
             }
         }
@@ -1269,6 +1269,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         if ('sendEmail' in p) { payload.send_email = p.sendEmail; delete payload.sendEmail; }
         if ('isActive' in p) { payload.is_active = p.isActive; delete payload.isActive; }
         if ('mainTaskId' in p) { payload.main_task_id = p.mainTaskId; delete payload.mainTaskId; }
+        if ('lastSentAt' in p) { payload.last_sent_at = p.lastSentAt; delete payload.lastSentAt; }
 
         const { data, error } = await supabase.from('reminders').update(payload).eq('id', id).select().single();
         if (error) {
@@ -1383,7 +1384,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                 }));
                 const { data: insertedSubs } = await supabase.from('subtasks').insert(subsToInsert).select();
                 if (insertedSubs && insertedSubs.length > 0) {
-                    setSubtasks(prev => [...prev, ...insertedSubs]);
+                    setSubtasks(prev => [...prev, ...insertedSubs.map(mapSubtaskToCamel)]);
                 }
             }
             

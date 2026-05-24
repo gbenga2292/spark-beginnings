@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { Badge } from '@/src/components/ui/badge';
 import { Button } from '@/src/components/ui/button';
+import { Input } from '@/src/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/src/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/src/components/ui/dropdown-menu';
 import { cn, formatUnit } from '@/src/lib/utils';
@@ -92,6 +93,16 @@ export function SiteInventoryView({ site, questionnaire, onBack, onSiteChange }:
     if (modalStartDate && modalStopDate && modalStopDate < modalStartDate) {
       setModalError('Stop Date cannot be before Start Date.');
       return;
+    }
+
+    // Pump stop cannot be after the site end date (equality allowed)
+    if (modalStopDate && site.endDate) {
+      const stop = new Date(modalStopDate);
+      const end = new Date(site.endDate);
+      if (stop.getTime() > end.getTime()) {
+        setModalError(`Pump Stop Date cannot be after the Site End Date (${formatDisplayDate(site.endDate)}).`);
+        return;
+      }
     }
 
     try {
@@ -670,14 +681,25 @@ export function SiteInventoryView({ site, questionnaire, onBack, onSiteChange }:
                                 <p className="text-xs text-slate-400 text-center">Previously deployed to this site</p>
                               </div>
                               <div className="p-3 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="h-8 px-3 text-slate-600 border-slate-200 w-full"
-                                  onClick={() => setSelectedMachine({ id: machine.id, name: machine.name })}
-                                >
-                                  View History
-                                </Button>
+                                <div className="flex items-center gap-2">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-8 px-3 text-slate-600 border-slate-200 flex-1"
+                                    onClick={() => setSelectedMachine({ id: machine.id, name: machine.name })}
+                                  >
+                                    View History
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-blue-600 text-slate-400"
+                                    onClick={() => handleOpenPumpDatesModal({ id: machine.id, name: machine.name })}
+                                    title="Configure Pump Dates"
+                                  >
+                                    <Settings className="h-4 w-4" />
+                                  </Button>
+                                </div>
                               </div>
                             </div>
                           ))}
@@ -892,6 +914,33 @@ export function SiteInventoryView({ site, questionnaire, onBack, onSiteChange }:
         </DialogContent>
       </Dialog>
 
+      {/* Configure Pump Dates Dialog */}
+      <Dialog open={isConfiguringPumpDates} onOpenChange={setIsConfiguringPumpDates}>
+        <DialogContent className="sm:max-w-[520px] p-6 rounded-2xl">
+          <DialogHeader className="mb-2">
+            <DialogTitle className="text-xl text-center text-slate-800">Configure Pump Dates</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSavePumpDates} className="space-y-4 mt-2">
+            <p className="text-sm text-slate-600">Machine: <span className="font-semibold">{configuringMachine?.name}</span></p>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Start Date</label>
+                <Input type="date" value={modalStartDate} onChange={e => setModalStartDate(e.target.value)} />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Stop Date</label>
+                <Input type="date" value={modalStopDate} onChange={e => setModalStopDate(e.target.value)} />
+              </div>
+            </div>
+            {modalError && <p className="text-sm text-rose-600">{modalError}</p>}
+            <div className="flex items-center justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={() => { setIsConfiguringPumpDates(false); setConfiguringMachine(null); }}>Cancel</Button>
+              <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white" type="submit">Save</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
       <BulkConsumableLogModal
         isOpen={showBulkLog}
         onClose={() => setShowBulkLog(false)}
@@ -966,11 +1015,18 @@ export function SiteInventoryView({ site, questionnaire, onBack, onSiteChange }:
               <input
                 type="date"
                 value={modalStopDate}
+                min={modalStartDate || undefined}
+                max={site.endDate ? new Date(site.endDate).toISOString().split('T')[0] : undefined}
                 onChange={(e) => setModalStopDate(e.target.value)}
                 className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               <p className="text-[10px] text-slate-400">
                 Determines the last date daily logs can be recorded. Leave empty for ongoing operations.
+                {site.endDate && (
+                  <span className="ml-1 text-amber-500 dark:text-amber-400 font-medium">
+                    Must be on or before site end ({formatDisplayDate(site.endDate)}).
+                  </span>
+                )}
               </p>
             </div>
 

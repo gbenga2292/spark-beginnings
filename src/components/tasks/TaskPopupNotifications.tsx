@@ -273,7 +273,6 @@ export function TaskPopupNotifications() {
 
     const checkReminders = () => {
       const now = Date.now();
-      const WINDOW_MS = 2 * 60 * 1000; // 2-minute window around remind_at
 
       reminders.forEach(rem => {
         if (!rem.isActive) return;
@@ -285,11 +284,52 @@ export function TaskPopupNotifications() {
         if (!isRecipient) return;
 
         const remindAt = new Date(rem.remindAt).getTime();
-        const diff = now - remindAt;
+        const isInvoiceReminder = rem.title?.startsWith('[Invoice]');
 
-        // Fire for any unacknowledged past reminder.
-        // It won't spam because `shownIds.current` tracks it for the session.
+        let popupStartDate = remindAt;
+        if (isInvoiceReminder) {
+          // Popup fires starting 2 days prior to actual end date (which is remindAt)
+          const pDate = new Date(remindAt);
+          pDate.setDate(pDate.getDate() - 2);
+          pDate.setHours(9, 0, 0, 0); // 9:00 AM
+          popupStartDate = pDate.getTime();
+        }
+
+        const diff = now - popupStartDate;
+        
+        // Fire for any unacknowledged past reminder
         if (diff < 0) return;
+
+        // If it is an invoice reminder:
+        if (isInvoiceReminder) {
+          // 1. Stop popping up after the actual end date
+          if (now > remindAt) return;
+
+          // 2. Check if we've already popped up today (Database tracked via lastSentAt)
+          const lastSent = rem.lastSentAt ? new Date(rem.lastSentAt) : null;
+          const todayStr = new Date().toISOString().split('T')[0];
+          const lastSentStr = lastSent ? lastSent.toISOString().split('T')[0] : '';
+          if (lastSentStr === todayStr) {
+            return; // Already notified today
+          }
+
+          // 3. Send email on the actual end date itself if sendEmail is true
+          if (rem.sendEmail && now >= remindAt) {
+            // Trigger Edge Function
+            supabase.functions.invoke('send-email-reminder', {
+              body: {
+                id: rem.id,
+                title: rem.title,
+                body: rem.body,
+                recipient_ids: rem.recipientIds,
+                send_email: true
+              }
+            }).catch(console.error);
+
+            // Set sendEmail to false in DB so it only sends once
+            updateReminder(rem.id, { sendEmail: false });
+          }
+        }
 
         // HR visibility filter: align with Tasks.tsx / TaskDashboard.tsx hasHrAccess pattern
         const isExternalHr = currentUser?.privileges?.tasks?.isExternalHr;
@@ -333,6 +373,12 @@ export function TaskPopupNotifications() {
           reminderId: rem.id,
           skipNative: true, // Reminders are already handled by native scheduling in AppDataContext
         });
+
+        // Set lastSentAt to now (propagates to DB and all clients)
+        if (isInvoiceReminder) {
+          const nowIso = new Date().toISOString();
+          updateReminder(rem.id, { lastSentAt: nowIso });
+        }
       });
     };
 
@@ -340,7 +386,7 @@ export function TaskPopupNotifications() {
     checkReminders();
     const interval = setInterval(checkReminders, 30_000);
     return () => clearInterval(interval);
-  }, [user?.id, reminders, pushPopup]);
+  }, [user?.id, reminders, pushPopup, mainTasks, currentUser, updateReminder]);
 
   /* ── Real-time: new comment / subtask changes ───────────────────────── */
   useEffect(() => {
@@ -422,13 +468,55 @@ export function TaskPopupNotifications() {
           const isAssigned = mt && (mt.assignedTo || (mt as any).assigned_to || '').includes(userId);
           if (isExternalHr && mt && !mt.is_hr_task && !isCreator && !isAssigned) return;
 
+          // Only trigger popup if:
+          // 1. Current user is assigned/creator of subtask or creator/assignee of main task
+          const existingSub = subtasks.find(s => s.id === payload.new.id);
+          const oldAssigned = existingSub?.assignedTo || existingSub?.assigned_to || '';
+          const newAssigned = (payload.new?.assignedTo || payload.new?.assigned_to || '');
+
+          const wasAlreadyAssigned = oldAssigned.includes(userId);
+          const isNewlyAssigned = newAssigned.includes(userId) && !wasAlreadyAssigned;
+
+          const isAssignedToMe = newAssigned.includes(userId);
+          const isCreatedByMe = (payload.new?.createdBy || payload.new?.created_by || '') === userId || isCreator;
+
+          if (!isAssignedToMe && !isCreatedByMe) return;
+
+          let title = '📋 Task updated';
+          let type: TaskPopup['type'] = 'update';
+
+          if (isNewlyAssigned) {
+            title = '✅ You were assigned a task';
+            type = 'assignment';
+          } else if (existingSub && existingSub.status !== payload.new.status) {
+            const statusLabels: Record<string, string> = {
+              'not_started': 'Not Started',
+              'in_progress': 'In Progress',
+              'pending_approval': 'Pending Approval',
+              'completed': 'Completed'
+            };
+            const newStatusLabel = statusLabels[payload.new.status] || payload.new.status;
+            
+            if (payload.new.status === 'completed') {
+              title = '🎉 Task Completed!';
+            } else if (existingSub && existingSub.status === 'completed' && payload.new.status !== 'completed') {
+              title = `🔄 Task re-opened: ${newStatusLabel}`;
+            } else {
+              title = `🔄 Task marked as ${newStatusLabel}`;
+            }
+            type = 'update';
+          } else {
+            // Ignore other silent edits like description/title updates to prevent irrelevant popup spam
+            return;
+          }
+
           pushPopup({
-            type:      'assignment',
-            title:     '✅ You were assigned a task',
+            type,
+            title,
             body:      `${payload.new.title}${mt ? ` (${mt.title})` : ''}`,
             subtaskUrl: `/tasks?open=${payload.new.id}`,
             taskUrl:   mt ? `/tasks?openTask=${mt.id}` : undefined,
-            dedupeKey: `assign-sub-${payload.new.id}`,
+            dedupeKey: `assign-sub-${payload.new.id}-${payload.new.status}-${newAssigned}`,
           });
         }
       )

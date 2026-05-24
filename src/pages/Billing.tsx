@@ -462,12 +462,18 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
     }
 
     if (form.createReminder && currentUser && data.endDate) {
-      const reminderDateObj = new Date(data.endDate);
+      // Actual end date (log-adjusted if countOffDays=false)
+      const actualEndDate = new Date(data.endDate);
+
+      const isCountingOffDays = data.countOffDays !== false;
+      const endDateLabel = isCountingOffDays ? 'projected end date' : 'actual end date (off-days excluded)';
+
       addReminder({
-        title: `Next Invoice for ${form.client} - ${form.site}`,
-        body: `Invoice ${form.invoiceNo} is pending payment. The duration has lapsed. Please notify the client to see if they want to extend or send a new invoice.`,
-        remindAt: reminderDateObj.toISOString(),
-        frequency: 'once',
+        title: `[Invoice] ${form.client} – ${form.site} ending soon`,
+        body: `Invoice ${form.invoiceNo} reaches its ${endDateLabel} on ${actualEndDate.toLocaleDateString()}. Confirm with the client to extend or prepare the next invoice.`,
+        remindAt: actualEndDate.toISOString(),      // Displayed on actual end date
+        endAt: actualEndDate.toISOString(),       // stops firing after actual end date
+        frequency: 'daily',
         recipientIds: [currentUser.id],
         sendEmail: !!form.sendEmailNotification,
         isActive: true,
@@ -1591,9 +1597,37 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
                           <div className="font-medium text-slate-800">{inv.duration || 0} Days</div>
                           <div className="text-slate-500 text-xs">
                             {(() => {
+                              const startDate = normalizeDate(inv.startDate || inv.date);
+                              const maxDuration = inv.machineConfigs && inv.machineConfigs.length > 0 
+                                ? Math.max(...inv.machineConfigs.map((r: any) => parseFloat(r.duration) || 0))
+                                : (parseFloat(inv.duration) || 0);
+
+                              let projectedEndDateStr = '';
+                              if (startDate && maxDuration > 0) {
+                                const start = new Date(startDate);
+                                if (!isNaN(start.getTime())) {
+                                  start.setDate(start.getDate() + maxDuration - 1);
+                                  projectedEndDateStr = start.toISOString().split('T')[0];
+                                }
+                              } else {
+                                projectedEndDateStr = normalizeDate(inv.endDate || inv.dueDate);
+                              }
+
                               const liveDetails = calculateFullInvoiceData(inv, inv.machineConfigs);
-                              const displayEndDate = liveDetails.endDate || inv.endDate || inv.dueDate;
-                              return `${formatDisplayDate(inv.startDate || inv.date)} - ${formatDisplayDate(displayEndDate)}`;
+                              const actualEndDateStr = liveDetails.endDate || inv.endDate || inv.dueDate;
+
+                              return (
+                                <div className="flex flex-col items-end gap-1 mt-0.5">
+                                  <div>
+                                    {formatDisplayDate(startDate)} - {formatDisplayDate(projectedEndDateStr)}
+                                  </div>
+                                  {inv.countOffDays === false && actualEndDateStr && (
+                                    <div className="text-[10px] text-amber-600 font-semibold bg-amber-50/80 px-1.5 py-0.5 rounded border border-amber-100">
+                                      Actual End: {formatDisplayDate(actualEndDateStr)}
+                                    </div>
+                                  )}
+                                </div>
+                              );
                             })()}
                           </div>
                         </TableCell>
@@ -1789,13 +1823,39 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
                     <div className="p-3 pl-4 grid grid-cols-2 gap-y-2 text-xs">
                       <div>
                         <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wide">Dates</p>
-                        <p className="font-medium text-slate-600 truncate">
+                        <div className="font-medium text-slate-600 flex flex-col gap-1 mt-0.5">
                           {(() => {
+                            const startDate = normalizeDate(inv.startDate || inv.date);
+                            const maxDuration = inv.machineConfigs && inv.machineConfigs.length > 0 
+                              ? Math.max(...inv.machineConfigs.map((r: any) => parseFloat(r.duration) || 0))
+                              : (parseFloat(inv.duration) || 0);
+
+                            let projectedEndDateStr = '';
+                            if (startDate && maxDuration > 0) {
+                              const start = new Date(startDate);
+                              if (!isNaN(start.getTime())) {
+                                start.setDate(start.getDate() + maxDuration - 1);
+                                projectedEndDateStr = start.toISOString().split('T')[0];
+                              }
+                            } else {
+                              projectedEndDateStr = normalizeDate(inv.endDate || inv.dueDate);
+                            }
+
                             const liveDetails = calculateFullInvoiceData(inv, inv.machineConfigs);
-                            const displayEndDate = liveDetails.endDate || inv.endDate || inv.dueDate;
-                            return `${formatDisplayDate(inv.startDate || inv.date)} - ${formatDisplayDate(displayEndDate)}`;
+                            const actualEndDateStr = liveDetails.endDate || inv.endDate || inv.dueDate;
+
+                            return (
+                              <>
+                                <span className="truncate">{formatDisplayDate(startDate)} - {formatDisplayDate(projectedEndDateStr)}</span>
+                                {inv.countOffDays === false && actualEndDateStr && (
+                                  <span className="text-[10px] text-amber-600 font-semibold bg-amber-50 px-1.5 py-0.5 rounded border border-amber-100 inline-block w-fit">
+                                    Actual End: {formatDisplayDate(actualEndDateStr)}
+                                  </span>
+                                )}
+                              </>
+                            );
                           })()}
-                        </p>
+                        </div>
                       </div>
                       <div className="text-right">
                         <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wide">Duration</p>

@@ -289,7 +289,35 @@ export function InvoiceDetailDialog({ invoice, invoiceList, open, onClose, onNav
             <SectionTitle icon={<Calendar className="h-4 w-4" />} title="Period & Summary" />
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
               <StatCard label="Start Date" value={formatDisplayDate(inv.startDate || invoice.date)} />
-              <StatCard label="End Date" value={formatDisplayDate(liveEndDate || inv.endDate || invoice.dueDate)} />
+              
+              <div className="bg-slate-50 border border-slate-100 rounded-lg px-3 py-2.5 flex flex-col justify-center">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">End Date</p>
+                <div className="mt-0.5">
+                  <p className="font-bold text-sm text-slate-700 truncate">
+                    {formatDisplayDate(
+                      (() => {
+                        const startDateStr = inv.startDate || invoice.date;
+                        const duration = invoice.duration ?? 0;
+                        if (!startDateStr || duration <= 0) return inv.endDate || invoice.dueDate || '';
+                        const start = new Date(startDateStr);
+                        if (!isNaN(start.getTime())) {
+                          start.setDate(start.getDate() + duration - 1);
+                          return start.toISOString().split('T')[0];
+                        }
+                        return inv.endDate || invoice.dueDate || '';
+                      })()
+                    )}
+                  </p>
+                  {inv.countOffDays === false && liveEndDate && (
+                    <div className="mt-1">
+                      <span className="text-[9px] font-bold uppercase tracking-wider text-amber-700 bg-amber-100/80 px-1.5 py-0.5 rounded border border-amber-200 inline-block truncate max-w-full">
+                        Actual: {formatDisplayDate(liveEndDate)}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
               <StatCard label="Duration" value={`${invoice.duration ?? 0} Days`} highlight />
               <StatCard label="Billing Cycle" value={invoice.billingCycle ?? '—'} />
             </div>
@@ -409,6 +437,17 @@ export function InvoiceDetailDialog({ invoice, invoiceList, open, onClose, onNav
                   </div>
                   <span className="font-bold text-slate-800 text-sm">{formatDisplayDate(projectedEndDate)}</span>
                 </div>
+
+                {/* Actual end date — only shown when off-days extend the invoice */}
+                {inv.countOffDays === false && liveEndDate && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-amber-700 text-sm font-medium">
+                      <Calendar className="h-4 w-4 text-amber-500" /> Actual End Date
+                      <span className="text-[10px] font-bold bg-amber-200/60 text-amber-800 px-1.5 py-0.5 rounded uppercase tracking-wide">Off-days excluded</span>
+                    </div>
+                    <span className="font-black text-amber-800 text-sm">{formatDisplayDate(liveEndDate)}</span>
+                  </div>
+                )}
 
                 {/* Site machines list */}
                 <div>

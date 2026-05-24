@@ -5,4 +5,9 @@
     "editor.defaultFormatter": "denoland.vscode-deno"
   },
   "css.lint.unknownAtRules": "ignore"
+  ,
+  "files.associations": {
+    "supabase/migrations/*.sql": "pgsql",
+    "supabase/**/*.sql": "pgsql"
+  }
 }

@@ -2,6 +2,7 @@ import { useMemo, useState, useRef, useEffect } from 'react';
 import { parseISO } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
+import { formatDisplayDate, normalizeDate } from '@/src/lib/dateUtils';
 
 import {
   Building2, ArrowLeft, MapPin, DollarSign, Activity, Wrench, MessagesSquare,
@@ -188,6 +189,77 @@ export function Site360View({ site, clientSites, onSiteChange, onBack, onEditSit
   const clientContacts = useAppStore(s => s.clientContacts);
   const { dailyMachineLogs, maintenanceAssets, maintenanceSessions, waybills, assets } = useOperations();
   const { mainTasks, subtasks } = useAppData();
+
+  const getInvoiceDates = (inv: any) => {
+    const startDate = normalizeDate(inv.startDate || inv.date);
+    const duration = parseFloat(inv.duration) || 0;
+    const countOffDays = inv.countOffDays ?? true;
+    const siteId = inv.siteId;
+
+    let projectedEndDateStr = '';
+    if (startDate && duration > 0) {
+      const start = new Date(startDate);
+      if (!isNaN(start.getTime())) {
+        start.setDate(start.getDate() + duration - 1);
+        projectedEndDateStr = start.toISOString().split('T')[0];
+      }
+    } else {
+      projectedEndDateStr = normalizeDate(inv.endDate || inv.dueDate);
+    }
+
+    let actualEndDateStr = '';
+    if (startDate && duration > 0) {
+      const start = new Date(startDate);
+      if (!isNaN(start.getTime())) {
+        if (countOffDays === false && siteId) {
+          let daysCounted = 0;
+          let currentDate = new Date(start);
+          const linkedAssets = inv.linkedAssetIds || [];
+
+          while (daysCounted < duration) {
+            const dateStr = currentDate.toISOString().split('T')[0];
+            const logsForDate = dailyMachineLogs.filter(l => l.siteId === siteId && l.date === dateStr);
+            
+            let dayContribution = 1.0;
+            if (logsForDate.length > 0) {
+              const relevantLogs = linkedAssets && linkedAssets.length > 0 
+                ? logsForDate.filter(l => linkedAssets.includes(l.assetId))
+                : logsForDate;
+              
+              if (relevantLogs.length > 0) {
+                const contributions = relevantLogs.map(l => {
+                  const status = l.operationalDay ?? (l.isActive ? 'full' : 'none');
+                  if (status === 'full') return 1.0;
+                  if (status === 'half') return 0.5;
+                  return 0.0;
+                });
+                dayContribution = Math.min(...contributions);
+              }
+            }
+
+            daysCounted += dayContribution;
+            if (daysCounted < duration) {
+              currentDate.setDate(currentDate.getDate() + 1);
+            }
+          }
+          actualEndDateStr = currentDate.toISOString().split('T')[0];
+        } else {
+          const startD = new Date(startDate);
+          startD.setDate(startD.getDate() + duration - 1);
+          actualEndDateStr = startD.toISOString().split('T')[0];
+        }
+      }
+    } else {
+      actualEndDateStr = normalizeDate(inv.endDate || inv.dueDate);
+    }
+
+    return {
+      startDate,
+      projectedEndDate: projectedEndDateStr,
+      actualEndDate: actualEndDateStr,
+      duration
+    };
+  };
 
   const isWithinFilter = (dateStr?: string) => {
     if (!dateStr) return false;
@@ -710,64 +782,63 @@ Answer site-specific questions using this context only. Be concise.`;
             {/* Site Identity Card */}
             <div className={cn(
               currentUser?.privileges?.sites?.canViewDecisionIntelligence ? 'lg:col-span-2' : 'lg:col-span-5',
-              'p-5 rounded-3xl border shadow-sm flex flex-col justify-between transition-all duration-300',
-              isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200',
-              isChatCollapsed ? 'lg:h-[72px] h-auto justify-center py-3' : 'lg:h-[300px]'
+              'p-5 rounded-sm border shadow-sm flex flex-col transition-all duration-300 overflow-x-hidden relative',
+              isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-300',
+              isChatCollapsed ? 'h-auto py-3 justify-center' : 'lg:h-[300px] justify-between overflow-y-auto style-scroll'
             )}>
+              {/* Industrial Accent Line */}
+              <div className="absolute top-0 left-0 w-full h-1 bg-slate-900 dark:bg-slate-100" />
+              
               <div 
-                className="flex items-start justify-between cursor-pointer group select-none"
+                className="flex flex-col sm:flex-row sm:items-start justify-between cursor-pointer group select-none gap-3 shrink-0"
                 onClick={() => setIsChatCollapsed(!isChatCollapsed)}
               >
-                <div className="flex items-start gap-3 min-w-0 flex-1">
-                  <div className={cn('p-2.5 rounded-2xl shrink-0 mt-0.5 transition-colors', isDark ? 'bg-indigo-900/50 group-hover:bg-indigo-800/60' : 'bg-indigo-50 group-hover:bg-indigo-100')}>
-                    <MapPin className="w-5 h-5 text-indigo-600" />
+                <div className="flex flex-col gap-2 min-w-0 flex-1 relative shrink-0">
+                  {/* Status Badges Overlayed Top */}
+                  <div className="flex items-center gap-2 flex-wrap mt-1">
+                    <span className={cn('text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 border',
+                      site.status === 'Active' ? 'bg-emerald-50 text-emerald-700 border-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-400' :
+                        site.status === 'Ended' ? 'bg-rose-50 text-rose-700 border-rose-600 dark:bg-rose-950/30 dark:text-rose-400' : 'bg-slate-100 text-slate-600 border-slate-400 dark:bg-slate-800'
+                    )}>{site.status}</span>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 border border-slate-300 dark:border-slate-700">VAT: {site.vat}</span>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 border border-slate-300 dark:border-slate-700 max-w-[150px] sm:max-w-[200px] truncate">
+                      CLIENT: {site.client}
+                    </span>
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <h1 className="text-lg sm:text-xl font-black text-slate-900 dark:text-white leading-tight truncate">{site.name}</h1>
-                    <p className="text-slate-500 text-xs mt-0.5">Client: <span className="font-semibold text-slate-700 dark:text-slate-300">{site.client}</span></p>
-                    
-                    {!isChatCollapsed && (
-                      <div className="flex flex-wrap items-center gap-1.5 mt-2.5">
-                        <Badge className={cn('text-xs',
-                          site.status === 'Active' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' :
-                            site.status === 'Ended' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-600'
-                        )}>{site.status}</Badge>
-                        <span className="text-xs text-slate-500 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">VAT: <strong>{site.vat}</strong></span>
-                        {site.startDate && (
-                          <span className="text-xs text-slate-500 flex items-center gap-1">
-                            <Calendar className="w-3.5 h-3.5" />
-                            {site.endDate ? (
-                              <span>
-                                {new Date(site.startDate).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })} – {new Date(site.endDate).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}
-                              </span>
-                            ) : (
-                              <span>Since {new Date(site.startDate).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}</span>
-                            )}
-                          </span>
-                        )}
-                        {!site.startDate && site.endDate && (
-                          <span className="text-xs text-slate-500 flex items-center gap-1">
-                            <Calendar className="w-3.5 h-3.5" />
-                            Ended {new Date(site.endDate).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}
-                          </span>
-                        )}
-                      </div>
-                    )}
+
+                  {/* Massive Typographic Hero */}
+                  <h1 className="text-lg sm:text-xl md:text-2xl font-black text-slate-900 dark:text-white leading-tight tracking-tight truncate group-hover:text-slate-600 dark:group-hover:text-slate-300 transition-colors mt-0.5">
+                    {site.name}
+                  </h1>
+
+                  {/* Date range below title */}
+                  <div className="text-[10px] font-mono text-slate-500 uppercase tracking-wider flex items-center gap-1.5 mt-0.5">
+                    <Calendar className="w-3 h-3" />
+                    {site.startDate ? (
+                      site.endDate ? (
+                        <span>
+                          {new Date(site.startDate).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })} — {new Date(site.endDate).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                        </span>
+                      ) : (
+                        <span>SINCE {new Date(site.startDate).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })}</span>
+                      )
+                    ) : site.endDate ? (
+                      <span>ENDED {new Date(site.endDate).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })}</span>
+                    ) : <span>NO DATE LOGGED</span>}
                   </div>
                 </div>
                 
-                {/* Visual expand/collapse indicator synced with Left column */}
                 <Button 
                   variant="ghost" 
                   size="sm" 
-                  className="text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 h-8 w-8 p-0 shrink-0 ml-2" 
+                  className="text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 h-8 w-8 p-0 shrink-0 self-start sm:ml-2 mt-1" 
                   onClick={e => { e.stopPropagation(); setIsChatCollapsed(!isChatCollapsed); }}
                 >
                   {isChatCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
                 </Button>
               </div>
 
-              {/* Quick stats strip inside identity card — animates smoothly on toggle */}
+              {/* Fragmented Stats Strip */}
               <AnimatePresence initial={false}>
                 {!isChatCollapsed && (
                   <motion.div
@@ -775,68 +846,72 @@ Answer site-specific questions using this context only. Be concise.`;
                     animate={{ opacity: 1, height: 'auto' }}
                     exit={{ opacity: 0, height: 0 }}
                     transition={{ duration: 0.3, ease: 'easeInOut' }}
-                    className="overflow-hidden"
+                    className="overflow-hidden shrink-0"
                   >
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-2 xl:grid-cols-3 gap-2 mt-4 pt-1 border-t border-slate-100 dark:border-slate-800/50">
-                      <div className={cn('rounded-xl p-2.5 transition-colors', isDark ? 'bg-slate-800/50 hover:bg-slate-800' : 'bg-slate-50 hover:bg-slate-100')}>
-                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-0.5">Total Billed</p>
-                        <p className="text-sm font-black text-sky-600 truncate">
-                          {currentUser?.privileges?.billing?.canViewAmounts ? `₦${Math.round(data.totalBilled).toLocaleString()}` : '***'}
-                        </p>
-                        <span className="text-[9px] font-semibold text-slate-400 dark:text-slate-500 block truncate">
-                          {data.siteInvoices.length} invoice{data.siteInvoices.length !== 1 ? 's' : ''}
-                        </span>
+                    <div className="flex flex-col gap-2 mt-4 pt-4 border-t-2 border-slate-200/60 dark:border-slate-800">
+                      {/* Dominant Financial Plane */}
+                      <div className="flex gap-2 w-full">
+                        <div className={cn('flex-1 border p-3 transition-transform hover:-translate-y-0.5 duration-200', isDark ? 'bg-slate-800/80 border-slate-700' : 'bg-slate-50 border-slate-300')}>
+                          <p className="text-[9px] font-bold uppercase tracking-widest text-slate-500 mb-1">Total Billed</p>
+                          <p className="text-base sm:text-lg font-black text-slate-900 dark:text-white truncate">
+                            {currentUser?.privileges?.billing?.canViewAmounts ? `₦${Math.round(data.totalBilled).toLocaleString()}` : '***'}
+                          </p>
+                          <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500">
+                            {data.siteInvoices.length} INVOICE{data.siteInvoices.length !== 1 ? 'S' : ''}
+                          </span>
+                        </div>
+                        <div className={cn('flex-1 border p-3 transition-transform hover:-translate-y-0.5 duration-200', isDark ? 'bg-slate-800/80 border-slate-700' : 'bg-slate-50 border-slate-300')}>
+                          <p className="text-[9px] font-bold uppercase tracking-widest text-slate-500 mb-1">Unpaid</p>
+                          <p className={cn('text-base sm:text-lg font-black truncate', data.outstanding > 0 ? 'text-rose-600 dark:text-rose-500' : 'text-emerald-600 dark:text-emerald-500')}>
+                            {currentUser?.privileges?.billing?.canViewAmounts ? `₦${Math.round(data.outstanding).toLocaleString()}` : '***'}
+                          </p>
+                        </div>
                       </div>
 
-                      <div className={cn('rounded-xl p-2.5 transition-colors', isDark ? 'bg-slate-800/50 hover:bg-slate-800' : 'bg-slate-50 hover:bg-slate-100')}>
-                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-0.5">Unpaid</p>
-                        <p className={cn('text-sm font-black truncate', data.outstanding > 0 ? 'text-rose-500' : 'text-emerald-500')}>
-                          {currentUser?.privileges?.billing?.canViewAmounts ? `₦${Math.round(data.outstanding).toLocaleString()}` : '***'}
-                        </p>
-                      </div>
+                      {/* Dense Operational Data Block */}
+                      <div className="flex flex-col gap-2">
+                        <details className={cn('border p-2 sm:p-2.5 group transition-all duration-200 relative', isDark ? 'border-slate-700 hover:border-slate-500' : 'border-slate-200 hover:border-slate-400')}>
+                          <summary className="outline-none list-none [&::-webkit-details-marker]:hidden cursor-pointer select-none">
+                            <div className="flex items-center justify-between">
+                              <p className="text-[9px] font-bold uppercase tracking-widest text-slate-500">
+                                Machine Days
+                              </p>
+                              {data.machineDaysBreakdown.length > 0 && (
+                                <span className="text-[8px] whitespace-nowrap bg-slate-200 dark:bg-slate-700 px-1 rounded text-slate-600 dark:text-slate-300 group-hover:bg-slate-300 dark:group-hover:bg-slate-600 transition-colors">Click for Detail ▼</span>
+                              )}
+                            </div>
+                            <p className="text-sm font-black text-slate-800 dark:text-slate-200 mt-0.5">{data.machineDays}</p>
+                          </summary>
+                          {data.machineDaysBreakdown.length > 0 && (
+                            <div className="mt-2 flex flex-col gap-0.5 w-full text-[10px] max-h-32 overflow-y-auto style-scroll pt-1 border-t border-slate-200 dark:border-slate-700">
+                              {data.machineDaysBreakdown.map((m, idx) => (
+                                <div key={idx} className="flex justify-between pb-0.5">
+                                  <span className="font-semibold text-slate-700 dark:text-slate-300 truncate pr-2">{m.name}</span>
+                                  <span className="text-slate-500 shrink-0">{m.total}d</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </details>
 
-                      <div className={cn('rounded-xl p-2.5 transition-colors', isDark ? 'bg-slate-800/50 hover:bg-slate-800' : 'bg-slate-50 hover:bg-slate-100')}>
-                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-0.5">Pending Tasks</p>
-                        <p className="text-sm font-black text-amber-600">{data.siteTasks.length}</p>
-                      </div>
-
-                      <div className={cn('rounded-xl p-2.5 transition-colors', isDark ? 'bg-slate-800/50 hover:bg-slate-800' : 'bg-slate-50 hover:bg-slate-100')}>
-                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-0.5">Machine Days</p>
-                        <p className="text-sm font-black text-indigo-600">{data.machineDays}</p>
-                        {data.machineDaysBreakdown.length > 0 && (
-                          <div className="mt-1 flex flex-col gap-0.5 max-h-24 overflow-y-auto pr-1">
-                            {data.machineDaysBreakdown.map((m, idx) => (
-                              <div key={idx} className="text-[9px] text-slate-500 dark:text-slate-400 leading-tight">
-                                <span className="font-semibold text-slate-700 dark:text-slate-300">{m.name}:</span> {m.total}d ({m.active} active, {m.off} off)
-                              </div>
-                            ))}
+                        <div className="grid grid-cols-3 gap-2">
+                          <div className={cn('border p-2 sm:p-2.5 group transition-all duration-200', isDark ? 'border-slate-700 hover:border-slate-500' : 'border-slate-200 hover:border-slate-400')}>
+                            <p className="text-[9px] font-bold uppercase tracking-widest text-slate-500">Tasks</p>
+                            <p className="text-sm font-black text-slate-800 dark:text-slate-200 mt-0.5">{data.siteTasks.length}</p>
                           </div>
-                        )}
-                      </div>
-
-                      <div className={cn('rounded-xl p-2.5 transition-colors', isDark ? 'bg-slate-800/50 hover:bg-slate-800' : 'bg-slate-50 hover:bg-slate-100')}>
-                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-0.5">Diesel Used</p>
-                        <p className="text-sm font-black text-amber-600 truncate">
-                          {Math.round(data.totalDiesel).toLocaleString()}L
-                        </p>
-                        <span className="text-[9px] font-semibold text-slate-400 dark:text-slate-500 block truncate">
-                          {data.machineLogs.length} log day{data.machineLogs.length !== 1 ? 's' : ''}
-                        </span>
-                      </div>
-
-                      <div className={cn('rounded-xl p-2.5 transition-colors', isDark ? 'bg-slate-800/50 hover:bg-slate-800' : 'bg-slate-50 hover:bg-slate-100')}>
-                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-0.5">Maint. Cost</p>
-                        <p className="text-sm font-black text-rose-500 truncate">
-                          {currentUser?.privileges?.billing?.canViewAmounts ? `₦${Math.round(data.totalMaintenanceCost).toLocaleString()}` : '***'}
-                        </p>
-                        <span className="text-[9px] font-semibold text-slate-400 dark:text-slate-500 block truncate">
-                          {data.siteMaintAssets.length} asset{data.siteMaintAssets.length !== 1 ? 's' : ''}
-                        </span>
-                      </div>
-
-                      <div className={cn('rounded-xl p-2.5 transition-colors', isDark ? 'bg-slate-800/50 hover:bg-slate-800' : 'bg-slate-50 hover:bg-slate-100')}>
-                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-0.5">Contacts</p>
-                        <p className="text-sm font-black text-slate-700 dark:text-slate-200">{data.siteContacts.length}</p>
+                          <div className={cn('border p-2 sm:p-2.5 group transition-all duration-200', isDark ? 'border-slate-700 hover:border-slate-500' : 'border-slate-200 hover:border-slate-400')}>
+                            <p className="text-[9px] font-bold uppercase tracking-widest text-slate-500">Diesel</p>
+                            <p className="text-sm font-black text-slate-800 dark:text-slate-200 mt-0.5 truncate">{Math.round(data.totalDiesel).toLocaleString()}L</p>
+                            <p className="text-[8px] font-mono text-slate-400 truncate hidden sm:block mt-0.5">{data.machineLogs.length} LOGS</p>
+                          </div>
+                          <div className={cn('border p-2 sm:p-2.5 group transition-all duration-200', isDark ? 'border-slate-700 hover:border-slate-500' : 'border-slate-200 hover:border-slate-400')}>
+                            <p className="text-[9px] font-bold uppercase tracking-widest text-slate-500">Maint.</p>
+                            <p className="text-sm font-black text-rose-600 dark:text-rose-500 mt-0.5 truncate">
+                              {currentUser?.privileges?.billing?.canViewAmounts ? `₦${Math.round(data.totalMaintenanceCost).toLocaleString()}` : '***'}
+                            </p>
+                            <p className="text-[8px] font-mono text-slate-400 truncate hidden sm:block mt-0.5">{data.siteMaintAssets.length} ASSETS</p>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </motion.div>
@@ -988,15 +1063,48 @@ Answer site-specific questions using this context only. Be concise.`;
                             <div
                               key={inv.id}
                               onClick={() => setSelectedInvoice(inv)}
-                              className="py-3 flex items-center justify-between gap-2 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 px-2 rounded-xl transition-colors"
+                              className="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 px-3 rounded-xl transition-colors"
                             >
-                              <div className="min-w-0">
-                                <p className="font-semibold text-sm truncate">{inv.invoiceNumber || inv.id.slice(0, 8)}</p>
-                                <p className="text-xs text-slate-500">{inv.date ? new Date(inv.date).toLocaleDateString('en-GB') : '—'} · {inv.billingCycle || 'Custom'}</p>
+                              <div className="min-w-0 flex-1 space-y-1">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="font-bold text-sm text-slate-900 dark:text-slate-100">
+                                    {inv.invoiceNumber || inv.id.slice(0, 8)}
+                                  </span>
+                                  <span className="text-[10px] bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 px-2 py-0.5 rounded font-medium">
+                                    {inv.billingCycle || 'Custom'}
+                                  </span>
+                                </div>
+                                
+                                {/* Dates breakdown */}
+                                {(() => {
+                                  const { startDate, projectedEndDate, actualEndDate, duration } = getInvoiceDates(inv);
+                                  return (
+                                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+                                      <span>
+                                        <span className="font-medium text-slate-400">Start:</span> {formatDisplayDate(startDate)}
+                                      </span>
+                                      <span>
+                                        <span className="font-medium text-slate-400">Duration:</span> {duration} {duration === 1 ? 'day' : 'days'}
+                                      </span>
+                                      <span>
+                                        <span className="font-medium text-slate-400">Projected End:</span> {formatDisplayDate(projectedEndDate)}
+                                      </span>
+                                      {actualEndDate && (
+                                        <span className="text-amber-600 dark:text-amber-400 font-semibold bg-amber-50/80 dark:bg-amber-950/20 px-1 rounded border border-amber-100 dark:border-amber-900/50">
+                                          <span className="text-slate-400 font-normal">Actual End:</span> {formatDisplayDate(actualEndDate)}
+                                        </span>
+                                      )}
+                                    </div>
+                                  );
+                                })()}
                               </div>
-                              <div className="flex items-center gap-2 shrink-0">
-                                <p className="font-bold text-sm">{currentUser?.privileges?.billing?.canViewAmounts ? `₦${(inv.totalCharge || inv.amount || 0).toLocaleString()}` : '***'}</p>
-                                <Badge className={isPaid ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}>{isPaid ? 'Paid' : 'Unpaid'}</Badge>
+                              <div className="flex items-center justify-between sm:justify-end gap-2.5 shrink-0">
+                                <p className="font-bold text-sm">
+                                  {currentUser?.privileges?.billing?.canViewAmounts ? `₦${(inv.totalCharge || inv.amount || 0).toLocaleString()}` : '***'}
+                                </p>
+                                <Badge className={isPaid ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}>
+                                  {isPaid ? 'Paid' : 'Unpaid'}
+                                </Badge>
                               </div>
                             </div>
                           );
@@ -1061,7 +1169,7 @@ Answer site-specific questions using this context only. Be concise.`;
                     <h3 className="font-bold text-lg flex items-center gap-2">
                       <Activity className="w-5 h-5 text-indigo-500" /> Operational Hub
                     </h3>
-                    <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800/80 p-0.5 rounded-xl">
+                    <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800/80 p-0.5 rounded-xl overflow-x-auto style-scroll max-w-full">
                       {[
                         { id: 'logs', label: 'Machine Logs', count: data.machineLogs.length, icon: ClipboardList, activeColor: 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 font-bold shadow-sm' },
                         { id: 'materials', label: 'Materials on Site', count: data.materialsOnSite.length, icon: Package, activeColor: 'bg-white dark:bg-slate-700 text-amber-600 dark:text-amber-400 font-bold shadow-sm' },
@@ -1306,8 +1414,8 @@ Answer site-specific questions using this context only. Be concise.`;
                     <h3 className="font-bold text-lg flex items-center gap-2">
                       <Clock className="w-5 h-5 text-indigo-500" /> Tasks Dashboard
                     </h3>
-                    <div className="flex items-center gap-3 flex-wrap">
-                      <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800/80 p-0.5 rounded-xl">
+                    <div className="flex items-center gap-3 flex-wrap min-w-0">
+                      <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800/80 p-0.5 rounded-xl overflow-x-auto style-scroll max-w-full">
                         {[
                           { id: 'pending', label: 'Pending', count: data.pendingSiteTasks.length, icon: CheckSquare, activeColor: 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 font-bold shadow-sm' },
                           { id: 'approval', label: 'Approval', count: data.approvalSiteTasks.length, icon: ShieldAlert, activeColor: 'bg-white dark:bg-slate-700 text-amber-600 dark:text-amber-400 font-bold shadow-sm' },

@@ -213,7 +213,21 @@ export function WaybillManager() {
                     </td>
                     <td className="px-5 py-4">{getStatusBadge(wb.status)}</td>
                     <td className="px-5 py-4 max-w-xs text-slate-600 dark:text-slate-400 text-xs">
-                      {wb.items.map(i => `${i.quantity} ${i.assetName}`).join(', ')}
+                      {(() => {
+                        const pumps = wb.items.filter(i => /pump/i.test(i.assetName));
+                        const others = wb.items.filter(i => !/pump/i.test(i.assetName));
+                        if (pumps.length > 0) {
+                          const pumpText = pumps.map(i => `${i.quantity} ${i.assetName}`).join(', ');
+                          return (
+                            <div className="truncate" title={wb.items.map(i => `${i.quantity} ${i.assetName}`).join(', ')}>
+                              {others.length > 0 ? `${pumpText} · +${others.length} other${others.length > 1 ? 's' : ''}` : pumpText}
+                            </div>
+                          );
+                        }
+                        if (wb.items.length === 0) return '—';
+                        if (wb.items.length === 1) return `${wb.items[0].quantity} ${wb.items[0].assetName}`;
+                        return <div className="truncate" title={wb.items.map(i => `${i.quantity} ${i.assetName}`).join(', ')}>{`${wb.items[0].quantity} ${wb.items[0].assetName} · +${wb.items.length - 1} other${wb.items.length - 1 > 1 ? 's' : ''}`}</div>;
+                      })()}
                     </td>
                     <td className="px-5 py-4">
                       <div className="flex items-center justify-center gap-1">
@@ -316,8 +330,18 @@ export function WaybillManager() {
                 
                 <div className="flex flex-col">
                     <span className="text-[10px] uppercase font-bold text-slate-400 mb-1">Items Summary</span>
-                    <span className="text-slate-600 dark:text-slate-400 text-xs line-clamp-2">
-                      {wb.items.map(i => `${i.quantity} ${i.assetName}`).join(', ')}
+                    <span className="text-slate-600 dark:text-slate-400 text-xs">
+                      {(() => {
+                        const pumps = wb.items.filter(i => /pump/i.test(i.assetName));
+                        const others = wb.items.filter(i => !/pump/i.test(i.assetName));
+                        if (pumps.length > 0) {
+                          const pumpText = pumps.map(i => `${i.quantity} ${i.assetName}`).join(', ');
+                          return others.length > 0 ? `${pumpText} · +${others.length} other${others.length > 1 ? 's' : ''}` : pumpText;
+                        }
+                        if (wb.items.length === 0) return '—';
+                        if (wb.items.length === 1) return `${wb.items[0].quantity} ${wb.items[0].assetName}`;
+                        return `${wb.items[0].quantity} ${wb.items[0].assetName} · +${wb.items.length - 1} other${wb.items.length - 1 > 1 ? 's' : ''}`;
+                      })()}
                     </span>
                 </div>
 
@@ -384,7 +408,7 @@ export function WaybillManager() {
       {/* ── Process Return Dialog ─────────────────────────────────────────────────── */}
       {waybillToProcess && (
         <Dialog open onOpenChange={() => setWaybillToProcess(null)}>
-          <DialogContent className="sm:max-w-[450px] p-6 rounded-2xl">
+          <DialogContent className="sm:max-w-[450px] p-6 rounded-2xl max-h-[80vh] overflow-auto">
             <div className="space-y-6">
               <div>
                 <h2 className="text-xl font-bold text-slate-800 dark:text-white">Process Return Sheet</h2>
@@ -403,7 +427,7 @@ export function WaybillManager() {
                 />
               </div>
 
-              <div className="space-y-3 max-h-80 overflow-y-auto no-scrollbar pr-1">
+              <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
                 <Label className="text-xs font-bold text-slate-700 border-b pb-2 block">Item Conditions</Label>
                 {waybillToProcess.items.map(item => (
                   <div key={item.assetId} className="p-3 bg-slate-50 dark:bg-slate-800 rounded-lg space-y-3 border border-slate-100 dark:border-slate-700">

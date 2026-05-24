@@ -1613,6 +1613,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                                     ).values()
                                   );
                                   const totalOwed = uniquePeriods.reduce((sum, period) => sum + Math.max(0, period.due - period.paid), 0);
+                              
                                   return totalOwed.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                                 })()}
                               </td>
