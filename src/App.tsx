@@ -7,6 +7,7 @@ import { Layout } from './components/layout/Layout';
 import { Login } from './pages/Login';
 import { SuperAdminSetup } from './pages/SuperAdminSetup';
 import { Dashboard } from './pages/Dashboard';
+import { HomePage } from './pages/HomePage';
 import { TitleBar } from './components/layout/TitleBar';
 import { ToastContainer, ConfirmDialog } from './components/ui/toast';
 import { GlobalDragScroll } from './components/ui/GlobalDragScroll';
@@ -124,22 +125,8 @@ function RootRedirect() {
   }
 
   if (currentUser) {
-    const p = currentUser.privileges;
-    
-    // Waterfall redirect based on highest-priority modules
-    if (p.tasks?.canViewDashboard) return <Navigate to="/tasks/dashboard" replace />;
-    if (p.tasks?.canView) return <Navigate to="/tasks" replace />;
-    if (p.dashboard?.canView) return <Navigate to="/hr-dashboard" replace />;
-    if (p.operations?.canView) return <Navigate to="/operations" replace />;
-    if (p.dailyJournal?.canView) return <Navigate to="/daily-journal" replace />;
-    if (p.employees?.canView) return <Navigate to="/employees" replace />;
-    if (p.sites?.canView) return <Navigate to="/sites" replace />;
-    if (p.ledger?.canView) return <Navigate to="/ledger" replace />;
-    if (p.weeklyReport?.canView) return <Navigate to="/weekly-report" replace />;
-    if (p.leaves?.canView) return <Navigate to="/leaves" replace />;
-    
-    // Fallback: If they have minimal permissions, at least let them see their profile
-    return <Navigate to="/profile" replace />;
+    // Always land on the home launchpad first — user picks their module from there
+    return <Navigate to="/home" replace />;
   }
 
   return <Navigate to="/login" replace />;
@@ -207,6 +194,7 @@ function AppContent() {
       <Route path="/setup" element={<SuperAdminSetup />} />
       <Route path="/" element={<AuthGuard><Layout /></AuthGuard>}>
         <Route index element={<RootRedirect />} />
+        <Route path="home" element={<Page label="Home"><HomePage /></Page>} />
         
         {/* ── Restricted Modules (Hidden in Web Build) ────────────────────────── */}
         {!IS_LIMITED_WEB_WEB && (

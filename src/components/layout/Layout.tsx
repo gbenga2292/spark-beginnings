@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Outlet, Navigate } from 'react-router-dom';
+import { Outlet, Navigate, useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 import { useAuth } from '@/src/hooks/useAuth';
@@ -19,6 +19,10 @@ export function Layout() {
   const [privBannerVisible, setPrivBannerVisible] = useState(false);
   const [reloadCountdown, setReloadCountdown] = useState<number | null>(null);
   const mainRef = useRef<HTMLElement>(null);
+  const location = useLocation();
+
+  // On the /home launchpad, hide the sidebar entirely
+  const isHomePage = location.pathname === '/home';
 
   // Start network monitoring
   useEffect(() => {
@@ -62,7 +66,7 @@ export function Layout() {
   return (
     <div className={`flex h-full w-full overflow-hidden font-sans transition-colors duration-200 ${isDark ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'
       }`}>
-      <Sidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
+      {!isHomePage && <Sidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />}
       <div className="flex flex-1 flex-col overflow-hidden w-full relative">
         <ConnectionBanner />
 
@@ -99,11 +103,13 @@ export function Layout() {
           </div>
         )}
 
-        <Header onMenuClick={() => setIsSidebarOpen(true)} />
+        {!isHomePage && <Header onMenuClick={() => setIsSidebarOpen(true)} />}
         <div className="flex-1 relative overflow-hidden">
           <main 
             ref={mainRef}
-            className={`h-full overflow-y-auto pt-4 px-2 pb-4 md:pt-4 md:px-6 md:pb-6 w-full ${isDark ? 'bg-slate-950' : 'bg-slate-50'}`}
+            className={`h-full overflow-y-auto w-full ${
+              isHomePage ? '' : 'pt-4 px-2 pb-4 md:pt-4 md:px-6 md:pb-6'
+            } ${isDark ? 'bg-slate-950' : 'bg-slate-50'}`}
           >
             <Outlet />
           </main>

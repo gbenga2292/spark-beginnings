@@ -18,7 +18,7 @@ import { Button } from "@/src/components/ui/button";
 import { toast, showConfirm } from "@/src/components/ui/toast";
 import { supabase } from "@/src/integrations/supabase/client";
 import type { TaskPriority } from "@/src/types/tasks";
-
+import { useSetPageTitle } from "@/src/contexts/PageContext";
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.06 } } };
 const item = { hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] as [number, number, number, number] } } };
 
@@ -94,6 +94,19 @@ function PersonalSpaceDashboard() {
   const navigate = useNavigate();
   const [openSubtaskId, setOpenSubtaskId] = useState<string | null>(null);
 
+  useSetPageTitle(
+    'Task Dashboard',
+    '',
+    <div className="flex items-center gap-2">
+      <Button variant="outline" size="sm" onClick={() => navigate('/tasks/archive')} className="gap-2">
+        <Archive className="w-4 h-4" /> Archive
+      </Button>
+      <Button variant="default" size="sm" onClick={() => navigate('/tasks')} className="gap-2">
+        <ListTodo className="w-4 h-4" /> My Tasks <ArrowRight className="w-4 h-4" />
+      </Button>
+    </div>
+  );
+
   const activeWsTasks = wsTasks.filter(mt => {
     const hasSubs = subtasks.some(s => s.mainTaskId === mt.id || s.main_task_id === mt.id);
     return hasSubs || mt.is_project || mt.is_hr_task || mt.created_by === currentUser?.id || mt.createdBy === currentUser?.id;
@@ -141,9 +154,6 @@ function PersonalSpaceDashboard() {
                 }
               </p>
             </div>
-            <button onClick={() => navigate('/tasks')} className="flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/15 hover:bg-white/25 border border-white/25 text-white text-sm font-semibold transition-all backdrop-blur-sm">
-              <ListTodo className="w-4 h-4" /> My Tasks <ArrowRight className="w-3.5 h-3.5" />
-            </button>
           </div>
           {/* Inline mini-stats */}
           <div className="relative mt-5 grid grid-cols-3 gap-3">
@@ -392,6 +402,19 @@ function AdminDashboard() {
   const navigate = useNavigate();
   const [openSubtaskId, setOpenSubtaskId] = useState<string | null>(null);
 
+  useSetPageTitle(
+    'Task Dashboard',
+    '',
+    <div className="flex items-center gap-2">
+      <Button variant="outline" size="sm" onClick={() => navigate('/tasks/archive')} className="gap-2">
+        <Archive className="w-4 h-4" /> Archive
+      </Button>
+      <Button variant="default" size="sm" onClick={() => navigate('/tasks')} className="gap-2">
+        Manage Tasks <ArrowRight className="w-4 h-4" />
+      </Button>
+    </div>
+  );
+
   const appUser = users.find(u => u.id === currentUser?.id);
   const isExternalHr = appUser?.privileges?.tasks?.isExternalHr;
 
@@ -447,9 +470,6 @@ function AdminDashboard() {
                 {pendingApproval > 0 && <span className="text-amber-200"> · {pendingApproval} awaiting approval</span>}
               </p>
             </div>
-            <button onClick={() => navigate("/tasks")} className="flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/15 hover:bg-white/25 border border-white/25 text-white text-sm font-semibold transition-all">
-              Manage Tasks <ArrowRight className="w-4 h-4" />
-            </button>
           </div>
           {/* Stats row */}
           <div className="relative mt-5 grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -592,6 +612,19 @@ function UserDashboard() {
   const { hrVariables } = useStore();
   const { restoreSubtask, deleteSubtaskPermanently } = useAppData();
 
+  useSetPageTitle(
+    'Task Dashboard',
+    '',
+    <div className="flex items-center gap-2">
+      <Button variant="outline" size="sm" onClick={() => navigate('/tasks/archive')} className="gap-2">
+        <Archive className="w-4 h-4" /> Archive
+      </Button>
+      <Button variant="default" size="sm" onClick={() => navigate('/tasks')} className="gap-2">
+        All Tasks <ArrowRight className="w-4 h-4" />
+      </Button>
+    </div>
+  );
+
   const appUser = users.find(u => u.id === currentUser?.id);
   const isExternalHr = appUser?.privileges?.tasks?.isExternalHr;
   const isHrDept = appUser?.department?.toLowerCase() === 'hr';
@@ -682,15 +715,6 @@ function UserDashboard() {
                 )}
                 {myPendingApproval > 0 && <span className="text-amber-200"> · {myPendingApproval} awaiting approval</span>}
               </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <button onClick={() => navigate('/tasks/archive')} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white text-sm font-semibold transition-all">
-                <Archive className="w-4 h-4" />
-                Archive
-              </button>
-              <button onClick={() => navigate('/tasks')} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/15 hover:bg-white/25 border border-white/25 text-white text-sm font-semibold transition-all">
-                All Tasks <ArrowRight className="w-4 h-4" />
-              </button>
             </div>
           </div>
           <div className="relative mt-5 grid grid-cols-2 sm:grid-cols-4 gap-2">

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Bell, AlertCircle, CalendarClock, Users, MapPin, Wallet, FileText, Landmark,
@@ -6,7 +6,8 @@ import {
   BellOff, BellRing
 } from 'lucide-react';
 import { useAppStore } from '@/src/store/appStore';
-import { useAppData } from '@/src/contexts/AppDataContext';
+import { useShallow } from 'zustand/react/shallow';
+import { useAppData, TaskContext } from '@/src/contexts/AppDataContext';
 import { useUserStore } from '@/src/store/userStore';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { formatDisplayDate } from '@/src/lib/dateUtils';
@@ -29,16 +30,30 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 export function NotificationsPage() {
   useSetPageTitle('Notifications', 'All notifications and alerts');
-  const navigate = useNavigate();
-  const { updateReminder, reminders, subtasks } = useAppData();
-  const {
-    employees, attendanceRecords, leaves, pendingInvoices, invoices,
+  const { 
+    employees, attendanceRecords, leaves, pendingInvoices, invoices, 
     salaryAdvances, loans, sites, disciplinaryRecords, evaluations, commLogs,
-  } = useAppStore();
+    dismissedNotifications, dismissNotification
+  } = useAppStore(useShallow((s) => ({
+    employees: s.employees,
+    attendanceRecords: s.attendanceRecords,
+    leaves: s.leaves,
+    pendingInvoices: s.pendingInvoices,
+    invoices: s.invoices,
+    salaryAdvances: s.salaryAdvances,
+    loans: s.loans,
+    sites: s.sites,
+    disciplinaryRecords: s.disciplinaryRecords,
+    evaluations: s.evaluations,
+    commLogs: s.commLogs,
+    dismissedNotifications: s.dismissedNotifications,
+    dismissNotification: s.dismissNotification,
+  })));
+  const { updateReminder, reminders, subtasks } = useAppData();
+  const navigate = useNavigate();
 
   const currentUser = useUserStore(s => s.getCurrentUser());
   const [activeCategory, setActiveCategory] = useState<string>('all');
-  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
 
   const notifications = useMemo<Notif[]>(() => {
     const notifs: Notif[] = [];
@@ -52,7 +67,6 @@ export function NotificationsPage() {
     };
     const isPastOrToday = (dateStr: string) => dateStr <= todayStr;
 
-    // 1. Reminders (all active ones for current user — no 24-hr cap)
     reminders.filter(r => {
       if (!r.isActive) return false;
       if (currentUser && r.recipientIds && r.recipientIds.length > 0 && !r.recipientIds.includes(currentUser.id)) return false;
@@ -92,7 +106,6 @@ export function NotificationsPage() {
       }
     });
 
-    // 2. Leave Approvals
     leaves.filter(l => l.approvalStatus === 'Pending' && l.status !== 'Cancelled').forEach(l => {
       notifs.push({ id: `leave-${l.id}`, icon: CalendarClock, text: `Leave Request pending: ${l.employeeName}`, time: l.startDate, color: 'text-amber-600', bg: 'bg-amber-50', url: '/leaves', priority: 2, category: 'approval' });
     });
@@ -103,7 +116,6 @@ export function NotificationsPage() {
       notifs.push({ id: `loan-${l.id}`, icon: Landmark, text: `Loan Request pending: ${l.employeeName}`, time: l.startDate, color: 'text-amber-600', bg: 'bg-amber-50', url: '/salary-loans', priority: 2, category: 'approval' });
     });
 
-    // 3. Finance
     invoices.filter(i => i.status === 'Overdue').forEach(i => {
       notifs.push({ id: `inv-ov-${i.id}`, icon: FileText, text: `Overdue Invoice: ${i.invoiceNumber}`, time: i.dueDate, color: 'text-rose-600', bg: 'bg-rose-50', url: '/client-accounts', priority: 0, category: 'finance' });
     });
@@ -111,7 +123,6 @@ export function NotificationsPage() {
       notifs.push({ id: 'pending-inv', icon: FileText, text: `${pendingInvoices.length} pending invoices to draft`, time: 'Now', color: 'text-blue-500', bg: 'bg-blue-50', url: '/client-accounts', priority: 3, category: 'finance' });
     }
 
-    // 4. HR Alerts
     employees.filter(e => e.status === 'Active' && e.lashmaExpiryDate && isWithinDays(e.lashmaExpiryDate, 7)).forEach(e => {
       notifs.push({ id: `lashma-${e.id}`, icon: ShieldCheck, text: `LASHMA Expiring Soon: ${e.firstname} ${e.surname}`, time: e.lashmaExpiryDate!, color: 'text-amber-600', bg: 'bg-amber-50', url: '/tasks/reminders', priority: 1, category: 'hr' });
     });
@@ -141,7 +152,6 @@ export function NotificationsPage() {
       }
     });
 
-    // 4b. Subtask deadline alerts (for tasks assigned to current user)
     const mySubtasks = subtasks.filter(s =>
       s.status !== 'completed' && s.deadline &&
       (currentUser && (
@@ -157,7 +167,6 @@ export function NotificationsPage() {
       }
     });
 
-    // 5. System
     const onboardingEmps = employees.filter(e => e.status === 'Onboarding');
     if (onboardingEmps.length > 0) {
       notifs.push({ id: 'onboarding-counts', icon: UserPlus, text: `${onboardingEmps.length} staff currently onboarding`, time: 'Ongoing', color: 'text-emerald-500', bg: 'bg-emerald-50', url: '/onboarding', priority: 4, category: 'system' });
@@ -170,18 +179,21 @@ export function NotificationsPage() {
     }
 
     return notifs.sort((a, b) => a.priority - b.priority);
-  }, [employees, attendanceRecords, leaves, pendingInvoices, invoices, salaryAdvances, loans, sites, disciplinaryRecords, evaluations, commLogs, reminders, currentUser]);
+  }, [employees, attendanceRecords, leaves, pendingInvoices, invoices, salaryAdvances, loans, sites, disciplinaryRecords, evaluations, commLogs, reminders, currentUser, subtasks]);
 
   const filtered = notifications.filter(n =>
-    !dismissed.has(n.id) && (activeCategory === 'all' || n.category === activeCategory)
+    !dismissedNotifications.includes(n.id) && (activeCategory === 'all' || n.category === activeCategory)
   );
 
-  const handleDismiss = (n: Notif, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (n.id.startsWith('rem-')) {
-      updateReminder(n.id.replace('rem-', ''), { isActive: false });
+  const handleDismiss = (id: string, e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation();
+      e.preventDefault();
     }
-    setDismissed(prev => new Set(prev).add(n.id));
+    if (id.startsWith('rem-')) {
+      updateReminder(id.replace('rem-', ''), { isActive: false });
+    }
+    dismissNotification(id);
   };
 
   const handleAction = (n: Notif) => {
@@ -200,12 +212,12 @@ export function NotificationsPage() {
 
   const categoryCounts = useMemo(() => {
     const counts: Record<string, number> = { all: 0 };
-    notifications.filter(n => !dismissed.has(n.id)).forEach(n => {
+    notifications.filter(n => !dismissedNotifications.includes(n.id)).forEach(n => {
       counts['all'] = (counts['all'] || 0) + 1;
       counts[n.category] = (counts[n.category] || 0) + 1;
     });
     return counts;
-  }, [notifications, dismissed]);
+  }, [notifications, dismissedNotifications]);
 
   return (
     <div className="flex flex-col gap-6 w-full pb-12 animate-in fade-in duration-300">
@@ -221,14 +233,16 @@ export function NotificationsPage() {
               <p className="text-xs text-slate-500">{filtered.length} active notification{filtered.length !== 1 ? 's' : ''}</p>
             </div>
           </div>
-          {dismissed.size < notifications.length && (
+          {dismissedNotifications.length < notifications.length && (
             <button
               onClick={() => {
-                const active = notifications.filter(n => !dismissed.has(n.id));
-                active.filter(n => n.id.startsWith('rem-')).forEach(n => {
-                  updateReminder(n.id.replace('rem-', ''), { isActive: false });
+                const active = notifications.filter(n => !dismissedNotifications.includes(n.id));
+                active.forEach(n => {
+                  if (n.id.startsWith('rem-')) {
+                    updateReminder(n.id.replace('rem-', ''), { isActive: false });
+                  }
+                  dismissNotification(n.id);
                 });
-                setDismissed(new Set(notifications.map(n => n.id)));
               }}
               className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-rose-600 transition-colors px-3 py-1.5 rounded-lg hover:bg-rose-50"
             >

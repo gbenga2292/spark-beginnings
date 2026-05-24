@@ -1156,8 +1156,23 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
         </div>
       ) : (
         /* Empty state */
-        <div className={`flex-1 flex flex-col items-center justify-center bg-[#f7f7f8] text-slate-400 p-8 ${!showListOnMobile ? 'flex' : 'hidden md:flex'}`}>
-          <div className="w-20 h-20 rounded-3xl bg-slate-100 flex items-center justify-center mb-5">
+        <div className={`relative flex-1 flex flex-col items-center justify-center bg-[#f7f7f8] text-slate-400 p-8 ${!showListOnMobile ? 'flex' : 'hidden md:flex'}`}>
+          {/* Mobile Back/Close Button */}
+          <button
+            onClick={() => {
+              if (onClose) {
+                onClose();
+              } else {
+                setShowListOnMobile(true);
+                onSelectSubtask(null);
+              }
+            }}
+            className="md:hidden absolute top-4 left-4 flex items-center justify-center w-10 h-10 rounded-full bg-white border border-slate-200 shadow-sm text-slate-500 hover:bg-slate-50 transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
+          
+          <div className="w-20 h-20 rounded-3xl bg-slate-100 flex items-center justify-center mb-5 shadow-sm">
             <CheckCircle2 className="w-10 h-10 text-slate-300" />
           </div>
           <p className="text-lg font-semibold text-slate-600 mb-1">Select a task</p>

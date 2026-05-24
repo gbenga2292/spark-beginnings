@@ -1,4 +1,5 @@
 import { formatDisplayDate } from '@/src/lib/dateUtils';
+import { format } from 'date-fns';
 import React, { isValidElement, Children } from 'react';
 
 // Helper to determine if a React node tree is effectively empty (e.g. nested fragments or divs with falsy children)
@@ -24,7 +25,7 @@ const isNodeEmpty = (node: any): boolean => {
 };
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { Capacitor, CapacitorHttp } from '@capacitor/core';
-import { Bell, Search, LogOut, Menu, X, User, Settings, ChevronRight, CalendarClock, Users, MapPin, Wallet, FileText, Landmark, Library, UserPlus, ShieldCheck, LayoutDashboard, Clock, AlertCircle, AtSign, ArrowLeft, ArrowUpCircle, RefreshCw, MoreVertical, Sparkles } from 'lucide-react';
+import { Bell, Search, LogOut, Menu, X, User, Settings, ChevronRight, CalendarClock, Users, MapPin, Wallet, FileText, Landmark, Library, UserPlus, ShieldCheck, LayoutDashboard, Clock, AlertCircle, AtSign, ArrowLeft, ArrowUpCircle, RefreshCw, MoreVertical, Sparkles, Home } from 'lucide-react';
 import { toast } from '@/src/components/ui/toast';
 import { StatusIndicator } from '@/src/components/offline/StatusIndicator';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -75,7 +76,8 @@ const ALL_SEARCH_ITEMS: SearchItem[] = [
 function useNotifications() {
   const { 
     employees, attendanceRecords, leaves, pendingInvoices, invoices, 
-    salaryAdvances, loans, sites, disciplinaryRecords, evaluations, commLogs 
+    salaryAdvances, loans, sites, disciplinaryRecords, evaluations, commLogs,
+    dismissedNotifications
   } = useAppStore(useShallow((s) => ({
     employees: s.employees,
     attendanceRecords: s.attendanceRecords,
@@ -88,11 +90,12 @@ function useNotifications() {
     disciplinaryRecords: s.disciplinaryRecords,
     evaluations: s.evaluations,
     commLogs: s.commLogs,
+    dismissedNotifications: s.dismissedNotifications,
   })));
   const { reminders } = useAppData();
 
   return useMemo(() => {
-    const notifs: { id: string; icon: any; text: string; time: string; color: string; url?: string; priority: number }[] = [];
+    const notifs: { id: string; icon: any; text: string; time: string; color: string; bg: string; url?: string; priority: number }[] = [];
     const now = new Date();
     const todayStr = now.toISOString().split('T')[0];
 
@@ -108,7 +111,7 @@ function useNotifications() {
       return dateStr <= todayStr;
     };
 
-    // 1. Reminders — show ALL active reminders for the current user (no time-window cap)
+    // 1. Reminders
     const currentUser = useUserStore.getState().getCurrentUser();
     reminders.filter(r => {
       if (!r.isActive) return false;
@@ -118,119 +121,97 @@ function useNotifications() {
       const isMention = r.title && r.title.startsWith('Mentioned');
       const remDate = new Date(r.remindAt);
       const isPast = remDate < now;
-      
       const isNewTask = r.title === 'New Task Created';
       
       if (isMention) {
           notifs.push({
-            id: `rem-${r.id}`,
-            icon: AtSign,
-            text: r.body || r.title,
-            time: r.createdAt ? r.createdAt.slice(0, 10) : 'New',
-            color: 'text-indigo-500',
+            id: `rem-${r.id}`, icon: AtSign, text: r.body || r.title,
+            time: r.createdAt ? format(new Date(r.createdAt), 'MMM d, h:mm a') : 'New',
+            color: 'text-indigo-500', bg: 'bg-indigo-50 dark:bg-indigo-500/10',
             url: r.subtaskId ? `/tasks?open=${r.subtaskId}` : r.mainTaskId ? `/tasks?openTask=${r.mainTaskId}` : undefined,
             priority: 1
           });
       } else if (isNewTask) {
           notifs.push({
-            id: `rem-${r.id}`,
-            icon: FileText,
-            text: `New Task: ${r.body || 'Task'}`,
-            time: r.createdAt ? r.createdAt.slice(0, 10) : 'New',
-            color: 'text-emerald-500',
+            id: `rem-${r.id}`, icon: FileText, text: `New Task: ${r.body || 'Task'}`,
+            time: r.createdAt ? format(new Date(r.createdAt), 'MMM d, h:mm a') : 'New',
+            color: 'text-emerald-500', bg: 'bg-emerald-50 dark:bg-emerald-500/10',
             url: r.mainTaskId ? `/tasks?openTask=${r.mainTaskId}` : undefined,
             priority: 2
           });
       } else {
           notifs.push({ 
-            id: `rem-${r.id}`, 
-            icon: isPast ? AlertCircle : Bell, 
+            id: `rem-${r.id}`, icon: isPast ? AlertCircle : Bell, 
             text: `Reminder: ${r.title}`, 
-            time: isPast ? 'Overdue' : r.remindAt.slice(0, 10), 
-            color: isPast ? 'text-rose-500' : 'text-indigo-500',
+            time: isPast ? 'Overdue' : format(remDate, 'MMM d, h:mm a'), 
+            color: isPast ? 'text-rose-500' : 'text-indigo-500', bg: isPast ? 'bg-rose-50 dark:bg-rose-500/10' : 'bg-indigo-50 dark:bg-indigo-500/10',
             url: r.subtaskId ? `/tasks?open=${r.subtaskId}` : r.mainTaskId ? `/tasks?openTask=${r.mainTaskId}` : undefined,
             priority: isPast ? 0 : 1
           });
       }
     });
 
-    // 2. Pending Approvals (Priority: 2)
+    // 2. Pending Approvals
     const currentUserId = currentUser?.id || useAuthStore.getState().user?.id;
-    
     leaves.filter(l => l.approvalStatus === 'Pending' && l.status !== 'Cancelled' && l.approvedById === currentUserId).forEach(l => {
-      notifs.push({ id: `leave-${l.id}`, icon: CalendarClock, text: `Leave Request: ${l.employeeName}`, time: l.startDate, color: 'text-amber-500', url: '/leaves', priority: 2 });
+      notifs.push({ id: `leave-${l.id}`, icon: CalendarClock, text: `Leave Request: ${l.employeeName}`, time: l.startDate, color: 'text-amber-600', bg: 'bg-amber-50 dark:bg-amber-500/10', url: '/leaves', priority: 2 });
     });
     salaryAdvances.filter(s => s.status === 'Pending' && s.approvedById === currentUserId).forEach(s => {
-      notifs.push({ id: `adv-${s.id}`, icon: Wallet, text: `Salary Advance: ${s.employeeName}`, time: s.requestDate, color: 'text-amber-500', url: '/salary-loans', priority: 2 });
+      notifs.push({ id: `adv-${s.id}`, icon: Wallet, text: `Salary Advance: ${s.employeeName}`, time: s.requestDate, color: 'text-amber-600', bg: 'bg-amber-50 dark:bg-amber-500/10', url: '/salary-loans', priority: 2 });
     });
     loans.filter(l => l.status === 'Pending' && l.approvedById === currentUserId).forEach(l => {
-      notifs.push({ id: `loan-${l.id}`, icon: Landmark, text: `Loan Request: ${l.employeeName}`, time: l.startDate, color: 'text-amber-500', url: '/salary-loans', priority: 2 });
+      notifs.push({ id: `loan-${l.id}`, icon: Landmark, text: `Loan Request: ${l.employeeName}`, time: l.startDate, color: 'text-amber-600', bg: 'bg-amber-50 dark:bg-amber-500/10', url: '/salary-loans', priority: 2 });
     });
 
-    // 3. Overdue Invoices (Priority: 1)
+    // 3. Finance
     invoices.filter(i => i.status === 'Overdue').forEach(i => {
-      notifs.push({ id: `inv-ov-${i.id}`, icon: FileText, text: `Overdue Invoice: ${i.invoiceNumber}`, time: i.dueDate, color: 'text-rose-600', url: '/client-accounts', priority: 1 });
+      notifs.push({ id: `inv-ov-${i.id}`, icon: FileText, text: `Overdue Invoice: ${i.invoiceNumber}`, time: i.dueDate, color: 'text-rose-600', bg: 'bg-rose-50 dark:bg-rose-500/10', url: '/client-accounts', priority: 1 });
     });
-
-    // 4. Quotations (Priority: 3)
     if (pendingInvoices.length > 0) {
-      notifs.push({ id: 'pending-inv', icon: FileText, text: `${pendingInvoices.length} Quotations to draft`, time: 'Now', color: 'text-blue-500', url: '/client-accounts', priority: 3 });
+      notifs.push({ id: 'pending-inv', icon: FileText, text: `${pendingInvoices.length} Quotations to draft`, time: 'Now', color: 'text-blue-500', bg: 'bg-blue-50 dark:bg-blue-500/10', url: '/client-accounts', priority: 3 });
     }
 
-    // 5. Expiring LASHMA (Priority: 2)
+    // 4. HR Alerts
     employees.filter(e => e.status === 'Active' && e.lashmaExpiryDate && isWithinDays(e.lashmaExpiryDate, 7)).forEach(e => {
-        notifs.push({ id: `lashma-${e.id}`, icon: ShieldCheck, text: `LASHMA Expiring: ${e.firstname} ${e.surname}`, time: e.lashmaExpiryDate!, color: 'text-amber-600', url: '/employees', priority: 2 });
+        notifs.push({ id: `lashma-${e.id}`, icon: ShieldCheck, text: `LASHMA Expiring: ${e.firstname} ${e.surname}`, time: e.lashmaExpiryDate!, color: 'text-amber-600', bg: 'bg-amber-50 dark:bg-amber-500/10', url: '/employees', priority: 2 });
     });
-
-    // 6. Comm Follow-ups (Priority: 2)
     commLogs.filter(c => c.followUpDate && !c.followUpDone && isPastOrToday(c.followUpDate)).forEach(c => {
-        notifs.push({ id: `comm-${c.id}`, icon: Clock, text: `Follow-up: ${c.subject || 'Communication'}`, time: c.followUpDate!, color: 'text-indigo-400', url: '/sites', priority: 2 });
+        notifs.push({ id: `comm-${c.id}`, icon: Clock, text: `Follow-up: ${c.subject || 'Communication'}`, time: c.followUpDate!, color: 'text-indigo-500', bg: 'bg-indigo-50 dark:bg-indigo-500/10', url: '/sites', priority: 2 });
     });
-
-    // 7. Site Endings (Priority: 2)
     sites.filter(s => s.status === 'Active' && s.endDate && isWithinDays(s.endDate, 7)).forEach(s => {
-        notifs.push({ id: `site-end-${s.id}`, icon: MapPin, text: `Site Ending Soon: ${s.name}`, time: s.endDate!, color: 'text-rose-400', url: '/sites', priority: 2 });
+        notifs.push({ id: `site-end-${s.id}`, icon: MapPin, text: `Site Ending Soon: ${s.name}`, time: s.endDate!, color: 'text-rose-500', bg: 'bg-rose-50 dark:bg-rose-500/10', url: '/sites', priority: 2 });
     });
-
-    // 8. Pending Evaluations (Priority: 3)
     evaluations.filter(e => e.status === 'Review').forEach(e => {
         const emp = employees.find(emp => emp.id === e.employeeId);
-        notifs.push({ id: `eval-${e.id}`, icon: Users, text: `Eval Review: ${emp ? emp.surname : 'Employee'}`, time: e.date, color: 'text-emerald-500', url: '/evaluations', priority: 3 });
+        notifs.push({ id: `eval-${e.id}`, icon: Users, text: `Eval Review: ${emp ? emp.surname : 'Employee'}`, time: e.date, color: 'text-emerald-500', bg: 'bg-emerald-50 dark:bg-emerald-500/10', url: '/evaluations', priority: 3 });
     });
-
-    // 9. Disciplinary Queries (Priority: 1)
     disciplinaryRecords.filter(d => d.workflowState === 'Reported' || d.workflowState === 'Query Issued').forEach(d => {
         const emp = employees.find(emp => emp.id === d.employeeId);
-        notifs.push({ id: `disc-${d.id}`, icon: ShieldCheck, text: `Disciplinary Action: ${emp ? emp.surname : 'Employee'}`, time: d.date, color: 'text-rose-500', url: '/performance-conduct', priority: 1 });
+        notifs.push({ id: `disc-${d.id}`, icon: ShieldCheck, text: `Disciplinary Action: ${emp ? emp.surname : 'Employee'}`, time: d.date, color: 'text-rose-500', bg: 'bg-rose-50 dark:bg-rose-500/10', url: '/performance-conduct', priority: 1 });
     });
-
-    // 10. Probation Ending (Priority: 3)
     employees.filter(e => e.status === 'Active' && e.startDate && e.probationPeriod).forEach(e => {
         const start = new Date(e.startDate);
         const end = new Date(start.getTime() + (e.probationPeriod! * 24 * 60 * 60 * 1000));
         const endStr = end.toISOString().split('T')[0];
         if (isWithinDays(endStr, 14)) { // Show 14 days before
-            notifs.push({ id: `prob-${e.id}`, icon: Users, text: `Probation Ending: ${e.firstname} ${e.surname}`, time: endStr, color: 'text-indigo-400', url: '/employees', priority: 3 });
+            notifs.push({ id: `prob-${e.id}`, icon: Users, text: `Probation Ending: ${e.firstname} ${e.surname}`, time: endStr, color: 'text-indigo-500', bg: 'bg-indigo-50 dark:bg-indigo-500/10', url: '/employees', priority: 3 });
         }
     });
 
-    // 11. Pending Onboarding (Priority: 4)
+    // 5. System
     const onboardingEmps = employees.filter(e => e.status === 'Onboarding');
     if (onboardingEmps.length > 0) {
-        notifs.push({ id: 'onboarding-counts', icon: UserPlus, text: `${onboardingEmps.length} staff currently onboarding`, time: 'Ongoing', color: 'text-emerald-500', url: '/onboarding', priority: 4 });
+        notifs.push({ id: 'onboarding-counts', icon: UserPlus, text: `${onboardingEmps.length} staff currently onboarding`, time: 'Ongoing', color: 'text-emerald-500', bg: 'bg-emerald-50 dark:bg-emerald-500/10', url: '/onboarding', priority: 4 });
     }
-
-    // 12. Recent Attendance (Info - Priority: 5)
     const dates = [...new Set(attendanceRecords.map((r) => r.date))].sort().reverse();
     if (dates.length > 0) {
       const latestDate = dates[0];
       const count = attendanceRecords.filter((r) => r.date === latestDate).length;
-      notifs.push({ id: `att-${latestDate}`, icon: CalendarClock, text: `${count} attendance records for ${latestDate}`, time: latestDate, color: 'text-slate-400', priority: 5 });
+      notifs.push({ id: `att-${latestDate}`, icon: CalendarClock, text: `${count} attendance records for ${latestDate}`, time: latestDate, color: 'text-slate-500', bg: 'bg-slate-100 dark:bg-slate-800', priority: 5 });
     }
 
-    // Sort by priority then time (roughly)
-    return notifs.sort((a, b) => a.priority - b.priority).slice(0, 15);
-  }, [employees, attendanceRecords, leaves, pendingInvoices, invoices, salaryAdvances, loans, sites, disciplinaryRecords, evaluations, commLogs, reminders]);
+    return notifs.sort((a, b) => a.priority - b.priority).filter(n => !dismissedNotifications.includes(n.id)).slice(0, 15);
+  }, [employees, attendanceRecords, leaves, pendingInvoices, invoices, salaryAdvances, loans, sites, disciplinaryRecords, evaluations, commLogs, reminders, dismissedNotifications]);
 }
 
 export function Header({ onMenuClick }: HeaderProps) {
@@ -238,11 +219,16 @@ export function Header({ onMenuClick }: HeaderProps) {
   const { signOut } = useAuth();
   const { updateReminder } = useAppData();
   const navigate = useNavigate();
-  const location = useLocation();
   const { setCurrentUser } = useUserStore();
   const currentUser = useUserStore((s) => s.getCurrentUser());
   const notifications = useNotifications();
   const { isDark } = useTheme();
+  const { 
+    updateCommLog, 
+    dismissedNotifications, 
+    dismissNotification 
+  } = useAppStore();
+  const location = useLocation();
   const { title, subtitle, headerButtons, showBackButton } = usePage();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -505,7 +491,18 @@ export function Header({ onMenuClick }: HeaderProps) {
 
         <StatusIndicator />
         <div className={`h-6 w-px hidden sm:block ${isDark ? 'bg-slate-700' : 'bg-slate-200'} mx-1`} />
-        
+
+        {/* Home Button */}
+        <button
+          onClick={() => navigate('/home')}
+          className={`h-8 w-8 rounded-lg flex items-center justify-center transition-colors ${
+            isDark ? 'text-slate-400 hover:bg-slate-800' : 'text-slate-500 hover:bg-slate-100'
+          }`}
+          title="Home"
+        >
+          <Home className="h-4 w-4" />
+        </button>
+
         {/* Notification Bell */}
         <div ref={notifRef} className="relative">
           <button
@@ -571,33 +568,46 @@ export function Header({ onMenuClick }: HeaderProps) {
                       >
                         {/* Priority Indicator */}
                         {n.priority <= 1 && (
-                          <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-rose-500" />
+                          <div className={`absolute left-0 top-0 bottom-0 w-0.5 ${n.priority === 0 ? 'bg-rose-500' : 'bg-amber-400'}`} />
                         )}
                         
-                        <div className={`h-8 w-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 ${
-                          isDark ? 'bg-slate-700/50' : 'bg-slate-100/80 shadow-sm'
-                        } ${n.color}`}>
+                        <div className={`h-8 w-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 ${n.bg} ${n.color}`}>
                           <n.icon className="h-4 w-4" />
                         </div>
 
-                        <div className="flex-1 min-w-0">
+                        <div className="flex-1 min-w-0 pr-6">
                           <div className="flex items-center justify-between gap-2">
-                            <p className={`text-[11px] font-bold uppercase tracking-wider opacity-60 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                            <p className={`text-[10px] font-bold uppercase tracking-wider ${n.priority === 0 ? 'text-rose-600' : n.priority === 1 ? 'text-amber-600' : 'text-slate-500'}`}>
                               {n.priority === 0 ? 'Urgent' : n.priority === 1 ? 'High Priority' : 'Attention'}
                             </p>
                             <p className="text-[10px] text-slate-400 font-medium whitespace-nowrap">
-                              {n.time.includes('-') ? formatDisplayDate(n.time) : n.time}
+                              {n.time.includes('-') && n.time.length <= 10 ? formatDisplayDate(n.time) : n.time}
                             </p>
                           </div>
-                          <p className={`text-[12px] leading-tight font-medium mt-0.5 ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>
+                          <p className={`text-xs leading-tight font-medium mt-1 line-clamp-2 ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>
                             {n.text}
                           </p>
                           {n.url && (
-                            <div className="mt-1.5 flex items-center gap-1 text-[10px] text-indigo-500 font-bold group-hover:translate-x-1 transition-transform">
-                              Take Action <ChevronRight className="h-2.5 w-2.5" />
+                            <div className="mt-1.5 flex items-center gap-1 text-[10px] text-indigo-500 font-bold group-hover:gap-2 transition-all">
+                              Take Action <ChevronRight className="h-3 w-3" />
                             </div>
                           )}
                         </div>
+
+                        {/* Hover Dismiss Button */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (n.id.startsWith('rem-')) {
+                              updateReminder(n.id.replace('rem-', ''), { isActive: false });
+                            }
+                            dismissNotification(n.id);
+                          }}
+                          className="absolute right-3 top-3 p-1.5 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
+                          title="Dismiss"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
                       </div>
                     ))}
                   </div>

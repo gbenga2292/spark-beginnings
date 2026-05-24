@@ -25,7 +25,7 @@ import { Invoice } from '@/src/store/appStore';
 import { ClientContactsPanel } from './ClientContactsPanel';
 import { TaskDetailSheet } from '@/src/components/tasks/TaskDetailSheet';
 import { AddSubtaskInline } from './Tasks/AddSubtaskInline';
-import { GlobalSearch } from '@/src/components/common/GlobalSearch';
+
 
 type SiteTab = 'financials' | 'operations' | 'maintenance' | 'comms' | 'tasks' | 'contacts';
 
@@ -163,7 +163,7 @@ export function Site360View({ site, clientSites, onSiteChange, onBack, onEditSit
 
   const invoicePaymentMap = useMemo(() => {
     const allSiteInvoices = invoices.filter(i => i.siteId === site.id || i.siteName?.trim() === site.name.trim()).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-    const allSitePayments = payments.filter(p => p.site?.trim() === site.name.trim() || p.client?.trim() === site.name.trim()).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    const allSitePayments = payments.filter(p => p.site?.trim() === site.name.trim() || p.client?.trim() === site.name.trim()).sort((a, b) => new Date(p.date).getTime() - new Date(b.date).getTime());
 
     let totalPaymentAvailable = allSitePayments.reduce((sum, p) => sum + (p.amount || 0), 0);
 
@@ -557,7 +557,6 @@ Answer site-specific questions using this context only. Be concise.`;
   // Header actions with Filters dropdown and Site Selector
   const headerActions = (
     <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2 w-full justify-end">
-      <GlobalSearch isDark={isDark} allClients={allClients} onSelectResult={handleSearchNavigation} />
       <div className="flex items-center gap-2">
       <div className="relative">
         <Button

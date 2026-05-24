@@ -28,19 +28,16 @@ export function StatusIndicator() {
             <button 
               onClick={() => setModalOpen(true)}
               className={`
-            relative flex items-center gap-1.5 px-2.5 py-1 rounded-full transition-all duration-200
+            relative flex items-center justify-center h-8 w-8 rounded-lg transition-all duration-200
             ${status === 'online' 
-              ? 'bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400 border border-emerald-500/20' 
+              ? 'bg-emerald-500/10 dark:bg-emerald-500/20 border border-emerald-500/20' 
               : status === 'unstable'
-              ? 'bg-amber-500/10 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400 border border-amber-500/20'
-              : 'bg-rose-500/10 text-rose-600 dark:bg-rose-500/20 dark:text-rose-400 border border-rose-500/20'
+              ? 'bg-amber-500/10 dark:bg-amber-500/20 border border-amber-500/20'
+              : 'bg-rose-500/10 dark:bg-rose-500/20 border border-rose-500/20'
             }
             hover:scale-105 active:scale-95
           `}>
-            <span className={`h-2 w-2 rounded-full ${dotColors[status]} ${status !== 'online' ? 'animate-pulse' : 'shadow-[0_0_8px_rgba(16,185,129,0.5)]'}`} />
-            <span className="hidden md:inline text-[10px] font-bold uppercase tracking-wider">
-              {status === 'online' ? 'Online' : status === 'unstable' ? 'Unstable' : 'Offline'}
-            </span>
+            <span className={`h-2.5 w-2.5 rounded-full ${dotColors[status]} ${status !== 'online' ? 'animate-pulse' : 'shadow-[0_0_8px_rgba(16,185,129,0.5)]'}`} />
           </button>
         </TooltipTrigger>
         <TooltipContent side="bottom" align="end" className="p-3 min-w-[140px] border-slate-200 dark:border-slate-700 shadow-xl">

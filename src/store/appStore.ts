@@ -683,6 +683,9 @@ interface AppState {
   consumableLogs: ConsumableUsageLog[];
   addConsumableLogs: (logs: ConsumableUsageLog[]) => void;
 
+  dismissedNotifications: string[];
+  dismissNotification: (id: string) => void;
+
   interviewCandidates: InterviewCandidate[];
   addInterviewCandidate: (candidate: InterviewCandidate) => void;
   updateInterviewCandidate: (id: string, updates: Partial<InterviewCandidate>) => void;
@@ -1459,11 +1462,19 @@ export const useAppStore = create<AppState>()(
       },
 
       // Consumables
-      addConsumableLogs: (logs) => {
-        set((s) => ({ consumableLogs: [...logs, ...s.consumableLogs] }));
-      },
+      consumableLogs: [],
+      addConsumableLogs: (logs) => set(s => ({ consumableLogs: [...s.consumableLogs, ...logs] })),
+
+      dismissedNotifications: [],
+      dismissNotification: (id) => set(s => {
+          if (!s.dismissedNotifications.includes(id)) {
+              return { dismissedNotifications: [...s.dismissedNotifications, id] };
+          }
+          return s;
+      }),
 
       // Interview Candidates
+      interviewCandidates: [],
       addInterviewCandidate: (candidate) => {
         set((s) => ({ interviewCandidates: [candidate, ...s.interviewCandidates] }));
         db.insertInterviewCandidate(candidate).catch(e => console.error('Failed to save candidate to DB:', e));
