@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import { useAppStore } from '@/src/store/appStore';
 import { cn } from '@/src/lib/utils';
 import { OperationalDay } from '@/src/types/operations';
+import { POSITION_HIERARCHY } from '@/src/lib/hierarchy';
 
 interface BulkMachineLogModalProps {
   isOpen: boolean;
@@ -22,7 +23,7 @@ interface BulkMachineLogModalProps {
 
 export function BulkMachineLogModal({ isOpen, onClose, siteId, siteName, machines, date }: BulkMachineLogModalProps) {
   const { logDailyActivity, dailyMachineLogs } = useOperations();
-  const { employees } = useAppStore();
+  const { employees, attendanceRecords } = useAppStore();
 
   const dewateringStaff = employees.filter(e => 
     (e.department === 'Dewatering' || e.department?.toLowerCase() === 'dewatering') && 
@@ -37,6 +38,104 @@ export function BulkMachineLogModal({ isOpen, onClose, siteId, siteName, machine
   const [maintenanceDetails, setMaintenanceDetails] = useState('');
   const [clientFeedback, setClientFeedback] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Reusable callback to find the auto supervisor for a specific date
+  const findAutoSupervisorForDate = (targetDate: string) => {
+    if (!targetDate || !siteName) return '';
+
+    // Get attendance records for this date and site
+    const siteRecords = attendanceRecords.filter(r => 
+      r.date === targetDate && 
+      ((r.day === 'Yes' && r.daySite === siteName) || 
+       (r.night === 'Yes' && r.nightSite === siteName))
+    );
+
+    if (siteRecords.length === 0) return '';
+
+    // Map to employees and filter to only include dewateringStaff
+    const dewateringStaffIds = new Set(dewateringStaff.map(s => s.id));
+    const dewateringStaffNames = new Set(dewateringStaff.map(s => `${s.firstname} ${s.surname}`.toUpperCase()));
+
+    const matchedStaff = siteRecords
+      .map(r => {
+        const emp = employees.find(e => 
+          e.id === r.staffId || 
+          `${e.firstname} ${e.surname}`.toUpperCase() === r.staffName.toUpperCase()
+        );
+        return { record: r, employee: emp };
+      })
+      .filter(x => 
+        x.employee && 
+        (dewateringStaffIds.has(x.employee.id) || 
+         dewateringStaffNames.has(`${x.employee.firstname} ${x.employee.surname}`.toUpperCase()))
+      );
+
+    if (matchedStaff.length === 0) return '';
+
+    // Helper to get shift priority (lower number = higher priority)
+    // Night shift takes priority
+    const getShiftPriority = (r: typeof attendanceRecords[0]) => {
+      if (r.night === 'Yes' && r.nightSite === siteName) return 1;
+      if (r.day === 'Yes' && r.daySite === siteName) return 2;
+      return 3;
+    };
+
+    // Helper to normalize position index
+    const getNormalizedPositionIndex = (pos?: string) => {
+      if (!pos) return 999;
+      let normalized = pos;
+      if (normalized === 'Assistant Site Supervisor') {
+        normalized = 'Assistant Supervisor';
+      }
+      const idx = POSITION_HIERARCHY.indexOf(normalized);
+      return idx === -1 ? 999 : idx;
+    };
+
+    // Sort staff
+    const sorted = [...matchedStaff].sort((a, b) => {
+      // 1. Shift Priority
+      const shiftA = getShiftPriority(a.record);
+      const shiftB = getShiftPriority(b.record);
+      if (shiftA !== shiftB) return shiftA - shiftB;
+
+      // 2. Position Hierarchy
+      const posA = getNormalizedPositionIndex(a.employee?.position || a.record.position);
+      const posB = getNormalizedPositionIndex(b.employee?.position || b.record.position);
+      if (posA !== posB) return posA - posB;
+
+      // 3. Start Date Seniority
+      const dateA = a.employee?.startDate ? new Date(a.employee.startDate).getTime() : Infinity;
+      const dateB = b.employee?.startDate ? new Date(b.employee.startDate).getTime() : Infinity;
+      return dateA - dateB;
+    });
+
+    const bestMatch = sorted[0];
+    if (bestMatch && bestMatch.employee) {
+      return `${bestMatch.employee.firstname} ${bestMatch.employee.surname}`;
+    }
+    return '';
+  };
+
+  // Auto-sync supervisor when startDate or attendanceRecords changes
+  useEffect(() => {
+    if (isOpen && startDate) {
+      const autoSelected = findAutoSupervisorForDate(startDate);
+      if (autoSelected) {
+        setSupervisorOnSite(autoSelected);
+      }
+    }
+  }, [startDate, isOpen, attendanceRecords]);
+
+  const handleSyncSupervisor = () => {
+    const autoSelected = findAutoSupervisorForDate(startDate);
+    if (autoSelected) {
+      setSupervisorOnSite(autoSelected);
+      toast.success(`Supervisor synced from attendance: ${autoSelected}`);
+    } else {
+      const displayDate = new Date(startDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+      toast.info(`No attendance record found for ${displayDate} at "${siteName}".`);
+    }
+  };
 
   const areAllNoDay = machines.length > 0 && machines.every(m => machineData[m.id]?.operationalDay === 'none');
 
@@ -80,7 +179,8 @@ export function BulkMachineLogModal({ isOpen, onClose, siteId, siteName, machine
         initData[m.id] = { operationalDay: 'full', dieselUsage: '' };
       });
       setMachineData(initData);
-      setSupervisorOnSite('');
+      const autoSelected = findAutoSupervisorForDate(date);
+      setSupervisorOnSite(autoSelected || '');
       setIssuesOnSite('');
       setMaintenanceDetails('');
       setClientFeedback('');
@@ -231,10 +331,19 @@ export function BulkMachineLogModal({ isOpen, onClose, siteId, siteName, machine
             
             {!areAllNoDay && (
               <div className="space-y-2">
-                <Label className="text-xs font-bold text-slate-700 dark:text-slate-300">Supervisor on Site</Label>
+                <div className="flex justify-between items-center">
+                  <Label className="text-xs font-bold text-slate-700 dark:text-slate-300">Supervisor on Site</Label>
+                  <button
+                    type="button"
+                    onClick={handleSyncSupervisor}
+                    className="text-[10px] font-bold text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 flex items-center gap-1 transition-colors bg-blue-50 dark:bg-blue-900/20 px-2 py-0.5 rounded"
+                  >
+                    <Clock className="h-3 w-3 animate-pulse" /> Sync with Attendance
+                  </button>
+                </div>
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                  <select value={supervisorOnSite} onChange={(e) => setSupervisorOnSite(e.target.value)} className="w-full h-10 pl-9 pr-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md text-sm font-medium focus:ring-2 focus:ring-indigo-500 transition-all appearance-none">
+                  <select value={supervisorOnSite} onChange={(e) => setSupervisorOnSite(e.target.value)} className="w-full h-10 pl-9 pr-12 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md text-sm font-medium focus:ring-2 focus:ring-indigo-500 transition-all appearance-none">
                     <option value="">Select Supervisor...</option>
                     {dewateringStaff.map(staff => <option key={staff.id} value={`${staff.firstname} ${staff.surname}`}>{staff.firstname} {staff.surname}</option>)}
                   </select>

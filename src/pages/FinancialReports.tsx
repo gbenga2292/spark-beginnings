@@ -446,12 +446,28 @@ export function FinancialReports() {
       });
     });
 
+    const filterY = filterYear === "All" ? null : parseInt(filterYear, 10);
+    const filterM = filterMonth === "All" ? null : parseInt(filterMonth, 10);
+    
+    const isMatch = (dateStr: string | undefined) => {
+      if (!dateStr) return false;
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return false;
+      if (filterY && d.getFullYear() !== filterY) return false;
+      if (filterM && (d.getMonth() + 1) !== filterM) return false;
+      return true;
+    };
+
     let outstandingLoans = 0;
-    salaryAdvances.forEach(a => { if (a.status === 'Approved') outstandingLoans += a.amount; });
-    loans.forEach(l => { if (l.status === 'Active') outstandingLoans += l.remainingBalance; });
+    salaryAdvances.forEach(a => { 
+      if (a.status === 'Approved' && (!filterY && !filterM ? true : isMatch(a.requestDate))) outstandingLoans += a.amount; 
+    });
+    loans.forEach(l => { 
+      if (l.status === 'Active' && (!filterY && !filterM ? true : isMatch(l.startDate))) outstandingLoans += l.remainingBalance; 
+    });
 
     return { totalGrossExposure, totalStatutory, totalOvertimeCost, outstandingLoans };
-  }, [proratedMonthsPayroll, MONTHS, filterMonth, salaryAdvances, loans]);
+  }, [proratedMonthsPayroll, MONTHS, filterMonth, filterYear, salaryAdvances, loans]);
 
   // Annual Payroll & Overtime Trend
   const payrollChartData = useMemo(() => {
@@ -2710,7 +2726,7 @@ export function FinancialReports() {
         </div>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-3">
+      <div className="grid gap-6 md:grid-cols-2">
         <Card className="bg-gradient-to-br from-slate-900 to-indigo-900 text-white border-0 shadow-xl overflow-hidden relative">
           <div className="absolute right-0 top-0 opacity-10"><NairaSign className="w-32 h-32 -mt-4 -mr-4" /></div>
           <CardHeader className="pb-2 relative z-10">
@@ -2732,17 +2748,6 @@ export function FinancialReports() {
           <CardContent>
             <div className="text-3xl font-bold text-slate-900 mb-1">₦{fm(payrollStats.totalStatutory)}</div>
             <p className="text-xs text-slate-500 flex items-center mt-1">Projected PAYE, Pension & NSITF.</p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-white border-slate-200 shadow-sm relative overflow-hidden">
-          <div className="absolute right-0 top-0 opacity-[0.03] text-amber-500"><CreditCard className="w-32 h-32 -mt-4 -mr-4" /></div>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-slate-500 uppercase tracking-widest">Active Outstanding Adv.</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-slate-900 mb-1">₦{fm(payrollStats.outstandingLoans)}</div>
-            <p className="text-xs text-slate-500 flex items-center mt-1"><TrendingUp className="h-3 w-3 mr-1 text-slate-400" /> Capital returning to company.</p>
           </CardContent>
         </Card>
       </div>

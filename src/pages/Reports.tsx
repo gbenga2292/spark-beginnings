@@ -1699,7 +1699,7 @@ export function Reports() {
               {/* Footer hint */}
               <div className="px-4 py-2 bg-slate-50 border-t border-slate-200 flex items-center gap-4 text-xs text-slate-400">
                 <span>Hover over a cell for details.</span>
-                <span className="ml-auto">Letters = first letter of site name Â· <strong>A</strong> = Absent Â· <strong>N</strong> = Night shift Â· Shaded columns = weekends</span>
+                <span className="ml-auto">Letters = first letter of site name · <strong>A</strong> = Absent · <strong>N</strong> = Night shift · Shaded columns = weekends</span>
               </div>
             </div>
           )}

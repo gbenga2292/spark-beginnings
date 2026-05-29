@@ -1,5 +1,6 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Capacitor, CapacitorHttp } from '@capacitor/core';
+import { Browser } from '@capacitor/browser';
 import { cn, IS_LIMITED_WEB_WEB } from '@/src/lib/utils';
 import { prefetchRoute } from '@/src/lib/routePrefetch';
 import { useUserStore, UserPrivileges } from '@/src/store/userStore';
@@ -50,7 +51,8 @@ import {
   ArrowUpCircle,
   RefreshCw,
   FolderOpen,
-  TrendingUp
+  TrendingUp,
+  HardHat
 } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { NairaSign } from '@/src/components/ui/naira-sign';
@@ -109,6 +111,16 @@ const navigation: NavCategory[] = [
     standaloneHref: '/client-360',
     items: [
       { name: 'Client 360', href: '/client-360', icon: Sparkles, privKey: 'sites', privField: 'canView' },
+    ],
+  },
+  // ── Simulator — standalone direct link ──────────────────────────────────
+  {
+    name: 'Simulator',
+    icon: HardHat,
+    standalone: true,
+    standaloneHref: '/operations/simulator',
+    items: [
+      { name: 'Simulator', href: '/operations/simulator', icon: HardHat, privKey: 'opsSites', privField: 'canView' },
     ],
   },
   // ── Tasks ────────────────────────────────────────────────────────
@@ -241,7 +253,7 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
   const isElectron = !!(window as any).electronAPI?.isElectron;
 
   // ── Android Auto-Update Logic (mobile-only) ────────────────────────────
-  const CURRENT_VERSION = '1.6.3'; // Matches package.json
+  const CURRENT_VERSION = '1.6.4'; // Matches package.json
   const UPDATE_SERVER_URL = import.meta.env.VITE_UPDATE_SERVER_URL || 'https://dewaterconstruct.com/app-updates';
   
   const [updateInfo, setUpdateInfo] = useState<{ version: string; url: string; notes: string } | null>(null);
@@ -267,7 +279,7 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
 
       // Trigger direct download without opening the Android external file browser
       // Using the short-lived signed URL protects the private APK from the public web
-      window.location.href = finalUrl;
+      await Browser.open({ url: finalUrl });
       setIsUpdateModalOpen(false);
       toast.success('Download started! Track progress in your notification bar, then tap the APK to install.');
     } catch (err: any) {
@@ -467,7 +479,7 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
             {navigation.map((category) => {
               // ── Web Version Category Filtering ────────────────────────────────
               if (IS_LIMITED_WEB_WEB) {
-                const allowedCategories = ['Dashboard', 'Client 360', 'Tasks', 'Account', 'Comms & Journals'];
+                const allowedCategories = ['Dashboard', 'Client 360', 'Simulator', 'Tasks', 'Account', 'Comms & Journals'];
                 if (!allowedCategories.includes(category.name)) return null;
               }
 

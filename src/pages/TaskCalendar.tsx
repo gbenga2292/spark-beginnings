@@ -485,7 +485,7 @@ export default function CalendarPage({ onNavigate, showCompleted: externalShowCo
                           </p>
                           <p className="text-[10px] sm:text-[11px] opacity-80">
                             {format(evt.time, 'h:mm a')}
-                            {evt.body && ` Â· ${evt.body}`}
+                            {evt.body && ` · ${evt.body}`}
                           </p>
                         </div>
                       ))}

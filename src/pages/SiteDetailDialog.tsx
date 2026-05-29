@@ -122,7 +122,7 @@ export function SiteDetailDialog({ site, filterMonth, filterYear, onClose, onEdi
     };
   }, [site, filterMonth, filterYear, invoices, payments, ledgerEntries, dailyMachineLogs, maintenanceAssets, maintenanceSessions, mainTasks, subtasks, commLogs, clientContacts]);
 
-  const tabs: { id: SiteTab; label: string; icon: React.ElementType; count?: number }[] = [
+  const tabs: { id: SiteTab; label: string; icon: any; count?: number }[] = [
     { id: 'financials', label: 'Financials', icon: DollarSign },
     { id: 'operations', label: 'Operations', icon: Activity, count: data.machineLogs.length },
     { id: 'maintenance', label: 'Maintenance', icon: Wrench, count: data.siteMaintAssets.length },

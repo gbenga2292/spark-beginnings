@@ -769,7 +769,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         // Intercept 'completed' -> 'pending_approval' ONLY if requiresApproval is set AND not bypassed by an approver
         if (status === 'completed' && !bypassApproval && (existing?.requiresApproval || (existing as any)?.requires_approval)) {
             finalStatus = 'pending_approval';
-            updatePayload.pending_approval_since = now;
+            updatePayload.pendingApprovalSince = now;
         } else if (status === 'completed') {
             updatePayload.completed_at = now;
         }
@@ -826,7 +826,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
     const approveSubtask = useCallback(async (id: string, userId?: string, note?: string) => {
         // Update task itself
         const now = new Date().toISOString();
-        const { data, error } = await supabase.from('subtasks').update({ status: 'completed', approved_by: userId || user?.id, completed_at: now }).eq('id', id).select().single();
+        const { data, error } = await supabase.from('subtasks').update({ status: 'completed', approvedBy: userId || user?.id, completed_at: now }).eq('id', id).select().single();
         if (error) {
             console.error('approveSubtask error:', error);
             toast.error('Failed to approve task.');
@@ -1011,7 +1011,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
 
     const rejectSubtask = useCallback(async (id: string, _userId?: string, note?: string) => {
         // Update task itself
-        const { data, error } = await supabase.from('subtasks').update({ status: 'in_progress', rejected_at: new Date().toISOString() }).eq('id', id).select().single();
+        const { data, error } = await supabase.from('subtasks').update({ status: 'in_progress', rejectedAt: new Date().toISOString() }).eq('id', id).select().single();
         if (error) {
             console.error('rejectSubtask error:', error);
             toast.error('Failed to reject task.');

@@ -238,7 +238,7 @@ export function Header({ onMenuClick }: HeaderProps) {
   const [mobileOverflowOpen, setMobileOverflowOpen] = useState(false);
   const [checkingUpdate, setCheckingUpdate] = useState(false);
 
-  const CURRENT_VERSION = '1.6.3'; // Matches package.json
+  const CURRENT_VERSION = '1.6.4'; // Matches package.json
   const UPDATE_SERVER_URL = import.meta.env.VITE_UPDATE_SERVER_URL || 'https://dewaterconstruct.com/app-updates';
 
   // ── Platform Detection ─────────────────────────────────────────────────

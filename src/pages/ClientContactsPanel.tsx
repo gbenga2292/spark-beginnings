@@ -10,6 +10,7 @@ import { toast } from '../components/ui/toast';
 interface Props {
   clientName: string;
   onClose: () => void;
+  inline?: boolean;
 }
 
 const EMPTY_CONTACT = (): Omit<ClientContact, 'id' | 'createdAt' | 'updatedAt'> => ({
@@ -115,7 +116,7 @@ const ContactForm = ({ draft, setDraft, isDark, clientSites, onSave, onCancel, t
   );
 };
 
-export function ClientContactsPanel({ clientName, onClose }: Props) {
+export function ClientContactsPanel({ clientName, onClose, inline = false }: Props) {
   const { isDark } = useTheme();
   const contacts = useAppStore(s => s.clientContacts);
   const sites = useAppStore(s => s.sites);
@@ -159,12 +160,109 @@ export function ClientContactsPanel({ clientName, onClose }: Props) {
     }
   };
 
-  const overlayBg = 'fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4';
-  const cardCls = cn('relative w-full max-w-2xl rounded-2xl border shadow-2xl overflow-hidden flex flex-col max-h-[90vh]', isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200');
+  const cardCls = cn(
+    'relative w-full rounded-2xl border overflow-hidden flex flex-col',
+    inline ? 'shadow-none border-0 max-h-full' : 'max-w-2xl shadow-2xl max-h-[90vh]',
+    isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'
+  );
 
+  if (inline) {
+    return (
+      <div className={cardCls}>
+        {/* Header */}
+        <div className={cn('flex items-center justify-between px-5 py-4 border-b flex-shrink-0', isDark ? 'border-slate-700' : 'border-slate-100')}>
+          <div>
+            <h2 className={cn('text-base font-semibold flex items-center gap-2', isDark ? 'text-slate-100' : 'text-slate-900')}>
+              <UserCheck className="w-4 h-4 text-indigo-500" />
+              Client Contacts — {clientName}
+            </h2>
+            <p className={cn('text-xs mt-0.5', isDark ? 'text-slate-400' : 'text-slate-500')}>
+              Contacts auto-saved from External Comm Logs. Edit details here; changes update all logs.
+            </p>
+          </div>
+          <button onClick={onClose} className={cn('p-1.5 rounded-lg transition-colors', isDark ? 'text-slate-500 hover:bg-slate-800' : 'text-slate-400 hover:bg-slate-100')}>
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3 style-scroll">
+          {/* Add new */}
+          {!showAdd && editingId === null && (
+            <Button onClick={() => { setShowAdd(true); setDraft(EMPTY_CONTACT()); }} variant="outline" className={cn('w-full gap-2 h-9 text-xs border-dashed', isDark ? 'border-slate-600 text-slate-400 hover:bg-slate-800' : 'border-slate-300 text-slate-500 hover:bg-slate-50')}>
+              <Plus className="w-3.5 h-3.5" /> Add Contact
+            </Button>
+          )}
+          {showAdd && <ContactForm draft={draft} setDraft={setDraft} isDark={isDark} clientSites={clientSites} onSave={handleAdd} onCancel={() => setShowAdd(false)} toggleSite={toggleSite} />}
+
+          {/* Contact list */}
+          {clientContacts.length === 0 && !showAdd && (
+            <div className="py-10 text-center">
+              <UserCheck className="w-10 h-10 mx-auto text-slate-300 mb-3" />
+              <p className={cn('text-sm', isDark ? 'text-slate-400' : 'text-slate-500')}>No contacts yet.</p>
+              <p className={cn('text-xs mt-1', isDark ? 'text-slate-500' : 'text-slate-400')}>They'll appear here when you log External Communications with a Contact Person.</p>
+            </div>
+          )}
+
+          {clientContacts.map(contact => (
+            <div key={contact.id}>
+              {editingId === contact.id ? (
+                <ContactForm draft={draft} setDraft={setDraft} isDark={isDark} clientSites={clientSites} onSave={saveEdit} onCancel={() => setEditingId(null)} toggleSite={toggleSite} />
+              ) : (
+                <div className={cn('rounded-xl border p-4 transition-all', isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200', !contact.isActive && 'opacity-60')}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0 space-y-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className={cn('font-semibold text-sm', isDark ? 'text-slate-100' : 'text-slate-800')}>{contact.name}</span>
+                        <span className={cn('text-[10px] px-2 py-0.5 rounded-full font-bold border', contact.isActive ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-red-50 text-red-600 border-red-200')}>
+                          {contact.isActive ? 'Active' : 'Inactive'}
+                        </span>
+                      </div>
+                      <CardRow icon={<Briefcase className="w-3 h-3 shrink-0" />} value={contact.position} />
+                      <CardRow icon={<Phone className="w-3 h-3 shrink-0" />} value={contact.phone} />
+                      <CardRow icon={<Mail className="w-3 h-3 shrink-0" />} value={contact.email} />
+                      <CardRow icon={<FileText className="w-3 h-3 shrink-0" />} value={contact.note} />
+                      {(contact.siteNames?.length ?? 0) > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {contact.siteNames!.map((s, i) => (
+                            <span key={i} className={cn('text-[10px] px-1.5 py-0.5 rounded font-medium', isDark ? 'bg-indigo-900/40 text-indigo-300' : 'bg-indigo-50 text-indigo-700')}>
+                              📍 {s}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex gap-1 shrink-0">
+                      <button onClick={() => startEdit(contact)} className={cn('p-1.5 rounded-lg transition-colors', isDark ? 'text-slate-400 hover:bg-slate-700 hover:text-indigo-400' : 'text-slate-400 hover:bg-slate-100 hover:text-indigo-600')} title="Edit">
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => { updateClientContact(contact.id, { isActive: !contact.isActive }); toast.success(contact.isActive ? 'Marked inactive' : 'Marked active'); }}
+                        className={cn('p-1.5 rounded-lg transition-colors', isDark ? 'text-slate-400 hover:bg-slate-700' : 'text-slate-400 hover:bg-slate-100')}
+                        title={contact.isActive ? 'Mark inactive' : 'Mark active'}
+                      >
+                        {contact.isActive ? <XCircle className="w-3.5 h-3.5" /> : <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />}
+                      </button>
+                      <button
+                        onClick={async () => { deleteClientContact(contact.id); toast.success('Contact removed'); }}
+                        className={cn('p-1.5 rounded-lg transition-colors', isDark ? 'text-slate-400 hover:bg-red-900/30 hover:text-red-400' : 'text-slate-400 hover:bg-red-50 hover:text-red-600')}
+                        title="Delete"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className={overlayBg} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div className={cardCls}>
         {/* Header */}
         <div className={cn('flex items-center justify-between px-5 py-4 border-b flex-shrink-0', isDark ? 'border-slate-700' : 'border-slate-100')}>

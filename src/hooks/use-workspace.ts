@@ -1,4 +1,4 @@
-import { useAppData } from '../contexts/AppDataContext';
+import { useAppData } from '@/src/contexts/AppDataContext';
 
 export function useWorkspace() {
     const { mainTasks, subtasks, users, workspaces } = useAppData();

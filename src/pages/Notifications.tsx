@@ -322,7 +322,7 @@ export function NotificationsPage() {
                           {n.time.includes('-') ? formatDisplayDate(n.time) : n.time}
                         </span>
                         <button
-                          onClick={e => handleDismiss(n, e)}
+                          onClick={e => handleDismiss(n.id, e)}
                           className="opacity-0 group-hover:opacity-100 p-1 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all"
                           title="Dismiss"
                         >

@@ -681,7 +681,7 @@ export function DailyJournal() {
         if (y > H - 40) { doc.addPage(); y = 30; }
 
         doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(99, 102, 241);
-        doc.text(`Session ${ji + 1}  Â·  ${journal.loggedBy}${journal.createdAt ? '  ' + format(new Date(journal.createdAt), 'HH:mm') : ''}`, 14, y);
+        doc.text(`Session ${ji + 1}  ·  ${journal.loggedBy}${journal.createdAt ? '  ' + format(new Date(journal.createdAt), 'HH:mm') : ''}`, 14, y);
         y += 3; doc.setDrawColor(220, 220, 240); doc.setLineWidth(0.1); doc.line(14, y, W - 14, y); y += 7;
 
         jEntries.forEach(entry => {
@@ -721,7 +721,7 @@ export function DailyJournal() {
 
       // Footer
       doc.setFontSize(7); doc.setFont('helvetica', 'italic'); doc.setTextColor(180, 180, 200);
-      doc.text(`Page ${idx + 1} Â· Dewatering Construction Etc Limited Â· Generated ${format(new Date(), 'PPP')}`, W / 2, H - 10, { align: 'center' });
+      doc.text(`Page ${idx + 1} · Dewatering Construction Etc Limited · Generated ${format(new Date(), 'PPP')}`, W / 2, H - 10, { align: 'center' });
     });
 
     return doc;
@@ -1006,7 +1006,7 @@ export function DailyJournal() {
           <DialogFooter className="px-4 sm:px-6 py-4 border-t border-border bg-slate-50 dark:bg-slate-900 shrink-0 flex-col sm:flex-row gap-3 sm:justify-end pb-safe">
             <Button variant="outline" onClick={() => setIsModalOpen(false)} className="h-11 sm:h-10 w-full sm:w-auto font-semibold">Cancel</Button>
             <Button onClick={handleSave} className={cn("h-11 sm:h-10 w-full sm:w-auto px-8 text-white font-bold shadow-md", showPublishReminder ? "bg-amber-500 hover:bg-amber-600 animate-pulse" : "bg-blue-600 hover:bg-blue-700")}>
-              {showPublishReminder ? 'âš ï¸ Publish Log' : 'Publish Log'}
+              {showPublishReminder ? '\u26a0\ufe0f Publish Log' : 'Publish Log'}
             </Button>
           </DialogFooter>
         </DialogContent>

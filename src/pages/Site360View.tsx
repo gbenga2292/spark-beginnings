@@ -75,7 +75,6 @@ export function Site360View({ site, clientSites, onSiteChange, onBack, onEditSit
 
   const [activeTab, setActiveTab] = useState<SiteTab>('financials');
   const [showFilters, setShowFilters] = useState(false);
-  const [showContactsPanel, setShowContactsPanel] = useState(false);
   const [isContactsCollapsed, setIsContactsCollapsed] = useState(false);
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   const [openSubtaskId, setOpenSubtaskId] = useState<string | null>(null);
@@ -99,6 +98,14 @@ export function Site360View({ site, clientSites, onSiteChange, onBack, onEditSit
   const [chatInput, setChatInput] = useState('');
   const [isGeneratingBrief, setIsGeneratingBrief] = useState(false);
   const [isChatCollapsed, setIsChatCollapsed] = useState(true);
+  const [isSiteInfoCollapsed, setIsSiteInfoCollapsed] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 1024);
+
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 1024);
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, []);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -163,7 +170,7 @@ export function Site360View({ site, clientSites, onSiteChange, onBack, onEditSit
 
   const invoicePaymentMap = useMemo(() => {
     const allSiteInvoices = invoices.filter(i => i.siteId === site.id || i.siteName?.trim() === site.name.trim()).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-    const allSitePayments = payments.filter(p => p.site?.trim() === site.name.trim() || p.client?.trim() === site.name.trim()).sort((a, b) => new Date(p.date).getTime() - new Date(b.date).getTime());
+    const allSitePayments = payments.filter(p => p.site?.trim() === site.name.trim() || p.client?.trim() === site.name.trim()).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
     let totalPaymentAvailable = allSitePayments.reduce((sum, p) => sum + (p.amount || 0), 0);
 
@@ -455,45 +462,46 @@ export function Site360View({ site, clientSites, onSiteChange, onBack, onEditSit
       (l.siteId === site.id || l.siteName?.trim() === site.name.trim()) && isWithinFilter(l.date)
     ).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-    // 1. Get contacts registered under this client that are linked to this site
-    const registeredContacts = clientContacts.filter(c =>
-      c.clientName?.trim().toLowerCase() === (site.client || site.name).trim().toLowerCase() &&
-      (c.siteIds?.includes(site.id) || c.siteNames?.includes(site.name))
+    // 1. All contacts registered under this client (matches ClientContactsPanel)
+    const allClientContacts = clientContacts.filter(c =>
+      c.clientName?.trim().toLowerCase() === (site.client || site.name).trim().toLowerCase()
     );
 
-    // 2. Extract any other contact names mentioned in this site's past communication logs
-    const pastCommNames = Array.from(new Set(siteComms.map(l => l.contactPerson).filter(Boolean)));
+    // 2. Extract any contact names from this site's comm logs not already in the registered list
+    const registeredNames = new Set(allClientContacts.map(c => c.name.trim().toLowerCase()));
+    const pastCommNames = Array.from(new Set(siteComms.map(l => l.contactPerson).filter(Boolean)))
+      .filter(name => !registeredNames.has(name.trim().toLowerCase()));
 
-    // 3. Merge them uniquely
-    const mergedContactsMap = new Map<string, { id: string; name: string; position?: string; phone?: string; email?: string }>();
-
-    // Add registered contacts first
-    registeredContacts.forEach(c => {
-      mergedContactsMap.set(c.name.trim().toLowerCase(), {
+    // 3. Build final list: registered contacts first, then unregistered past-comm contacts
+    const siteContacts: {
+      id: string; name: string; position?: string; phone?: string; email?: string;
+      note?: string; isActive?: boolean; siteIds?: string[]; siteNames?: string[]; isRegistered: boolean;
+    }[] = [
+      ...allClientContacts.map(c => ({
         id: c.id,
         name: c.name,
         position: c.position,
         phone: c.phone,
-        email: c.email
-      });
-    });
-
-    // Add past communication contacts if not already present
-    pastCommNames.forEach((name, idx) => {
-      const trimmed = name.trim();
-      const lower = trimmed.toLowerCase();
-      if (!mergedContactsMap.has(lower)) {
-        mergedContactsMap.set(lower, {
-          id: `past-comm-${idx}`,
-          name: trimmed,
-          position: 'Past Contact',
-          phone: undefined,
-          email: undefined
-        });
-      }
-    });
-
-    const siteContacts = Array.from(mergedContactsMap.values());
+        email: c.email,
+        note: c.note,
+        isActive: c.isActive,
+        siteIds: c.siteIds,
+        siteNames: c.siteNames,
+        isRegistered: true,
+      })),
+      ...pastCommNames.map((name, idx) => ({
+        id: `past-comm-${idx}`,
+        name: name.trim(),
+        position: 'Past Comm Contact',
+        phone: undefined,
+        email: undefined,
+        note: undefined,
+        isActive: true,
+        siteIds: [],
+        siteNames: [],
+        isRegistered: false,
+      })),
+    ];
 
     const alerts: { title: string; type: 'warning' | 'danger' }[] = [];
     if (siteMaintAssets.some(a => a.status === 'overdue')) alerts.push({ title: 'Overdue maintenance on one or more assets', type: 'danger' });
@@ -556,57 +564,58 @@ Answer site-specific questions using this context only. Be concise.`;
 
   // Header actions with Filters dropdown and Site Selector
   const headerActions = (
-    <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2 w-full justify-end">
-      <div className="flex items-center gap-2">
-      <div className="relative">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setShowFilters(!showFilters)}
-          className={cn("h-8 w-8 p-0 flex items-center justify-center relative shrink-0", isDark ? "border-slate-700 hover:bg-slate-800 text-slate-300" : "border-slate-300 hover:bg-slate-100 text-slate-700")}
-        >
-          <Filter className="w-3.5 h-3.5" />
-          {(filterMonth !== 'all' || filterYear !== 'all') && (
-            <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-indigo-500 rounded-full border-2 border-white dark:border-slate-950" />
-          )}
-        </Button>
-
-        {showFilters && (
-          <div className={cn("absolute right-0 top-full mt-2 p-4 rounded-2xl border shadow-xl z-50 flex flex-col gap-3 w-56", isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-200")}>
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Month</label>
-              <select value={filterMonth} onChange={e => { setFilterMonth(e.target.value); setShowFilters(false); }} className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}>
-                <option value="all">All Months</option>
-                {months.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-              </select>
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Year</label>
-              <select value={filterYear} onChange={e => { setFilterYear(e.target.value); setShowFilters(false); }} className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}>
-                <option value="all">All Years</option>
-                {years.map(y => <option key={y} value={y}>{y}</option>)}
-              </select>
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div className={cn('flex items-center gap-1.5 px-2 py-1 h-8 rounded-lg border shadow-sm transition-colors', isDark ? 'bg-slate-900 border-slate-700 hover:border-indigo-500' : 'bg-white border-slate-200 hover:border-indigo-300')}>
+    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full justify-end">
+      {/* Site Selector - Order First on Mobile */}
+      <div className={cn('flex items-center gap-1.5 px-2 py-1 h-8 rounded-lg border shadow-sm transition-colors order-first sm:order-last w-full sm:w-auto', isDark ? 'bg-slate-900 border-slate-700 hover:border-indigo-500' : 'bg-white border-slate-200 hover:border-indigo-300')}>
         <Building2 className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-        <div className="relative flex items-center">
+        <div className="relative flex items-center w-full">
           <select
             value={site.id}
             onChange={e => {
               const selected = clientSites.find(s => s.id === e.target.value);
               if (selected) onSiteChange(selected);
             }}
-            className={cn('appearance-none bg-transparent font-bold text-xs pr-5 focus:outline-none cursor-pointer max-w-[120px] sm:max-w-[150px] truncate', isDark ? 'text-white' : 'text-slate-900')}
+            className={cn('appearance-none bg-transparent font-bold text-xs pr-5 focus:outline-none cursor-pointer w-full sm:max-w-[150px] truncate', isDark ? 'text-white' : 'text-slate-900')}
           >
             {clientSites.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
           <ChevronDown className="w-3.5 h-3.5 absolute right-0 pointer-events-none text-slate-400" />
         </div>
       </div>
+
+      <div className="flex items-center gap-2 justify-end">
+        <div className="relative">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowFilters(!showFilters)}
+            className={cn("h-8 w-8 p-0 flex items-center justify-center relative shrink-0", isDark ? "border-slate-700 hover:bg-slate-800 text-slate-300" : "border-slate-300 hover:bg-slate-100 text-slate-700")}
+          >
+            <Filter className="w-3.5 h-3.5" />
+            {(filterMonth !== 'all' || filterYear !== 'all') && (
+              <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-indigo-500 rounded-full border-2 border-white dark:border-slate-950" />
+            )}
+          </Button>
+
+          {showFilters && (
+            <div className={cn("absolute right-0 top-full mt-2 p-4 rounded-2xl border shadow-xl z-50 flex flex-col gap-3 w-56", isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-200")}>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Month</label>
+                <select value={filterMonth} onChange={e => { setFilterMonth(e.target.value); setShowFilters(false); }} className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}>
+                  <option value="all">All Months</option>
+                  {months.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                </select>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Year</label>
+                <select value={filterYear} onChange={e => { setFilterYear(e.target.value); setShowFilters(false); }} className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}>
+                  <option value="all">All Years</option>
+                  {years.map(y => <option key={y} value={y}>{y}</option>)}
+                </select>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -783,14 +792,23 @@ Answer site-specific questions using this context only. Be concise.`;
               currentUser?.privileges?.sites?.canViewDecisionIntelligence ? 'lg:col-span-2' : 'lg:col-span-5',
               'p-5 rounded-sm border shadow-sm flex flex-col transition-all duration-300 overflow-x-hidden relative',
               isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-300',
-              isChatCollapsed ? 'h-auto py-3 justify-center' : 'lg:h-[300px] justify-between overflow-y-auto style-scroll'
+              // On mobile: use independent isSiteInfoCollapsed state
+              // On desktop (lg): use linked isChatCollapsed state
+              isMobile
+                ? (isSiteInfoCollapsed ? 'h-auto py-3 justify-center' : 'h-auto justify-start')
+                : (isChatCollapsed ? 'h-auto py-3 justify-center' : 'lg:h-[300px] justify-between overflow-y-auto style-scroll')
             )}>
               {/* Industrial Accent Line */}
               <div className="absolute top-0 left-0 w-full h-1 bg-slate-900 dark:bg-slate-100" />
               
               <div 
                 className="flex flex-col sm:flex-row sm:items-start justify-between cursor-pointer group select-none gap-3 shrink-0"
-                onClick={() => setIsChatCollapsed(!isChatCollapsed)}
+                onClick={() => {
+                  // On mobile: toggle site info independently
+                  // On desktop: toggle linked chat state
+                  if (isMobile) setIsSiteInfoCollapsed(!isSiteInfoCollapsed);
+                  else setIsChatCollapsed(!isChatCollapsed);
+                }}
               >
                 <div className="flex flex-col gap-2 min-w-0 flex-1 relative shrink-0">
                   {/* Status Badges Overlayed Top */}
@@ -831,15 +849,20 @@ Answer site-specific questions using this context only. Be concise.`;
                   variant="ghost" 
                   size="sm" 
                   className="text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 h-8 w-8 p-0 shrink-0 self-start sm:ml-2 mt-1" 
-                  onClick={e => { e.stopPropagation(); setIsChatCollapsed(!isChatCollapsed); }}
+                  onClick={e => {
+                    e.stopPropagation();
+                    if (isMobile) setIsSiteInfoCollapsed(!isSiteInfoCollapsed);
+                    else setIsChatCollapsed(!isChatCollapsed);
+                  }}
                 >
-                  {isChatCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+                  {(isMobile ? isSiteInfoCollapsed : isChatCollapsed) ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
                 </Button>
               </div>
 
               {/* Fragmented Stats Strip */}
               <AnimatePresence initial={false}>
-                {!isChatCollapsed && (
+                {/* On mobile: show when site info is expanded; On desktop: show when chat is expanded */}
+                {(isMobile ? !isSiteInfoCollapsed : !isChatCollapsed) && (
                   <motion.div
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: 'auto' }}
@@ -946,8 +969,7 @@ Answer site-specific questions using this context only. Be concise.`;
                       ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400'
                       : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
                   )}>
-                  <tab.icon className="w-3.5 h-3.5 shrink-0" />
-                  <span className="hidden min-[480px]:inline whitespace-nowrap">{tab.label}</span>
+                  <span className="whitespace-nowrap">{tab.label}</span>
                 </button>
               ))}
             </div>
@@ -1720,44 +1742,12 @@ Answer site-specific questions using this context only. Be concise.`;
 
             {/* CONTACTS */}
             {activeTab === 'contacts' && (
-              <div className="animate-in fade-in zoom-in-[0.98] duration-200 ease-out space-y-5">
-                <div className={card}>
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="font-bold text-base sm:text-lg flex items-center gap-2"><Users className="w-5 h-5 text-indigo-500" /> Site Contacts ({data.siteContacts.length})</h3>
-                    {currentUser?.privileges?.clients?.canEdit && (
-                      <Button onClick={() => setShowContactsPanel(true)} size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white flex items-center gap-1.5 rounded-xl h-9 px-2.5 sm:px-3 shrink-0">
-                        <Plus className="w-4 h-4" /><span className="hidden sm:inline">Manage Contacts</span>
-                      </Button>
-                    )}
-                  </div>
-                  {data.siteContacts.length > 0 ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {data.siteContacts.map(contact => (
-                        <div key={contact.id} className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
-                          <h4 className="font-semibold text-sm text-slate-800 dark:text-slate-200">{contact.name}</h4>
-                          {contact.position && <p className="text-xs text-slate-500 mt-0.5">{contact.position}</p>}
-                          <div className="mt-3 space-y-2">
-                            {contact.phone && (
-                              <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
-                                <Phone className="w-3.5 h-3.5 shrink-0" />
-                                <span>{contact.phone}</span>
-                              </div>
-                            )}
-                            {contact.email && (
-                              <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
-                                <Mail className="w-3.5 h-3.5 shrink-0" />
-                                <span>{contact.email}</span>
-                              </div>
-                            )}
-                            {!contact.phone && !contact.email && (
-                              <p className="text-xs text-slate-400 italic">No contact details</p>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : <p className="text-slate-500 text-sm text-center py-8">No contacts found for this site.</p>}
-                </div>
+              <div className="animate-in fade-in zoom-in-[0.98] duration-200 ease-out">
+                <ClientContactsPanel
+                  clientName={site.client || site.name}
+                  onClose={() => setActiveTab('financials')}
+                  inline
+                />
               </div>
             )}
           </div>
@@ -1782,13 +1772,6 @@ Answer site-specific questions using this context only. Be concise.`;
               alert('External communication log added successfully!');
             }}
           />
-
-          {showContactsPanel && (
-            <ClientContactsPanel
-              clientName={site.client || site.name}
-              onClose={() => setShowContactsPanel(false)}
-            />
-          )}
         </div>
       </div>
       

@@ -971,7 +971,7 @@ function ProductivityScore() {
 
 /* ─── Stat Card ─────────────────────────────────────────────────────────── */
 function StatCard({ label, value, icon: Icon, color, sub }: {
-  label: string; value: number; icon: React.ElementType;
+  label: string; value: number; icon: any;
   color: "blue" | "green" | "red" | "yellow" | "gray"; sub?: string;
 }) {
   const accentMap = {

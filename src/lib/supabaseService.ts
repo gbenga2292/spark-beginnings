@@ -1009,9 +1009,6 @@ export async function fetchAllAppData(privs?: any) {
 }
 
 export async function fetchAllUsers(privs?: any) {
-  const isAdmin = privs?.users?.canManage === true;
-  const canView = isAdmin || (privs && privs.users && privs.users.canView === true);
-  if (!canView) return [];
   const { data } = await supabase.from('profiles').select('*').order('created_at');
   return (data || []).map(dbToProfile);
 }
@@ -1312,6 +1309,7 @@ export const db = {
         mobDemob: 'mob_demob', rentalCost: 'rental_cost', dieselCost: 'diesel_cost',
         techniciansCost: 'technicians_cost', totalCost: 'total_cost', totalCharge: 'total_charge',
         totalExclusiveOfVat: 'total_exclusive_of_vat', printLayout: 'print_layout', historyLog: 'history_log',
+        machineConfigs: 'machine_configs', countOffDays: 'count_off_days'
       };
       update[map[k] || k] = v;
     });
@@ -1340,6 +1338,7 @@ export const db = {
         dieselCost: 'diesel_cost', techniciansCost: 'technicians_cost',
         totalCost: 'total_cost', totalCharge: 'total_charge',
         totalExclusiveOfVat: 'total_exclusive_of_vat', printLayout: 'print_layout', historyLog: 'history_log',
+        machineConfigs: 'machine_configs', countOffDays: 'count_off_days'
       };
       update[map[k] || k] = v;
     });
@@ -2085,4 +2084,20 @@ export const db = {
     const { error } = await supabase.from('interview_candidates').delete().eq('id', id);
     if (error) { console.error('deleteInterviewCandidate:', error); throw error; }
   },
+
+  // Dewatering Layouts
+  async saveDewateringLayout(layout: any) {
+    const { error } = await supabase.from('dewatering_layouts').upsert(layout, { onConflict: 'id' });
+    if (error) { console.error('saveDewateringLayout:', error); throw error; }
+  },
+  async getDewateringLayouts(userId: string) {
+    const { data, error } = await supabase.from('dewatering_layouts').select('*').eq('user_id', userId).order('created_at', { ascending: false });
+    if (error) { console.error('getDewateringLayouts:', error); throw error; }
+    return data;
+  },
+  async deleteDewateringLayout(id: string) {
+    const { error } = await supabase.from('dewatering_layouts').delete().eq('id', id);
+    if (error) { console.error('deleteDewateringLayout:', error); throw error; }
+  },
 };
+

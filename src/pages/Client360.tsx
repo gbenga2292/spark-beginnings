@@ -681,8 +681,8 @@ export function Client360() {
       return status === 'completed' && !t.isDeleted && isWithinTimeFilter(t.deadline || t.createdAt);
     });
 
-    const contacts = clientContacts.filter(c => c.clientName?.trim() === selectedClient && isWithinTimeFilter(c.createdAt));
-    const logs = commLogs.filter(c => c.client?.trim() === selectedClient && isWithinTimeFilter(c.date)).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    const contacts = clientContacts.filter(c => c.clientName?.trim().toLowerCase() === selectedClient?.trim().toLowerCase());
+    const logs = commLogs.filter(c => c.client?.trim().toLowerCase() === selectedClient?.trim().toLowerCase() && isWithinTimeFilter(c.date)).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     
     // Find deployed staff
     const clientAttendance = attendanceRecords.filter(a => isWithinTimeFilter(a.date) && (a.dayClient?.trim() === selectedClient || a.nightClient?.trim() === selectedClient));
@@ -988,16 +988,16 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
       )}
 
       {/* Client Selector */}
-      <div className={cn("flex items-center gap-1.5 px-2 py-1 h-8 rounded-lg border shadow-sm transition-colors shrink-0", 
+      <div className={cn("flex items-center gap-1.5 px-2 py-1 h-8 rounded-lg border shadow-sm transition-colors shrink-0 order-first md:order-last w-full md:w-auto", 
         isDark ? "bg-slate-900 border-slate-700 hover:border-indigo-500" : "bg-white border-slate-200 hover:border-indigo-300"
       )}>
         <Building2 className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-        <div className="relative flex items-center">
+        <div className="relative flex items-center w-full">
           <select
             value={selectedClient}
             onChange={(e) => setSelectedClient(e.target.value)}
             className={cn(
-              "appearance-none bg-transparent font-bold text-xs pr-5 focus:outline-none cursor-pointer max-w-[120px] sm:max-w-[150px] truncate",
+              "appearance-none bg-transparent font-bold text-xs pr-5 focus:outline-none cursor-pointer w-full md:max-w-[150px] truncate",
               isDark ? "text-white bg-slate-900" : "text-slate-900 bg-white"
             )}
           >
@@ -1142,18 +1142,17 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                   { id: 'financials', label: 'Financials', icon: DollarSign, show: currentUser?.privileges?.billing?.canView || currentUser?.privileges?.payments?.canView },
                   { id: 'operations', label: 'Site 360', icon: Briefcase, show: currentUser?.privileges?.sites?.canView },
                   { id: 'contacts', label: 'Contacts', icon: Users, show: currentUser?.privileges?.clients?.canView },
-                  { id: 'activity', label: 'Communications', icon: MessagesSquare, show: currentUser?.privileges?.commLog?.canView },
+                  { id: 'activity', label: 'Comms', icon: MessagesSquare, show: currentUser?.privileges?.commLog?.canView },
                   { id: 'tasks', label: 'Tasks', icon: CheckSquare, show: currentUser?.privileges?.tasks?.canView || currentUser?.privileges?.tasks?.canViewMyTasks }
                 ].filter(tab => tab.show !== false).map(tab => (
                   <button key={tab.id} onClick={() => setActiveTab(tab.id as TabType)}
                     className={cn(
-                      "flex items-center gap-1.5 min-[480px]:gap-1.5 px-3 min-[480px]:px-3.5 sm:px-4 py-3 text-xs sm:text-sm font-semibold border-b-2 transition-colors shrink-0",
+                      "flex flex-1 justify-center items-center px-1.5 sm:px-4 py-3 text-[11px] min-[400px]:text-xs sm:text-sm font-semibold border-b-2 transition-colors",
                       activeTab === tab.id 
                         ? "border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400" 
                         : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
                     )}>
-                    <tab.icon className="w-3.5 h-3.5 shrink-0" /> 
-                    <span className="hidden min-[480px]:inline whitespace-nowrap">{tab.label}</span>
+                    <span className="whitespace-nowrap">{tab.label}</span>
                     {tab.id === 'operations' && clientPendingSites.length > 0 && (
                       <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500 text-white shrink-0 shadow-sm animate-in scale-in-50 duration-200">
                         {clientPendingSites.length}

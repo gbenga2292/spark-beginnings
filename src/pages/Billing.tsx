@@ -49,7 +49,7 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
 
   // ─── Permissions ───────────────────────────────────────────
   const priv = usePriv('billing');
-  const { addReminder } = useAppData();
+  const { addReminder, updateReminder, reminders } = useAppData();
   const { user: currentUser } = useAuth();
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -392,9 +392,13 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
     const movingFromActiveToQuotation = !!existingInActive && form.destination === 'Pending';
     const movingFromQuotationToActive = !!existingInPending && form.destination === 'Active';
 
+    let invoiceIdToUse = '';
+
     if (form.destination === 'Active') {
+      const newInvoiceId = selectedId && !movingFromQuotationToActive ? selectedId : generateId();
+      invoiceIdToUse = newInvoiceId;
       const newInvoice: Invoice = {
-        id: selectedId && !movingFromQuotationToActive ? selectedId : generateId(),
+        id: newInvoiceId,
         invoiceNumber: data.invoiceNo,
         client: data.client,
         project: 'Billed',
@@ -444,7 +448,9 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
 
     } else {
       // Destination is Pending/Quotation
-      const pendingData = { ...data, id: selectedId && !movingFromActiveToQuotation ? selectedId : generateId() } as any;
+      const pendingId = selectedId && !movingFromActiveToQuotation ? selectedId : generateId();
+      invoiceIdToUse = pendingId;
+      const pendingData = { ...data, id: pendingId } as any;
 
       if (movingFromActiveToQuotation) {
         // Move: remove from active, add to pending
@@ -461,24 +467,45 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
       }
     }
 
-    if (form.createReminder && currentUser && data.endDate) {
-      // Actual end date (log-adjusted if countOffDays=false)
-      const actualEndDate = new Date(data.endDate);
+    if (currentUser && data.endDate) {
+      const existingReminder = reminders?.find(r => 
+        (r.sourceRef === 'invoice_' + invoiceIdToUse) || 
+        (selectedId && r.title.includes(`[Invoice]`) && r.body.includes(`Invoice ${form.invoiceNo} `))
+      );
 
-      const isCountingOffDays = data.countOffDays !== false;
-      const endDateLabel = isCountingOffDays ? 'projected end date' : 'actual end date (off-days excluded)';
+      if (form.createReminder || existingReminder) {
+        // Actual end date (log-adjusted if countOffDays=false)
+        const actualEndDate = new Date(data.endDate);
 
-      addReminder({
-        title: `[Invoice] ${form.client} – ${form.site} ending soon`,
-        body: `Invoice ${form.invoiceNo} reaches its ${endDateLabel} on ${actualEndDate.toLocaleDateString()}. Confirm with the client to extend or prepare the next invoice.`,
-        remindAt: actualEndDate.toISOString(),      // Displayed on actual end date
-        endAt: actualEndDate.toISOString(),       // stops firing after actual end date
-        frequency: 'daily',
-        recipientIds: [currentUser.id],
-        sendEmail: !!form.sendEmailNotification,
-        isActive: true,
-        createdBy: currentUser.id
-      });
+        const isCountingOffDays = data.countOffDays !== false;
+        const endDateLabel = isCountingOffDays ? 'projected end date' : 'actual end date (off-days excluded)';
+
+        const title = `[Invoice] ${form.client} – ${form.site} ending soon`;
+        const body = `Invoice ${form.invoiceNo} reaches its ${endDateLabel} on ${actualEndDate.toLocaleDateString()}. Confirm with the client to extend or prepare the next invoice.`;
+
+        if (existingReminder) {
+          updateReminder(existingReminder.id, {
+            title,
+            body,
+            remindAt: actualEndDate.toISOString(),
+            endAt: actualEndDate.toISOString(),
+            sourceRef: 'invoice_' + invoiceIdToUse
+          });
+        } else if (form.createReminder) {
+          addReminder({
+            title,
+            body,
+            remindAt: actualEndDate.toISOString(),
+            endAt: actualEndDate.toISOString(),
+            frequency: 'daily',
+            recipientIds: [currentUser.id],
+            sendEmail: !!form.sendEmailNotification,
+            isActive: true,
+            createdBy: currentUser.id,
+            sourceRef: 'invoice_' + invoiceIdToUse
+          });
+        }
+      }
     }
 
     setIsModalOpen(false);

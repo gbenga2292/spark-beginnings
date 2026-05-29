@@ -9,7 +9,7 @@ interface ViewToggleProps {
   onChange: (mode: TaskViewMode) => void;
 }
 
-const VIEWS: { mode: TaskViewMode; icon: React.ElementType; label: string }[] = [
+const VIEWS: { mode: TaskViewMode; icon: any; label: string }[] = [
   { mode: "board", icon: LayoutGrid, label: "Board" },
   { mode: "list", icon: List, label: "List" },
   { mode: "compact", icon: AlignJustify, label: "Compact" },

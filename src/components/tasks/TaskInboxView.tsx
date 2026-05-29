@@ -20,7 +20,7 @@ import type { SubTask, MainTask, AppUser, SubTaskStatus, CommentAttachment } fro
 import { AppraisalScoreSheet } from "../evaluations/AppraisalScoreSheet";
 
 // ── Status Config ─────────────────────────────────────────────────────────────
-const statusConfig: Record<SubTaskStatus, { label: string; pillClass: string; dotColor: string; icon: React.ElementType }> = {
+const statusConfig: Record<SubTaskStatus, { label: string; pillClass: string; dotColor: string; icon: any }> = {
   not_started: { label: "To Start", pillClass: "bg-slate-100 text-slate-600 border border-slate-200", dotColor: "bg-slate-400", icon: Circle },
   in_progress: { label: "In Progress", pillClass: "bg-blue-100 text-blue-700 border border-blue-200", dotColor: "bg-blue-500", icon: Loader2 },
   pending_approval: { label: "Approval Needed", pillClass: "bg-amber-100 text-amber-700 border border-amber-200", dotColor: "bg-amber-500", icon: Hourglass },

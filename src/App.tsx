@@ -14,7 +14,7 @@ import { GlobalDragScroll } from './components/ui/GlobalDragScroll';
 import { useTheme } from './hooks/useTheme';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { PageErrorBoundary } from './components/common/PageErrorBoundary';
-import { TaskProvider } from './contexts/AppDataContext';
+import { TaskProvider } from '@/src/contexts/AppDataContext';
 import { PageProvider } from './contexts/PageContext';
 import { ProtectedRoute } from './components/common/ProtectedRoute';
 import { IS_LIMITED_WEB_WEB } from './lib/utils';
@@ -72,6 +72,7 @@ const VehicleManager = lazy(() => import('./pages/VehicleManager').then(m => ({ 
 const EmployeeAnalytics = lazy(() => import('./pages/EmployeeAnalytics').then(m => ({ default: m.EmployeeAnalytics })));
 const NotificationsPage = lazy(() => import('./pages/Notifications').then(m => ({ default: m.NotificationsPage })));
 const InterviewManager = lazy(() => import('./pages/InterviewManager').then(m => ({ default: m.default })));
+const Simulator = lazy(() => import('./pages/Simulator').then(m => ({ default: m.default })));
 import { OperationsProvider } from './contexts/OperationsContext';
 
 // ── Suspense fallback ─────────────────────────────────────────────────────────
@@ -249,6 +250,7 @@ function AppContent() {
                       <Route path="vehicles" element={<ProtectedRoute requiredModule="opsVehicles"><VehicleManager /></ProtectedRoute>} />
                       <Route path="sites" element={<ProtectedRoute requiredModule="opsSites"><SiteManager /></ProtectedRoute>} />
                       <Route path="analytics" element={<ProtectedRoute requiredModule="opsCheckout"><EmployeeAnalytics /></ProtectedRoute>} />
+                      <Route path="simulator" element={<ProtectedRoute requiredModule="opsSites"><Simulator /></ProtectedRoute>} />
                       <Route path="*" element={<Navigate to="/operations" replace />} />
                     </Routes>
                   </>

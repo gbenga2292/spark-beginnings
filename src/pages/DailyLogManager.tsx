@@ -76,92 +76,104 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
   const [dieselUsage, setDieselUsage] = useState<string>(selectedLog ? selectedLog.dieselUsage.toString() : '0');
   const [supervisorOnSite, setSupervisorOnSite] = useState(selectedLog?.supervisorOnSite || '');
 
+  // Reusable callback to find the auto supervisor for a specific date
+  const findAutoSupervisorForDate = React.useCallback((targetDate: string) => {
+    if (!targetDate || !siteName) return '';
+
+    // Get attendance records for this date and site
+    const siteRecords = attendanceRecords.filter(r => 
+      r.date === targetDate && 
+      ((r.day === 'Yes' && r.daySite === siteName) || 
+       (r.night === 'Yes' && r.nightSite === siteName))
+    );
+
+    if (siteRecords.length === 0) return '';
+
+    // Map to employees and filter to only include dewateringStaff
+    const dewateringStaffIds = new Set(dewateringStaff.map(s => s.id));
+    const dewateringStaffNames = new Set(dewateringStaff.map(s => `${s.firstname} ${s.surname}`.toUpperCase()));
+
+    const matchedStaff = siteRecords
+      .map(r => {
+        const emp = employees.find(e => 
+          e.id === r.staffId || 
+          `${e.firstname} ${e.surname}`.toUpperCase() === r.staffName.toUpperCase()
+        );
+        return { record: r, employee: emp };
+      })
+      .filter(x => 
+        x.employee && 
+        (dewateringStaffIds.has(x.employee.id) || 
+         dewateringStaffNames.has(`${x.employee.firstname} ${x.employee.surname}`.toUpperCase()))
+      );
+
+    if (matchedStaff.length === 0) return '';
+
+    // Helper to get shift priority (lower number = higher priority)
+    // Night shift takes priority
+    const getShiftPriority = (r: AttendanceRecord) => {
+      if (r.night === 'Yes' && r.nightSite === siteName) return 1;
+      if (r.day === 'Yes' && r.daySite === siteName) return 2;
+      return 3;
+    };
+
+    // Helper to normalize position index
+    const getNormalizedPositionIndex = (pos?: string) => {
+      if (!pos) return 999;
+      let normalized = pos;
+      if (normalized === 'Assistant Site Supervisor') {
+        normalized = 'Assistant Supervisor';
+      }
+      const idx = POSITION_HIERARCHY.indexOf(normalized);
+      return idx === -1 ? 999 : idx;
+    };
+
+    // Sort staff
+    const sorted = [...matchedStaff].sort((a, b) => {
+      // 1. Shift Priority
+      const shiftA = getShiftPriority(a.record);
+      const shiftB = getShiftPriority(b.record);
+      if (shiftA !== shiftB) return shiftA - shiftB;
+
+      // 2. Position Hierarchy
+      const posA = getNormalizedPositionIndex(a.employee?.position || a.record.position);
+      const posB = getNormalizedPositionIndex(b.employee?.position || b.record.position);
+      if (posA !== posB) return posA - posB;
+
+      // 3. Start Date Seniority
+      const dateA = a.employee?.startDate ? new Date(a.employee.startDate).getTime() : Infinity;
+      const dateB = b.employee?.startDate ? new Date(b.employee.startDate).getTime() : Infinity;
+      return dateA - dateB;
+    });
+
+    const bestMatch = sorted[0];
+    if (bestMatch && bestMatch.employee) {
+      return `${bestMatch.employee.firstname} ${bestMatch.employee.surname}`;
+    }
+    return '';
+  }, [siteName, attendanceRecords, employees, dewateringStaff]);
+
   // Auto-select supervisor based on attendance when date/site changes
   React.useEffect(() => {
     // Only auto-select when creating a new log or if the supervisor is currently empty
     if (selectedLog && date === selectedLog.date) return;
 
-    const findAutoSupervisor = () => {
-      if (!date || !siteName) return '';
-
-      // Get attendance records for this date and site
-      const siteRecords = attendanceRecords.filter(r => 
-        r.date === date && 
-        ((r.day === 'Yes' && r.daySite === siteName) || 
-         (r.night === 'Yes' && r.nightSite === siteName))
-      );
-
-      if (siteRecords.length === 0) return '';
-
-      // Map to employees and filter to only include dewateringStaff
-      const dewateringStaffIds = new Set(dewateringStaff.map(s => s.id));
-      const dewateringStaffNames = new Set(dewateringStaff.map(s => `${s.firstname} ${s.surname}`.toUpperCase()));
-
-      const matchedStaff = siteRecords
-        .map(r => {
-          const emp = employees.find(e => 
-            e.id === r.staffId || 
-            `${e.firstname} ${e.surname}`.toUpperCase() === r.staffName.toUpperCase()
-          );
-          return { record: r, employee: emp };
-        })
-        .filter(x => 
-          x.employee && 
-          (dewateringStaffIds.has(x.employee.id) || 
-           dewateringStaffNames.has(`${x.employee.firstname} ${x.employee.surname}`.toUpperCase()))
-        );
-
-      if (matchedStaff.length === 0) return '';
-
-      // Helper to get shift priority (lower number = higher priority)
-      // Night shift takes priority
-      const getShiftPriority = (r: AttendanceRecord) => {
-        if (r.night === 'Yes' && r.nightSite === siteName) return 1;
-        if (r.day === 'Yes' && r.daySite === siteName) return 2;
-        return 3;
-      };
-
-      // Helper to normalize position index
-      const getNormalizedPositionIndex = (pos?: string) => {
-        if (!pos) return 999;
-        let normalized = pos;
-        if (normalized === 'Assistant Site Supervisor') {
-          normalized = 'Assistant Supervisor';
-        }
-        const idx = POSITION_HIERARCHY.indexOf(normalized);
-        return idx === -1 ? 999 : idx;
-      };
-
-      // Sort staff
-      const sorted = [...matchedStaff].sort((a, b) => {
-        // 1. Shift Priority
-        const shiftA = getShiftPriority(a.record);
-        const shiftB = getShiftPriority(b.record);
-        if (shiftA !== shiftB) return shiftA - shiftB;
-
-        // 2. Position Hierarchy
-        const posA = getNormalizedPositionIndex(a.employee?.position || a.record.position);
-        const posB = getNormalizedPositionIndex(b.employee?.position || b.record.position);
-        if (posA !== posB) return posA - posB;
-
-        // 3. Start Date Seniority
-        const dateA = a.employee?.startDate ? new Date(a.employee.startDate).getTime() : Infinity;
-        const dateB = b.employee?.startDate ? new Date(b.employee.startDate).getTime() : Infinity;
-        return dateA - dateB;
-      });
-
-      const bestMatch = sorted[0];
-      if (bestMatch && bestMatch.employee) {
-        return `${bestMatch.employee.firstname} ${bestMatch.employee.surname}`;
-      }
-      return '';
-    };
-
-    const autoSelected = findAutoSupervisor();
+    const autoSelected = findAutoSupervisorForDate(date);
     if (autoSelected) {
       setSupervisorOnSite(autoSelected);
     }
-  }, [date, siteName, attendanceRecords, employees, dewateringStaff, selectedLog]);
+  }, [date, selectedLog, findAutoSupervisorForDate]);
+
+  const handleSyncSupervisor = () => {
+    const autoSelected = findAutoSupervisorForDate(date);
+    if (autoSelected) {
+      setSupervisorOnSite(autoSelected);
+      toast.success(`Supervisor synced from attendance: ${autoSelected}`);
+    } else {
+      toast.info(`No attendance record found for ${formatDisplayDate(date)} at "${siteName}".`);
+    }
+  };
+
 
   const [clientFeedback, setClientFeedback] = useState(selectedLog?.clientFeedback || '');
   const [maintenanceDetails, setMaintenanceDetails] = useState(selectedLog?.maintenanceDetails || '');
@@ -191,6 +203,38 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
       .filter(l => l.assetId === assetId && l.siteId === siteId)
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [dailyMachineLogs, assetId, siteId]);
+
+  // Background Auto-sync for historical logs with missing supervisor when attendance becomes available
+  React.useEffect(() => {
+    if (!logs.length || !attendanceRecords.length || !employees.length) return;
+
+    // Find the first log that has no supervisor, but has a matching attendance record supervisor
+    const logToSync = logs.find(log => {
+      if (log.supervisorOnSite) return false; // Already has supervisor, don't overwrite
+
+      const calculated = findAutoSupervisorForDate(log.date);
+      return !!calculated;
+    });
+
+    if (logToSync) {
+      const calculateAndSync = async () => {
+        const supervisor = findAutoSupervisorForDate(logToSync.date);
+        if (supervisor) {
+          try {
+            await logDailyActivity({
+              ...logToSync,
+              supervisorOnSite: supervisor
+            });
+            toast.success(`Auto-synced supervisor for ${formatDisplayDate(logToSync.date)} to match attendance: ${supervisor}`);
+          } catch (e) {
+            console.error('Failed auto-syncing supervisor:', e);
+          }
+        }
+      };
+
+      calculateAndSync();
+    }
+  }, [logs, attendanceRecords, employees, findAutoSupervisorForDate, logDailyActivity]);
 
   // Derive effective pump start/stop dates
   // Configured pump dates override the automatic fallback from earliest log
@@ -797,13 +841,22 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
                 {/* Supervisor Field */}
                 {isActive && (
                   <div className="space-y-2">
-                    <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider ml-1">Supervisor on Site</label>
+                    <div className="flex justify-between items-center">
+                      <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider ml-1">Supervisor on Site</label>
+                      <button
+                        type="button"
+                        onClick={handleSyncSupervisor}
+                        className="text-[10px] font-bold text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 flex items-center gap-1 transition-colors bg-blue-50 dark:bg-blue-900/20 px-2 py-0.5 rounded"
+                      >
+                        <Clock className="h-3 w-3 animate-pulse" /> Sync with Attendance
+                      </button>
+                    </div>
                     <div className="relative group">
                       <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
                       <select
                         value={supervisorOnSite}
                         onChange={(e) => setSupervisorOnSite(e.target.value)}
-                        className="w-full h-10 pl-9 pr-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md text-sm font-medium focus:ring-2 focus:ring-blue-500/20 transition-all appearance-none cursor-pointer"
+                        className="w-full h-10 pl-9 pr-12 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md text-sm font-medium focus:ring-2 focus:ring-blue-500/20 transition-all appearance-none cursor-pointer"
                       >
                         <option value="">Select Supervisor</option>
                         {dewateringStaff.map(staff => (

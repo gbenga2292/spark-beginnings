@@ -170,7 +170,12 @@ export function Login() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    await performLogin(email, password);
+    let finalEmail = email.trim();
+    if (finalEmail && !finalEmail.includes('@')) {
+      finalEmail = `${finalEmail}@dewaterconstruct.com`;
+      setEmail(finalEmail);
+    }
+    await performLogin(finalEmail, password);
   };
 
   const handleBiometricLogin = async () => {
@@ -357,7 +362,7 @@ export function Login() {
                 <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <Input
                   id="email"
-                  type="email"
+                  type="text"
                   name="email"
                   autoComplete="email"
                   list="saved-emails-list"

@@ -43,6 +43,7 @@ import {
   LogOut,
   Search,
   X,
+  HardHat,
 } from 'lucide-react';
 import { supabase } from '../integrations/supabase/client';
 import { NairaSign } from '../components/ui/naira-sign';
@@ -97,6 +98,19 @@ const navigation: NavCategory[] = [
     standaloneHref: '/client-360',
     items: [
       { name: 'Client 360', href: '/client-360', icon: Sparkles, privKey: 'sites', privField: 'canView' },
+    ],
+  },
+  {
+    name: 'Simulator',
+    icon: HardHat,
+    color: 'from-blue-500 to-indigo-500',
+    bgLight: 'bg-blue-50 hover:bg-blue-100',
+    bgDark: 'dark:bg-blue-950/40 dark:hover:bg-blue-900/60',
+    iconColor: 'text-blue-600 dark:text-blue-400',
+    standalone: true,
+    standaloneHref: '/operations/simulator',
+    items: [
+      { name: 'Simulator', href: '/operations/simulator', icon: HardHat, privKey: 'opsSites', privField: 'canView' },
     ],
   },
   {
@@ -297,14 +311,14 @@ export function HomePage() {
   return (
     <div
       className={cn(
-        'min-h-full w-full overflow-y-auto',
+        'min-h-full w-full flex flex-col',
         isDark ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'
       )}
     >
       {/* ── Compact Hero Header ─────────────────────────────────────────────────────── */}
       <div
         className={cn(
-          'relative px-4 py-2 md:px-6 md:py-3',
+          'sticky top-0 z-50 px-4 py-2 md:px-6 md:py-3',
           isDark
             ? 'bg-gradient-to-r from-slate-900 via-indigo-950/60 to-slate-900 border-b border-slate-800'
             : 'bg-gradient-to-r from-indigo-700 via-indigo-600 to-indigo-800 shadow-sm'
@@ -394,7 +408,7 @@ export function HomePage() {
           {navigation.map((category) => {
             // Web build filtering
             if (IS_LIMITED_WEB_WEB) {
-              const allowed = ['Dashboard', 'Client 360', 'Tasks', 'Account', 'Comms & Journals'];
+              const allowed = ['Dashboard', 'Client 360', 'Simulator', 'Tasks', 'Account', 'Comms & Journals'];
               if (!allowed.includes(category.name)) return null;
             }
 

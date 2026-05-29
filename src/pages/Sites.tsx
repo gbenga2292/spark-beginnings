@@ -676,8 +676,7 @@ export function Sites() {
       submitStatus = 'Ended';
     } else if (editForm.startDate && nowStr < editForm.startDate) {
       submitStatus = 'Inactive';
-    } else if (submitStatus === 'Ended') {
-      // If end date was cleared, it can't be "Ended" anymore
+    } else {
       submitStatus = 'Active';
     }
 

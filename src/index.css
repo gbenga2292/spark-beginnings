@@ -728,9 +728,213 @@ html.dark.ui-brutalism {
 
 /* Make text visible in mobile action menus, since they are often hidden by sm:inline */
 .mobile-action-menu span.hidden.sm\:inline,
+.dark textarea {
+  background-color: rgb(var(--color-background))  !important;
+  border-color:     rgb(var(--color-border))  !important;
+  color:            rgb(var(--color-foreground)) !important;
+}
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: rgb(var(--color-muted-foreground)) !important;
+}
+
+/* ── Table rows / cells — prevent dark-text-on-dark blending ────────── */
+.dark table { color: rgb(203 213 225); }             /* slate-300 base */
+.dark thead tr,
+.dark .dark-thead { background-color: rgb(15 23 42) !important; } /* slate-950 */
+.dark tbody tr:hover { background-color: rgb(30 41 59 / 0.5) !important; }
+
+/* ── Ring-based focus outlines on dark inputs ───────────────────────── */
+.dark .ring-1 { --tw-ring-color: rgb(51 65 85); }
+.dark .ring-slate-100 { --tw-ring-color: rgb(51 65 85) !important; }
+.dark .ring-slate-200 { --tw-ring-color: rgb(51 65 85) !important; }
+
+/* ══════════════════════════════════════════════════════════════════════
+   UI Layout Theme Systems
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* ── Modern ──────────────────────────────────────────────────────────── */
+.ui-modern .bg-card, .ui-modern [data-radix-popper-content-wrapper] {
+  border-radius: 1.5rem !important;
+  border: 1px solid rgb(0 0 0 / 0.05) !important;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01) !important;
+}
+.dark.ui-modern .bg-card, .dark.ui-modern [data-radix-popper-content-wrapper] {
+  border: 1px solid rgb(255 255 255 / 0.05) !important;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3) !important;
+}
+.ui-modern button, .ui-modern input, .ui-modern select, .ui-modern .rounded-lg, .ui-modern .rounded-xl {
+  border-radius: 1rem !important;
+}
+
+/* ── Glassmorphism ────────────────────────────────────────────────────── */
+html.ui-glass body {
+  background: radial-gradient(circle at top left, #f3f4f6, #e5e7eb) !important;
+}
+html.dark.ui-glass body {
+  background: radial-gradient(circle at top left, #1e293b, #0f172a) !important;
+}
+.ui-glass .bg-card, .ui-glass [data-radix-popper-content-wrapper], .ui-glass table th:not(.bg-slate-900) {
+  background: rgba(255, 255, 255, 0.6) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.8) !important;
+  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.05) !important;
+}
+.dark.ui-glass .bg-card, .dark.ui-glass [data-radix-popper-content-wrapper], .dark.ui-glass table th:not(.bg-slate-900) {
+  background: rgba(15, 23, 42, 0.6) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3) !important;
+}
+.ui-glass table th.bg-slate-900, .dark.ui-glass table th.bg-slate-900 {
+  background: #0f172a !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* ── Neo-Brutalism ────────────────────────────────────────────────────── */
+html.ui-brutalism {
+  --color-border: 0 0 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
+}
+html.dark.ui-brutalism {
+  --color-border: 255 255 255;
+}
+.ui-brutalism * {
+  border-radius: 0 !important;
+}
+.ui-brutalism .bg-card, .ui-brutalism [data-radix-popper-content-wrapper] {
+  border-width: 3px !important;
+  border-color: #000 !important;
+  box-shadow: 6px 6px 0px 0px #000 !important;
+}
+.dark.ui-brutalism .bg-card, .dark.ui-brutalism [data-radix-popper-content-wrapper] {
+  border-color: #fff !important;
+  box-shadow: 6px 6px 0px 0px #fff !important;
+}
+.ui-brutalism input, .ui-brutalism select, .ui-brutalism button {
+  border-width: 2px !important;
+  border-color: #000 !important;
+}
+.ui-brutalism a.bg-indigo-600, .ui-brutalism button.bg-indigo-600, .ui-brutalism button.bg-emerald-600, .ui-brutalism button[class*="bg-"] {
+  box-shadow: 4px 4px 0px 0px #000 !important;
+  transition: all 0.1s;
+}
+.ui-brutalism a.bg-indigo-600:active, .ui-brutalism button[class*="bg-"]:active {
+  box-shadow: 0px 0px 0px 0px #000 !important;
+  transform: translate(4px, 4px) !important;
+}
+.dark.ui-brutalism a.bg-indigo-600, .dark.ui-brutalism button[class*="bg-"] {
+  box-shadow: 4px 4px 0px 0px #fff !important;
+  border-color: #fff !important;
+}
+.dark.ui-brutalism a.bg-indigo-600:active, .dark.ui-brutalism button[class*="bg-"]:active {
+  box-shadow: 0px 0px 0px 0px #fff !important;
+}
+.dark.ui-brutalism input, .dark.ui-brutalism select, .dark.ui-brutalism button {
+  border-color: #fff !important;
+}
+
+/* ── Minimalist ──────────────────────────────────────────────────────── */
+.ui-minimalist .bg-card, .ui-minimalist [data-radix-popper-content-wrapper] {
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+.ui-minimalist .shadow, .ui-minimalist .shadow-sm, .ui-minimalist .shadow-md, .ui-minimalist .shadow-lg, .ui-minimalist [class*="shadow"] {
+  box-shadow: none !important;
+}
+.ui-minimalist input, .ui-minimalist select, .ui-minimalist button, .ui-minimalist .rounded-lg, .ui-minimalist .rounded-xl, .ui-minimalist .rounded-full {
+  border-radius: 0px !important;
+}
+
+
+
+/* ══════════════════════════════════════════════════════════════════════
+   BOTTOM SHEET ANIMATION — used by the mobile 3-dot action menu
+   ══════════════════════════════════════════════════════════════════════ */
+@keyframes slide-up {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.25s cubic-bezier(0.32, 0.72, 0, 1) forwards;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   MOBILE ACTION MENU — makes injected header button groups fit inside
+   the 3-dot dropdown without horizontal overflow or squishing.
+   Strategy: only constrain width at the outermost level; let inner
+   UI components (date pickers, segment tabs, icon rows) stay horizontal.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* Stretch every direct child of the dropdown to full width */
+.mobile-action-menu > * {
+  width: 100% !important;
+  box-sizing: border-box;
+  overflow-x: hidden;
+}
+
+/* The flex wrapper each page passes as headerButtons: go vertical */
+.mobile-action-menu > .flex,
+.mobile-action-menu > .relative > .flex,
+.mobile-action-menu > div > .flex:first-child {
+  flex-direction: column !important;
+  align-items: stretch !important;
+  width: 100% !important;
+  gap: 0.5rem;
+}
+
+/* Any direct child that is itself a flex row should stretch full-width */
+.mobile-action-menu .flex.flex-col,
+.mobile-action-menu .flex.flex-col > * {
+  width: 100% !important;
+}
+
+/* Large text/action buttons (non-icon) → full width, left-aligned */
+.mobile-action-menu button:not([class*="w-7"]):not([class*="w-8"]):not([class*="w-9"]):not([class*="h-5"]):not([class*="h-6"]) {
+  width: 100% !important;
+  justify-content: flex-start !important;
+  min-height: 2.5rem;
+  text-align: left;
+}
+
+/* Icon-only square buttons keep their fixed dimensions */
+.mobile-action-menu button[class*="w-8"],
+.mobile-action-menu button[class*="w-9"],
+.mobile-action-menu button[class*="w-7"] {
+  width: auto !important;
+  min-width: 2rem;
+  flex-shrink: 0 !important;
+}
+
+/* Prevent overflow without breaking scrollable content */
+.mobile-action-menu {
+  overflow-x: hidden;
+}
+
+/* Make text visible in mobile action menus, since they are often hidden by sm:inline */
+.mobile-action-menu span.hidden.sm\:inline,
 .mobile-action-menu span.hidden.md\:inline,
 .mobile-action-menu span.hidden.lg\:inline {
   display: inline !important;
 }
 
-
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 0;
+  }
+  body {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}

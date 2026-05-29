@@ -1462,7 +1462,6 @@ export const useAppStore = create<AppState>()(
       },
 
       // Consumables
-      consumableLogs: [],
       addConsumableLogs: (logs) => set(s => ({ consumableLogs: [...s.consumableLogs, ...logs] })),
 
       dismissedNotifications: [],
@@ -1474,7 +1473,6 @@ export const useAppStore = create<AppState>()(
       }),
 
       // Interview Candidates
-      interviewCandidates: [],
       addInterviewCandidate: (candidate) => {
         set((s) => ({ interviewCandidates: [candidate, ...s.interviewCandidates] }));
         db.insertInterviewCandidate(candidate).catch(e => console.error('Failed to save candidate to DB:', e));

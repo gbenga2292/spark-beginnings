@@ -102,7 +102,7 @@ const task32PayeVerified = (cl: OnboardingChecklist) => cl.payeVerified;
 function Section({
   icon: Icon, label, color, children, defaultOpen = true, locked = false, lockMsg,
 }: {
-  icon: React.ElementType; label: string; color: string;
+  icon: any; label: string; color: string;
   children: React.ReactNode; defaultOpen?: boolean; locked?: boolean; lockMsg?: string;
 }) {
   const [open, setOpen] = useState(defaultOpen);
