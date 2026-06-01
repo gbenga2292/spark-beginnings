@@ -228,6 +228,8 @@ export function Client360() {
   const [selectedInvoiceForDetail, setSelectedInvoiceForDetail] = useState<any>(null);
   const [financialsSubTab, setFinancialsSubTab] = useState<'invoices' | 'payments'>('invoices');
   const [hideFullySettled, setHideFullySettled] = useState(false);
+  const [showOnlyUnpaidInvoices, setShowOnlyUnpaidInvoices] = useState(false);
+  const [invoiceSort, setInvoiceSort] = useState<{ key: string; direction: 'asc' | 'desc' }>({ key: 'date', direction: 'desc' });
 
   // ── Global Header Search Navigation Handler ──────────────────────────────
   const handleSearchNavigation = (result: any) => {
@@ -751,6 +753,8 @@ export function Client360() {
 
     healthScore = Math.max(0, Math.min(100, healthScore));
 
+    const allClientPaymentsForCheck = payments.filter(p => p.client?.trim() === selectedClient);
+
     const rawClientInvoices = invoices.filter(i => i.client?.trim() === selectedClient);
     const latestInvoicesBySite = new Map();
     rawClientInvoices.forEach(inv => {
@@ -759,15 +763,15 @@ export function Client360() {
       if (!existing) {
         latestInvoicesBySite.set(siteIdKey, inv);
       } else {
-        const existingDate = inv.date ? new Date(normalizeDate(inv.date)).getTime() : 0;
-        const newDate = existing.date ? new Date(normalizeDate(existing.date)).getTime() : 0;
-        if (existingDate > newDate) {
+        const invDate = inv.date ? new Date(normalizeDate(inv.date)).getTime() : 0;
+        const existingMapDate = existing.date ? new Date(normalizeDate(existing.date)).getTime() : 0;
+        if (invDate > existingMapDate) {
           latestInvoicesBySite.set(siteIdKey, inv);
         }
       }
     });
 
-    const clientInvoices = Array.from(latestInvoicesBySite.values()).map(inv => {
+    const clientInvoices = rawClientInvoices.map(inv => {
       const site = clientSites.find(s => s.id === inv.siteId || s.name === inv.siteName);
       let nextBillingDate = null;
       let siteStatus = site?.status || 'Ended'; 
@@ -778,8 +782,34 @@ export function Client360() {
           nextBillingDate = d.toISOString().split('T')[0];
         }
       }
-      return { ...inv, nextBillingDate, siteStatus };
-    }).filter(inv => inv.siteStatus !== 'Ended');
+
+      let intelligentStatus = inv.status;
+      if (intelligentStatus !== 'Paid') {
+        const invAmount = inv.totalCharge || inv.amount || 0;
+        const invDateNum = inv.date ? new Date(normalizeDate(inv.date)).getTime() : 0;
+        
+        // Find if there's a payment on the same site with a similar amount made around or after the invoice date
+        const matchingPayment = allClientPaymentsForCheck.find(p => {
+          const siteMatch = (p.site?.trim() === inv.siteName?.trim() || p.site === inv.siteId);
+          const diff = Math.abs((p.amount || 0) - invAmount);
+          const isSimilarAmount = invAmount > 0 && (diff / invAmount) <= 0.05; // Within 5% tolerance for Withholding Tax/deductions
+          const pDateNum = p.date ? new Date(normalizeDate(p.date)).getTime() : 0;
+          const isDateValid = pDateNum >= (invDateNum - (7 * 24 * 60 * 60 * 1000)); // Payment made no more than 7 days prior, or after
+          
+          return siteMatch && isSimilarAmount && isDateValid;
+        });
+
+        if (matchingPayment) {
+          intelligentStatus = 'Paid';
+        }
+      }
+
+      return { ...inv, nextBillingDate, siteStatus, status: intelligentStatus };
+    }).sort((a, b) => {
+      const dateA = a.date ? new Date(normalizeDate(a.date)).getTime() : 0;
+      const dateB = b.date ? new Date(normalizeDate(b.date)).getTime() : 0;
+      return dateB - dateA;
+    });
 
     return {
       clientSites, activeSites: activeSites.length, totalSites: clientSites.length,
@@ -1395,25 +1425,90 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                           Registry of all invoices sent to this client and upcoming billing schedules.
                         </p>
                       </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setShowOnlyUnpaidInvoices(!showOnlyUnpaidInvoices)}
+                          className={cn(
+                            "flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors",
+                            showOnlyUnpaidInvoices 
+                              ? "bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-500/10 dark:text-indigo-400 dark:border-indigo-500/20"
+                              : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700 dark:hover:bg-slate-700"
+                          )}
+                        >
+                          <Filter className="w-3.5 h-3.5" />
+                          Unpaid Only
+                        </button>
+                      </div>
                     </div>
 
-                    {clientData.clientInvoices && clientData.clientInvoices.length > 0 ? (
+                    {(() => {
+                      let displayedInvoices = clientData.clientInvoices?.filter(inv => !showOnlyUnpaidInvoices || inv.status !== 'Paid') || [];
+                      
+                      displayedInvoices.sort((a, b) => {
+                        let valA: any = a[invoiceSort.key as keyof typeof a];
+                        let valB: any = b[invoiceSort.key as keyof typeof b];
+                        
+                        if (invoiceSort.key === 'date' || invoiceSort.key === 'dueDate' || invoiceSort.key === 'nextBillingDate') {
+                          valA = valA ? new Date(normalizeDate(valA)).getTime() : 0;
+                          valB = valB ? new Date(normalizeDate(valB)).getTime() : 0;
+                        } else if (invoiceSort.key === 'totalCharge') {
+                          valA = a.totalCharge || a.amount || 0;
+                          valB = b.totalCharge || b.amount || 0;
+                        } else if (typeof valA === 'string' && typeof valB === 'string') {
+                          valA = valA.toLowerCase();
+                          valB = valB.toLowerCase();
+                        }
+                        
+                        if (valA < valB) return invoiceSort.direction === 'asc' ? -1 : 1;
+                        if (valA > valB) return invoiceSort.direction === 'asc' ? 1 : -1;
+                        return 0;
+                      });
+
+                      return displayedInvoices.length > 0 ? (
                       <div className="overflow-x-auto style-scroll rounded-xl border border-slate-100 dark:border-slate-800">
                         <table className="w-full text-left text-xs border-collapse min-w-[640px]">
                           <thead>
                             <tr className={cn("border-b font-bold text-slate-500 uppercase tracking-wider text-[10px]", isDark ? "bg-slate-800/40 border-slate-800" : "bg-slate-50 border-slate-100")}>
-                              <th className="p-3">Invoice No</th>
-                              <th className="p-3">Date Sent</th>
-                              <th className="p-3">Site</th>
-                              <th className="p-3 text-right">Duration</th>
-                              <th className="p-3 text-right">Amount</th>
-                              <th className="p-3 text-center">Status</th>
-                              <th className="p-3 text-center">Due Date</th>
-                              <th className="p-3 text-center">Next Billing Date</th>
+                              {[
+                                { key: 'invoiceNumber', label: 'Invoice No', align: 'left' },
+                                { key: 'date', label: 'Date Sent', align: 'left' },
+                                { key: 'siteName', label: 'Site', align: 'left' },
+                                { key: 'duration', label: 'Duration', align: 'right' },
+                                { key: 'totalCharge', label: 'Amount', align: 'right' },
+                                { key: 'status', label: 'Status', align: 'center' },
+                                { key: 'dueDate', label: 'Due Date', align: 'center' },
+                                { key: 'nextBillingDate', label: 'Next Billing Date', align: 'center' }
+                              ].map(col => (
+                                <th 
+                                  key={col.key} 
+                                  className={`p-3 cursor-pointer select-none hover:bg-slate-200/50 dark:hover:bg-slate-700/50 transition-colors ${
+                                    col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'
+                                  }`}
+                                  onClick={() => {
+                                    if (invoiceSort.key === col.key) {
+                                      setInvoiceSort({ key: col.key, direction: invoiceSort.direction === 'asc' ? 'desc' : 'asc' });
+                                    } else {
+                                      setInvoiceSort({ key: col.key, direction: 'desc' });
+                                    }
+                                  }}
+                                >
+                                  <div className={`flex items-center gap-1.5 inline-flex ${col.align === 'right' ? 'flex-row-reverse' : ''}`}>
+                                    {col.label}
+                                    {invoiceSort.key === col.key ? (
+                                      invoiceSort.direction === 'asc' ? <ChevronUp className="w-3 h-3 text-indigo-500" /> : <ChevronDown className="w-3 h-3 text-indigo-500" />
+                                    ) : (
+                                      <div className="flex flex-col opacity-30">
+                                        <ChevronUp className="w-2 h-2 -mb-[3px]" />
+                                        <ChevronDown className="w-2 h-2" />
+                                      </div>
+                                    )}
+                                  </div>
+                                </th>
+                              ))}
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                            {clientData.clientInvoices.map((inv, idx) => (
+                            {displayedInvoices.map((inv, idx) => (
                               <tr key={inv.id || idx} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors cursor-pointer" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedInvoiceForDetail(inv); }}>
                                 <td className="p-3 font-medium text-slate-900 dark:text-white">
                                   {inv.invoiceNumber || '-'}
@@ -1462,10 +1557,13 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                     ) : (
                       <div className="py-12 flex flex-col items-center justify-center text-center text-slate-500">
                         <FileText className="w-12 h-12 text-slate-300 dark:text-slate-700 mb-3" />
-                        <p className="font-semibold text-sm">No Invoices Sent</p>
-                        <p className="text-xs text-slate-400 mt-1">No invoices have been recorded for this client within the selected filter period.</p>
+                        <p className="font-semibold text-sm">No Invoices Found</p>
+                        <p className="text-xs text-slate-400 mt-1">
+                          {showOnlyUnpaidInvoices ? "No unpaid invoices found for this client." : "No invoices have been recorded for this client within the selected filter period."}
+                        </p>
                       </div>
-                    )}
+                    );
+                  })()}
                   </div>
                   )}
 

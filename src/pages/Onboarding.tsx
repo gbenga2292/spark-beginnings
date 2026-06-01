@@ -398,6 +398,7 @@ export function Onboarding() {
     if (patch.payeNumberInput !== undefined) syncPatch.taxId = patch.payeNumberInput;
     if (patch.bankName !== undefined) syncPatch.bankName = patch.bankName;
     if (patch.accountNo !== undefined) syncPatch.accountNo = patch.accountNo;
+    if (patch.verifiedStartDate !== undefined) syncPatch.verifiedStartDate = patch.verifiedStartDate;
 
     updateEmployee(selectedEmployee.id, syncPatch);
 

@@ -99,6 +99,9 @@ export function Dashboard() {
         });
 
         const monthsToProcess = filterMonth ? [filterMonth] : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+        
+        const todayMidnight = new Date();
+        todayMidnight.setHours(0, 0, 0, 0);
 
         // Absent count & OT count for filtered period
         let totalAbsentDays = 0;
@@ -124,6 +127,8 @@ export function Dashboard() {
                     const dateStr = `${filterYear}-${String(targetMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
                     const dDate = new Date(filterYear, targetMonth - 1, day);
                     
+                    if (dDate >= todayMidnight) continue;
+
                     if (emp.startDate && new Date(emp.startDate) > dDate) continue;
                     if (emp.endDate && new Date(emp.endDate) < dDate) continue;
 
@@ -170,9 +175,6 @@ export function Dashboard() {
 
 
         // --- Leave logic ---
-        const todayMidnight = new Date();
-        todayMidnight.setHours(0, 0, 0, 0);
-
         // "On Leave Now": leave has started on/before today, not yet past expectedEndDate, and employee hasn't returned
         const currentlyOnLeave = leaves.filter(l => {
             if (l.status === 'Cancelled') return false;
@@ -268,12 +270,16 @@ export function Dashboard() {
                 let expectedStaffForDay = 0;
                 const dDate = new Date(filterYear, filterMonth - 1, day);
                 
+                const todayMidnight = new Date();
+                todayMidnight.setHours(0, 0, 0, 0);
+
                 // Exclude Sundays and Holidays from expectations
                 const isSun = dDate.getDay() === 0;
                 const isSat = dDate.getDay() === 6;
                 const isHol = holidays.some(h => h.date === dateStr);
 
                 historicallyActiveStaff.forEach(emp => {
+                    if (dDate >= todayMidnight) return;
                     if (emp.startDate && new Date(emp.startDate) > dDate) return;
                     if (emp.endDate && new Date(emp.endDate) < dDate) return;
 
@@ -359,6 +365,11 @@ export function Dashboard() {
                         const dateStr = `${filterYear}-${String(m.value).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
                         const dDate = new Date(filterYear, m.value - 1, day);
                         
+                        const todayMidnight = new Date();
+                        todayMidnight.setHours(0, 0, 0, 0);
+
+                        if (dDate >= todayMidnight) continue;
+
                         if (emp.startDate && new Date(emp.startDate) > dDate) continue;
                         if (emp.endDate && new Date(emp.endDate) < dDate) continue;
 
@@ -477,9 +488,6 @@ export function Dashboard() {
             if (daysUntil <= 14) ALERTS.push({ type: 'warning', msg: `Upcoming Public Holiday: ${nextHol.name} in ${daysUntil} day(s).` });
         }
 
-        if (kpiStats.attendanceRate < 70 && kpiStats.totalPossibleDays > 0) {
-            ALERTS.push({ type: 'urgent', msg: `Low attendance rate: ${kpiStats.attendanceRate}% — review staffing.` });
-        }
 
         if (ALERTS.length === 0) {
             ALERTS.push({ type: 'info', msg: 'No pending critical actions. Systems nominal.' });
