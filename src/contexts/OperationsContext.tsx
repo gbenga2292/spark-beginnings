@@ -572,7 +572,10 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
       const updatedWaybill = { 
         ...waybill, 
         status, 
-        ...(sentToSiteDate ? { sentToSiteDate } : {}),
+        ...(sentToSiteDate ? { 
+          sentToSiteDate,
+          issueDate: sentToSiteDate
+        } : {}),
         ...(returnConditions ? { 
           items: waybill.items.map(item => ({
             ...item,

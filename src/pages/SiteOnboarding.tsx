@@ -395,20 +395,12 @@ export function SiteOnboarding() {
       setShowUnsavedModal(true);
       return;
     }
-    if (window.history.length > 2) {
-      navigate(-1);
-    } else {
-      navigate('/sites');
-    }
+    navigate(-1);
   };
 
   const forceLeave = () => {
     setShowUnsavedModal(false);
-    if (window.history.length > 2) {
-      navigate(-1);
-    } else {
-      navigate('/sites');
-    }
+    navigate(-1);
   };
 
   const headerActions = (

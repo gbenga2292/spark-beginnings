@@ -35,6 +35,7 @@ interface LedgerEntry {
 interface WaybillItem { quantity: number; assetName: string; }
 interface Waybill {
   issueDate: string;
+  sentToSiteDate?: string;
   siteName?: string;
   items: WaybillItem[];
   status: string;
@@ -195,9 +196,10 @@ export function WeeklyReportPreview({
         ) : activeSiteNames.map(sName => {
           const siteExpenses = weekLedger.filter(e => e.site === sName);
           const siteMachines = weekMachineLogs.filter(m => m.siteName === sName);
-          const siteWaybills = waybills.filter(w =>
-            w.siteName === sName && w.issueDate >= startStr && w.issueDate <= endStr
-          );
+          const siteWaybills = waybills.filter(w => {
+            const date = w.sentToSiteDate || w.issueDate;
+            return w.siteName === sName && date >= startStr && date <= endStr;
+          });
           const siteJournalEntries = weekJournalEntries.filter(e =>
             e.siteName === sName &&
             weekJournals.some(j => j.id === e.journalId)
@@ -238,7 +240,7 @@ export function WeeklyReportPreview({
               <DataTable
                 headers={['Date', 'Items', 'Status', 'Driver']}
                 rows={siteWaybills.map(w => [
-                  formatDisplayDate(w.issueDate),
+                  formatDisplayDate(w.sentToSiteDate || w.issueDate),
                   w.items.map(i => `${i.quantity}× ${i.assetName}`).join(', ') || 'Various',
                   w.status, w.driverName || '-'
                 ])}

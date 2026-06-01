@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/src/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
 import { Input } from '@/src/components/ui/input';
-import { Download, Upload, CreditCard, ChevronDown, X, Printer, MoreVertical } from 'lucide-react';
+import { Download, Upload, CreditCard, ChevronDown, X, Printer } from 'lucide-react';
 import { useAppStore, Employee } from '@/src/store/appStore';
 import { computeWorkDays, computeWorkDaysInRange, MONTH_INDEX } from '@/src/lib/workdays';
 import logoSrc from '../../logo/logo-2.png';
@@ -284,15 +284,17 @@ export function Payroll() {
             if (recordDate >= periodStart && recordDate <= periodEnd) {
               const metrics = calculateAttendanceMetrics(r, holidayDates, payrollVariables, monthValues as any, attendanceRecords);
               
-              if (metrics.ot > 0) totalOTInstances += 1;
-
-              if (r.day?.toLowerCase() === 'yes') {
-                daysWorked += 1;
-              } else if (r.day?.toLowerCase() === 'no') {
-                const st = r.absentStatus?.toUpperCase() || '';
-                const isRealAbsence = ["ABSENT", "NO WORK", "ABSENT WITHOUT PERMIT", "SUSPENSION", "OFF DUTY"].includes(st);
-                if (isRealAbsence) {
-                  daysAbsent += 1;
+              if (metrics.ot > 0) {
+                totalOTInstances += 1;
+              } else {
+                if (r.day?.toLowerCase() === 'yes') {
+                  daysWorked += 1;
+                } else if (r.day?.toLowerCase() === 'no') {
+                  const st = r.absentStatus?.toUpperCase() || '';
+                  const isRealAbsence = ["ABSENT", "NO WORK", "ABSENT WITHOUT PERMIT", "SUSPENSION", "OFF DUTY"].includes(st);
+                  if (isRealAbsence) {
+                    daysAbsent += 1;
+                  }
                 }
               }
             }
@@ -1018,66 +1020,64 @@ export function Payroll() {
           )}
         </div>
 
-        {/* Mobile Controls */}
-        <div className="md:hidden">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="h-9 w-9 p-0 bg-white shadow-sm border-slate-200">
-                <MoreVertical className="h-5 w-5 text-slate-600" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56 p-2">
-              <div className="flex flex-col gap-2 pb-2 mb-2 border-b border-slate-100">
-                <label className="text-xs font-semibold text-slate-500 px-2">Filter Period</label>
-                <select
-                  className="h-9 rounded-md border border-slate-200 bg-slate-50 px-3 py-1 text-sm outline-none w-full"
-                  value={selectedMonth}
-                  onChange={(e) => setSelectedMonth(e.target.value)}
+        {/* Mobile Controls — rendered as flat items inside Header's Page Actions panel */}
+        <div className="md:hidden flex flex-col gap-2 w-full">
+          {/* Period Filter */}
+          <div className="flex flex-col gap-1.5">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Filter Period</span>
+            <select
+              className="h-9 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 text-sm text-slate-700 dark:text-slate-200 outline-none w-full"
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+            >
+              {months.map(month => (
+                <option key={month.key} value={month.key}>{month.label}</option>
+              ))}
+            </select>
+            <select
+              className="h-9 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 text-sm text-slate-700 dark:text-slate-200 outline-none w-full"
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(Number(e.target.value))}
+            >
+              {Array.from({ length: currentYear - YEAR_RANGE_START + 2 }, (_, i) => YEAR_RANGE_START + i).map(yr => (
+                <option key={yr} value={yr}>{yr}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Print */}
+          {priv.canGenerate && (
+            <button
+              onClick={() => handleOpenPrintDialog(activeTab === 'processing' ? 'PAYSLIPS' : activeTab.toUpperCase() as any)}
+              className="flex items-center gap-2.5 w-full px-3 h-10 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-indigo-50 dark:hover:bg-slate-700 transition-colors text-left"
+            >
+              <Printer className="h-4 w-4 text-indigo-500 shrink-0" />
+              Print {activeTab === 'processing' ? 'Payslips' : 'Schedule'}
+            </button>
+          )}
+
+          {/* Export CSV */}
+          {finRepPriv?.canExport && activeTab === 'processing' && (
+            <div className="flex flex-col gap-1.5 pt-1 border-t border-slate-100 dark:border-slate-700/60">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Export CSV</span>
+              {([
+                { key: 'PAYSLIPS', label: 'Entire Payroll Table' },
+                { key: 'PAYE',     label: 'PAYE Schedule' },
+                { key: 'PENSION',  label: 'Pension Schedule' },
+                { key: 'NSITF',    label: 'NSITF Schedule' },
+                { key: 'WITHHOLDING', label: 'Withholding Schedule' },
+              ] as const).map(({ key, label }) => (
+                <button
+                  key={key}
+                  onClick={() => handleExportScheduleCSV(key)}
+                  className="flex items-center gap-2.5 w-full px-3 h-10 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-emerald-50 dark:hover:bg-slate-700 transition-colors text-left"
                 >
-                  {months.map(month => (
-                    <option key={month.key} value={month.key}>{month.label}</option>
-                  ))}
-                </select>
-                <select
-                  className="h-9 rounded-md border border-slate-200 bg-slate-50 px-3 py-1 text-sm outline-none w-full"
-                  value={selectedYear}
-                  onChange={(e) => setSelectedYear(Number(e.target.value))}
-                >
-                  {Array.from({ length: currentYear - YEAR_RANGE_START + 2 }, (_, i) => YEAR_RANGE_START + i).map(yr => (
-                    <option key={yr} value={yr}>{yr}</option>
-                  ))}
-                </select>
-              </div>
-              
-              {priv.canGenerate && (
-                <DropdownMenuItem onClick={() => handleOpenPrintDialog(activeTab === 'processing' ? 'PAYSLIPS' : activeTab.toUpperCase() as any)} className="cursor-pointer">
-                  <Printer className="mr-2 h-4 w-4" />
-                  Print {activeTab === 'processing' ? 'Payslips' : 'Schedule'}
-                </DropdownMenuItem>
-              )}
-              {finRepPriv?.canExport && activeTab === 'processing' && (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuLabel className="px-2 pt-2 pb-1 text-xs text-slate-500">Export CSV</DropdownMenuLabel>
-                  <DropdownMenuItem onClick={() => handleExportScheduleCSV('PAYSLIPS')} className="cursor-pointer">
-                    Entire Payroll Table
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleExportScheduleCSV('PAYE')} className="cursor-pointer">
-                    PAYE Schedule
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleExportScheduleCSV('PENSION')} className="cursor-pointer">
-                    Pension Schedule
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleExportScheduleCSV('NSITF')} className="cursor-pointer">
-                    NSITF Schedule
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleExportScheduleCSV('WITHHOLDING')} className="cursor-pointer">
-                    Withholding Schedule
-                  </DropdownMenuItem>
-                </>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+                  <Upload className="h-4 w-4 text-emerald-500 shrink-0" />
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </>,
       [selectedMonth, selectedYear, activeTab]

@@ -89,6 +89,11 @@ export function WaybillManager() {
   const setCurrentSearch = activeTab === 'waybill' ? setWaybillSearch : setReturnSearch;
 
   // ── Full-page detail view (replaces list entirely) ────────────────────
+  const handleOpenSendDialog = (wb: Waybill) => {
+    setSentDate(wb.issueDate ? wb.issueDate.split('T')[0] : new Date().toISOString().split('T')[0]);
+    setWaybillToSend(wb);
+  };
+
   const handleSendWaybill = () => {
     if (waybillToSend) {
       updateWaybillStatus(waybillToSend.id, 'sent_to_site', sentDate);
@@ -102,6 +107,7 @@ export function WaybillManager() {
       initial[item.assetId] = { good: item.quantity, damaged: 0, missing: 0 };
     });
     setReturnConditions(initial);
+    setSentDate(wb.issueDate ? wb.issueDate.split('T')[0] : new Date().toISOString().split('T')[0]);
     setWaybillToProcess(wb);
   };
 
@@ -209,7 +215,7 @@ export function WaybillManager() {
                       </div>
                     </td>
                     <td className="px-5 py-4 font-medium text-slate-600 dark:text-slate-300 whitespace-nowrap text-xs">
-                      {formatDisplayDate(wb.issueDate)}
+                      {formatDisplayDate(wb.sentToSiteDate || wb.issueDate)}
                     </td>
                     <td className="px-5 py-4">{getStatusBadge(wb.status)}</td>
                     <td className="px-5 py-4 max-w-xs text-slate-600 dark:text-slate-400 text-xs">
@@ -247,7 +253,7 @@ export function WaybillManager() {
                               <Button 
                                 size="sm" 
                                 className="h-8 gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs ml-1"
-                                onClick={() => setWaybillToSend(wb)}>
+                                onClick={() => handleOpenSendDialog(wb)}>
                                 <Calendar className="h-3.5 w-3.5" /> Send
                               </Button>
                             )}
@@ -308,7 +314,7 @@ export function WaybillManager() {
                 <div className="flex items-start justify-between">
                   <div className="flex flex-col">
                     <span className="font-bold text-slate-800 dark:text-slate-200">{wb.id}</span>
-                    <span className="text-xs text-slate-400 font-medium">{formatDisplayDate(wb.issueDate)}</span>
+                    <span className="text-xs text-slate-400 font-medium">{formatDisplayDate(wb.sentToSiteDate || wb.issueDate)}</span>
                   </div>
                   <div>
                     {getStatusBadge(wb.status)}
@@ -362,7 +368,7 @@ export function WaybillManager() {
                         <Button 
                           size="sm" 
                           className="h-8 gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs ml-1"
-                          onClick={() => setWaybillToSend(wb)}>
+                          onClick={() => handleOpenSendDialog(wb)}>
                           <Calendar className="h-3.5 w-3.5" /> Send
                         </Button>
                       )}

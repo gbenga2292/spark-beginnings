@@ -20,12 +20,18 @@ interface WaybillDetailViewProps {
   onClose: () => void;
 }
 
-export function WaybillDetailView({ waybill, onClose }: WaybillDetailViewProps) {
-  const { updateWaybillStatus } = useOperations();
+export function WaybillDetailView({ waybill: propWaybill, onClose }: WaybillDetailViewProps) {
+  const { waybills, updateWaybillStatus } = useOperations();
+  const waybill = waybills.find(w => w.id === propWaybill.id) || propWaybill;
+
   const [showPdfPreview, setShowPdfPreview] = useState(false);
   const [pdfDataUri, setPdfDataUri] = useState<string>('');
   const [showDateDialog, setShowDateDialog] = useState(false);
-  const [sentDate, setSentDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [sentDate, setSentDate] = useState<string>(
+    (waybill.sentToSiteDate || waybill.issueDate)
+      ? (waybill.sentToSiteDate || waybill.issueDate)!.split('T')[0]
+      : new Date().toISOString().split('T')[0]
+  );
   const [returnConditions, setReturnConditions] = useState<Record<string, { good: number, damaged: number, missing: number }>>({});
 
   const generatePdfDoc = () => {
@@ -45,7 +51,7 @@ export function WaybillDetailView({ waybill, onClose }: WaybillDetailViewProps) 
     doc.setFontSize(11);
     doc.setFont('times', 'normal');
     doc.text(`Waybill No: REF-${waybill.id.substring(0, 8).toUpperCase()}`, 20, 48);
-    doc.text(`Date: ${formatDisplayDate(waybill.issueDate)}`, 20, 55);
+    doc.text(`Date: ${formatDisplayDate(waybill.sentToSiteDate || waybill.issueDate)}`, 20, 55);
     doc.text(`Driver Name: ${waybill.driverName}`, 20, 62);
     doc.text(`Vehicle: ${waybill.vehicle || 'L200'}`, 20, 69);
 
@@ -146,6 +152,8 @@ export function WaybillDetailView({ waybill, onClose }: WaybillDetailViewProps) 
       });
       setReturnConditions(initial);
     }
+    const d = waybill.sentToSiteDate || waybill.issueDate;
+    setSentDate(d ? d.split('T')[0] : new Date().toISOString().split('T')[0]);
     setShowDateDialog(true);
   };
 
@@ -214,7 +222,11 @@ export function WaybillDetailView({ waybill, onClose }: WaybillDetailViewProps) 
           <Button
             size="sm"
             className="h-9 px-2 sm:px-3 gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-[11px] uppercase tracking-tight shadow-sm transition-all"
-            onClick={() => setShowDateDialog(true)}
+            onClick={() => {
+              const d = waybill.sentToSiteDate || waybill.issueDate;
+              setSentDate(d ? d.split('T')[0] : new Date().toISOString().split('T')[0]);
+              setShowDateDialog(true);
+            }}
           >
             <CheckCircle2 className="h-4 w-4" /> <span className="hidden sm:inline">Mark as Sent</span>
           </Button>
@@ -272,7 +284,7 @@ export function WaybillDetailView({ waybill, onClose }: WaybillDetailViewProps) 
           {/* Info cells */}
           <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-slate-100 dark:divide-slate-800">
             {[
-              { icon: Calendar, label: 'Issue Date', value: formatDisplayDate(waybill.issueDate) },
+              { icon: Calendar, label: 'Date', value: formatDisplayDate(waybill.sentToSiteDate || waybill.issueDate) },
               { icon: User,     label: 'Driver',     value: waybill.driverName },
               { icon: Car,      label: 'Vehicle',    value: waybill.vehicle || 'L200' },
             ].map((cell, i) => (

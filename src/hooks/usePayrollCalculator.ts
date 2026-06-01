@@ -105,21 +105,23 @@ export function usePayrollCalculator() {
             // Use calculateAttendanceMetrics for accurate OT detection
             const metrics = calculateAttendanceMetrics(r, holidayDates, payrollVariables, monthValues as any, attendanceRecords);
 
-            if (metrics.ot > 0) totalOTInstances += 1;
-
-            if (r.day?.toLowerCase() === 'yes') {
-              daysWorked += 1;
-            }
-            if (r.night?.toLowerCase() === 'yes') {
-              daysWorked += 1;
-            }
-            
-            if (r.day?.toLowerCase() === 'no' && r.night?.toLowerCase() === 'no') {
-              // Only count real absences if NEITHER shift was worked
-              const st = (r as any).absentStatus?.toUpperCase() || '';
-              const isRealAbsence = ['ABSENT', 'NO WORK', 'ABSENT WITHOUT PERMIT', 'SUSPENSION', 'OFF DUTY'].includes(st);
-              if (isRealAbsence) {
-                daysAbsent += 1;
+            if (metrics.ot > 0) {
+              totalOTInstances += 1;
+            } else {
+              if (r.day?.toLowerCase() === 'yes') {
+                daysWorked += 1;
+              }
+              if (r.night?.toLowerCase() === 'yes') {
+                daysWorked += 1;
+              }
+              
+              if (r.day?.toLowerCase() === 'no' && r.night?.toLowerCase() === 'no') {
+                // Only count real absences if NEITHER shift was worked
+                const st = (r as any).absentStatus?.toUpperCase() || '';
+                const isRealAbsence = ['ABSENT', 'NO WORK', 'ABSENT WITHOUT PERMIT', 'SUSPENSION', 'OFF DUTY'].includes(st);
+                if (isRealAbsence) {
+                  daysAbsent += 1;
+                }
               }
             }
           }

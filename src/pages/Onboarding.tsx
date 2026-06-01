@@ -396,6 +396,8 @@ export function Onboarding() {
     // Sync pension and paye numbers to the employee record in real-time
     if (patch.pensionNumberInput !== undefined) syncPatch.pensionNumber = patch.pensionNumberInput;
     if (patch.payeNumberInput !== undefined) syncPatch.taxId = patch.payeNumberInput;
+    if (patch.bankName !== undefined) syncPatch.bankName = patch.bankName;
+    if (patch.accountNo !== undefined) syncPatch.accountNo = patch.accountNo;
 
     updateEmployee(selectedEmployee.id, syncPatch);
 

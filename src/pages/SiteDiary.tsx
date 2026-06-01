@@ -129,14 +129,9 @@ export function SiteDiary() {
   useSetPageTitle(
     site ? `${site.name}(${site.client})` : 'Site Diary',
     site ? `Client: ${site.client}` : 'View aggregated daily journal entries',
-    <Button 
-      variant="outline" 
-      size="sm" 
-      className="gap-2 shrink-0 bg-white shadow-sm"
-      onClick={() => navigate(`/sites?client=${encodeURIComponent(site.client)}`)}
-    >
-      <ArrowLeft className="h-4 w-4" /> Back to Sites
-    </Button>
+    null,
+    [site],
+    () => navigate(-1)
   );
 
   return (

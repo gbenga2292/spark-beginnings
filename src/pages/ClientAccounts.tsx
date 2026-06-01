@@ -26,6 +26,7 @@ export function ClientAccounts() {
 
   const [activeTab, setActiveTab] = useState(tabs.length > 0 ? tabs[0].id : '');
   const [searchTerm, setSearchTerm] = useState('');
+  const [fullPageContent, setFullPageContent] = useState<React.ReactNode | null>(null);
 
   // If permissions change and active tab is no longer available, switch to first available
   useEffect(() => {
@@ -49,8 +50,10 @@ export function ClientAccounts() {
   return (
     <div className={cn("flex flex-col h-full", isDark ? "bg-slate-950" : "bg-slate-50")}>
       {/* Tabs Header */}
-      <div className={cn(
-          "flex flex-col gap-3 px-4 sm:px-6 pt-4 pb-0 mb-4 border-b",
+      <div 
+        style={{ display: fullPageContent ? 'none' : 'flex' }}
+        className={cn(
+          "flex-col gap-3 px-4 sm:px-6 pt-4 pb-0 mb-4 border-b",
           isDark ? "border-slate-800 bg-slate-900/50" : "bg-white border-slate-200"
       )}>
         <div className="flex items-center justify-between gap-4 w-full">
@@ -110,8 +113,13 @@ export function ClientAccounts() {
       </div>
 
       {/* Tab Content */}
-      <div className="flex-1 w-full overflow-y-auto px-4 sm:px-6">
-        {ActiveComponent ? React.cloneElement(ActiveComponent as React.ReactElement, { searchTerm } as any) : null}
+      <div className={cn("flex-1 w-full overflow-y-auto", fullPageContent ? "" : "px-4 sm:px-6")}>
+        <div style={{ display: fullPageContent ? 'block' : 'none' }} className="h-full">
+           {fullPageContent}
+        </div>
+        <div style={{ display: fullPageContent ? 'none' : 'block' }} className="h-full">
+           {ActiveComponent ? React.cloneElement(ActiveComponent as React.ReactElement, { searchTerm, setFullPageContent } as any) : null}
+        </div>
       </div>
     </div>
   );

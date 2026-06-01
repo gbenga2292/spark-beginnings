@@ -5,9 +5,16 @@ import {
   Calendar, Sparkles, ChevronDown, ChevronUp, Users, Phone, DollarSign,
   Activity, Briefcase, MessagesSquare, RefreshCcw, Filter, Send,
   ShieldAlert, ShieldCheck, Settings2, X, Edit2, ChevronRight, CheckSquare,
-  Plus, Trash2, Circle, Eye, Search, Receipt
+  Plus, Trash2, Circle, Eye, Search, Receipt, BookOpen, MessageSquare, Pencil, MoreVertical
 } from 'lucide-react';
 import { toast, showConfirm } from '@/src/components/ui/toast';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from '@/src/components/ui/dropdown-menu';
 import { motion, AnimatePresence } from 'framer-motion';
 import { TaskDetailSheet } from '@/src/components/tasks/TaskDetailSheet';
 import { Button } from '@/src/components/ui/button';
@@ -48,6 +55,7 @@ export function Client360() {
   const vatRate = useAppStore(s => s.payrollVariables.vatRate);
   const clientProfiles = useAppStore(s => s.clientProfiles);
   const updateSite = useAppStore(s => s.updateSite);
+  const deleteSite = useAppStore(s => s.deleteSite);
   const updateClientProfile = useAppStore(s => s.updateClientProfile);
   const addClientProfile = useAppStore(s => s.addClientProfile);
   const pendingSites = useAppStore(s => s.pendingSites);
@@ -84,6 +92,22 @@ export function Client360() {
     clientId?: string;
     siteId?: string;
   }>({ open: false, title: '', description: '' });
+
+  // ── Permission checks & narrative state ──
+  const sitePriv = currentUser?.privileges?.sites;
+  const canEditSite   = !currentUser || (sitePriv?.canView === true && sitePriv?.canEditSite === true);
+  const canDeleteSite = !currentUser || (sitePriv?.canView === true && sitePriv?.canDeleteSite === true);
+  const canViewComm   = !currentUser || currentUser?.privileges?.commLog?.canView === true;
+
+  const [narrativeSite, setNarrativeSite] = useState<{ site: Site; q: any | null } | null>(null);
+
+  const handleDeleteSite = async (id: string) => {
+    const ok = await showConfirm('Delete this site?', { variant: 'danger', confirmLabel: 'Delete' });
+    if (ok) { 
+      deleteSite(id); 
+      toast.success('Site deleted.'); 
+    }
+  };
 
   // Pending Onboarding: delete with guard
   const handleDeletePendingOnboarding = async (site: { id: string; siteName: string; clientName: string }) => {
@@ -1732,7 +1756,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                       <div className="space-y-3 flex-1 overflow-y-auto max-h-[400px] style-scroll pr-2">
                         {clientData.clientSites.length > 0 ? clientData.clientSites.map(site => (
                           <div key={site.id}
-                            className={cn('p-3 rounded-lg border cursor-pointer transition-all hover:border-indigo-400 hover:shadow-md group', isDark ? 'border-slate-800 bg-slate-800/50 hover:bg-slate-800' : 'border-slate-100 bg-slate-50 hover:bg-white')}
+                            className={cn('p-3 rounded-lg border cursor-pointer transition-all hover:border-indigo-400 hover:shadow-md group relative', isDark ? 'border-slate-800 bg-slate-800/50 hover:bg-slate-800' : 'border-slate-100 bg-slate-50 hover:bg-white')}
                             onClick={() => setSelectedSite(site)}
                           >
                             <div className="flex justify-between items-center">
@@ -1740,9 +1764,85 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                                 <MapPin className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
                                 <span className="font-semibold text-sm">{site.name}</span>
                               </div>
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                                 <Badge className={site.status === 'Active' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700'}>{site.status}</Badge>
-                                <ChevronRight className="w-4 h-4 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button
+                                      variant="ghost" size="icon"
+                                      className="h-8 w-8 text-slate-400 hover:text-indigo-600 hover:bg-slate-200/50 dark:hover:bg-slate-700/50 rounded-lg flex items-center justify-center shrink-0 border-0 bg-transparent cursor-pointer"
+                                    >
+                                      <MoreVertical className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end" className="w-[180px]">
+                                    <DropdownMenuItem 
+                                      onClick={() => setNarrativeSite({ site, q: pendingSites.find(ps => ps.siteName === site.name && ps.clientName === site.client) || null })}
+                                      className="gap-2"
+                                    >
+                                      <FileText className="h-4 w-4 text-slate-400" />
+                                      <span>Site Summary</span>
+                                    </DropdownMenuItem>
+                                    
+                                    {canEditSite && (
+                                      <DropdownMenuItem 
+                                        onClick={() => {
+                                          const linkedQ = pendingSites.find(ps => ps.siteName === site.name && ps.clientName === site.client);
+                                          if (linkedQ) navigate(`/sites/onboarding/${linkedQ.id}`);
+                                          else navigate('/sites/onboarding/new', { state: { linkedSite: site } });
+                                        }}
+                                        className="gap-2"
+                                      >
+                                        <Eye className="h-4 w-4 text-slate-400" />
+                                        <span>View Onboarding</span>
+                                      </DropdownMenuItem>
+                                    )}
+                                    {canViewComm && (
+                                      <DropdownMenuItem 
+                                        onClick={() => {
+                                          navigate(`/sites/conversations/${site.id}`);
+                                        }}
+                                        className="gap-2"
+                                      >
+                                        <MessageSquare className="h-4 w-4 text-slate-400" />
+                                        <span>Site Conversations</span>
+                                      </DropdownMenuItem>
+                                    )}
+
+                                    <DropdownMenuItem 
+                                      onClick={() => {
+                                        navigate(`/sites/diary/${site.id}`);
+                                      }}
+                                      className="gap-2 text-emerald-600 focus:text-emerald-700"
+                                    >
+                                      <BookOpen className="h-4 w-4" />
+                                      <span>Site Diary</span>
+                                    </DropdownMenuItem>
+    
+                                    {canEditSite && (
+                                      <DropdownMenuItem 
+                                        onClick={() => openSiteEdit(site)}
+                                        className="gap-2 text-indigo-700 focus:text-indigo-700 focus:bg-indigo-50"
+                                      >
+                                        <Pencil className="h-4 w-4" />
+                                        <span>Edit Site</span>
+                                      </DropdownMenuItem>
+                                    )}
+    
+                                    {canDeleteSite && (
+                                      <>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem 
+                                          onClick={() => handleDeleteSite(site.id)}
+                                          className="gap-2 text-red-600 focus:text-red-600 focus:bg-red-50"
+                                        >
+                                          <Trash2 className="h-4 w-4" />
+                                          <span>Delete</span>
+                                        </DropdownMenuItem>
+                                      </>
+                                    )}
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
                               </div>
                             </div>
                             {site.startDate && <p className="text-xs text-slate-400 mt-1.5 ml-5.5">Since {new Date(site.startDate).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}</p>}
@@ -2465,6 +2565,220 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
           initialSiteId={taskDialog.siteId}
         />
       )}
+
+      {/* ── Site Narrative Info Modal ── */}
+      {narrativeSite && (
+        <div className="fixed inset-0 bg-slate-900/60 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4 animate-in fade-in duration-200">
+          <div className="absolute inset-0 bg-slate-900/60" onClick={() => setNarrativeSite(null)} />
+          <div className={cn("relative bg-white h-full sm:h-auto sm:max-h-[90vh] w-full max-w-xl sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-10 duration-300", isDark ? "bg-slate-900 text-white" : "bg-white text-slate-900")}>
+            {/* Header */}
+            <div className="bg-gradient-to-r from-indigo-600 to-indigo-500 px-5 sm:px-6 py-4 sm:py-5 flex items-start justify-between shrink-0">
+              <div className="pr-8 text-left">
+                <h2 className="text-white font-bold text-lg leading-tight truncate">{narrativeSite.site.name}</h2>
+                <div className="flex items-center gap-2 mt-1">
+                  <p className="text-indigo-100 text-xs font-medium bg-white/10 px-2 py-0.5 rounded uppercase tracking-wider">{narrativeSite.site.status}</p>
+                  <span className="text-indigo-300 text-xs">•</span>
+                  <p className="text-indigo-100 text-xs truncate max-w-[150px] sm:max-w-none">{narrativeSite.site.client}</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setNarrativeSite(null)} 
+                className="text-white/80 hover:text-white bg-white/10 hover:bg-white/20 p-2 rounded-full transition-colors shrink-0 border-0 cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Scrollable Content */}
+            <div className="p-5 sm:p-6 overflow-y-auto style-scroll flex-1 text-left">
+              {/* Quick Info Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-6">
+                <div className={cn("p-3 sm:p-4 rounded-xl border group hover:border-indigo-100 transition-colors", isDark ? "bg-slate-800 border-slate-700" : "bg-slate-50 border-slate-100")}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="p-1.5 bg-indigo-50 dark:bg-indigo-950/30 rounded-md text-indigo-600 dark:text-indigo-400">
+                      <MapPin className="h-3.5 w-3.5" />
+                    </div>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Site Address</p>
+                  </div>
+                  <p className="text-sm font-semibold">{narrativeSite.q?.address || 'Address not listed'}</p>
+                </div>
+
+                <div className={cn("p-3 sm:p-4 rounded-xl border group hover:border-indigo-100 transition-colors", isDark ? "bg-slate-800 border-slate-700" : "bg-slate-50 border-slate-100")}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="p-1.5 bg-emerald-50 dark:bg-emerald-950/30 rounded-md text-emerald-600 dark:text-emerald-400">
+                      <Users className="h-3.5 w-3.5" />
+                    </div>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Contact Person</p>
+                  </div>
+                  <p className="text-sm font-semibold">
+                    {narrativeSite.q?.contactPersonName || 'Contact not listed'}
+                    {narrativeSite.q?.contactPersonPhone && (
+                      <span className={cn("block text-[11px] font-medium mt-1 inline-block px-1.5 py-0.5 rounded border", isDark ? "bg-slate-900 border-slate-700 text-slate-300" : "bg-white border-slate-100 text-slate-500")}>
+                        {narrativeSite.q.contactPersonPhone}
+                      </span>
+                    )}
+                  </p>
+                </div>
+
+                <div className={cn("p-3 sm:p-4 rounded-xl border group hover:border-indigo-100 transition-colors", isDark ? "bg-slate-800 border-slate-700" : "bg-slate-50 border-slate-100")}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="p-1.5 bg-amber-50 dark:bg-amber-950/30 rounded-md text-amber-600 dark:text-amber-400">
+                      <Briefcase className="h-3.5 w-3.5" />
+                    </div>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Project Name</p>
+                  </div>
+                  <p className="text-sm font-semibold truncate">{narrativeSite.q?.phase1?.whatIsBeingBuilt || 'Dewatering Operations'}</p>
+                </div>
+
+                <div className={cn("p-3 sm:p-4 rounded-xl border group hover:border-indigo-100 transition-colors", isDark ? "bg-slate-800 border-slate-700" : "bg-slate-50 border-slate-100")}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="p-1.5 bg-blue-50 dark:bg-blue-950/30 rounded-md text-blue-600 dark:text-blue-400">
+                      <FileText className="h-3.5 w-3.5" />
+                    </div>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tax Status</p>
+                  </div>
+                  <p className="text-sm font-semibold">{narrativeSite.q?.phase4?.clientTaxStatus || 'Standard'}</p>
+                </div>
+              </div>
+
+              {/* Narrative Section */}
+              <div className="relative">
+                <div className="absolute left-0 top-0 bottom-0 w-1 bg-indigo-50 dark:bg-indigo-950 rounded-full" />
+                <div className="pl-5">
+                  <h3 className="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                    <BookOpen className="h-3.5 w-3.5" />
+                    Project Narrative
+                  </h3>
+                  <div className={cn("text-sm leading-relaxed whitespace-pre-line font-medium", isDark ? "text-slate-300" : "text-slate-650")}>
+                    {buildNarrative(narrativeSite.site, narrativeSite.q)}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className={cn("px-5 sm:px-6 py-4 border-t flex justify-end shrink-0", isDark ? "bg-slate-900 border-slate-800" : "bg-slate-50 border-slate-150")}>
+              <Button 
+                onClick={() => setNarrativeSite(null)}
+                className={cn("w-full sm:w-auto shadow-sm", isDark ? "bg-slate-800 hover:bg-slate-750 text-white border-slate-750" : "bg-white hover:bg-slate-50 text-slate-600 border-slate-200")}
+              >
+                Close Summary
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
+
+const toDisplayDate = (iso: string | null | undefined): string => {
+  if (!iso) return '';
+  const date = new Date(iso);
+  if (isNaN(date.getTime())) return iso;
+  return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+};
+
+const buildNarrative = (site: any, q: any | null): string => {
+  const lines: string[] = [];
+  const isEnded = site.status === 'Ended';
+  const name = site.name || 'this site';
+  const client = site.client || 'the client';
+
+  // Helper for tense-aware verbs
+  const getVerb = (present: string, past: string) => isEnded ? past : present;
+
+  // Opening
+  lines.push(`${name} ${getVerb('is', 'was')} a dewatering project undertaken by DCEL on behalf of ${client}.`);
+
+  if (q) {
+    // Phase 1 — Project Scope
+    const p1 = q.phase1;
+    if (p1?.whatIsBeingBuilt) {
+      lines.push(`The project ${getVerb('involves', 'involved')} ${p1.whatIsBeingBuilt.toLowerCase()}.`);
+    }
+    if (p1?.excavationDepthMeters) {
+      lines.push(`Excavation ${getVerb('is planned', 'was')} to a depth of ${p1.excavationDepthMeters} metres.`);
+    }
+    if (p1?.siteLength && p1?.siteWidth) {
+      lines.push(`The site ${getVerb('measures', 'measured')} approximately ${p1.siteLength}m by ${p1.siteWidth}m.`);
+    }
+    if (p1?.timelineStartDate) {
+      lines.push(`Works ${getVerb('are scheduled to commence', 'commenced')} on ${p1.timelineStartDate}.`);
+    }
+    
+    const dataAvail = [
+      p1?.geotechnicalReportAvailable && 'geotechnical report', 
+      p1?.hydrogeologicalDataAvailable && 'hydrogeological data'
+    ].filter(Boolean);
+    
+    if (dataAvail.length) {
+      lines.push(`Background data available at inquiry: ${dataAvail.join(' and ')}.`);
+    }
+
+    // Phase 2 — Site Assessment
+    const p2 = q.phase2;
+    const visited = p2?.siteVisited || p2?.walkthroughCompleted;
+    if (visited) {
+      lines.push(`A site visit and walkthrough were conducted to assess site conditions.`);
+    }
+    if (p2?.knownObstacles) {
+      lines.push(`Known site obstacles ${getVerb('include', 'included')}: ${p2.knownObstacles}.`);
+    }
+    if (p2?.dischargeLocation) {
+      lines.push(`Dewatering discharge ${getVerb('will be', 'was')} directed to ${p2.dischargeLocation}.`);
+    }
+    if (p2?.dieselSupplyStrategy) {
+      lines.push(`Diesel supply ${getVerb('is to be', 'was')} provided by ${p2.dieselSupplyStrategy}.`);
+    }
+
+    // Phase 3 — Engineering
+    const p3 = q.phase3;
+    const methods = (p3?.dewateringMethods || []);
+    if (methods.length) {
+      lines.push(`The approved dewatering method(s) for this site: ${methods.join(', ')}.`);
+    }
+    if (p3?.totalWellpointsRequired) {
+      lines.push(`The system ${getVerb('requires', 'required')} ${p3.totalWellpointsRequired} wellpoints across ${p3.totalHeadersRequired || '—'} header pipes.`);
+    }
+    if (p3?.totalPumpsRequired) {
+      lines.push(`A total of ${p3.totalPumpsRequired} pump(s) ${getVerb('will be', 'were')} deployed.`);
+    }
+    if (p3?.expectedDailyDieselUsage) {
+      lines.push(`${getVerb('Estimated daily', 'Actual')} diesel consumption ${getVerb('is', 'was')} ${p3.expectedDailyDieselUsage}.`);
+    }
+
+    // Phase 4 — Commercial
+    const p4 = q.phase4;
+    if (p4?.scopeOfWorkSummary) lines.push(`Scope of work: ${p4.scopeOfWorkSummary}`);
+    if (p4?.scopeExclusionsSummary) lines.push(`Exclusions from scope: ${p4.scopeExclusionsSummary}`);
+    if (p4?.clientTaxStatus) lines.push(`Client tax classification is ${p4.clientTaxStatus}.`);
+    if (p4?.proposalAccepted) lines.push(`The client formally accepted the proposal.`);
+
+    // Phase 5 — Handover
+    const p5 = q.phase5;
+    const milestones: string[] = [];
+    if (p5?.safetyPlanIntegrated) milestones.push('site safety plan integrated');
+    if (p5?.stage1AdvanceReceived) milestones.push('50% advance payment received');
+    if (p5?.stage2InstallationComplete) milestones.push(isEnded ? 'installation completed' : 'installation complete and system started');
+    if (p5?.stage2FirstInvoiceIssued) milestones.push('first hire invoice issued');
+    if (p5?.stage3TimelyBilling) milestones.push(isEnded ? 'billing cycle completed' : 'regular hire invoicing ongoing');
+    if (p5?.stage4DemobilizationComplete) milestones.push('demobilisation complete');
+    if (p5?.stage4FinalInvoiceIssued) milestones.push('final invoice and WHT credit issued');
+    
+    if (milestones.length) {
+      lines.push(`Project milestones achieved: ${milestones.join(', ')}.`);
+    }
+    if (p5?.actualEndDate) {
+      lines.push(`The project concluded on ${p5.actualEndDate}.`);
+    }
+  } else {
+    lines.push(`No detailed onboarding record has been linked to this site yet.`);
+  }
+
+  lines.push(`Current site status: ${site.status}. VAT: ${site.vat}.`);
+  if (site.startDate) {
+    lines.push(`${getVerb('Start date', 'Project started')}: ${site.startDate}${site.endDate ? `. Concluded: ${site.endDate}` : ''}.`);
+  }
+  return lines.join(' ');
+};

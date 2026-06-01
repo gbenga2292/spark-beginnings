@@ -532,6 +532,8 @@ export interface PendingInvoice {
   historyLog?: any[];
   machineConfigs?: { qt: number, rate: number, duration: number }[];
   countOffDays?: boolean;
+  technicianDuration?: number;
+  technicianDurationSameAsMachine?: boolean;
 }
 
 export interface Invoice {
@@ -571,6 +573,8 @@ export interface Invoice {
   /** Asset IDs of machines whose logs count against this invoice's duration */
   linkedAssetIds?: string[];
   countOffDays?: boolean;
+  technicianDuration?: number;
+  technicianDurationSameAsMachine?: boolean;
 }
 
 export interface SalaryAdvance {

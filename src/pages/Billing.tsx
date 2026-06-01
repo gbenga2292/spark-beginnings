@@ -1,9 +1,11 @@
 import { formatDisplayDate, normalizeDate } from '@/src/lib/dateUtils';
 import React, { useState, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import InvoiceLogo from '../../logo/logo-2.png';
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction, AlertDialogCancel } from '@/src/components/task_ui/alert-dialog';
 import { useAppStore, PendingInvoice, Invoice } from '@/src/store/appStore';
 import { toast, showConfirm } from '@/src/components/ui/toast';
-import { Trash2, Edit, CheckCircle, Plus, X, ArrowRightCircle, Upload, Download, Mail, ChevronUp, ChevronDown, ChevronRight, Printer, PlusCircle } from 'lucide-react';
+import { Trash2, Edit, CheckCircle, Plus, X, ArrowRightCircle, Upload, Download, Mail, ChevronUp, ChevronDown, ChevronRight, Printer, PlusCircle, ArrowLeft, Save } from 'lucide-react';
 import { Input } from '@/src/components/ui/input';
 import { Button } from '@/src/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
@@ -16,11 +18,10 @@ import { generateId, cn } from '@/src/lib/utils';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel } from '@/src/components/ui/dropdown-menu';
 import { NumericFormat } from 'react-number-format';
 import { supabase } from '@/src/integrations/supabase/client';
-import { InvoiceRuntimeTracker } from './InvoiceRuntimeTracker';
 import { InvoiceDetailDialog } from './InvoiceDetailDialog';
 import { useOperations } from '@/src/contexts/OperationsContext';
 
-export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
+export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: string; setFullPageContent?: (content: React.ReactNode) => void }) {
   const sites = useAppStore((state) => state.sites);
   const pendingSites = useAppStore((state) => state.pendingSites);
   const pendingInvoices = useAppStore((state) => state.pendingInvoices);
@@ -55,11 +56,6 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'quotations' | 'all' | 'active' | 'unpaid' | 'completed'>('all');
   const [showFilters, setShowFilters] = useState(false);
-  const isViewingAll = activeTab === 'all';
-  const isViewingActive = activeTab === 'active';
-  const isViewingQuotations = activeTab === 'quotations';
-  const isViewingUnpaid = activeTab === 'unpaid';
-  const isViewingCompleted = activeTab === 'completed';
   const payments = useAppStore(state => state.payments);
   const ledgerBanks = useAppStore(state => state.ledgerBanks);
   const ledgerBeneficiaryBanks = useAppStore(state => state.ledgerBeneficiaryBanks);
@@ -111,6 +107,8 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
     dailyRentalCost: '',
     noOfTechnician: '',
     techniciansDailyRate: '',
+    technicianDuration: '',
+    technicianDurationSameAsMachine: true,
     dieselCostPerLtr: '',
     dailyUsage: '',
     mobDemob: '',
@@ -226,8 +224,12 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
       return sum + (parseFloat(row.rate) || 0) * (parseFloat(row.duration) || 0);
     }, 0);
 
-    const dieselCost = noOfMachine * dailyUsage * dieselCostPerLtr * maxDuration;
-    const techniciansCost = noOfTechnician * techniciansDailyRate * maxDuration;
+    const actualTechDuration = form.technicianDurationSameAsMachine ? maxDuration : (parseFloat(form.technicianDuration) || 0);
+
+    const dieselCost = machineConfigs.length > 0
+      ? machineConfigs.reduce((sum, row) => sum + dailyUsage * dieselCostPerLtr * (parseFloat(row.duration) || 0), 0)
+      : noOfMachine * dailyUsage * dieselCostPerLtr * maxDuration;
+    const techniciansCost = noOfTechnician * techniciansDailyRate * actualTechDuration;
     const instMobDemob = mobDemob + installation;
     const otherCosts = damages;
     const totalCost = rentalCost + dieselCost + techniciansCost + instMobDemob + otherCosts;
@@ -269,6 +271,9 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
     const maxDuration = activeCfgs
       ? Math.max(...activeCfgs.map(r => parseFloat(r.duration) || 0))
       : (parseFloat(input.duration) || 0);
+
+    const isTechSame = input.technicianDurationSameAsMachine ?? true;
+    const actualTechDuration = isTechSame ? maxDuration : (parseFloat(input.technicianDuration) || 0);
 
     const siteName = (input.site || input.siteName || '').trim();
     const clientName = (input.client || '').trim();
@@ -331,8 +336,10 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
       ? activeCfgs.reduce((sum, row) => sum + (parseFloat(row.rate) || 0) * (parseFloat(row.duration) || 0), 0)
       : (parseInt(input.noOfMachine) || 0) * (parseFloat(input.dailyRentalCost) || 0) * maxDuration;
 
-    const dieselCost = noOfMachine * dailyUsage * dieselCostPerLtr * maxDuration;
-    const techniciansCost = noOfTechnician * techniciansDailyRate * maxDuration;
+    const dieselCost = activeCfgs
+      ? activeCfgs.reduce((sum, row) => sum + dailyUsage * dieselCostPerLtr * (parseFloat(row.duration) || 0), 0)
+      : noOfMachine * dailyUsage * dieselCostPerLtr * maxDuration;
+    const techniciansCost = noOfTechnician * techniciansDailyRate * actualTechDuration;
     const instMobDemob = mobDemob + installation;
     const otherCosts = damages;
     const totalCost = rentalCost + dieselCost + techniciansCost + instMobDemob + otherCosts;
@@ -367,6 +374,8 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
       client: clientName, site: siteName,
       machineConfigs: machineConfigsOut,
       countOffDays: input.countOffDays ?? true,
+      technicianDuration: isTechSame ? undefined : (parseFloat(input.technicianDuration) || 0),
+      technicianDurationSameAsMachine: isTechSame,
     };
   };
 
@@ -430,6 +439,8 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
         totalExclusiveOfVat: data.totalExclusiveOfVat,
         machineConfigs: data.machineConfigs,
         countOffDays: data.countOffDays,
+        technicianDuration: data.technicianDuration,
+        technicianDurationSameAsMachine: data.technicianDurationSameAsMachine,
       };
 
       if (movingFromQuotationToActive) {
@@ -528,6 +539,8 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
       dailyRentalCost: 'dailyRentalCost' in inv ? String(inv.dailyRentalCost ?? 0) : '0',
       noOfTechnician: 'noOfTechnician' in inv ? String(inv.noOfTechnician ?? 0) : '0',
       techniciansDailyRate: 'techniciansDailyRate' in inv ? String(inv.techniciansDailyRate ?? 0) : '0',
+      technicianDuration: 'technicianDuration' in inv ? String(inv.technicianDuration ?? 0) : '0',
+      technicianDurationSameAsMachine: 'technicianDurationSameAsMachine' in inv ? (inv.technicianDurationSameAsMachine ?? true) : true,
       dieselCostPerLtr: 'dieselCostPerLtr' in inv ? String(inv.dieselCostPerLtr ?? 0) : '0',
       dailyUsage: 'dailyUsage' in inv ? String(inv.dailyUsage ?? 0) : '0',
       mobDemob: 'mobDemob' in inv ? String(inv.mobDemob ?? 0) : '0',
@@ -606,7 +619,9 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
         totalCost: inv.totalCost,
         vat: inv.vat,
         totalCharge: inv.totalCharge,
-        totalExclusiveOfVat: inv.totalExclusiveOfVat
+        totalExclusiveOfVat: inv.totalExclusiveOfVat,
+        technicianDuration: inv.technicianDuration,
+        technicianDurationSameAsMachine: inv.technicianDurationSameAsMachine
       });
       deletePendingInvoice(inv.id);
       if (selectedId === inv.id) handleClear();
@@ -654,6 +669,8 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
       noOfMachine: String(machineIndices.length),
       noOfTechnician: String(inv.noOfTechnician || 0),
       techniciansDailyRate: String(inv.techniciansDailyRate || 0),
+      technicianDuration: String(inv.technicianDuration || 0),
+      technicianDurationSameAsMachine: inv.technicianDurationSameAsMachine ?? true,
       dieselCostPerLtr: String(inv.dieselCostPerLtr || 0),
       dailyUsage: String(inv.dailyUsage || 0),
       mobDemob: '0', // Usually mob/demob is one-time, but user can re-input
@@ -1160,11 +1177,32 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
     }
   };
 
-  const sitesForClient = siteRegistry.filter(s => s.client === (form.client || '').trim());
+  React.useEffect(() => {
+    if (printInvoiceTarget && setFullPageContent) {
+      setFullPageContent(
+        <div className="flex flex-col w-full max-w-5xl mx-auto pb-10 pt-0 animate-in fade-in slide-in-from-bottom-2 duration-300">
+           <div className="w-full flex flex-col relative">
+             <InvoicePrintModal
+               invoice={printInvoiceTarget}
+               ledgerBanks={ledgerBanks}
+               ledgerBeneficiaryBanks={ledgerBeneficiaryBanks}
+               onClose={() => setPrintInvoiceTarget(null)}
+             />
+           </div>
+        </div>
+      );
+    } else if (setFullPageContent) {
+      setFullPageContent(null);
+    }
+    
+    return () => {
+      if (setFullPageContent) setFullPageContent(null);
+    };
+  }, [printInvoiceTarget, setFullPageContent, ledgerBanks, ledgerBeneficiaryBanks]);
 
   useSetPageTitle(
-    activeTab === 'all' ? 'All Invoices' : activeTab === 'active' ? 'Active Invoices' : activeTab === 'quotations' ? 'Quotations' : activeTab === 'unpaid' ? 'Unpaid Site Records' : 'Completed Invoices',
-    activeTab === 'all'
+    printInvoiceTarget ? null : (activeTab === 'all' ? 'All Invoices' : activeTab === 'active' ? 'Active Invoices' : activeTab === 'quotations' ? 'Quotations' : activeTab === 'unpaid' ? 'Unpaid Site Records' : 'Completed Invoices'),
+    printInvoiceTarget ? '' : (activeTab === 'all'
       ? 'View every historical invoice record'
       : activeTab === 'active'
       ? 'Invoices for sites currently in progress'
@@ -1172,8 +1210,9 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
       ? 'Sites with outstanding balances'
       : activeTab === 'quotations' 
       ? 'Review and process quotation drafts'
-      : 'Review invoices for sites with consolidated payments',
-    <div className="flex items-center gap-2 md:gap-3">
+      : 'Review invoices for sites with consolidated payments'),
+    printInvoiceTarget ? null : (
+      <>
       {priv.canExport && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -1214,7 +1253,8 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
           <Plus className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Create Invoice</span>
         </Button>
       )}
-    </div>
+      </>),
+    [activeTab, priv, siteRegistry, pendingInvoices, completedSites, unpaidSites, currentList, printInvoiceTarget]
   );
 
   return (
@@ -1488,7 +1528,6 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
                       <TableRow
                         className="hover:bg-slate-50 transition-colors cursor-pointer group"
                         onClick={() => {
-                          console.log('Billing: Toggling site expansion', { siteKey, current: expandedSiteKey });
                           setExpandedSiteKey(prev => prev === siteKey ? null : siteKey);
                         }}
                       >
@@ -2064,6 +2103,28 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
                       <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Daily Tech Rate</label>
                       <NumericFormat customInput={Input} thousandSeparator decimalScale={2} value={form.techniciansDailyRate} onValueChange={(v) => handleChange('techniciansDailyRate', v.value || '')} className="bg-slate-50" />
                     </div>
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Tech Duration</label>
+                        <label className="flex items-center gap-1 text-[9px] text-slate-500 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={form.technicianDurationSameAsMachine}
+                            onChange={e => handleChange('technicianDurationSameAsMachine', e.target.checked)}
+                            className="accent-indigo-600 w-3 h-3"
+                          />
+                          Same as M-1
+                        </label>
+                      </div>
+                      <Input 
+                        type="number" 
+                        min="0" 
+                        value={form.technicianDurationSameAsMachine ? (machineConfigs.length > 0 ? Math.max(...machineConfigs.map(r => parseFloat(r.duration) || 0)) : '') : form.technicianDuration} 
+                        onChange={e => handleChange('technicianDuration', e.target.value)} 
+                        disabled={form.technicianDurationSameAsMachine}
+                        className={form.technicianDurationSameAsMachine ? "bg-slate-100 text-slate-400 cursor-not-allowed" : "bg-slate-50"} 
+                      />
+                    </div>
                   </div>
 
                   {/* ── Per-machine rate / duration rows ──────────────── */}
@@ -2288,7 +2349,7 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
             <div className="relative bg-white rounded-xl shadow-2xl p-6 w-full max-w-md mx-4 border border-slate-200">
               <h3 className="text-xl font-bold text-slate-900 mb-2">Import Policy</h3>
               <p className="text-sm text-slate-500 leading-relaxed mb-6">
-                How would you like to process the {isViewingActive ? 'Active' : 'Pending'} Invoice records from this CSV file?
+                How would you like to process the {activeTab === 'active' ? 'Active' : 'Pending'} Invoice records from this CSV file?
               </p>
               <div className="flex flex-col gap-3">
                 <Button onClick={() => processImport(importFile, 'update')} className="bg-indigo-600 hover:bg-indigo-700 text-white h-auto py-3 flex-col items-center justify-center">
@@ -2311,18 +2372,9 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
           </div>
         )}
 
-        {/* Print Invoice Modal Overlay */}
-        {printInvoiceTarget && (
-          <InvoicePrintModal 
-            invoice={printInvoiceTarget as any} 
-            onClose={() => setPrintInvoiceTarget(null)}
-            ledgerBanks={ledgerBanks}
-            ledgerBeneficiaryBanks={ledgerBeneficiaryBanks}
-          />
-        )}
         </div>
 
-        {/* Invoice Detail Dialog - Moved outside animated containers for better stacking context */}
+        {/* Invoice Detail Dialog */}
         <InvoiceDetailDialog
           invoice={detailInvoice}
           invoiceList={currentList ?? []}
@@ -2373,6 +2425,65 @@ function toWords(num: number): string {
   return str;
 }
 
+function getOrdinalSuffix(day: number): string {
+  if (day > 3 && day < 21) return 'th';
+  switch (day % 10) {
+    case 1:  return "st";
+    case 2:  return "nd";
+    case 3:  return "rd";
+    default: return "th";
+  }
+}
+
+function formatDateRange(startDateStr: string, durationDays: number): string {
+  if (!startDateStr || !durationDays) return '';
+  const start = new Date(startDateStr);
+  if (isNaN(start.getTime())) return '';
+  
+  const end = new Date(start);
+  end.setDate(start.getDate() + durationDays - 1);
+  
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const fullMonths = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  
+  const sDay = start.getDate();
+  const eDay = end.getDate();
+  const sMonth = start.getMonth();
+  const eMonth = end.getMonth();
+  const sYear = start.getFullYear();
+  const eYear = end.getFullYear();
+  
+  const sDayStr = `${sDay}${getOrdinalSuffix(sDay)}`;
+  const eDayStr = `${eDay}${getOrdinalSuffix(eDay)}`;
+  
+  if (sYear !== eYear) {
+    return `(${sDayStr} ${months[sMonth]} ${sYear} - ${eDayStr} ${months[eMonth]} ${eYear})`;
+  }
+  if (sMonth !== eMonth) {
+    return `(${sDayStr} ${months[sMonth]} - ${eDayStr} ${months[eMonth]} ${sYear})`;
+  }
+  return `(${sDayStr} - ${eDayStr} ${fullMonths[sMonth]} ${sYear})`;
+}
+
+function getAmtStyle(amountVal: number) {
+  const str = `NGN ${amountVal.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+  const len = str.length;
+  const size = len > 18 ? '10px' : (len > 15 ? '11.5px' : '13px');
+  return {
+    whiteSpace: 'nowrap' as const,
+    fontSize: size,
+  };
+}
+
+function getLabelStyle(labelStr: string) {
+  const len = labelStr.length;
+  const size = len > 18 ? '10px' : (len > 15 ? '11.5px' : '13px');
+  return {
+    whiteSpace: 'nowrap' as const,
+    fontSize: size,
+  };
+}
+
 export function InvoicePrintModal({ invoice, onClose, ledgerBanks, ledgerBeneficiaryBanks }: { 
   invoice: any, 
   onClose: () => void,
@@ -2381,89 +2492,245 @@ export function InvoicePrintModal({ invoice, onClose, ledgerBanks, ledgerBenefic
 }) {
   const printRef = React.useRef<HTMLDivElement>(null);
   
-  // Combine both banks for selection dropdown logic if needed, but here we just take the first as default
   const defaultBank = ledgerBeneficiaryBanks[0]?.name || ledgerBanks[0]?.name || 'Stanbic IBTC Bank\n0000000000';
   
-  const [billedToInput, setBilledToInput] = useState(invoice.client || 'Client Name\nCompany Address\nCity');
-  const [paidToInput, setPaidToInput] = useState('Dewatering Construction Etc Limited\n' + defaultBank);
-  const [projectText, setProjectText] = useState('DCEL- SED');
-  const [termsText, setTermsText] = useState('For Immediate Payment');
+  const getInitialBilledTo = () => {
+    if (invoice.printLayout?.billedToInput) return invoice.printLayout.billedToInput;
+    let defaultAddress = invoice.client || 'Client Name';
+    const clientProfiles = useAppStore.getState().clientProfiles || [];
+    const clientProfile = clientProfiles.find(c => c.name === invoice.client || c.id === invoice.clientId);
+    if (clientProfile && clientProfile.address) {
+      defaultAddress = `${clientProfile.name}\n${clientProfile.address}`;
+    } else {
+      defaultAddress = `${invoice.client || 'Client Name'}\nCompany Address\nCity`;
+    }
+    return defaultAddress;
+  };
+
+  const [billedToInput, setBilledToInput] = useState(getInitialBilledTo());
+  const [paidToInput, setPaidToInput] = useState(invoice.printLayout?.paidToInput || ('Dewatering Construction Etc Limited\n' + defaultBank));
+  const [projectText, setProjectText] = useState(invoice.printLayout?.projectText || 'DCEL- SED');
+  const [termsText, setTermsText] = useState(invoice.printLayout?.termsText || 'For Immediate Payment');
   
   const [invoiceDate, setInvoiceDate] = useState(invoice.printLayout?.invoiceDate || invoice.date || invoice.startDate || '');
   const [invoiceNo, setInvoiceNo] = useState(invoice.printLayout?.invoiceNo || invoice.invoiceNumber || invoice.invoiceNo || '');
   const [paymentsCredits, setPaymentsCredits] = useState<number>(invoice.printLayout?.paymentsCredits || 0);
   
+  const [combineDiesel, setCombineDiesel] = useState(invoice.printLayout?.combineDiesel || false);
+
+  const generateDieselItems = (combine: boolean, maxMachineDuration: number) => {
+    const list: any[] = [];
+    if (!(invoice.dieselCost && invoice.dieselCost > 0)) return list;
+
+    const dailyUsage = parseFloat(invoice.dailyUsage) || 0;
+    const dieselCostPerLtr = parseFloat(invoice.dieselCostPerLtr) || 0;
+
+    if (invoice.machineConfigs && invoice.machineConfigs.length > 0 && !combine) {
+      const configs: any[] = invoice.machineConfigs;
+      const firstDur  = parseFloat(configs[0]?.duration) || 0;
+      const resolved = configs.map((m: any) => ({
+        duration: m.sameDurationAsFirst ? firstDur : (parseFloat(m.duration) || 0),
+      }));
+
+      const dieselGroups = new Map<number, { duration: number; count: number }>();
+      resolved.forEach((m) => {
+        if (m.duration > 0) {
+          const key = m.duration;
+          if (!dieselGroups.has(key)) dieselGroups.set(key, { duration: m.duration, count: 0 });
+          dieselGroups.get(key)!.count++;
+        }
+      });
+
+      dieselGroups.forEach((g) => {
+        const unitDieselCost = dailyUsage * dieselCostPerLtr * g.duration;
+        const totalDieselCost = unitDieselCost * g.count;
+        const pumpLabel = g.count > 1 ? `${g.count} Pumps` : '1 Pump';
+        list.push({
+          id: generateId(),
+          selected: true,
+          type: 'diesel',
+          desc: `Diesel Supply for ${pumpLabel} (${dailyUsage}L/day per pump for ${g.duration} Days @ ₦${dieselCostPerLtr.toLocaleString()}/L)`,
+          qty: g.count,
+          unitRate: unitDieselCost,
+          amount: totalDieselCost,
+        });
+      });
+    } else {
+      let totalLiters = 0;
+      let totalCost = 0;
+      let pumpCount = 0;
+
+      if (invoice.machineConfigs && invoice.machineConfigs.length > 0) {
+        const configs: any[] = invoice.machineConfigs;
+        const firstDur  = parseFloat(configs[0]?.duration) || 0;
+        const resolved = configs.map((m: any) => ({
+          duration: m.sameDurationAsFirst ? firstDur : (parseFloat(m.duration) || 0),
+        }));
+
+        resolved.forEach((m) => {
+          totalLiters += dailyUsage * m.duration;
+          totalCost += dailyUsage * dieselCostPerLtr * m.duration;
+          pumpCount++;
+        });
+
+        const pumpLabel = pumpCount > 1 ? `${pumpCount} Pumps` : '1 Pump';
+        list.push({
+          id: generateId(),
+          selected: true,
+          type: 'diesel',
+          desc: `Diesel Supply (Estimated ${totalLiters.toLocaleString()} Liters total for ${pumpLabel} at varying durations @ ₦${dieselCostPerLtr.toLocaleString()}/L)`,
+          qty: 1,
+          unitRate: totalCost,
+          amount: totalCost,
+        });
+      } else {
+        list.push({ 
+          id: generateId(), 
+          selected: true, 
+          type: 'diesel',
+          desc: `Diesel Supply (${invoice.dailyUsage || 0}L/day for ${maxMachineDuration} Days @ ₦${(invoice.dieselCostPerLtr || 0).toLocaleString()}/L)`, 
+          qty: 1, 
+          unitRate: invoice.dieselCost, 
+          amount: invoice.dieselCost 
+        });
+      }
+    }
+    return list;
+  };
+
+  const handleToggleCombineDiesel = (checked: boolean) => {
+    setCombineDiesel(checked);
+    setItems(prev => {
+      const nonDieselItems = prev.filter(item => item.type !== 'diesel');
+      let insertIndex = prev.findIndex(item => item.type === 'diesel');
+      if (insertIndex === -1) {
+        insertIndex = prev.findIndex(item => item.type === 'rental');
+        if (insertIndex !== -1) {
+          while (insertIndex < prev.length && prev[insertIndex].type === 'rental') {
+            insertIndex++;
+          }
+        } else {
+          insertIndex = 0;
+        }
+      }
+      
+      let maxMachineDuration = invoice.duration || 0;
+      if (invoice.machineConfigs && invoice.machineConfigs.length > 0) {
+        const configs: any[] = invoice.machineConfigs;
+        const firstDur  = parseFloat(configs[0]?.duration) || 0;
+        const resolved = configs.map((m: any) => ({
+          duration: m.sameDurationAsFirst ? firstDur : (parseFloat(m.duration) || 0),
+        }));
+        maxMachineDuration = Math.max(...resolved.map(m => m.duration));
+      }
+
+      const newDiesels = generateDieselItems(checked, maxMachineDuration);
+      const nextItems = [...nonDieselItems];
+      nextItems.splice(insertIndex, 0, ...newDiesels);
+      return nextItems;
+    });
+  };
+
   const [items, setItems] = useState<any[]>(() => {
     if (invoice.printLayout?.items) return invoice.printLayout.items;
     const list = [];
+    
+    let maxMachineDuration = invoice.duration || 0;
+    const sites = useAppStore.getState().sites || [];
+    const siteName = (invoice.siteName || invoice.site || '').trim();
+    const clientName = (invoice.client || '').trim();
+    const realSite = sites.find(s => s.name === siteName && s.client === clientName) || sites.find(s => s.name === clientName && s.client === siteName);
+    const siteLocation = realSite?.address ? ` at ${realSite.address}` : (invoice.siteName || invoice.site ? ` at ${invoice.siteName || invoice.site}` : '');
+
     if (invoice.machineConfigs && invoice.machineConfigs.length > 0) {
       const configs: any[] = invoice.machineConfigs;
       const firstRate = parseFloat(configs[0]?.rate) || 0;
       const firstDur  = parseFloat(configs[0]?.duration) || 0;
 
-      // Resolve effective rate/duration per machine, respecting "same as first" flags
       const resolved = configs.map((m: any) => ({
         rate:     m.sameRateAsFirst     ? firstRate : (parseFloat(m.rate)     || 0),
         duration: m.sameDurationAsFirst ? firstDur  : (parseFloat(m.duration) || 0),
       }));
 
-      // Group machines that share the same rate+duration into a single line item
-      const groups = new Map<string, { rate: number; duration: number; count: number }>();
-      resolved.forEach((m) => {
-        if (m.rate > 0 && m.duration > 0) {
-          const key = `${m.rate}|${m.duration}`;
-          if (!groups.has(key)) groups.set(key, { rate: m.rate, duration: m.duration, count: 0 });
-          groups.get(key)!.count++;
-        }
-      });
+      maxMachineDuration = Math.max(...resolved.map(m => m.duration));
 
-      let phaseNum = 1;
-      groups.forEach((g) => {
-        const unitCost  = g.rate * g.duration;
-        const totalCost = unitCost * g.count;
-        const pumpLabel = g.count > 1 ? `${g.count} Dewatering Pumps` : '1 Dewatering Pump';
+      let pumpNum = 1;
+      resolved.forEach((m) => {
+        const unitCost  = m.rate * m.duration;
+        const dateRangeStr = formatDateRange(invoice.startDate || invoice.date, m.duration);
+        const dateRangeSuffix = dateRangeStr ? ` ${dateRangeStr}` : '';
         list.push({
           id: generateId(),
           selected: true,
-          desc: `Phase ${phaseNum}\nLease of ${pumpLabel} @ ₦${g.rate.toLocaleString()} per pump for ${g.duration} days.`,
-          qty: g.count,
+          type: 'rental',
+          desc: `Pump ${pumpNum}: Lease of 1 Dewatering Pump @ ₦${m.rate.toLocaleString()} per pump for ${m.duration} days.${dateRangeSuffix}${siteLocation}.`,
+          qty: 1,
           unitRate: unitCost,
-          amount: totalCost,
+          amount: unitCost,
         });
-        phaseNum++;
+        pumpNum++;
       });
+
+      const dieselItems = generateDieselItems(invoice.printLayout?.combineDiesel || false, maxMachineDuration);
+      list.push(...dieselItems);
     } else if (invoice.rentalCost && invoice.rentalCost > 0) {
       const n = invoice.noOfMachine || 1;
       const pumpLabel = n > 1 ? `${n} Dewatering Pumps` : '1 Dewatering Pump';
-      list.push({ id: generateId(), selected: true, desc: `Phase 1\nLease of ${pumpLabel} @ ₦${(invoice.dailyRentalCost || 0).toLocaleString()} per pump for ${invoice.duration || 0} days.`, qty: n, unitRate: invoice.rentalCost, amount: invoice.rentalCost });
+      const dateRangeStr = formatDateRange(invoice.startDate || invoice.date, invoice.duration || 0);
+      const dateRangeSuffix = dateRangeStr ? ` ${dateRangeStr}` : '';
+      list.push({ 
+        id: generateId(), 
+        selected: true, 
+        type: 'rental',
+        desc: `Phase 1\nLease of ${pumpLabel} @ ₦${(invoice.dailyRentalCost || 0).toLocaleString()} per pump for ${invoice.duration || 0} days.${dateRangeSuffix}${siteLocation}.`, 
+        qty: n, 
+        unitRate: (invoice.dailyRentalCost || 0) * (invoice.duration || 0), 
+        amount: invoice.rentalCost 
+      });
     }
+    
     if (invoice.techniciansCost && invoice.techniciansCost > 0) {
-      list.push({ id: generateId(), selected: true, desc: `Technician Charge for ${invoice.noOfTechnician || 0} dewatering staff @ N${(invoice.techniciansDailyRate || 0).toLocaleString()} per technician per day for ${invoice.duration || 0} days.`, qty: invoice.noOfTechnician || 1, unitRate: invoice.techniciansCost, amount: invoice.techniciansCost });
+      const actualTechDuration = invoice.technicianDurationSameAsMachine !== false 
+        ? maxMachineDuration 
+        : (parseFloat(invoice.technicianDuration) || invoice.duration || 0);
+      
+      const ratePerTech = (invoice.techniciansDailyRate || 0) * actualTechDuration;
+      
+      list.push({ 
+        id: generateId(), 
+        selected: true, 
+        type: 'technician',
+        desc: `Technician Charge for ${invoice.noOfTechnician || 0} dewatering staff @ N${(invoice.techniciansDailyRate || 0).toLocaleString()} per technician per day for ${actualTechDuration} days.`, 
+        qty: invoice.noOfTechnician || 1, 
+        unitRate: ratePerTech, 
+        amount: invoice.techniciansCost 
+      });
     }
-    if (invoice.dieselCost && invoice.dieselCost > 0) {
-      list.push({ id: generateId(), selected: true, desc: `Diesel Supply (${invoice.dailyUsage || 0}L/day for ${invoice.duration || 0} Days @ ₦${(invoice.dieselCostPerLtr || 0).toLocaleString()}/L)`, qty: 1, unitRate: invoice.dieselCost, amount: invoice.dieselCost });
+    
+    if (!list.some(item => item.type === 'diesel') && invoice.dieselCost && invoice.dieselCost > 0) {
+      const dieselItems = generateDieselItems(invoice.printLayout?.combineDiesel || false, maxMachineDuration);
+      list.push(...dieselItems);
     }
+    
     if (invoice.mobDemob && invoice.mobDemob > 0) {
-      list.push({ id: generateId(), selected: true, desc: `Mobilization / Demobilization`, qty: 1, unitRate: invoice.mobDemob, amount: invoice.mobDemob });
+      list.push({ id: generateId(), selected: true, type: 'mobDemob', desc: `Mobilization / Demobilization`, qty: 1, unitRate: invoice.mobDemob, amount: invoice.mobDemob });
     }
     if (invoice.installation && invoice.installation > 0) {
-      list.push({ id: generateId(), selected: true, desc: `Installation`, qty: 1, unitRate: invoice.installation, amount: invoice.installation });
+      list.push({ id: generateId(), selected: true, type: 'installation', desc: `Installation`, qty: 1, unitRate: invoice.installation, amount: invoice.installation });
     }
     if (invoice.damages && invoice.damages > 0) {
-      list.push({ id: generateId(), selected: true, desc: `Damages / Repairs`, qty: 1, unitRate: invoice.damages, amount: invoice.damages });
+      list.push({ id: generateId(), selected: true, type: 'damages', desc: `Damages / Repairs`, qty: 1, unitRate: invoice.damages, amount: invoice.damages });
     }
     if (list.length === 0) {
-       list.push({ id: generateId(), selected: true, desc: 'Description of service...', qty: 1, amount: 0 });
+       list.push({ id: generateId(), selected: true, type: 'custom', desc: 'Description of service...', qty: 1, amount: 0 });
     }
     return list;
   });
 
   const subtotal = items.reduce((acc, curr) => acc + (parseFloat(curr.amount) || 0), 0);
-  
-  const vatIncSetting = invoice.vatInc;
-  const vatRateStr = String(useAppStore.getState().payrollVariables?.vatRate || '7.5');
-  const vatRate = parseFloat(vatRateStr) || 7.5;
+  const vatRate = parseFloat(String(useAppStore.getState().payrollVariables?.vatRate || '7.5')) || 7.5;
 
+  const vatIncSetting = invoice.vatInc;
   let totalCharge = subtotal;
   let vat = 0;
   if (vatIncSetting === 'Yes') {
@@ -2476,11 +2743,10 @@ export function InvoicePrintModal({ invoice, onClose, ledgerBanks, ledgerBenefic
   const [customWords, setCustomWords] = useState<string | null>(invoice.printLayout?.customWords || null);
   
   React.useEffect(() => {
-    // Determine auto-calculate if words have never been saved
     if (customWords === null && !invoice.printLayout?.customWords) {
       setCustomWords('TOTAL AMOUNT IN WORD: ' + toWords(totalCharge));
     }
-  }, [totalCharge, invoice.printLayout?.customWords]);
+  }, [totalCharge, customWords, invoice.printLayout?.customWords]);
 
   const wordsValue = customWords !== null ? customWords : ('TOTAL AMOUNT IN WORD: ' + toWords(totalCharge));
   const [footerText, setFooterText] = useState(invoice.printLayout?.footerText || 'We look forward to your swift response.');
@@ -2490,67 +2756,176 @@ export function InvoicePrintModal({ invoice, onClose, ledgerBanks, ledgerBenefic
   const [footerEmail, setFooterEmail] = useState(invoice.printLayout?.footerEmail || 'info@dewaterconstruct.com');
 
   const calcBalanceDue = totalCharge - paymentsCredits;
+  const [isSaving, setIsSaving] = React.useState(false);
+
+  // ── Dirty tracking ─────────────────────────────────────────────────
+  const initialSnapshot = React.useRef(
+    JSON.stringify({
+      items: invoice.printLayout?.items || null,
+      invoiceDate: invoice.printLayout?.invoiceDate || invoice.date || invoice.startDate || '',
+      invoiceNo: invoice.printLayout?.invoiceNo || invoice.invoiceNumber || invoice.invoiceNo || '',
+      customWords: invoice.printLayout?.customWords || null,
+      paymentsCredits: invoice.printLayout?.paymentsCredits || 0,
+      footerCompany: invoice.printLayout?.footerCompany || 'DEWATERING CONSTRUCTION ETC LIMITED',
+      footerContact: invoice.printLayout?.footerContact || '09030002182, 08028280712',
+      footerEmail: invoice.printLayout?.footerEmail || 'info@dewaterconstruct.com',
+      footerText: invoice.printLayout?.footerText || 'We look forward to your swift response.',
+      billedToInput: getInitialBilledTo(),
+      paidToInput: invoice.printLayout?.paidToInput || ('Dewatering Construction Etc Limited\n' + defaultBank),
+      projectText: invoice.printLayout?.projectText || 'DCEL- SED',
+      termsText: invoice.printLayout?.termsText || 'For Immediate Payment',
+      combineDiesel: invoice.printLayout?.combineDiesel || false,
+    })
+  );
+
+  const currentSnapshot = JSON.stringify({
+    items, invoiceDate, invoiceNo, customWords, paymentsCredits,
+    footerCompany, footerContact, footerEmail, footerText,
+    billedToInput, paidToInput, projectText, termsText,
+    combineDiesel,
+  });
+
+  const hasUnsavedChanges = currentSnapshot !== initialSnapshot.current;
+
+  // After a successful save, update the snapshot so the badge disappears
+  const updateSnapshot = () => {
+    initialSnapshot.current = JSON.stringify({
+      items, invoiceDate, invoiceNo, customWords, paymentsCredits,
+      footerCompany, footerContact, footerEmail, footerText,
+      billedToInput, paidToInput, projectText, termsText,
+    });
+  };
+
+  // ── Leave confirmation ─────────────────────────────────────────────
+  const [showLeaveDialog, setShowLeaveDialog] = React.useState(false);
+
+  const guardedClose = () => {
+    if (hasUnsavedChanges) {
+      setShowLeaveDialog(true);
+    } else {
+      onClose();
+    }
+  };
+
+  // ── History viewer ─────────────────────────────────────────────────
+  const historyLog: any[] = (invoice as any).historyLog || [];
+  const savedLayout = invoice.printLayout;
+  const [showHistory, setShowHistory] = React.useState(false);
 
   const handlePrint = () => {
     const content = printRef.current;
     if (!content) return;
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
-    printWindow.document.write(`
+
+    // Read live .value from React-controlled elements BEFORE cloning
+    // (cloneNode copies HTML attributes, not the live .value property)
+    const liveTextareas = Array.from(
+      content.querySelectorAll<HTMLTextAreaElement>('textarea.hide-on-print')
+    );
+    const liveInputs = Array.from(
+      content.querySelectorAll<HTMLInputElement>('input.hide-on-print')
+    );
+    const taValues  = liveTextareas.map(el => el.value);
+    const inpValues = liveInputs.map(el => el.value);
+
+    // Clone so mutations don't affect the live UI
+    const clone = content.cloneNode(true) as HTMLElement;
+
+    // Replace each textarea.hide-on-print with a value-bearing span
+    Array.from(clone.querySelectorAll<HTMLTextAreaElement>('textarea.hide-on-print'))
+      .forEach((ta, i) => {
+        const span = document.createElement('span');
+        span.style.whiteSpace = 'pre-wrap';
+        span.textContent = taValues[i] ?? '';
+        ta.parentNode?.replaceChild(span, ta);
+      });
+
+    // Replace each input.hide-on-print with a value-bearing span
+    Array.from(clone.querySelectorAll<HTMLInputElement>('input.hide-on-print'))
+      .forEach((inp, i) => {
+        const span = document.createElement('span');
+        span.textContent = inpValues[i] ?? '';
+        inp.parentNode?.replaceChild(span, inp);
+      });
+
+    // Remove all remaining .hide-on-print elements (buttons, column TH/TD, etc.)
+    Array.from(clone.querySelectorAll('.hide-on-print'))
+      .forEach(el => el.parentNode?.removeChild(el));
+
+    // Remove .show-on-print spans — no longer needed since inputs are replaced above
+    Array.from(clone.querySelectorAll('.show-on-print'))
+      .forEach(el => el.parentNode?.removeChild(el));
+
+    // Use a hidden iframe so the browser's native print dialog opens
+    // without spawning a new tab
+    const iframe = document.createElement('iframe');
+    iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden;';
+    document.body.appendChild(iframe);
+
+    const iframeDoc = iframe.contentWindow?.document;
+    if (!iframeDoc) { document.body.removeChild(iframe); return; }
+
+    iframeDoc.open();
+    iframeDoc.write(`
       <html><head><title>Print Invoice ${invoiceNo}</title>
       <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; background-color: white;}
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 13.5px; color: #111; background: white!important; line-height: 1.4; }
-        .a4-page { width: 210mm; min-height: 297mm; padding: 15mm; margin: auto; break-after: auto; display: flex; flex-direction: column; }
-        
-        .top-section { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 25px; }
+        * { box-sizing: border-box; margin: 0; padding: 0; background-color: white; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 13.5px; color: #111; background: white !important; line-height: 1.4; }
+
+        /* No min-height, no flex-column — content determines page height naturally */
+        .a4-page { width: 210mm; padding: 15mm; margin: auto; display: block; }
+
+        .top-section { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 25px !important; }
         .logo-box { width: 60%; }
-        /* Logo representation */
-        .logo-box svg { height: 90px; width: auto; }
         .inv-header { text-align: right; width: 240px; }
-        .inv-header h1 { font-family: 'Arial Black', Impact, sans-serif; font-size: 32px; font-weight: 900; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 1px; color: #111; text-align: right; margin-top: 10px;}
-        .date-table { width: 100%; border-collapse: collapse; border: 1.5px solid #385296; font-size: 13.5px; font-weight: bold; }
-        .date-table th { border: 1.5px solid #385296; padding: 4px; text-align: center; }
-        .date-table td { border: 1.5px solid #385296; padding: 4px; text-align: center; font-weight: normal; }
+        .inv-header h1 { font-family: 'Arial Black', Impact, sans-serif; font-size: 32px !important; font-weight: 900; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 1px; color: #111; text-align: right; margin-top: 10px; }
 
-        .mid-section { display: flex; justify-content: space-between; gap: 30px; margin-bottom: 20px; }
-        .box { flex: 1; border: 1.5px solid #385296; }
-        .box-title { font-weight: bold; padding: 5px 8px; font-size: 13.5px; border-bottom: 1.5px solid #385296; }
-        .box-content { padding: 8px; white-space: pre-wrap; font-size: 13.5px; min-height: 80px; }
+        table.date-table { width: 100%; border-collapse: collapse !important; border: 1.5px solid #385296 !important; font-size: 13.5px; font-weight: bold; background: white; margin: 0 !important; }
+        table.date-table th { border: 1.5px solid #385296 !important; padding: 4px !important; text-align: center; }
+        table.date-table td { border: 1.5px solid #385296 !important; padding: 4px !important; text-align: center; font-weight: normal; vertical-align: middle; }
 
-        .project-terms { display: flex; justify-content: flex-end; margin-bottom: -1.5px; }
-        .pt-table { border-collapse: collapse; width: 340px; text-align: center; font-size: 12px; }
-        .pt-table th, .pt-table td { border: 1.5px solid #385296; padding: 4px; }
-        .pt-table th { font-weight: normal; }
-        .pt-table td { font-weight: normal; }
+        .mid-section { display: flex; justify-content: space-between; gap: 30px; margin-bottom: 20px !important; }
+        .box { flex: 1; border: 1.5px solid #385296 !important; background: white; }
+        .box-title { font-weight: bold; padding: 5px 8px !important; font-size: 13.5px; border-bottom: 1.5px solid #385296 !important; margin: 0 !important; }
+        .box-content { padding: 8px !important; white-space: pre-wrap; font-size: 13.5px; min-height: 80px; }
 
-        .main-table { width: 100%; border-collapse: collapse; border: 1.5px solid #385296; font-size: 13.5px; }
-        .main-table th { border: 1.5px solid #385296; padding: 8px; text-align: center; font-weight: bold; }
-        .main-table td { border-left: 1.5px solid #385296; border-right: 1.5px solid #385296; padding: 12px; vertical-align: top; }
-        
+        .project-terms { display: flex; justify-content: flex-end; margin-bottom: -1.5px !important; }
+        table.pt-table { border-collapse: collapse !important; width: 340px; text-align: center; font-size: 12px; background: white; margin: 0 !important; }
+        table.pt-table th, table.pt-table td { border: 1.5px solid #385296 !important; padding: 4px !important; }
+        table.pt-table th { font-weight: normal; }
+        table.pt-table td { font-weight: normal; }
+
+        table.main-table { width: 100%; border-collapse: collapse !important; font-size: 13.5px; background: white; margin: 0 !important; }
+        table.main-table th { border: 1.5px solid #385296 !important; padding: 8px !important; text-align: center; font-weight: bold; }
+        table.main-table td { border-left: 1.5px solid #385296 !important; border-right: 1.5px solid #385296 !important; padding: 12px !important; vertical-align: top; }
+        table.main-table tr.item-row td { border-top: none !important; }
+
+        .borderless-cell { border: none !important; border-left: hidden !important; border-bottom: hidden !important; background: transparent !important; }
         .desc-col { width: 65%; }
-        .qty-col { width: 15%; text-align: center!important; }
-        .amt-col { width: 20%; text-align: right!important; padding-right: 10px!important;}
+        .qty-col { width: 15%; text-align: center !important; }
+        .amt-col { width: 20%; text-align: right !important; padding-right: 10px !important; }
 
-        .footer { margin-top: auto; padding-top: 40px; font-size: 13.5px; line-height: 1.4; font-weight: bold;}
-        
+        /* padding-top only — no margin-top:auto so footer stays right after content */
+        .footer { padding-top: 30px; font-size: 13.5px; line-height: 1.4; font-weight: bold; page-break-inside: avoid; }
+
         @media print {
           body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-          .a4-page { width: 100%; padding: 10mm; margin: 0; box-shadow: none; break-after: auto; }
+          .a4-page { margin: 0 !important; padding: 10mm !important; box-shadow: none !important; }
         }
-        .hide-on-print { display: none !important; }
-        .show-on-print { display: block !important; }
-        span.show-on-print { display: inline !important; }
       </style></head><body>
-      ${content.innerHTML}
+      ${clone.innerHTML}
       </body></html>
     `);
-    printWindow.document.close();
-    printWindow.focus();
-    setTimeout(() => { printWindow.print(); }, 400);
-  };
+    iframeDoc.close();
 
-  const [isSaving, setIsSaving] = React.useState(false);
+    iframe.contentWindow?.focus();
+    setTimeout(() => {
+      iframe.contentWindow?.print();
+      // Clean up iframe after print dialog closes
+      setTimeout(() => {
+        if (document.body.contains(iframe)) document.body.removeChild(iframe);
+      }, 2000);
+    }, 500);
+  };
 
   const handleSaveLayout = async () => {
     const layout = {
@@ -2563,6 +2938,11 @@ export function InvoicePrintModal({ invoice, onClose, ledgerBanks, ledgerBenefic
       footerContact,
       footerEmail,
       footerText,
+      billedToInput,
+      paidToInput,
+      projectText,
+      termsText,
+      combineDiesel,
     };
 
     const actionLog = {
@@ -2578,7 +2958,6 @@ export function InvoicePrintModal({ invoice, onClose, ledgerBanks, ledgerBenefic
 
     setIsSaving(true);
     try {
-      // Await the real DB write so errors are surfaced
       const { error } = await supabase
         .from(table)
         .update({ print_layout: layout, history_log: newHistory })
@@ -2586,7 +2965,6 @@ export function InvoicePrintModal({ invoice, onClose, ledgerBanks, ledgerBenefic
 
       if (error) throw error;
 
-      // Only update local state after DB confirms
       if (isPending) {
         useAppStore.getState().updatePendingInvoice(currentId, { printLayout: layout, historyLog: newHistory });
       } else {
@@ -2594,6 +2972,7 @@ export function InvoicePrintModal({ invoice, onClose, ledgerBanks, ledgerBenefic
       }
 
       toast.success('Invoice layout saved successfully');
+      updateSnapshot();
     } catch (e: any) {
       console.error('Save layout error:', e);
       toast.error('Failed to save layout: ' + (e?.message || 'Unknown error'));
@@ -2616,115 +2995,190 @@ export function InvoicePrintModal({ invoice, onClose, ledgerBanks, ledgerBenefic
     setItems(items.filter((_, i) => i !== index));
   };
 
+  useSetPageTitle(
+    'PDF Preview',
+    `#${invoiceNo} · ${invoice.client}`,
+    <div className="flex items-center gap-2">
+      {hasUnsavedChanges && (
+        <span className="hidden sm:flex items-center gap-1.5 text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-3 py-1">
+          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+          Unsaved Changes
+        </span>
+      )}
+      {savedLayout && (
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => setShowHistory(!showHistory)}
+          className="h-9 gap-2 text-slate-600 border-slate-200 bg-white hover:bg-slate-50 font-semibold text-[11px] uppercase tracking-tight shadow-sm px-4 transition-all"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>
+          <span className="hidden sm:inline">History</span>
+        </Button>
+      )}
+      <div className="h-6 w-px bg-slate-200 mx-1 hidden sm:block" />
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={handleSaveLayout}
+        disabled={isSaving}
+        className="h-9 gap-2 text-slate-700 border-slate-200 bg-white hover:bg-slate-50 font-semibold text-[11px] uppercase tracking-tight shadow-sm px-4 transition-all"
+      >
+        <Save className="h-4 w-4" />
+        <span className="hidden sm:inline">{isSaving ? 'Saving...' : 'Save State'}</span>
+      </Button>
+      <Button
+        size="sm"
+        onClick={handlePrint}
+        className="h-9 gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-[11px] uppercase tracking-tight px-4 shadow-sm transition-all"
+      >
+        <Printer className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Print Document</span>
+      </Button>
+    </div>,
+    [],
+    guardedClose
+  );
+
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-md">
-      <div className="bg-white max-w-[900px] w-full rounded-2xl shadow-2xl h-[96vh] flex flex-col pointer-events-auto overflow-hidden border border-slate-200">
+    <>
+    {/* ── Leave Confirmation Dialog ───────────────────────────────────── */}
+    <AlertDialog open={showLeaveDialog} onOpenChange={setShowLeaveDialog}>
+      <AlertDialogContent className="max-w-md">
+        <AlertDialogHeader>
+          <AlertDialogTitle className="text-base font-bold text-slate-800">You have unsaved changes</AlertDialogTitle>
+          <AlertDialogDescription className="text-sm text-slate-500">
+            You've made edits to this invoice layout that haven't been saved yet. Would you like to save before leaving?
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter className="gap-2">
+          <AlertDialogCancel className="text-sm">Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={() => { setShowLeaveDialog(false); onClose(); }}
+            className="bg-red-600 hover:bg-red-700 text-white text-sm"
+          >
+            Discard Changes
+          </AlertDialogAction>
+          <AlertDialogAction
+            onClick={async () => { await handleSaveLayout(); setShowLeaveDialog(false); onClose(); }}
+            className="bg-blue-600 hover:bg-blue-700 text-white text-sm"
+          >
+            Save & Leave
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
 
-        {/* ── Editor Header ─────────────────────────────────────────────────── */}
-        <div className="shrink-0 flex items-center justify-between px-5 py-3.5 bg-white border-b border-slate-100">
-          <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-xl bg-teal-50 flex items-center justify-center">
-              <Printer className="h-4 w-4 text-teal-600" />
-            </div>
-            <div>
-              <p className="text-sm font-bold text-slate-800 leading-tight">Invoice Print Editor</p>
-              <p className="text-[11px] text-slate-400 font-medium">#{invoiceNo} · {invoice.client}</p>
-            </div>
-          </div>
-
+    {/* ── History Panel ────────────────────────────────────────────────── */}
+    {showHistory && (
+      <div className="mb-3 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden animate-in slide-in-from-top-2 duration-200">
+        <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            {/* Status pill */}
-            <span className="hidden sm:flex items-center gap-1.5 text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-3 py-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-              Unsaved Changes
-            </span>
-
-            <div className="h-6 w-px bg-slate-200 mx-1 hidden sm:block" />
-
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleSaveLayout}
-              className="h-9 gap-2 text-slate-700 border-slate-200 bg-white hover:bg-slate-50 font-semibold text-xs px-4"
-            >
-              Save State
-            </Button>
-            <Button
-              size="sm"
-              onClick={handlePrint}
-              className="h-9 gap-2 bg-teal-600 hover:bg-teal-700 text-white font-semibold text-xs px-4 shadow-sm"
-            >
-              <Printer className="w-3.5 h-3.5" /> Print Document
-            </Button>
-            <button
-              onClick={onClose}
-              className="h-9 w-9 rounded-xl flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors ml-1"
-            >
-              <X className="h-4 w-4" />
-            </button>
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>
+            <span className="text-sm font-bold text-slate-700">Save History</span>
+            <Badge className="text-[10px] bg-slate-100 text-slate-500 border-slate-200">{historyLog.length} entries</Badge>
           </div>
+          <button onClick={() => setShowHistory(false)} className="text-slate-400 hover:text-slate-600 transition-colors">
+            <X className="h-4 w-4" />
+          </button>
         </div>
+        {historyLog.length === 0 ? (
+          <div className="px-5 py-6 text-center text-sm text-slate-400">No save history yet. Save the layout to create the first entry.</div>
+        ) : (
+          <div className="divide-y divide-slate-100 max-h-[200px] overflow-y-auto">
+            {[...historyLog].reverse().map((entry: any, idx: number) => (
+              <div key={idx} className="px-5 py-2.5 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                <div className="flex items-center gap-3">
+                  <div className="h-7 w-7 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600 text-[10px] font-bold">
+                    {historyLog.length - idx}
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-slate-700">{entry.action || 'Saved Print Layout'}</p>
+                    <p className="text-[10px] text-slate-400">
+                      {new Date(entry.date).toLocaleString()} · ₦{(entry.totalCharge || 0).toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+                {savedLayout && idx === 0 && (
+                  <Badge className="text-[9px] bg-green-50 text-green-600 border-green-200">Current</Badge>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    )}
 
-        {/* ── Toolbar strip ────────────────────────────────────────────────── */}
-        <div className="shrink-0 px-5 py-2 bg-slate-50 border-b border-slate-100 flex items-center gap-3 text-[11px] text-slate-500 font-medium">
-          <span className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded border border-dashed border-slate-400 inline-block" />
-            Dashed fields are editable
-          </span>
-          <span className="text-slate-300">·</span>
-          <span>Click any field in the document to edit it</span>
-          <span className="text-slate-300">·</span>
-          <span>Fields are hidden when printing</span>
+    <div className="flex flex-col w-full mx-auto bg-white rounded-xl shadow-sm border border-slate-200">
+      <div className="px-6 py-3.5 border-b border-slate-100 bg-slate-50/50 flex flex-wrap items-center justify-between gap-4 rounded-t-xl hide-on-print">
+        <div className="flex items-center gap-6">
+          <label className="flex items-center gap-2.5 text-xs font-bold text-slate-600 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={combineDiesel}
+              onChange={(e) => handleToggleCombineDiesel(e.target.checked)}
+              className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+            />
+            Combine Diesel Supply Items
+          </label>
         </div>
-
+        <div className="text-[11px] text-slate-400 font-medium">
+          * Demarcates pump leases serially and lists diesel per pump duration.
+        </div>
+      </div>
+      <div className="flex flex-col">
         {/* ── A4 Canvas ─────────────────────────────────────────────────────── */}
-        <div className="flex-1 overflow-auto bg-[#e8eaed] p-8 flex justify-center [scrollbar-gutter:stable]">
+        <div className="pt-2 pb-6 px-4 sm:px-6 lg:px-8 flex justify-center [scrollbar-gutter:stable] rounded-xl bg-slate-50/30">
+          <style>{`
+            .invoice-canvas {
+              font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+              font-size: 13.5px;
+              color: #111;
+              line-height: 1.4;
+            }
+            .invoice-canvas * {
+              box-sizing: border-box;
+            }
+            .invoice-canvas .a4-page {
+              width: 210mm;
+              min-height: 297mm;
+              padding: 15mm;
+              margin: auto;
+              background-color: white;
+              box-shadow: 0 4px 24px 0 rgba(0,0,0,0.18), 0 1px 4px 0 rgba(0,0,0,0.10);
+              border-radius: 2px;
+              display: flex;
+              flex-direction: column;
+            }
+            .invoice-canvas .top-section { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 25px !important; }
+            .invoice-canvas .logo-box { width: 60%; }
+            .invoice-canvas .inv-header { text-align: right; width: 240px; }
+            .invoice-canvas .inv-header h1 { font-family: 'Arial Black', Impact, sans-serif; font-size: 32px !important; font-weight: 900; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 1px; color: #111; text-align: right; margin-top: 10px;}
+            .invoice-canvas table.date-table { width: 100%; border-collapse: collapse !important; border: 1.5px solid #385296 !important; font-size: 13.5px; font-weight: bold; background: white; margin: 0 !important; }
+            .invoice-canvas table.date-table th { border: 1.5px solid #385296 !important; padding: 4px !important; text-align: center; }
+            .invoice-canvas table.date-table td { border: 1.5px solid #385296 !important; padding: 4px !important; text-align: center; font-weight: normal; vertical-align: middle; }
+            .invoice-canvas .mid-section { display: flex; justify-content: space-between; gap: 30px; margin-bottom: 20px !important; }
+            .invoice-canvas .box { flex: 1; border: 1.5px solid #385296 !important; background: white; }
+            .invoice-canvas .box-title { font-weight: bold; padding: 5px 8px !important; font-size: 13.5px; border-bottom: 1.5px solid #385296 !important; margin: 0 !important; }
+            .invoice-canvas .box-content { padding: 8px !important; white-space: pre-wrap; font-size: 13.5px; min-height: 80px; }
+            .invoice-canvas .project-terms { display: flex; justify-content: flex-end; margin-bottom: -1.5px !important; }
+            .invoice-canvas table.pt-table { border-collapse: collapse !important; width: 340px; text-align: center; font-size: 12px; background: white; margin: 0 !important; }
+            .invoice-canvas table.pt-table th, .invoice-canvas table.pt-table td { border: 1.5px solid #385296 !important; padding: 4px !important; }
+            .invoice-canvas table.pt-table th { font-weight: normal; }
+            .invoice-canvas table.pt-table td { font-weight: normal; }
+            .invoice-canvas table.main-table { width: 100%; border-collapse: collapse !important; font-size: 13.5px; background: white; margin: 0 !important; }
+            .invoice-canvas table.main-table th { border: 1.5px solid #385296 !important; padding: 8px !important; text-align: center; font-weight: bold; }
+            .invoice-canvas table.main-table td { border-left: 1.5px solid #385296 !important; border-right: 1.5px solid #385296 !important; padding: 12px !important; vertical-align: top; }
+            .invoice-canvas table.main-table tr.item-row td { border-top: none !important; }
+            .invoice-canvas table.main-table td.hide-on-print,
+            .invoice-canvas table.main-table th.hide-on-print { border: none !important; padding: 0 !important; width: 0 !important; overflow: hidden !important; }
+            .invoice-canvas .borderless-cell { border: none !important; border-left: hidden !important; border-bottom: hidden !important; background: transparent !important; }
+            .invoice-canvas .desc-col { width: 65%; }
+            .invoice-canvas .qty-col { width: 15%; text-align: center!important; }
+            .invoice-canvas .amt-col { width: 20%; text-align: right!important; padding-right: 10px!important;}
+            .invoice-canvas .footer { margin-top: auto; padding-top: 40px; font-size: 13.5px; line-height: 1.4; font-weight: bold;}
+            .invoice-canvas .show-on-print { display: none !important; }
+          `}</style>
           <div ref={printRef}>
-            <style>{`
-              .invoice-canvas {
-                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                font-size: 13.5px;
-                color: #111;
-                line-height: 1.4;
-              }
-              .invoice-canvas * {
-                box-sizing: border-box;
-              }
-              .invoice-canvas .a4-page {
-                width: 210mm;
-                min-height: 297mm;
-                padding: 15mm;
-                margin: auto;
-                background-color: white;
-                box-shadow: 0 4px 24px 0 rgba(0,0,0,0.18), 0 1px 4px 0 rgba(0,0,0,0.10);
-                border-radius: 2px;
-                display: flex;
-                flex-direction: column;
-              }
-              .invoice-canvas .top-section { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 25px !important; }
-              .invoice-canvas .logo-box { width: 60%; }
-              .invoice-canvas .inv-header { text-align: right; width: 240px; }
-              .invoice-canvas .inv-header h1 { font-family: 'Arial Black', Impact, sans-serif; font-size: 32px !important; font-weight: 900; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 1px; color: #111; text-align: right; margin-top: 10px;}
-              .invoice-canvas table.date-table { width: 100%; border-collapse: collapse !important; border: 1.5px solid #385296 !important; font-size: 13.5px; font-weight: bold; background: white; margin: 0 !important; }
-              .invoice-canvas table.date-table th { border: 1.5px solid #385296 !important; padding: 4px !important; text-align: center; }
-              .invoice-canvas table.date-table td { border: 1.5px solid #385296 !important; padding: 4px !important; text-align: center; font-weight: normal; vertical-align: middle; }
-              .invoice-canvas .mid-section { display: flex; justify-content: space-between; gap: 30px; margin-bottom: 20px !important; }
-              .invoice-canvas .box { flex: 1; border: 1.5px solid #385296 !important; background: white; }
-              .invoice-canvas .box-title { font-weight: bold; padding: 5px 8px !important; font-size: 13.5px; border-bottom: 1.5px solid #385296 !important; margin: 0 !important; }
-              .invoice-canvas .box-content { padding: 8px !important; white-space: pre-wrap; font-size: 13.5px; min-height: 80px; }
-              .invoice-canvas .project-terms { display: flex; justify-content: flex-end; margin-bottom: -1.5px !important; }
-              .invoice-canvas table.pt-table { border-collapse: collapse !important; width: 340px; text-align: center; font-size: 12px; background: white; margin: 0 !important; }
-              .invoice-canvas table.pt-table th, .invoice-canvas table.pt-table td { border: 1.5px solid #385296 !important; padding: 4px !important; }
-              .invoice-canvas table.pt-table th { font-weight: normal; }
-              .invoice-canvas table.pt-table td { font-weight: normal; }
-              .invoice-canvas table.main-table { width: 100%; border-collapse: collapse !important; border: 1.5px solid #385296 !important; font-size: 13.5px; background: white; margin: 0 !important; }
-              .invoice-canvas table.main-table th { border: 1.5px solid #385296 !important; padding: 8px !important; text-align: center; font-weight: bold; }
-              .invoice-canvas table.main-table td { border-left: 1.5px solid #385296 !important; border-right: 1.5px solid #385296 !important; padding: 12px !important; vertical-align: top; }
-              .invoice-canvas .desc-col { width: 65%; }
-              .invoice-canvas .qty-col { width: 15%; text-align: center!important; }
-              .invoice-canvas .amt-col { width: 20%; text-align: right!important; padding-right: 10px!important;}
-              .invoice-canvas .footer { margin-top: auto; padding-top: 40px; font-size: 13.5px; line-height: 1.4; font-weight: bold;}
-            `}</style>
             <div className="invoice-canvas">
               <div className="a4-page">
                 {/* Top: Logo + Invoice header */}
@@ -2816,7 +3270,7 @@ export function InvoicePrintModal({ invoice, onClose, ledgerBanks, ledgerBenefic
                 </thead>
                 <tbody>
                   {items.map((item, idx) => (
-                    <tr key={item.id}>
+                    <tr key={item.id} className="item-row">
                       <td className="hide-on-print" style={{ borderLeft: 'none', borderRight: '1.5px solid #385296', textAlign: 'center', background: '#fafafa' }}>
                         <button
                           onClick={() => handleDeleteItem(idx)}
@@ -2854,8 +3308,22 @@ export function InvoicePrintModal({ invoice, onClose, ledgerBanks, ledgerBenefic
                     </tr>
                   ))}
 
+                  {/* VAT Charge line item */}
+                  {vat > 0 && (
+                    <tr className="item-row">
+                      <td className="hide-on-print" style={{ borderLeft: 'none', borderRight: '1.5px solid #385296', textAlign: 'center', background: '#fafafa' }}></td>
+                      <td style={{ borderRight: '1.5px solid #385296', verticalAlign: 'top', padding: '12px' }}>
+                        <span style={{ fontWeight: 'normal' }}>VAT CHARGE{vatIncSetting === 'Yes' ? ' (Incl.)' : ''}</span>
+                      </td>
+                      <td className="qty-col" style={{ borderRight: '1.5px solid #385296' }}></td>
+                      <td className="amt-col" style={{ borderRight: 'none' }}>
+                        <span>{vat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      </td>
+                    </tr>
+                  )}
+
                   {/* Amount-in-words + Add item row */}
-                  <tr>
+                  <tr className="item-row">
                     <td className="hide-on-print" style={{ borderLeft: 'none', borderRight: '1.5px solid #385296', background: '#fafafa' }}></td>
                     <td style={{ borderRight: '1.5px solid #385296', paddingTop: '24px', paddingBottom: '16px' }}>
                       <button
@@ -2875,60 +3343,38 @@ export function InvoicePrintModal({ invoice, onClose, ledgerBanks, ledgerBenefic
                     <td className="amt-col" style={{ borderRight: 'none' }}></td>
                   </tr>
 
-                  {/* Totals */}
-                  {vat > 0 ? (
-                  <>
+                  {/* Totals — Total Due row with footer text */}
                   <tr style={{ borderTop: '1.5px solid #385296' }}>
                     <td className="hide-on-print" style={{ borderLeft: 'none', borderRight: '1.5px solid #385296', background: '#fafafa' }}></td>
-                    <td rowSpan={5} style={{ borderRight: '1.5px solid #385296', padding: '12px', verticalAlign: 'bottom' }}>
+                    <td style={{ borderRight: '1.5px solid #385296', borderBottom: '1.5px solid #385296', padding: '12px', verticalAlign: 'middle' }}>
                       <input className="hide-on-print" value={footerText} onChange={e => setFooterText(e.target.value)} style={{ width: '100%', border: '1px dashed #c7d2e0', padding: 4, borderRadius: 3, outline: 'none', background: '#f9fafb', fontSize: 13, fontFamily: 'inherit' }} />
                       <span className="show-on-print" style={{ display: 'none', fontSize: '13.5px' }}>{footerText}</span>
                     </td>
-                    <td className="qty-col" style={{ borderBottom: '1px solid #e2e8f0', borderRight: '1.5px solid #385296', textAlign: 'left', padding: '8px 12px' }}>Subtotal</td>
-                    <td className="amt-col" style={{ borderBottom: '1px solid #e2e8f0', borderRight: 'none', padding: '8px 12px' }}>NGN {subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                    <td className="qty-col" style={{ borderBottom: '1.5px solid #385296', borderRight: '1.5px solid #385296', textAlign: 'left', fontWeight: 'bold', padding: '10px 12px', ...getLabelStyle('Total Due') }}>Total Due</td>
+                    <td className="amt-col" style={{ borderBottom: '1.5px solid #385296', borderRight: 'none', fontWeight: 'bold', padding: '10px 12px', whiteSpace: 'nowrap', fontSize: '13.5px' }}>NGN {totalCharge.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                   </tr>
                   <tr>
-                    <td className="hide-on-print" style={{ borderLeft: 'none', borderRight: '1.5px solid #385296', background: '#fafafa' }}></td>
-                    <td className="qty-col" style={{ borderBottom: '1.5px solid #385296', borderRight: '1.5px solid #385296', textAlign: 'left', padding: '8px 12px', color: '#dc2626' }}>VAT Charge {vatIncSetting === 'Yes' ? '(Incl.)' : ''}</td>
-                    <td className="amt-col" style={{ borderBottom: '1.5px solid #385296', borderRight: 'none', padding: '8px 12px', color: '#dc2626' }}>NGN {vat.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                  </tr>
-                  <tr>
-                    <td className="hide-on-print" style={{ borderLeft: 'none', borderRight: '1.5px solid #385296', background: '#fafafa' }}></td>
-                    <td className="qty-col" style={{ borderBottom: '1.5px solid #385296', borderRight: '1.5px solid #385296', textAlign: 'left', fontWeight: 'bold', padding: '8px 12px' }}>Total Due</td>
-                    <td className="amt-col" style={{ borderBottom: '1.5px solid #385296', borderRight: 'none', fontWeight: 'bold', padding: '8px 12px' }}>NGN {totalCharge.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                  </tr>
-                  </>
-                  ) : (
-                  <tr style={{ borderTop: '1.5px solid #385296' }}>
-                    <td className="hide-on-print" style={{ borderLeft: 'none', borderRight: '1.5px solid #385296', background: '#fafafa' }}></td>
-                    <td rowSpan={3} style={{ borderRight: '1.5px solid #385296', padding: '12px', verticalAlign: 'bottom' }}>
-                      <input className="hide-on-print" value={footerText} onChange={e => setFooterText(e.target.value)} style={{ width: '100%', border: '1px dashed #c7d2e0', padding: 4, borderRadius: 3, outline: 'none', background: '#f9fafb', fontSize: 13, fontFamily: 'inherit' }} />
-                      <span className="show-on-print" style={{ display: 'none', fontSize: '13.5px' }}>{footerText}</span>
-                    </td>
-                    <td className="qty-col" style={{ borderBottom: '1.5px solid #385296', borderRight: '1.5px solid #385296', textAlign: 'left', fontWeight: 'bold', padding: '10px 12px' }}>Total Due</td>
-                    <td className="amt-col" style={{ borderBottom: '1.5px solid #385296', borderRight: 'none', fontWeight: 'bold', padding: '10px 12px' }}>NGN {totalCharge.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                  </tr>
-                  )}
-                  <tr>
-                    <td className="hide-on-print" style={{ borderLeft: 'none', borderRight: '1.5px solid #385296', background: '#fafafa' }}></td>
-                    <td className="qty-col" style={{ borderBottom: '1.5px solid #385296', borderRight: '1.5px solid #385296', textAlign: 'left', fontWeight: 'bold', padding: '10px 12px' }}>Payments/Credits</td>
-                    <td className="amt-col" style={{ borderBottom: '1.5px solid #385296', borderRight: 'none', padding: '10px 12px' }}>
+                    <td className="hide-on-print borderless-cell"></td>
+                    <td className="borderless-cell"></td>
+                    <td className="qty-col" style={{ borderBottom: '1.5px solid #385296', borderLeft: '1.5px solid #385296', borderRight: '1.5px solid #385296', textAlign: 'left', fontWeight: 'bold', padding: '10px 12px', ...getLabelStyle('Payments/Credits') }}>Payments/Credits</td>
+                    <td className="amt-col" style={{ borderBottom: '1.5px solid #385296', borderRight: 'none', padding: '10px 12px', whiteSpace: 'nowrap', fontWeight: 'normal', fontSize: '11.5px' }}>
                       <span className="hide-on-print" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 4 }}>
                         NGN
                         <input
                           type="number"
                           value={paymentsCredits}
                           onChange={e => setPaymentsCredits(Number(e.target.value))}
-                          style={{ width: '80px', textAlign: 'right', border: '1px dashed #c7d2e0', borderRadius: 3, padding: '2px 4px', outline: 'none', background: '#f9fafb' }}
+                          style={{ width: '80px', textAlign: 'right', border: '1px dashed #c7d2e0', borderRadius: 3, padding: '2px 4px', outline: 'none', background: '#f9fafb', fontSize: '11.5px' }}
                         />
                       </span>
-                      <span className="show-on-print" style={{ display: 'none' }}>NGN {paymentsCredits.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                      <span className="show-on-print" style={{ display: 'none', fontWeight: 'normal', fontSize: '11.5px' }}>NGN {paymentsCredits.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                     </td>
                   </tr>
                   <tr>
-                    <td className="hide-on-print" style={{ borderLeft: 'none', borderRight: '1.5px solid #385296', background: '#fafafa' }}></td>
-                    <td className="qty-col" style={{ borderRight: '1.5px solid #385296', borderBottom: 'none', textAlign: 'left', fontWeight: 'bold', padding: '10px 12px' }}>Balance Due</td>
-                    <td className="amt-col" style={{ borderRight: 'none', borderBottom: 'none', fontWeight: 'bold', padding: '10px 12px' }}>NGN {calcBalanceDue.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                    <td className="hide-on-print borderless-cell"></td>
+                    <td className="borderless-cell"></td>
+                    <td className="qty-col" style={{ borderLeft: '1.5px solid #385296', borderRight: '1.5px solid #385296', borderBottom: '1.5px solid #385296', textAlign: 'left', fontWeight: 'bold', padding: '10px 12px', ...getLabelStyle('Balance Due') }}>Balance Due</td>
+                    <td className="amt-col" style={{ borderRight: 'none', borderBottom: '1.5px solid #385296', fontWeight: 'normal', padding: '10px 12px', whiteSpace: 'nowrap', fontSize: '11.5px' }}>NGN {calcBalanceDue.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                   </tr>
                 </tbody>
               </table>
@@ -2970,5 +3416,6 @@ export function InvoicePrintModal({ invoice, onClose, ledgerBanks, ledgerBenefic
         </div>
       </div>
     </div>
+    </>
   );
 }

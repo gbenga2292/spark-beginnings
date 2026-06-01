@@ -554,10 +554,13 @@ export function WeeklyReport() {
         // C. Consumables Used
         checkPageBreak(30, `SITE PROFILE: ${sName}`);
         currentY = drawSubTitle('C. Consumables Used (Waybills/Inventory)', currentY);
-        const siteWaybills = waybills.filter(w => w.siteName === sName && w.issueDate >= format(start, 'yyyy-MM-dd') && w.issueDate <= format(end, 'yyyy-MM-dd'));
+        const siteWaybills = waybills.filter(w => {
+          const date = w.sentToSiteDate || w.issueDate;
+          return w.siteName === sName && date >= format(start, 'yyyy-MM-dd') && date <= format(end, 'yyyy-MM-dd');
+        });
         if (siteWaybills.length > 0) {
           const waybillBody = siteWaybills.map(w => [
-            formatDisplayDate(w.issueDate),
+            formatDisplayDate(w.sentToSiteDate || w.issueDate),
             w.items.map(i => `${i.quantity}x ${i.assetName}`).join(', ') || 'Various Items',
             w.status,
             w.driverName || '-'

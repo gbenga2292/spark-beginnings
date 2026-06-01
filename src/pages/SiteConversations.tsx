@@ -71,14 +71,6 @@ export function SiteConversations() {
     'Site Conversations',
     site ? `${site.name} · ${site.client}` : 'Comm Logs',
     <div className="flex items-center gap-3">
-      <Button 
-        variant="outline" 
-        size="sm" 
-        className="gap-2 shrink-0 bg-white shadow-sm"
-        onClick={() => navigate(`/sites?client=${encodeURIComponent(site.client)}`)}
-      >
-        <ArrowLeft className="h-4 w-4" /> Back
-      </Button>
       <Button
         size="sm"
         className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white shrink-0 shadow-sm"
@@ -88,7 +80,9 @@ export function SiteConversations() {
       >
         <Plus className="w-4 h-4" /> New Log
       </Button>
-    </div>
+    </div>,
+    [site, siteId],
+    () => navigate(-1)
   );
 
   return (

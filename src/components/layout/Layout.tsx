@@ -67,7 +67,7 @@ export function Layout() {
     <div className={`flex h-full w-full overflow-hidden font-sans transition-colors duration-200 ${isDark ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'
       }`}>
       {!isHomePage && <Sidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />}
-      <div className="flex flex-1 flex-col overflow-hidden w-full relative">
+      <div id="layout-content-wrapper" className="flex flex-1 flex-col overflow-hidden w-full relative">
         <ConnectionBanner />
 
         {/* ── Privilege-update banner ─────────────────────────────── */}

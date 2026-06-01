@@ -113,6 +113,8 @@ export function dbToInvoice(r: any): Invoice {
     printLayout: r.print_layout, historyLog: r.history_log || [],
     machineConfigs: r.machine_configs || undefined,
     countOffDays: r.count_off_days ?? true,
+    technicianDuration: r.technician_duration != null ? Number(r.technician_duration) : undefined,
+    technicianDurationSameAsMachine: r.technician_duration_same_as_machine ?? true,
   };
 }
 
@@ -132,6 +134,8 @@ export function dbToPendingInvoice(r: any): PendingInvoice {
     printLayout: r.print_layout, historyLog: r.history_log || [],
     machineConfigs: r.machine_configs || undefined,
     countOffDays: r.count_off_days ?? true,
+    technicianDuration: r.technician_duration != null ? Number(r.technician_duration) : undefined,
+    technicianDurationSameAsMachine: r.technician_duration_same_as_machine ?? true,
   };
 }
 
@@ -595,6 +599,8 @@ function invoiceToDb(i: Invoice) {
     print_layout: i.printLayout, history_log: i.historyLog || [],
     machine_configs: i.machineConfigs || null,
     count_off_days: i.countOffDays ?? true,
+    technician_duration: i.technicianDuration,
+    technician_duration_same_as_machine: i.technicianDurationSameAsMachine ?? true,
   };
 }
 
@@ -613,6 +619,8 @@ function pendingInvoiceToDb(p: PendingInvoice) {
     print_layout: p.printLayout, history_log: p.historyLog || [],
     machine_configs: p.machineConfigs || null,
     count_off_days: p.countOffDays ?? true,
+    technician_duration: p.technicianDuration,
+    technician_duration_same_as_machine: p.technicianDurationSameAsMachine ?? true,
   };
 }
 
