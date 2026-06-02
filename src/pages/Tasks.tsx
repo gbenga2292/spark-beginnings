@@ -946,7 +946,7 @@ function AdminTasksView() {
                 scope === 'pending_review' ? teamTasks.filter(mt => pendingApprovalSubs.some(s => s.mainTaskId === mt.id)) :
                   teamTasks
             }
-            users={activeUsers}
+            users={wsMembers}
             activeSubtaskId={openSubtaskId}
             onSelectSubtask={id => setOpenSubtaskId(id)}
           />

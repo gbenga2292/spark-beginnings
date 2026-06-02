@@ -133,6 +133,7 @@ const TXN_COLUMNS: ColumnDef[] = [
   { id: 'p_basic',      label: 'Gross Pay',        summable: true,  sources: ['PAYROLL'] },
   { id: 'p_pension',    label: 'Pension',          summable: true,  sources: ['PAYROLL'] },
   { id: 'p_paye',       label: 'PAYE Tax',         summable: true,  sources: ['PAYROLL'] },
+  { id: 'p_wht',        label: 'WHT',              summable: true,  sources: ['PAYROLL'] },
   { id: 'p_nsitf',      label: 'NSITF',            summable: true,  sources: ['PAYROLL'] },
   { id: 'p_net',        label: 'Net Pay',          summable: true,  sources: ['PAYROLL'] },
   { id: 'p_month',      label: 'Month',            summable: false, sources: ['PAYROLL'] },
@@ -223,7 +224,7 @@ const BUILT_IN_PRESETS: ReportPreset[] = [
   {
     id: '__payroll', name: 'Payroll Report', builtIn: true,
     sources: ['PAYROLL'],
-    columns: ['sn','p_employee','p_department','p_position','p_staffType','p_basic','p_pension','p_paye','p_nsitf','p_net','p_month','p_year', 'p_bank', 'p_account'],
+    columns: ['sn','p_employee','p_department','p_position','p_staffType','p_basic','p_pension','p_paye','p_wht','p_nsitf','p_net','p_month','p_year', 'p_bank', 'p_account'],
   },
   {
     id: '__led', name: 'Ledger Report', builtIn: true,
@@ -673,8 +674,10 @@ export function AccountsReportBuilder({
             const mKey = monthNameToKey(rec._raw.month); // normalize to 'jan', 'feb', etc.
             if (mKey) {
               const payeKey = `p_paye_${mKey}`;
+              const whtKey  = `p_wht_${mKey}`;
               const netKey  = `p_net_${mKey}`;
               g._raw[payeKey] = (g._raw[payeKey] || 0) + (rec._raw.paye || 0);
+              g._raw[whtKey]  = (g._raw[whtKey] || 0) + (rec._raw.withholdingTax || 0);
               g._raw[netKey]  = (g._raw[netKey] || 0) + (rec._raw.takeHomePay || 0);
             }
           }
@@ -818,11 +821,12 @@ export function AccountsReportBuilder({
         cols = cols.filter(c => !['p_month', 'p_year'].includes(c.id));
         if (isPivoted) {
           // Filter out main total columns for PAYE and Net Pay to avoid redundancy
-          cols = cols.filter(c => !['p_paye', 'p_net'].includes(c.id));
+          cols = cols.filter(c => !['p_paye', 'p_wht', 'p_net'].includes(c.id));
           // Inject monthly columns
           selectedMonths.forEach(mKey => {
             const mLabel = MONTHS.find(m => m.key === mKey)?.label || mKey;
             cols.push({ id: `p_paye_${mKey}`, label: `${mLabel} PAYE`, summable: true, sources: ['PAYROLL'] });
+            cols.push({ id: `p_wht_${mKey}`, label: `${mLabel} WHT`, summable: true, sources: ['PAYROLL'] });
             cols.push({ id: `p_net_${mKey}`,  label: `${mLabel} Net`,  summable: true, sources: ['PAYROLL'] });
           });
         }
@@ -839,7 +843,7 @@ export function AccountsReportBuilder({
       if (isPivoted && isGroupedView && selectedSources.length === 1 && selectedSources[0] === 'PAYROLL') {
         const pivotIds: string[] = [];
         selectedMonths.forEach(mKey => {
-          pivotIds.push(`p_paye_${mKey}`, `p_net_${mKey}`);
+          pivotIds.push(`p_paye_${mKey}`, `p_wht_${mKey}`, `p_net_${mKey}`);
         });
         // Find position after 'p_staffType' or 'p_basic' to insert
         const insertIdx = base.findIndex(id => id === 'p_staffType' || id === 'p_basic');
@@ -967,7 +971,7 @@ export function AccountsReportBuilder({
         return r[colId];
       }
       // If it's a pivot column but not found on this record (e.g. employee didn't work that month)
-      if (isPivoted && (colId.startsWith('p_paye_') || colId.startsWith('p_net_'))) {
+      if (isPivoted && (colId.startsWith('p_paye_') || colId.startsWith('p_wht_') || colId.startsWith('p_net_'))) {
         return 0;
       }
 
@@ -979,6 +983,7 @@ export function AccountsReportBuilder({
         case 'p_basic':      return r.grossPay || 0;
         case 'p_pension':    return r.pension || 0;
         case 'p_paye':       return r.paye || 0;
+        case 'p_wht':        return r.withholdingTax || 0;
         case 'p_nsitf':      return r.nsitf || 0;
         case 'p_net':        return r.takeHomePay || 0;
         case 'p_month':      return MONTHS.find(m => m.key === r.month)?.label || r.month || '—';

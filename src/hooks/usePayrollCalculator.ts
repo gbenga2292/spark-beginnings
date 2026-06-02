@@ -147,13 +147,20 @@ export function usePayrollCalculator() {
           overtime = totalOTInstances * (dailyRate * (1 + otRate));
         }
 
-        const hasPension = emp.subjectToPension !== undefined ? emp.subjectToPension : emp.payeTax;
-        const breakDownSalary = emp.payeTax || hasPension;
+        // hasPension: mirrors Payroll.tsx exactly (line 367-369)
+        // Uses subjectToPension if explicitly set, else falls back to payeTax
+        // NON-EMPLOYEE staff are always excluded from pension
+        const hasPension = (emp.subjectToPension !== undefined && emp.subjectToPension !== null)
+          ? (emp.subjectToPension && emp.staffType !== 'NON-EMPLOYEE')
+          : (emp.payeTax && emp.staffType !== 'NON-EMPLOYEE');
 
-        const basicSalary = breakDownSalary ? salary * (payrollVariables.basic / 100) : 0;
-        const housing = breakDownSalary ? salary * (payrollVariables.housing / 100) : 0;
-        const transport = breakDownSalary ? salary * (payrollVariables.transport / 100) : 0;
-        const otherAllowances = breakDownSalary ? salary * (payrollVariables.otherAllowances / 100) : 0;
+        // Allowance breakdown: ONLY for payeTax employees — matches Payroll.tsx exactly
+        // Pension-eligible but non-payeTax employees have pensionSum = 0, so pension = 0
+        // This is intentional to match the Pension Schedule (source of truth)
+        const basicSalary = emp.payeTax ? salary * (payrollVariables.basic / 100) : 0;
+        const housing = emp.payeTax ? salary * (payrollVariables.housing / 100) : 0;
+        const transport = emp.payeTax ? salary * (payrollVariables.transport / 100) : 0;
+        const otherAllowances = emp.payeTax ? salary * (payrollVariables.otherAllowances / 100) : 0;
 
         const totalAllowances = basicSalary + housing + transport + otherAllowances;
         const pensionSum = basicSalary + housing + transport;
@@ -163,6 +170,7 @@ export function usePayrollCalculator() {
         const pension = hasPension ? pensionSum * (payrollVariables.employeePensionRate / 100) : 0;
 
         let paye = 0;
+        let withholdingTax = 0;
         if (emp.payeTax) {
           const tv = payeTaxVariables;
           const annualGross = (salary * 12) + overtime;
@@ -189,7 +197,7 @@ export function usePayrollCalculator() {
 
           paye = annualTax / 12;
         } else if (emp.withholdingTax) {
-          paye = salary * ((payrollVariables as any).withholdingTaxRate ?? 0);
+          withholdingTax = salary * ((payrollVariables as any).withholdingTaxRate ?? 0);
         }
 
         const empAdvances = salaryAdvances.filter(a => {
@@ -218,7 +226,7 @@ export function usePayrollCalculator() {
 
         const loanRepayment = advanceDeduction + loanDeduction;
 
-        const takeHomePay = grossPay - (paye + loanRepayment + pension);
+        const takeHomePay = grossPay - (paye + withholdingTax + loanRepayment + pension);
 
         const employerPension = hasPension ? pensionSum * (payrollVariables.employerPensionRate / 100) : 0;
         const nsitf = emp.payeTax ? grossPay * (payrollVariables.nsitfRate / 100) : 0;
@@ -241,6 +249,7 @@ export function usePayrollCalculator() {
           overtime,
           grossPay,
           paye,
+          withholdingTax,
           loanRepayment,
           pension,
           employerPension,

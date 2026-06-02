@@ -5,14 +5,17 @@ import { DewateringCanvas } from '../components/canvas/DewateringCanvas';
 import { Dewatering3DView } from '../components/canvas/Dewatering3DView';
 import { ResultsPanel } from '../components/canvas/ResultsPanel';
 import { Toolbar, ActiveTool } from '../components/canvas/Toolbar';
+import { StatusBar } from '../components/canvas/StatusBar';
 import { DrawingSheetPreview, ExportOptions } from '../components/canvas/DrawingSheetPreview';
 import { calculateBOM, LineData, PlacedComponent, DimensionData, AreaData, HoseData, ElevationLevel } from '../utils/simulationLogic';
 import { captureKonvaStage, captureThreeCanvas } from '../utils/drawingExportUtils';
 import { useSetPageTitle } from '../contexts/PageContext';
 import { db } from '../lib/supabaseService';
 import { useUserStore } from '../store/userStore';
+import { useAppStore } from '../store/appStore';
 import { supabase } from '../integrations/supabase/client';
 import { toast } from 'sonner';
+import { CADLayer, DEFAULT_LAYERS } from '../utils/cadDataModels';
 
 interface SavedLayout {
   id: string;
@@ -28,12 +31,31 @@ interface SavedLayout {
 }
 
 export default function Simulator() {
+  const { isSimulatorDirty, setSimulatorDirty } = useAppStore();
   const [lines, setLines] = useState<LineData[]>([]);
   const [placedComponents, setPlacedComponents] = useState<PlacedComponent[]>([]);
   const [dimensions, setDimensions] = useState<DimensionData[]>([]);
   const [areas, setAreas] = useState<AreaData[]>([]);
   const [hoses, setHoses] = useState<HoseData[]>([]);
   const [activeTool, setActiveTool] = useState<ActiveTool>('line');
+  const [cursorPos, setCursorPos] = useState<{ x: number; y: number } | null>(null);
+
+  // browser reload / tab close guard
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isSimulatorDirty) {
+        e.preventDefault();
+        e.returnValue = 'You have unsaved simulator changes. Are you sure you want to leave?';
+        return e.returnValue;
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      // Clean up the store dirty state when unmounting the simulator entirely
+      setSimulatorDirty(false);
+    };
+  }, [isSimulatorDirty, setSimulatorDirty]);
   const [backgroundImage, setBackgroundImage] = useState<string | undefined>();
   const [history, setHistory] = useState<{ type: 'line' | 'component' | 'dimension' | 'area' | 'hose'; id: string }[]>([]);
   const [lineLengthMeters, setLineLengthMeters] = useState<number | ''>('');
@@ -44,18 +66,23 @@ export default function Simulator() {
   ]);
   const [activeLevelId, setActiveLevelId] = useState<string>('gl-level');
 
+  // Layer Management
+  const [layers, setLayers] = useState<CADLayer[]>(DEFAULT_LAYERS);
+  const [activeLayerId, setActiveLayerId] = useState<string>('layer-0');
+
   // Dewatering Level Settings
   const [groundElevation, setGroundElevation] = useState<number>(0);
   const [targetDepth, setTargetDepth] = useState<number>(5);
   const [screenLength, setScreenLength] = useState<number>(2);
   const [showWellpoints, setShowWellpoints] = useState(false);
+  const [wellpointSide, setWellpointSide] = useState<'left' | 'right' | 'both'>('left');
   const [isSaving, setIsSaving] = useState(false);
   const [backgroundFile, setBackgroundFile] = useState<File | null>(null);
   const [orthoLocked, setOrthoLocked] = useState(false);
   const [gridSnap, setGridSnap] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [showResults, setShowResults] = useState(window.innerWidth >= 640);
   const [show3D, setShow3D] = useState(false);
+  const [showResults, setShowResults] = useState(window.innerWidth >= 640);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Save dialog state
@@ -68,6 +95,7 @@ export default function Simulator() {
   const [showDrawingPreview, setShowDrawingPreview] = useState(false);
   const [showExportOptions, setShowExportOptions] = useState(false);
   const [exportOptions, setExportOptions] = useState<ExportOptions>({
+    layoutFormat: 'combined',
     includeSitePlan: true,
     include3DView: true,
     includeBOM: true,
@@ -106,6 +134,7 @@ export default function Simulator() {
       const url = URL.createObjectURL(file);
       setBackgroundImage(url);
       setBackgroundFile(file);
+      setSimulatorDirty(true);
     }
   };
 
@@ -155,6 +184,7 @@ export default function Simulator() {
       setCurrentLayoutName(saveName.trim());
       setShowSaveDialog(false);
       setSaveName('');
+      setSimulatorDirty(false);
     } catch (err: any) {
       toast.error(err.message || 'Failed to save layout.');
     } finally {
@@ -204,6 +234,7 @@ export default function Simulator() {
     setShowLoadPanel(false);
     setCurrentLayoutName(layout.name);
     toast.success(`Loaded layout "${layout.name}".`);
+    setSimulatorDirty(false);
   };
 
   const handleDeleteLayout = async (id: string, name: string) => {
@@ -226,18 +257,47 @@ export default function Simulator() {
 
   const confirmExport = async () => {
     setShowExportOptions(false);
-    const sitePlanUrl = captureKonvaStage(stageRef);
-    if (!sitePlanUrl) {
-      toast.error('Failed to capture the site plan drawing.');
-      return;
-    }
-    
+    const fmt = exportOptions.layoutFormat;
+
+    let sitePlanUrl: string | null = null;
     let perspectiveUrl: string | null = null;
-    if (show3D && exportOptions.include3DView) {
-      perspectiveUrl = captureThreeCanvas();
-      if (!perspectiveUrl) {
-        toast.warning('Failed to capture 3D view. Continuing without it.');
+
+    // ── Pure 2D: capture Konva stage only ──
+    if (fmt === 'pure-2d' || fmt === 'combined') {
+      if (show3D) {
+        // 2D canvas is not mounted when in 3D mode
+        toast.error(
+          'Please switch back to the 2D canvas view before exporting a 2D Floor Plan.',
+          { duration: 4000 }
+        );
+        return;
       }
+      sitePlanUrl = captureKonvaStage(stageRef);
+      if (!sitePlanUrl) {
+        toast.error('Failed to capture the 2D site plan. Make sure the canvas has content.');
+        return;
+      }
+    }
+
+    // ── Pure 3D: capture Three.js canvas only ──
+    if (fmt === 'pure-3d' || fmt === 'combined') {
+      if (!show3D && fmt === 'pure-3d') {
+        toast.error(
+          'Please switch to the 3D view before exporting a 3D Perspective sheet.',
+          { duration: 4000 }
+        );
+        return;
+      }
+      perspectiveUrl = captureThreeCanvas();
+      if (!perspectiveUrl && fmt === 'pure-3d') {
+        toast.error('Failed to capture 3D view. Make sure 3D mode is active.');
+        return;
+      }
+    }
+
+    if (!sitePlanUrl && !perspectiveUrl) {
+      toast.error('No drawings captured for export.');
+      return;
     }
 
     // Fetch company info
@@ -312,6 +372,7 @@ export default function Simulator() {
     setAreas([]);
     setHoses([]);
     setHistory([]);
+    setSimulatorDirty(false);
   };
 
   const handleUndo = () => {
@@ -329,6 +390,7 @@ export default function Simulator() {
       setPlacedComponents(placedComponents.filter(c => c.id !== lastAction.id));
     }
     setHistory(history.slice(0, -1));
+    setSimulatorDirty(true);
   };
 
   const handleLinesChange = (newLines: LineData[]) => {
@@ -339,6 +401,7 @@ export default function Simulator() {
       }
     }
     setLines(newLines);
+    setSimulatorDirty(true);
   };
 
   const handleComponentsChange = (newComps: PlacedComponent[]) => {
@@ -347,6 +410,7 @@ export default function Simulator() {
       setHistory([...history, { type: 'component', id: newComp.id }]);
     }
     setPlacedComponents(newComps);
+    setSimulatorDirty(true);
   };
 
   const handleDimensionsChange = (newDims: DimensionData[]) => {
@@ -355,6 +419,7 @@ export default function Simulator() {
       setHistory([...history, { type: 'dimension', id: newDim.id }]);
     }
     setDimensions(newDims);
+    setSimulatorDirty(true);
   };
 
   const handleAreasChange = (newAreas: AreaData[]) => {
@@ -363,6 +428,7 @@ export default function Simulator() {
       setHistory([...history, { type: 'area', id: newArea.id }]);
     }
     setAreas(newAreas);
+    setSimulatorDirty(true);
   };
 
   const handleHosesChange = (newHoses: HoseData[]) => {
@@ -375,16 +441,25 @@ export default function Simulator() {
     setHoses(newHoses);
   };
 
+  const handleToolSelect = (tool: ActiveTool) => {
+    setActiveTool(tool);
+    if (['line', 'hose', 'discharge'].includes(tool)) {
+      setOrthoLocked(true);
+    }
+  };
+
   return (
     <div className={isFullscreen ? "fixed inset-0 z-50 bg-gray-100 flex flex-col overflow-hidden" : "absolute inset-0 flex flex-col bg-gray-100 overflow-hidden"}>
       {/* Top Toolbar Ribbon */}
       <div className="flex-shrink-0 z-10 w-full">
         <Toolbar 
           activeTool={activeTool} 
-          onToolSelect={setActiveTool} 
+          onToolSelect={handleToolSelect} 
           onUndo={handleUndo} 
           showWellpoints={showWellpoints}
           onToggleWellpoints={() => setShowWellpoints(!showWellpoints)}
+          wellpointSide={wellpointSide}
+          onToggleWellpointSide={() => setWellpointSide(prev => prev === 'left' ? 'right' : prev === 'right' ? 'both' : 'left')}
           orthoLocked={orthoLocked}
           onToggleOrtho={() => setOrthoLocked(!orthoLocked)}
           gridSnap={gridSnap}
@@ -397,7 +472,7 @@ export default function Simulator() {
         />
       </div>
 
-      <div className="flex flex-1 relative overflow-hidden">
+      <div className="flex flex-1 relative overflow-hidden flex-col">
         {/* Main Canvas Area */}
         <div className="flex-1 bg-[#e5e7eb] overflow-hidden relative">
           {show3D ? (
@@ -410,6 +485,7 @@ export default function Simulator() {
               targetDepth={targetDepth}
               screenLength={screenLength}
               levels={levels}
+              wellpointSide={wellpointSide}
             />
           ) : (
             <>
@@ -430,6 +506,7 @@ export default function Simulator() {
               backgroundImageUrl={backgroundImage}
               fixedLineLengthMeters={lineLengthMeters === '' ? undefined : lineLengthMeters}
               showWellpoints={showWellpoints}
+              wellpointSide={wellpointSide}
               orthoLocked={orthoLocked}
               gridSnap={gridSnap}
               levels={levels}
@@ -438,6 +515,13 @@ export default function Simulator() {
               onAddLevel={(lvl) => setLevels(prev => [...prev, lvl])}
               onUpdateLevel={(id, updates) => setLevels(prev => prev.map(l => l.id === id ? { ...l, ...updates } : l))}
               onDeleteLevel={(id) => setLevels(prev => prev.filter(l => l.id !== id))}
+              layers={layers}
+              activeLayerId={activeLayerId}
+              onSelectLayer={setActiveLayerId}
+              onUpdateLayer={(id, updates) => setLayers(prev => prev.map(l => l.id === id ? { ...l, ...updates } : l))}
+              onAddLayer={(layer) => setLayers(prev => [...prev, layer])}
+              onDeleteLayer={(id) => setLayers(prev => prev.filter(l => l.id !== id))}
+              onCursorPosChange={setCursorPos}
             />
             </>
           )}
@@ -459,6 +543,16 @@ export default function Simulator() {
             />
           </div>
         </div>
+
+        <StatusBar
+          cursorPos={cursorPos}
+          activeTool={activeTool}
+          gridSnap={gridSnap}
+          orthoLocked={orthoLocked}
+          osnapEnabled={true}
+          activeLayerName={layers.find(l => l.id === activeLayerId)?.name || 'Layer 0'}
+          isDirty={isSimulatorDirty}
+        />
       </div>
 
       {/* ── Save Dialog ── */}
@@ -590,48 +684,79 @@ export default function Simulator() {
             </div>
             
             <div className="space-y-4 mb-6">
-              <label className="flex items-center gap-3">
-                <input
-                  type="checkbox"
-                  checked={exportOptions.includeSitePlan}
-                  onChange={e => setExportOptions(prev => ({ ...prev, includeSitePlan: e.target.checked }))}
-                  className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-                />
-                <span className="text-sm text-gray-700">Include Site Plan (2D)</span>
-              </label>
-              
-              <label className="flex items-center gap-3">
-                <input
-                  type="checkbox"
-                  checked={exportOptions.include3DView}
-                  onChange={e => setExportOptions(prev => ({ ...prev, include3DView: e.target.checked }))}
-                  disabled={!show3D}
-                  className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 disabled:opacity-50"
-                />
-                <span className={`text-sm ${show3D ? 'text-gray-700' : 'text-gray-400'}`}>
-                  Include 3D Perspective (requires 3D view active)
-                </span>
-              </label>
-              
-              <label className="flex items-center gap-3">
-                <input
-                  type="checkbox"
-                  checked={exportOptions.includeBOM}
-                  onChange={e => setExportOptions(prev => ({ ...prev, includeBOM: e.target.checked }))}
-                  className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-                />
-                <span className="text-sm text-gray-700">Include Bill of Materials</span>
-              </label>
-              
-              <label className="flex items-center gap-3">
-                <input
-                  type="checkbox"
-                  checked={exportOptions.includeLegend}
-                  onChange={e => setExportOptions(prev => ({ ...prev, includeLegend: e.target.checked }))}
-                  className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-                />
-                <span className="text-sm text-gray-700">Include Legend</span>
-              </label>
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">
+                  Layout Sheet Format
+                </label>
+                <select
+                  value={exportOptions.layoutFormat}
+                  onChange={e => {
+                    const format = e.target.value as 'combined' | 'pure-2d' | 'pure-3d';
+                    setExportOptions(prev => {
+                      const next = { ...prev, layoutFormat: format };
+                      // Auto-adjust checkboxes based on selected format for user convenience
+                      if (format === 'pure-2d') {
+                        next.includeSitePlan = true;
+                        next.include3DView = false;
+                      } else if (format === 'pure-3d') {
+                        next.includeSitePlan = false;
+                        next.include3DView = true;
+                        next.includeBOM = false;
+                        next.includeLegend = false;
+                      } else if (format === 'combined') {
+                        next.includeSitePlan = true;
+                        next.include3DView = show3D;
+                        next.includeBOM = true;
+                        next.includeLegend = true;
+                      }
+                      return next;
+                    });
+                  }}
+                  className="w-full text-sm border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 p-2 border"
+                >
+                  <option value="combined">Combined Sheet (A-100) — 2D + 3D + BOM</option>
+                  <option value="pure-2d">Pure 2D Floor Plan (A-101) — Blueprint layout</option>
+                  <option value="pure-3d">Pure 3D Perspective (A-102) — Full-bleed 3D render</option>
+                </select>
+              </div>
+
+              {/* Contextual requirement banner */}
+              {exportOptions.layoutFormat === 'pure-2d' && (
+                <div className={`rounded-md px-3 py-2 text-xs flex items-start gap-2 ${
+                  show3D ? 'bg-amber-50 border border-amber-300 text-amber-800' : 'bg-green-50 border border-green-300 text-green-800'
+                }`}>
+                  <span className="mt-0.5">{show3D ? '⚠️' : '✅'}</span>
+                  <span>
+                    {show3D
+                      ? 'You are currently in 3D view. Switch back to the 2D canvas before generating to capture the floor plan.'
+                      : 'Ready — 2D canvas is active. This will export the full floor plan with BOM and legend.'}
+                  </span>
+                </div>
+              )}
+              {exportOptions.layoutFormat === 'pure-3d' && (
+                <div className={`rounded-md px-3 py-2 text-xs flex items-start gap-2 ${
+                  show3D ? 'bg-green-50 border border-green-300 text-green-800' : 'bg-amber-50 border border-amber-300 text-amber-800'
+                }`}>
+                  <span className="mt-0.5">{show3D ? '✅' : '⚠️'}</span>
+                  <span>
+                    {show3D
+                      ? 'Ready — 3D view is active. This will export a full-bleed 3D perspective with floating BOM.'
+                      : 'Switch to 3D view mode first (toggle the 3D button in the toolbar) to capture a perspective render.'}
+                  </span>
+                </div>
+              )}
+              {exportOptions.layoutFormat === 'combined' && (
+                <div className={`rounded-md px-3 py-2 text-xs flex items-start gap-2 ${
+                  show3D ? 'bg-amber-50 border border-amber-300 text-amber-800' : 'bg-blue-50 border border-blue-300 text-blue-800'
+                }`}>
+                  <span className="mt-0.5">{show3D ? '⚠️' : 'ℹ️'}</span>
+                  <span>
+                    {show3D
+                      ? 'Switch back to 2D canvas view to capture the site plan. The 3D panel will be omitted from this sheet if not captured.'
+                      : 'Combined sheet will include the 2D floor plan, BOM, and legend. Enable 3D view first if you also want a perspective thumbnail.'}
+                  </span>
+                </div>
+              )}
             </div>
             
             <div className="flex justify-end gap-3">
@@ -643,8 +768,7 @@ export default function Simulator() {
               </button>
               <button
                 onClick={confirmExport}
-                disabled={!exportOptions.includeSitePlan && !exportOptions.include3DView && !exportOptions.includeBOM && !exportOptions.includeLegend}
-                className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+                className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
               >
                 Generate Sheet
               </button>

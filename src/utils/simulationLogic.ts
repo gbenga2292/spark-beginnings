@@ -15,6 +15,7 @@ export interface LineData {
   points: Point[];
   depthFromGL?: number; // Optional override for depth below Ground Level
   levelId?: string; // Links this line to a specific elevation level
+  layerId?: string;
   locked?: boolean;
   zIndex?: number;
 }
@@ -24,6 +25,7 @@ export interface DimensionData {
   start: Point;
   end: Point;
   text: string;
+  layerId?: string;
 }
 
 export interface AreaData {
@@ -34,6 +36,7 @@ export interface AreaData {
   height: number;
   kind?: string;
   levelId?: string; // Links this area to a specific elevation level
+  layerId?: string;
   locked?: boolean;
   zIndex?: number;
 }
@@ -41,6 +44,10 @@ export interface AreaData {
 export interface HoseData {
   id: string;
   points: Point[];
+  kind?: string;
+  layerId?: string;
+  locked?: boolean;
+  zIndex?: number;
 }
 
 export type ComponentType = 'pump' | 'tee' | 'elbow';
@@ -50,7 +57,9 @@ export interface PlacedComponent {
   type: ComponentType;
   x: number;
   y: number;
+  rotation?: number; // Optional rotation in degrees for directional assets
   levelId?: string; // Links this component to a specific elevation level
+  layerId?: string;
 }
 
 export interface DewateringSimulationResult {

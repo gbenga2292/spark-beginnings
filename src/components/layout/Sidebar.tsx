@@ -56,6 +56,7 @@ import {
 } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { NairaSign } from '@/src/components/ui/naira-sign';
+import { APP_VERSION } from '@/src/constants/version';
 import { 
   Dialog, 
   DialogContent, 
@@ -253,7 +254,7 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
   const isElectron = !!(window as any).electronAPI?.isElectron;
 
   // ── Android Auto-Update Logic (mobile-only) ────────────────────────────
-  const CURRENT_VERSION = '1.6.6'; // Matches package.json
+  const CURRENT_VERSION = APP_VERSION;
   const UPDATE_SERVER_URL = import.meta.env.VITE_UPDATE_SERVER_URL || 'https://dewaterconstruct.com/app-updates';
   
   const [updateInfo, setUpdateInfo] = useState<{ version: string; url: string; notes: string } | null>(null);
@@ -333,7 +334,23 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
   }, [isAndroidNative, isElectron]);
 
   const handleLinkClick = async (e: React.MouseEvent, href: string) => {
-    const { isVariablesDirty, setVariablesDirty, isLedgerDirty, setLedgerDirty, isEmployeeFormDirty, setEmployeeFormDirty } = useAppStore.getState();
+    const { isVariablesDirty, setVariablesDirty, isLedgerDirty, setLedgerDirty, isEmployeeFormDirty, setEmployeeFormDirty, isSimulatorDirty, setSimulatorDirty } = useAppStore.getState();
+
+    if (location.pathname === '/operations/simulator' && isSimulatorDirty && href !== '/operations/simulator') {
+      e.preventDefault();
+      const ok = await showConfirm('You have unsaved simulator changes. Do you want to discard them and leave?', {
+        title: 'Unsaved Changes',
+        confirmLabel: 'Discard & Leave',
+        cancelLabel: 'Stay Here',
+        variant: 'danger'
+      });
+      if (ok) {
+        setSimulatorDirty(false);
+        setIsOpen?.(false);
+        navigate(href);
+      }
+      return;
+    }
 
     if (location.pathname === '/ledger' && (pendingLedgerEntries.length > 0 || isLedgerDirty) && href !== '/ledger') {
       e.preventDefault();

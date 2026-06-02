@@ -20,6 +20,7 @@ import { exportFullAppToExcel, restoreFullAppFromExcel } from '@/src/lib/excelBa
 import { usePriv } from '@/src/hooks/usePriv';
 import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import packageJson from '../../../package.json';
+import { APP_VERSION } from '@/src/constants/version';
 
 interface CompanyInfo {
   name: string;
@@ -63,7 +64,7 @@ const DEFAULT_BACKUP_SETTINGS: BackupSettings = {
 
 export function Settings() {
   const [activeTab, setActiveTab] = useState('general');
-  const [appVersion, setAppVersion] = useState((packageJson as any).version || '1.6.4');
+  const [appVersion, setAppVersion] = useState(APP_VERSION);
   const [isChecking, setIsChecking] = useState(false);
   const isElectron = ((window as any).electronAPI as any)?.isElectron as boolean | undefined;
   const isAndroidNative = Capacitor.getPlatform() === 'android';
@@ -101,15 +102,7 @@ export function Settings() {
     if (isElectron && ((window as any).electronAPI as any)?.getVersion) {
       ((window as any).electronAPI as any).getVersion().then((v: string) => setAppVersion(v)).catch(console.error);
     } else if (isAndroidNative) {
-      setAppVersion('1.6.3');
-    }
-  }, [isElectron, isAndroidNative]);
-
-  useEffect(() => {
-    if (isElectron && ((window as any).electronAPI as any)?.getVersion) {
-      ((window as any).electronAPI as any).getVersion().then((v: string) => setAppVersion(v)).catch(console.error);
-    } else if (isAndroidNative) {
-      setAppVersion('1.6.3');
+      setAppVersion(APP_VERSION);
     }
   }, [isElectron, isAndroidNative]);
 
@@ -449,7 +442,7 @@ export function Settings() {
     } else if (isAndroidNative) {
       setIsChecking(true);
       try {
-        const CURRENT_VERSION = '1.6.4';
+        const CURRENT_VERSION = APP_VERSION;
         const UPDATE_SERVER_URL = import.meta.env.VITE_UPDATE_SERVER_URL || 'https://dewaterconstruct.com/app-updates';
         const response = await CapacitorHttp.get({
           url: `${UPDATE_SERVER_URL}/version.json?t=${Date.now()}`,

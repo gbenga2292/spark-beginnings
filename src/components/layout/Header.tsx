@@ -23,10 +23,10 @@ const isNodeEmpty = (node: any): boolean => {
   
   return false;
 };
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import { Bell, Search, LogOut, Menu, X, User, Settings, ChevronRight, CalendarClock, Users, MapPin, Wallet, FileText, Landmark, Library, UserPlus, ShieldCheck, LayoutDashboard, Clock, AlertCircle, AtSign, ArrowLeft, ArrowUpCircle, RefreshCw, MoreVertical, Sparkles, Home } from 'lucide-react';
-import { toast } from '@/src/components/ui/toast';
+import { toast, showConfirm } from '@/src/components/ui/toast';
 import { StatusIndicator } from '@/src/components/offline/StatusIndicator';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/src/store/auth';
@@ -40,6 +40,7 @@ import { useTheme } from '@/src/hooks/useTheme';
 import { usePage } from '@/src/contexts/PageContext';
 import { useShallow } from 'zustand/react/shallow';
 import { HEADER_PORTAL_ID } from '@/src/hooks/useHeaderPortal';
+import { APP_VERSION } from '@/src/constants/version';
 
 interface HeaderProps {
   onMenuClick?: () => void;
@@ -218,7 +219,30 @@ export function Header({ onMenuClick }: HeaderProps) {
   const { user, logout } = useAuthStore();
   const { signOut } = useAuth();
   const { updateReminder } = useAppData();
-  const navigate = useNavigate();
+  const { isSimulatorDirty, setSimulatorDirty } = useAppStore();
+  const location = useLocation();
+  const rawNavigate = useNavigate();
+  const navigate = useCallback(async (to: any, options?: any) => {
+    if (location.pathname === '/operations/simulator' && isSimulatorDirty) {
+      if (to === '/operations/simulator') {
+        rawNavigate(to, options);
+        return;
+      }
+      const ok = await showConfirm('You have unsaved simulator changes. Do you want to discard them and leave?', {
+        title: 'Unsaved Changes',
+        confirmLabel: 'Discard & Leave',
+        cancelLabel: 'Stay Here',
+        variant: 'danger'
+      });
+      if (ok) {
+        setSimulatorDirty(false);
+        rawNavigate(to, options);
+      }
+    } else {
+      rawNavigate(to, options);
+    }
+  }, [location.pathname, isSimulatorDirty, rawNavigate]);
+
   const { setCurrentUser } = useUserStore();
   const currentUser = useUserStore((s) => s.getCurrentUser());
   const notifications = useNotifications();
@@ -228,7 +252,7 @@ export function Header({ onMenuClick }: HeaderProps) {
     dismissedNotifications, 
     dismissNotification 
   } = useAppStore();
-  const location = useLocation();
+
   const { title, subtitle, headerButtons, showBackButton } = usePage();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -238,7 +262,7 @@ export function Header({ onMenuClick }: HeaderProps) {
   const [mobileOverflowOpen, setMobileOverflowOpen] = useState(false);
   const [checkingUpdate, setCheckingUpdate] = useState(false);
 
-  const CURRENT_VERSION = '1.6.6'; // Matches package.json
+  const CURRENT_VERSION = APP_VERSION;
   const UPDATE_SERVER_URL = import.meta.env.VITE_UPDATE_SERVER_URL || 'https://dewaterconstruct.com/app-updates';
 
   // ── Platform Detection ─────────────────────────────────────────────────

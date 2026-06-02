@@ -8,7 +8,7 @@ import { Badge } from '@/src/components/ui/badge';
 import {
   Download, Upload, ReceiptText, Wallet, TrendingUp, Landmark, Activity, AlertCircle,
   PieChart as PieChartIcon, BarChart3, Filter, X, CheckCircle2, FileSpreadsheet, FileText, Backpack, CreditCard,
-  Eye, Save, Trash2, XCircle, Maximize2, Minimize2
+  Eye, Save, Trash2, XCircle, Maximize2, Minimize2, MapPin
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/src/components/ui/dialog';
 import { Checkbox } from '@/src/components/ui/checkbox';
@@ -403,6 +403,7 @@ export function FinancialReports() {
           const proratedPension = r.pension * prorateFactor;
           const proratedEmployerPension = r.employerPension * prorateFactor;
           const proratedPaye = r.paye * prorateFactor;
+          const proratedWht = (r.withholdingTax || 0) * prorateFactor;
           const proratedLoan = r.loanRepayment * prorateFactor;
           
           return {
@@ -415,9 +416,10 @@ export function FinancialReports() {
             pension: proratedPension,
             employerPension: proratedEmployerPension,
             paye: proratedPaye,
+            withholdingTax: proratedWht,
             loanRepayment: proratedLoan,
             grossPay: proratedSalary + r.overtime,
-            takeHomePay: (proratedSalary + r.overtime) - (proratedPaye + proratedLoan + proratedPension)
+            takeHomePay: (proratedSalary + r.overtime) - (proratedPaye + proratedWht + proratedLoan + proratedPension)
           };
         });
       }
@@ -440,8 +442,8 @@ export function FinancialReports() {
       rows.forEach(row => {
         totalGrossExposure += row.grossPay;
         totalOvertimeCost += row.overtime;
-        if (row.pension > 0 || row.employerPension > 0) {
-          totalStatutory += (row.pension + row.employerPension + row.nsitf + row.paye);
+        if (row.pension > 0 || row.employerPension > 0 || row.paye > 0 || (row.withholdingTax || 0) > 0) {
+          totalStatutory += (row.pension + row.employerPension + row.nsitf + row.paye + (row.withholdingTax || 0));
         }
       });
     });
@@ -491,6 +493,7 @@ export function FinancialReports() {
       let employeePension = 0;
       let loansAmount = 0;
       let paye = 0;
+      let wht = 0;
 
       results.forEach(r => {
         salary += r.salary;
@@ -499,8 +502,9 @@ export function FinancialReports() {
         employeePension += r.pension;
         loansAmount += r.loanRepayment;
         paye += r.paye;
+        wht += (r.withholdingTax || 0);
       });
-      const totalPayout = grossPay - (employeePension + loansAmount + paye);
+      const totalPayout = grossPay - (employeePension + loansAmount + paye + wht);
 
       return {
         monthLabel: month.label,
@@ -510,6 +514,7 @@ export function FinancialReports() {
         employeePension,
         loans: loansAmount,
         paye,
+        wht,
         totalPayout
       };
     });
@@ -517,6 +522,8 @@ export function FinancialReports() {
 
   const [summaryTab, setSummaryTab] = useState<'client' | 'site' | 'vat'>('client');
   const [debtorView, setDebtorView] = useState<'client' | 'site'>('client');
+  const [rankingView, setRankingView] = useState<'client' | 'site'>('client');
+  const [rankingTooltip, setRankingTooltip] = useState<{ x: number; y: number; sites: string[]; count: number; accent: 'indigo' | 'emerald' } | null>(null);
   const [selectedFields, setSelectedFields] = useState<string[]>([]);
   const [exportMessage, setExportMessage] = useState<string | null>(null);
   const [activeFinBuilderTab, setActiveFinBuilderTab] = useState<string>("Revenue & Billing");
@@ -708,6 +715,79 @@ export function FinancialReports() {
       .sort((a, b) => b.Outstanding - a.Outstanding)
       .slice(0, 10);
   }, [invoices, payments, debtorView]);
+
+  // Invoice & Payment Ranking Data
+  const rankingData = useMemo(() => {
+    // 1. Invoice ranking
+    const invoiceGroups = new Map<string, { key: string; name: string; client: string; siteList: Set<string>; amount: number }>();
+    invoices.forEach(inv => {
+      const clientName = (inv.client || 'Unknown Client').trim();
+      const siteName = (inv.siteName || (inv as any).site || 'Unknown Site').trim();
+      
+      if (rankingView === 'client') {
+        if (!invoiceGroups.has(clientName)) {
+          invoiceGroups.set(clientName, { key: clientName, name: clientName, client: clientName, siteList: new Set(), amount: 0 });
+        }
+        const group = invoiceGroups.get(clientName)!;
+        group.siteList.add(siteName);
+        group.amount += (inv.amount || 0);
+      } else {
+        const key = `${siteName} - ${clientName}`;
+        if (!invoiceGroups.has(key)) {
+          invoiceGroups.set(key, { key, name: siteName, client: clientName, siteList: new Set(), amount: 0 });
+        }
+        const group = invoiceGroups.get(key)!;
+        group.amount += (inv.amount || 0);
+      }
+    });
+
+    const invoiceRanked = Array.from(invoiceGroups.values())
+      .map(g => ({
+        name: g.name,
+        client: g.client,
+        noOfSites: g.siteList.size,
+        sites: Array.from(g.siteList),
+        amount: g.amount
+      }))
+      .filter(g => g.amount > 0)
+      .sort((a, b) => b.amount - a.amount);
+
+    // 2. Payment ranking
+    const paymentGroups = new Map<string, { key: string; name: string; client: string; siteList: Set<string>; amount: number }>();
+    payments.forEach(pay => {
+      const clientName = (pay.client || 'Unknown Client').trim();
+      const siteName = (pay.site || 'Unknown Site').trim();
+      
+      if (rankingView === 'client') {
+        if (!paymentGroups.has(clientName)) {
+          paymentGroups.set(clientName, { key: clientName, name: clientName, client: clientName, siteList: new Set(), amount: 0 });
+        }
+        const group = paymentGroups.get(clientName)!;
+        group.siteList.add(siteName);
+        group.amount += (pay.amount || 0);
+      } else {
+        const key = `${siteName} - ${clientName}`;
+        if (!paymentGroups.has(key)) {
+          paymentGroups.set(key, { key, name: siteName, client: clientName, siteList: new Set(), amount: 0 });
+        }
+        const group = paymentGroups.get(key)!;
+        group.amount += (pay.amount || 0);
+      }
+    });
+
+    const paymentRanked = Array.from(paymentGroups.values())
+      .map(g => ({
+        name: g.name,
+        client: g.client,
+        noOfSites: g.siteList.size,
+        sites: Array.from(g.siteList),
+        amount: g.amount
+      }))
+      .filter(g => g.amount > 0)
+      .sort((a, b) => b.amount - a.amount);
+
+    return { invoiceRanked, paymentRanked };
+  }, [invoices, payments, rankingView]);
 
   // Balance Brought Forward — net balance from ALL dates strictly before the filtered period (year/month)
   const bfData = useMemo(() => {
@@ -1405,22 +1485,43 @@ export function FinancialReports() {
   };
 
   const exportLedgerPdf = () => {
-    const head = [["Client", summaryTab === 'site' ? "Site" : "", filterYear !== 'All' ? "B/F (₦)" : "", "Inv. Qty", "Total Invoiced (₦)", "Total Payments (₦)", "Balance Due (₦)", "WHT (₦)", ...(summaryTab === 'client' ? ["AMT FOR VAT", "VAT PAID", "VAT REMIT", "VAT OWED"] : []), "Status"].filter(Boolean)];
-    const body = summaryData.map(r => [
-      r.client, ...(summaryTab === 'site' ? [r.site] : []),
-      ...(filterYear !== 'All' ? [(r.bf || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })] : []),
-      r.noOfInvoices, (r.totalInvoices || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 
-      (r.totalPayment || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-      (r.balance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-      (r.withholdingTax || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-      ...(summaryTab === 'client' ? [
-        (r.amountForVat || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-        (r.vatPaid || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-        (r.vatRemitted || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-        (r.vatOwed || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-      ] : []),
-      r.status
-    ].filter(v => v !== undefined));
+    const head = [
+      summaryTab === 'vat'
+        ? ["Client", "VAT Policy", "Payment Made (₦)", "AMT FOR VAT (₦)", "VAT ON PAYMENTS (₦)", "AMT FOR VAT (REMITTED) (₦)", "VAT REMIT (₦)", "AMT FOR VAT (OWED) (₦)", "VAT OWED (₦)"]
+        : ["Client", summaryTab === 'site' ? "Site" : "", filterYear !== 'All' ? "B/F (₦)" : "", "Inv. Qty", "Total Invoiced (₦)", "Total Payments (₦)", "Balance Due (₦)", "WHT (₦)", ...(summaryTab === 'client' ? ["AMT FOR VAT", "VAT PAID", "VAT REMIT", "VAT OWED"] : []), "Status"].filter(Boolean)
+    ];
+    const body = summaryData.map(r => {
+      if (summaryTab === 'vat') {
+        const amtForVatRemitted = r.vatRemitted !== 0 && vatRate > 0 ? ((r.vatRemitted / (vatRate / 100)) || 0) : 0;
+        const amtForVatOwed = r.vatOwed !== 0 && vatRate > 0 ? ((r.vatOwed / (vatRate / 100)) || 0) : 0;
+        return [
+          r.client,
+          r.vatPolicy || 'No',
+          (r.totalPayment || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+          (r.amountForVat || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+          (r.vatPaid || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+          amtForVatRemitted.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+          (r.vatRemitted || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+          amtForVatOwed.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+          (r.vatOwed || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+        ];
+      }
+      return [
+        r.client, ...(summaryTab === 'site' ? [r.site] : []),
+        ...(filterYear !== 'All' ? [(r.bf || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })] : []),
+        r.noOfInvoices, (r.totalInvoices || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 
+        (r.totalPayment || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+        (r.balance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+        (r.withholdingTax || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+        ...(summaryTab === 'client' ? [
+          (r.amountForVat || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+          (r.vatPaid || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+          (r.vatRemitted || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+          (r.vatOwed || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+        ] : []),
+        r.status
+      ].filter(v => v !== undefined);
+    });
     
     setPreviewModal({
       isOpen: true,
@@ -2409,6 +2510,7 @@ export function FinancialReports() {
                   <>
                     <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-indigo-200 px-5 py-4 text-right">AMT FOR VAT</TableHead>
                     <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-indigo-200 px-5 py-4 text-right">VAT ON PAYMENTS</TableHead>
+                    <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-indigo-200 px-5 py-4 text-right">AMT FOR VAT (REMITTED)</TableHead>
                     <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-indigo-200 px-5 py-4 text-right">VAT REMIT</TableHead>
                     <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-indigo-200 px-5 py-4 text-right">AMT FOR VAT (OWED)</TableHead>
                     <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-rose-300 px-5 py-4 text-right">VAT OWED</TableHead>
@@ -2458,6 +2560,9 @@ export function FinancialReports() {
                     <>
                       <TableCell className="px-5 py-3 text-right font-mono text-emerald-600/70 text-xs">{row.amountForVat ? row.amountForVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
                       <TableCell className="px-5 py-3 text-right font-mono text-emerald-600/70 text-xs">{row.vatPaid ? row.vatPaid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
+                      <TableCell className="px-5 py-3 text-right font-mono text-sky-600/70 text-xs">
+                        {row.vatRemitted !== 0 && vatRate > 0 ? ((row.vatRemitted / (vatRate / 100)) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}
+                      </TableCell>
                       <TableCell className="px-5 py-3 text-right font-mono text-sky-600/70 text-xs">{row.vatRemitted ? row.vatRemitted.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
                       <TableCell className="px-5 py-3 text-right font-mono text-rose-600/70 text-xs">{row.vatOwed !== 0 && vatRate > 0 ? ((row.vatOwed / (vatRate / 100)) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
                       <TableCell className={`px-5 py-3 text-right font-mono font-bold text-xs ${row.vatOwed < 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
@@ -2528,6 +2633,9 @@ export function FinancialReports() {
                       <>
                         <TableCell className="bg-slate-900 px-5 py-4 text-right font-mono font-medium text-emerald-400">{totalAmountForVat ? totalAmountForVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
                         <TableCell className="bg-slate-900 px-5 py-4 text-right font-mono font-medium text-emerald-400">{totalVATPaid ? totalVATPaid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
+                        <TableCell className="bg-slate-900 px-5 py-4 text-right font-mono font-medium text-sky-400">
+                          {totalVATRemitted !== 0 && vatRate > 0 ? ((totalVATRemitted / (vatRate / 100)) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}
+                        </TableCell>
                         <TableCell className="bg-slate-900 px-5 py-4 text-right font-mono font-medium text-sky-400">{totalVATRemitted ? totalVATRemitted.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
                         <TableCell className="bg-slate-900 px-5 py-4 text-right font-mono font-medium text-rose-400">{totalVATOwed !== 0 && vatRate > 0 ? ((totalVATOwed / (vatRate / 100)) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
                         <TableCell className={`bg-slate-900 px-5 py-4 text-right font-mono font-bold text-xs ${totalVATOwed < 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
@@ -2667,17 +2775,268 @@ export function FinancialReports() {
                   <Legend iconType="circle" wrapperStyle={{ paddingTop: '10px', fontSize: '13px' }} />
                   <Bar dataKey="Cleared" stackId="a" fill="#cbd5e1" name="Received" />
                   <Bar dataKey="Outstanding" stackId="a" fill="#f59e0b" name="Outstanding" radius={[0, 4, 4, 0]}>
-                    <LabelList dataKey="Outstanding" position="right" style={{ fontSize: 10, fontWeight: 700, fill: '#d97706' }} formatter={(v: any) => v > 0 ? `₦${(v/1000000).toFixed(1)}M` : ''} />
+                    <LabelList dataKey="Outstanding" position="insideRight" formatter={(val: number) => val > 0 ? `₦${(val / 1000000).toFixed(1)}M` : ''} style={{ fill: '#fff', fontSize: 10, fontWeight: 700 }} />
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
           ) : (
-            <div className="py-12 text-center text-slate-500 font-medium">
-              <Activity className="w-10 h-10 opacity-20 mx-auto mb-3" /><p>No outstanding balances.</p>
+            <div className="text-slate-400 text-sm text-center py-10">
+              <AlertCircle className="w-8 h-8 opacity-20 mx-auto mb-2" /><p>No receivables data available.</p>
             </div>
           )}
         </CardContent>
+      </Card>
+
+      {/* Invoices & Payments Ranking Card */}
+      <Card className="shadow-sm border-slate-200">
+        <CardHeader className="bg-slate-50/50 border-b border-slate-100 pb-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="w-5 h-5 text-indigo-600" />
+              <CardTitle className="text-sm text-slate-800 uppercase tracking-wide">Invoices & Payments Ranking</CardTitle>
+            </div>
+            <div className="flex bg-slate-200/50 p-1 rounded-lg">
+              <button
+                className={`px-3 py-1 text-xs font-semibold rounded transition-all ${
+                  rankingView === 'client' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500'
+                }`}
+                onClick={() => setRankingView('client')}
+              >
+                By Client
+              </button>
+              <button
+                className={`px-3 py-1 text-xs font-semibold rounded transition-all ${
+                  rankingView === 'site' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500'
+                }`}
+                onClick={() => setRankingView('site')}
+              >
+                By Site
+              </button>
+            </div>
+          </div>
+          <CardDescription>Highest revenue and collections ranked by Client or Site.</CardDescription>
+        </CardHeader>
+        <CardContent className="p-5">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* INVOICES RANKING */}
+            <div>
+              <div className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3 border-b border-slate-100 pb-2 flex items-center justify-between">
+                <span>INVOICES</span>
+                <span className="text-[10px] text-slate-400 normal-case font-normal">Ranked by Billed Amount</span>
+              </div>
+              <div className="[&>div]:max-h-[350px] [&>div]:no-scrollbar">
+                <Table className="whitespace-nowrap min-w-full text-xs">
+                  <TableHeader className="bg-slate-900 sticky top-0 z-10 shadow-sm">
+                    <TableRow className="hover:bg-slate-900 border-b border-indigo-500/50">
+                      <TableHead className="font-semibold tracking-wider uppercase text-slate-300 py-3 text-left">
+                        {rankingView === 'client' ? 'CLIENT' : 'SITE'}
+                      </TableHead>
+                      {rankingView === 'client' ? (
+                        <TableHead className="font-semibold tracking-wider uppercase text-slate-300 py-3 text-center w-24">NO OF SITE</TableHead>
+                      ) : (
+                        <TableHead className="font-semibold tracking-wider uppercase text-slate-300 py-3 text-left">CLIENT</TableHead>
+                      )}
+                      <TableHead className="font-semibold tracking-wider uppercase text-slate-300 py-3 text-right">AMOUNT</TableHead>
+                      <TableHead className="font-semibold tracking-wider uppercase text-slate-300 py-3 text-center w-14">RANK</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {rankingData.invoiceRanked.length > 0 ? (
+                      rankingData.invoiceRanked.map((row, idx) => (
+                        <TableRow
+                          key={idx}
+                          className={`hover:bg-indigo-50/20 transition-colors border-b border-slate-100/80 ${
+                            idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/20'
+                          }`}
+                        >
+                          <TableCell className="py-3 font-semibold text-slate-700 truncate max-w-[150px]" title={row.name}>
+                            {row.name}
+                          </TableCell>
+                          {rankingView === 'client' ? (
+                            <TableCell className="py-3 text-center">
+                              <span
+                                className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-600 border border-indigo-100 hover:bg-indigo-600 hover:text-white transition-all cursor-help hover:scale-105 active:scale-95 shadow-sm"
+                                onMouseEnter={(e) => {
+                                  if (row.sites && row.sites.length > 0) {
+                                    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                                    setRankingTooltip({ x: rect.left + rect.width / 2, y: rect.top, sites: row.sites, count: row.noOfSites, accent: 'indigo' });
+                                  }
+                                }}
+                                onMouseLeave={() => setRankingTooltip(null)}
+                              >
+                                <MapPin className="w-2.5 h-2.5 shrink-0" />
+                                {row.noOfSites}
+                              </span>
+                            </TableCell>
+                          ) : (
+                            <TableCell className="py-3 text-slate-500 truncate max-w-[120px]" title={row.client}>
+                              {row.client}
+                            </TableCell>
+                          )}
+                          <TableCell className="py-3 text-right font-mono font-bold text-indigo-600">
+                            {fmRaw(row.amount)}
+                          </TableCell>
+                          <TableCell className="py-3 text-center">
+                            <div className="flex justify-center">
+                              {idx === 0 ? (
+                                <span className="flex items-center justify-center w-7 h-7 rounded-full font-black text-[11px] text-white bg-gradient-to-br from-amber-400 to-yellow-500 shadow-[0_0_12px_rgba(251,191,36,0.6)] border border-amber-300">
+                                  1
+                                </span>
+                              ) : idx === 1 ? (
+                                <span className="flex items-center justify-center w-7 h-7 rounded-full font-black text-[11px] text-white bg-gradient-to-br from-slate-400 to-slate-500 shadow-[0_0_10px_rgba(100,116,139,0.5)] border border-slate-300">
+                                  2
+                                </span>
+                              ) : idx === 2 ? (
+                                <span className="flex items-center justify-center w-7 h-7 rounded-full font-black text-[11px] text-white bg-gradient-to-br from-amber-600 to-orange-700 shadow-[0_0_10px_rgba(180,83,9,0.45)] border border-amber-500">
+                                  3
+                                </span>
+                              ) : (
+                                <span className="flex items-center justify-center w-6 h-6 rounded-full font-bold text-[10px] text-slate-500 bg-slate-100 border border-slate-200">
+                                  {idx + 1}
+                                </span>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={4} className="py-8 text-center text-slate-400 italic">
+                          No invoice data available for this period.
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+
+            {/* PAYMENTS RANKING */}
+            <div>
+              <div className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3 border-b border-slate-100 pb-2 flex items-center justify-between">
+                <span>PAYMENTS</span>
+                <span className="text-[10px] text-slate-400 normal-case font-normal">Ranked by Collected Amount</span>
+              </div>
+              <div className="[&>div]:max-h-[350px] [&>div]:no-scrollbar">
+                <Table className="whitespace-nowrap min-w-full text-xs">
+                  <TableHeader className="bg-slate-900 sticky top-0 z-10 shadow-sm">
+                    <TableRow className="hover:bg-slate-900 border-b border-emerald-500/50">
+                      <TableHead className="font-semibold tracking-wider uppercase text-slate-300 py-3 text-left">
+                        {rankingView === 'client' ? 'CLIENT' : 'SITE'}
+                      </TableHead>
+                      {rankingView === 'client' ? (
+                        <TableHead className="font-semibold tracking-wider uppercase text-slate-300 py-3 text-center w-24">NO OF SITE</TableHead>
+                      ) : (
+                        <TableHead className="font-semibold tracking-wider uppercase text-slate-300 py-3 text-left">CLIENT</TableHead>
+                      )}
+                      <TableHead className="font-semibold tracking-wider uppercase text-slate-300 py-3 text-right">AMOUNT</TableHead>
+                      <TableHead className="font-semibold tracking-wider uppercase text-slate-300 py-3 text-center w-14">RANK</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {rankingData.paymentRanked.length > 0 ? (
+                      rankingData.paymentRanked.map((row, idx) => (
+                        <TableRow
+                          key={idx}
+                          className={`hover:bg-emerald-50/20 transition-colors border-b border-slate-100/80 ${
+                            idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/20'
+                          }`}
+                        >
+                          <TableCell className="py-3 font-semibold text-slate-700 truncate max-w-[150px]" title={row.name}>
+                            {row.name}
+                          </TableCell>
+                          {rankingView === 'client' ? (
+                            <TableCell className="py-3 text-center">
+                              <span
+                                className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-100 hover:bg-emerald-600 hover:text-white transition-all cursor-help hover:scale-105 active:scale-95 shadow-sm"
+                                onMouseEnter={(e) => {
+                                  if (row.sites && row.sites.length > 0) {
+                                    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                                    setRankingTooltip({ x: rect.left + rect.width / 2, y: rect.top, sites: row.sites, count: row.noOfSites, accent: 'emerald' });
+                                  }
+                                }}
+                                onMouseLeave={() => setRankingTooltip(null)}
+                              >
+                                <MapPin className="w-2.5 h-2.5 shrink-0" />
+                                {row.noOfSites}
+                              </span>
+                            </TableCell>
+                          ) : (
+                            <TableCell className="py-3 text-slate-500 truncate max-w-[120px]" title={row.client}>
+                              {row.client}
+                            </TableCell>
+                          )}
+                          <TableCell className="py-3 text-right font-mono font-bold text-emerald-600">
+                            {fmRaw(row.amount)}
+                          </TableCell>
+                          <TableCell className="py-3 text-center">
+                            <div className="flex justify-center">
+                              {idx === 0 ? (
+                                <span className="flex items-center justify-center w-7 h-7 rounded-full font-black text-[11px] text-white bg-gradient-to-br from-amber-400 to-yellow-500 shadow-[0_0_12px_rgba(251,191,36,0.6)] border border-amber-300">
+                                  1
+                                </span>
+                              ) : idx === 1 ? (
+                                <span className="flex items-center justify-center w-7 h-7 rounded-full font-black text-[11px] text-white bg-gradient-to-br from-slate-400 to-slate-500 shadow-[0_0_10px_rgba(100,116,139,0.5)] border border-slate-300">
+                                  2
+                                </span>
+                              ) : idx === 2 ? (
+                                <span className="flex items-center justify-center w-7 h-7 rounded-full font-black text-[11px] text-white bg-gradient-to-br from-amber-600 to-orange-700 shadow-[0_0_10px_rgba(180,83,9,0.45)] border border-amber-500">
+                                  3
+                                </span>
+                              ) : (
+                                <span className="flex items-center justify-center w-6 h-6 rounded-full font-bold text-[10px] text-slate-500 bg-slate-100 border border-slate-200">
+                                  {idx + 1}
+                                </span>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={4} className="py-8 text-center text-slate-400 italic">
+                          No payment data available for this period.
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+
+        {/* Fixed-position tooltip — renders above all overflow containers */}
+        {rankingTooltip && (
+          <div
+            className="pointer-events-none fixed z-[9999]"
+            style={{
+              left: rankingTooltip.x,
+              top: rankingTooltip.y - 8,
+              transform: 'translateX(-50%) translateY(-100%)',
+            }}
+          >
+            <div className={`w-56 bg-slate-950/97 backdrop-blur-md border shadow-2xl rounded-xl p-3 text-left ${rankingTooltip.accent === 'indigo' ? 'border-indigo-900/60' : 'border-emerald-900/60'}`}>
+              <div className={`text-[10px] font-bold uppercase tracking-wider mb-1.5 pb-1 border-b border-slate-800 flex items-center justify-between ${rankingTooltip.accent === 'indigo' ? 'text-indigo-400' : 'text-emerald-400'}`}>
+                <span>Sites</span>
+                <span className={`font-mono px-1.5 rounded text-[9px] font-extrabold border ${rankingTooltip.accent === 'indigo' ? 'bg-indigo-950 border-indigo-900/50 text-indigo-300' : 'bg-emerald-950 border-emerald-900/50 text-emerald-300'}`}>
+                  {rankingTooltip.count}
+                </span>
+              </div>
+              <ul className="space-y-1 max-h-[140px] overflow-y-auto pr-1 no-scrollbar">
+                {rankingTooltip.sites.map((siteName, sIdx) => (
+                  <li key={sIdx} className={`text-[10px] font-medium text-slate-300 flex items-center gap-1.5 py-0.5 ${rankingTooltip.accent === 'indigo' ? 'hover:text-indigo-400' : 'hover:text-emerald-400'}`}>
+                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${rankingTooltip.accent === 'indigo' ? 'bg-indigo-500 shadow-[0_0_4px_#6366f1]' : 'bg-emerald-500 shadow-[0_0_4px_#10b981]'}`}></span>
+                    <span className="truncate">{siteName}</span>
+                  </li>
+                ))}
+              </ul>
+              {/* Arrow */}
+              <div className={`absolute top-full left-1/2 -translate-x-1/2 w-2.5 h-2.5 border-r border-b rotate-45 -mt-1.5 ${rankingTooltip.accent === 'indigo' ? 'bg-slate-950 border-indigo-900/60' : 'bg-slate-950 border-emerald-900/60'}`}></div>
+            </div>
+          </div>
+        )}
       </Card>
 
       {/* Site Revenue Chart */}
@@ -2842,16 +3201,17 @@ export function FinancialReports() {
               const gEmployeePension = payrollSummaryData.reduce((s, row) => s + row.employeePension, 0);
               const gLoans = payrollSummaryData.reduce((s, row) => s + row.loans, 0);
               const gPaye = payrollSummaryData.reduce((s, row) => s + row.paye, 0);
+              const gWht = payrollSummaryData.reduce((s, row) => s + row.wht, 0);
               const gTotalPayout = payrollSummaryData.reduce((s, row) => s + row.totalPayout, 0);
 
               const fm = (n: number) => priv?.canViewAmounts === false ? '***' : n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
               const fmT = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
               const exportPayrollSummaryCsv = () => {
-                const headers = ['MONTH', 'SALARY', 'OVERTIME', 'GROSS PAY', 'EMPLOYEE PENSION', 'LOANS', 'PAYE', 'TOTAL PAYOUT'];
+                const headers = ['MONTH', 'SALARY', 'OVERTIME', 'GROSS PAY', 'EMPLOYEE PENSION', 'LOANS', 'PAYE', 'WHT', 'TOTAL PAYOUT'];
                 const data = [
-                  ...payrollSummaryData.map(r => [r.monthLabel, fm(r.salary), fm(r.overtime), fm(r.grossPay), fm(r.employeePension), fm(r.loans), fm(r.paye), fm(r.totalPayout)]),
-                  ['GRAND TOTAL', fm(gSalary), fm(gOvertime), fm(gGrossPay), fm(gEmployeePension), fm(gLoans), fm(gPaye), fm(gTotalPayout)]
+                  ...payrollSummaryData.map(r => [r.monthLabel, fm(r.salary), fm(r.overtime), fm(r.grossPay), fm(r.employeePension), fm(r.loans), fm(r.paye), fm(r.wht), fm(r.totalPayout)]),
+                  ['GRAND TOTAL', fm(gSalary), fm(gOvertime), fm(gGrossPay), fm(gEmployeePension), fm(gLoans), fm(gPaye), fm(gWht), fm(gTotalPayout)]
                 ];
                 let csv = 'data:text/csv;charset=utf-8,';
                 csv += headers.join(',') + '\n';
@@ -2878,7 +3238,7 @@ export function FinancialReports() {
               };
 
               const exportPayrollSummaryPdf = () => {
-                const head = [['MONTH', 'SALARY', 'OVERTIME', 'GROSS PAY', 'EMPLOYEE PENSION', 'LOANS', 'PAYE', 'TOTAL PAYOUT']];
+                const head = [['MONTH', 'SALARY', 'OVERTIME', 'GROSS PAY', 'EMPLOYEE PENSION', 'LOANS', 'PAYE', 'WHT', 'TOTAL PAYOUT']];
                 const body = [
                   ...payrollSummaryData.map(r => [
                     r.monthLabel,
@@ -2888,6 +3248,7 @@ export function FinancialReports() {
                     fm(r.employeePension),
                     fm(r.loans),
                     fm(r.paye),
+                    fm(r.wht),
                     fm(r.totalPayout)
                   ]),
                   [
@@ -2898,6 +3259,7 @@ export function FinancialReports() {
                      fm(gEmployeePension),
                      fm(gLoans),
                      fm(gPaye),
+                     fm(gWht),
                      fm(gTotalPayout)
                   ]
                 ];
@@ -2931,7 +3293,7 @@ export function FinancialReports() {
                   <div className={`rounded-2xl border border-slate-200 shadow-lg overflow-auto no-scrollbar ${fullScreenTable === 'payroll' ? 'flex-1 min-h-0' : ''}`} style={{ background: 'linear-gradient(to bottom, #f8fafc, #ffffff)' }}>
                     <div className="min-w-[1100px]">
                       {/* column legend bar */}
-                      <div className="grid grid-cols-8 text-[10px] font-bold tracking-widest uppercase px-0 bg-gradient-to-r from-[#1a4a5c] via-[#1f6075] to-[#1a4a5c] border-b border-[#0d3344]">
+                      <div className="grid grid-cols-9 text-[10px] font-bold tracking-widest uppercase px-0 bg-gradient-to-r from-[#1a4a5c] via-[#1f6075] to-[#1a4a5c] border-b border-[#0d3344]">
                         {[
                           { label: 'MONTH',        align: 'left',  accent: false, wide: true },
                           { label: 'SALARY',       align: 'right', accent: false },
@@ -2940,6 +3302,7 @@ export function FinancialReports() {
                           { label: 'EMP. PENSION', align: 'right', accent: false },
                           { label: 'LOANS',        align: 'right', accent: false },
                           { label: 'PAYE',         align: 'right', accent: false },
+                          { label: 'WHT',          align: 'right', accent: false },
                           { label: 'TOTAL PAYOUT', align: 'right', accent: true  },
                         ].map(col => (
                           <div
@@ -2964,7 +3327,7 @@ export function FinancialReports() {
                           return (
                             <div
                               key={row.monthLabel}
-                              className={`grid grid-cols-8 items-center group transition-all duration-150 hover:shadow-md hover:z-10 relative ${
+                              className={`grid grid-cols-9 items-center group transition-all duration-150 hover:shadow-md hover:z-10 relative ${
                                 isEven ? 'bg-white' : 'bg-slate-50/70'
                               } hover:bg-teal-50/60`}
                             >
@@ -3000,6 +3363,11 @@ export function FinancialReports() {
                                   ₦{fm(row.paye)}
                                 </span>
                               </div>
+                              <div className="py-3 px-4 text-right">
+                                <span className="inline-flex items-center gap-1 text-xs font-mono font-semibold text-rose-700 bg-rose-50 border border-rose-200 rounded-full px-2.5 py-0.5">
+                                  ₦{fm(row.wht)}
+                                </span>
+                              </div>
                               <div className="py-3 px-4 bg-slate-800/[0.03] border-l border-slate-200 group-hover:bg-slate-800/[0.06]">
                                 <div className="flex flex-col items-end gap-1">
                                   <span className="text-sm font-mono font-extrabold text-slate-900">₦{fm(row.totalPayout)}</span>
@@ -3023,7 +3391,7 @@ export function FinancialReports() {
                             GRAND TOTAL
                           </span>
                         </div>
-                        {[gSalary, gOvertime, gGrossPay, gEmployeePension, gLoans, gPaye, gTotalPayout].map((val, i) => {
+                        {[gSalary, gOvertime, gGrossPay, gEmployeePension, gLoans, gPaye, gWht, gTotalPayout].map((val, i) => {
                           const isAccent = i === 2 || i === 6;
                           const isPaye   = i === 5;
                           return (

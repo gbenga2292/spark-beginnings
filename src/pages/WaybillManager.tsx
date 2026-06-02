@@ -19,6 +19,7 @@ import { Label } from '@/src/components/ui/label';
 
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { useAppStore } from '../store/appStore';
+import { useUserStore } from '../store/userStore';
 import { isInternalSite } from '@/src/lib/siteUtils';
 
 function WaybillManagerHeader({ onCreate, activeTab }: { onCreate: () => void, activeTab: 'waybill' | 'return' }) {
@@ -39,6 +40,8 @@ function WaybillManagerHeader({ onCreate, activeTab }: { onCreate: () => void, a
 export function WaybillManager() {
   const { waybills, updateWaybillStatus, deleteWaybill } = useOperations();
   const sites = useAppStore(state => state.sites);
+  const currentUser = useUserStore(s => s.getCurrentUser());
+  const canUndo = !!currentUser?.privileges?.users?.canView;
 
   const activeWaybills = useMemo(() => {
     return waybills.filter(wb => {
@@ -263,6 +266,13 @@ export function WaybillManager() {
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             )}
+                            {wb.status === 'sent_to_site' && canUndo && (
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20"
+                                title="Undo Send"
+                                onClick={() => updateWaybillStatus(wb.id, 'outstanding')}>
+                                <RotateCcw className="h-4 w-4" />
+                              </Button>
+                            )}
                           </>
                         ) : (
                           <>
@@ -284,6 +294,13 @@ export function WaybillManager() {
                               <Button variant="ghost" size="icon" className="h-8 w-8 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20"
                                 onClick={() => deleteWaybill(wb.id)}>
                                 <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
+                            {wb.status === 'sent_to_site' && canUndo && (
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20"
+                                title="Undo Return Process"
+                                onClick={() => updateWaybillStatus(wb.id, 'outstanding')}>
+                                <RotateCcw className="h-4 w-4" />
                               </Button>
                             )}
                           </>
@@ -378,6 +395,13 @@ export function WaybillManager() {
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       )}
+                      {wb.status === 'sent_to_site' && canUndo && (
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20"
+                          title="Undo Send"
+                          onClick={() => updateWaybillStatus(wb.id, 'outstanding')}>
+                          <RotateCcw className="h-4 w-4" />
+                        </Button>
+                      )}
                     </>
                   ) : (
                     <>
@@ -399,6 +423,13 @@ export function WaybillManager() {
                         <Button variant="ghost" size="icon" className="h-8 w-8 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20"
                           onClick={() => deleteWaybill(wb.id)}>
                           <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                      {wb.status === 'sent_to_site' && canUndo && (
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20"
+                          title="Undo Return Process"
+                          onClick={() => updateWaybillStatus(wb.id, 'outstanding')}>
+                          <RotateCcw className="h-4 w-4" />
                         </Button>
                       )}
                     </>

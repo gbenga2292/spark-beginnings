@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { MousePointer2, Pencil, Droplet, GitMerge, CornerDownRight, Square, Undo2, Eraser, Eye, EyeOff, Crosshair, Maximize, Minimize, Grid, Ruler, Spline, Frame, ChevronUp, ChevronDown, Printer } from 'lucide-react';
+import { MousePointer2, Pencil, Droplet, GitMerge, CornerDownRight, Square, Undo2, Eraser, Eye, EyeOff, Crosshair, Maximize, Minimize, Grid, Ruler, Spline, Frame, ChevronUp, ChevronDown, Printer, Move, Copy, RotateCw } from 'lucide-react';
 import { ComponentType } from '../../utils/simulationLogic';
 
-export type ActiveTool = 'select' | 'line' | 'dimension' | 'delete' | 'area' | 'hose' | 'discharge' | 'discharge-area' | 'site-area' | ComponentType;
+export type ActiveTool = 'select' | 'line' | 'dimension' | 'delete' | 'area' | 'hose' | 'discharge' | 'discharge-area' | 'site-area' | 'move' | 'copy' | 'rotate' | ComponentType;
 
 interface ToolbarProps {
   activeTool: ActiveTool;
@@ -10,6 +10,8 @@ interface ToolbarProps {
   onUndo: () => void;
   showWellpoints?: boolean;
   onToggleWellpoints?: () => void;
+  wellpointSide?: 'left' | 'right' | 'both';
+  onToggleWellpointSide?: () => void;
   orthoLocked?: boolean;
   onToggleOrtho?: () => void;
   gridSnap?: boolean;
@@ -24,6 +26,7 @@ interface ToolbarProps {
 export const Toolbar: React.FC<ToolbarProps> = ({ 
   activeTool, onToolSelect, onUndo, 
   showWellpoints, onToggleWellpoints, 
+  wellpointSide = 'left', onToggleWellpointSide,
   orthoLocked, onToggleOrtho, 
   gridSnap, onToggleGridSnap,
   isFullscreen, onToggleFullscreen,
@@ -49,136 +52,199 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   ];
   
   const editTools = [
-    { id: 'select', label: 'Select/Edit', icon: MousePointer2 },
+    { id: 'select', label: 'Select', icon: MousePointer2 },
+    { id: 'move', label: 'Move', icon: Move },
+    { id: 'copy', label: 'Copy', icon: Copy },
+    { id: 'rotate', label: 'Rotate', icon: RotateCw },
     { id: 'delete', label: 'Erase', icon: Eraser },
   ];
 
-  const renderTool = (tool: {id: string, label: string, icon: any}) => {
+  const renderTool = (tool: {id: string, label: string, icon: any, desc?: string}) => {
     const Icon = tool.icon;
     const isActive = activeTool === tool.id;
     return (
       <button
         key={tool.id}
         onClick={() => onToolSelect(tool.id as ActiveTool)}
-        title={tool.label}
-        className={`flex flex-col items-center justify-center p-2 rounded transition-colors ${
+        title={tool.desc ? `${tool.label} - ${tool.desc}` : tool.label}
+        className={`relative flex flex-col items-center justify-center p-2 rounded transition-all duration-200 ${
           isActive 
-            ? 'bg-blue-100 text-blue-700 shadow-inner' 
-            : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+            ? 'bg-blue-50/70 text-blue-600 shadow-sm border border-blue-200/50' 
+            : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 border border-transparent'
         }`}
       >
-        <Icon size={20} className="mb-1" />
-        <span className="text-[10px] font-medium">{tool.label}</span>
+        <Icon size={18} className="mb-1" />
+        <span className="text-[10px] font-semibold">{tool.label}</span>
+        {isActive && (
+          <span className="absolute bottom-0 left-2 right-2 h-0.5 bg-blue-600 rounded-full" />
+        )}
       </button>
     );
   };
 
+  const drawToolsExtended = [
+    { id: 'site-area', label: 'Site Area', icon: Grid, desc: 'Boundary of layout' },
+    { id: 'area', label: 'Excavation', icon: Frame, desc: 'Excavated pit boundaries' },
+    { id: 'discharge-area', label: 'Disc. Area', icon: Square, desc: 'Discharge/recharge zone' },
+    { id: 'line', label: 'Header', icon: Pencil, desc: 'Header pipeline' },
+    { id: 'hose', label: 'Suction', icon: Spline, desc: 'Suction hose connection' },
+    { id: 'discharge', label: 'Discharge', icon: GitMerge, desc: 'Discharge pipeline' },
+    { id: 'dimension', label: 'Dimension', icon: Ruler, desc: 'Measure distance between points' },
+  ];
+  
+  const compToolsExtended = [
+    { id: 'pump', label: 'Dew. Pump', icon: Droplet, desc: 'High-capacity dewatering pump unit' },
+    { id: 'tee', label: 'Place Tee', icon: CornerDownRight, desc: 'Auto-connecting pipeline Tee joint' },
+    { id: 'elbow', label: 'Place Elbow', icon: Crosshair, desc: 'Auto-connecting pipeline Elbow joint' },
+  ];
+  
+  const editToolsExtended = [
+    { id: 'select', label: 'Select', icon: MousePointer2, desc: 'Select or edit items (ESC to cancel)' },
+    { id: 'move', label: 'Move', icon: Move, desc: 'Move elements around canvas' },
+    { id: 'copy', label: 'Copy', icon: Copy, desc: 'Duplicate selected elements' },
+    { id: 'rotate', label: 'Rotate', icon: RotateCw, desc: 'Click component to rotate 90° · Right-click to flip 180°' },
+    { id: 'delete', label: 'Erase', icon: Eraser, desc: 'Remove elements from canvas' },
+  ];
+
   return (
-    <div className="relative z-20 w-full bg-white">
+    <div className="relative z-20 w-full bg-white select-none">
       <div className={`grid transition-[grid-template-rows] duration-300 ${isMobileCollapsed ? 'grid-rows-[0fr] sm:grid-rows-[1fr]' : 'grid-rows-[1fr]'}`}>
         <div className="overflow-hidden">
-          <div className="bg-white border-b border-gray-200 shadow-sm flex items-center px-4 py-2 space-x-6 overflow-x-auto select-none">
+          <div className="bg-white border-b border-gray-200/80 shadow-sm flex items-center px-4 py-2 space-x-6 overflow-x-auto select-none">
             
             {/* Draw Section */}
-            <div className="flex items-center space-x-1 border-r border-gray-200 pr-6">
-              {drawTools.map(renderTool)}
+            <div className="flex flex-col space-y-1 pr-6 border-r border-gray-200">
+              <span className="text-[9px] font-bold text-gray-400 tracking-wider uppercase mb-0.5 select-none">Draw</span>
+              <div className="flex items-center space-x-1">
+                {drawToolsExtended.map(renderTool)}
+              </div>
             </div>
 
             {/* Components Section */}
-            <div className="flex items-center space-x-1 border-r border-gray-200 pr-6">
-              {compTools.map(renderTool)}
+            <div className="flex flex-col space-y-1 pr-6 border-r border-gray-200">
+              <span className="text-[9px] font-bold text-gray-400 tracking-wider uppercase mb-0.5 select-none">Components</span>
+              <div className="flex items-center space-x-1">
+                {compToolsExtended.map(renderTool)}
+              </div>
             </div>
 
             {/* Modify Section */}
-            <div className="flex items-center space-x-1 border-r border-gray-200 pr-6">
-              {editTools.map(renderTool)}
-              <button
-                onClick={onUndo}
-                title="Undo Last Action"
-                className="flex flex-col items-center justify-center p-2 rounded transition-colors text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-              >
-                <Undo2 size={20} className="mb-1" />
-                <span className="text-[10px] font-medium">Undo</span>
-              </button>
+            <div className="flex flex-col space-y-1 pr-6 border-r border-gray-200">
+              <span className="text-[9px] font-bold text-gray-400 tracking-wider uppercase mb-0.5 select-none">Modify</span>
+              <div className="flex items-center space-x-1">
+                {editToolsExtended.map(renderTool)}
+                <button
+                  onClick={onUndo}
+                  title="Undo Last Action"
+                  className="flex flex-col items-center justify-center p-2 rounded transition-colors text-gray-600 hover:bg-gray-100 hover:text-gray-900 border border-transparent"
+                >
+                  <Undo2 size={18} className="mb-1" />
+                  <span className="text-[10px] font-semibold">Undo</span>
+                </button>
+              </div>
             </div>
 
             {/* Settings / View Section */}
-            <div className="flex items-center space-x-1">
-              {onToggleWellpoints && (
-                <button
-                  onClick={onToggleWellpoints}
-                  title={showWellpoints ? 'Hide Wellpoints' : 'Show Wellpoints'}
-                  className={`flex flex-col items-center justify-center p-2 rounded transition-colors ${
-                    showWellpoints ? 'bg-blue-100 text-blue-700 shadow-inner' : 'text-gray-600 hover:bg-gray-100'
-                  }`}
-                >
-                  {showWellpoints ? <Eye size={20} className="mb-1" /> : <EyeOff size={20} className="mb-1" />}
-                  <span className="text-[10px] font-medium">Wellpoints</span>
-                </button>
-              )}
+            <div className="flex flex-col space-y-1 pr-6">
+              <span className="text-[9px] font-bold text-gray-400 tracking-wider uppercase mb-0.5 select-none">View / Settings</span>
+              <div className="flex items-center space-x-1">
+                {onToggleWellpoints && (
+                  <button
+                    onClick={onToggleWellpoints}
+                    title={showWellpoints ? 'Hide Wellpoints' : 'Show Wellpoints'}
+                    className={`flex flex-col items-center justify-center p-2 rounded transition-colors ${
+                      showWellpoints ? 'bg-blue-50/70 text-blue-600 shadow-sm border border-blue-200/50' : 'text-gray-600 hover:bg-gray-100'
+                    }`}
+                  >
+                    {showWellpoints ? <Eye size={18} className="mb-1" /> : <EyeOff size={18} className="mb-1" />}
+                    <span className="text-[10px] font-semibold">Wellpoints</span>
+                  </button>
+                )}
 
-              {onToggleOrtho && (
-                <button
-                  onClick={onToggleOrtho}
-                  title="Lock Ortho Snapping"
-                  className={`flex flex-col items-center justify-center p-2 rounded transition-colors ${
-                    orthoLocked ? 'bg-blue-100 text-blue-700 shadow-inner' : 'text-gray-600 hover:bg-gray-100'
-                  }`}
-                >
-                  <Crosshair size={20} className="mb-1" />
-                  <span className="text-[10px] font-medium">Ortho</span>
-                </button>
-              )}
+                {onToggleWellpointSide && showWellpoints && (
+                  <button
+                    onClick={onToggleWellpointSide}
+                    title={`Wellpoint Side: ${wellpointSide === 'left' ? 'Left' : wellpointSide === 'right' ? 'Right' : 'Both'}`}
+                    className="flex flex-col items-center justify-center p-2 rounded transition-colors bg-blue-50/70 text-blue-600 shadow-sm border border-blue-200/50"
+                  >
+                    <span className="text-[14px] mb-0.5">{wellpointSide === 'left' ? '◀' : wellpointSide === 'right' ? '▶' : '◀▶'}</span>
+                    <span className="text-[10px] font-semibold">{wellpointSide === 'left' ? 'Left' : wellpointSide === 'right' ? 'Right' : 'Both'}</span>
+                  </button>
+                )}
 
-              {onToggleGridSnap && (
-                <button
-                  onClick={onToggleGridSnap}
-                  title="Toggle Grid Snap"
-                  className={`flex flex-col items-center justify-center p-2 rounded transition-colors ${
-                    gridSnap ? 'bg-blue-100 text-blue-700 shadow-inner' : 'text-gray-600 hover:bg-gray-100'
-                  }`}
-                >
-                  <Grid size={20} className="mb-1" />
-                  <span className="text-[10px] font-medium">Grid Snap</span>
-                </button>
-              )}
+                {onToggleOrtho && (
+                  <button
+                    onClick={onToggleOrtho}
+                    title="Lock Ortho Snapping"
+                    className={`flex flex-col items-center justify-center p-2 rounded transition-colors ${
+                      orthoLocked ? 'bg-blue-50/70 text-blue-600 shadow-sm border border-blue-200/50' : 'text-gray-600 hover:bg-gray-100'
+                    }`}
+                  >
+                    <Crosshair size={18} className="mb-1" />
+                    <span className="text-[10px] font-semibold">Ortho</span>
+                  </button>
+                )}
 
-              {onToggleFullscreen && (
-                <button
-                  onClick={onToggleFullscreen}
-                  title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
-                  className={`flex flex-col items-center justify-center p-2 rounded transition-colors ${
-                    isFullscreen ? 'bg-blue-100 text-blue-700 shadow-inner' : 'text-gray-600 hover:bg-gray-100'
-                  }`}
-                >
-                  {isFullscreen ? <Minimize size={20} className="mb-1" /> : <Maximize size={20} className="mb-1" />}
-                  <span className="text-[10px] font-medium">Fullscreen</span>
-                </button>
-              )}
+                {onToggleGridSnap && (
+                  <button
+                    onClick={onToggleGridSnap}
+                    title="Toggle Grid Snap"
+                    className={`flex flex-col items-center justify-center p-2 rounded transition-colors ${
+                      gridSnap ? 'bg-blue-50/70 text-blue-600 shadow-sm border border-blue-200/50' : 'text-gray-600 hover:bg-gray-100'
+                    }`}
+                  >
+                    <Grid size={18} className="mb-1" />
+                    <span className="text-[10px] font-semibold">Grid Snap</span>
+                  </button>
+                )}
 
-              {/* Separator */}
-              <div className="w-px h-10 bg-gray-300 mx-1"></div>
+                {onToggleFullscreen && (
+                  <button
+                    onClick={onToggleFullscreen}
+                    title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
+                    className={`flex flex-col items-center justify-center p-2 rounded transition-colors ${
+                      isFullscreen ? 'bg-blue-50/70 text-blue-600 shadow-sm border border-blue-200/50' : 'text-gray-600 hover:bg-gray-100'
+                    }`}
+                  >
+                    {isFullscreen ? <Minimize size={18} className="mb-1" /> : <Maximize size={18} className="mb-1" />}
+                    <span className="text-[10px] font-semibold">Fullscreen</span>
+                  </button>
+                )}
 
-              {onToggle3D && (
-                <button
-                  onClick={onToggle3D}
-                  className={`flex items-center justify-center px-4 py-2 ml-2 border border-transparent rounded-md shadow-sm text-sm font-medium transition-colors ${show3D ? 'bg-indigo-600 text-white hover:bg-indigo-700' : 'bg-gray-200 text-gray-800 hover:bg-gray-300'}`}
-                >
-                  {show3D ? 'View 2D' : 'View 3D'}
-                </button>
-              )}
+                {/* Separator */}
+                <div className="w-px h-8 bg-gray-200 mx-1"></div>
 
-              {onExportDrawing && (
-                <button
-                  onClick={onExportDrawing}
-                  title="Export Drawing Sheet"
-                  className="flex flex-col items-center justify-center p-2 rounded transition-colors text-gray-600 hover:bg-gray-100 hover:text-gray-900 ml-1"
-                >
-                  <Printer size={20} className="mb-1" />
-                  <span className="text-[10px] font-medium">Export</span>
-                </button>
-              )}
+                {onToggle3D && (
+                  <button
+                    onClick={onToggle3D}
+                    className={`flex items-center justify-center px-3 py-1.5 ml-2 border border-transparent rounded-md shadow-sm text-xs font-bold transition-colors ${show3D ? 'bg-indigo-600 text-white hover:bg-indigo-700' : 'bg-gray-200 text-gray-800 hover:bg-gray-300'}`}
+                  >
+                    {show3D ? 'View 2D' : 'View 3D'}
+                  </button>
+                )}
+
+                {onExportDrawing && (
+                  <button
+                    onClick={onExportDrawing}
+                    title="Export Drawing Sheet"
+                    className="flex flex-col items-center justify-center p-2 rounded transition-colors text-gray-600 hover:bg-gray-100 hover:text-gray-900 ml-1 border border-transparent"
+                  >
+                    <Printer size={18} className="mb-1" />
+                    <span className="text-[10px] font-semibold">Export</span>
+                  </button>
+                )}
+              </div>
             </div>
+
+            {/* Active Tool Chip */}
+            <div className="flex-1" />
+            <div className="hidden lg:flex items-center space-x-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 shrink-0 select-none">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Active Tool</span>
+              <span className="text-xs font-bold text-indigo-600 px-2.5 py-0.5 bg-indigo-50 border border-indigo-100 rounded-md">
+                {activeTool.toUpperCase().replace('-', ' ')}
+              </span>
+            </div>
+
           </div>
         </div>
       </div>

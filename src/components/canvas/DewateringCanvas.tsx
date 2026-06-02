@@ -1,7 +1,9 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { Stage, Layer, Line, Circle, Rect, Text, Group, Image as KonvaImage, Transformer } from 'react-konva';
+import { Stage, Layer, Line, Circle, Rect, Text, Group, Image as KonvaImage, Transformer, RegularPolygon } from 'react-konva';
 import useImage from 'use-image';
-import { Point, LineData, PlacedComponent, ComponentType, DimensionData, PIXELS_PER_METER, ElevationLevel } from '../../utils/simulationLogic';
+import { Point, LineData, PlacedComponent, ComponentType, DimensionData, PIXELS_PER_METER, ElevationLevel, AreaData, HoseData } from '../../utils/simulationLogic';
+import { CADLayer } from '../../utils/cadDataModels';
+import { findSnapPoint, findConnectionSnap, SnapPoint } from '../../utils/geometryEngine';
 import { Check, X } from 'lucide-react';
 import { ActiveTool } from './Toolbar';
 import { DesignPanel } from './DesignPanel';
@@ -17,21 +19,29 @@ interface DewateringCanvasProps {
   backgroundImageUrl?: string | null;
   fixedLineLengthMeters?: number;
   showWellpoints?: boolean;
+  wellpointSide?: 'left' | 'right' | 'both';
   orthoLocked?: boolean;
   gridSnap?: boolean;
   dimensions?: DimensionData[];
   onDimensionsChange?: (dims: DimensionData[]) => void;
-  areas: any[];
-  onAreasChange?: (areas: any[]) => void;
-  hoses: any[];
-  onHosesChange?: (hoses: any[]) => void;
+  areas: AreaData[];
+  onAreasChange?: (areas: AreaData[]) => void;
+  hoses: HoseData[];
+  onHosesChange?: (hoses: HoseData[]) => void;
   levels: ElevationLevel[];
   activeLevelId: string;
   onSelectLevel?: (id: string) => void;
   onAddLevel?: (level: ElevationLevel) => void;
   onUpdateLevel?: (id: string, updates: Partial<ElevationLevel>) => void;
   onDeleteLevel?: (id: string) => void;
+  layers?: CADLayer[];
+  activeLayerId?: string;
+  onSelectLayer?: (id: string) => void;
+  onUpdateLayer?: (id: string, updates: Partial<CADLayer>) => void;
+  onAddLayer?: (layer: CADLayer) => void;
+  onDeleteLayer?: (id: string) => void;
   stageRef?: React.RefObject<any>;
+  onCursorPosChange?: (pos: Point | null) => void;
 }
 
 function snapToAngle(prev: Point, raw: Point): Point {
@@ -65,6 +75,105 @@ function distMeters(a: Point, b: Point): number {
   return Math.sqrt(dx * dx + dy * dy) / PIXELS_PER_METER;
 }
 
+function getTangentLengthsForSegment(lines: LineData[], line: LineData, segmentIdx: number): { T_start: number; T_end: number } {
+  const R = 0.2; // bend radius in meters
+  const threshold = 12; // Snap distance in pixels
+  const points = line.points;
+  const n = points.length;
+  
+  let T_start = 0;
+  let T_end = 0;
+
+  // 1. Calculate T_start (at points[segmentIdx])
+  if (segmentIdx > 0) {
+    T_start = getTangentLengthAtInternalVertex(points, segmentIdx);
+  } else {
+    // Endpoint: check if snapped to another line's endpoint
+    const startPt = points[0];
+    let snappedPt: Point | null = null;
+    let otherDir: Point | null = null;
+    
+    for (const l of lines) {
+      if (l.id !== line.id && l.points.length > 1) {
+        const ep1 = l.points[0];
+        const ep2 = l.points[l.points.length - 1];
+        if (Math.sqrt((startPt.x - ep1.x) ** 2 + (startPt.y - ep1.y) ** 2) < threshold) {
+          snappedPt = ep1;
+          otherDir = { x: l.points[1].x - ep1.x, y: l.points[1].y - ep1.y };
+          break;
+        } else if (Math.sqrt((startPt.x - ep2.x) ** 2 + (startPt.y - ep2.y) ** 2) < threshold) {
+          snappedPt = ep2;
+          otherDir = { x: l.points[l.points.length - 2].x - ep2.x, y: l.points[l.points.length - 2].y - ep2.y };
+          break;
+        }
+      }
+    }
+    if (snappedPt && otherDir) {
+      const thisDir = { x: points[1].x - startPt.x, y: points[1].y - startPt.y };
+      T_start = getTangentLengthBetweenVectors(thisDir, otherDir);
+    }
+  }
+
+  // 2. Calculate T_end (at points[segmentIdx + 1])
+  if (segmentIdx < n - 2) {
+    T_end = getTangentLengthAtInternalVertex(points, segmentIdx + 1);
+  } else {
+    // Endpoint: check if snapped to another line's endpoint
+    const endPt = points[n - 1];
+    let snappedPt: Point | null = null;
+    let otherDir: Point | null = null;
+    
+    for (const l of lines) {
+      if (l.id !== line.id && l.points.length > 1) {
+        const ep1 = l.points[0];
+        const ep2 = l.points[l.points.length - 1];
+        if (Math.sqrt((endPt.x - ep1.x) ** 2 + (endPt.y - ep1.y) ** 2) < threshold) {
+          snappedPt = ep1;
+          otherDir = { x: l.points[1].x - ep1.x, y: l.points[1].y - ep1.y };
+          break;
+        } else if (Math.sqrt((endPt.x - ep2.x) ** 2 + (endPt.y - ep2.y) ** 2) < threshold) {
+          snappedPt = ep2;
+          otherDir = { x: l.points[l.points.length - 2].x - ep2.x, y: l.points[l.points.length - 2].y - ep2.y };
+          break;
+        }
+      }
+    }
+    if (snappedPt && otherDir) {
+      const thisDir = { x: points[n - 2].x - endPt.x, y: points[n - 2].y - endPt.y };
+      T_end = getTangentLengthBetweenVectors(thisDir, otherDir);
+    }
+  }
+
+  return { T_start, T_end };
+}
+
+function getTangentLengthAtInternalVertex(points: Point[], idx: number): number {
+  const prev = points[idx - 1];
+  const curr = points[idx];
+  const next = points[idx + 1];
+  return getTangentLengthBetweenVectors(
+    { x: prev.x - curr.x, y: prev.y - curr.y },
+    { x: next.x - curr.x, y: next.y - curr.y }
+  );
+}
+
+function getTangentLengthBetweenVectors(v1: Point, v2: Point): number {
+  const len1 = Math.sqrt(v1.x*v1.x + v1.y*v1.y);
+  const len2 = Math.sqrt(v2.x*v2.x + v2.y*v2.y);
+  if (len1 === 0 || len2 === 0) return 0;
+  
+  const a1 = Math.atan2(v1.y, v1.x);
+  const a2 = Math.atan2(v2.y, v2.x);
+  let diff = a2 - a1;
+  while (diff < -Math.PI) diff += Math.PI * 2;
+  while (diff > Math.PI) diff -= Math.PI * 2;
+  const deflectionAngle = Math.PI - Math.abs(diff);
+  
+  const R = 0.2;
+  const T_meters = R * Math.tan(deflectionAngle / 2);
+  return T_meters * PIXELS_PER_METER;
+}
+
 export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
   lines,
   onLinesChange,
@@ -77,6 +186,7 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
   backgroundImageUrl,
   fixedLineLengthMeters,
   showWellpoints = true,
+  wellpointSide = 'left',
   orthoLocked,
   gridSnap,
   areas = [],
@@ -89,7 +199,14 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
   onAddLevel,
   onUpdateLevel,
   onDeleteLevel,
+  layers = [],
+  activeLayerId,
+  onSelectLayer: onSelectCadLayer,
+  onUpdateLayer,
+  onAddLayer,
+  onDeleteLayer,
   stageRef: externalStageRef,
+  onCursorPosChange,
 }) => {
   const [currentLine, setCurrentLine] = useState<Point[]>([]);
   const [currentDim, setCurrentDim] = useState<Point[]>([]);
@@ -131,6 +248,16 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
   const hoseDragStartRef = useRef<{ points: Point[]; mouseX: number; mouseY: number } | null>(null);
 
   const localStageRef = useRef<any>(null);
+
+  // --- Visibility state (hidden items) ---
+  const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
+  const isItemVisible = useCallback((item: any) => !hiddenIds.has(item.id), [hiddenIds]);
+
+  // --- UI State ---
+  const [showHUD, setShowHUD] = useState(true);
+  const [osnapEnabled, setOsnapEnabled] = useState(true);
+  const [currentSnap, setCurrentSnap] = useState<SnapPoint | null>(null);
+
   const stageRef = externalStageRef || localStageRef;
   const containerRef = useRef<HTMLDivElement>(null);
   const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 });
@@ -190,15 +317,102 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
   // ---------- geometry helpers ----------
   const getSnappedPoint = useCallback((raw: Point): Point => {
     let pt = gridSnap ? snapToGrid(raw, PIXELS_PER_METER / 2) : raw;
+
+    // Object Snap
+    if (osnapEnabled) {
+      const snapLines = [
+        ...lines.filter(isItemVisible),
+        ...hoses.filter(isItemVisible)
+      ];
+      areas.filter(isItemVisible).forEach((a: any) => {
+        snapLines.push({
+          id: a.id,
+          points: [
+            { x: a.x, y: a.y },
+            { x: a.x + a.width, y: a.y },
+            { x: a.x + a.width, y: a.y + a.height },
+            { x: a.x, y: a.y + a.height },
+            { x: a.x, y: a.y }
+          ]
+        });
+      });
+
+      // Helper: rotate a local offset by component rotation angle
+      const rotatePort = (ox: number, oy: number, angleDeg: number) => {
+        const r = (angleDeg || 0) * (Math.PI / 180);
+        return {
+          x: ox * Math.cos(r) - oy * Math.sin(r),
+          y: ox * Math.sin(r) + oy * Math.cos(r),
+        };
+      };
+
+      // --- Priority connection ports (magnetic 30px snap) ---
+      const connectionPorts: { id: string; pt: Point }[] = [];
+      const isConnTool = ['hose', 'discharge', 'line', 'select'].includes(activeTool);
+
+      if (isConnTool) {
+        // Header pipe open endpoints
+        lines.filter(isItemVisible).forEach((l: any) => {
+          if (l.points?.length >= 2) {
+            const first = l.points[0];
+            const last = l.points[l.points.length - 1];
+            connectionPorts.push({ id: `hdr-start-${l.id}`, pt: { x: first.x, y: first.y } });
+            connectionPorts.push({ id: `hdr-end-${l.id}`, pt: { x: last.x, y: last.y } });
+          }
+        });
+      }
+
+      placedComponents.forEach((c: any) => {
+        if (c.type === 'pump' && isConnTool) {
+          // Always offer both suction and discharge ports for connection/select tools
+          const suctionPt = { x: c.x - 20, y: c.y };
+          connectionPorts.push({ id: `pump-suction-${c.id}`, pt: suctionPt });
+          snapLines.push({ id: `pump-suction-${c.id}`, points: [suctionPt, suctionPt] });
+
+          const dischargePt = { x: c.x + 20, y: c.y };
+          connectionPorts.push({ id: `pump-discharge-${c.id}`, pt: dischargePt });
+          snapLines.push({ id: `pump-discharge-${c.id}`, points: [dischargePt, dischargePt] });
+        }
+
+        // Tee: 3 ports — left (-15,0), right (15,0), branch (0,15)
+        if (c.type === 'tee' && isConnTool) {
+          const teeLocalPorts = [[-15, 0], [15, 0], [0, 15]];
+          teeLocalPorts.forEach(([ox, oy], i) => {
+            const p = rotatePort(ox, oy, c.rotation || 0);
+            const wp = { x: c.x + p.x, y: c.y + p.y };
+            connectionPorts.push({ id: `tee-port-${c.id}-${i}`, pt: wp });
+            snapLines.push({ id: `tee-port-${c.id}-${i}`, points: [wp, wp] });
+          });
+        }
+
+        // Elbow: 2 ports — left (-12,0) and bottom (0,12)
+        if (c.type === 'elbow' && isConnTool) {
+          const elbowLocalPorts = [[-12, 0], [0, 12]];
+          elbowLocalPorts.forEach(([ox, oy], i) => {
+            const p = rotatePort(ox, oy, c.rotation || 0);
+            const wp = { x: c.x + p.x, y: c.y + p.y };
+            connectionPorts.push({ id: `elbow-port-${c.id}-${i}`, pt: wp });
+            snapLines.push({ id: `elbow-port-${c.id}-${i}`, points: [wp, wp] });
+          });
+        }
+      });
+
+      // Priority connection snap (30px) → fallback to general snap (15px)
+      const connSnap = isConnTool ? findConnectionSnap(pt, connectionPorts) : null;
+      if (connSnap) {
+        pt = connSnap.pt;
+      } else {
+        const snapResult = findSnapPoint(pt, snapLines);
+        if (snapResult) pt = snapResult.pt;
+      }
+    }
+
     if (currentLine.length === 0) return pt;
     const prev = currentLine[currentLine.length - 1];
     pt = (shiftHeld || orthoLocked) ? snapToAngle(prev, pt) : pt;
     if (fixedLineLengthMeters) pt = applyFixedLength(prev, pt, fixedLineLengthMeters);
     return pt;
-  }, [currentLine, shiftHeld, orthoLocked, fixedLineLengthMeters, gridSnap]);
-
-  // --- Visibility state (hidden items) ---
-  const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
+  }, [currentLine, shiftHeld, orthoLocked, fixedLineLengthMeters, gridSnap, osnapEnabled, lines, hoses, areas, isItemVisible, layers, activeTool, placedComponents]);
 
   // --- Layer management callbacks ---
   const layerItems: any[] = useMemo(() => {
@@ -282,11 +496,11 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
   const finishLine = useCallback((pts: Point[]) => {
     if (pts.length > 1) {
       if (activeTool === 'hose' && onHosesChange) {
-        onHosesChange([...hoses, { id: crypto.randomUUID(), points: pts, kind: 'suction' }]);
+        onHosesChange([...hoses, { id: crypto.randomUUID(), points: pts, kind: 'suction', layerId: activeLayerId }]);
       } else if (activeTool === 'discharge' && onHosesChange) {
-        onHosesChange([...hoses, { id: crypto.randomUUID(), points: pts, kind: 'discharge' }]);
+        onHosesChange([...hoses, { id: crypto.randomUUID(), points: pts, kind: 'discharge', layerId: activeLayerId }]);
       } else {
-        const newLine: LineData = { id: crypto.randomUUID(), points: pts, levelId: activeLevelId };
+        const newLine: LineData = { id: crypto.randomUUID(), points: pts, levelId: activeLevelId, layerId: activeLayerId };
         onLinesChange([...lines, newLine]);
       }
     }
@@ -295,7 +509,7 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
     setCurrentDischarge([]);
     setCursorPos(null);
     setDimTyped('');
-  }, [lines, hoses, activeTool, onLinesChange, onHosesChange, activeLevelId]);
+  }, [lines, hoses, activeTool, onLinesChange, onHosesChange, activeLevelId, activeLayerId]);
 
   // ---------- AutoCAD keyboard capture ----------
   useEffect(() => {
@@ -436,7 +650,8 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
         type: activeTool as ComponentType,
         x: pt.x,
         y: pt.y,
-        levelId: activeLevelId
+        levelId: activeLevelId,
+        layerId: activeLayerId
       };
       onPlacedComponentsChange([...placedComponents, newComp]);
       return;
@@ -459,7 +674,8 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
           width: Math.abs(pt.x - currentAreaStart.pt.x),
           height: Math.abs(pt.y - currentAreaStart.pt.y),
           kind: currentAreaStart.kind,
-          levelId: activeLevelId
+          levelId: activeLevelId,
+          layerId: activeLayerId
         };
         if (onAreasChange) onAreasChange([...areas, newArea]);
         setCurrentAreaStart(null);
@@ -486,7 +702,8 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
           id: Math.random().toString(36).substring(2, 9),
           start,
           end: pt,
-          text: `${distM}m`
+          text: `${distM}m`,
+          layerId: activeLayerId
         };
         if (onDimensionsChange && dimensions) {
           onDimensionsChange([...dimensions, newDim]);
@@ -512,7 +729,7 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
         const prev = currentList[currentList.length - 1];
         pt = applyFixedLength(prev, (shiftHeld || orthoLocked) ? snapToAngle(prev, snappedRaw) : snappedRaw, meters);
       } else {
-        pt = activeTool === 'line' ? getSnappedPoint(snappedRaw) : snappedRaw;
+        pt = getSnappedPoint(snappedRaw);
       }
 
       setCurrentList(p => [...p, pt]);
@@ -536,7 +753,30 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
 
     const raw = getWorldPointerPos(stage);
     if (raw) {
-      setCursorPos(gridSnap ? snapToGrid(raw, PIXELS_PER_METER / 2) : raw);
+      const gridPt = gridSnap ? snapToGrid(raw, PIXELS_PER_METER / 2) : raw;
+      setCursorPos(gridPt);
+      if (onCursorPosChange) onCursorPosChange(gridPt);
+
+      // Update snap indicator during drawing
+      if (isDrawing && osnapEnabled) {
+        const snapLines = [
+          ...lines.filter(isItemVisible),
+          ...hoses.filter(isItemVisible)
+        ];
+        areas.filter(isItemVisible).forEach((a: any) => {
+          snapLines.push({
+            id: a.id,
+            points: [
+              { x: a.x, y: a.y }, { x: a.x + a.width, y: a.y },
+              { x: a.x + a.width, y: a.y + a.height }, { x: a.x, y: a.y + a.height },
+              { x: a.x, y: a.y }
+            ]
+          });
+        });
+        setCurrentSnap(findSnapPoint(gridPt, snapLines));
+      } else {
+        setCurrentSnap(null);
+      }
     }
   };
 
@@ -550,8 +790,14 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
   const handleAreaClick = (e: any, id: string) => {
     const area = areas.find((a: any) => a.id === id);
     if (area?.locked) return;
-    if (activeTool === 'select') {
+    if (['select', 'move', 'rotate'].includes(activeTool)) {
       setSelectedId(id);
+      e.cancelBubble = true;
+    }
+    if (activeTool === 'copy' && area) {
+      if (onAreasChange) {
+        onAreasChange([...areas, { ...area, id: crypto.randomUUID(), x: area.x + 40, y: area.y + 40 }]);
+      }
       e.cancelBubble = true;
     }
     if (activeTool === 'delete') {
@@ -565,13 +811,15 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
         id: Date.now().toString() + 'w',
         start: { x: area.x, y: area.y },
         end: { x: area.x + area.width, y: area.y },
-        text: `${wM}m`
+        text: `${wM}m`,
+        layerId: activeLayerId
       };
       const newDimH: DimensionData = {
         id: Date.now().toString() + 'h',
         start: { x: area.x, y: area.y },
         end: { x: area.x, y: area.y + area.height },
-        text: `${hM}m`
+        text: `${hM}m`,
+        layerId: activeLayerId
       };
       if (onDimensionsChange && dimensions) {
         onDimensionsChange([...dimensions, newDimW, newDimH]);
@@ -622,8 +870,12 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
   const handleLineClick = (e: any, id: string) => {
     const line = lines.find(l => l.id === id);
     if (line?.locked) return;
-    if (activeTool === 'select') {
+    if (['select', 'move', 'rotate'].includes(activeTool)) {
       setSelectedId(id);
+      e.cancelBubble = true;
+    }
+    if (activeTool === 'copy' && line) {
+      onLinesChange([...lines, { ...line, id: crypto.randomUUID(), points: line.points.map(p => ({ x: p.x + 40, y: p.y + 40 })) }]);
       e.cancelBubble = true;
     }
     if (activeTool === 'delete') {
@@ -703,12 +955,16 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
   const handleHoseClick = (e: any, id: string) => {
     const hose = hoses.find(h => h.id === id);
     if (hose?.locked) return;
-    if (activeTool === 'select') {
+    if (['select', 'move', 'rotate'].includes(activeTool)) {
       setSelectedId(id);
       e.cancelBubble = true;
     }
-    if (activeTool === 'delete') {
-      if (onHosesChange) onHosesChange(hoses.filter(h => h.id !== id));
+    if (activeTool === 'copy' && hose && onHosesChange) {
+      onHosesChange([...hoses, { ...hose, id: crypto.randomUUID(), points: hose.points.map((p: any) => ({ x: p.x + 40, y: p.y + 40 })) }]);
+      e.cancelBubble = true;
+    }
+    if (activeTool === 'delete' && onHosesChange) {
+      onHosesChange(hoses.filter(h => h.id !== id));
       e.cancelBubble = true;
     }
     if (activeTool === 'dimension' && hose && hose.points.length > 1) {
@@ -767,37 +1023,34 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
   };
 
   const handleHoseVertexDragMove = (hoseId: string, ptIndex: number, e: any) => {
-    const newX = e.target.x();
-    const newY = e.target.y();
+    const rawX = e.target.x();
+    const rawY = e.target.y();
+    const snapped = getSnappedPoint({ x: rawX, y: rawY });
     if (onHosesChange) {
       onHosesChange(hoses.map(h =>
         h.id !== hoseId ? h : {
           ...h,
-          points: h.points.map((p, i) => i === ptIndex ? { x: newX, y: newY } : p),
+          points: h.points.map((p, i) => i === ptIndex ? snapped : p),
         }
       ));
     }
   };
 
   const handleHoseVertexDragEnd = (hoseId: string, ptIndex: number, e: any) => {
-    const newX = e.target.x();
-    const newY = e.target.y();
+    const rawX = e.target.x();
+    const rawY = e.target.y();
+    const snapped = getSnappedPoint({ x: rawX, y: rawY });
     if (onHosesChange) {
       onHosesChange(hoses.map(h =>
         h.id !== hoseId ? h : {
           ...h,
-          points: h.points.map((p, i) => i === ptIndex ? { x: newX, y: newY } : p),
+          points: h.points.map((p, i) => i === ptIndex ? snapped : p),
         }
       ));
     }
   };
 
   // ---------- component click / drag ----------
-  const handleCompClick = (e: any, id: string) => {
-    if (activeTool === 'select') { setSelectedId(id); e.cancelBubble = true; }
-    if (activeTool === 'delete') { onPlacedComponentsChange(placedComponents.filter(c => c.id !== id)); e.cancelBubble = true; }
-  };
-
   const handleCompDragEnd = (id: string, e: any) => {
     let newX = e.target.x();
     let newY = e.target.y();
@@ -816,45 +1069,259 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
   const typedMeters = parseFloat(dimTyped);
   const resolvedDistM = !isNaN(typedMeters) && typedMeters > 0 ? typedMeters : liveDistM;
 
+  // --- Auto fittings logic ---
+  const autoFittings = useMemo(() => {
+    const fittings: { type: 'elbow' | 'tee'; x: number; y: number; rotation: number }[] = [];
+    const threshold = 12; // Snap distance in pixels (~8-12px)
+
+    // Helper: point distance
+    const ptDist = (a: Point, b: Point) => Math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2);
+
+    // Helper: is point on line segment
+    const distToSegment = (p: Point, a: Point, b: Point) => {
+      const l2 = (a.x - b.x) ** 2 + (a.y - b.y) ** 2;
+      if (l2 === 0) return { dist: ptDist(p, a), proj: { x: a.x, y: a.y } };
+      let t = ((p.x - a.x) * (b.x - a.x) + (p.y - a.y) * (b.y - a.y)) / l2;
+      t = Math.max(0, Math.min(1, t));
+      const proj = { x: a.x + t * (b.x - a.x), y: a.y + t * (b.y - a.y) };
+      return { dist: ptDist(p, proj), proj };
+    };
+
+    // 1. Elbow detection: Two header pipe endpoints meet
+    const headerEndpoints: { pt: Point; parentId: string }[] = [];
+    lines.forEach(l => {
+      if (l.points.length > 1) {
+        headerEndpoints.push({ pt: l.points[0], parentId: l.id });
+        headerEndpoints.push({ pt: l.points[l.points.length - 1], parentId: l.id });
+      }
+    });
+
+    // Check header endpoint-to-endpoint meetings (Elbow)
+    for (let i = 0; i < headerEndpoints.length; i++) {
+      for (let j = i + 1; j < headerEndpoints.length; j++) {
+        if (headerEndpoints[i].parentId !== headerEndpoints[j].parentId) {
+          if (ptDist(headerEndpoints[i].pt, headerEndpoints[j].pt) < threshold) {
+            fittings.push({
+              type: 'elbow',
+              x: (headerEndpoints[i].pt.x + headerEndpoints[j].pt.x) / 2,
+              y: (headerEndpoints[i].pt.y + headerEndpoints[j].pt.y) / 2,
+              rotation: 0
+            });
+          }
+        }
+      }
+    }
+
+    // 2. Tee detection: Header segment endpoint meets another header segment mid-body
+    lines.forEach(l => {
+      for (let i = 0; i < l.points.length - 1; i++) {
+        const a = l.points[i];
+        const b = l.points[i + 1];
+
+        // Check if any other header pipe's endpoint meets this segment mid-body (Tee)
+        headerEndpoints.forEach(hept => {
+          if (hept.parentId !== l.id) {
+            if (ptDist(hept.pt, a) > threshold && ptDist(hept.pt, b) > threshold) {
+              const { dist, proj } = distToSegment(hept.pt, a, b);
+              if (dist < threshold) {
+                fittings.push({
+                  type: 'tee',
+                  x: proj.x,
+                  y: proj.y,
+                  rotation: Math.atan2(b.y - a.y, b.x - a.x) * (180 / Math.PI)
+                });
+              }
+            }
+          }
+        });
+      }
+    });
+
+    // 3. Internal corner elbows (within any multi-point line)
+    lines.forEach(l => {
+      if (l.points.length > 2) {
+        for (let i = 1; i < l.points.length - 1; i++) {
+          const prev = l.points[i - 1];
+          const curr = l.points[i];
+          const next = l.points[i + 1];
+          
+          const dx1 = curr.x - prev.x;
+          const dy1 = curr.y - prev.y;
+          const dx2 = next.x - curr.x;
+          const dy2 = next.y - curr.y;
+          const len1 = Math.sqrt(dx1*dx1 + dy1*dy1);
+          const len2 = Math.sqrt(dx2*dx2 + dy2*dy2);
+          
+          let rot = 0;
+          if (len1 > 0 && len2 > 0) {
+            const a1 = Math.atan2(dy1, dx1);
+            const a2 = Math.atan2(dy2, dx2);
+            let diff = a2 - a1;
+            while (diff < -Math.PI) diff += Math.PI * 2;
+            while (diff > Math.PI) diff -= Math.PI * 2;
+            rot = (a1 + diff / 2) * (180 / Math.PI);
+          }
+          
+          fittings.push({
+            type: 'elbow',
+            x: curr.x,
+            y: curr.y,
+            rotation: rot
+          });
+        }
+      }
+    });
+
+    // Deduplicate fittings that land at the exact same pixel coord
+    const uniqueFittings: typeof fittings = [];
+    fittings.forEach(fit => {
+      const isDup = uniqueFittings.some(uf => ptDist(uf, fit) < 5);
+      if (!isDup) uniqueFittings.push(fit);
+    });
+
+    return uniqueFittings;
+  }, [lines]);
+
   // ---------- component renderer ----------
   const renderComponent = (comp: PlacedComponent) => {
+    const isSelected = ['select', 'move', 'rotate'].includes(activeTool) && selectedId === comp.id;
+    const isDraggable = ['select', 'move', 'rotate'].includes(activeTool);
     const del = activeTool === 'delete';
-    const sel = activeTool === 'select' && selectedId === comp.id;
-    const isDraggable = activeTool === 'select';
+
+    const handleCompClick = (e: any) => {
+      if (['select', 'move'].includes(activeTool)) { setSelectedId(comp.id); e.cancelBubble = true; }
+      if (activeTool === 'rotate') {
+        // Each click rotates 90°; right-click flips 180°
+        const delta = e.evt?.button === 2 ? 180 : 90;
+        const newRot = ((comp.rotation || 0) + delta) % 360;
+        onPlacedComponentsChange(placedComponents.map(c => c.id === comp.id ? { ...c, rotation: newRot } : c));
+        e.cancelBubble = true;
+        return;
+      }
+      if (activeTool === 'copy') {
+        onPlacedComponentsChange([...placedComponents, { ...comp, id: crypto.randomUUID(), x: comp.x + 40, y: comp.y + 40 }]);
+        e.cancelBubble = true;
+      }
+      if (activeTool === 'delete') { onPlacedComponentsChange(placedComponents.filter(c => c.id !== comp.id)); e.cancelBubble = true; }
+    };
+
     const base = {
-      onClick: (e: any) => handleCompClick(e, comp.id),
-      onTap: (e: any) => handleCompClick(e, comp.id),
+      onClick: handleCompClick,
+      onTap: handleCompClick,
       draggable: isDraggable,
       onDragEnd: (e: any) => handleCompDragEnd(comp.id, e),
-      strokeWidth: sel ? 3 : 2,
+      strokeWidth: isSelected ? 3 : 2,
     };
 
     switch (comp.type) {
       case 'pump': return (
         <Group key={comp.id} {...base}>
-          <Rect x={comp.x - 20} y={comp.y - 15} width={40} height={30} fill={del ? '#fca5a5' : '#0ea5e9'} stroke={sel ? '#fbbf24' : '#0284c7'} strokeWidth={2} cornerRadius={2} />
+          {/* Pump body shadow */}
+          <Rect x={comp.x - 22} y={comp.y - 17} width={44} height={34} fill="rgba(0,0,0,0.1)" cornerRadius={3} listening={false} />
+          {/* Main pump block */}
+          <Rect x={comp.x - 20} y={comp.y - 15} width={40} height={30} fill={del ? '#fca5a5' : '#0ea5e9'} stroke={isSelected ? '#fbbf24' : '#0284c7'} strokeWidth={2} cornerRadius={2} />
           <Rect x={comp.x - 10} y={comp.y - 8} width={20} height={16} fill="#bae6fd" />
-          <Text x={comp.x - 35} y={comp.y - 28} text="Dewatering Pump" fill="#0284c7" fontSize={11} fontStyle="bold" listening={false} />
+          
+          {/* Suction port indicator at the left face edge */}
+          <Circle x={comp.x - 20} y={comp.y} radius={5} fill="#fbbf24" stroke="#78350f" strokeWidth={1} />
+          <Circle x={comp.x - 20} y={comp.y} radius={2} fill="#fff" />
+          <Text x={comp.x - 55} y={comp.y - 4} text="Suction" fill="#78350f" fontSize={7} fontStyle="bold" listening={false} />
+
+          {/* Discharge port indicator at the right face edge */}
+          <Circle x={comp.x + 20} y={comp.y} radius={5} fill="#3b82f6" stroke="#1d4ed8" strokeWidth={1} />
+          <Circle x={comp.x + 20} y={comp.y} radius={2} fill="#fff" />
+          <Text x={comp.x + 25} y={comp.y - 4} text="Discharge" fill="#1d4ed8" fontSize={7} fontStyle="bold" listening={false} />
+
+          {/* Labels */}
+          <Text x={comp.x - 35} y={comp.y - 28} text="Dewatering Pump" fill="#0284c7" fontSize={9} fontStyle="bold" listening={false} />
+          <Text x={comp.x - 35} y={comp.y + 19} text="Cap: 150 m³/h" fill="#64748b" fontSize={8} fontStyle="bold" listening={false} />
         </Group>
       );
-      case 'tee': return (
-        <React.Fragment key={comp.id}>
-          <Rect x={comp.x - 10} y={comp.y - 10} width={20} height={20}
-            fill={del ? '#6ee7b7' : '#10b981'}
-            stroke={sel ? '#fbbf24' : '#064e3b'}
-            {...base} />
-          <Text x={comp.x - 4} y={comp.y - 6} text="T" fill="white" fontSize={12} fontStyle="bold" listening={false} />
-        </React.Fragment>
-      );
-      case 'elbow': return (
-        <React.Fragment key={comp.id}>
-          <Circle x={comp.x} y={comp.y} radius={8}
-            fill={del ? '#fcd34d' : '#f59e0b'}
-            stroke={sel ? '#fbbf24' : '#78350f'}
-            strokeWidth={1.5}
-            {...base} />
-        </React.Fragment>
-      );
+      case 'tee': {
+        const showPorts = ['hose', 'discharge', 'line'].includes(activeTool);
+        return (
+          <Group 
+            key={comp.id} 
+            x={comp.x} 
+            y={comp.y} 
+            rotation={comp.rotation || 0}
+            {...base}
+          >
+            {/* Main horizontal flow path */}
+            <Rect x={-15} y={-4} width={30} height={8} fill={del ? '#a7f3d0' : '#d1fae5'} stroke={isSelected ? '#fbbf24' : '#065f46'} strokeWidth={1.5} cornerRadius={1} />
+            {/* Branch perpendicular path */}
+            <Rect x={-4} y={0} width={8} height={15} fill={del ? '#a7f3d0' : '#d1fae5'} stroke={isSelected ? '#fbbf24' : '#065f46'} strokeWidth={1.5} cornerRadius={1} />
+            
+            {/* Three flanged inlets (Left, Right, Bottom) */}
+            <Line points={[-15, -6, -15, 6]} stroke="#065f46" strokeWidth={2.5} />
+            <Line points={[15, -6, 15, 6]} stroke="#065f46" strokeWidth={2.5} />
+            <Line points={[-6, 15, 6, 15]} stroke="#065f46" strokeWidth={2.5} />
+            
+            {/* Center visual label */}
+            <Circle x={0} y={2} radius={3.5} fill="#10b981" />
+            <Text x={-2.5} y={-1} text="T" fill="white" fontSize={6} fontStyle="bold" listening={false} />
+
+            {/* Port snap indicators — shown when connection tool is active */}
+            {showPorts && (
+              <>
+                {/* Left port */}
+                <Circle x={-15} y={0} radius={5} fill="rgba(6,182,212,0.25)" stroke="#06b6d4" strokeWidth={1.5} listening={false} />
+                <Circle x={-15} y={0} radius={2} fill="#06b6d4" listening={false} />
+                {/* Right port */}
+                <Circle x={15} y={0} radius={5} fill="rgba(6,182,212,0.25)" stroke="#06b6d4" strokeWidth={1.5} listening={false} />
+                <Circle x={15} y={0} radius={2} fill="#06b6d4" listening={false} />
+                {/* Branch (mouth) port */}
+                <Circle x={0} y={15} radius={6} fill="rgba(250,204,21,0.3)" stroke="#facc15" strokeWidth={2} listening={false} />
+                <Circle x={0} y={15} radius={2.5} fill="#facc15" listening={false} />
+              </>
+            )}
+
+            {/* Flip hint when selected */}
+            {isSelected && <Text x={-22} y={-20} text="↺ rotate" fill="#f59e0b" fontSize={7} fontStyle="bold" listening={false} />}
+          </Group>
+        );
+      }
+      case 'elbow': {
+        const showPorts = ['hose', 'discharge', 'line'].includes(activeTool);
+        return (
+          <Group 
+            key={comp.id} 
+            x={comp.x} 
+            y={comp.y} 
+            rotation={comp.rotation || 0}
+            {...base}
+          >
+            {/* L-shaped 90-degree curved body */}
+            {/* Horizontal side */}
+            <Rect x={-12} y={-4} width={12} height={8} fill={del ? '#fcd34d' : '#fef3c7'} stroke={isSelected ? '#fbbf24' : '#78350f'} strokeWidth={1.5} cornerRadius={1} />
+            {/* Vertical side */}
+            <Rect x={-4} y={0} width={8} height={12} fill={del ? '#fcd34d' : '#fef3c7'} stroke={isSelected ? '#fbbf24' : '#78350f'} strokeWidth={1.5} cornerRadius={1} />
+            
+            {/* Flange 1 (Left end) */}
+            <Line points={[-12, -6, -12, 6]} stroke="#78350f" strokeWidth={2.5} />
+            {/* Flange 2 (Bottom end) */}
+            <Line points={[-6, 12, 6, 12]} stroke="#78350f" strokeWidth={2.5} />
+            
+            {/* Visual label */}
+            <Circle x={-2} y={2} radius={3.5} fill="#f59e0b" />
+            <Text x={-4} y={-1} text="E" fill="white" fontSize={6} fontStyle="bold" listening={false} />
+
+            {/* Port snap indicators */}
+            {showPorts && (
+              <>
+                {/* Left port */}
+                <Circle x={-12} y={0} radius={5} fill="rgba(6,182,212,0.25)" stroke="#06b6d4" strokeWidth={1.5} listening={false} />
+                <Circle x={-12} y={0} radius={2} fill="#06b6d4" listening={false} />
+                {/* Bottom port */}
+                <Circle x={0} y={12} radius={5} fill="rgba(6,182,212,0.25)" stroke="#06b6d4" strokeWidth={1.5} listening={false} />
+                <Circle x={0} y={12} radius={2} fill="#06b6d4" listening={false} />
+              </>
+            )}
+
+            {isSelected && <Text x={-18} y={-20} text="↺ rotate" fill="#f59e0b" fontSize={7} fontStyle="bold" listening={false} />}
+          </Group>
+        );
+      }
       default: return null;
     }
   };
@@ -909,6 +1376,12 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
         onAddLevel={onAddLevel!}
         onUpdateLevel={onUpdateLevel!}
         onDeleteLevel={onDeleteLevel!}
+        cadLayers={layers}
+        activeCadLayerId={activeLayerId}
+        onSelectCadLayer={onSelectCadLayer}
+        onUpdateCadLayer={onUpdateLayer}
+        onAddCadLayer={onAddLayer}
+        onDeleteCadLayer={onDeleteLayer}
       />
       
       <div
@@ -930,7 +1403,7 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
           onMouseDown={handleStageMouseDown}
           onMouseMove={handlePointerMove}
           onMouseUp={handleStageMouseUp}
-          onMouseLeave={() => { setIsPanning(false); lastPanPosRef.current = null; }}
+          onMouseLeave={() => { setIsPanning(false); lastPanPosRef.current = null; if (onCursorPosChange) onCursorPosChange(null); }}
           onTouchStart={handleStageMouseDown}
           onTouchMove={handlePointerMove}
           onDblTap={(e) => {
@@ -966,7 +1439,7 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
           )}
 
           {/* Excavation, Discharge & Site Areas */}
-          {areas.filter(a => !hiddenIds.has(a.id)).map((area: any) => {
+          {areas.filter(isItemVisible).map((area: any) => {
             const isDischarge = area.kind === 'discharge';
             const isSite = area.kind === 'site';
             const isSelected = selectedId === area.id && activeTool === 'select';
@@ -1017,7 +1490,7 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
           })}
 
           {/* Finished lines (sorted by zIndex, rendered after areas so they appear on top) */}
-          {[...lines].filter((l: any) => !hiddenIds.has(l.id)).sort((a: any, b: any) => (a.zIndex ?? 100) - (b.zIndex ?? 100)).map((line) => {
+          {[...lines].filter(isItemVisible).sort((a: any, b: any) => (a.zIndex ?? 100) - (b.zIndex ?? 100)).map((line) => {
             const isSelected = activeTool === 'select' && selectedId === line.id;
             return (
               <React.Fragment key={line.id}>
@@ -1033,22 +1506,113 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
                   onDragStart={(e) => handleLineDragStart(line.id, e)}
                   onDragEnd={(e) => handleLineDragEnd(line.id, e)}
                 />
-                {/* Visible line (thick outer edge) */}
-                <Line
-                  points={line.points.flatMap(p => [p.x, p.y])}
-                  stroke={activeTool === 'delete' ? '#ef4444' : isSelected ? '#fbbf24' : '#0369a1'}
-                  strokeWidth={isSelected ? 10 : 8}
-                  lineJoin="round" lineCap="round"
-                  listening={false}
-                />
-                {/* Visible line (inner pipe body) */}
-                <Line
-                  points={line.points.flatMap(p => [p.x, p.y])}
-                  stroke={activeTool === 'delete' ? '#fca5a5' : '#22d3ee'}
-                  strokeWidth={4}
-                  lineJoin="round" lineCap="round"
-                  listening={false}
-                />
+                {/* Segmented 2D Header Pipe Pieces (6-meter standard rigid segments + remainder) */}
+                {(() => {
+                  const pipeSegments: React.ReactNode[] = [];
+                  const headerLengthPx = 6 * PIXELS_PER_METER;
+                  
+                  for (let i = 0; i < line.points.length - 1; i++) {
+                    const p1 = line.points[i];
+                    const p2 = line.points[i + 1];
+                    const dx = p2.x - p1.x;
+                    const dy = p2.y - p1.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist === 0) continue;
+                    
+                    const dirX = dx / dist;
+                    const dirY = dy / dist;
+                    
+                    // Offset pipe ends at corners so they connect cleanly to the outer edge of elbow fittings
+                    const { T_start, T_end } = getTangentLengthsForSegment(lines, line, i);
+                    const adjustedDist = dist - T_start - T_end;
+                    if (adjustedDist <= 0.1) continue; // too short to fit pipes
+                    
+                    const numPipes = Math.floor((adjustedDist / PIXELS_PER_METER) / 6);
+                    
+                    for (let k = 0; k < numPipes; k++) {
+                      const startPx = T_start + k * headerLengthPx;
+                      const endPx = T_start + (k + 1) * headerLengthPx;
+                      const sx = p1.x + dirX * startPx;
+                      const sy = p1.y + dirY * startPx;
+                      const ex = p1.x + dirX * endPx;
+                      const ey = p1.y + dirY * endPx;
+                      
+                      pipeSegments.push(
+                        <Group key={`pipe-${line.id}-${i}-${k}`} listening={false}>
+                          {/* Outer pipe border */}
+                          <Line
+                            points={[sx, sy, ex, ey]}
+                            stroke={activeTool === 'delete' ? '#ef4444' : isSelected ? '#fbbf24' : '#0369a1'}
+                            strokeWidth={isSelected ? 10 : 8}
+                            lineCap="square"
+                          />
+                          {/* Inner pipe body (galvanized steel blue look) */}
+                          <Line
+                            points={[sx, sy, ex, ey]}
+                            stroke={activeTool === 'delete' ? '#fca5a5' : '#22d3ee'}
+                            strokeWidth={4}
+                            lineCap="square"
+                          />
+                          {/* Left joint flange */}
+                          <Line
+                            points={[sx - dirY * 4, sy + dirX * 4, sx + dirY * 4, sy - dirX * 4]}
+                            stroke="#0369a1"
+                            strokeWidth={2.5}
+                          />
+                          {/* Right joint flange */}
+                          <Line
+                            points={[ex - dirY * 4, ey + dirX * 4, ex + dirY * 4, ey - dirX * 4]}
+                            stroke="#0369a1"
+                            strokeWidth={2.5}
+                          />
+                        </Group>
+                      );
+                    }
+
+                    // Render remainder pipe segment to connect corners perfectly
+                    const remainderPx = adjustedDist - numPipes * headerLengthPx;
+                    if (remainderPx > 1.0) { // segment of at least 10cm
+                      const startPx = T_start + numPipes * headerLengthPx;
+                      const endPx = dist - T_end;
+                      const sx = p1.x + dirX * startPx;
+                      const sy = p1.y + dirY * startPx;
+                      const ex = p1.x + dirX * endPx;
+                      const ey = p1.y + dirY * endPx;
+
+                      pipeSegments.push(
+                        <Group key={`pipe-${line.id}-${i}-rem`} listening={false}>
+                          {/* Outer pipe border */}
+                          <Line
+                            points={[sx, sy, ex, ey]}
+                            stroke={activeTool === 'delete' ? '#ef4444' : isSelected ? '#fbbf24' : '#0369a1'}
+                            strokeWidth={isSelected ? 10 : 8}
+                            lineCap="square"
+                          />
+                          {/* Inner pipe body */}
+                          <Line
+                            points={[sx, sy, ex, ey]}
+                            stroke={activeTool === 'delete' ? '#fca5a5' : '#22d3ee'}
+                            strokeWidth={4}
+                            lineCap="square"
+                          />
+                          {/* Left joint flange */}
+                          <Line
+                            points={[sx - dirY * 4, sy + dirX * 4, sx + dirY * 4, sy - dirX * 4]}
+                            stroke="#0369a1"
+                            strokeWidth={2.5}
+                          />
+                          {/* Right joint flange */}
+                          <Line
+                            points={[ex - dirY * 4, ey + dirX * 4, ex + dirY * 4, ey - dirX * 4]}
+                            stroke="#0369a1"
+                            strokeWidth={2.5}
+                          />
+                        </Group>
+                      );
+                    }
+                  }
+                  return pipeSegments;
+                })()}
                 
                 {/* Length and Depth Label */}
                 {line.points.length > 1 && (() => {
@@ -1093,12 +1657,14 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
                   />
                 ))}
 
-                {/* Wellpoints and Header Visualizations */}
+                {/* Wellpoints and Header Visualizations — all sizes are scale-invariant */}
                 {showWellpoints && (() => {
                   const headerLengthPx = 6 * PIXELS_PER_METER;
                   const wpDistPx = headerLengthPx / 6;
                   const elements = [];
                   let currentHeaderCount = 0;
+                  // invScale keeps visual sizes constant regardless of canvas zoom
+                  const invScale = 1 / scale;
                   
                   for (let i = 0; i < line.points.length - 1; i++) {
                     const p1 = line.points[i];
@@ -1108,48 +1674,144 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
                     const dist = Math.sqrt(dx * dx + dy * dy);
                     if (dist === 0) continue;
                     
-                    // Wellpoints
-                    let traveled = wpDistPx / 2; // Offset slightly from start
-                    let wpCount = 0;
-                    while (traveled <= dist) {
-                      const t = traveled / dist;
-                      const wpX = p1.x + dx * t;
-                      const wpY = p1.y + dy * t;
-                      const perpX = -dy / dist;
-                      const perpY = dx / dist;
-                      const offsetLength = 8; // Shrink wellpoints
-                      const outerX = wpX + perpX * offsetLength;
-                      const outerY = wpY + perpY * offsetLength;
-                      elements.push(
-                        <Group key={`wp-${line.id}-${i}-${wpCount}`} listening={false}>
-                          <Line points={[wpX, wpY, outerX, outerY]} stroke="#94a3b8" strokeWidth={1.5} />
-                          <Circle x={outerX} y={outerY} radius={4} fill="#e0f2fe" stroke="#38bdf8" strokeWidth={1} />
-                          <Circle x={outerX} y={outerY} radius={1.5} fill="#0369a1" />
-                        </Group>
-                      );
-                      traveled += wpDistPx;
-                      wpCount++;
-                    }
+                    const dirX = dx / dist;
+                    const dirY = dy / dist;
+                    const numPipes = Math.floor((dist / PIXELS_PER_METER) / 6);
                     
-                    // Header dividers
-                    let hTraveled = headerLengthPx;
-                    let hCount = 0;
-                    while (hTraveled <= dist) {
+                    for (let k = 0; k < numPipes; k++) {
                       currentHeaderCount++;
-                      const t = hTraveled / dist;
-                      const hx = p1.x + dx * t;
-                      const hy = p1.y + dy * t;
-                      const perpX = -dy / dist;
-                      const perpY = dx / dist;
-                      const tickSize = 6;
+                      const startPx = k * headerLengthPx;
+                      
+                      // Render 6 wellpoints on BOTH sides of this 6-meter header pipe segment
+                      for (let w = 0; w < 6; w++) {
+                        const wpOffsetPx = startPx + (w + 0.5) * wpDistPx;
+                        const wpX = p1.x + dirX * wpOffsetPx;
+                        const wpY = p1.y + dirY * wpOffsetPx;
+                        // Physical offset: 1m from header centreline
+                        const offsetLength = PIXELS_PER_METER; // = 10px = 1m
+
+                        for (const side of (wellpointSide === 'left' ? [1] : wellpointSide === 'right' ? [-1] : [1, -1])) {
+                          const perpX = -dirY * side;
+                          const perpY = dirX * side;
+                          // Connector starts at pipe edge (half of visual stroke = 4px)
+                          const edgePx = 4 * invScale;
+                          const sx = wpX + perpX * edgePx;
+                          const sy = wpY + perpY * edgePx;
+                          const outerX = wpX + perpX * Math.max(offsetLength, 6 * invScale);
+                          const outerY = wpY + perpY * Math.max(offsetLength, 6 * invScale);
+
+                          elements.push(
+                            <Group key={`wp-${line.id}-${i}-${k}-${w}-s${side}`} listening={false}>
+                              {/* Connector swing joint stub — starts at pipe edge */}
+                              <Line
+                                points={[sx, sy, outerX, outerY]}
+                                stroke="#64748b"
+                                strokeWidth={Math.max(1, 1.5 * invScale)}
+                              />
+                              {/* Wellpoint top cap — scale-invariant circle */}
+                              <Circle
+                                x={outerX} y={outerY}
+                                radius={Math.max(2.5, 4 * invScale)}
+                                fill="#e0f2fe"
+                                stroke="#0ea5e9"
+                                strokeWidth={Math.max(0.8, 1.2 * invScale)}
+                              />
+                              <Circle
+                                x={outerX} y={outerY}
+                                radius={Math.max(1, 1.8 * invScale)}
+                                fill="#0369a1"
+                              />
+                            </Group>
+                          );
+                        }
+                      }
+                      
+                      // Header segment label — scale-invariant font
+                      const labelPx = startPx + headerLengthPx / 2;
+                      const lx = p1.x + dirX * labelPx;
+                      const ly = p1.y + dirY * labelPx;
+                      const perpX = -dirY;
+                      const perpY = dirX;
+                      const labelOffset = Math.max(12, 12 * invScale);
                       elements.push(
-                        <Line key={`ht-${line.id}-${i}-${hCount}`} points={[hx - perpX * tickSize, hy - perpY * tickSize, hx + perpX * tickSize, hy + perpY * tickSize]} stroke="#1e3a8a" strokeWidth={2} listening={false} />
+                        <Text 
+                          key={`hl-${line.id}-${i}-${k}`} 
+                          x={lx - perpX * labelOffset - 6 * invScale} 
+                          y={ly - perpY * labelOffset - 4 * invScale} 
+                          text={`H${currentHeaderCount}`} 
+                          fontSize={Math.max(7, 9 * invScale)}
+                          fontStyle="bold" 
+                          fill="#1e3a8a" 
+                          listening={false} 
+                        />
                       );
+                    }
+
+                    // Render wellpoints on the remainder segment
+                    const remainderPx = dist - numPipes * headerLengthPx;
+                    if (remainderPx > 1.0) {
+                      currentHeaderCount++;
+                      const startPx = numPipes * headerLengthPx;
+                      const numWps = Math.floor(remainderPx / wpDistPx);
+                      
+                      for (let w = 0; w < numWps; w++) {
+                        const wpOffsetPx = startPx + (w + 0.5) * wpDistPx;
+                        const wpX = p1.x + dirX * wpOffsetPx;
+                        const wpY = p1.y + dirY * wpOffsetPx;
+                        const offsetLength = PIXELS_PER_METER;
+
+                        for (const side of (wellpointSide === 'left' ? [1] : wellpointSide === 'right' ? [-1] : [1, -1])) {
+                          const perpX = -dirY * side;
+                          const perpY = dirX * side;
+                          const edgePx = 4 * invScale;
+                          const sx = wpX + perpX * edgePx;
+                          const sy = wpY + perpY * edgePx;
+                          const outerX = wpX + perpX * Math.max(offsetLength, 6 * invScale);
+                          const outerY = wpY + perpY * Math.max(offsetLength, 6 * invScale);
+
+                          elements.push(
+                            <Group key={`wp-${line.id}-${i}-rem-${w}-s${side}`} listening={false}>
+                              <Line
+                                points={[sx, sy, outerX, outerY]}
+                                stroke="#64748b"
+                                strokeWidth={Math.max(1, 1.5 * invScale)}
+                              />
+                              <Circle
+                                x={outerX} y={outerY}
+                                radius={Math.max(2.5, 4 * invScale)}
+                                fill="#e0f2fe"
+                                stroke="#0ea5e9"
+                                strokeWidth={Math.max(0.8, 1.2 * invScale)}
+                              />
+                              <Circle
+                                x={outerX} y={outerY}
+                                radius={Math.max(1, 1.8 * invScale)}
+                                fill="#0369a1"
+                              />
+                            </Group>
+                          );
+                        }
+                      }
+
+                      // Label for remainder pipe
+                      const labelPx = startPx + remainderPx / 2;
+                      const lx = p1.x + dirX * labelPx;
+                      const ly = p1.y + dirY * labelPx;
+                      const perpX = -dirY;
+                      const perpY = dirX;
+                      const labelOffset = Math.max(12, 12 * invScale);
                       elements.push(
-                        <Text key={`hl-${line.id}-${i}-${hCount}`} x={hx + perpX * 10 - 6} y={hy + perpY * 10 - 4} text={`H${currentHeaderCount}`} fontSize={10} fontStyle="bold" fill="#1e3a8a" listening={false} />
+                        <Text 
+                          key={`hl-${line.id}-${i}-rem`} 
+                          x={lx - perpX * labelOffset - 6 * invScale} 
+                          y={ly - perpY * labelOffset - 4 * invScale} 
+                          text={`H${currentHeaderCount}`} 
+                          fontSize={Math.max(7, 9 * invScale)}
+                          fontStyle="bold" 
+                          fill="#1e3a8a" 
+                          listening={false} 
+                        />
                       );
-                      hTraveled += headerLengthPx;
-                      hCount++;
                     }
                   }
                   return elements;
@@ -1160,7 +1822,7 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
 
 
           {/* Suction Pipes (yellow) */}
-          {hoses.filter((h: any) => h.kind !== 'discharge' && !hiddenIds.has(h.id)).map((hose: any) => {
+          {hoses.filter((h: any) => h.kind !== 'discharge' && isItemVisible(h)).map((hose: any) => {
             const isSelected = activeTool === 'select' && selectedId === hose.id;
             return (
               <React.Fragment key={hose.id}>
@@ -1180,7 +1842,7 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
                   points={hose.points.flatMap((p: Point) => [p.x, p.y])}
                   stroke={activeTool === 'delete' ? '#ef4444' : isSelected ? '#fbbf24' : '#eab308'}
                   strokeWidth={isSelected ? 6 : 4}
-                  tension={0.5}
+                  tension={0}
                   lineJoin="round" lineCap="round"
                   listening={false}
                 />
@@ -1228,7 +1890,7 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
           })}
 
           {/* Discharge Pipes (orange) */}
-          {hoses.filter((h: any) => h.kind === 'discharge' && !hiddenIds.has(h.id)).map((hose: any) => {
+          {hoses.filter((h: any) => h.kind === 'discharge' && isItemVisible(h)).map((hose: any) => {
             const isSelected = activeTool === 'select' && selectedId === hose.id;
             return (
               <React.Fragment key={hose.id}>
@@ -1248,7 +1910,7 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
                   points={hose.points.flatMap((p: Point) => [p.x, p.y])}
                   stroke={activeTool === 'delete' ? '#ef4444' : isSelected ? '#fbbf24' : '#f97316'}
                   strokeWidth={isSelected ? 6 : 4}
-                  tension={0.5}
+                  tension={0}
                   lineJoin="round" lineCap="round"
                   listening={false}
                 />
@@ -1304,7 +1966,7 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
             const segM = last && cur ? distMeters(last, cur) : 0;
             return (
               <>
-                <Line points={pts.flatMap((p: Point) => [p.x, p.y])} stroke="#eab308" strokeWidth={4} tension={0.5} lineJoin="round" lineCap="round" dash={[8, 8]} opacity={0.8} listening={false} />
+                <Line points={pts.flatMap((p: Point) => [p.x, p.y])} stroke="#eab308" strokeWidth={4} tension={0} lineJoin="round" lineCap="round" dash={[8, 8]} opacity={0.8} listening={false} />
                 {cur && <Text x={cur.x + 10} y={cur.y - 20} text={`Seg: ${segM.toFixed(1)}m | Total: ${totalM.toFixed(1)}m`} fill="#854d0e" fontSize={12} fontStyle="bold" padding={3} listening={false} />}
               </>
             );
@@ -1319,7 +1981,7 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
             const segM = last && cur ? distMeters(last, cur) : 0;
             return (
               <>
-                <Line points={pts.flatMap((p: Point) => [p.x, p.y])} stroke="#f97316" strokeWidth={4} tension={0.5} lineJoin="round" lineCap="round" dash={[8, 8]} opacity={0.8} listening={false} />
+                <Line points={pts.flatMap((p: Point) => [p.x, p.y])} stroke="#f97316" strokeWidth={4} tension={0} lineJoin="round" lineCap="round" dash={[8, 8]} opacity={0.8} listening={false} />
                 {cur && <Text x={cur.x + 10} y={cur.y - 20} text={`Seg: ${segM.toFixed(1)}m | Total: ${totalM.toFixed(1)}m`} fill="#9a3412" fontSize={12} fontStyle="bold" padding={3} listening={false} />}
               </>
             );
@@ -1354,8 +2016,8 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
             );
           })()}
 
-          {/* Saved Dimensions */}
-          {(dimensions || []).map(dim => {
+          {/* Dimensions */}
+          {(dimensions || []).filter(isItemVisible).map(dim => {
             const dx = dim.end.x - dim.start.x;
             const dy = dim.end.y - dim.start.y;
             const angle = Math.atan2(dy, dx) * 180 / Math.PI;
@@ -1429,21 +2091,91 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
                 stroke={(shiftHeld || orthoLocked) ? '#22c55e' : '#ef4444'}
                 strokeWidth={2} dash={[6, 4]} opacity={0.75} listening={false}
               />
-              {resolvedDistM !== null && (
-                <Text
-                  x={(lastPoint.x + previewPoint.x) / 2 + 6}
-                  y={(lastPoint.y + previewPoint.y) / 2 - 18}
-                  text={`${resolvedDistM.toFixed(2)} m`}
-                  fontSize={13} fontStyle="bold"
-                  fill={dimTyped ? '#3b82f6' : (shiftHeld || orthoLocked) ? '#16a34a' : '#b91c1c'}
-                  listening={false}
-                />
-              )}
+              <Text 
+                x={(lastPoint.x + previewPoint.x) / 2} y={(lastPoint.y + previewPoint.y) / 2 - 15}
+                text={`${(Math.sqrt(Math.pow(previewPoint.x - lastPoint.x, 2) + Math.pow(previewPoint.y - lastPoint.y, 2)) / PIXELS_PER_METER).toFixed(2)}m`}
+                fill="#3b82f6" fontSize={12} fontStyle="bold" listening={false}
+              />
             </>
           )}
 
-          {placedComponents.map(renderComponent)}
-          {/* Transformer */}
+          {/* OSnap Indicator */}
+          {currentSnap && (
+            <Group x={currentSnap.pt.x} y={currentSnap.pt.y} listening={false}>
+              {currentSnap.type === 'endpoint' && (
+                <Rect x={-5} y={-5} width={10} height={10} stroke="#f59e0b" strokeWidth={2} fill="transparent" />
+              )}
+              {currentSnap.type === 'midpoint' && (
+                <RegularPolygon sides={3} radius={7} stroke="#f59e0b" strokeWidth={2} fill="transparent" rotation={0} />
+              )}
+              {currentSnap.type === 'nearest' && (
+                <RegularPolygon sides={4} radius={6} stroke="#f59e0b" strokeWidth={2} fill="transparent" rotation={45} />
+              )}
+            </Group>
+          )}
+
+          {/* Components */}
+          {placedComponents.filter(isItemVisible).map(renderComponent)}
+
+           {/* Visual Auto Fittings (Elbows/Tees derived from junctions) */}
+          {(() => {
+            const invScale = 1 / scale;
+            return autoFittings.map((fit, i) => {
+              if (fit.type === 'elbow') {
+                return (
+                  <Group key={`auto-elbow-${i}`} x={fit.x} y={fit.y} listening={false}>
+                    {/* Outer curved connector block */}
+                    <Circle 
+                      radius={Math.max(4, 7 * invScale)} 
+                      fill="#f59e0b" 
+                      stroke="#78350f" 
+                      strokeWidth={Math.max(0.5, 1 * invScale)} 
+                      shadowColor="#000" 
+                      shadowBlur={2 * invScale} 
+                      shadowOpacity={0.2} 
+                    />
+                    <Circle 
+                      radius={Math.max(1.5, 3 * invScale)} 
+                      fill="#fff" 
+                    />
+                  </Group>
+                );
+              } else {
+                return (
+                  <Group key={`auto-tee-${i}`} x={fit.x} y={fit.y} rotation={fit.rotation} listening={false}>
+                    {/* High contrast visual Tee joint */}
+                    <Rect 
+                      x={-4 * invScale} 
+                      y={-8 * invScale} 
+                      width={8 * invScale} 
+                      height={16 * invScale} 
+                      fill="#10b981" 
+                      stroke="#064e3b" 
+                      strokeWidth={Math.max(0.5, 1.5 * invScale)} 
+                      cornerRadius={1 * invScale} 
+                    />
+                    <Rect 
+                      x={-8 * invScale} 
+                      y={-4 * invScale} 
+                      width={16 * invScale} 
+                      height={8 * invScale} 
+                      fill="#10b981" 
+                      stroke="#064e3b" 
+                      strokeWidth={Math.max(0.5, 1.5 * invScale)} 
+                      cornerRadius={1 * invScale} 
+                    />
+                    {/* Center junction bullet */}
+                    <Circle 
+                      radius={Math.max(1.2, 2.5 * invScale)} 
+                      fill="#fff" 
+                    />
+                  </Group>
+                );
+              }
+            });
+          })()}
+          
+          {/* Current Hoses (drawing in progress) */}
           {activeTool === 'select' && (
             <Transformer 
               ref={trRef} 
@@ -1476,6 +2208,22 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
               >
                 {levels.map(l => (
                   <option key={l.id} value={l.id}>{l.name} (-{l.depthFromGL}m)</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-slate-600 block mb-1">Layer</label>
+              <select
+                className="w-full border rounded px-2 py-1 text-sm focus:ring-1 focus:ring-blue-500 outline-none bg-white"
+                value={selectedArea.layerId || activeLayerId}
+                onChange={(e) => {
+                  if (onAreasChange) {
+                    onAreasChange(areas.map((a: any) => a.id === selectedId ? { ...a, layerId: e.target.value } : a));
+                  }
+                }}
+              >
+                {layers.map(l => (
+                  <option key={l.id} value={l.id}>{l.name}</option>
                 ))}
               </select>
             </div>
@@ -1530,6 +2278,22 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
               >
                 {levels.map(l => (
                   <option key={l.id} value={l.id}>{l.name} (-{l.depthFromGL}m)</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-slate-600 block mb-1">Layer</label>
+              <select
+                className="w-full border rounded px-2 py-1 text-sm focus:ring-1 focus:ring-blue-500 outline-none bg-white"
+                value={selectedLine.layerId || activeLayerId}
+                onChange={(e) => {
+                  if (onLinesChange) {
+                    onLinesChange(lines.map((l: any) => l.id === selectedId ? { ...l, layerId: e.target.value } : l));
+                  }
+                }}
+              >
+                {layers.map(l => (
+                  <option key={l.id} value={l.id}>{l.name}</option>
                 ))}
               </select>
             </div>

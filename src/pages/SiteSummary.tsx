@@ -49,8 +49,13 @@ export function SiteSummary({ filterYears = [], filterMonths = [] }: { filterYea
   const currentMonthKey = monthsMap[selectedMonth - 1];
   const { workDays, overtimeRate } = monthValues[currentMonthKey];
 
-  const results: { name: string; client: string; cost: number; teamSize: number }[] = [];
+  const results: { name: string; client: string; cost: number; pension: number; paye: number; wht: number; loanRepayment: number; netPay: number; teamSize: number }[] = [];
   let grandTotal = 0;
+  let grandPension = 0;
+  let grandPaye = 0;
+  let grandWht = 0;
+  let grandLoanRepayment = 0;
+  let grandNetPay = 0;
 
     const filterAllMonths = filterMonths.includes('All') || filterMonths.length === 0;
     const monthsToProcess = filterAllMonths 
@@ -70,12 +75,12 @@ export function SiteSummary({ filterYears = [], filterMonths = [] }: { filterYea
     });
 
     // Group purely by Site Name. The Master Lists dictate the true assigned Client.
-    const siteAllocations: Record<string, { cost: number; teamSize: Set<string>; displayName: string; displayClient: string }> = {};
+    const siteAllocations: Record<string, { cost: number; pension: number; paye: number; wht: number; loanRepayment: number; netPay: number; teamSize: Set<string>; displayName: string; displayClient: string }> = {};
 
     // 1. Initialize with Master Map
     Object.values(masterSiteMap).forEach(s => {
       const key = s.name.toLowerCase().trim();
-      siteAllocations[key] = { cost: 0, teamSize: new Set(), displayName: s.name, displayClient: s.client };
+      siteAllocations[key] = { cost: 0, pension: 0, paye: 0, wht: 0, loanRepayment: 0, netPay: 0, teamSize: new Set(), displayName: s.name, displayClient: s.client };
     });
 
     // 2. Ensure a definitive 'Office' bucket exists
@@ -84,6 +89,11 @@ export function SiteSummary({ filterYears = [], filterMonths = [] }: { filterYea
       const officeSite = sites.find(s => s.name.toLowerCase().trim() === 'office' || s.client === 'DCEL');
       siteAllocations[officeKey] = { 
         cost: 0, 
+        pension: 0,
+        paye: 0,
+        wht: 0,
+        loanRepayment: 0,
+        netPay: 0,
         teamSize: new Set(), 
         displayName: officeSite?.name || 'Office', 
         displayClient: officeSite?.client || 'DCEL' 
@@ -103,6 +113,11 @@ export function SiteSummary({ filterYears = [], filterMonths = [] }: { filterYea
       payrollRows.forEach(row => {
         const staffPayrollId = row.id;
         const staffGrossPay = row.grossPay;
+        const staffPension = row.pension || 0;
+        const staffPaye = row.paye || 0;
+        const staffWht = row.withholdingTax || 0;
+        const staffLoanRepayment = row.loanRepayment || 0;
+        const staffNetPay = row.takeHomePay || 0;
         
         if (staffGrossPay <= 0) return;
 
@@ -133,6 +148,11 @@ export function SiteSummary({ filterYears = [], filterMonths = [] }: { filterYea
 
               siteAllocations[lowerSite] = { 
                 cost: 0, 
+                pension: 0,
+                paye: 0,
+                wht: 0,
+                loanRepayment: 0,
+                netPay: 0,
                 teamSize: new Set(), 
                 displayName: master?.name || cleanedSite, 
                 displayClient: master?.client || (cName?.trim() && cName.trim() !== 'Internal' ? cName.trim() : 'Internal')
@@ -168,13 +188,28 @@ export function SiteSummary({ filterYears = [], filterMonths = [] }: { filterYea
           Object.entries(staffSiteContribution).forEach(([siteKey, units]) => {
             const proportion = units / totalStaffUnits;
             const allocatedCost = proportion * staffGrossPay;
+            const allocatedPension = proportion * staffPension;
+            const allocatedPaye = proportion * staffPaye;
+            const allocatedWht = proportion * staffWht;
+            const allocatedLoanRepayment = proportion * staffLoanRepayment;
+            const allocatedNetPay = proportion * staffNetPay;
             
             siteAllocations[siteKey].cost += allocatedCost;
+            siteAllocations[siteKey].pension += allocatedPension;
+            siteAllocations[siteKey].paye += allocatedPaye;
+            siteAllocations[siteKey].wht += allocatedWht;
+            siteAllocations[siteKey].loanRepayment += allocatedLoanRepayment;
+            siteAllocations[siteKey].netPay += allocatedNetPay;
             siteAllocations[siteKey].teamSize.add(staffPayrollId);
           });
         } else {
           // No physical attendance records for this month -> attribute to Office overhead
           siteAllocations[officeKey].cost += staffGrossPay;
+          siteAllocations[officeKey].pension += staffPension;
+          siteAllocations[officeKey].paye += staffPaye;
+          siteAllocations[officeKey].wht += staffWht;
+          siteAllocations[officeKey].loanRepayment += staffLoanRepayment;
+          siteAllocations[officeKey].netPay += staffNetPay;
           siteAllocations[officeKey].teamSize.add(staffPayrollId);
         }
       });
@@ -184,13 +219,32 @@ export function SiteSummary({ filterYears = [], filterMonths = [] }: { filterYea
     // Convert map to strictly populated array
     Object.values(siteAllocations).forEach(data => {
       if (data.cost > 0) {
+        // Round all components to 2 decimal places to ensure clean representation and export consistency
+        const cost = Math.round(data.cost * 100) / 100;
+        const pension = Math.round(data.pension * 100) / 100;
+        const paye = Math.round(data.paye * 100) / 100;
+        const wht = Math.round(data.wht * 100) / 100;
+        const loanRepayment = Math.round(data.loanRepayment * 100) / 100;
+        // Make Net Pay the plug variable to guarantee perfect mathematical reconciliation to the nearest kobo
+        const netPay = Math.round((cost - (pension + paye + wht + loanRepayment)) * 100) / 100;
+
         results.push({
           name: data.displayName,
           client: data.displayClient,
-          cost: data.cost,
+          cost,
+          pension,
+          paye,
+          wht,
+          loanRepayment,
+          netPay,
           teamSize: data.teamSize.size
         });
-        grandTotal += data.cost;
+        grandTotal += cost;
+        grandPension += pension;
+        grandPaye += paye;
+        grandWht += wht;
+        grandLoanRepayment += loanRepayment;
+        grandNetPay += netPay;
       }
     });
 
@@ -198,12 +252,34 @@ export function SiteSummary({ filterYears = [], filterMonths = [] }: { filterYea
 
   const handleExportSummaryCSV = () => {
     if (results.length === 0) return;
-    const ws = XLSX.utils.json_to_sheet(results.map((r, i) => ({
-      "S/N": i + 1,
+    
+    // Convert to row objects with numeric values so Excel handles formulas/sums correctly
+    const exportRows = results.map((r, i) => ({
+      "S/N": (i + 1).toString(),
       "Client": r.client,
       "Site": r.name,
-      "Total Cost (₦)": r.cost.toFixed(2)
-    })));
+      "Gross Salary (₦)": r.cost,
+      "Pension (₦)": r.pension,
+      "PAYE (₦)": r.paye,
+      "Withholding Tax (₦)": r.wht,
+      "Loan Repayment (₦)": r.loanRepayment,
+      "Net Pay (₦)": r.netPay
+    }));
+
+    // Append GRAND TOTAL row to the spreadsheet
+    exportRows.push({
+      "S/N": "Total",
+      "Client": "",
+      "Site": "GRAND TOTAL",
+      "Gross Salary (₦)": grandTotal,
+      "Pension (₦)": grandPension,
+      "PAYE (₦)": grandPaye,
+      "Withholding Tax (₦)": grandWht,
+      "Loan Repayment (₦)": grandLoanRepayment,
+      "Net Pay (₦)": grandNetPay
+    });
+
+    const ws = XLSX.utils.json_to_sheet(exportRows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Site Summary");
     XLSX.writeFile(wb, `Site_Summary_${monthNames[selectedMonth - 1]}_${selectedYear}.xlsx`);
@@ -232,7 +308,12 @@ export function SiteSummary({ filterYears = [], filterMonths = [] }: { filterYea
                 <TableHead>S/N</TableHead>
                 <TableHead>Client</TableHead>
                 <TableHead>Site Name</TableHead>
-                <TableHead className="text-right">Total Cost (₦)</TableHead>
+                <TableHead className="text-right">Gross Salary (₦)</TableHead>
+                <TableHead className="text-right">Pension (₦)</TableHead>
+                <TableHead className="text-right">PAYE Tax (₦)</TableHead>
+                <TableHead className="text-right">WHT (₦)</TableHead>
+                <TableHead className="text-right">Loan Repayment (₦)</TableHead>
+                <TableHead className="text-right">Net Pay (₦)</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -242,11 +323,16 @@ export function SiteSummary({ filterYears = [], filterMonths = [] }: { filterYea
                   <TableCell className="font-medium text-indigo-900">{r.client}</TableCell>
                   <TableCell>{r.name}</TableCell>
                   <TableCell className="text-right font-bold text-slate-700">₦{r.cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
+                  <TableCell className="text-right text-slate-600">₦{r.pension.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
+                  <TableCell className="text-right text-slate-600">₦{r.paye.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
+                  <TableCell className="text-right text-slate-600">₦{r.wht.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
+                  <TableCell className="text-right text-slate-600">₦{r.loanRepayment.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
+                  <TableCell className="text-right font-semibold text-emerald-700">₦{r.netPay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
                 </TableRow>
               ))}
               {results.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center py-8 text-slate-500">
+                  <TableCell colSpan={9} className="text-center py-8 text-slate-500">
                     No costs recorded for this month.
                   </TableCell>
                 </TableRow>
@@ -257,6 +343,11 @@ export function SiteSummary({ filterYears = [], filterMonths = [] }: { filterYea
                 <tr className="bg-slate-50/80 font-bold border-t-2">
                   <td colSpan={3} className="px-4 py-3 text-right">GRAND TOTAL:</td>
                   <td className="px-4 py-3 text-right text-indigo-700 text-lg">₦{grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                  <td className="px-4 py-3 text-right text-indigo-700 text-lg">₦{grandPension.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                  <td className="px-4 py-3 text-right text-indigo-700 text-lg">₦{grandPaye.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                  <td className="px-4 py-3 text-right text-indigo-700 text-lg">₦{grandWht.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                  <td className="px-4 py-3 text-right text-indigo-700 text-lg">₦{grandLoanRepayment.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                  <td className="px-4 py-3 text-right text-emerald-700 text-lg font-bold">₦{grandNetPay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                 </tr>
               </tfoot>
             )}

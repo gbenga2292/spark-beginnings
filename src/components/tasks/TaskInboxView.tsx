@@ -1722,7 +1722,7 @@ function UpdatesFeed({ subtask, mainTask, users, currentUser, postComment, getSu
   const [pendingAttachments, setPendingAttachments] = useState<{name: string, base64: string}[]>([]);
   const [pendingFileLinks, setPendingFileLinks] = useState<string[]>([]);
 
-  const filteredUsers = users.filter(u => u.id !== currentUser?.id && u.name?.toLowerCase().includes(mentionQuery.toLowerCase()));
+  const filteredUsers = users.filter(u => u.isActive && u.id !== currentUser?.id && u.name?.toLowerCase().includes(mentionQuery.toLowerCase()));
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
