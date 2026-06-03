@@ -215,16 +215,18 @@ export function VatPayments({ setPreviewModal, searchTerm = '' }: { setPreviewMo
                 toast.info('No VAT payments to export');
                 return;
             }
-            const headers = ['id', 'client', 'date', 'month', 'year', 'amount'];
+            const headers = ['id', 'client', 'date', 'month', 'year', 'amountForVat', 'amount'];
             const extractCSV = (val: any) => typeof val === 'number' ? String(val) : `"${String(val ?? '').replace(/"/g, '""')}"`;
 
             const rows = vatPayments.map(pay => {
+                const amtForVat = pay.amount !== 0 && vatRate > 0 ? ((pay.amount / (vatRate / 100)) || 0) : 0;
                 const data = [
                     pay.id,
                     pay.client,
                     formatDisplayDate(pay.date),
                     pay.month || '',
                     pay.year || '',
+                    amtForVat,
                     pay.amount
                 ];
                 return data.map(extractCSV).join(',');
@@ -266,15 +268,19 @@ export function VatPayments({ setPreviewModal, searchTerm = '' }: { setPreviewMo
                     isOpen: true,
                     title: 'Preview VAT Remittance Export',
                     filename: fileName,
-                    headers: headers.map(h => h.toUpperCase()),
-                    data: vatPayments.map(pay => [
-                        pay.id,
-                        pay.client,
-                        formatDisplayDate(pay.date),
-                        pay.month || '',
-                        pay.year || '',
-                        `₦${(pay.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                    ]),
+                    headers: ["ID", "CLIENT", "DATE", "MONTH", "YEAR", "AMOUNT FOR VAT (₦)", "AMOUNT (₦)"],
+                    data: vatPayments.map(pay => {
+                        const amtForVat = pay.amount !== 0 && vatRate > 0 ? ((pay.amount / (vatRate / 100)) || 0) : 0;
+                        return [
+                            pay.id,
+                            pay.client,
+                            formatDisplayDate(pay.date),
+                            pay.month || '',
+                            pay.year || '',
+                            `₦${amtForVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+                            `₦${(pay.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                        ];
+                    }),
                     onConfirm
                 });
             } else {
@@ -408,9 +414,9 @@ export function VatPayments({ setPreviewModal, searchTerm = '' }: { setPreviewMo
         return [...filtered].sort((a, b) => {
             let valA: any = (a as any)[entriesSortField];
             let valB: any = (b as any)[entriesSortField];
-            if (entriesSortField === 'amount') {
-                valA = valA || 0;
-                valB = valB || 0;
+            if (entriesSortField === 'amount' || entriesSortField === 'amountForVat') {
+                valA = a.amount || 0;
+                valB = b.amount || 0;
             } else if (typeof valA === 'string') {
                 valA = valA.toLowerCase();
                 valB = valB.toLowerCase();
@@ -616,7 +622,9 @@ export function VatPayments({ setPreviewModal, searchTerm = '' }: { setPreviewMo
                                                     <p className="text-xs text-slate-500">VAT Period: {p.month} {p.year} | Paid: {formatDisplayDate(p.date)}</p>
                                                 </div>
                                                 <div className="text-right ml-4 shrink-0">
-                                                    <p className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Amount</p>
+                                                    <p className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Amount for VAT</p>
+                                                    <p className="font-semibold text-slate-500 font-mono text-xs mb-1">₦{priv?.canViewAmounts === false ? '***' : ((p.amount || 0) !== 0 && vatRate > 0 ? ((p.amount / (vatRate / 100)) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-')}</p>
+                                                    <p className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">VAT Paid</p>
                                                     <p className="font-bold text-emerald-600 font-mono text-sm">₦{priv?.canViewAmounts === false ? '***' : (p.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                                                 </div>
                                             </div>
@@ -649,6 +657,11 @@ export function VatPayments({ setPreviewModal, searchTerm = '' }: { setPreviewMo
                                                 </div>
                                             </TableHead>
                                             <TableHead className="px-4 py-2.5 text-right">
+                                                <div className="text-[11px] font-mono font-bold text-slate-500 bg-white px-2 py-1 rounded border border-slate-100 shadow-sm inline-block">
+                                                    ₦{formatSum(vatPaymentsSum !== 0 && vatRate > 0 ? vatPaymentsSum / (vatRate / 100) : 0)}
+                                                </div>
+                                            </TableHead>
+                                            <TableHead className="px-4 py-2.5 text-right">
                                                 <div className="text-[12px] font-mono font-black text-emerald-600 bg-white px-3 py-1 rounded border border-emerald-100 shadow-sm inline-block">
                                                     ₦{formatSum(vatPaymentsSum)}
                                                 </div>
@@ -661,7 +674,8 @@ export function VatPayments({ setPreviewModal, searchTerm = '' }: { setPreviewMo
                                                 { field: 'client', label: 'Client', align: 'left' },
                                                 { field: 'month', label: 'VAT Month', align: 'left' },
                                                 { field: 'year', label: 'VAT Year', align: 'center' },
-                                                { field: 'amount', label: 'Amount (₦)', align: 'right' },
+                                                { field: 'amountForVat', label: 'Amount for VAT (₦)', align: 'right' },
+                                                { field: 'amount', label: 'VAT Paid (₦)', align: 'right' },
                                             ].map((col) => (
                                                 <TableHead
                                                     key={col.field}
@@ -687,6 +701,9 @@ export function VatPayments({ setPreviewModal, searchTerm = '' }: { setPreviewMo
                                                 <TableCell className="px-4 py-3 font-semibold text-slate-800">{p.client}</TableCell>
                                                 <TableCell className="px-4 py-3 text-slate-600">{p.month}</TableCell>
                                                 <TableCell className="px-4 py-3 text-center text-slate-600">{p.year}</TableCell>
+                                                <TableCell className="px-4 py-3 text-right font-mono text-slate-600/70 text-xs">
+                                                    {priv?.canViewAmounts === false ? '***' : ((p.amount || 0) !== 0 && vatRate > 0 ? ((p.amount / (vatRate / 100)) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-')}
+                                                </TableCell>
                                                 <TableCell className="px-4 py-3 text-right font-mono font-bold text-emerald-600">
                                                     {priv?.canViewAmounts === false ? '***' : (p.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                 </TableCell>
@@ -706,7 +723,7 @@ export function VatPayments({ setPreviewModal, searchTerm = '' }: { setPreviewMo
                                         ))}
                                         {sortedVatPayments.length === 0 && (
                                             <TableRow>
-                                                <TableCell colSpan={showActions ? 6 : 5} className="px-4 py-8 text-center text-slate-500 font-medium tracking-wide">
+                                                <TableCell colSpan={showActions ? 7 : 6} className="px-4 py-8 text-center text-slate-500 font-medium tracking-wide">
                                                     No VAT payment records.
                                                 </TableCell>
                                             </TableRow>
@@ -759,7 +776,7 @@ export function VatPayments({ setPreviewModal, searchTerm = '' }: { setPreviewMo
                                             <p className="text-[11px] sm:text-xs font-mono font-black text-rose-600 break-all" title={'₦' + formatSum(overallTotals.vatBalanceToPay)}>₦{formatSum(overallTotals.vatBalanceToPay)}</p>
                                         </div>
                                         <div className="bg-white p-2 rounded border border-indigo-50 shadow-sm col-span-2 min-w-0">
-                                            <p className="text-[10px] text-slate-400 font-bold uppercase truncate">Principle on VAT Due</p>
+                                            <p className="text-[10px] text-slate-400 font-bold uppercase truncate">Amount for VAT</p>
                                             <p className="text-[11px] sm:text-xs font-mono font-bold text-indigo-600 break-all" title={'₦' + formatSum(overallTotals.principleOnVatDue)}>₦{formatSum(overallTotals.principleOnVatDue)}</p>
                                         </div>
                                     </div>
@@ -778,7 +795,7 @@ export function VatPayments({ setPreviewModal, searchTerm = '' }: { setPreviewMo
                                                     <span className="text-xs font-mono text-slate-600">{t.vat ? t.vat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</span>
                                                 </div>
                                                 <div className="flex justify-between">
-                                                    <span className="text-[10px] text-slate-500 uppercase">Remitted</span>
+                                                    <span className="text-[10px] text-slate-500 uppercase">VAT Paid</span>
                                                     <span className="text-xs font-mono text-emerald-600">{t.vatPaid ? t.vatPaid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</span>
                                                 </div>
                                                 <div className="flex justify-between">
@@ -786,7 +803,7 @@ export function VatPayments({ setPreviewModal, searchTerm = '' }: { setPreviewMo
                                                     <span className="text-xs font-mono font-bold text-rose-600">{t.vatBalanceToPay ? t.vatBalanceToPay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</span>
                                                 </div>
                                                 <div className="flex justify-between col-span-2 border-t border-slate-50 pt-1 mt-1">
-                                                    <span className="text-[10px] text-slate-500 uppercase">Principle on VAT Due</span>
+                                                    <span className="text-[10px] text-slate-500 uppercase">Amount for VAT</span>
                                                     <span className="text-xs font-mono font-medium text-indigo-600">{t.principleOnVatDue ? t.principleOnVatDue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</span>
                                                 </div>
                                             </div>
@@ -840,7 +857,7 @@ export function VatPayments({ setPreviewModal, searchTerm = '' }: { setPreviewMo
                                                 { field: 'vat',               label: 'VAT Value', align: 'right' },
                                                 { field: 'vatPaid',           label: 'VAT Remitted', align: 'right' },
                                                 { field: 'vatBalanceToPay',   label: 'Balance to Pay', align: 'right', className: 'text-rose-600' },
-                                                { field: 'principleOnVatDue', label: 'Principle on VAT Due', align: 'right', className: 'text-indigo-600' },
+                                                { field: 'principleOnVatDue', label: 'Amount for VAT', align: 'right', className: 'text-indigo-600' },
                                             ].map((col) => (
                                                 <TableHead
                                                     key={col.field}
