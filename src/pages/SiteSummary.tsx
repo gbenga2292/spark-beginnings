@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/src/components/ui/card';
 import { Button } from '@/src/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
@@ -8,7 +8,7 @@ import { usePriv } from '@/src/hooks/usePriv';
 import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
 import { usePayrollCalculator } from '@/src/hooks/usePayrollCalculator';
-import { calculateAttendanceMetrics } from '@/src/lib/attendanceLogic';
+import { calculateAttendanceMetrics, getStaffDateWorkedMap } from '@/src/lib/attendanceLogic';
 
 export function SiteSummary({ filterYears = [], filterMonths = [] }: { filterYears?: string[], filterMonths?: string[] } = {}) {
   const [internalMonth, setInternalMonth] = useState(new Date().getMonth() + 1);
@@ -26,6 +26,7 @@ export function SiteSummary({ filterYears = [], filterMonths = [] }: { filterYea
 
   const priv = usePriv('sites');
   const { calculatePayrollForMonth } = usePayrollCalculator();
+  const staffDateWorkedMap = useMemo(() => getStaffDateWorkedMap(attendanceRecords), [attendanceRecords]);
 
   if (!priv.canViewClientSummary) {
     return (
@@ -132,7 +133,7 @@ export function SiteSummary({ filterYears = [], filterMonths = [] }: { filterYea
         let totalStaffUnits = 0;
 
         staffRecords.forEach(r => {
-          const metrics = calculateAttendanceMetrics(r, holidayDates, payrollVariables, monthValues as any, attendanceRecords);
+          const metrics = calculateAttendanceMetrics(r, holidayDates, payrollVariables, monthValues as any, staffDateWorkedMap);
 
           const processShift = (sName: string, cName: string, weight: number) => {
             if (!sName || weight <= 0) return;

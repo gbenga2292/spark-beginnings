@@ -32,7 +32,7 @@ import {
 } from "@/src/components/task_ui/popover";
 import { DayPicker } from "react-day-picker";
 import "react-day-picker/style.css";
-import { calculateAttendanceMetrics } from '@/src/lib/attendanceLogic';
+import { calculateAttendanceMetrics, getStaffDateWorkedMap } from '@/src/lib/attendanceLogic';
 import type { Employee } from '@/src/store/appStore';
 
 // ─── useIsMobile: zero-re-render breakpoint detection via matchMedia ────────────────
@@ -694,8 +694,9 @@ export function Attendance() {
   };
 
   const handleExportExcel = async (mode: 'bare' | 'detailed' = 'detailed') => {
+    const staffDateWorkedMap = getStaffDateWorkedMap(attendanceRecords);
     const exportData = attendanceRecords.map(r => {
-      const met = calculateAttendanceMetrics(r, publicHolidays, payrollVariables, monthValues, attendanceRecords);
+      const met = calculateAttendanceMetrics(r, publicHolidays, payrollVariables, monthValues, staffDateWorkedMap);
       if (mode === 'bare') {
         return {
           Date: r.date ? new Date(r.date + 'T00:00:00') : '',
@@ -976,6 +977,7 @@ export function Attendance() {
   };
 
   const runEstimationForBatch = (rows: any[], dateStr: string): AttendanceRecord[] => {
+    const staffDateWorkedMap = getStaffDateWorkedMap(attendanceRecords);
     return rows.map(row => {
       const staffId = row['Staff ID'] || row.staffId || row.staff_id || '';
       const staffName = row['Staff Name'] || row.staffName || row.staff_name || '';
@@ -1011,7 +1013,7 @@ export function Attendance() {
         overtimeDetails,
       };
 
-      const met = calculateAttendanceMetrics(partialRec, publicHolidays, payrollVariables, monthValues as any, attendanceRecords);
+      const met = calculateAttendanceMetrics(partialRec, publicHolidays, payrollVariables, monthValues as any, staffDateWorkedMap);
 
       return {
         id: generateId(),
@@ -1172,6 +1174,7 @@ export function Attendance() {
       const nd = normalizeDate(r.date);
       return nd === nextDayStr || nd === nextNextDayStr;
     });
+    const nextDaysWorkedMap = getStaffDateWorkedMap(nextDaysRecords);
 
     // First pass: build raw records with day/night/site info
     type RawRecord = {
@@ -1276,7 +1279,7 @@ export function Attendance() {
       };
 
       // Pass only next-2-days records instead of all 10k — reduces NDW scan from O(N) to ~O(50)
-      const met = calculateAttendanceMetrics(partialRec, publicHolidays, payrollVariables, monthValues as any, nextDaysRecords);
+      const met = calculateAttendanceMetrics(partialRec, publicHolidays, payrollVariables, monthValues as any, nextDaysWorkedMap);
 
       return {
         id: idMap.get(raw.empId) || generateId(),

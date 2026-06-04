@@ -13,7 +13,7 @@ import logoSrc from '../../logo/logo-2.png';
 import { usePriv } from '@/src/hooks/usePriv';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/src/components/ui/dropdown-menu';
-import { calculateAttendanceMetrics } from '@/src/lib/attendanceLogic';
+import { calculateAttendanceMetrics, getStaffDateWorkedMap } from '@/src/lib/attendanceLogic';
 import { supabase } from '@/src/integrations/supabase/client';
 
 interface PayrollRecord {
@@ -217,6 +217,7 @@ export function Payroll() {
       const monthConfig = monthValues[mKey as keyof typeof monthValues] || { workDays: fallbackWorkdays, overtimeRate: 0.5 };
       const otRate = monthConfig.overtimeRate;
 
+      const staffDateWorkedMap = getStaffDateWorkedMap(attendanceRecords);
       let snCounter = 1;
 
       return employees
@@ -282,7 +283,7 @@ export function Payroll() {
             
             const recordDate = new Date(r.date + 'T12:00:00'); // Normalize to noon for comparison
             if (recordDate >= periodStart && recordDate <= periodEnd) {
-              const metrics = calculateAttendanceMetrics(r, holidayDates, payrollVariables, monthValues as any, attendanceRecords);
+              const metrics = calculateAttendanceMetrics(r, holidayDates, payrollVariables, monthValues as any, staffDateWorkedMap);
               
               if (metrics.ot > 0) {
                 totalOTInstances += 1;

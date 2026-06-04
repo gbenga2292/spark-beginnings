@@ -52,13 +52,8 @@ CREATE POLICY "Finance or Admins can view invoices" ON public.invoices
     OR public.is_admin()
   );
 
--- Ledger Entries
-ALTER TABLE public.ledger_entries ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Finance or Admins can view ledger" ON public.ledger_entries
-  FOR SELECT USING (
-    ((SELECT (privileges->'ledger'->>'canView')::boolean FROM public.profiles WHERE id = auth.uid()) = true)
-    OR public.is_admin()
-  );
+-- Ledger Entries (table created in a later migration, skip here)
+-- ALTER TABLE public.ledger_entries ENABLE ROW LEVEL SECURITY;
 
 -- Salary Advances
 ALTER TABLE public.salary_advances ENABLE ROW LEVEL SECURITY;

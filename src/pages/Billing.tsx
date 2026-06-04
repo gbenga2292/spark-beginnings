@@ -291,13 +291,25 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
       const start = new Date(startDate);
       if (!isNaN(start.getTime())) {
         if (input.countOffDays === false && siteId) {
+          // Pre-index dailyMachineLogs by date for O(1) loop retrieval
+          const logsByDate = new Map<string, typeof dailyMachineLogs>();
+          for (let i = 0; i < dailyMachineLogs.length; i++) {
+            const log = dailyMachineLogs[i];
+            if (log.siteId === siteId && log.date) {
+              if (!logsByDate.has(log.date)) {
+                logsByDate.set(log.date, []);
+              }
+              logsByDate.get(log.date)!.push(log);
+            }
+          }
+
           let daysCounted = 0;
           let currentDate = new Date(start);
           const linkedAssets = input.linkedAssetIds || [];
 
           while (daysCounted < maxDuration) {
             const dateStr = currentDate.toISOString().split('T')[0];
-            const logsForDate = dailyMachineLogs.filter(l => l.siteId === siteId && l.date === dateStr);
+            const logsForDate = logsByDate.get(dateStr) || [];
             
             let dayContribution = 1.0;
             if (logsForDate.length > 0) {

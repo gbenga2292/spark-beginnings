@@ -7,11 +7,10 @@
 CREATE OR REPLACE FUNCTION public.protect_profile_privileges()
 RETURNS TRIGGER AS $$
 BEGIN
-  -- If not an admin, ensure privileges, email, and workspace_id remain unchanged
+  -- If not an admin, ensure privileges and email remain unchanged
   IF NOT public.is_admin() THEN
     IF (OLD.privileges IS DISTINCT FROM NEW.privileges) OR 
-       (OLD.email IS DISTINCT FROM NEW.email) OR
-       (OLD.workspace_id IS DISTINCT FROM NEW.workspace_id) THEN
+       (OLD.email IS DISTINCT FROM NEW.email) THEN
       RAISE EXCEPTION 'You do not have permission to modify security-critical fields.';
     END IF;
   END IF;

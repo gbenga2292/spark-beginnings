@@ -1,8 +1,7 @@
 import { useCallback } from 'react';
 import { useAppStore } from '@/src/store/appStore';
 import { computeWorkDays } from '@/src/lib/workdays';
-import { calculateAttendanceMetrics } from '@/src/lib/attendanceLogic';
-
+import { calculateAttendanceMetrics, getStaffDateWorkedMap } from '@/src/lib/attendanceLogic';
 const MONTHS = [
   { key: 'jan', label: 'January' },
   { key: 'feb', label: 'February' },
@@ -41,6 +40,7 @@ export function usePayrollCalculator() {
     const monthConfig = monthValues[mKey as keyof typeof monthValues] || { workDays: fallbackWorkdays, overtimeRate: 0.5 };
     const otRate = monthConfig.overtimeRate;
 
+    const staffDateWorkedMap = getStaffDateWorkedMap(attendanceRecords);
     let snCounter = 1;
 
     return employees
@@ -103,7 +103,7 @@ export function usePayrollCalculator() {
 
           if (r.staffId === emp.id && recordMonth === selectedMonthIndex && recordYear === year) {
             // Use calculateAttendanceMetrics for accurate OT detection
-            const metrics = calculateAttendanceMetrics(r, holidayDates, payrollVariables, monthValues as any, attendanceRecords);
+            const metrics = calculateAttendanceMetrics(r, holidayDates, payrollVariables, monthValues as any, staffDateWorkedMap);
 
             if (metrics.ot > 0) {
               totalOTInstances += 1;

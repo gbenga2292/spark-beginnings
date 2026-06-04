@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   Building2, MapPin, AlertTriangle, FileText, CheckCircle2, Clock, 
@@ -504,27 +504,27 @@ export function Client360() {
   const hasAnyOptions = activeClientContacts.length > 0;
   const isKnownOption = (name: string) => activeClientContacts.some(c => c.name.trim().toLowerCase() === name.trim().toLowerCase());
 
-  const clientData = useMemo(() => {
-    if (!selectedClient) return null;
-    const clientNameLow = selectedClient.toLowerCase();
+  const isWithinTimeFilter = useCallback((dateString?: string) => {
+    if (!dateString) return false;
+    if (filterMonth === 'all' && filterYear === 'all') return true;
+    try {
+      const normalized = normalizeDate(dateString);
+      if (!normalized) return false;
+      const d = parseISO(normalized);
+      if (isNaN(d.getTime())) return false;
+      
+      const matchesYear = filterYear === 'all' || d.getFullYear().toString() === filterYear;
+      const matchesMonth = filterMonth === 'all' || (d.getMonth() + 1).toString() === filterMonth;
+      
+      return matchesYear && matchesMonth;
+    } catch (e) {
+      return false;
+    }
+  }, [filterMonth, filterYear]);
 
-    const isWithinTimeFilter = (dateString?: string) => {
-      if (!dateString) return false;
-      if (filterMonth === 'all' && filterYear === 'all') return true;
-      try {
-        const normalized = normalizeDate(dateString);
-        if (!normalized) return false;
-        const d = parseISO(normalized);
-        if (isNaN(d.getTime())) return false;
-        
-        const matchesYear = filterYear === 'all' || d.getFullYear().toString() === filterYear;
-        const matchesMonth = filterMonth === 'all' || (d.getMonth() + 1).toString() === filterMonth;
-        
-        return matchesYear && matchesMonth;
-      } catch (e) {
-        return false;
-      }
-    };
+  // 1. Client Sites & Active Sites Info
+  const clientSites = useMemo(() => {
+    if (!selectedClient) return [];
 
     const isSiteActiveInFilter = (s: Site) => {
       if (filterMonth === 'all' && filterYear === 'all') return true;
@@ -561,10 +561,28 @@ export function Client360() {
       }
     };
 
-    const clientSites = sites.filter(s => s.client.trim() === selectedClient && isSiteActiveInFilter(s));
-    const activeSites = clientSites.filter(s => s.status === 'Active');
+    return sites.filter(s => s.client.trim() === selectedClient && isSiteActiveInFilter(s));
+  }, [sites, selectedClient, filterMonth, filterYear]);
 
-    // Financial calculations
+  const activeSites = useMemo(() => {
+    return clientSites.filter(s => s.status === 'Active');
+  }, [clientSites]);
+
+  // 2. Financial Calculations
+  const financialData = useMemo(() => {
+    if (!selectedClient) {
+      return {
+        clientInvoices: [],
+        vatDeficit: 0,
+        paymentsCleared: 0,
+        totalRevenue: 0,
+        totalCost: 0,
+        profit: 0,
+        paymentsWithVatStatus: [],
+        vatMonthsIncluded: []
+      };
+    }
+
     const clientPayments = payments.filter(p => p.client?.trim() === selectedClient && isWithinTimeFilter(p.date));
     const paymentsCleared = clientPayments.reduce((acc, p) => acc + (p.amount || 0), 0);
 
@@ -588,14 +606,11 @@ export function Client360() {
     const totalVatPaid = clientVatPayments.reduce((acc, vp) => acc + (vp.amount || 0), 0);
     const vatDeficit = totalVatGenerated - totalVatPaid;
     
-    // Capture the months the VAT payments cover
     const vatMonthsIncluded = Array.from(new Set(clientVatPayments.map(vp => `${vp.month} ${vp.year}`)));
 
-    // Detailed payment and VAT registry mapping
     const vatDueByMonthYear: Record<string, number> = {};
     const vatPaymentsByMonthYear: Record<string, number> = {};
 
-    // 1. Calculate VAT due for each month-year from ALL client payments
     const allClientPayments = payments.filter(p => p.client?.trim() === selectedClient);
     allClientPayments.forEach(p => {
       const normalized = normalizeDate(p.date);
@@ -618,7 +633,6 @@ export function Client360() {
       vatDueByMonthYear[key] = (vatDueByMonthYear[key] || 0) + vatAmount;
     });
 
-    // 2. Calculate VAT paid for each month-year from ALL client VAT payments
     const allClientVatPayments = vatPayments.filter(vp => vp.client?.trim() === selectedClient);
     allClientVatPayments.forEach(vp => {
       if (!vp.month || !vp.year) return;
@@ -626,7 +640,6 @@ export function Client360() {
       vatPaymentsByMonthYear[key] = (vatPaymentsByMonthYear[key] || 0) + (vp.amount || 0);
     });
 
-    // 3. Map filtered clientPayments with their individual VAT details and the monthly status
     const paymentsWithVatStatus = clientPayments.map(p => {
       const normalized = normalizeDate(p.date);
       let monthName = 'Unknown';
@@ -676,8 +689,73 @@ export function Client360() {
     const clientCosts = ledgerEntries.filter(l => l.client?.trim() === selectedClient && isWithinTimeFilter(l.date));
     const totalCost = clientCosts.reduce((acc, l) => acc + (l.amount || 0), 0);
 
+    const rawClientInvoices = invoices.filter(i => i.client?.trim() === selectedClient);
+
+    const clientInvoices = rawClientInvoices.map(inv => {
+      const site = clientSites.find(s => s.id === inv.siteId || s.name === inv.siteName);
+      let nextBillingDate = null;
+      let siteStatus = site?.status || 'Ended'; 
+      if (siteStatus !== 'Ended' && (inv.dueDate || inv.date)) {
+        const d = new Date(normalizeDate(inv.dueDate || inv.date));
+        if (!isNaN(d.getTime())) {
+          d.setDate(d.getDate() + 1);
+          nextBillingDate = d.toISOString().split('T')[0];
+        }
+      }
+
+      let intelligentStatus = inv.status;
+      if (intelligentStatus !== 'Paid') {
+        const invAmount = inv.totalCharge || inv.amount || 0;
+        const invDateNum = inv.date ? new Date(normalizeDate(inv.date)).getTime() : 0;
+        
+        const matchingPayment = allClientPayments.find(p => {
+          const siteMatch = (p.site?.trim() === inv.siteName?.trim() || p.site === inv.siteId);
+          const diff = Math.abs((p.amount || 0) - invAmount);
+          const isSimilarAmount = invAmount > 0 && (diff / invAmount) <= 0.05;
+          const pDateNum = p.date ? new Date(normalizeDate(p.date)).getTime() : 0;
+          const isDateValid = pDateNum >= (invDateNum - (7 * 24 * 60 * 60 * 1000));
+          
+          return siteMatch && isSimilarAmount && isDateValid;
+        });
+
+        if (matchingPayment) {
+          intelligentStatus = 'Paid';
+        }
+      }
+
+      return { ...inv, nextBillingDate, siteStatus, status: intelligentStatus };
+    }).sort((a, b) => {
+      const dateA = a.date ? new Date(normalizeDate(a.date)).getTime() : 0;
+      const dateB = b.date ? new Date(normalizeDate(b.date)).getTime() : 0;
+      return dateB - dateA;
+    });
+
+    return {
+      clientInvoices,
+      vatDeficit,
+      paymentsCleared,
+      totalRevenue,
+      totalCost,
+      profit: totalRevenue - totalCost,
+      paymentsWithVatStatus,
+      vatMonthsIncluded
+    };
+  }, [selectedClient, payments, invoices, vatPayments, ledgerEntries, clientSites, vatRate, isWithinTimeFilter]);
+
+  // 3. Tasks Data
+  const tasksData = useMemo(() => {
+    if (!selectedClient) {
+      return {
+        pendingTasks: [],
+        completedTasks: [],
+        approvalTasks: []
+      };
+    }
+
+    const clientNameLow = selectedClient.toLowerCase();
     const clientId = clientProfiles.find(c => c.name.trim() === selectedClient)?.id;
     const clientSiteIds = new Set(clientSites.map(s => s.id));
+    
     const clientTasks = mainTasks.filter(t => {
       if (t.title?.toLowerCase().includes(clientNameLow)) return true;
       if (t.description && t.description.toLowerCase().includes(clientNameLow)) return true;
@@ -694,27 +772,49 @@ export function Client360() {
 
       return false;
     });
+
     const pendingTasks = clientTasks.filter(t => {
       const status = deriveMainTaskStatus(t.id, subtasks);
       return (status === 'not_started' || status === 'in_progress') && !t.isDeleted && isWithinTimeFilter(t.deadline || t.createdAt);
     });
+
     const approvalTasks = clientTasks.filter(t => {
       const status = deriveMainTaskStatus(t.id, subtasks);
       return status === 'pending_approval' && !t.isDeleted && isWithinTimeFilter(t.deadline || t.createdAt);
     });
+
     const completedTasks = clientTasks.filter(t => {
       const status = deriveMainTaskStatus(t.id, subtasks);
       return status === 'completed' && !t.isDeleted && isWithinTimeFilter(t.deadline || t.createdAt);
     });
 
+    return {
+      pendingTasks,
+      completedTasks,
+      approvalTasks
+    };
+  }, [selectedClient, mainTasks, subtasks, clientSites, clientProfiles, isWithinTimeFilter, deriveMainTaskStatus]);
+
+  // 4. Operational Data & Logs
+  const operationalData = useMemo(() => {
+    if (!selectedClient) {
+      return {
+        contacts: [],
+        logs: [],
+        deployedStaffCount: 0,
+        machineLogs: [],
+        activeMachinesCount: 0,
+        deployedMachines: [],
+        waybills: []
+      };
+    }
+
     const contacts = clientContacts.filter(c => c.clientName?.trim().toLowerCase() === selectedClient?.trim().toLowerCase());
     const logs = commLogs.filter(c => c.client?.trim().toLowerCase() === selectedClient?.trim().toLowerCase() && isWithinTimeFilter(c.date)).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     
-    // Find deployed staff
     const clientAttendance = attendanceRecords.filter(a => isWithinTimeFilter(a.date) && (a.dayClient?.trim() === selectedClient || a.nightClient?.trim() === selectedClient));
     const uniqueStaffIds = new Set(clientAttendance.map(a => a.staffId));
-    
-    // Machine Logs & Deployed Machines
+
     const siteIds = new Set(clientSites.map(s => s.id));
     const siteNames = new Set(clientSites.map(s => s.name));
     const clientMachineLogs = dailyMachineLogs.filter(l => siteIds.has(l.siteId) && isWithinTimeFilter(l.date));
@@ -725,9 +825,26 @@ export function Client360() {
 
     const clientWaybills = waybills.filter(w => siteIds.has(w.siteId) && isWithinTimeFilter(w.issueDate));
 
-    // Health Score & Alerts Calculation
+    return {
+      contacts,
+      logs,
+      deployedStaffCount: uniqueStaffIds.size,
+      machineLogs: clientMachineLogs,
+      activeMachinesCount: deployedMachines.length,
+      deployedMachines,
+      waybills: clientWaybills
+    };
+  }, [selectedClient, clientContacts, commLogs, attendanceRecords, dailyMachineLogs, assets, waybills, clientSites, isWithinTimeFilter]);
+
+  // 5. Health Score Data
+  const healthData = useMemo(() => {
     let healthScore = 100;
     const alerts: { title: string; type: 'danger' | 'warning' | 'info' }[] = [];
+
+    if (!selectedClient) return { healthScore, alerts };
+
+    const { vatDeficit, totalRevenue, paymentsCleared } = financialData;
+    const { pendingTasks } = tasksData;
 
     // Financial Health
     if (vatDeficit > 50000) { healthScore -= 15; alerts.push({ title: `High VAT Deficit: ₦${vatDeficit.toLocaleString()}`, type: 'danger' }); }
@@ -753,80 +870,38 @@ export function Client360() {
 
     healthScore = Math.max(0, Math.min(100, healthScore));
 
-    const allClientPaymentsForCheck = payments.filter(p => p.client?.trim() === selectedClient);
+    return { healthScore, alerts };
+  }, [selectedClient, financialData, tasksData, clientSites, activeSites]);
 
-    const rawClientInvoices = invoices.filter(i => i.client?.trim() === selectedClient);
-    const latestInvoicesBySite = new Map();
-    rawClientInvoices.forEach(inv => {
-      const siteIdKey = inv.siteId || inv.siteName || 'unknown';
-      const existing = latestInvoicesBySite.get(siteIdKey);
-      if (!existing) {
-        latestInvoicesBySite.set(siteIdKey, inv);
-      } else {
-        const invDate = inv.date ? new Date(normalizeDate(inv.date)).getTime() : 0;
-        const existingMapDate = existing.date ? new Date(normalizeDate(existing.date)).getTime() : 0;
-        if (invDate > existingMapDate) {
-          latestInvoicesBySite.set(siteIdKey, inv);
-        }
-      }
-    });
-
-    const clientInvoices = rawClientInvoices.map(inv => {
-      const site = clientSites.find(s => s.id === inv.siteId || s.name === inv.siteName);
-      let nextBillingDate = null;
-      let siteStatus = site?.status || 'Ended'; 
-      if (siteStatus !== 'Ended' && (inv.dueDate || inv.date)) {
-        const d = new Date(normalizeDate(inv.dueDate || inv.date));
-        if (!isNaN(d.getTime())) {
-          d.setDate(d.getDate() + 1);
-          nextBillingDate = d.toISOString().split('T')[0];
-        }
-      }
-
-      let intelligentStatus = inv.status;
-      if (intelligentStatus !== 'Paid') {
-        const invAmount = inv.totalCharge || inv.amount || 0;
-        const invDateNum = inv.date ? new Date(normalizeDate(inv.date)).getTime() : 0;
-        
-        // Find if there's a payment on the same site with a similar amount made around or after the invoice date
-        const matchingPayment = allClientPaymentsForCheck.find(p => {
-          const siteMatch = (p.site?.trim() === inv.siteName?.trim() || p.site === inv.siteId);
-          const diff = Math.abs((p.amount || 0) - invAmount);
-          const isSimilarAmount = invAmount > 0 && (diff / invAmount) <= 0.05; // Within 5% tolerance for Withholding Tax/deductions
-          const pDateNum = p.date ? new Date(normalizeDate(p.date)).getTime() : 0;
-          const isDateValid = pDateNum >= (invDateNum - (7 * 24 * 60 * 60 * 1000)); // Payment made no more than 7 days prior, or after
-          
-          return siteMatch && isSimilarAmount && isDateValid;
-        });
-
-        if (matchingPayment) {
-          intelligentStatus = 'Paid';
-        }
-      }
-
-      return { ...inv, nextBillingDate, siteStatus, status: intelligentStatus };
-    }).sort((a, b) => {
-      const dateA = a.date ? new Date(normalizeDate(a.date)).getTime() : 0;
-      const dateB = b.date ? new Date(normalizeDate(b.date)).getTime() : 0;
-      return dateB - dateA;
-    });
-
+  // 6. Combined clientData interface
+  const clientData = useMemo(() => {
+    if (!selectedClient) return null;
     return {
-      clientSites, activeSites: activeSites.length, totalSites: clientSites.length,
-      clientInvoices,
-      vatDeficit, paymentsCleared, totalRevenue, totalCost, profit: totalRevenue - totalCost,
-      paymentsWithVatStatus,
-      pendingTasks, completedTasks, approvalTasks, contacts, logs, 
-      deployedStaffCount: uniqueStaffIds.size,
-      machineLogs: clientMachineLogs,
-      activeMachinesCount: deployedMachines.length,
-      deployedMachines,
-      waybills: clientWaybills,
-      healthScore,
-      alerts,
-      vatMonthsIncluded
+      clientSites,
+      activeSites: activeSites.length,
+      totalSites: clientSites.length,
+      clientInvoices: financialData.clientInvoices,
+      vatDeficit: financialData.vatDeficit,
+      paymentsCleared: financialData.paymentsCleared,
+      totalRevenue: financialData.totalRevenue,
+      totalCost: financialData.totalCost,
+      profit: financialData.profit,
+      paymentsWithVatStatus: financialData.paymentsWithVatStatus,
+      pendingTasks: tasksData.pendingTasks,
+      completedTasks: tasksData.completedTasks,
+      approvalTasks: tasksData.approvalTasks,
+      contacts: operationalData.contacts,
+      logs: operationalData.logs,
+      deployedStaffCount: operationalData.deployedStaffCount,
+      machineLogs: operationalData.machineLogs,
+      activeMachinesCount: operationalData.activeMachinesCount,
+      deployedMachines: operationalData.deployedMachines,
+      waybills: operationalData.waybills,
+      healthScore: healthData.healthScore,
+      alerts: healthData.alerts,
+      vatMonthsIncluded: financialData.vatMonthsIncluded
     };
-  }, [selectedClient, filterMonth, filterYear, sites, invoices, payments, vatPayments, ledgerEntries, mainTasks, clientContacts, commLogs, attendanceRecords, dailyMachineLogs, assets, waybills]);
+  }, [selectedClient, clientSites, activeSites, financialData, tasksData, operationalData, healthData]);
 
   // AI Chat State
   const [messages, setMessages] = useState<{role: 'user' | 'assistant' | 'system', content: string}[]>([]);

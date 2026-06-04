@@ -31,14 +31,36 @@ export function Payments({ setPreviewModal, searchTerm = '' }: { setPreviewModal
     const deletePayment = useAppStore((state) => state.deletePayment);
     const vatRate = useAppStore((state) => state.payrollVariables.vatRate);
 
+    // Memoized TIN lookup map for O(1) rendering lookups
+    const tinMap = useMemo(() => {
+        const map = new Map<string, string>();
+        
+        // Seed from pendingSites fallback
+        pendingSites.forEach(s => {
+            const key = s.clientName?.trim().toLowerCase();
+            const tin = s.phase4?.clientTinNumber;
+            if (key && tin) {
+                map.set(key, tin);
+            }
+        });
+
+        // Overlay clientProfiles (primary source of truth)
+        clientProfiles.forEach(cp => {
+            const key = cp.name?.trim().toLowerCase();
+            const tin = cp.tinNumber;
+            if (key && tin) {
+                map.set(key, tin);
+            }
+        });
+
+        return map;
+    }, [clientProfiles, pendingSites]);
+
     // Case-insensitive TIN lookup with pendingSites fallback
     const getTinForClient = (clientName: string): string => {
         if (!clientName) return '';
         const key = clientName.trim().toLowerCase();
-        const profile = clientProfiles.find(cp => cp.name?.trim().toLowerCase() === key);
-        if (profile?.tinNumber) return profile.tinNumber;
-        const pending = pendingSites.find(s => s.clientName?.trim().toLowerCase() === key && s.phase4?.clientTinNumber);
-        return pending?.phase4?.clientTinNumber || '';
+        return tinMap.get(key) || '';
     };
 
     // ─── Permissions ───────────────────────────────────────────

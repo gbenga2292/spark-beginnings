@@ -1,4 +1,19 @@
 project_id = "qivyzfdxrzmzhvgjfaed"
 
+[api]
+port = 40321
+
+[db]
+port = 40322
+
+[studio]
+port = 40323
+
+[inbucket]
+port = 40324
+
+[analytics]
+port = 40325
+
 [functions.create-user]
 verify_jwt = false

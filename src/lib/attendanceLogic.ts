@@ -19,12 +19,26 @@ export interface AttendanceMetrics {
  * This ensures that if a date is later marked as a public holiday, 
  * the overtime and workdays are automatically updated without re-importing.
  */
+export function getStaffDateWorkedMap(records: AttendanceRecord[]): Map<string, boolean> {
+  const map = new Map<string, boolean>();
+  for (let i = 0; i < records.length; i++) {
+    const r = records[i];
+    if (r.staffId && r.date && (r.day === 'Yes' || r.night === 'Yes')) {
+      const normalizedDate = normalizeDate(r.date);
+      if (normalizedDate) {
+        map.set(`${r.staffId}_${normalizedDate}`, true);
+      }
+    }
+  }
+  return map;
+}
+
 export function calculateAttendanceMetrics(
   record: Partial<AttendanceRecord>,
   publicHolidays: string[], // "YYYY-MM-DD" array
   payrollVariables: any, // AppState['payrollVariables']
   monthValues: Record<string, MonthValue>,
-  allRecords: AttendanceRecord[] = []
+  allRecords: AttendanceRecord[] | Map<string, boolean> = []
 ): AttendanceMetrics {
   const dateStr = record.date || '';
   if (!dateStr) {
@@ -52,11 +66,16 @@ export function calculateAttendanceMetrics(
   if (dow !== 7) {
     const nextDayStr = format(addDays(d, 1), 'yyyy-MM-dd');
     // Normalize dates for comparison to ensure robustness
-    const staffWorksNextDay = allRecords.some(r => 
-      r.staffId === record.staffId && 
-      (normalizeDate(r.date) === nextDayStr) && 
-      (r.day === 'Yes' || r.night === 'Yes')
-    );
+    let staffWorksNextDay = false;
+    if (allRecords instanceof Map) {
+      staffWorksNextDay = allRecords.has(`${record.staffId}_${nextDayStr}`);
+    } else {
+      staffWorksNextDay = allRecords.some(r => 
+        r.staffId === record.staffId && 
+        (normalizeDate(r.date) === nextDayStr) && 
+        (r.day === 'Yes' || r.night === 'Yes')
+      );
+    }
     
     if (staffWorksNextDay) {
       ndw = 'Yes';
@@ -65,11 +84,16 @@ export function calculateAttendanceMetrics(
         const nextDayIsHolidayOrSun = publicHolidays.includes(nextDayStr) || nextDayDow === 7;
         if (nextDayIsHolidayOrSun) {
            const nextNextDayStr = format(addDays(d, 2), 'yyyy-MM-dd');
-           const staffWorksNextNextDay = allRecords.some(r => 
-             r.staffId === record.staffId && 
-             (normalizeDate(r.date) === nextNextDayStr) && 
-             (r.day === 'Yes' || r.night === 'Yes')
-           );
+           let staffWorksNextNextDay = false;
+           if (allRecords instanceof Map) {
+             staffWorksNextNextDay = allRecords.has(`${record.staffId}_${nextNextDayStr}`);
+           } else {
+             staffWorksNextNextDay = allRecords.some(r => 
+               r.staffId === record.staffId && 
+               (normalizeDate(r.date) === nextNextDayStr) && 
+               (r.day === 'Yes' || r.night === 'Yes')
+             );
+           }
            if (staffWorksNextNextDay) ndw = 'Yes';
         }
     }
