@@ -60,6 +60,7 @@ export function Client360() {
   const addClientProfile = useAppStore(s => s.addClientProfile);
   const pendingSites = useAppStore(s => s.pendingSites);
   const deletePendingSite = useAppStore(s => s.deletePendingSite);
+  const updatePendingSite = useAppStore(s => s.updatePendingSite);
   const addCommLog = useAppStore(s => s.addCommLog);
   const addPendingSite = useAppStore(s => s.addPendingSite);
   const { mainTasks, subtasks, users } = useAppData();
@@ -1165,20 +1166,70 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
     );
   }
 
-  // â”€â”€ Handlers for edit dialogs â”€â”€
+  // ——— Handlers for edit dialogs ———
   const openSiteEdit = (site: Site) => {
     setSiteEditForm({ ...site });
     setSiteEditTarget(site);
   };
 
   const saveSiteEdit = () => {
-    if (siteEditTarget) {
-      updateSite(siteEditTarget.id, siteEditForm);
-      // Also update selectedSite if it's open
-      if (selectedSite?.id === siteEditTarget.id) {
-        setSelectedSite({ ...siteEditTarget, ...siteEditForm } as Site);
-      }
+    if (!siteEditTarget) return;
+
+    // Normalize dates to yyyy-MM-dd
+    const startDate = normalizeDate(siteEditForm.startDate || '');
+    const endDate   = normalizeDate(siteEditForm.endDate   || '');
+
+    // Auto-compute status from date range
+    const nowStr = new Date().toISOString().split('T')[0];
+    let computedStatus: 'Active' | 'Inactive' | 'Ended' =
+      siteEditForm.status as 'Active' | 'Inactive' | 'Ended' ?? 'Active';
+    if (endDate) {
+      computedStatus = 'Ended';
+    } else if (startDate && nowStr < startDate) {
+      computedStatus = 'Inactive';
+    } else {
+      computedStatus = 'Active';
     }
+
+    const updatedFields: Partial<Site> = {
+      ...siteEditForm,
+      startDate,
+      endDate,
+      status: computedStatus,
+    };
+
+    updateSite(siteEditTarget.id, updatedFields);
+
+    // Sync to linked onboarding record
+    const linkedPS = pendingSites.find(ps => ps.siteId === siteEditTarget.id);
+    if (linkedPS) {
+      const taxStatus = (siteEditForm.vat ?? linkedPS.phase4?.clientTaxStatus) === 'Add'
+        ? 'Mainland (Add 7.5% VAT)'
+        : (siteEditForm.vat ?? '') === 'Yes'
+          ? 'Mainland (Yes 7.5% VAT)'
+          : 'Free Trade Zone (0% VAT)';
+
+      updatePendingSite(linkedPS.id, {
+        siteName: (siteEditForm.name ?? linkedPS.siteName),
+        phase1: {
+          ...linkedPS.phase1,
+          timelineStartDate: startDate || linkedPS.phase1.timelineStartDate,
+        },
+        phase4: {
+          ...linkedPS.phase4,
+          clientTaxStatus: taxStatus,
+        },
+        phase5: {
+          ...linkedPS.phase5,
+          actualEndDate: endDate,
+        },
+      });
+    }
+
+    if (selectedSite?.id === siteEditTarget.id) {
+      setSelectedSite({ ...siteEditTarget, ...updatedFields } as Site);
+    }
+
     setSiteEditTarget(null);
     setSiteEditForm({});
   };
@@ -2557,10 +2608,97 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
               <Button variant="ghost" size="icon" onClick={() => setSiteEditTarget(null)} className="h-8 w-8"><X className="w-4 h-4" /></Button>
             </div>
             <div className="space-y-4 overflow-y-auto pr-1 flex-1 style-scroll mb-4">
-              <div><label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Address</label><textarea value={siteEditForm.address || ''} onChange={e => setSiteEditForm(f => ({ ...f, address: e.target.value }))} rows={2} placeholder="e.g. 5 Marina Road, Lagos Island" className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')} /></div>
-              <div><label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Main Contact Person</label><input value={siteEditForm.mainContactPerson || ''} onChange={e => setSiteEditForm(f => ({ ...f, mainContactPerson: e.target.value }))} placeholder="e.g. John Doe" className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')} /></div>
-              <div><label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Contact Phone Number</label><input value={siteEditForm.contactPhone || ''} onChange={e => setSiteEditForm(f => ({ ...f, contactPhone: e.target.value }))} placeholder="e.g. +234 801 234 5678" className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')} /></div>
-              <div><label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Position</label><input value={siteEditForm.position || ''} onChange={e => setSiteEditForm(f => ({ ...f, position: e.target.value }))} placeholder="e.g. Site Manager" className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')} /></div>
+              {/* Site Name */}
+              <div>
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Site Name</label>
+                <input
+                  value={siteEditForm.name || ''}
+                  onChange={e => setSiteEditForm(f => ({ ...f, name: e.target.value }))}
+                  placeholder="e.g. Warri Refinery Site B"
+                  className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
+                />
+              </div>
+
+              {/* Start Date + End Date side by side */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Start Date</label>
+                  <input
+                    type="date"
+                    value={siteEditForm.startDate || ''}
+                    onChange={e => setSiteEditForm(f => ({ ...f, startDate: e.target.value }))}
+                    className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">End Date</label>
+                  <input
+                    type="date"
+                    value={siteEditForm.endDate || ''}
+                    onChange={e => setSiteEditForm(f => ({ ...f, endDate: e.target.value }))}
+                    className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
+                  />
+                </div>
+              </div>
+
+              {/* Address */}
+              <div>
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Address</label>
+                <textarea
+                  value={siteEditForm.address || ''}
+                  onChange={e => setSiteEditForm(f => ({ ...f, address: e.target.value }))}
+                  rows={2}
+                  placeholder="e.g. 5 Marina Road, Lagos Island"
+                  className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
+                />
+              </div>
+
+              {/* Main Contact Person */}
+              <div>
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Main Contact Person</label>
+                <input
+                  value={siteEditForm.mainContactPerson || ''}
+                  onChange={e => setSiteEditForm(f => ({ ...f, mainContactPerson: e.target.value }))}
+                  placeholder="e.g. John Doe"
+                  className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
+                />
+              </div>
+
+              {/* Contact Phone + Position side by side */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Contact Phone</label>
+                  <input
+                    value={siteEditForm.contactPhone || ''}
+                    onChange={e => setSiteEditForm(f => ({ ...f, contactPhone: e.target.value }))}
+                    placeholder="e.g. +234 801 234 5678"
+                    className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Position</label>
+                  <input
+                    value={siteEditForm.position || ''}
+                    onChange={e => setSiteEditForm(f => ({ ...f, position: e.target.value }))}
+                    placeholder="e.g. Site Manager"
+                    className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
+                  />
+                </div>
+              </div>
+
+              {/* VAT Status */}
+              <div>
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">VAT Status</label>
+                <select
+                  value={siteEditForm.vat || 'No'}
+                  onChange={e => setSiteEditForm(f => ({ ...f, vat: e.target.value as 'Yes' | 'No' | 'Add' }))}
+                  className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
+                >
+                  <option value="No">No VAT — Free Trade Zone (0%)</option>
+                  <option value="Yes">Yes — Mainland (7.5% VAT)</option>
+                  <option value="Add">Add — Mainland (Add 7.5% VAT)</option>
+                </select>
+              </div>
             </div>
             <div className="flex gap-3 shrink-0 pt-3 border-t border-slate-100 dark:border-slate-800">
               <Button variant="outline" onClick={() => setSiteEditTarget(null)} className="flex-1 rounded-xl">Cancel</Button>
