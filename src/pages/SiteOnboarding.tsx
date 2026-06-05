@@ -6,7 +6,7 @@ import { Badge } from '@/src/components/ui/badge';
 import { useAppStore } from '@/src/store/appStore';
 import { SiteQuestionnaire } from '@/src/types/SiteQuestionnaire';
 import { toast } from '@/src/components/ui/toast';
-import { Save, ArrowLeft, CheckCircle2, Building2, MapPin, Calendar, User, LayoutGrid, ChevronDown, ChevronUp } from 'lucide-react';
+import { Save, ArrowLeft, CheckCircle2, Building2, MapPin, Calendar, User, LayoutGrid, ChevronDown, ChevronUp, Edit2 } from 'lucide-react';
 import { CreateProjectDialog } from '@/src/components/tasks/CreateProjectDialog';
 import { useAppData } from '@/src/contexts/AppDataContext';
 import { useAuth } from '@/src/hooks/useAuth';
@@ -136,12 +136,17 @@ export function SiteOnboarding() {
   const getServiceTemplates = useAppStore(s => s.getServiceTemplates);
   const invoices = useAppStore(s => s.invoices);
   const payments = useAppStore(s => s.payments);
+  const addClientProfile = useAppStore(s => s.addClientProfile);
+  const updateClientProfile = useAppStore(s => s.updateClientProfile);
+  const addClientContact = useAppStore(s => s.addClientContact);
+  const updateClientContact = useAppStore(s => s.updateClientContact);
 
   const [form, setForm] = useState<SiteQuestionnaire>(blankForm());
   const [initialForm, setInitialForm] = useState<SiteQuestionnaire>(blankForm());
   const [activePhase, setActivePhase] = useState<1 | 2 | 3 | 4 | 5>(1);
   const [showUnsavedModal, setShowUnsavedModal] = useState(false);
   const [isInfoCollapsed, setIsInfoCollapsed] = useState(true);
+  const [isEditingHeader, setIsEditingHeader] = useState(false);
   const { createProject, users, projects } = useAppData();
   const { user } = useAuth();
 
@@ -293,11 +298,66 @@ export function SiteOnboarding() {
     toast.success(`Phase ${phase} complete and saved.`);
   };
 
+  const syncOnboardingToAllStores = useCallback((updatedForm: SiteQuestionnaire) => {
+    if (!updatedForm.clientName) return;
+
+    // 1. Sync ClientProfile
+    const existingProfile = clientProfiles.find(
+      p => p.name.trim().toLowerCase() === updatedForm.clientName.trim().toLowerCase()
+    );
+    if (existingProfile) {
+      updateClientProfile(existingProfile.id, {
+        address: updatedForm.address || existingProfile.address,
+        mainContactPerson: updatedForm.contactPersonName || existingProfile.mainContactPerson,
+        contactPhone: updatedForm.contactPersonPhone || existingProfile.contactPhone,
+      });
+    } else {
+      addClientProfile({
+        id: generateId(),
+        name: updatedForm.clientName,
+        address: updatedForm.address || '',
+        mainContactPerson: updatedForm.contactPersonName || '',
+        contactPhone: updatedForm.contactPersonPhone || '',
+        startDate: updatedForm.phase1.timelineStartDate || new Date().toISOString().split('T')[0],
+        createdAt: new Date().toISOString(),
+      });
+    }
+
+    // 2. Sync ClientContact
+    if (updatedForm.contactPersonName) {
+      const clientContacts = useAppStore.getState().clientContacts;
+      const existingContact = clientContacts.find(
+        c => c.clientName.trim().toLowerCase() === updatedForm.clientName.trim().toLowerCase() &&
+             c.name.trim().toLowerCase() === updatedForm.contactPersonName.trim().toLowerCase()
+      );
+      if (existingContact) {
+        updateClientContact(existingContact.id, {
+          phone: updatedForm.contactPersonPhone || existingContact.phone,
+          position: updatedForm.contactPersonPosition || existingContact.position,
+        });
+      } else {
+        addClientContact({
+          id: generateId(),
+          name: updatedForm.contactPersonName,
+          phone: updatedForm.contactPersonPhone || '',
+          position: updatedForm.contactPersonPosition || '',
+          clientName: updatedForm.clientName,
+          isActive: true,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+      }
+    }
+  }, [clientProfiles, updateClientProfile, addClientProfile, updateClientContact, addClientContact]);
+
   // ─── Save ──────────────────────────────────────────────────────────────────
   const executeSave = useCallback(() => {
     // Ensure we have a clean copy of the form to save
     const dataToSave = { ...form, updatedAt: new Date().toISOString() };
     
+    // Sync client profile and contact details
+    syncOnboardingToAllStores(dataToSave);
+
     if (isNew) {
       addPendingSite(dataToSave);
       navigate(`/sites/onboarding/${form.id}`, { replace: true });
@@ -329,6 +389,19 @@ export function SiteOnboarding() {
             updates.vat = newVat;
           }
 
+          if (form.address !== matchingSite.address) {
+            updates.address = form.address || '';
+          }
+          if (form.contactPersonName !== matchingSite.mainContactPerson) {
+            updates.mainContactPerson = form.contactPersonName || '';
+          }
+          if (form.contactPersonPhone !== matchingSite.contactPhone) {
+            updates.contactPhone = form.contactPersonPhone || '';
+          }
+          if (form.contactPersonPosition !== matchingSite.position) {
+            updates.position = form.contactPersonPosition || '';
+          }
+
           if (Object.keys(updates).length > 0) {
             updateSite(matchingSite.id, updates);
           }
@@ -337,7 +410,7 @@ export function SiteOnboarding() {
       setInitialForm(form);
       toast.success('Progress saved.');
     }
-  }, [form, isNew, addPendingSite, updatePendingSite, updateSite, navigate]);
+  }, [form, isNew, addPendingSite, updatePendingSite, updateSite, navigate, syncOnboardingToAllStores]);
 
   const handleSave = useCallback(() => {
     if (!form.clientName.trim() || !form.siteName.trim()) {
@@ -380,13 +453,19 @@ export function SiteOnboarding() {
       status: 'Active',
       vat: (() => { const ts = (form.phase4.clientTaxStatus as string) || ''; return ts === 'Add' ? 'Add' : ts === 'Yes' ? 'Yes' : 'No'; })() as 'Yes' | 'No' | 'Add',
       startDate: form.phase1.timelineStartDate || new Date().toISOString().split('T')[0],
-      endDate: ''
+      endDate: '',
+      address: form.address || '',
+      mainContactPerson: form.contactPersonName || '',
+      contactPhone: form.contactPersonPhone || '',
+      position: form.contactPersonPosition || ''
     });
     const activated = { ...form, status: 'Active' as const, updatedAt: new Date().toISOString() };
     updatePendingSite(form.id, activated);
+    // Sync contact and client profile as well
+    syncOnboardingToAllStores(activated);
     setForm(activated);
     setInitialForm(activated);
-    toast.success(`ðŸŽ‰ ${form.siteName} is now an Active Site!`);
+    toast.success(`🎉 ${form.siteName} is now an Active Site!`);
     navigate('/sites');
   };
 
@@ -470,52 +549,134 @@ export function SiteOnboarding() {
           
           {!isInfoCollapsed && (
             <div className="mt-5">
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
-            <div className="flex items-start gap-3">
-              <div className="p-2 rounded-lg bg-indigo-50 flex-shrink-0">
-                <User className="h-4 w-4 text-indigo-600" />
-              </div>
-              <div className="space-y-0.5">
-                <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Client</p>
-                {form.clientName ? (
-                  <button
-                    onClick={() => navigate(`/sites?client=${encodeURIComponent(form.clientName)}`)}
-                    className="text-sm font-medium text-indigo-600 hover:text-indigo-800 hover:underline underline-offset-2 transition-colors text-left"
-                  >
-                    {form.clientName}
-                  </button>
-                ) : (
-                  <span className="text-slate-300 font-normal italic text-sm">—</span>
-                )}
-              </div>
-            </div>
-            <div className="flex items-start gap-3">
-              <div className="p-2 rounded-lg bg-emerald-50 flex-shrink-0">
-                <MapPin className="h-4 w-4 text-emerald-600" />
-              </div>
-              <InfoField label="Site Name" value={form.siteName} />
-            </div>
-            <div className="flex items-start gap-3">
-              <div className="p-2 rounded-lg bg-amber-50 flex-shrink-0">
-                <Calendar className="h-4 w-4 text-amber-600" />
-              </div>
-              <InfoField label="Planned Start" value={form.phase1.timelineStartDate} />
-            </div>
-            <div className="flex items-start gap-3">
-              <div className="p-2 rounded-lg bg-slate-50 flex-shrink-0">
-                <Building2 className="h-4 w-4 text-slate-600" />
-              </div>
-              <InfoField label="Client Tax Status" value={form.phase4.clientTaxStatus} />
-            </div>
-          </div>
-          {/* Address + Contact row */}
-          {(form.address || form.contactPersonName || form.contactPersonPhone) && (
-            <div className="mt-4 pt-4 border-t border-slate-100 grid grid-cols-2 sm:grid-cols-3 gap-6">
-              {form.address && <InfoField label="Address" value={form.address} />}
-              {form.contactPersonName && <InfoField label="Contact Person" value={form.contactPersonName} />}
-              {form.contactPersonPhone && <InfoField label="Contact Phone" value={form.contactPersonPhone} />}
-            </div>
-          )}
+              {isEditingHeader ? (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Client Name</label>
+                      <Input
+                        list="clientList"
+                        value={form.clientName}
+                        onChange={e => upd({ clientName: e.target.value })}
+                        disabled={headerLocked}
+                      />
+                      <datalist id="clientList">{clients.map(c => <option key={c} value={c} />)}</datalist>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Site Name</label>
+                      <Input
+                        value={form.siteName}
+                        onChange={e => upd({ siteName: e.target.value })}
+                        disabled={headerLocked}
+                      />
+                    </div>
+                    <div className="space-y-1 col-span-2">
+                      <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Site / Client Address</label>
+                      <Input
+                        placeholder="e.g. 12 Allen Avenue, Ikeja, Lagos"
+                        value={form.address || ''}
+                        onChange={e => upd({ address: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Contact Person</label>
+                      <Input
+                        placeholder="e.g. Mr. Adeyemi"
+                        value={form.contactPersonName || ''}
+                        onChange={e => upd({ contactPersonName: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Contact Phone</label>
+                      <Input
+                        placeholder="e.g. 08012345678"
+                        value={form.contactPersonPhone || ''}
+                        onChange={e => {
+                          const digits = e.target.value.replace(/[^0-9+\-\s]/g, '');
+                          upd({ contactPersonPhone: digits });
+                        }}
+                      />
+                    </div>
+                    <div className="space-y-1 col-span-1 sm:col-span-2">
+                      <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Contact Position</label>
+                      <Input
+                        placeholder="e.g. Project Manager"
+                        value={form.contactPersonPosition || ''}
+                        onChange={e => upd({ contactPersonPosition: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+                    <Button variant="outline" size="sm" onClick={() => { setForm(initialForm); setIsEditingHeader(false); }} className="h-8 text-xs font-semibold">
+                      Cancel
+                    </Button>
+                    <Button size="sm" onClick={() => { executeSave(); setIsEditingHeader(false); }} className="h-8 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-bold">
+                      Save Details
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="flex justify-end mb-4">
+                    <Button
+                      onClick={() => setIsEditingHeader(true)}
+                      size="sm"
+                      variant="outline"
+                      className="text-xs gap-1.5 h-8 border-slate-200 text-slate-700 hover:bg-slate-50 font-bold"
+                    >
+                      <Edit2 className="w-3.5 h-3.5 text-indigo-650" />
+                      <span>Edit Info</span>
+                    </Button>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
+                    <div className="flex items-start gap-3">
+                      <div className="p-2 rounded-lg bg-indigo-50 flex-shrink-0">
+                        <User className="h-4 w-4 text-indigo-600" />
+                      </div>
+                      <div className="space-y-0.5">
+                        <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Client</p>
+                        {form.clientName ? (
+                          <button
+                            onClick={() => navigate(`/sites?client=${encodeURIComponent(form.clientName)}`)}
+                            className="text-sm font-medium text-indigo-600 hover:text-indigo-800 hover:underline underline-offset-2 transition-colors text-left bg-transparent border-0 p-0 cursor-pointer"
+                          >
+                            {form.clientName}
+                          </button>
+                        ) : (
+                          <span className="text-slate-300 font-normal italic text-sm">—</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <div className="p-2 rounded-lg bg-emerald-50 flex-shrink-0">
+                        <MapPin className="h-4 w-4 text-emerald-600" />
+                      </div>
+                      <InfoField label="Site Name" value={form.siteName} />
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <div className="p-2 rounded-lg bg-amber-50 flex-shrink-0">
+                        <Calendar className="h-4 w-4 text-amber-600" />
+                      </div>
+                      <InfoField label="Planned Start" value={form.phase1.timelineStartDate} />
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <div className="p-2 rounded-lg bg-slate-50 flex-shrink-0">
+                        <Building2 className="h-4 w-4 text-slate-600" />
+                      </div>
+                      <InfoField label="Client Tax Status" value={form.phase4.clientTaxStatus} />
+                    </div>
+                  </div>
+                  {/* Address + Contact row */}
+                  {(form.address || form.contactPersonName || form.contactPersonPhone || form.contactPersonPosition) && (
+                    <div className="mt-4 pt-4 border-t border-slate-100 grid grid-cols-2 sm:grid-cols-4 gap-6">
+                      {form.address && <div className="col-span-1 sm:col-span-2"><InfoField label="Address" value={form.address} /></div>}
+                      {form.contactPersonName && <InfoField label="Contact Person" value={form.contactPersonName} />}
+                      {form.contactPersonPhone && <InfoField label="Contact Phone" value={form.contactPersonPhone} />}
+                      {form.contactPersonPosition && <InfoField label="Contact Position" value={form.contactPersonPosition} />}
+                    </div>
+                  )}
+                </>
+              )}
           {/* Phase progress bar */}
           <div className="mt-5 pt-4 border-t border-slate-100">
             <div className="flex items-center justify-between mb-2">
@@ -616,6 +777,14 @@ export function SiteOnboarding() {
                 }}
               />
               <p className="text-xs text-slate-400">Numbers only</p>
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-slate-700">Contact Position</label>
+              <Input
+                placeholder="e.g. Project Manager"
+                value={form.contactPersonPosition || ''}
+                onChange={e => upd({ contactPersonPosition: e.target.value })}
+              />
             </div>
           </div>
           <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">

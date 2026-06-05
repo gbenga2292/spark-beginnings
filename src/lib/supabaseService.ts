@@ -921,7 +921,7 @@ export async function fetchAllAppData(privs?: any) {
     supabase.from('sites').select('*').order('created_at'),
     supabase.from('clients').select('*').order('name'),
     canView('employees') ? supabase.from('employees').select('*').order('surname') : Promise.resolve({ data: [] }),
-    canView('attendance') ? supabase.from('attendance_records').select('*').order('date', { ascending: false }).limit(10000) : Promise.resolve({ data: [] }),
+    canView('attendance') ? supabase.from('attendance_records').select('*').gte('date', `${new Date().getFullYear()}-01-01`).lte('date', `${new Date().getFullYear()}-12-31`).order('date', { ascending: false }) : Promise.resolve({ data: [] }),
     canView('billing') ? supabase.from('invoices').select('*').order('date', { ascending: false }) : Promise.resolve({ data: [] }),
     canView('billing') ? supabase.from('pending_invoices').select('*').order('created_at') : Promise.resolve({ data: [] }),
     canView('salaryLoans') ? supabase.from('salary_advances').select('*').order('request_date', { ascending: false }) : Promise.resolve({ data: [] }),
@@ -1014,6 +1014,17 @@ export async function fetchAllAppData(privs?: any) {
     superAdminSignupEnabled: settings?.super_admin_signup_enabled ?? true,
     settingsId: settings?.id,
   };
+}
+
+export async function fetchAttendanceByYear(year: number): Promise<AttendanceRecord[]> {
+  const { data, error } = await supabase
+    .from('attendance_records')
+    .select('*')
+    .gte('date', `${year}-01-01`)
+    .lte('date', `${year}-12-31`)
+    .order('date', { ascending: false });
+  if (error) throw error;
+  return (data || []).map(dbToAttendance);
 }
 
 export async function fetchAllUsers(privs?: any) {

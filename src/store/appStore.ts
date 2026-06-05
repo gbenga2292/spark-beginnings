@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { db } from '@/src/lib/supabaseService';
+import { db, fetchAttendanceByYear } from '@/src/lib/supabaseService';
 import { SiteQuestionnaire } from '@/src/types/SiteQuestionnaire';
 import { Vehicle, VehicleTripLeg, VehicleDocumentType, ConsumableUsageLog } from '@/src/types/operations';
 import { InterviewCandidate } from '@/src/types/interviews';
@@ -663,6 +663,9 @@ interface AppState {
   clientProfiles: ClientProfile[];
   employees: Employee[];
   attendanceRecords: AttendanceRecord[];
+  loadedAttendanceYears: number[];
+  attendanceYearLoading: boolean;
+  fetchAttendanceYearIfNeeded: (year: number) => Promise<void>;
   disciplinaryRecords: DisciplinaryRecord[];
   evaluations: EvaluationRecord[];
   positions: Position[];
@@ -915,6 +918,8 @@ export const useAppStore = create<AppState>()(
       departments: [],
       employees: [],
       attendanceRecords: [],
+      loadedAttendanceYears: [new Date().getFullYear()],
+      attendanceYearLoading: false,
       pendingInvoices: [],
       invoices: [],
       salaryAdvances: [],
@@ -1083,6 +1088,27 @@ export const useAppStore = create<AppState>()(
       updateAttendanceRecord: async (id, record) => { set((s) => ({ attendanceRecords: s.attendanceRecords.map(r => r.id === id ? { ...r, ...record } : r) })); await db.updateAttendanceRecord(id, record); },
       removeAttendanceRecordsByDate: async (date) => { set((s) => ({ attendanceRecords: s.attendanceRecords.filter(r => r.date !== date) })); await db.deleteAttendanceByDate(date); },
       deleteAttendanceRecords: async (ids) => { set((s) => ({ attendanceRecords: s.attendanceRecords.filter(r => !ids.includes(r.id)) })); await db.deleteAttendanceByIds(ids); },
+      fetchAttendanceYearIfNeeded: async (year) => {
+        if (!year || isNaN(year)) return;
+        if (get().loadedAttendanceYears.includes(year)) return;
+
+        set({ attendanceYearLoading: true });
+        try {
+          const records = await fetchAttendanceByYear(year);
+          set((s) => {
+            const newKeys = new Set(records.map(r => `${r.staffId}-${r.date}`));
+            const filtered = s.attendanceRecords.filter(r => !newKeys.has(`${r.staffId}-${r.date}`));
+            return {
+              attendanceRecords: [...filtered, ...records],
+              loadedAttendanceYears: [...s.loadedAttendanceYears, year]
+            };
+          });
+        } catch (error) {
+          console.error(`Failed to fetch attendance for year ${year}:`, error);
+        } finally {
+          set({ attendanceYearLoading: false });
+        }
+      },
 
       // Positions & Departments
       addPosition: (position) => { set((s) => ({ positions: [...s.positions, position] })); db.insertPosition(position); },

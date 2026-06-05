@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useUserStore } from '../store/userStore';
-import { Billing } from './Billing';
-import { Payments } from './Payments';
-import { VatPayments } from './VatPayments';
+import { lazy, Suspense } from 'react';
+
+const Billing = lazy(() => import('./Billing').then(m => ({ default: m.Billing })));
+const Payments = lazy(() => import('./Payments').then(m => ({ default: m.Payments })));
+const VatPayments = lazy(() => import('./VatPayments').then(m => ({ default: m.VatPayments })));
 import { useTheme } from '../hooks/useTheme';
 import { cn } from '../lib/utils';
 import { ReceiptText, Landmark, Search } from 'lucide-react';
@@ -118,7 +120,9 @@ export function ClientAccounts() {
            {fullPageContent}
         </div>
         <div style={{ display: fullPageContent ? 'none' : 'block' }} className="h-full">
-           {ActiveComponent ? React.cloneElement(ActiveComponent as React.ReactElement, { searchTerm, setFullPageContent } as any) : null}
+           <Suspense fallback={<div className="flex items-center justify-center h-full p-8 text-slate-500">Loading...</div>}>
+             {ActiveComponent ? React.cloneElement(ActiveComponent as React.ReactElement, { searchTerm, setFullPageContent } as any) : null}
+           </Suspense>
         </div>
       </div>
     </div>

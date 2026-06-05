@@ -142,12 +142,18 @@ export function Client360() {
   // Extract unique client names, excluding internal 'DCEL'
   const allClients = useMemo(() => {
     const names = new Set<string>();
+    // Include clients from active sites
     sites.forEach(s => { 
       const name = s.client?.trim();
       if (name && name.toUpperCase() !== 'DCEL') names.add(name); 
     });
+    // Also include clients who only exist in onboarding (no site record yet)
+    pendingSites.forEach(ps => {
+      const name = ps.clientName?.trim();
+      if (name && name.toUpperCase() !== 'DCEL') names.add(name);
+    });
     return Array.from(names).sort();
-  }, [sites]);
+  }, [sites, pendingSites]);
 
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -216,7 +222,7 @@ export function Client360() {
   }, [pendingSites, selectedClient]);
 
   const [activitySubTab, setActivitySubTab] = useState<'history' | 'onboarding'>('history');
-  const [sitesSubTab, setSitesSubTab] = useState<'portfolio' | 'onboarding'>('portfolio');
+  const [sitesSubTab, setSitesSubTab] = useState<'portfolio' | 'onboarding' | 'closed'>('portfolio');
   const [filterMonth, setFilterMonth] = useState<string>('all');
   const [filterYear, setFilterYear] = useState<string>('all');
   const [isChatCollapsed, setIsChatCollapsed] = useState(true);
@@ -1894,8 +1900,9 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                   {/* Secondary Tab Switcher */}
                   <div className="flex border-b border-slate-200 dark:border-slate-800 mb-2 overflow-x-auto style-scroll pb-px gap-1">
                     {[
-                      { id: 'portfolio', label: 'Active Sites', count: clientData.clientSites.length, color: 'text-indigo-650 bg-indigo-50 dark:bg-indigo-950/20 dark:text-indigo-400', icon: MapPin },
-                      { id: 'onboarding', label: 'Onboarding Progress', count: clientPendingSites.length, color: 'text-amber-700 bg-amber-50 dark:bg-amber-950/20 dark:text-amber-400', icon: Clock }
+                      { id: 'portfolio', label: 'Active', count: clientData.clientSites.filter((s: any) => s.status === 'Active').length, color: 'text-indigo-650 bg-indigo-50 dark:bg-indigo-950/20 dark:text-indigo-400', icon: MapPin },
+                      { id: 'onboarding', label: 'Onboarding', count: clientPendingSites.length, color: 'text-amber-700 bg-amber-50 dark:bg-amber-950/20 dark:text-amber-400', icon: Clock },
+                      { id: 'closed', label: 'Closed', count: clientData.clientSites.filter((s: any) => s.status !== 'Active').length, color: 'text-slate-600 bg-slate-100 dark:bg-slate-800 dark:text-slate-300', icon: CheckCircle2 }
                     ].map(subTab => {
                       const isActive = sitesSubTab === subTab.id;
                       return (
@@ -2134,6 +2141,91 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                       )}
                     </div>
                   )}
+
+                  {/* Sub-tab: Closed Sites */}
+                  {sitesSubTab === 'closed' && (() => {
+                    const closedSites = clientData.clientSites.filter((s: any) => s.status !== 'Active');
+                    return (
+                      <div className={cn("p-6 rounded-2xl border shadow-sm flex flex-col", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
+                        <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                          <CheckCircle2 className="w-5 h-5 text-slate-400"/> Closed Sites ({closedSites.length})
+                        </h3>
+                        <div className="space-y-3 flex-1 overflow-y-auto max-h-[400px] style-scroll pr-2">
+                          {closedSites.length > 0 ? closedSites.map((site: any) => (
+                            <div key={site.id}
+                              className={cn('p-3 rounded-lg border cursor-pointer transition-all hover:border-slate-400 hover:shadow-md group relative', isDark ? 'border-slate-800 bg-slate-800/50 hover:bg-slate-800' : 'border-slate-100 bg-slate-50 hover:bg-white')}
+                              onClick={() => setSelectedSite(site)}
+                            >
+                              <div className="flex justify-between items-center">
+                                <div className="flex items-center gap-2">
+                                  <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                  <span className="font-semibold text-sm text-slate-600 dark:text-slate-300">{site.name}</span>
+                                </div>
+                                <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                  <Badge className="bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300">{site.status || 'Ended'}</Badge>
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button
+                                        variant="ghost" size="icon"
+                                        className="h-8 w-8 text-slate-400 hover:text-slate-600 hover:bg-slate-200/50 dark:hover:bg-slate-700/50 rounded-lg flex items-center justify-center shrink-0 border-0 bg-transparent cursor-pointer"
+                                      >
+                                        <MoreVertical className="h-4 w-4" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end" className="w-[180px]">
+                                      <DropdownMenuItem
+                                        onClick={() => setNarrativeSite({ site, q: pendingSites.find(ps => ps.siteName === site.name && ps.clientName === site.client) || null })}
+                                        className="gap-2"
+                                      >
+                                        <FileText className="h-4 w-4 text-slate-400" />
+                                        <span>Site Summary</span>
+                                      </DropdownMenuItem>
+                                      {canViewComm && (
+                                        <DropdownMenuItem
+                                          onClick={() => navigate(`/sites/conversations/${site.id}`)}
+                                          className="gap-2"
+                                        >
+                                          <MessageSquare className="h-4 w-4 text-slate-400" />
+                                          <span>Site Conversations</span>
+                                        </DropdownMenuItem>
+                                      )}
+                                      <DropdownMenuItem
+                                        onClick={() => navigate(`/sites/diary/${site.id}`)}
+                                        className="gap-2 text-emerald-600 focus:text-emerald-700"
+                                      >
+                                        <BookOpen className="h-4 w-4" />
+                                        <span>Site Diary</span>
+                                      </DropdownMenuItem>
+                                      {canDeleteSite && (
+                                        <>
+                                          <DropdownMenuSeparator />
+                                          <DropdownMenuItem
+                                            onClick={() => handleDeleteSite(site.id)}
+                                            className="gap-2 text-red-600 focus:text-red-600 focus:bg-red-50"
+                                          >
+                                            <Trash2 className="h-4 w-4" />
+                                            <span>Delete</span>
+                                          </DropdownMenuItem>
+                                        </>
+                                      )}
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </div>
+                              </div>
+                              {site.startDate && <p className="text-xs text-slate-400 mt-1.5 ml-5.5">Since {new Date(site.startDate).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}</p>}
+                              {site.endDate && <p className="text-xs text-rose-400 mt-0.5 ml-5.5">Ended {new Date(site.endDate).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}</p>}
+                            </div>
+                          )) : (
+                            <div className="py-12 flex flex-col items-center justify-center text-center text-slate-500">
+                              <CheckCircle2 className="w-12 h-12 text-slate-300 dark:text-slate-700 mb-3" />
+                              <p className="font-semibold text-sm">No Closed Sites</p>
+                              <p className="text-xs text-slate-400 mt-1">All sites for this client are currently active.</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
 

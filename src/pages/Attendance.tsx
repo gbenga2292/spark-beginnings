@@ -242,6 +242,7 @@ export function Attendance() {
   const removeAttendanceRecordsByDate = useAppStore((state) => state.removeAttendanceRecordsByDate);
   const deleteAttendanceRecords = useAppStore((state) => state.deleteAttendanceRecords);
   const leaves = useAppStore((state) => state.leaves);
+  const fetchAttendanceYearIfNeeded = useAppStore((state) => state.fetchAttendanceYearIfNeeded);
 
   const publicHolidaysStore = useAppStore((state) => state.publicHolidays);
   const monthValues = useAppStore((state) => state.monthValues);
@@ -272,6 +273,15 @@ export function Attendance() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [mobileCalendarOpen, setMobileCalendarOpen] = useState(false);
   const [desktopCalendarOpen, setDesktopCalendarOpen] = useState(false);
+
+  useEffect(() => {
+    if (registerDate) {
+      const year = parseInt(registerDate.split('-')[0], 10);
+      if (!isNaN(year)) {
+        fetchAttendanceYearIfNeeded(year);
+      }
+    }
+  }, [registerDate, fetchAttendanceYearIfNeeded]);
 
   const [dbPage, setDbPage] = useState(1);
   const dbPageSize = 100;

@@ -71,6 +71,7 @@ export function Payroll() {
   const payeTaxVariables = useAppStore((state) => state.payeTaxVariables);
   const monthValues = useAppStore((state) => state.monthValues);
   const attendanceRecords = useAppStore((state) => state.attendanceRecords);
+  const fetchAttendanceYearIfNeeded = useAppStore((state) => state.fetchAttendanceYearIfNeeded);
   const publicHolidays = useAppStore((state) => state.publicHolidays);
   const departments = useAppStore((state) => state.departments);
 
@@ -79,6 +80,10 @@ export function Payroll() {
     return defaultMonthKey;
   });
   const [selectedYear, setSelectedYear] = useState(currentYear);
+
+  useEffect(() => {
+    fetchAttendanceYearIfNeeded(selectedYear);
+  }, [selectedYear, fetchAttendanceYearIfNeeded]);
   const [activeTab, setActiveTab] = useState('processing');
   const [isProcessing, setIsProcessing] = useState(false);
   const [printDialogOpen, setPrintDialogOpen] = useState(false);

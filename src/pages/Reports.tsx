@@ -1,11 +1,13 @@
 import { formatDisplayDate } from '@/src/lib/dateUtils';
 import React, { useState, useMemo } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { computeWorkDays } from '@/src/lib/workdays';
 import { Card, CardContent, CardHeader, CardTitle } from '@/src/components/ui/card';
 import { Button } from '@/src/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
 import { Download, FileSpreadsheet, FileText, PieChart as PieChartIcon, Users, Building2, Activity, CheckCircle2, CalendarClock, LayoutGrid, BarChart2, Flame, Eye, Save, AlertCircle, XCircle, Maximize2, Minimize2 } from 'lucide-react';
 import { useAppStore, DisciplinaryRecord } from '@/src/store/appStore';
+import { useShallow } from 'zustand/react/shallow';
 import { toast } from '@/src/components/ui/toast';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, LabelList } from 'recharts';
 import jsPDF from 'jspdf';
@@ -30,19 +32,20 @@ const getBase64ImageFromUrl = async (imageUrl: string) => {
 
 export function Reports() {
   const priv = usePriv('reports');
-  const departments = useAppStore((state) => state.departments);
+  const departments = useAppStore(useShallow((state) => state.departments));
   const nonEmployeeDeptNames = useMemo(() => new Set(departments.filter(d => d.staffType === 'NON-EMPLOYEE').map(d => d.name)), [departments]);
 
-  const employees = useAppStore((state) => state.employees).filter(e => 
+  const employees = useAppStore(useShallow((state) => state.employees.filter(e => 
     (e.status === 'Active' || e.status === 'On Leave') && 
     e.staffType?.toUpperCase() !== 'NON-EMPLOYEE' && e.staffType?.toUpperCase() !== 'NON EMPLOYEE' &&
     (!e.department || !nonEmployeeDeptNames.has(e.department))
-  );
-  const sites = filterOperationalSites(useAppStore((state) => state.sites));
-  const attendanceRecords = useAppStore((state) => state.attendanceRecords);
-  const leaves = useAppStore((state) => state.leaves);
-  const publicHolidays = useAppStore((state) => state.publicHolidays);
-  const disciplinaryRecords = useAppStore((state) => state.disciplinaryRecords);
+  )));
+  const sites = filterOperationalSites(useAppStore(useShallow((state) => state.sites)));
+  const attendanceRecords = useAppStore(useShallow((state) => state.attendanceRecords));
+  const leaves = useAppStore(useShallow((state) => state.leaves));
+  const publicHolidays = useAppStore(useShallow((state) => state.publicHolidays));
+  const disciplinaryRecords = useAppStore(useShallow((state) => state.disciplinaryRecords));
+  const fetchAttendanceYearIfNeeded = useAppStore((state) => state.fetchAttendanceYearIfNeeded);
   const [selectedFields, setSelectedFields] = useState<string[]>([]);
   const [exportMessage, setExportMessage] = useState<string | null>(null);
   const [activeEmpBuilderTab, setActiveEmpBuilderTab] = useState<string>("Identity & Profile");
@@ -77,6 +80,34 @@ export function Reports() {
   const [otYear, setOtYear] = useState<number>(currentYear);
   const [otChartView, setOtChartView] = useState<'table' | 'heatmap' | 'bar'>('table');
   const [fullScreenTable, setFullScreenTable] = useState<'site-work' | 'monthly-summary' | 'overtime-detail' | null>(null);
+
+  const siteGanttParentRef = React.useRef<HTMLDivElement>(null);
+  const siteGanttRowVirtualizer = useVirtualizer({
+    count: operationsStaff.length,
+    getScrollElement: () => siteGanttParentRef.current,
+    estimateSize: () => 41,
+    overscan: 5,
+  });
+
+  const heatmapParentRef = React.useRef<HTMLDivElement>(null);
+  const heatmapRowVirtualizer = useVirtualizer({
+    count: operationsInternalStaff.length,
+    getScrollElement: () => heatmapParentRef.current,
+    estimateSize: () => 41,
+    overscan: 5,
+  });
+
+  React.useEffect(() => {
+    fetchAttendanceYearIfNeeded(selectedYear);
+  }, [selectedYear, fetchAttendanceYearIfNeeded]);
+
+  React.useEffect(() => {
+    fetchAttendanceYearIfNeeded(summaryYear);
+  }, [summaryYear, fetchAttendanceYearIfNeeded]);
+
+  React.useEffect(() => {
+    fetchAttendanceYearIfNeeded(otYear);
+  }, [otYear, fetchAttendanceYearIfNeeded]);
 
   const toggleFullScreen = async (tableName: 'site-work' | 'monthly-summary' | 'overtime-detail') => {
     if (fullScreenTable === tableName) {
@@ -169,11 +200,11 @@ export function Reports() {
       days.forEach(d => { grid[emp.id][d] = { site: '', isAbsent: false, isNight: false }; });
     });
 
+    const prefix = `${selectedYear}-${String(selectedMonth).padStart(2,'0')}-`;
     attendanceRecords.forEach(rec => {
-      const recDate = new Date(rec.date);
-      if (recDate.getMonth() + 1 !== selectedMonth || recDate.getFullYear() !== selectedYear) return;
+      if (!rec.date || !rec.date.startsWith(prefix)) return;
       if (!grid[rec.staffId]) return;
-      const day = recDate.getDate();
+      const day = parseInt(rec.date.substring(8, 10), 10);
       const isAbsent = rec.day?.toLowerCase() !== 'yes';
       const isNight = !isAbsent && rec.night?.toLowerCase() === 'yes';
       const site = isAbsent ? 'Absent' : (rec.daySite || rec.nightSite || '');
@@ -315,9 +346,9 @@ export function Reports() {
   const operationsStaffSiteData = useMemo(() => {
     const daysInMonth = new Date(selectedYear, selectedMonth, 0).getDate();
 
+    const prefix = `${selectedYear}-${String(selectedMonth).padStart(2,'0')}-`;
     const filteredRecords = attendanceRecords.filter(rec => {
-      const recDate = new Date(rec.date);
-      return recDate.getMonth() + 1 === selectedMonth && recDate.getFullYear() === selectedYear;
+      return rec.date && rec.date.startsWith(prefix);
     });
 
     const siteCounts: Record<string, Record<string, number>> = {};
@@ -430,9 +461,9 @@ export function Reports() {
     });
 
     // Filter attendance records for the selected year
+    const prefix = `${summaryYear}-`;
     const yearRecords = attendanceRecords.filter(rec => {
-      const recDate = new Date(rec.date);
-      return recDate.getFullYear() === summaryYear;
+      return rec.date && rec.date.startsWith(prefix);
     });
 
     // Process actual records first
@@ -596,9 +627,9 @@ export function Reports() {
       }
     });
 
+    const prefix = `${otYear}-`;
     const yearRecords = attendanceRecords.filter(rec => {
-      const recDate = new Date(rec.date);
-      return recDate.getFullYear() === otYear;
+      return rec.date && rec.date.startsWith(prefix);
     });
 
     yearRecords.forEach(rec => {
@@ -1593,7 +1624,7 @@ export function Reports() {
 
               {/* Chart grid */}
               <div className={`overflow-x-auto ${fullScreenTable === 'site-work' ? 'flex-1' : ''}`}>
-                <div className="overflow-y-auto" style={{ maxHeight: fullScreenTable === 'site-work' ? 'none' : '450px' }}>
+                <div ref={siteGanttParentRef} className="overflow-y-auto" style={{ maxHeight: fullScreenTable === 'site-work' ? 'calc(100vh - 200px)' : '450px' }}>
                   <div style={{ minWidth: `${Math.max(700, 160 + ganttData.days.length * 34)}px` }}>
                     {/* Header row: day numbers */}
                     <div className="flex sticky top-0 z-20 bg-slate-800">
@@ -1630,19 +1661,36 @@ export function Reports() {
                     {operationsStaff.length === 0 ? (
                       <div className="text-center py-10 text-slate-400 text-sm">No staff found for the selected filter.</div>
                     ) : (
-                      operationsStaff.map((emp, idx) => {
-                        const empGrid = ganttData.grid[emp.id] || {};
-                        const totalAssigned = Object.values(empGrid).filter(v => v.site && v.site !== 'Absent').length;
-                        const totalAbsent  = Object.values(empGrid).filter(v => v.isAbsent).length;
+                      <div
+                        style={{
+                          height: `${siteGanttRowVirtualizer.getTotalSize()}px`,
+                          width: '100%',
+                          position: 'relative',
+                        }}
+                      >
+                        {siteGanttRowVirtualizer.getVirtualItems().map((virtualRow) => {
+                          const emp = operationsStaff[virtualRow.index];
+                          const idx = virtualRow.index;
+                          const empGrid = ganttData.grid[emp.id] || {};
+                          const totalAssigned = Object.values(empGrid).filter(v => v.site && v.site !== 'Absent').length;
+                          const totalAbsent  = Object.values(empGrid).filter(v => v.isAbsent).length;
 
-                        return (
-                          <div
-                            key={emp.id}
-                            className={`flex border-b border-slate-100 last:border-0 hover:bg-indigo-50/30 transition-colors ${
-                              idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'
-                            }`}
-                          >
-                            {/* Employee name */}
+                          return (
+                            <div
+                              key={emp.id}
+                              style={{
+                                position: 'absolute',
+                                top: 0,
+                                left: 0,
+                                width: '100%',
+                                height: `${virtualRow.size}px`,
+                                transform: `translateY(${virtualRow.start}px)`,
+                              }}
+                              className={`flex border-b border-slate-100 last:border-0 hover:bg-indigo-50/30 transition-colors ${
+                                idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'
+                              }`}
+                            >
+                              {/* Employee name */}
                             <div className="flex-shrink-0 w-40 px-3 py-2 border-r border-slate-200 flex flex-col justify-center">
                               <div className="text-xs font-semibold text-slate-800 leading-tight truncate">{emp.surname} {emp.firstname}</div>
                               <div className="text-[10px] text-slate-400 leading-tight truncate">{emp.position}</div>
@@ -1690,7 +1738,8 @@ export function Reports() {
                             </div>
                           </div>
                         );
-                      })
+                      })}
+                      </div>
                     )}
                   </div>
                 </div>
@@ -1960,7 +2009,7 @@ export function Reports() {
                   </div>
 
                   <div className={`overflow-x-auto ${fullScreenTable === 'monthly-summary' ? 'flex-1' : ''}`}>
-                    <div className="overflow-y-auto" style={{ maxHeight: fullScreenTable === 'monthly-summary' ? 'none' : '480px' }}>
+                    <div ref={heatmapParentRef} className="overflow-y-auto" style={{ maxHeight: fullScreenTable === 'monthly-summary' ? 'calc(100vh - 200px)' : '480px' }}>
                       <div style={{ minWidth: '720px' }}>
                         {/* Header */}
                         <div className="flex sticky top-0 z-20 bg-slate-800">
@@ -1981,17 +2030,34 @@ export function Reports() {
                         {operationsInternalStaff.length === 0 ? (
                           <div className="text-center py-10 text-slate-400 text-sm">No staff found for the selected filter.</div>
                         ) : (
-                          operationsInternalStaff.map((emp, idx) => {
-                            const data = monthlyWorkSummary[emp.id];
-                            const totals = staffTotals[emp.id];
-                            return (
-                              <div
-                                key={emp.id}
-                                className={`flex border-b border-slate-100 last:border-0 ${
-                                  idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/30'
-                                }`}
-                              >
-                                {/* Name */}
+                          <div
+                            style={{
+                              height: `${heatmapRowVirtualizer.getTotalSize()}px`,
+                              width: '100%',
+                              position: 'relative',
+                            }}
+                          >
+                            {heatmapRowVirtualizer.getVirtualItems().map((virtualRow) => {
+                              const emp = operationsInternalStaff[virtualRow.index];
+                              const idx = virtualRow.index;
+                              const data = monthlyWorkSummary[emp.id];
+                              const totals = staffTotals[emp.id];
+                              return (
+                                <div
+                                  key={emp.id}
+                                  style={{
+                                    position: 'absolute',
+                                    top: 0,
+                                    left: 0,
+                                    width: '100%',
+                                    height: `${virtualRow.size}px`,
+                                    transform: `translateY(${virtualRow.start}px)`,
+                                  }}
+                                  className={`flex border-b border-slate-100 last:border-0 ${
+                                    idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/30'
+                                  }`}
+                                >
+                                  {/* Name */}
                                 <div className={`flex-shrink-0 w-44 px-3 py-2 border-r border-slate-200 flex flex-col justify-center ${
                                   idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'
                                 }`}>
@@ -2047,10 +2113,11 @@ export function Reports() {
                                   {(totals?.totalDaysAbsent || 0) > 0 && (
                                     <div className="text-[10px] text-red-500 font-semibold">{totals?.totalDaysAbsent} absent</div>
                                   )}
+                                  </div>
                                 </div>
-                              </div>
-                            );
-                          })
+                              );
+                            })}
+                          </div>
                         )}
 
                         {/* Grand total row */}
