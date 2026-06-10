@@ -162,6 +162,16 @@ function PersonalTasksView() {
         return next;
       }, { replace: true });
     }
+
+    const actionParam = searchParams.get("action");
+    if (actionParam === "new") {
+      setShowCreate(true);
+      setSearchParams(prev => {
+        const next = new URLSearchParams(prev);
+        next.delete("action");
+        return next;
+      }, { replace: true });
+    }
   }, [searchParams, setSearchParams, subtasks]);
 
 

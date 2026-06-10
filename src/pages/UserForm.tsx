@@ -151,6 +151,13 @@ const PRIV_GROUPS: PG[] = [
         ] },
       { key: 'opsSites', label: 'Ops Site Manager', parentKey: 'opsSites', masterField: 'canView',
         fields: [{ key: 'canView', label: 'View Assigned Sites' }] },
+      { key: 'simulator', label: 'Layout Simulator', parentKey: 'simulator', masterField: 'canView',
+        fields: [
+          { key: 'canView', label: 'View' },
+          { key: 'canSave', label: 'Save Layouts' },
+          { key: 'canDelete', label: 'Delete Layouts', danger: true },
+          { key: 'canExport', label: 'Export Drawings' },
+        ] },
     ],
   },
   {

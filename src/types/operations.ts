@@ -253,3 +253,30 @@ export interface ConsumableUsageLog {
   loggedBy?: string;
   created_at?: string;
 }
+
+export interface MaintenanceCertificate {
+  id: string;
+  certNumber: string;       // e.g. CERT-20250609-4K7X
+  machineId: string;
+  machineName: string;
+  machineCategory: 'machine' | 'vehicle';
+  machineSite: string;
+  machineSerial?: string;
+  issuedDate: string;       // ISO date string
+  expiryDate: string;       // ISO date string
+  issuedByEmployeeId: string;
+  issuedByName: string;
+  issuedByDesignation?: string;
+  lastServiceDate?: string;
+  nextServiceDate?: string;
+  totalServices: number;
+  complianceStandards?: string;
+  conditionsOfOperation?: string;
+  manufacturer?: string;
+  modelNumber?: string;
+  outcomeRemarks?: string;
+  lastInspectionDateOverride?: string;
+  issuedDateOverride?: string;
+  criteriaCompliance?: Record<string, boolean>;
+}
+

@@ -271,8 +271,22 @@ export function TaskReminders() {
     setEditingId(rem.id);
     setFormError('');
     setShowForm(true);
+    setShowForm(true);
     setSelected(null);
   };
+
+  useEffect(() => {
+    const actionParam = searchParams.get("action");
+    if (actionParam === "new") {
+      openCreate();
+      setSearchParams(prev => {
+        const next = new URLSearchParams(prev);
+        next.delete("action");
+        return next;
+      }, { replace: true });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, setSearchParams]);
 
   useSetPageTitle(
     'Task Reminders',

@@ -1057,18 +1057,6 @@ Answer site-specific questions using this context only. Be concise.`;
                         </div>
                       </div>
 
-                      <div className="p-4 rounded-xl bg-white/80 dark:bg-slate-800/80 border border-slate-100 dark:border-slate-700/50 shadow-sm flex flex-col justify-between">
-                        <div>
-                          <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">VAT Remitted to FIRS (Selected Period)</p>
-                          <p className="text-xl font-black text-emerald-600 dark:text-emerald-400">{currentUser?.privileges?.billing?.canViewAmounts ? `₦${data.periodVatRemitted.toLocaleString()}` : '***'}</p>
-                          <p className="text-xs text-slate-400 mt-1">Total All-Time Remitted: {currentUser?.privileges?.billing?.canViewAmounts ? `₦${data.totalVatRemitted.toLocaleString()}` : '***'}</p>
-                        </div>
-                        <div className="mt-3">
-                          <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 font-semibold text-xs py-1 px-2.5">
-                            Official Tax Remittance
-                          </Badge>
-                        </div>
-                      </div>
                     </div>
                   </div>
                 )}

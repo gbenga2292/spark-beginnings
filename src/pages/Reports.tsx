@@ -81,6 +81,30 @@ export function Reports() {
   const [otChartView, setOtChartView] = useState<'table' | 'heatmap' | 'bar'>('table');
   const [fullScreenTable, setFullScreenTable] = useState<'site-work' | 'monthly-summary' | 'overtime-detail' | null>(null);
 
+  // ── All staff for site-work report (with optional Office/Field filter) ──
+  const siteReportBaseStaff = useMemo(() =>
+    employees.filter(emp => emp.status === 'Active'),
+  [employees]);
+
+  const operationsStaff = useMemo(() => {
+    if (siteStaffTypeFilter === 'All') return siteReportBaseStaff;
+    return siteReportBaseStaff.filter(emp => (emp.staffType?.toUpperCase() || '') === siteStaffTypeFilter);
+  }, [siteReportBaseStaff, siteStaffTypeFilter]);
+
+  // Calculate monthly work summary for all staff (excluding Engineer and CEO), with optional Office/Field filter
+  const summaryBaseStaff = useMemo(() => {
+    return employees.filter(emp =>
+      emp.status === 'Active' &&
+      emp.position !== 'Engineer' &&
+      emp.position !== 'CEO'
+    );
+  }, [employees]);
+
+  const operationsInternalStaff = useMemo(() => {
+    if (summaryStaffTypeFilter === 'All') return summaryBaseStaff;
+    return summaryBaseStaff.filter(emp => (emp.staffType?.toUpperCase() || '') === summaryStaffTypeFilter);
+  }, [summaryBaseStaff, summaryStaffTypeFilter]);
+
   const siteGanttParentRef = React.useRef<HTMLDivElement>(null);
   const siteGanttRowVirtualizer = useVirtualizer({
     count: operationsStaff.length,
@@ -176,17 +200,6 @@ export function Reports() {
     { name: 'Active', value: activeEmployees, color: '#10b981' },
     { name: 'Inactive', value: inactiveEmployees, color: '#f43f5e' }
   ], [activeEmployees, inactiveEmployees]);
-
-
-  // ── All staff for site-work report (with optional Office/Field filter) ──
-  const siteReportBaseStaff = useMemo(() =>
-    employees.filter(emp => emp.status === 'Active'),
-  [employees]);
-
-  const operationsStaff = useMemo(() => {
-    if (siteStaffTypeFilter === 'All') return siteReportBaseStaff;
-    return siteReportBaseStaff.filter(emp => (emp.staffType?.toUpperCase() || '') === siteStaffTypeFilter);
-  }, [siteReportBaseStaff, siteStaffTypeFilter]);
 
   // ── Gantt data: per-employee, per-day attendance grid ──
   const ganttData = useMemo(() => {
@@ -423,20 +436,6 @@ export function Reports() {
     return { siteCounts, totalRecords: filteredRecords.length };
   }, [attendanceRecords, selectedMonth, selectedYear, operationsStaff, activeSitesForMonth, departments, publicHolidays]);
 
-  // Calculate monthly work summary for all staff (excluding Engineer and CEO), with optional Office/Field filter
-  const summaryBaseStaff = useMemo(() => {
-    return employees.filter(emp =>
-      emp.status === 'Active' &&
-      emp.position !== 'Engineer' &&
-      emp.position !== 'CEO'
-    );
-  }, [employees]);
-
-  const operationsInternalStaff = useMemo(() => {
-    if (summaryStaffTypeFilter === 'All') return summaryBaseStaff;
-    return summaryBaseStaff.filter(emp => (emp.staffType?.toUpperCase() || '') === summaryStaffTypeFilter);
-  }, [summaryBaseStaff, summaryStaffTypeFilter]);
-
   const monthlyWorkSummary = useMemo(() => {
     const summaryData: Record<string, { 
       name: string; 
@@ -478,11 +477,11 @@ export function Reports() {
 
         const month = rec.mth || new Date(rec.date).getMonth() + 1;
         if (month >= 1 && month <= 12) {
-          if (rec.day === 'Yes') {
+          if (rec.day === 'Yes' || rec.night === 'Yes') {
             if ((rec.ot ?? 0) > 0) {
               summaryData[empId].months[month].otDays += 1;
             } else {
-              summaryData[empId].months[month].daysWorked += 1;
+              summaryData[empId].months[month].daysWorked += (rec.dayWk ?? 1);
             }
           }
           if (rec.absentStatus === 'Absent') {
@@ -504,6 +503,9 @@ export function Reports() {
         const empStart = emp.startDate ? new Date(emp.startDate) : null;
         if (empStart) empStart.setHours(0, 0, 0, 0);
 
+        const empEnd = emp.endDate ? new Date(emp.endDate) : null;
+        if (empEnd) empEnd.setHours(0, 0, 0, 0);
+
         for (let m = 1; m <= 12; m++) {
           // Only process months up to today if it's the current year
           if (summaryYear > today.getFullYear()) continue;
@@ -520,6 +522,9 @@ export function Reports() {
             
             // Check start date
             if (empStart && dateObj < empStart) continue;
+
+            // Check end date
+            if (empEnd && dateObj > empEnd) continue;
 
             const iso = `${summaryYear}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
             

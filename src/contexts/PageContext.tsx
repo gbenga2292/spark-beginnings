@@ -55,7 +55,6 @@ export function usePage() {
 
 // Global generation counter — incremented on every mount so newest caller wins
 let _generation = 0;
-
 export function useSetPageTitle(
   title: ReactNode | null,
   subtitle: ReactNode = '',
@@ -69,12 +68,12 @@ export function useSetPageTitle(
   const buttonsRef = useRef(buttons);
   buttonsRef.current = buttons;
 
+  // Capture showBackButton callback in a ref so it never gets stale
+  const showBackButtonRef = useRef(showBackButton);
+  showBackButtonRef.current = showBackButton;
+
   // This component's generation — set on first mount, stays stable
   const generationRef = useRef<number>(-1);
-
-  // Track the "current highest generation" across all hook instances via a shared ref
-  // We store it on the dispatch context object itself as a side-channel
-  const sharedRef = useRef<{ activeGen: number }>({ activeGen: 0 });
 
   useEffect(() => {
     if (!dispatch || title === null) return;
@@ -88,8 +87,17 @@ export function useSetPageTitle(
     setTitle(title);
     setSubtitle(subtitle);
     setHeaderButtons(buttonsRef.current);
-    // Wrap the function in another function if it is a callback so that useState stores the function rather than executing it.
-    setShowBackButton(() => showBackButton);
+
+    // Set callback via a stable wrapper function that accesses the latest ref
+    if (typeof showBackButton === 'function') {
+      setShowBackButton(() => () => {
+        if (typeof showBackButtonRef.current === 'function') {
+          showBackButtonRef.current();
+        }
+      });
+    } else {
+      setShowBackButton(showBackButton);
+    }
 
     return () => {
       // Only clear if we are still the latest owner (i.e. no newer component mounted yet)

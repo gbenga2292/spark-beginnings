@@ -16,6 +16,7 @@ import { useAppStore } from '../store/appStore';
 import { supabase } from '../integrations/supabase/client';
 import { toast } from 'sonner';
 import { CADLayer, DEFAULT_LAYERS } from '../utils/cadDataModels';
+import { usePriv } from '../hooks/usePriv';
 
 interface SavedLayout {
   id: string;
@@ -31,6 +32,7 @@ interface SavedLayout {
 }
 
 export default function Simulator() {
+  const priv = usePriv('simulator');
   const { isSimulatorDirty, setSimulatorDirty } = useAppStore();
   const [lines, setLines] = useState<LineData[]>([]);
   const [placedComponents, setPlacedComponents] = useState<PlacedComponent[]>([]);
@@ -144,6 +146,10 @@ export default function Simulator() {
       toast.error('You must be logged in to save.');
       return;
     }
+    if (!priv.canSave) {
+      toast.error('You do not have permission to save layouts.');
+      return;
+    }
     if (!saveName.trim()) {
       toast.error('Please enter a name for the layout.');
       return;
@@ -238,6 +244,10 @@ export default function Simulator() {
   };
 
   const handleDeleteLayout = async (id: string, name: string) => {
+    if (!priv.canDelete) {
+      toast.error('You do not have permission to delete layouts.');
+      return;
+    }
     if (!confirm(`Delete layout "${name}"? This cannot be undone.`)) return;
     setDeletingId(id);
     try {
@@ -252,6 +262,10 @@ export default function Simulator() {
   };
 
   const handleExportDrawing = () => {
+    if (!priv.canExport) {
+      toast.error('You do not have permission to export drawings.');
+      return;
+    }
     setShowExportOptions(true);
   };
 
@@ -349,8 +363,9 @@ export default function Simulator() {
       </label>
       <button 
         onClick={() => { setSaveName(''); setShowSaveDialog(true); }} 
-        disabled={isSaving}
+        disabled={isSaving || !priv.canSave}
         className="flex items-center justify-center px-4 py-2 bg-green-600 text-white border border-transparent rounded-md shadow-sm text-sm font-medium hover:bg-green-700 disabled:opacity-50"
+        title={!priv.canSave ? "You don't have permission to save layouts" : ""}
       >
         <Save className="w-4 h-4 mr-2" />
         <span>Save</span>
@@ -651,14 +666,16 @@ export default function Simulator() {
                           <span>{(layout.components || []).length} comps</span>
                         </div>
                       </div>
-                      <button
-                        onClick={e => { e.stopPropagation(); handleDeleteLayout(layout.id, layout.name); }}
-                        disabled={deletingId === layout.id}
-                        className="p-1.5 rounded-lg text-gray-300 hover:text-rose-500 hover:bg-rose-50 transition-colors opacity-0 group-hover:opacity-100 shrink-0"
-                        title="Delete layout"
-                      >
-                        {deletingId === layout.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                      </button>
+                      {priv.canDelete && (
+                        <button
+                          onClick={e => { e.stopPropagation(); handleDeleteLayout(layout.id, layout.name); }}
+                          disabled={deletingId === layout.id}
+                          className="p-1.5 rounded-lg text-gray-300 hover:text-rose-500 hover:bg-rose-50 transition-colors opacity-0 group-hover:opacity-100 shrink-0"
+                          title="Delete layout"
+                        >
+                          {deletingId === layout.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                        </button>
+                      )}
                     </div>
                     {layout.background_image_url && (
                       <div className="mt-2.5 rounded-lg overflow-hidden h-20 bg-gray-200">

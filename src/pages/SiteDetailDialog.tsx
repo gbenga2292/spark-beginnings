@@ -4,8 +4,10 @@ import { normalizeDate } from '@/src/lib/dateUtils';
 import {
   X, MapPin, DollarSign, Activity, Wrench, MessagesSquare,
   CheckCircle2, AlertTriangle, Clock, Fuel, Calendar,
-  ChevronRight, Settings2, FileText, Users
+  ChevronRight, Settings2, FileText, Users, Paperclip, ExternalLink, Eye
 } from 'lucide-react';
+import { DocPreviewModal } from '@/src/components/DocPreviewModal';
+import type { SiteAttachment } from '@/src/types/SiteQuestionnaire';
 import { Badge } from '@/src/components/ui/badge';
 import { Button } from '@/src/components/ui/button';
 import { cn } from '@/src/lib/utils';
@@ -14,7 +16,7 @@ import { useAppStore, Site } from '@/src/store/appStore';
 import { useOperations } from '@/src/contexts/OperationsContext';
 import { useAppData, deriveMainTaskStatus } from '@/src/contexts/AppDataContext';
 
-type SiteTab = 'financials' | 'operations' | 'maintenance' | 'comms';
+type SiteTab = 'financials' | 'operations' | 'maintenance' | 'comms' | 'attachments';
 
 interface Props {
   site: Site;
@@ -27,6 +29,7 @@ interface Props {
 export function SiteDetailDialog({ site, filterMonth, filterYear, onClose, onEditSite }: Props) {
   const { isDark } = useTheme();
   const [activeTab, setActiveTab] = useState<SiteTab>('financials');
+  const [previewDoc, setPreviewDoc] = useState<SiteAttachment | null>(null);
 
   const invoices = useAppStore(s => s.invoices);
   const payments = useAppStore(s => s.payments);
@@ -34,8 +37,17 @@ export function SiteDetailDialog({ site, filterMonth, filterYear, onClose, onEdi
   const vatRate = useAppStore(s => s.payrollVariables.vatRate);
   const commLogs = useAppStore(s => s.commLogs);
   const clientContacts = useAppStore(s => s.clientContacts);
+  const pendingSites = useAppStore(s => s.pendingSites);
   const { dailyMachineLogs, maintenanceAssets, maintenanceSessions } = useOperations();
   const { mainTasks, subtasks } = useAppData();
+
+  // Resolve attachments from the linked onboarding record
+  const siteAttachments = useMemo(() => {
+    const record = pendingSites.find(
+      s => s.siteName?.trim() === site.name.trim() && s.clientName?.trim() === site.client?.trim()
+    );
+    return record?.attachments ?? [];
+  }, [pendingSites, site.name, site.client]);
 
   const isWithinFilter = (dateStr?: string) => {
     if (!dateStr) return false;
@@ -127,6 +139,7 @@ export function SiteDetailDialog({ site, filterMonth, filterYear, onClose, onEdi
     { id: 'operations', label: 'Operations', icon: Activity, count: data.machineLogs.length },
     { id: 'maintenance', label: 'Maintenance', icon: Wrench, count: data.siteMaintAssets.length },
     { id: 'comms', label: 'Comms & Tasks', icon: MessagesSquare, count: data.siteComms.length + data.siteTasks.length },
+    { id: 'attachments', label: 'Documents', icon: Paperclip, count: siteAttachments.length },
   ];
 
   const card = cn('p-5 rounded-2xl border shadow-sm', isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200');
@@ -422,8 +435,92 @@ export function SiteDetailDialog({ site, filterMonth, filterYear, onClose, onEdi
             </div>
           )}
 
+          {/* ── ATTACHMENTS TAB ── */}
+          {activeTab === 'attachments' && (
+            <div className="space-y-4">
+              <div className={card}>
+                <h3 className="font-bold mb-4 flex items-center gap-2">
+                  <Paperclip className="w-4 h-4 text-indigo-500" />
+                  Site Documents ({siteAttachments.length})
+                </h3>
+
+                {siteAttachments.length === 0 ? (
+                  <div className="text-center py-10">
+                    <Paperclip className="w-8 h-8 text-slate-200 mx-auto mb-3" />
+                    <p className="text-slate-500 text-sm font-medium">No documents uploaded yet.</p>
+                    <p className="text-slate-400 text-xs mt-1">
+                      Open the Site Onboarding record and go to the Documents tab to upload files.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {siteAttachments.map((att, i) => {
+                      const isImage = att.fileType?.startsWith('image/');
+                      return (
+                        <a
+                          key={att.id ?? i}
+                          href={att.url || '#'}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={cn(
+                            'flex items-center gap-3 p-3 rounded-xl border transition-all group',
+                            att.url
+                              ? 'border-slate-100 hover:border-indigo-200 hover:bg-indigo-50/40 cursor-pointer'
+                              : 'border-slate-100 bg-slate-50 cursor-default opacity-60'
+                          )}
+                        >
+                          <div className={cn(
+                            'h-9 w-9 rounded-lg flex items-center justify-center shrink-0',
+                            isImage ? 'bg-sky-100 text-sky-600' : 'bg-indigo-100 text-indigo-600'
+                          )}>
+                            <FileText className="h-4 w-4" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-slate-800 truncate group-hover:text-indigo-700 transition-colors">
+                              {att.caption || att.name}
+                            </p>
+                            {att.caption && (
+                              <p className="text-xs text-slate-400 truncate">{att.name}</p>
+                            )}
+                            <p className="text-xs text-slate-400">
+                              {att.uploadedBy && <>{att.uploadedBy} · </>}
+                              {att.uploadedAt && !isNaN(new Date(att.uploadedAt).getTime())
+                                ? new Date(att.uploadedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+                                : '—'}
+                            </p>
+                          </div>
+                          {att.url && (
+                            <div className="flex items-center gap-1 shrink-0">
+                              <button
+                                onClick={e => { e.preventDefault(); e.stopPropagation(); setPreviewDoc(att); }}
+                                className="h-7 w-7 rounded-lg flex items-center justify-center text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                                title="Preview"
+                              >
+                                <Eye className="h-3.5 w-3.5" />
+                              </button>
+                              <ExternalLink className="h-4 w-4 text-slate-300 group-hover:text-indigo-500 transition-colors" />
+                            </div>
+                          )}
+                        </a>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
+
+      {/* In-app document preview */}
+      {previewDoc && previewDoc.url && (
+        <DocPreviewModal
+          url={previewDoc.url}
+          name={previewDoc.name}
+          caption={previewDoc.caption}
+          onClose={() => setPreviewDoc(null)}
+        />
+      )}
     </div>
   );
 }

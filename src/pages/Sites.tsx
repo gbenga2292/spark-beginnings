@@ -7,10 +7,11 @@ import { Input } from '@/src/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
 import { Badge } from '@/src/components/ui/badge';
 import { Dialog, DialogFooter } from '@/src/components/ui/dialog';
-import { Search, Plus, MapPin, Building2, X, Save, Pencil, Trash2, Download, Upload, CheckCircle2, Circle, Eye, FileText, MoreVertical, Clock, LayoutGrid, List, ArrowUpDown, ChevronUp, ChevronDown, MessageSquare, BookOpen, Calendar, Phone, Mail, Car, MessageCircle, Users, ArrowLeft, Check, Bell, UserCheck, UserCircle, Briefcase, Sparkles, Edit2 } from 'lucide-react';
+import { Search, Plus, MapPin, Building2, X, Save, Pencil, Trash2, Download, Upload, CheckCircle2, Circle, Eye, FileText, MoreVertical, Clock, LayoutGrid, List, ArrowUpDown, ChevronUp, ChevronDown, MessageSquare, BookOpen, Calendar, Phone, Mail, Car, MessageCircle, Users, ArrowLeft, Check, Bell, UserCheck, UserCircle, Briefcase, Sparkles, Edit2, ExternalLink, Paperclip } from 'lucide-react';
 import { useAppStore, Site, ClientProfile } from '@/src/store/appStore';
 import { toast, showConfirm } from '@/src/components/ui/toast';
-import { SiteQuestionnaire } from '@/src/types/SiteQuestionnaire';
+import { SiteQuestionnaire, SiteAttachment } from '@/src/types/SiteQuestionnaire';
+import { DocPreviewModal } from '@/src/components/DocPreviewModal';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
 import {
   DropdownMenu,
@@ -212,6 +213,7 @@ export function Sites() {
   const [editForm, setEditForm] = useState({ ...EMPTY_FORM });
   const [addError, setAddError] = useState('');
   const [narrativeSite, setNarrativeSite] = useState<{ site: any; q: SiteQuestionnaire | null } | null>(null);
+  const [previewDoc, setPreviewDoc] = useState<SiteAttachment | null>(null);
   const [contactsFor, setContactsFor] = useState<string | null>(null);
   const [clientEditOpen, setClientEditOpen] = useState(false);
   const [clientEditForm, setClientEditForm] = useState<Partial<ClientProfile>>({});
@@ -380,6 +382,22 @@ export function Sites() {
   const updatePendingSite = useAppStore((s) => s.updatePendingSite);
   const deletePendingSite = useAppStore((s) => s.deletePendingSite);
   const { mainTasks, createMainTask } = useAppData();
+
+  // ── Auto-activate sites whose start date has arrived ──────────────────────
+  // Runs on mount and whenever sites change. Silently promotes any site that
+  // is still stored as 'Inactive' but whose startDate is today or earlier.
+  useEffect(() => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    sites.forEach(site => {
+      if (
+        site.status === 'Inactive' &&
+        site.startDate &&
+        normalizeDate(site.startDate)! <= todayStr
+      ) {
+        updateSite(site.id, { status: 'Active' });
+      }
+    });
+  }, [sites, updateSite]);
 
   const handleDeletePending = async (site: SiteQuestionnaire) => {
     // Check for linked comm logs
@@ -593,6 +611,13 @@ export function Sites() {
   const filteredPendingSites = pendingSites.filter(site => {
     if (site.status !== 'Pending') return false;
     if (selectedClientName && site.clientName.toLowerCase() !== selectedClientName.toLowerCase()) return false;
+    
+    const hasActiveSite = sites.some(s => 
+      s.status === 'Active' && 
+      s.name.trim().toLowerCase() === site.siteName.trim().toLowerCase() && 
+      s.client.trim().toLowerCase() === site.clientName.trim().toLowerCase()
+    );
+    if (hasActiveSite) return false;
     
     return (
       site.siteName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -1281,7 +1306,14 @@ export function Sites() {
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end" className="w-[180px]">
                                   <DropdownMenuItem 
-                                    onClick={() => setNarrativeSite({ site, q: pendingSites.find(ps => ps.siteName === site.name && ps.clientName === site.client) || null })}
+                                    onClick={() => {
+                                      const q = pendingSites.find(ps => 
+                                        (ps.siteId && ps.siteId === site.id) || 
+                                        (ps.siteName.toLowerCase().trim() === site.name.toLowerCase().trim() && 
+                                         ps.clientName.toLowerCase().trim() === site.client.toLowerCase().trim())
+                                      ) || null;
+                                      setNarrativeSite({ site, q });
+                                    }}
                                     className="gap-2"
                                   >
                                     <FileText className="h-4 w-4 text-slate-400" />
@@ -1291,7 +1323,11 @@ export function Sites() {
                                   {canEditSite && (
                                     <DropdownMenuItem 
                                       onClick={() => {
-                                        const linkedQ = pendingSites.find(ps => ps.siteName === site.name && ps.clientName === site.client);
+                                        const linkedQ = pendingSites.find(ps => 
+                                          (ps.siteId && ps.siteId === site.id) || 
+                                          (ps.siteName.toLowerCase().trim() === site.name.toLowerCase().trim() && 
+                                           ps.clientName.toLowerCase().trim() === site.client.toLowerCase().trim())
+                                        );
                                         if (linkedQ) navigate(`/sites/onboarding/${linkedQ.id}`);
                                         else navigate('/sites/onboarding/new', { state: { linkedSite: site } });
                                       }}
@@ -1367,7 +1403,11 @@ export function Sites() {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 p-4 sm:p-5 bg-slate-50/30 overflow-y-auto style-scroll flex-1 min-h-0">
                 {sortedSites.map(site => {
-                  const q = pendingSites.find(ps => ps.siteName === site.name && ps.clientName === site.client);
+                  const q = pendingSites.find(ps => 
+                    (ps.siteId && ps.siteId === site.id) || 
+                    (ps.siteName.toLowerCase().trim() === site.name.toLowerCase().trim() && 
+                     ps.clientName.toLowerCase().trim() === site.client.toLowerCase().trim())
+                  ) || null;
                   
                   return (
                     <Card 
@@ -1732,6 +1772,71 @@ export function Sites() {
                   </div>
                 </div>
               </div>
+
+              {/* Site Documents Section */}
+              {narrativeSite.q?.attachments && narrativeSite.q.attachments.length > 0 && (
+                <div className="relative mt-6 pt-6 border-t border-slate-100">
+                  <div className="absolute left-0 top-6 bottom-0 w-1 bg-indigo-50 rounded-full" />
+                  <div className="pl-5">
+                    <h3 className="text-xs font-bold text-indigo-600 uppercase tracking-widest mb-3 flex items-center gap-2">
+                      <Paperclip className="h-3.5 w-3.5" />
+                      Site Documents
+                    </h3>
+                    <div className="space-y-2 mt-2">
+                        {narrativeSite.q.attachments.map((att, i) => (
+                          <div
+                            key={att.id || i}
+                            className="flex items-center justify-between p-2.5 rounded-lg border border-slate-100 hover:border-indigo-100 hover:bg-slate-50/50 transition-colors group"
+                          >
+                            <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                              <div className="h-8 w-8 rounded bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0 mt-0.5">
+                                <FileText className="h-4 w-4" />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="text-xs font-bold text-slate-700 truncate group-hover:text-indigo-600 transition-colors">
+                                  {att.caption || att.name}
+                                </p>
+                                {att.caption && (
+                                  <p className="text-[10px] text-slate-400 truncate mt-0.5">
+                                    {att.name}
+                                  </p>
+                                )}
+                                <p className="text-[9px] text-slate-400 mt-0.5 font-medium">
+                                  {att.uploadedBy && `${att.uploadedBy} · `}
+                                  {att.uploadedAt && !isNaN(new Date(att.uploadedAt).getTime())
+                                    ? new Date(att.uploadedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+                                    : '—'}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1 shrink-0 ml-2">
+                              {att.url && (
+                                <button
+                                  onClick={() => setPreviewDoc(att)}
+                                  className="h-7 w-7 rounded-lg flex items-center justify-center text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                                  title="Preview"
+                                >
+                                  <Eye className="h-3.5 w-3.5" />
+                                </button>
+                              )}
+                              {att.url && (
+                                <a
+                                  href={att.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="h-7 w-7 rounded-lg flex items-center justify-center text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                                  title="Open in new tab"
+                                >
+                                  <ExternalLink className="h-3.5 w-3.5" />
+                                </a>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Footer */}
@@ -1745,6 +1850,16 @@ export function Sites() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* In-app document preview */}
+      {previewDoc && previewDoc.url && (
+        <DocPreviewModal
+          url={previewDoc.url}
+          name={previewDoc.name}
+          caption={previewDoc.caption}
+          onClose={() => setPreviewDoc(null)}
+        />
       )}
 
       {/* Client Edit Dialog */}

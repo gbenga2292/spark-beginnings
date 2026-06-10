@@ -918,7 +918,10 @@ export const useAppStore = create<AppState>()(
       departments: [],
       employees: [],
       attendanceRecords: [],
-      loadedAttendanceYears: [new Date().getFullYear()],
+      loadedAttendanceYears: [],
+      // NOTE: years are added to this list AFTER data is confirmed fetched.
+      // Do not pre-seed the current year here — that would prevent fetchAttendanceYearIfNeeded
+      // from fetching real data, causing Jan-level records to silently truncate at 1000 rows.
       attendanceYearLoading: false,
       pendingInvoices: [],
       invoices: [],

@@ -5,7 +5,7 @@ import {
   Wrench, Activity, Clock, Shield, AlertCircle, 
   TrendingUp, BarChart3, Download, 
   MapPin, Tag, User, DollarSign, Package, History,
-  ChevronRight, CheckCircle2, X, Trash2
+  ChevronRight, CheckCircle2, X, Trash2, Award
 } from 'lucide-react';
 import { MaintenanceAsset, MaintenanceSession, MaintenanceAssetLog } from '../types/operations';
 import { useOperations } from '../contexts/OperationsContext';
@@ -21,6 +21,8 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, 
   Tooltip, ResponsiveContainer
 } from 'recharts';
+import { MaintenanceDocumentModal } from '@/src/components/maintenance/MaintenanceDocumentModal';
+import { MaintenanceCertificateModal } from '@/src/components/maintenance/MaintenanceCertificateModal';
 
 interface MaintenanceAssetDetailViewProps {
   asset: MaintenanceAsset;
@@ -37,6 +39,8 @@ export function MaintenanceAssetDetailView({ asset, onBack, onLogService }: Main
   const [timeRange, setTimeRange] = useState<'6m' | '1y' | 'all'>('1y');
   const [showLogDialog, setShowLogDialog] = useState(false);
   const [activeTab, setActiveTab] = useState<'maintenance' | 'operational'>('maintenance');
+  const [showDocumentModal, setShowDocumentModal] = useState(false);
+  const [showCertificateModal, setShowCertificateModal] = useState(false);
 
   const assetSessions = useMemo(() => {
     return maintenanceSessions
@@ -322,8 +326,16 @@ export function MaintenanceAssetDetailView({ asset, onBack, onLogService }: Main
                   <History className="h-4 w-4" /> View Full History
                 </Button>
                 <Button variant="outline"
-                  className="w-full h-10 rounded-lg bg-slate-700 border-slate-600 hover:bg-slate-600 text-white font-bold text-xs gap-2">
+                  className="w-full h-10 rounded-lg bg-slate-700 border-slate-600 hover:bg-slate-600 text-white font-bold text-xs gap-2"
+                  onClick={() => setShowDocumentModal(true)}
+                >
                   <Download className="h-4 w-4" /> Export Report
+                </Button>
+                <Button variant="outline"
+                  className="w-full h-10 rounded-lg bg-emerald-700/20 border-emerald-600/40 hover:bg-emerald-700/30 text-emerald-400 font-bold text-xs gap-2"
+                  onClick={() => setShowCertificateModal(true)}
+                >
+                  <Award className="h-4 w-4" /> Generate Certificate
                 </Button>
               </div>
             </div>
@@ -442,6 +454,20 @@ export function MaintenanceAssetDetailView({ asset, onBack, onLogService }: Main
           </div>
         </DialogContent>
       </Dialog>
+
+      <MaintenanceDocumentModal
+        asset={asset}
+        sessions={assetSessions}
+        isOpen={showDocumentModal}
+        onClose={() => setShowDocumentModal(false)}
+      />
+
+      <MaintenanceCertificateModal
+        asset={asset}
+        sessions={assetSessions}
+        isOpen={showCertificateModal}
+        onClose={() => setShowCertificateModal(false)}
+      />
     </div>
   );
 }

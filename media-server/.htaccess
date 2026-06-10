@@ -1,16 +1,22 @@
-# Minimal .htaccess — only what's needed for the media server
-# CORS headers are set in PHP directly, so we don't need mod_headers here
+# Media server — minimal configuration
+# CORS headers removed: DocPreviewModal uses iframe/img (browser navigations),
+# not fetch() calls, so cross-origin headers are not required for previews.
 
-# Increase upload limits if your host allows php_value in .htaccess
-# (comment these out if you still get 500)
+# ── Upload limits ─────────────────────────────────────────────────────────────
 php_value upload_max_filesize 200M
 php_value post_max_size 210M
 php_value max_execution_time 300
 
-# Video MIME types for correct streaming
+# ── MIME types ────────────────────────────────────────────────────────────────
+# Video — needed so browsers play inline without triggering download
 AddType video/mp4 .mp4
 AddType video/webm .webm
 AddType video/quicktime .mov
-
-# Allow byte-range requests for mobile video scrubbing
-Header set Accept-Ranges bytes
+# Documents — correct MIME so MS Office Online Viewer recognises the file
+AddType application/pdf .pdf
+AddType application/msword .doc
+AddType application/vnd.openxmlformats-officedocument.wordprocessingml.document .docx
+AddType application/vnd.ms-excel .xls
+AddType application/vnd.openxmlformats-officedocument.spreadsheetml.sheet .xlsx
+AddType application/vnd.ms-powerpoint .ppt
+AddType application/vnd.openxmlformats-officedocument.presentationml.presentation .pptx

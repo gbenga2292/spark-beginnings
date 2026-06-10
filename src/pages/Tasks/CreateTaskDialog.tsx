@@ -20,6 +20,9 @@ interface CreateTaskDialogProps {
   initialDescription?: string;
   initialClientId?: string;
   initialSiteId?: string;
+  initialDeadline?: string;
+  initialDeadlineTime?: string;
+  isDarkTheme?: boolean;
 }
 
 export function CreateTaskDialog({
@@ -34,7 +37,10 @@ export function CreateTaskDialog({
   initialTitle = "",
   initialDescription = "",
   initialClientId = "",
-  initialSiteId = ""
+  initialSiteId = "",
+  initialDeadline = "",
+  initialDeadlineTime = "",
+  isDarkTheme = false
 }: CreateTaskDialogProps) {
   const { addReminder, createMainTask } = useAppData();
   const clientProfiles = useAppStore(s => s.clientProfiles);
@@ -45,8 +51,8 @@ export function CreateTaskDialog({
   const [description, setDesc] = useState(initialDescription);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [assignedTo, setAssignedTo] = useState<string[]>([]);
-  const [deadline, setDeadline] = useState("");
-  const [deadlineTime, setDeadlineTime] = useState("");
+  const [deadline, setDeadline] = useState(initialDeadline);
+  const [deadlineTime, setDeadlineTime] = useState(initialDeadlineTime);
   const [priority, setPriority] = useState<TaskPriority | undefined>(undefined);
   const [requiresApproval, setRequiresApproval] = useState(false);
   const [approverId, setApproverId] = useState<string>("");
@@ -159,53 +165,83 @@ export function CreateTaskDialog({
         initial={{ opacity: 0, scale: 0.96, y: 8 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         transition={{ duration: 0.18 }}
-        className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-lg overflow-y-auto max-h-[90vh]"
+        className={`border rounded-2xl shadow-2xl w-full max-w-lg overflow-y-auto max-h-[90vh] ${
+          isDarkTheme ? "bg-[#0f111a] border-[#2a2e3d] text-white" : "bg-card border-border text-foreground"
+        }`}
       >
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-gradient-to-r from-primary/5 to-transparent">
+        <div className={`flex items-center justify-between px-6 py-4 border-b bg-gradient-to-r ${
+          isDarkTheme ? "border-white/5 from-indigo-500/5 to-transparent" : "border-border from-primary/5 to-transparent"
+        }`}>
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
-              <Plus className="w-4.5 h-4.5 text-primary" />
+            <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${
+              isDarkTheme ? "bg-indigo-500/10" : "bg-primary/10"
+            }`}>
+              <Plus className={`w-4.5 h-4.5 ${isDarkTheme ? "text-indigo-400" : "text-primary"}`} />
             </div>
             <div>
-              <h2 className="text-base font-semibold text-foreground">New Task</h2>
-              <p className="text-[11px] text-muted-foreground">Create a new task and assign subtasks</p>
+              <h2 className={`text-base font-semibold ${isDarkTheme ? "text-white" : "text-foreground"}`}>New Task</h2>
+              <p className={`text-[11px] ${isDarkTheme ? "text-white/50" : "text-muted-foreground"}`}>Create a new task and assign subtasks</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-full hover:bg-muted transition-colors flex-shrink-0">
-            <X className="w-4 h-4 text-muted-foreground" />
+          <button onClick={onClose} className={`p-1.5 rounded-full transition-colors flex-shrink-0 ${
+            isDarkTheme ? "hover:bg-white/5 text-white/50 hover:text-white" : "hover:bg-muted text-muted-foreground"
+          }`}>
+            <X className="w-4 h-4" />
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
           <div>
-            <label className="block text-xs font-semibold text-foreground uppercase tracking-wide mb-1.5">
+            <label className={`block text-xs font-semibold uppercase tracking-wide mb-1.5 ${
+              isDarkTheme ? "text-white/80" : "text-foreground"
+            }`}>
               Task Title <span className="text-red-400">*</span>
             </label>
             <input required autoFocus value={title} onChange={e => setTitle(e.target.value)}
               placeholder="e.g. Review Q2 Report"
-              className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all shadow-sm" />
+              className={`w-full px-3.5 py-2.5 rounded-xl border text-sm transition-all shadow-sm ${
+                isDarkTheme 
+                  ? "border-white/10 bg-[#141622] text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500" 
+                  : "border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              }`} />
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-foreground uppercase tracking-wide mb-1.5">Description</label>
+            <label className={`block text-xs font-semibold uppercase tracking-wide mb-1.5 ${
+              isDarkTheme ? "text-white/80" : "text-foreground"
+            }`}>Description</label>
             <textarea rows={2} value={description} onChange={e => setDesc(e.target.value)}
               placeholder="Optional notes…"
-              className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none transition-all shadow-sm" />
+              className={`w-full px-3.5 py-2.5 rounded-xl border text-sm transition-all shadow-sm resize-none ${
+                isDarkTheme 
+                  ? "border-white/10 bg-[#141622] text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500" 
+                  : "border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              }`} />
           </div>
 
           <div className="grid grid-cols-3 gap-3">
             <div className="relative">
-              <label className="block text-xs font-semibold text-foreground uppercase tracking-wide mb-1.5">Assigned To</label>
+              <label className={`block text-xs font-semibold uppercase tracking-wide mb-1.5 ${
+                isDarkTheme ? "text-white/80" : "text-foreground"
+              }`}>Assigned To</label>
               <button type="button" onClick={() => setOpenMainDropdown(!openMainDropdown)}
-                className="w-full px-3.5 py-2.5 flex items-center justify-between rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all shadow-sm cursor-pointer whitespace-nowrap overflow-hidden">
+                className={`w-full px-3.5 py-2.5 flex items-center justify-between rounded-xl border text-sm focus:outline-none focus:ring-2 transition-all shadow-sm cursor-pointer whitespace-nowrap overflow-hidden ${
+                  isDarkTheme 
+                    ? "border-white/10 bg-[#141622] text-white focus:ring-indigo-500/20" 
+                    : "border-border bg-background text-foreground focus:ring-primary/20"
+                }`}>
                 <span className="truncate">{assignedTo.length > 0 ? `${assignedTo.length} assignee(s)` : "Unassigned"}</span>
                 <ChevronDown className="w-4 h-4 text-muted-foreground opacity-50 shrink-0" />
               </button>
               {openMainDropdown && (
                 <>
                   <div className="fixed inset-0 z-[100]" onClick={() => setOpenMainDropdown(false)} />
-                  <div className="absolute top-full left-0 mt-2 min-w-full w-max max-w-[350px] max-h-[220px] overflow-y-auto bg-card border border-border rounded-xl shadow-xl z-[101] py-1 hide-scrollbar">
-                    <label className="flex items-center gap-2.5 px-3 py-2 cursor-pointer hover:bg-muted transition-colors w-full border-b border-border">
+                  <div className={`absolute top-full left-0 mt-2 min-w-full w-max max-w-[350px] max-h-[220px] overflow-y-auto border rounded-xl shadow-xl z-[101] py-1 hide-scrollbar ${
+                    isDarkTheme ? "bg-[#141622] border-white/10 text-white" : "bg-card border-border text-foreground"
+                  }`}>
+                    <label className={`flex items-center gap-2.5 px-3 py-2 cursor-pointer transition-colors w-full border-b ${
+                      isDarkTheme ? "hover:bg-white/5 border-white/5" : "hover:bg-muted border-border"
+                    }`}>
                       <input type="checkbox"
                         checked={assignedTo.length === activeUsers.length && activeUsers.length > 0}
                         onChange={(e) => {
@@ -214,10 +250,12 @@ export function CreateTaskDialog({
                         }}
                         className="w-3.5 h-3.5 rounded border-border text-primary focus:ring-primary/20"
                       />
-                      <span className="text-sm font-semibold text-foreground whitespace-normal leading-tight">All staff</span>
+                      <span className="text-sm font-semibold whitespace-normal leading-tight">All staff</span>
                     </label>
                     {activeUsers.map(u => (
-                      <label key={u.id} className="flex items-center gap-2.5 px-3 py-2 cursor-pointer hover:bg-muted transition-colors w-full">
+                      <label key={u.id} className={`flex items-center gap-2.5 px-3 py-2 cursor-pointer transition-colors w-full ${
+                        isDarkTheme ? "hover:bg-white/5" : "hover:bg-muted"
+                      }`}>
                         <input type="checkbox"
                           checked={assignedTo.includes(u.id)}
                           onChange={(e) => {
@@ -226,7 +264,7 @@ export function CreateTaskDialog({
                           }}
                           className="w-3.5 h-3.5 rounded border-border text-primary focus:ring-primary/20"
                         />
-                        <span className="text-sm text-foreground whitespace-normal leading-tight">{u.name}</span>
+                        <span className="text-sm whitespace-normal leading-tight">{u.name}</span>
                       </label>
                     ))}
                   </div>
@@ -234,26 +272,50 @@ export function CreateTaskDialog({
               )}
             </div>
             <div>
-              <label className="block text-xs font-semibold text-foreground uppercase tracking-wide mb-1.5">Due Date</label>
+              <label className={`block text-xs font-semibold uppercase tracking-wide mb-1.5 ${
+                isDarkTheme ? "text-white/80" : "text-foreground"
+              }`}>Due Date</label>
               <input type="date" value={deadline} onChange={e => setDeadline(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all shadow-sm" />
+                className={`w-full px-3.5 py-2.5 rounded-xl border text-sm focus:outline-none focus:ring-2 transition-all shadow-sm ${
+                  isDarkTheme 
+                    ? "border-white/10 bg-[#141622] text-white focus:ring-indigo-500/20" 
+                    : "border-border bg-background text-foreground focus:ring-primary/20"
+                }`} />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-foreground uppercase tracking-wide mb-1.5">Time <span className="normal-case font-normal text-muted-foreground/60">(opt.)</span></label>
+              <label className={`block text-xs font-semibold uppercase tracking-wide mb-1.5 ${
+                isDarkTheme ? "text-white/80" : "text-foreground"
+              }`}>Time <span className={`normal-case font-normal ${isDarkTheme ? "text-white/40" : "text-muted-foreground/60"}`}>(opt.)</span></label>
               <input type="time" value={deadlineTime} onChange={e => setDeadlineTime(e.target.value)}
                 disabled={!deadline}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-sm" />
+                className={`w-full px-3.5 py-2.5 rounded-xl border text-sm focus:outline-none focus:ring-2 transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-sm ${
+                  isDarkTheme 
+                    ? "border-white/10 bg-[#141622] text-white focus:ring-indigo-500/20" 
+                    : "border-border bg-background text-foreground focus:ring-primary/20"
+                }`} />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-foreground uppercase tracking-wide mb-2">Priority</label>
-            <div className="flex items-center gap-2 flex-wrap bg-muted/30 p-1.5 rounded-xl border border-border/50">
+            <label className={`block text-xs font-semibold uppercase tracking-wide mb-2 ${
+              isDarkTheme ? "text-white/80" : "text-foreground"
+            }`}>Priority</label>
+            <div className={`flex items-center gap-2 flex-wrap p-1.5 rounded-xl border ${
+              isDarkTheme ? "bg-white/5 border-white/5" : "bg-muted/30 border-border/50"
+            }`}>
               <button type="button" onClick={() => setPriority(undefined)}
-                className={`flex-1 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-sm ${!priority ? 'bg-background text-foreground border border-border ring-1 ring-primary/20' : 'text-muted-foreground hover:text-foreground hover:bg-black/5'}`}>None</button>
+                className={`flex-1 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-sm ${
+                  !priority 
+                    ? (isDarkTheme ? "bg-[#141622] text-white border border-white/10 ring-1 ring-indigo-500/20" : "bg-background text-foreground border border-border ring-1 ring-primary/20") 
+                    : (isDarkTheme ? "text-white/50 hover:text-white hover:bg-white/5" : "text-muted-foreground hover:text-foreground hover:bg-black/5")
+                }`}>None</button>
               {PRIORITY_ORDER.map(p => (
                 <button key={p} type="button" onClick={() => setPriority(p)}
-                  className={`flex-1 flex justify-center items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-sm border ${priority === p ? `${PRIORITY_CONFIG[p].className} ring-1 ring-primary/20` : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-black/5'}`}>
+                  className={`flex-1 flex justify-center items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-sm border ${
+                    priority === p 
+                      ? `${PRIORITY_CONFIG[p].className} ring-1 ${isDarkTheme ? "ring-indigo-500/20" : "ring-primary/20"}` 
+                      : (isDarkTheme ? "border-transparent text-white/50 hover:text-white hover:bg-white/5" : "border-transparent text-muted-foreground hover:text-foreground hover:bg-black/5")
+                  }`}>
                   <span className={`w-2 h-2 rounded-full ${PRIORITY_CONFIG[p].dot}`} />
                   {PRIORITY_CONFIG[p].label}
                 </button>
@@ -265,20 +327,26 @@ export function CreateTaskDialog({
             <label className="flex items-center gap-2 cursor-pointer mt-1">
               <input type="checkbox" checked={requiresApproval} onChange={e => setRequiresApproval(e.target.checked)}
                 className="w-4 h-4 rounded border-border text-primary focus:ring-primary/20 transition-all" />
-              <span className="text-xs font-medium text-foreground">Approval Needed</span>
+              <span className={`text-xs font-medium ${isDarkTheme ? "text-white/80" : "text-foreground"}`}>Approval Needed</span>
             </label>
             {requiresApproval && (
               <div className="ml-6">
-                <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1.5">Select Approver</label>
+                <label className={`block text-[10px] font-bold uppercase tracking-wider mb-1.5 ${
+                  isDarkTheme ? "text-white/40" : "text-muted-foreground"
+                }`}>Select Approver</label>
                 <select 
                   value={approverId} 
                   onChange={e => setApproverId(e.target.value)}
                   required={requiresApproval}
-                  className="w-full px-3 py-1.5 rounded-lg border border-border bg-background text-xs focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  className={`w-full px-3 py-1.5 rounded-lg border text-xs focus:outline-none focus:ring-2 ${
+                    isDarkTheme 
+                      ? "border-white/10 bg-[#141622] text-white focus:ring-indigo-500/20" 
+                      : "border-border bg-background text-foreground focus:ring-primary/20"
+                  }`}
                 >
                   <option value="">Choose an approver...</option>
                   {activeUsers.map(u => (
-                    <option key={u.id} value={u.id}>{u.name}</option>
+                    <option key={u.id} value={u.id} className={isDarkTheme ? "bg-[#141622]" : ""}>{u.name}</option>
                   ))}
                 </select>
               </div>
@@ -286,58 +354,84 @@ export function CreateTaskDialog({
           </div>
           
           <label className="flex items-center gap-2 cursor-pointer mt-1 group">
-            <div className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${isHrTask ? 'bg-rose-500 border-rose-500 text-white' : 'border-border bg-background'}`}>
+            <div className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${
+              isHrTask ? "bg-rose-500 border-rose-500 text-white" : (isDarkTheme ? "border-white/10 bg-[#141622]" : "border-border bg-background")
+            }`}>
               <input type="checkbox" checked={isHrTask} onChange={e => setIsHrTask(e.target.checked)}
                 className="sr-only" />
               {isHrTask && <CheckCircle2 className="w-3 h-3" />}
             </div>
-            <span className="text-xs font-medium text-foreground flex items-center gap-1.5">
+            <span className={`text-xs font-medium flex items-center gap-1.5 ${isDarkTheme ? "text-white/80" : "text-foreground"}`}>
               HR Task 
             </span>
           </label>
 
           {/* Tag to Site Section */}
-          <div className={`mt-2 border border-border rounded-xl transition-all ${tagToSite ? 'bg-primary/5 border-primary/20' : ''}`}>
+          <div className={`mt-2 border rounded-xl transition-all ${
+            tagToSite 
+              ? (isDarkTheme ? "bg-indigo-500/10 border-indigo-500/20" : "bg-primary/5 border-primary/20") 
+              : (isDarkTheme ? "border-white/10" : "border-border")
+          }`}>
              <div className="flex items-center justify-between px-4 py-3 cursor-pointer" onClick={() => setTagToSite(!tagToSite)}>
                 <div className="flex items-center gap-2.5">
-                   <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${tagToSite ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
+                   <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
+                     tagToSite 
+                       ? (isDarkTheme ? "bg-indigo-600 text-white" : "bg-primary text-primary-foreground") 
+                       : (isDarkTheme ? "bg-white/5 text-white/50" : "bg-muted text-muted-foreground")
+                   }`}>
                       <MapPin className="w-4 h-4" />
                    </div>
                    <div>
-                      <span className="text-sm font-semibold text-foreground">Tag to Site / Client</span>
-                      <p className="text-[10px] text-muted-foreground">Associate this task with a specific client and site</p>
+                      <span className={`text-sm font-semibold ${isDarkTheme ? "text-white" : "text-foreground"}`}>Tag to Site / Client</span>
+                      <p className={`text-[10px] ${isDarkTheme ? "text-white/40" : "text-muted-foreground"}`}>Associate this task with a specific client and site</p>
                    </div>
                 </div>
-                <div className={`w-10 h-6 rounded-full transition-colors relative ${tagToSite ? 'bg-primary' : 'bg-slate-200'}`}>
-                   <div className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow-sm transition-all ${tagToSite ? 'left-5' : 'left-1'}`} />
+                <div className={`w-10 h-6 rounded-full transition-colors relative ${
+                  tagToSite 
+                    ? (isDarkTheme ? "bg-indigo-600" : "bg-primary") 
+                    : (isDarkTheme ? "bg-white/10" : "bg-slate-200")
+                }`}>
+                   <div className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow-sm transition-all ${tagToSite ? "left-5" : "left-1"}`} />
                 </div>
              </div>
 
              <AnimatePresence>
                 {tagToSite && (
-                   <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+                   <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
                       <div className="px-4 pb-4 pt-1 grid grid-cols-2 gap-4">
                          <div>
-                            <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1.5">Client</label>
-                            <select value={clientId} onChange={e => { setClientId(e.target.value); setSiteId(''); }}
-                               className="w-full px-3 py-2 rounded-xl border border-border bg-background text-xs focus:outline-none focus:ring-2 focus:ring-primary/20">
-                               <option value="">No Client</option>
+                            <label className={`block text-[10px] font-bold uppercase tracking-wider mb-1.5 ${
+                              isDarkTheme ? "text-white/40" : "text-muted-foreground"
+                            }`}>Client</label>
+                            <select value={clientId} onChange={e => { setClientId(e.target.value); setSiteId(""); }}
+                               className={`w-full px-3 py-2 rounded-xl border text-xs focus:outline-none focus:ring-2 ${
+                                 isDarkTheme 
+                                   ? "border-white/10 bg-[#141622] text-white focus:ring-indigo-500/20" 
+                                   : "border-border bg-background text-foreground focus:ring-primary/20"
+                               }`}>
+                               <option value="" className={isDarkTheme ? "bg-[#141622]" : ""}>No Client</option>
                                {clientProfiles.map(c => (
-                                  <option key={c.id} value={c.id}>{c.name}</option>
+                                  <option key={c.id} value={c.id} className={isDarkTheme ? "bg-[#141622]" : ""}>{c.name}</option>
                                ))}
                             </select>
                          </div>
                          <div>
-                            <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1.5">Site</label>
+                            <label className={`block text-[10px] font-bold uppercase tracking-wider mb-1.5 ${
+                              isDarkTheme ? "text-white/40" : "text-muted-foreground"
+                            }`}>Site</label>
                             <select value={siteId} onChange={e => setSiteId(e.target.value)} disabled={!clientId}
-                               className="w-full px-3 py-2 rounded-xl border border-border bg-background text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50">
-                               <option value="">No Site</option>
+                               className={`w-full px-3 py-2 rounded-xl border text-xs focus:outline-none focus:ring-2 disabled:opacity-50 ${
+                                 isDarkTheme 
+                                   ? "border-white/10 bg-[#141622] text-white focus:ring-indigo-500/20" 
+                                   : "border-border bg-background text-foreground focus:ring-primary/20"
+                               }`}>
+                               <option value="" className={isDarkTheme ? "bg-[#141622]" : ""}>No Site</option>
                                {sites.filter(s => {
                                   const cName = clientProfiles.find(c => c.id === clientId)?.name;
                                   return s.client === cName || s.client === clientId;
-                               }).map(s => (
-                                  <option key={s.id} value={s.id}>{s.name}</option>
-                               ))}
+                                }).map(s => (
+                                  <option key={s.id} value={s.id} className={isDarkTheme ? "bg-[#141622]" : ""}>{s.name}</option>
+                                ))}
                             </select>
                          </div>
                       </div>
@@ -346,14 +440,20 @@ export function CreateTaskDialog({
              </AnimatePresence>
           </div>
 
-          <div className="border border-border rounded-xl overflow-hidden">
+          <div className={`border rounded-xl overflow-hidden ${isDarkTheme ? "border-white/5" : "border-border"}`}>
             <button type="button" onClick={toggleSubs}
-              className="w-full flex items-center justify-between px-4 py-3 bg-muted/50 hover:bg-muted transition-colors text-left">
-              <span className="text-sm font-medium text-foreground flex items-center gap-2">
-                <Plus className="w-3.5 h-3.5 text-primary" />Subtasks
-                {subtasks.length > 0 && <span className="text-[11px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-semibold">{subtasks.length}</span>}
+              className={`w-full flex items-center justify-between px-4 py-3 transition-colors text-left ${
+                isDarkTheme ? "bg-white/5 hover:bg-white/10" : "bg-muted/50 hover:bg-muted"
+              }`}>
+              <span className={`text-sm font-medium flex items-center gap-2 ${isDarkTheme ? "text-white" : "text-foreground"}`}>
+                <Plus className={`w-3.5 h-3.5 ${isDarkTheme ? "text-indigo-400" : "text-primary"}`} />Subtasks
+                {subtasks.length > 0 && (
+                  <span className={`text-[11px] px-1.5 py-0.5 rounded-full font-semibold ${
+                    isDarkTheme ? "bg-[#141622] text-indigo-400" : "bg-primary/10 text-primary"
+                  }`}>{subtasks.length}</span>
+                )}
               </span>
-              <span className="text-xs text-muted-foreground">{showSubs ? "Hide" : "Optional"}</span>
+              <span className={`text-xs ${isDarkTheme ? "text-white/40" : "text-muted-foreground"}`}>{showSubs ? "Hide" : "Optional"}</span>
             </button>
 
             <AnimatePresence>
@@ -364,28 +464,44 @@ export function CreateTaskDialog({
                     {subtasks.map((sub, i) => (
                       <div key={i} className="space-y-1.5">
                         <div className="flex items-center gap-2">
-                          <span className="text-xs font-semibold text-muted-foreground w-4 flex-shrink-0 text-right">{i + 1}.</span>
+                          <span className={`text-xs font-semibold w-4 flex-shrink-0 text-right ${isDarkTheme ? "text-white/40" : "text-muted-foreground"}`}>{i + 1}.</span>
                           <input required value={sub.title} onChange={e => updateRow(i, "title", e.target.value)}
                             placeholder="Subtask title"
-                            className="flex-1 px-3 py-2 rounded-xl border border-border text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-sm" />
+                            className={`flex-1 px-3 py-2 rounded-xl border text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-sm ${
+                              isDarkTheme 
+                                ? "border-white/10 bg-[#141622] text-white focus:ring-indigo-500/20" 
+                                : "border-border bg-background text-foreground focus:ring-primary/20"
+                            }`} />
                           <button type="button" onClick={() => removeRow(i)}
-                            className="text-muted-foreground hover:text-red-500 hover:bg-red-50 p-1.5 rounded-lg transition-colors flex-shrink-0">
+                            className={`p-1.5 rounded-lg transition-colors flex-shrink-0 ${
+                              isDarkTheme 
+                                ? "text-white/40 hover:text-red-400 hover:bg-white/5" 
+                                : "text-muted-foreground hover:text-red-500 hover:bg-red-50"
+                            }`}>
                             <X className="w-4 h-4" />
                           </button>
                         </div>
                         <div className="flex items-center gap-2 ml-6 flex-wrap">
                           <div className="relative">
                             <button type="button" onClick={() => setOpenSubDropdown(openSubDropdown === i ? null : i)}
-                              className="px-2.5 py-1.5 flex items-center justify-between gap-2 min-w-[120px] rounded-lg border border-border text-xs bg-background focus:outline-none focus:ring-1 focus:ring-primary/20 shadow-sm cursor-pointer">
-                              <span className="truncate">{sub.assignedTo.length > 0 ? `${sub.assignedTo.length} selected` : 'Assign...'}</span>
+                              className={`px-2.5 py-1.5 flex items-center justify-between gap-2 min-w-[120px] rounded-lg border text-xs focus:outline-none focus:ring-1 shadow-sm cursor-pointer ${
+                                isDarkTheme 
+                                  ? "border-white/10 bg-[#141622] text-white/70 focus:ring-indigo-500/20" 
+                                  : "border-border bg-background text-foreground focus:ring-primary/20"
+                              }`}>
+                              <span className="truncate">{sub.assignedTo.length > 0 ? `${sub.assignedTo.length} selected` : "Assign..."}</span>
                               <ChevronDown className="w-3 h-3 text-muted-foreground opacity-50 shrink-0" />
                             </button>
                             {openSubDropdown === i && (
                               <>
                                 <div className="fixed inset-0 z-[100]" onClick={() => setOpenSubDropdown(null)} />
-                                <div className="absolute top-full left-0 mt-1 min-w-[200px] w-max max-w-[350px] max-h-[200px] overflow-y-auto bg-card border border-border rounded-lg shadow-xl z-[101] py-1 hide-scrollbar">
+                                <div className={`absolute top-full left-0 mt-1 min-w-[200px] w-max max-w-[350px] max-h-[200px] overflow-y-auto border rounded-lg shadow-xl z-[101] py-1 hide-scrollbar ${
+                                  isDarkTheme ? "bg-[#141622] border-white/10 text-white" : "bg-card border-border text-foreground"
+                                }`}>
                                   {activeUsers.map(u => (
-                                    <label key={u.id} className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted transition-colors">
+                                    <label key={u.id} className={`flex items-center gap-2 px-3 py-2 cursor-pointer transition-colors ${
+                                      isDarkTheme ? "hover:bg-white/5" : "hover:bg-muted"
+                                    }`}>
                                       <input type="checkbox"
                                         checked={sub.assignedTo.includes(u.id)}
                                         onChange={(e) => {
@@ -393,7 +509,7 @@ export function CreateTaskDialog({
                                           else updateRow(i, "assignedTo", sub.assignedTo.filter(id => id !== u.id));
                                         }}
                                         className="w-3 h-3 rounded" />
-                                      <span className="text-xs text-foreground whitespace-normal leading-tight">{u.name}</span>
+                                      <span className="text-xs whitespace-normal leading-tight">{u.name}</span>
                                     </label>
                                   ))}
                                 </div>
@@ -401,34 +517,54 @@ export function CreateTaskDialog({
                             )}
                           </div>
                           <input type="date" value={sub.deadline} onChange={e => updateRow(i, "deadline", e.target.value)}
-                            className="px-2.5 py-1.5 rounded-lg border border-border text-xs bg-background focus:outline-none focus:ring-1 focus:ring-primary/20 shadow-sm" />
+                            className={`px-2.5 py-1.5 rounded-lg border text-xs bg-background focus:outline-none focus:ring-1 shadow-sm ${
+                              isDarkTheme 
+                                ? "border-white/10 bg-[#141622] text-white focus:ring-indigo-500/20" 
+                                : "border-border bg-background text-foreground focus:ring-primary/20"
+                            }`} />
                           <input type="time" value={sub.deadlineTime} onChange={e => updateRow(i, "deadlineTime", e.target.value)}
                             disabled={!sub.deadline}
-                            className="px-2.5 py-1.5 rounded-lg border border-border text-xs bg-background focus:outline-none focus:ring-1 focus:ring-primary/20 shadow-sm disabled:opacity-50" />
-                          <select value={sub.priority ?? ''} onChange={e => updateRow(i, "priority", e.target.value ? e.target.value as TaskPriority : undefined)}
-                            className="px-2.5 py-1.5 rounded-lg border border-border text-xs bg-background focus:outline-none focus:ring-1 focus:ring-primary/20 shadow-sm">
-                            <option value="">No Priority</option>
-                            {PRIORITY_ORDER.map(p => <option key={p} value={p}>{PRIORITY_CONFIG[p].label}</option>)}
+                            className={`px-2.5 py-1.5 rounded-lg border text-xs bg-background focus:outline-none focus:ring-1 shadow-sm disabled:opacity-50 ${
+                              isDarkTheme 
+                                ? "border-white/10 bg-[#141622] text-white focus:ring-indigo-500/20" 
+                                : "border-border bg-background text-foreground focus:ring-primary/20"
+                            }`} />
+                          <select value={sub.priority ?? ""} onChange={e => updateRow(i, "priority", e.target.value ? e.target.value as TaskPriority : undefined)}
+                            className={`px-2.5 py-1.5 rounded-lg border text-xs bg-background focus:outline-none focus:ring-1 shadow-sm ${
+                              isDarkTheme 
+                                ? "border-white/10 bg-[#141622] text-white focus:ring-indigo-500/20" 
+                                : "border-border bg-background text-foreground focus:ring-primary/20"
+                            }`}>
+                            <option value="" className={isDarkTheme ? "bg-[#141622]" : ""}>No Priority</option>
+                            {PRIORITY_ORDER.map(p => <option key={p} value={p} className={isDarkTheme ? "bg-[#141622]" : ""}>{PRIORITY_CONFIG[p].label}</option>)}
                           </select>
                         </div>
                         <div className="ml-6 flex flex-col gap-2">
                           <label className="flex items-center gap-1.5 cursor-pointer">
                             <input type="checkbox" checked={sub.requiresApproval} onChange={e => updateRow(i, "requiresApproval", e.target.checked)}
                               className="w-3.5 h-3.5 rounded border-border text-primary focus:ring-primary/20" />
-                            <span className="text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors">Approval Needed</span>
+                            <span className={`text-[11px] font-medium transition-colors ${
+                              isDarkTheme ? "text-white/60 hover:text-white" : "text-muted-foreground hover:text-foreground"
+                            }`}>Approval Needed</span>
                           </label>
                           {sub.requiresApproval && (
                             <div className="w-full max-w-[200px]">
-                              <label className="block text-[9px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Select Approver</label>
+                              <label className={`block text-[9px] font-bold uppercase tracking-wider mb-1 ${
+                                isDarkTheme ? "text-white/40" : "text-muted-foreground"
+                              }`}>Select Approver</label>
                               <select 
                                 value={sub.approverId} 
                                 onChange={e => updateRow(i, "approverId", e.target.value)}
                                 required={sub.requiresApproval}
-                                className="w-full px-2 py-1 rounded-lg border border-border bg-background text-[11px] focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                className={`w-full px-2 py-1 rounded-lg border text-[11px] focus:outline-none focus:ring-2 ${
+                                  isDarkTheme 
+                                    ? "border-white/10 bg-[#141622] text-white focus:ring-indigo-500/20" 
+                                    : "border-border bg-background text-foreground focus:ring-primary/20"
+                                }`}
                               >
                                 <option value="">Choose an approver...</option>
                                 {activeUsers.map(u => (
-                                  <option key={u.id} value={u.id}>{u.name}</option>
+                                  <option key={u.id} value={u.id} className={isDarkTheme ? "bg-[#141622]" : ""}>{u.name}</option>
                                 ))}
                               </select>
                             </div>
@@ -437,7 +573,11 @@ export function CreateTaskDialog({
                       </div>
                     ))}
                     <button type="button" onClick={addRow}
-                      className="w-full py-2.5 rounded-xl border border-dashed border-border bg-muted/30 text-xs font-semibold text-muted-foreground hover:bg-muted transition-all active:scale-[0.98]">
+                      className={`w-full py-2.5 rounded-xl border border-dashed text-xs font-semibold transition-all active:scale-[0.98] ${
+                        isDarkTheme 
+                          ? "border-white/10 bg-white/5 text-white/60 hover:bg-white/10 hover:text-white" 
+                          : "border-border bg-muted/30 text-muted-foreground hover:bg-muted"
+                      }`}>
                       + Add another subtask
                     </button>
                   </div>
@@ -447,42 +587,66 @@ export function CreateTaskDialog({
           </div>
 
           {/* Reminder Section */}
-          <div className={`mt-2 border border-border rounded-xl transition-all ${enableReminder ? 'bg-indigo-50/10 border-indigo-200/50' : ''}`}>
+          <div className={`mt-2 border rounded-xl transition-all ${
+            enableReminder 
+              ? (isDarkTheme ? "bg-indigo-500/10 border-indigo-500/20" : "bg-indigo-50/10 border-indigo-200/50") 
+              : (isDarkTheme ? "border-white/5" : "border-border")
+          }`}>
              <div className="flex items-center justify-between px-4 py-3 cursor-pointer" onClick={() => setEnableReminder(!enableReminder)}>
                 <div className="flex items-center gap-2.5">
-                   <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${enableReminder ? 'bg-indigo-500 text-white' : 'bg-muted text-muted-foreground'}`}>
+                   <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
+                     enableReminder 
+                       ? "bg-indigo-500 text-white" 
+                       : (isDarkTheme ? "bg-white/5 text-white/50" : "bg-muted text-muted-foreground")
+                   }`}>
                       <Bell className="w-4 h-4" />
                    </div>
                    <div>
-                      <span className="text-sm font-semibold text-foreground">Enable Reminder</span>
-                      <p className="text-[10px] text-muted-foreground">Notification before task is due</p>
+                      <span className={`text-sm font-semibold ${isDarkTheme ? "text-white" : "text-foreground"}`}>Enable Reminder</span>
+                      <p className={`text-[10px] ${isDarkTheme ? "text-white/40" : "text-muted-foreground"}`}>Notification before task is due</p>
                    </div>
                 </div>
-                <div className={`w-10 h-6 rounded-full transition-colors relative ${enableReminder ? 'bg-indigo-600' : 'bg-slate-200'}`}>
-                   <div className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow-sm transition-all ${enableReminder ? 'left-5' : 'left-1'}`} />
+                <div className={`w-10 h-6 rounded-full transition-colors relative ${
+                  enableReminder ? "bg-indigo-600" : (isDarkTheme ? "bg-white/10" : "bg-slate-200")
+                }`}>
+                   <div className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow-sm transition-all ${enableReminder ? "left-5" : "left-1"}`} />
                 </div>
              </div>
 
              <AnimatePresence>
                 {enableReminder && (
-                   <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+                   <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
                       <div className="px-4 pb-4 pt-1 grid grid-cols-1 gap-4">
                          <div className="grid grid-cols-2 gap-3">
                             <div>
-                               <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                               <label className={`block text-[10px] font-bold uppercase tracking-wider mb-1.5 flex items-center gap-1 ${
+                                 isDarkTheme ? "text-white/40" : "text-muted-foreground"
+                               }`}>
                                   <Clock className="w-3 h-3" /> Time To Remind At <span className="text-red-400">*</span>
                                </label>
                                <input type="datetime-local" value={reminderAt} onChange={e => setReminderAt(e.target.value)}
-                                  className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-xs focus:outline-none focus:ring-2 focus:ring-indigo-100" />
+                                  className={`w-full px-3.5 py-2.5 rounded-xl border text-xs focus:outline-none focus:ring-2 ${
+                                    isDarkTheme 
+                                      ? "border-white/10 bg-[#141622] text-white focus:ring-indigo-500/20" 
+                                      : "border-border bg-background text-foreground focus:ring-indigo-100"
+                                  }`} />
                             </div>
                             <div>
-                               <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1">
+                               <label className={`block text-[10px] font-bold uppercase tracking-wider mb-2 flex items-center gap-1 ${
+                                 isDarkTheme ? "text-white/40" : "text-muted-foreground"
+                               }`}>
                                   <RefreshCw className="w-3 h-3" /> Frequency
                                </label>
                                <div className="flex flex-wrap gap-1">
                                   {FREQ_KEYS.map(f => (
                                      <button key={f} type="button" onClick={() => setReminderFreq(f)}
-                                        className={`px-2 py-1 rounded-md text-[10px] font-bold border transition-all ${reminderFreq === f ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-muted-foreground border-border hover:border-indigo-300'}`}>
+                                        className={`px-2 py-1 rounded-md text-[10px] font-bold border transition-all ${
+                                          reminderFreq === f 
+                                            ? "bg-indigo-600 text-white border-indigo-600" 
+                                            : (isDarkTheme 
+                                                ? "bg-transparent text-white/50 border-white/10 hover:border-indigo-500/50 hover:text-white" 
+                                                : "bg-white text-muted-foreground border-border hover:border-indigo-300")
+                                        }`}>
                                         {FREQ_LABELS[f]}
                                      </button>
                                   ))}
@@ -496,12 +660,20 @@ export function CreateTaskDialog({
           </div>
 
           <div className="flex justify-end gap-3 pt-1">
-            <Button type="button" onClick={onClose}
-              className="px-5 h-auto py-2.5 rounded-xl border border-border bg-card text-sm text-muted-foreground hover:bg-muted transition-colors">Cancel</Button>
-            <Button type="submit" disabled={!title.trim() || (enableReminder && !reminderAt) || isSubmitting}
-              className="px-5 h-auto py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">
-              {isSubmitting ? 'Creating...' : 'Create Task'}
-            </Button>
+            <button type="button" onClick={onClose}
+              className={`px-5 h-auto py-2.5 rounded-xl border text-sm transition-colors ${
+                isDarkTheme 
+                  ? "border-white/10 bg-transparent text-white/60 hover:bg-white/5 hover:text-white" 
+                  : "border-border bg-card text-muted-foreground hover:bg-muted"
+              }`}>Cancel</button>
+            <button type="submit" disabled={!title.trim() || (enableReminder && !reminderAt) || isSubmitting}
+              className={`px-5 h-auto py-2.5 rounded-xl text-sm font-medium transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed ${
+                isDarkTheme 
+                  ? "bg-indigo-600 hover:bg-indigo-500 text-white disabled:bg-indigo-600/50" 
+                  : "bg-primary text-primary-foreground hover:bg-primary/90"
+              }`}>
+              {isSubmitting ? "Creating..." : "Create Task"}
+            </button>
           </div>
         </form>
       </motion.div>

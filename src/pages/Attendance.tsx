@@ -1225,7 +1225,16 @@ export function Attendance() {
       // Default: on weekdays that aren't holidays, Operations staff are at Office for day shift.
       // Other departments only get an entry if manually specified (status, day, night, or overtime).
       const isOperations = opsEngDeptNames.has(emp.department);  // O(1) Set lookup
-      const fillData = isOperations ? isWorkday : false;
+      let fillData = isOperations ? isWorkday : false;
+
+      // Check if employee is actively employed on the register date
+      const rDate = new Date(registerDate);
+      rDate.setHours(0, 0, 0, 0);
+      let isEmployed = true;
+      if (emp.startDate && new Date(emp.startDate) > rDate) isEmployed = false;
+      if (emp.endDate && new Date(emp.endDate) < rDate) isEmployed = false;
+      if (!isEmployed) fillData = false;
+
       const hasOvertime = attendanceData[emp.id]?.overtime;
       if (!fillData && !staffHasWorkEntry && !formDaySite && !formNightSite && !hasOvertime) return;
 

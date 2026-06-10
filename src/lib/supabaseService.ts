@@ -921,7 +921,7 @@ export async function fetchAllAppData(privs?: any) {
     supabase.from('sites').select('*').order('created_at'),
     supabase.from('clients').select('*').order('name'),
     canView('employees') ? supabase.from('employees').select('*').order('surname') : Promise.resolve({ data: [] }),
-    canView('attendance') ? supabase.from('attendance_records').select('*').gte('date', `${new Date().getFullYear()}-01-01`).lte('date', `${new Date().getFullYear()}-12-31`).order('date', { ascending: false }) : Promise.resolve({ data: [] }),
+    canView('attendance') ? fetchAttendanceByYearRaw(new Date().getFullYear()) : Promise.resolve([]),
     canView('billing') ? supabase.from('invoices').select('*').order('date', { ascending: false }) : Promise.resolve({ data: [] }),
     canView('billing') ? supabase.from('pending_invoices').select('*').order('created_at') : Promise.resolve({ data: [] }),
     canView('salaryLoans') ? supabase.from('salary_advances').select('*').order('request_date', { ascending: false }) : Promise.resolve({ data: [] }),
@@ -963,7 +963,7 @@ export async function fetchAllAppData(privs?: any) {
     clients: (clientsRes.data || []).map((c: any) => c.name),
     clientProfiles: (clientsRes.data || []).map(dbToClientProfile),
     employees: (employeesRes.data || []).map(dbToEmployee),
-    attendanceRecords: (attendanceRes.data || []).map(dbToAttendance),
+    attendanceRecords: (attendanceRes || []).map(dbToAttendance),
     invoices: (invoicesRes.data || []).map(dbToInvoice),
     pendingInvoices: (pendingInvRes.data || []).map(dbToPendingInvoice),
     salaryAdvances: (advancesRes.data || []).map(dbToSalaryAdvance),
@@ -1016,15 +1016,31 @@ export async function fetchAllAppData(privs?: any) {
   };
 }
 
+export async function fetchAttendanceByYearRaw(year: number): Promise<any[]> {
+  let allData: any[] = [];
+  let page = 0;
+  const pageSize = 1000;
+  while (true) {
+    const { data, error } = await supabase
+      .from('attendance_records')
+      .select('*')
+      .gte('date', `${year}-01-01`)
+      .lte('date', `${year}-12-31`)
+      .order('date', { ascending: false })
+      .range(page * pageSize, (page + 1) * pageSize - 1);
+    
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+    allData = [...allData, ...data];
+    if (data.length < pageSize) break;
+    page++;
+  }
+  return allData;
+}
+
 export async function fetchAttendanceByYear(year: number): Promise<AttendanceRecord[]> {
-  const { data, error } = await supabase
-    .from('attendance_records')
-    .select('*')
-    .gte('date', `${year}-01-01`)
-    .lte('date', `${year}-12-31`)
-    .order('date', { ascending: false });
-  if (error) throw error;
-  return (data || []).map(dbToAttendance);
+  const data = await fetchAttendanceByYearRaw(year);
+  return data.map(dbToAttendance);
 }
 
 export async function fetchAllUsers(privs?: any) {

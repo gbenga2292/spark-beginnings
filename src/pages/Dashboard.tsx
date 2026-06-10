@@ -222,12 +222,29 @@ export function Dashboard() {
     // ── DEPARTMENT BREAKDOWN ──
     const deptData = useMemo(() => {
         const deptMap: Record<string, number> = {};
-        employees.filter(e => e.status === 'Active').forEach(emp => {
+        
+        employees.forEach(emp => {
+            if (emp.status !== 'Active' && !emp.endDate) return;
+
+            if (filterMonth) {
+                const startOfViewingMonth = new Date(filterYear, filterMonth - 1, 1);
+                const endOfViewingMonth = new Date(filterYear, filterMonth, 0);
+
+                if (emp.startDate && new Date(emp.startDate) > endOfViewingMonth) return;
+                if (emp.endDate && new Date(emp.endDate) < startOfViewingMonth) return;
+            } else {
+                const startOfYear = new Date(filterYear, 0, 1);
+                const endOfYear = new Date(filterYear, 11, 31);
+                
+                if (emp.startDate && new Date(emp.startDate) > endOfYear) return;
+                if (emp.endDate && new Date(emp.endDate) < startOfYear) return;
+            }
+
             const dept = emp.department || 'Unassigned';
             deptMap[dept] = (deptMap[dept] || 0) + 1;
         });
         return Object.entries(deptMap).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
-    }, [employees]);
+    }, [employees, filterMonth, filterYear]);
 
     // ── ELAPSED WORKING DAYS ──
     const elapsedWorkDaysYear = useMemo(() => {

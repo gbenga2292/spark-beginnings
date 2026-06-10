@@ -239,7 +239,7 @@ function AppContent() {
             {/* Operations & Analytics — Restricted on Web */}
             <Route path="operations/*" element={
               <Page label="Operations">
-                <ProtectedRoute requiredModule={['operations', 'opsInventory', 'opsWaybills', 'opsCheckout', 'opsMaintenance', 'opsVehicles', 'opsSites']}>
+                <ProtectedRoute requiredModule={['operations', 'opsInventory', 'opsWaybills', 'opsCheckout', 'opsMaintenance', 'opsVehicles', 'opsSites', 'simulator']}>
                   <>
                     <Routes>
                       <Route index element={<OperationsDashboard />} />
@@ -250,7 +250,7 @@ function AppContent() {
                       <Route path="vehicles" element={<ProtectedRoute requiredModule="opsVehicles"><VehicleManager /></ProtectedRoute>} />
                       <Route path="sites" element={<ProtectedRoute requiredModule="opsSites"><SiteManager /></ProtectedRoute>} />
                       <Route path="analytics" element={<ProtectedRoute requiredModule="opsCheckout"><EmployeeAnalytics /></ProtectedRoute>} />
-                      <Route path="simulator" element={<ProtectedRoute requiredModule="opsSites"><Simulator /></ProtectedRoute>} />
+                      <Route path="simulator" element={<ProtectedRoute requiredModule="simulator"><Simulator /></ProtectedRoute>} />
                       <Route path="*" element={<Navigate to="/operations" replace />} />
                     </Routes>
                   </>

@@ -109,6 +109,14 @@ export interface InterviewsPriv {
   canForwardToOnboarding: boolean;
 }
 
+// ─── Simulator ───────────────────────────────────────────────
+export interface SimulatorPriv {
+  canView: boolean;
+  canSave: boolean;
+  canDelete: boolean;
+  canExport: boolean;
+}
+
 // ─── Master interface ─────────────────────────────────────────
 export interface UserPrivileges {
   dashboard:         DashboardPriv;
@@ -144,6 +152,7 @@ export interface UserPrivileges {
   dailyJournal:      DailyJournalPriv;
   weeklyReport:      WeeklyReportPriv;
   interviews:        InterviewsPriv;
+  simulator:         SimulatorPriv;
 }
 
 export interface AppUser {
@@ -209,6 +218,7 @@ export const FULL_ACCESS: UserPrivileges = {
   dailyJournal:     { canView: true, canAdd: true, canEdit: true, canDelete: true, canExport: true },
   weeklyReport:     { canView: true, canViewHr: true, canViewOps: true, canViewComm: true, canViewFinance: true },
   interviews:       { canView: true, canAdd: true, canEdit: true, canDelete: true, canConductInterview: true, canRecordVerdict: true, canForwardToOnboarding: true },
+  simulator:        { canView: true, canSave: true, canDelete: true, canExport: true },
 };
 
 // ─── NO ACCESS ───────────────────────────────────────────────
@@ -253,6 +263,7 @@ export const NO_ACCESS: UserPrivileges = {
   dailyJournal:     { canView: false, canAdd: false, canEdit: false, canDelete: false, canExport: false },
   weeklyReport:     { canView: false, canViewHr: false, canViewOps: false, canViewComm: false, canViewFinance: false },
   interviews:       { canView: false, canAdd: false, canEdit: false, canDelete: false, canConductInterview: false, canRecordVerdict: false, canForwardToOnboarding: false },
+  simulator:        { canView: false, canSave: false, canDelete: false, canExport: false },
 };
 
 // ─── DEFAULT PRESETS ─────────────────────────────────────────

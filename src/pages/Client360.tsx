@@ -1,24 +1,25 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { 
-  Building2, MapPin, AlertTriangle, FileText, CheckCircle2, Clock, 
+import {
+  Building2, MapPin, AlertTriangle, FileText, CheckCircle2, Clock,
   Calendar, Sparkles, ChevronDown, ChevronUp, Users, Phone, DollarSign,
   Activity, Briefcase, MessagesSquare, RefreshCcw, Filter, Send,
   ShieldAlert, ShieldCheck, Settings2, X, Edit2, ChevronRight, CheckSquare,
-  Plus, Trash2, Circle, Eye, Search, Receipt, BookOpen, MessageSquare, Pencil, MoreVertical
+  Plus, Trash2, Circle, Eye, MoreVertical, BookOpen, MessageSquare, Pencil,
+  Hourglass,
 } from 'lucide-react';
 import { toast, showConfirm } from '@/src/components/ui/toast';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
-} from '@/src/components/ui/dropdown-menu';
 import { motion, AnimatePresence } from 'framer-motion';
 import { TaskDetailSheet } from '@/src/components/tasks/TaskDetailSheet';
 import { Button } from '@/src/components/ui/button';
 import { Badge } from '@/src/components/ui/badge';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from '@/src/components/ui/dropdown-menu';
 import { useTheme } from '@/src/hooks/useTheme';
 import { cn } from '@/src/lib/utils';
 import { useAppStore, Site, ClientProfile } from '@/src/store/appStore';
@@ -30,10 +31,10 @@ import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { parseISO } from 'date-fns';
 import { normalizeDate } from '@/src/lib/dateUtils';
 import { Site360View } from './Site360View';
-import { GlobalSearch } from '@/src/components/common/GlobalSearch';
 import { ClientContactsPanel } from './ClientContactsPanel';
 import { CreateTaskDialog } from './Tasks/CreateTaskDialog';
 import { InvoiceDetailDialog } from './InvoiceDetailDialog';
+import { GlobalSearch } from '@/src/components/common/GlobalSearch';
 
 type TabType = 'overview' | 'contacts' | 'financials' | 'operations' | 'activity' | 'tasks' | 'onboarding';
 
@@ -216,14 +217,22 @@ export function Client360() {
   }, [allClients, searchParams, setSearchParams, selectedClient, activeTab]);
 
   const clientPendingSites = useMemo(() => {
+    // All site names for this client that have been activated (exist as a site record, any status)
+    const activatedSiteNames = new Set(
+      sites
+        .filter(s => s.client?.trim().toLowerCase() === selectedClient?.trim().toLowerCase())
+        .map(s => s.name?.trim().toLowerCase())
+    );
+
     return pendingSites.filter(ps =>
       ps.clientName?.trim().toLowerCase() === selectedClient?.trim().toLowerCase() &&
-      ps.status === 'Pending'
+      ps.status === 'Pending' &&
+      !activatedSiteNames.has(ps.siteName?.trim().toLowerCase())
     );
-  }, [pendingSites, selectedClient]);
+  }, [pendingSites, selectedClient, sites]);
 
   const [activitySubTab, setActivitySubTab] = useState<'history' | 'onboarding'>('history');
-  const [sitesSubTab, setSitesSubTab] = useState<'portfolio' | 'onboarding' | 'closed'>('portfolio');
+  const [sitesSubTab, setSitesSubTab] = useState<'portfolio' | 'onboarding' | 'pending' | 'closed'>('portfolio');
   const [filterMonth, setFilterMonth] = useState<string>('all');
   const [filterYear, setFilterYear] = useState<string>('all');
   const [isChatCollapsed, setIsChatCollapsed] = useState(true);
@@ -1398,12 +1407,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                         {clientData.activeSites} <span className="text-xs sm:text-sm font-medium text-slate-400">/ {clientData.totalSites}</span>
                       </p>
                     </div>
-                    <div className={cn("p-3 sm:p-5 rounded-2xl border shadow-sm min-w-0", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
-                      <p className="text-[10px] sm:text-xs text-slate-500 font-bold uppercase tracking-wider mb-1 flex items-center gap-1.5 truncate"><Users className="w-3.5 h-3.5 shrink-0"/> Deployed Staff</p>
-                      <p className="text-sm min-[390px]:text-base sm:text-lg md:text-2xl font-black text-sky-600 truncate">
-                        {clientData.deployedStaffCount} <span className="text-xs sm:text-sm font-medium text-slate-400">Today</span>
-                      </p>
-                    </div>
+
                   </div>
 
                   {/* Proactive Alerts & Health Score */}
@@ -1953,7 +1957,8 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                     {[
                       { id: 'portfolio', label: 'Active', count: clientData.clientSites.filter((s: any) => s.status === 'Active').length, color: 'text-indigo-650 bg-indigo-50 dark:bg-indigo-950/20 dark:text-indigo-400', icon: MapPin },
                       { id: 'onboarding', label: 'Onboarding', count: clientPendingSites.length, color: 'text-amber-700 bg-amber-50 dark:bg-amber-950/20 dark:text-amber-400', icon: Clock },
-                      { id: 'closed', label: 'Closed', count: clientData.clientSites.filter((s: any) => s.status !== 'Active').length, color: 'text-slate-600 bg-slate-100 dark:bg-slate-800 dark:text-slate-300', icon: CheckCircle2 }
+                      { id: 'pending', label: 'Pending', count: clientData.clientSites.filter((s: any) => s.status === 'Inactive').length, color: 'text-blue-650 bg-blue-50 dark:bg-blue-950/20 dark:text-blue-400', icon: Hourglass },
+                      { id: 'closed', label: 'Closed', count: clientData.clientSites.filter((s: any) => s.status === 'Ended').length, color: 'text-slate-600 bg-slate-100 dark:bg-slate-800 dark:text-slate-300', icon: CheckCircle2 }
                     ].map(subTab => {
                       const isActive = sitesSubTab === subTab.id;
                       return (
@@ -1981,113 +1986,116 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                   </div>
 
                   {/* Sub-tab: Active Sites */}
-                  {sitesSubTab === 'portfolio' && (
-                    <div className={cn("p-6 rounded-2xl border shadow-sm flex flex-col", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
-                      <h3 className="text-lg font-bold mb-4 flex items-center gap-2"><MapPin className="w-5 h-5 text-indigo-500"/> Site Portfolio ({clientData.clientSites.length})</h3>
-                      <div className="space-y-3 flex-1 overflow-y-auto max-h-[400px] style-scroll pr-2">
-                        {clientData.clientSites.length > 0 ? clientData.clientSites.map(site => (
-                          <div key={site.id}
-                            className={cn('p-3 rounded-lg border cursor-pointer transition-all hover:border-indigo-400 hover:shadow-md group relative', isDark ? 'border-slate-800 bg-slate-800/50 hover:bg-slate-800' : 'border-slate-100 bg-slate-50 hover:bg-white')}
-                            onClick={() => setSelectedSite(site)}
-                          >
-                            <div className="flex justify-between items-center">
-                              <div className="flex items-center gap-2">
-                                <MapPin className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
-                                <span className="font-semibold text-sm">{site.name}</span>
-                              </div>
-                              <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                                <Badge className={site.status === 'Active' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700'}>{site.status}</Badge>
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <Button
-                                      variant="ghost" size="icon"
-                                      className="h-8 w-8 text-slate-400 hover:text-indigo-600 hover:bg-slate-200/50 dark:hover:bg-slate-700/50 rounded-lg flex items-center justify-center shrink-0 border-0 bg-transparent cursor-pointer"
-                                    >
-                                      <MoreVertical className="h-4 w-4" />
-                                    </Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end" className="w-[180px]">
-                                    <DropdownMenuItem 
-                                      onClick={() => setNarrativeSite({ site, q: pendingSites.find(ps => ps.siteName === site.name && ps.clientName === site.client) || null })}
-                                      className="gap-2"
-                                    >
-                                      <FileText className="h-4 w-4 text-slate-400" />
-                                      <span>Site Summary</span>
-                                    </DropdownMenuItem>
-                                    
-                                    {canEditSite && (
+                  {sitesSubTab === 'portfolio' && (() => {
+                    const activeSitesList = clientData.clientSites.filter((s: any) => s.status === 'Active');
+                    return (
+                      <div className={cn("p-6 rounded-2xl border shadow-sm flex flex-col", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
+                        <h3 className="text-lg font-bold mb-4 flex items-center gap-2"><MapPin className="w-5 h-5 text-indigo-500"/> Site Portfolio ({activeSitesList.length})</h3>
+                        <div className="space-y-3 flex-1 overflow-y-auto max-h-[400px] style-scroll pr-2">
+                          {activeSitesList.length > 0 ? activeSitesList.map(site => (
+                            <div key={site.id}
+                              className={cn('p-3 rounded-lg border cursor-pointer transition-all hover:border-indigo-400 hover:shadow-md group relative', isDark ? 'border-slate-800 bg-slate-800/50 hover:bg-slate-800' : 'border-slate-100 bg-slate-50 hover:bg-white')}
+                              onClick={() => setSelectedSite(site)}
+                            >
+                              <div className="flex justify-between items-center">
+                                <div className="flex items-center gap-2">
+                                  <MapPin className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                                  <span className="font-semibold text-sm">{site.name}</span>
+                                </div>
+                                <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                  <Badge className={site.status === 'Active' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700'}>{site.status}</Badge>
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button
+                                        variant="ghost" size="icon"
+                                        className="h-8 w-8 text-slate-400 hover:text-indigo-600 hover:bg-slate-200/50 dark:hover:bg-slate-700/50 rounded-lg flex items-center justify-center shrink-0 border-0 bg-transparent cursor-pointer"
+                                      >
+                                        <MoreVertical className="h-4 w-4" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end" className="w-[180px]">
                                       <DropdownMenuItem 
-                                        onClick={() => {
-                                          const linkedQ = pendingSites.find(ps => ps.siteName === site.name && ps.clientName === site.client);
-                                          if (linkedQ) navigate(`/sites/onboarding/${linkedQ.id}`);
-                                          else navigate('/sites/onboarding/new', { state: { linkedSite: site } });
-                                        }}
+                                        onClick={() => setNarrativeSite({ site, q: pendingSites.find(ps => ps.siteName === site.name && ps.clientName === site.client) || null })}
                                         className="gap-2"
                                       >
-                                        <Eye className="h-4 w-4 text-slate-400" />
-                                        <span>View Onboarding</span>
+                                        <FileText className="h-4 w-4 text-slate-400" />
+                                        <span>Site Summary</span>
                                       </DropdownMenuItem>
-                                    )}
-                                    {canViewComm && (
-                                      <DropdownMenuItem 
-                                        onClick={() => {
-                                          navigate(`/sites/conversations/${site.id}`);
-                                        }}
-                                        className="gap-2"
-                                      >
-                                        <MessageSquare className="h-4 w-4 text-slate-400" />
-                                        <span>Site Conversations</span>
-                                      </DropdownMenuItem>
-                                    )}
-
-                                    <DropdownMenuItem 
-                                      onClick={() => {
-                                        navigate(`/sites/diary/${site.id}`);
-                                      }}
-                                      className="gap-2 text-emerald-600 focus:text-emerald-700"
-                                    >
-                                      <BookOpen className="h-4 w-4" />
-                                      <span>Site Diary</span>
-                                    </DropdownMenuItem>
-    
-                                    {canEditSite && (
-                                      <DropdownMenuItem 
-                                        onClick={() => openSiteEdit(site)}
-                                        className="gap-2 text-indigo-700 focus:text-indigo-700 focus:bg-indigo-50"
-                                      >
-                                        <Pencil className="h-4 w-4" />
-                                        <span>Edit Site</span>
-                                      </DropdownMenuItem>
-                                    )}
-    
-                                    {canDeleteSite && (
-                                      <>
-                                        <DropdownMenuSeparator />
+                                      
+                                      {canEditSite && (
                                         <DropdownMenuItem 
-                                          onClick={() => handleDeleteSite(site.id)}
-                                          className="gap-2 text-red-600 focus:text-red-600 focus:bg-red-50"
+                                          onClick={() => {
+                                            const linkedQ = pendingSites.find(ps => ps.siteName === site.name && ps.clientName === site.client);
+                                            if (linkedQ) navigate(`/sites/onboarding/${linkedQ.id}`);
+                                            else navigate('/sites/onboarding/new', { state: { linkedSite: site } });
+                                          }}
+                                          className="gap-2"
                                         >
-                                          <Trash2 className="h-4 w-4" />
-                                          <span>Delete</span>
+                                          <Eye className="h-4 w-4 text-slate-400" />
+                                          <span>View Onboarding</span>
                                         </DropdownMenuItem>
-                                      </>
-                                    )}
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
+                                      )}
+                                      {canViewComm && (
+                                        <DropdownMenuItem 
+                                          onClick={() => {
+                                            navigate(`/sites/conversations/${site.id}`);
+                                          }}
+                                          className="gap-2"
+                                        >
+                                          <MessageSquare className="h-4 w-4 text-slate-400" />
+                                          <span>Site Conversations</span>
+                                        </DropdownMenuItem>
+                                      )}
+
+                                      <DropdownMenuItem 
+                                        onClick={() => {
+                                          navigate(`/sites/diary/${site.id}`);
+                                        }}
+                                        className="gap-2 text-emerald-600 focus:text-emerald-700"
+                                      >
+                                        <BookOpen className="h-4 w-4" />
+                                        <span>Site Diary</span>
+                                      </DropdownMenuItem>
+      
+                                      {canEditSite && (
+                                        <DropdownMenuItem 
+                                          onClick={() => openSiteEdit(site)}
+                                          className="gap-2 text-indigo-700 focus:text-indigo-700 focus:bg-indigo-50"
+                                        >
+                                          <Pencil className="h-4 w-4" />
+                                          <span>Edit Site</span>
+                                        </DropdownMenuItem>
+                                      )}
+      
+                                      {canDeleteSite && (
+                                        <>
+                                          <DropdownMenuSeparator />
+                                          <DropdownMenuItem 
+                                            onClick={() => handleDeleteSite(site.id)}
+                                            className="gap-2 text-red-600 focus:text-red-600 focus:bg-red-50"
+                                          >
+                                            <Trash2 className="h-4 w-4" />
+                                            <span>Delete</span>
+                                          </DropdownMenuItem>
+                                        </>
+                                      )}
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </div>
                               </div>
+                              {site.startDate && <p className="text-xs text-slate-400 mt-1.5 ml-5.5">Since {new Date(site.startDate).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}</p>}
                             </div>
-                            {site.startDate && <p className="text-xs text-slate-400 mt-1.5 ml-5.5">Since {new Date(site.startDate).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}</p>}
-                          </div>
-                        )) : (
-                          <div className="py-12 flex flex-col items-center justify-center text-center text-slate-500">
-                            <MapPin className="w-12 h-12 text-slate-300 dark:text-slate-700 mb-3" />
-                            <p className="font-semibold text-sm">No Active Sites</p>
-                            <p className="text-xs text-slate-400 mt-1">There are no active sites logged for this client.</p>
-                          </div>
-                        )}
+                          )) : (
+                            <div className="py-12 flex flex-col items-center justify-center text-center text-slate-500">
+                              <MapPin className="w-12 h-12 text-slate-300 dark:text-slate-700 mb-3" />
+                              <p className="font-semibold text-sm">No Active Sites</p>
+                              <p className="text-xs text-slate-400 mt-1">There are no active sites logged for this client.</p>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    );
+                  })()}
 
                   {/* Sub-tab: Onboarding Progress */}
                   {sitesSubTab === 'onboarding' && (
@@ -2193,9 +2201,116 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                     </div>
                   )}
 
+                  {/* Sub-tab: Pending Sites */}
+                  {sitesSubTab === 'pending' && (() => {
+                    const inactiveSites = clientData.clientSites.filter((s: any) => s.status === 'Inactive');
+                    return (
+                      <div className={cn("p-6 rounded-2xl border shadow-sm flex flex-col", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
+                        <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                          <Hourglass className="w-5 h-5 text-blue-500"/> Pending Sites ({inactiveSites.length})
+                        </h3>
+                        <div className="space-y-3 flex-1 overflow-y-auto max-h-[400px] style-scroll pr-2">
+                          {inactiveSites.length > 0 ? inactiveSites.map((site: any) => (
+                            <div key={site.id}
+                              className={cn('p-3 rounded-lg border cursor-pointer transition-all hover:border-indigo-400 hover:shadow-md group relative', isDark ? 'border-slate-800 bg-slate-800/50 hover:bg-slate-800' : 'border-slate-100 bg-slate-50 hover:bg-white')}
+                              onClick={() => setSelectedSite(site)}
+                            >
+                              <div className="flex justify-between items-center">
+                                <div className="flex items-center gap-2">
+                                  <MapPin className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                                  <span className="font-semibold text-sm">{site.name}</span>
+                                </div>
+                                <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                  <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-950/20 dark:text-amber-400 border border-amber-200 dark:border-amber-900/30">{site.status}</Badge>
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button
+                                        variant="ghost" size="icon"
+                                        className="h-8 w-8 text-slate-400 hover:text-indigo-600 hover:bg-slate-200/50 dark:hover:bg-slate-700/50 rounded-lg flex items-center justify-center shrink-0 border-0 bg-transparent cursor-pointer"
+                                      >
+                                        <MoreVertical className="h-4 w-4" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end" className="w-[180px]">
+                                      <DropdownMenuItem
+                                        onClick={() => setNarrativeSite({ site, q: pendingSites.find(ps => ps.siteName === site.name && ps.clientName === site.client) || null })}
+                                        className="gap-2"
+                                      >
+                                        <FileText className="h-4 w-4 text-slate-400" />
+                                        <span>Site Summary</span>
+                                      </DropdownMenuItem>
+                                      
+                                      {canEditSite && (
+                                        <DropdownMenuItem
+                                          onClick={() => {
+                                            const linkedQ = pendingSites.find(ps => ps.siteName === site.name && ps.clientName === site.client);
+                                            if (linkedQ) navigate(`/sites/onboarding/${linkedQ.id}`);
+                                            else navigate('/sites/onboarding/new', { state: { linkedSite: site } });
+                                          }}
+                                          className="gap-2"
+                                        >
+                                          <Eye className="h-4 w-4 text-slate-400" />
+                                          <span>View Onboarding</span>
+                                        </DropdownMenuItem>
+                                      )}
+                                      {canViewComm && (
+                                        <DropdownMenuItem
+                                          onClick={() => navigate(`/sites/conversations/${site.id}`)}
+                                          className="gap-2"
+                                        >
+                                          <MessageSquare className="h-4 w-4 text-slate-400" />
+                                          <span>Site Conversations</span>
+                                        </DropdownMenuItem>
+                                      )}
+                                      <DropdownMenuItem
+                                        onClick={() => navigate(`/sites/diary/${site.id}`)}
+                                        className="gap-2 text-emerald-600 focus:text-emerald-700"
+                                      >
+                                        <BookOpen className="h-4 w-4" />
+                                        <span>Site Diary</span>
+                                      </DropdownMenuItem>
+                                      {canEditSite && (
+                                        <DropdownMenuItem
+                                          onClick={() => openSiteEdit(site)}
+                                          className="gap-2 text-indigo-700 focus:text-indigo-700 focus:bg-indigo-50"
+                                        >
+                                          <Pencil className="h-4 w-4" />
+                                          <span>Edit Site</span>
+                                        </DropdownMenuItem>
+                                      )}
+                                      {canDeleteSite && (
+                                        <>
+                                          <DropdownMenuSeparator />
+                                          <DropdownMenuItem
+                                            onClick={() => handleDeleteSite(site.id)}
+                                            className="gap-2 text-red-600 focus:text-red-600 focus:bg-red-50"
+                                          >
+                                            <Trash2 className="h-4 w-4" />
+                                            <span>Delete</span>
+                                          </DropdownMenuItem>
+                                        </>
+                                      )}
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </div>
+                              </div>
+                              {site.startDate && <p className="text-xs text-slate-400 mt-1.5 ml-5.5">Starts {new Date(site.startDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>}
+                            </div>
+                          )) : (
+                            <div className="py-12 flex flex-col items-center justify-center text-center text-slate-500">
+                              <Clock className="w-12 h-12 text-slate-300 dark:text-slate-700 mb-3" />
+                              <p className="font-semibold text-sm">No Pending Sites</p>
+                              <p className="text-xs text-slate-400 mt-1">There are no pending (inactive) sites logged for this client.</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
                   {/* Sub-tab: Closed Sites */}
                   {sitesSubTab === 'closed' && (() => {
-                    const closedSites = clientData.clientSites.filter((s: any) => s.status !== 'Active');
+                    const closedSites = clientData.clientSites.filter((s: any) => s.status === 'Ended');
                     return (
                       <div className={cn("p-6 rounded-2xl border shadow-sm flex flex-col", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
                         <h3 className="text-lg font-bold mb-4 flex items-center gap-2">

@@ -1,3 +1,13 @@
+export interface SiteAttachment {
+  id: string;        // Unique ID (from media server or local)
+  name: string;      // Original file name
+  url: string;       // Public URL on media server
+  fileType?: string; // MIME type or 'document' | 'image' | 'video'
+  uploadedAt: string;
+  uploadedBy?: string;
+  caption?: string;  // Custom caption/description for the document
+}
+
 export interface SiteQuestionnaire {
   id: string;
   siteId?: string; // Links to an existing site, or will be generated once approved
@@ -74,6 +84,9 @@ export interface SiteQuestionnaire {
 
   createdAt: string;
   updatedAt: string;
+
+  // Uploaded site documents (stored as metadata; files hosted on media server)
+  attachments?: SiteAttachment[];
 
   // Dynamic fields from the onboarding template (keyed by field ID → value string)
   customFields?: Record<string, string>;

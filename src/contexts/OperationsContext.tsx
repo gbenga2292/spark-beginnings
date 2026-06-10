@@ -2,7 +2,8 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import {
   Asset, Waybill, AssetCategory, AssetType, AssetStatus, WaybillStatus, WaybillType, 
   Checkout, MaintenanceAsset, MaintenanceSession, MaintenanceLogType, ServiceStatus,
-  Vehicle, VehicleTripLeg, VehicleDocumentType, DailyMachineLog, AssetPumpDate
+  Vehicle, VehicleTripLeg, VehicleDocumentType, DailyMachineLog, AssetPumpDate,
+  MaintenanceCertificate
 } from '../types/operations';
 import { supabase } from '@/src/integrations/supabase/client';
 import { useAppStore } from '../store/appStore';
@@ -68,6 +69,10 @@ interface OperationsContextType {
   deleteDailyLog: (logId: string) => Promise<void>;
   sitePumpDates: AssetPumpDate[];
   persistSitePumpDates: (assetId: string, siteId: string, pumpStartDate: string, pumpStopDate: string | null) => Promise<void>;
+
+  // Certificates
+  maintenanceCertificates: MaintenanceCertificate[];
+  issueCertificate: (cert: Omit<MaintenanceCertificate, 'id'>) => void;
 }
 
 const OperationsContext = createContext<OperationsContextType | undefined>(undefined);
@@ -86,6 +91,7 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
   const [maintenanceSessions, setMaintenanceSessions] = useState<MaintenanceSession[]>([]);
   const [dailyMachineLogs, setDailyMachineLogs] = useState<DailyMachineLog[]>([]);
   const [sitePumpDates, setSitePumpDates] = useState<AssetPumpDate[]>([]);
+  const [maintenanceCertificates, setMaintenanceCertificates] = useState<MaintenanceCertificate[]>([]);
 
   const { 
     vehicles, 
@@ -314,6 +320,30 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
       fetchData();
     }
   }, [user]);
+
+  useEffect(() => {
+    const cachedCerts = localStorage.getItem('dcel-maintenance-certificates');
+    if (cachedCerts) {
+      try {
+        setMaintenanceCertificates(JSON.parse(cachedCerts));
+      } catch (e) {
+        console.error('Failed to parse cached certificates:', e);
+      }
+    }
+  }, []);
+
+  const issueCertificate = (cert: Omit<MaintenanceCertificate, 'id'>) => {
+    const newCert: MaintenanceCertificate = {
+      ...cert,
+      id: crypto.randomUUID()
+    };
+    setMaintenanceCertificates(prev => {
+      const updated = [newCert, ...prev];
+      localStorage.setItem('dcel-maintenance-certificates', JSON.stringify(updated));
+      return updated;
+    });
+    toast.success(`Certificate ${newCert.certNumber} issued successfully`);
+  };
 
   const persistAsset = async (asset: Asset) => {
     try {
@@ -1011,6 +1041,8 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
       dailyMachineLogs,
       sitePumpDates,
       persistSitePumpDates,
+      maintenanceCertificates,
+      issueCertificate,
       addAsset,
       bulkAddAssets,
       updateAsset,

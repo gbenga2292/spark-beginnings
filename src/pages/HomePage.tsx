@@ -110,7 +110,7 @@ const navigation: NavCategory[] = [
     standalone: true,
     standaloneHref: '/operations/simulator',
     items: [
-      { name: 'Simulator', href: '/operations/simulator', icon: HardHat, privKey: 'opsSites', privField: 'canView' },
+      { name: 'Simulator', href: '/operations/simulator', icon: HardHat, privKey: 'simulator', privField: 'canView' },
     ],
   },
   {

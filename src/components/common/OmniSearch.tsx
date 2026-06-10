@@ -23,6 +23,7 @@ import {
   Truck,
   ShoppingCart,
   Activity,
+  HardHat,
 } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { useAppStore } from '@/src/store/appStore';
@@ -94,6 +95,7 @@ export const OmniSearch: React.FC<OmniSearchProps> = ({ isOpen, onClose, isDark 
     { label: 'User Management', desc: 'Users & privileges', href: '/users', icon: ShieldCheck, pK: 'users', pF: 'canView' },
     { label: 'Inventory', desc: 'Assets & tools', href: '/operations/assets', icon: Package, pK: 'opsInventory', pF: 'canView' },
     { label: 'Waybills', desc: 'Dispatch & returns', href: '/operations/waybills', icon: Truck, pK: 'opsWaybills', pF: 'canView' },
+    { label: 'Layout Simulator', desc: 'Dewatering layout CAD & 3D simulator', href: '/operations/simulator', icon: HardHat, pK: 'simulator', pF: 'canView' },
   ], []);
 
   const searchResults = useMemo(() => {

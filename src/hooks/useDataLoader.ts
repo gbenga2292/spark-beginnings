@@ -177,6 +177,10 @@ export function useDataLoader(isAuthenticated: boolean) {
           ...(appData.payrollVariables ? { payrollVariables: appData.payrollVariables as any } : {}),
           ...(appData.payeTaxVariables ? { payeTaxVariables: appData.payeTaxVariables as any } : {}),
           ...(appData.monthValues && Object.keys(appData.monthValues as any).length > 0 ? { monthValues: appData.monthValues as any } : {}),
+          // Mark the current year as fully loaded (all pages fetched via pagination).
+          // This prevents fetchAttendanceYearIfNeeded from re-fetching on first navigation
+          // while still allowing lazy loads for past years (e.g. 2025) on demand.
+          loadedAttendanceYears: [new Date().getFullYear()],
         };
 
         // Hydrate appStore

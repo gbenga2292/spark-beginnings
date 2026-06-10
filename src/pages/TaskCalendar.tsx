@@ -5,17 +5,27 @@ import {
   isBefore, startOfDay
 } from 'date-fns';
 import {
-  Bell, ChevronLeft, ChevronRight, ArrowLeft, CheckSquare,
+  Bell, ChevronLeft, ChevronRight, ArrowLeft, CheckSquare, BookOpen, Clock
 } from 'lucide-react';
 import { useAuth } from '@/src/hooks/useAuth';
 import { useAppData } from '@/src/contexts/AppDataContext';
 import { useNavigate } from 'react-router-dom';
-import { Dialog, DialogFooter } from '@/src/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose, DialogFooter } from '@/src/components/ui/dialog';
 import { Button } from '@/src/components/ui/button';
 import { useAppStore } from '@/src/store/appStore';
+import { CreateTaskDialog } from '@/src/pages/Tasks/CreateTaskDialog';
+import { CreateReminderDialog } from '@/src/pages/Tasks/CreateReminderDialog';
+import { CreateDailyJournalDialog } from '@/src/pages/DailyJournal/CreateDailyJournalDialog';
 
 const WEEKDAYS_FULL = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
+
+const formatDateKey = (d: Date): string => {
+  const yr = d.getFullYear();
+  const mo = String(d.getMonth() + 1).padStart(2, '0');
+  const da = String(d.getDate()).padStart(2, '0');
+  return `${yr}-${mo}-${da}`;
+};
 
 const STATUS_STYLES: Record<string, { bg: string, label: string, icon: any }> = {
   completed: {
@@ -43,6 +53,11 @@ const STATUS_STYLES: Record<string, { bg: string, label: string, icon: any }> = 
     label: 'Reminders',
     icon: Bell,
   },
+  journal: {
+    bg: 'bg-gradient-to-r from-amber-400 to-orange-400',
+    label: 'Daily Journal',
+    icon: BookOpen,
+  },
   holiday: {
     bg: 'bg-pink-600',
     label: 'Public Holiday',
@@ -51,13 +66,13 @@ const STATUS_STYLES: Record<string, { bg: string, label: string, icon: any }> = 
 };
 
 type ViewMode = 'month' | 'day';
-type FilterMode = 'all' | 'mine';
+type FilterMode = 'all' | 'all_tasks' | 'all_reminders' | 'journal';
 
 interface CalendarEvent {
   id: string;
   title: string;
   time: Date;
-  type: 'task' | 'reminder';
+  type: 'task' | 'reminder' | 'journal';
   status?: string;
   body?: string;
   colorClass: string;
@@ -94,6 +109,8 @@ export default function CalendarPage({ onNavigate, showCompleted: externalShowCo
   const [filterMode, setFilterMode] = useState<FilterMode>('all');
   const [showCompleted, setShowCompleted] = useState(externalShowCompleted ?? true);
   const holidays = useAppStore(state => state.publicHolidays);
+  const dailyJournals = useAppStore(state => state.dailyJournals);
+  const siteJournalEntries = useAppStore(state => state.siteJournalEntries);
   
   // Update local state if external prop changes
   useMemo(() => {
@@ -101,7 +118,13 @@ export default function CalendarPage({ onNavigate, showCompleted: externalShowCo
       setShowCompleted(externalShowCompleted);
     }
   }, [externalShowCompleted]);
+  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
+  const [addEventDialogOpen, setAddEventDialogOpen] = useState(false);
+  const [selectedAddHour, setSelectedAddHour] = useState<number | null>(null);
   const [previewEvent, setPreviewEvent] = useState<CalendarEvent | null>(null);
+  const [showCreateTask, setShowCreateTask] = useState(false);
+  const [showCreateReminder, setShowCreateReminder] = useState(false);
+  const [showCreateDailyJournal, setShowCreateDailyJournal] = useState(false);
 
   const allEvents = useMemo(() => {
     const events: CalendarEvent[] = [];
@@ -110,86 +133,88 @@ export default function CalendarPage({ onNavigate, showCompleted: externalShowCo
 
     const activeMainTaskIds = new Set(mainTasks.filter(m => !m.isDeleted).map(m => m.id));
 
-    // Subtasks
-    let relevantSubtasks = filterMode === 'all'
-      ? subtasks.filter(s => s.deadline && activeMainTaskIds.has((s as any).main_task_id || s.mainTaskId))
-      : subtasks.filter(s => s.deadline && s.assignedTo?.includes(currentUser?.id as string) && activeMainTaskIds.has((s as any).main_task_id || s.mainTaskId));
+    // 1. Determine if we should show tasks
+    const showTasks = ['all', 'all_tasks'].includes(filterMode);
 
-    if (!showCompleted) {
-      relevantSubtasks = relevantSubtasks.filter(s => s.status !== 'completed');
-    }
+    if (showTasks) {
+      // Subtasks
+      let relevantSubtasks = subtasks.filter(s => s.deadline && activeMainTaskIds.has((s as any).main_task_id || s.mainTaskId));
 
-    relevantSubtasks.forEach(s => {
-      const deadline = new Date(s.deadline!);
-      const isOverdue = s.status !== 'completed' && isBefore(deadline, today);
-      let statusKey = s.status === 'completed' ? 'completed' : (isOverdue ? 'overdue' : (s.status || 'not_started'));
-      // Normalize 'pending_approval' to 'in_progress' (Ongoing)
-      if (statusKey === 'pending_approval') statusKey = 'in_progress';
-      
-      const style = STATUS_STYLES[statusKey] || STATUS_STYLES.not_started;
-
-      events.push({
-        id: s.id || 'unknown', title: s.title, time: deadline,
-        type: 'task', status: s.status, colorClass: style.bg,
-        isMain: false,
-      });
-    });
-
-    // Main tasks
-    let relevantMainTasks = filterMode === 'all'
-      ? mainTasks.filter(m => m.deadline && !m.isDeleted)
-      : mainTasks.filter(m => m.deadline && !m.isDeleted && (m.assignedTo?.includes(currentUser?.id as string) || m.createdBy === currentUser?.id));
-
-    relevantMainTasks.forEach(m => {
-      const deadline = new Date(m.deadline!);
-      
-      // Calculate main task status based on subtasks
-      const taskSubs = subtasks.filter(s => s.main_task_id === m.id || s.mainTaskId === m.id);
-      
-      // If the main task has subtasks, skip adding it to the calendar
-      // to prevent duplicate visual clutter since the subtasks will be rendered.
-      if (taskSubs.length > 0) {
-        return;
+      if (!showCompleted) {
+        relevantSubtasks = relevantSubtasks.filter(s => s.status !== 'completed');
       }
-      
-      let mStatus = 'not_started';
 
-      const isOverdue = mStatus !== 'completed' && isBefore(deadline, today);
-      const statusKey = mStatus === 'completed' ? 'completed' : (isOverdue ? 'overdue' : mStatus);
-      
-      const style = STATUS_STYLES[statusKey] || STATUS_STYLES.not_started;
+      relevantSubtasks.forEach(s => {
+        const deadline = new Date(s.deadline!);
+        const isOverdue = s.status !== 'completed' && isBefore(deadline, today);
+        let statusKey = s.status === 'completed' ? 'completed' : (isOverdue ? 'overdue' : (s.status || 'not_started'));
+        // Normalize 'pending_approval' to 'in_progress' (Ongoing)
+        if (statusKey === 'pending_approval') statusKey = 'in_progress';
+        
+        const style = STATUS_STYLES[statusKey] || STATUS_STYLES.not_started;
 
-      events.push({
-        id: m.id, title: m.title, time: deadline,
-        type: 'task', status: mStatus, colorClass: style.bg,
-        isMain: true,
-      });
-    });
-
-    // Reminders
-    let relevantReminders = filterMode === 'all'
-      ? reminders.filter(r => r.isActive)
-      : reminders.filter(r => {
-          if (!r.isActive) return false;
-          return r.recipientIds?.includes(currentUser?.id ?? '') || r.createdBy === currentUser?.id;
+        events.push({
+          id: s.id || 'unknown', title: s.title, time: deadline,
+          type: 'task', status: s.status, colorClass: style.bg,
+          isMain: false,
+          body: s.description || '',
         });
+      });
 
-    if (isExternalHr) {
-      relevantReminders = relevantReminders.filter(r => {
-        const mt = mainTasks.find(m => m.id === r.mainTaskId);
-        const isAssigned = mt && (mt.assignedTo || (mt as any).assigned_to || '').includes(currentUser?.id || '');
-        return mt && (!!mt.is_hr_task || mt.created_by === currentUser?.id || mt.createdBy === currentUser?.id || isAssigned);
+      // Main tasks
+      let relevantMainTasks = mainTasks.filter(m => m.deadline && !m.isDeleted);
+
+      relevantMainTasks.forEach(m => {
+        const deadline = new Date(m.deadline!);
+        
+        // Calculate main task status based on subtasks
+        const taskSubs = subtasks.filter(s => s.main_task_id === m.id || s.mainTaskId === m.id);
+        
+        // If the main task has subtasks, skip adding it to the calendar
+        // to prevent duplicate visual clutter since the subtasks will be rendered.
+        if (taskSubs.length > 0) {
+          return;
+        }
+        
+        let mStatus = 'not_started';
+
+        const isOverdue = mStatus !== 'completed' && isBefore(deadline, today);
+        const statusKey = mStatus === 'completed' ? 'completed' : (isOverdue ? 'overdue' : mStatus);
+        
+        const style = STATUS_STYLES[statusKey] || STATUS_STYLES.not_started;
+
+        events.push({
+          id: m.id, title: m.title, time: deadline,
+          type: 'task', status: mStatus, colorClass: style.bg,
+          isMain: true,
+          body: m.description || '',
+        });
       });
     }
 
-    relevantReminders.forEach(r => {
-      events.push({
-        id: r.id, title: r.title, time: parseISO(r.remindAt),
-        type: 'reminder', body: r.body, colorClass: STATUS_STYLES.reminder.bg,
-      });
-    });
+    // 2. Determine if we should show reminders
+    const showReminders = ['all', 'all_reminders'].includes(filterMode);
 
-    // Public Holidays
+    if (showReminders) {
+      let relevantReminders = reminders.filter(r => r.isActive);
+
+      if (isExternalHr) {
+        relevantReminders = relevantReminders.filter(r => {
+          const mt = mainTasks.find(m => m.id === r.mainTaskId);
+          const isAssigned = mt && (mt.assignedTo || (mt as any).assigned_to || '').includes(currentUser?.id || '');
+          return mt && (!!mt.is_hr_task || mt.created_by === currentUser?.id || mt.createdBy === currentUser?.id || isAssigned);
+        });
+      }
+
+      relevantReminders.forEach(r => {
+        events.push({
+          id: r.id, title: r.title, time: parseISO(r.remindAt),
+          type: 'reminder', body: r.body, colorClass: STATUS_STYLES.reminder.bg,
+        });
+      });
+    }
+
+    // 3. Public Holidays (always shown in all filter modes)
     holidays.forEach(h => {
       events.push({
         id: `hol-${h.date}`, title: h.name, time: parseISO(h.date),
@@ -197,9 +222,78 @@ export default function CalendarPage({ onNavigate, showCompleted: externalShowCo
       });
     });
 
-    return events;
-  }, [reminders, subtasks, mainTasks, currentUser, filterMode, showCompleted, holidays]);
+    // 4. Daily Journals — one pill per entry, placed at actual creation time
+    const showJournals = ['all', 'journal'].includes(filterMode);
 
+    if (showJournals) {
+      dailyJournals.forEach(j => {
+        // Always use the journal's explicit `date` for calendar-day grouping to avoid UTC
+        // timezone drift (createdAt is stored in UTC and could shift the day in local time).
+        // Preserve createdAt's hour/minute only for day-view hour-slot placement.
+        let entryTime: Date;
+        if (j.createdAt) {
+          const utcTime = parseISO(j.createdAt);
+          // Reconstruct: correct local date from j.date, time-of-day from createdAt local
+          entryTime = parseISO(
+            `${j.date}T${String(utcTime.getHours()).padStart(2, '0')}:${String(utcTime.getMinutes()).padStart(2, '0')}:00`
+          );
+        } else {
+          entryTime = parseISO(`${j.date}T08:00:00`);
+        }
+        const loggerName = j.loggedBy || 'Unknown';
+        const entries = siteJournalEntries.filter(e => e.journalId === j.id);
+        const sites = entries.map(e => e.siteName).filter(Boolean);
+        const sitesText = sites.length > 0 ? sites.join(', ') : null;
+
+        let detailedBody = j.generalNotes ? `${j.generalNotes}\n\n` : '';
+        if (entries.length > 0) {
+          entries.forEach(e => {
+            if (e.narration) {
+              detailedBody += `[${e.siteName}]:\n${e.narration}\n\n`;
+            }
+          });
+        }
+        if (!detailedBody.trim()) {
+          detailedBody = sitesText ? `${loggerName} · ${sitesText}` : `Logged by ${loggerName}`;
+        }
+
+        events.push({
+          id: j.id,
+          title: sitesText
+            ? `Daily Log: ${sitesText.slice(0, 40)}`
+            : `Daily Log · ${loggerName}`,
+          time: entryTime,
+          type: 'journal',
+          body: detailedBody.trim(),
+          colorClass: STATUS_STYLES.journal.bg,
+        });
+      });
+    }
+
+    return events;
+  }, [reminders, subtasks, mainTasks, currentUser, filterMode, showCompleted, holidays, dailyJournals, siteJournalEntries, isExternalHr]);
+
+
+  const visibleLegendKeys = useMemo(() => {
+    const keys = new Set<string>(['holiday']); // holiday is always included
+    
+    if (['all', 'all_tasks'].includes(filterMode)) {
+      keys.add('completed');
+      keys.add('overdue');
+      keys.add('in_progress');
+      keys.add('not_started');
+    }
+    
+    if (['all', 'all_reminders'].includes(filterMode)) {
+      keys.add('reminder');
+    }
+    
+    if (['all', 'journal'].includes(filterMode)) {
+      keys.add('journal');
+    }
+    
+    return keys;
+  }, [filterMode]);
 
   const calDays = useMemo(() => {
     const monthStart = startOfMonth(calMonth);
@@ -210,7 +304,7 @@ export default function CalendarPage({ onNavigate, showCompleted: externalShowCo
   const eventsByDate = useMemo(() => {
     const map = new Map<string, CalendarEvent[]>();
     allEvents.forEach(e => {
-      const key = format(e.time, 'yyyy-MM-dd');
+      const key = formatDateKey(e.time);
       const arr = map.get(key) || [];
       arr.push(e);
       map.set(key, arr);
@@ -219,7 +313,8 @@ export default function CalendarPage({ onNavigate, showCompleted: externalShowCo
   }, [allEvents]);
 
   const dayEvents = useMemo(() => {
-    return allEvents.filter(e => isSameDay(e.time, selectedDate))
+    const selectedKey = formatDateKey(selectedDate);
+    return allEvents.filter(e => formatDateKey(e.time) === selectedKey)
       .sort((a, b) => a.time.getTime() - b.time.getTime());
   }, [allEvents, selectedDate]);
 
@@ -251,6 +346,10 @@ export default function CalendarPage({ onNavigate, showCompleted: externalShowCo
     if (h === 12) return '12 PM';
     return `${h - 12} PM`;
   };
+
+  const calMonthYear = calMonth.getFullYear();
+  const calMonthMonth = calMonth.getMonth();
+  const todayKey = useMemo(() => formatDateKey(new Date()), []);
 
   const numWeeks = calDays.length / 7;
 
@@ -294,8 +393,10 @@ export default function CalendarPage({ onNavigate, showCompleted: externalShowCo
             onChange={(e) => setFilterMode(e.target.value as FilterMode)}
             className="bg-white/10 text-white border border-white/20 text-xs sm:text-sm rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
           >
-            <option value="all" className="bg-[#0f111a] text-white">All Tasks & Reminders</option>
-            <option value="mine" className="bg-[#0f111a] text-white">My Tasks & Reminders</option>
+            <option value="all" className="bg-[#0f111a] text-white">All Tasks, Reminders & Daily Journal</option>
+            <option value="all_tasks" className="bg-[#0f111a] text-white">All Tasks</option>
+            <option value="all_reminders" className="bg-[#0f111a] text-white">All Reminders</option>
+            <option value="journal" className="bg-[#0f111a] text-white">All Daily Journal</option>
           </select>
           <button onClick={goToToday}
             className="px-3 py-1.5 rounded-lg border border-white/20 text-xs sm:text-sm font-medium text-white hover:bg-white/10 transition-colors">
@@ -315,13 +416,15 @@ export default function CalendarPage({ onNavigate, showCompleted: externalShowCo
       </div>
 
       {/* ─── Legend ─── */}
-      <div className="flex items-center gap-3 sm:gap-4 px-3 sm:px-5 py-2 border-b border-white/10 flex-shrink-0 flex-wrap">
-        {Object.entries(STATUS_STYLES).map(([key, style]) => (
-          <div key={key} className="flex items-center gap-1.5">
-            <span className={`w-2.5 h-2.5 rounded-full ${style.bg}`} />
-            <span className="text-[10px] sm:text-xs text-white/70 font-medium">{style.label}</span>
-          </div>
-        ))}
+      <div className="flex items-center gap-3 sm:gap-4 px-3 sm:px-5 py-2 border-b border-white/10 flex-shrink-0 flex-wrap min-h-[37px] transition-all duration-300">
+        {Object.entries(STATUS_STYLES)
+          .filter(([key]) => visibleLegendKeys.has(key))
+          .map(([key, style]) => (
+            <div key={key} className="flex items-center gap-1.5 animate-in fade-in slide-in-from-left-1 duration-200">
+              <span className={`w-2.5 h-2.5 rounded-full ${key === 'journal' ? 'bg-gradient-to-r from-amber-400 to-orange-400' : style.bg}`} />
+              <span className="text-[10px] sm:text-xs text-white/70 font-medium">{style.label}</span>
+            </div>
+          ))}
       </div>
 
       {/* ─── Month View ─── */}
@@ -337,9 +440,9 @@ export default function CalendarPage({ onNavigate, showCompleted: externalShowCo
 
           <div className="flex-1 grid grid-cols-7 auto-rows-fr min-h-0">
             {calDays.map((day) => {
-              const isCurrentMonth = isSameMonth(day, calMonth);
-              const isTodayDay = isToday(day);
-              const dateKey = format(day, 'yyyy-MM-dd');
+              const isCurrentMonth = day.getFullYear() === calMonthYear && day.getMonth() === calMonthMonth;
+              const dateKey = formatDateKey(day);
+              const isTodayDay = dateKey === todayKey;
               const events = eventsByDate.get(dateKey) || [];
               const maxVisible = numWeeks > 5 ? 1 : 2;
               const overflow = events.length - maxVisible;
@@ -356,7 +459,7 @@ export default function CalendarPage({ onNavigate, showCompleted: externalShowCo
                     <span className={`text-[10px] sm:text-base font-medium sm:font-bold w-6 h-6 sm:w-8 sm:h-8 flex items-center justify-center rounded-full
                       ${isTodayDay ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' : 'text-white/80'}
                     `}>
-                      {format(day, 'd')}
+                      {day.getDate()}
                     </span>
                   </div>
 
@@ -366,18 +469,13 @@ export default function CalendarPage({ onNavigate, showCompleted: externalShowCo
                         key={evt.id}
                         onClick={(e) => {
                           e.stopPropagation();
-                          if (evt.type === 'reminder') {
-                            navigate(`/tasks/reminders?view=${evt.id}`);
-                          } else if (evt.isMain) {
-                            navigate(`/tasks?openTask=${evt.id}`);
-                          } else {
-                            navigate(`/tasks?open=${evt.id}`);
-                          }
-                          onNavigate?.();
+                          if (evt.id.startsWith('hol-')) return;
+                          setPreviewEvent(evt);
                         }}
-                        className={`${evt.colorClass} text-white text-[8px] sm:text-[10px] leading-tight font-medium px-1 sm:px-1.5 py-0.5 rounded truncate hover:brightness-110 transition-all`}
+                        className={`${evt.colorClass} ${evt.type === 'journal' ? 'text-slate-900 font-semibold' : 'text-white'} text-[8px] sm:text-[10px] leading-tight font-medium px-1 sm:px-1.5 py-0.5 rounded truncate hover:brightness-110 transition-all flex items-center gap-0.5`}
                       >
-                        <span className="hidden sm:inline">{format(evt.time, 'h:mm ')} </span>
+                        {evt.type === 'journal' && <BookOpen className="w-2 h-2 flex-shrink-0 hidden sm:inline-block" />}
+                        {evt.type !== 'journal' && <span className="hidden sm:inline">{format(evt.time, 'h:mm ')} </span>}
                         {evt.title}
                       </div>
                     ))}
@@ -391,6 +489,15 @@ export default function CalendarPage({ onNavigate, showCompleted: externalShowCo
               );
             })}
           </div>
+        </div>
+      )}
+
+      {/* Empty state: journal filter active but no logs this month */}
+      {viewMode === 'month' && filterMode === 'journal' && allEvents.length === 0 && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 pointer-events-none">
+          <BookOpen className="w-10 h-10 text-amber-400/40" />
+          <p className="text-sm text-white/30 font-medium">No daily logs recorded this month</p>
+          <p className="text-xs text-white/20">Navigate to another month or switch filters</p>
         </div>
       )}
 
@@ -411,26 +518,29 @@ export default function CalendarPage({ onNavigate, showCompleted: externalShowCo
                 {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
                   <div key={i} className="text-center text-[9px] font-semibold text-white/30 py-0.5">{d}</div>
                 ))}
-                {calDays.map(day => {
-                  const isCurrentMonth = isSameMonth(day, calMonth);
-                  const isTodayDay = isToday(day);
-                  const isSelected = isSameDay(day, selectedDate);
-                  const dateKey = format(day, 'yyyy-MM-dd');
-                  const hasEvents = eventsByDate.has(dateKey);
-                  return (
-                    <button key={day.toISOString()} onClick={() => setSelectedDate(day)}
-                      className={`relative w-full aspect-square flex items-center justify-center text-[10px] font-medium rounded-full transition-all
-                        ${!isCurrentMonth ? 'text-white/15' : 'text-white/70'}
-                        ${isTodayDay && !isSelected ? 'text-indigo-400 font-bold' : ''}
-                        ${isSelected ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' : 'hover:bg-white/10'}
-                      `}>
-                      {format(day, 'd')}
-                      {hasEvents && !isSelected && (
-                        <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-indigo-500" />
-                      )}
-                    </button>
-                  );
-                })}
+                {(() => {
+                  const selectedKey = formatDateKey(selectedDate);
+                  return calDays.map(day => {
+                    const isCurrentMonth = day.getFullYear() === calMonthYear && day.getMonth() === calMonthMonth;
+                    const dateKey = formatDateKey(day);
+                    const isTodayDay = dateKey === todayKey;
+                    const isSelected = dateKey === selectedKey;
+                    const hasEvents = eventsByDate.has(dateKey);
+                    return (
+                      <button key={day.toISOString()} onClick={() => setSelectedDate(day)}
+                        className={`relative w-full aspect-square flex items-center justify-center text-[10px] font-medium rounded-full transition-all
+                          ${!isCurrentMonth ? 'text-white/15' : 'text-white/70'}
+                          ${isTodayDay && !isSelected ? 'text-indigo-400 font-bold' : ''}
+                          ${isSelected ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' : 'hover:bg-white/10'}
+                        `}>
+                        {day.getDate()}
+                        {hasEvents && !isSelected && (
+                          <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-indigo-500" />
+                        )}
+                      </button>
+                    );
+                  });
+                })()}
               </div>
             </div>
 
@@ -448,6 +558,10 @@ export default function CalendarPage({ onNavigate, showCompleted: externalShowCo
                 <span className="text-white/50">Reminders</span>
                 <span className="font-semibold text-white">{dayEvents.filter(e => e.type === 'reminder').length}</span>
               </div>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-white/50">Daily Journals</span>
+                <span className="font-semibold text-white">{dayEvents.filter(e => e.type === 'journal').length}</span>
+              </div>
             </div>
           </div>
 
@@ -464,21 +578,22 @@ export default function CalendarPage({ onNavigate, showCompleted: externalShowCo
                       </span>
                     </div>
 
-                    <div className="flex-1 border-l border-white/10 pl-2 py-1 relative">
+                    <div 
+                      className="flex-1 border-l border-white/10 pl-2 py-1 relative cursor-pointer hover:bg-white/5 transition-colors"
+                      onClick={() => {
+                        setSelectedAddHour(hour);
+                        setAddEventDialogOpen(true);
+                      }}
+                    >
                       {hourEvents.map(evt => (
                         <div
                           key={evt.id}
-                          onClick={() => {
-                            if (evt.type === 'reminder') {
-                              navigate(`/tasks/reminders?view=${evt.id}`);
-                            } else if (evt.isMain) {
-                              navigate(`/tasks?openTask=${evt.id}`);
-                            } else {
-                              navigate(`/tasks?open=${evt.id}`);
-                            }
-                            onNavigate?.();
-                          }}
-                          className={`${evt.colorClass} text-white rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 mb-1 cursor-pointer hover:brightness-110 transition-all`}
+                           onClick={(e) => {
+                             e.stopPropagation();
+                             if (evt.id.startsWith('hol-')) return;
+                             setPreviewEvent(evt);
+                           }}
+                          className={`${evt.colorClass} ${evt.type === 'journal' ? 'text-slate-900' : 'text-white'} rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 mb-1 cursor-pointer hover:brightness-110 transition-all`}
                         >
                           <p className="text-xs sm:text-sm font-medium truncate">
                             {evt.title}
@@ -499,37 +614,142 @@ export default function CalendarPage({ onNavigate, showCompleted: externalShowCo
       )}
 
       {/* ─── Event Preview Dialog ─── */}
-      <Dialog 
-        open={!!previewEvent} 
-        onClose={() => setPreviewEvent(null)}
-        title={previewEvent?.title || "Event Details"}
-      >
-        <div className="py-2">
-           <div className="mb-4 text-sm text-slate-500 font-medium">
-             {previewEvent && format(previewEvent.time, "EEEE, MMMM d, yyyy 'at' h:mm a")}
-           </div>
-           <p className="text-sm text-slate-700 dark:text-slate-300">
-             {previewEvent?.body || (previewEvent?.type === 'task' ? 'This is a scheduled task that requires your attention.' : 'No description provided.')}
-           </p>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => setPreviewEvent(null)}>Close</Button>
-          <Button onClick={() => {
-            if (!previewEvent) return;
-            if (previewEvent.type === 'reminder') {
-               navigate(`/tasks/reminders?view=${previewEvent.id}`);
-            } else if (previewEvent.isMain) {
-               navigate(`/tasks?openTask=${previewEvent.id}`);
-            } else {
-               navigate(`/tasks?open=${previewEvent.id}`);
-            }
-            setPreviewEvent(null);
-            onNavigate?.();
-          }} className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm border-0 font-medium ml-2">
-            Go to {previewEvent?.type === 'reminder' ? 'Reminder' : 'Task'}
-          </Button>
-        </DialogFooter>
+      <Dialog open={!!previewEvent} onOpenChange={(open: boolean) => !open && setPreviewEvent(null)}>
+        <DialogContent className="sm:max-w-[400px] bg-[#0f111a] border-[#2a2e3d] rounded-2xl shadow-2xl text-white p-0 overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-white/5 bg-[#0f111a]">
+            <DialogTitle className="text-white font-bold text-lg">{previewEvent?.title || "Event Details"}</DialogTitle>
+            <DialogClose className="w-8 h-8 rounded-xl bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/50 hover:text-white transition-colors" />
+          </div>
+          <div className="p-5 flex flex-col gap-4 overflow-y-auto min-h-0 custom-scrollbar max-h-[60vh]">
+            <div className="text-sm text-white/50 font-medium flex items-center gap-2 shrink-0">
+              <Clock className="w-4 h-4 text-indigo-400" />
+              {previewEvent && format(previewEvent.time, "EEEE, MMMM d, yyyy 'at' h:mm a")}
+            </div>
+            
+            <div className="bg-white/5 border border-white/10 rounded-xl p-4 shrink-0">
+              <p className="text-sm text-white/90 whitespace-pre-wrap leading-relaxed">
+                {previewEvent?.body || (previewEvent?.type === 'task' ? 'This is a scheduled task that requires your attention.' : 'No description provided.')}
+              </p>
+            </div>
+          </div>
+          
+          <div className="flex justify-end gap-3 px-5 py-4 border-t border-white/5 bg-[#0f111a]">
+            <Button 
+              variant="outline" 
+              onClick={() => setPreviewEvent(null)}
+              className="border-white/10 bg-white/5 text-white/70 hover:bg-white/10 hover:text-white"
+            >
+              Close
+            </Button>
+            <Button onClick={() => {
+              if (!previewEvent) return;
+              if (previewEvent.type === 'reminder') {
+                 navigate(`/tasks/reminders?view=${previewEvent.id}`);
+              } else if (previewEvent.type === 'journal') {
+                 navigate(`/daily-journal`);
+              } else if (previewEvent.isMain) {
+                 navigate(`/tasks?openTask=${previewEvent.id}`);
+              } else {
+                 navigate(`/tasks?open=${previewEvent.id}`);
+              }
+              setPreviewEvent(null);
+              onNavigate?.();
+            }} className="bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm border-0 font-medium">
+              Go to {previewEvent?.type === 'reminder' ? 'Reminder' : previewEvent?.type === 'journal' ? 'Journal' : 'Task'}
+            </Button>
+          </div>
+        </DialogContent>
       </Dialog>
+
+      {/* ─── Add Event Dialog ─── */}
+      <Dialog open={addEventDialogOpen} onOpenChange={setAddEventDialogOpen}>
+        <DialogContent className="sm:max-w-[400px] bg-[#0f111a] border-[#2a2e3d] rounded-2xl shadow-2xl text-white p-0 overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-white/5 bg-[#0f111a]">
+            <DialogTitle className="text-white font-bold text-lg">Add New</DialogTitle>
+            <DialogClose className="w-8 h-8 rounded-xl bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/50 hover:text-white transition-colors" />
+          </div>
+          <div className="p-5 flex flex-col gap-3">
+            <p className="text-sm text-white/60 mb-3">
+              What would you like to add for <span className="font-semibold text-white/90">{selectedAddHour !== null ? formatHour(selectedAddHour) : ''}</span> on <span className="font-semibold text-white/90">{format(selectedDate, 'MMM d, yyyy')}</span>?
+            </p>
+            <button
+              onClick={() => {
+                setAddEventDialogOpen(false);
+                setShowCreateTask(true);
+              }}
+              className="flex items-center gap-3 w-full p-3 rounded-xl bg-[#1a1d27] hover:bg-[#232736] transition-colors border border-white/5 text-left group"
+            >
+              <div className="w-10 h-10 rounded-lg bg-[#2a2e3d] group-hover:bg-[#34394c] flex items-center justify-center shrink-0 transition-colors">
+                <CheckSquare className="w-5 h-5 text-indigo-400" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-white">Task</p>
+                <p className="text-xs text-white/50 mt-0.5">Create a new task or project</p>
+              </div>
+            </button>
+            <button
+              onClick={() => {
+                setAddEventDialogOpen(false);
+                setShowCreateReminder(true);
+              }}
+              className="flex items-center gap-3 w-full p-3 rounded-xl bg-[#1a1d27] hover:bg-[#232736] transition-colors border border-white/5 text-left group"
+            >
+              <div className="w-10 h-10 rounded-lg bg-[#2a2e3d] group-hover:bg-[#34394c] flex items-center justify-center shrink-0 transition-colors">
+                <Bell className="w-5 h-5 text-purple-400" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-white">Reminder</p>
+                <p className="text-xs text-white/50 mt-0.5">Set a timely notification</p>
+              </div>
+            </button>
+            <button
+              onClick={() => {
+                setAddEventDialogOpen(false);
+                setShowCreateDailyJournal(true);
+              }}
+              className="flex items-center gap-3 w-full p-3 rounded-xl bg-[#1a1d27] hover:bg-[#232736] transition-colors border border-white/5 text-left group"
+            >
+              <div className="w-10 h-10 rounded-lg bg-[#2a2e3d] group-hover:bg-[#34394c] flex items-center justify-center shrink-0 transition-colors">
+                <BookOpen className="w-5 h-5 text-amber-400" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-white">Daily Journal</p>
+                <p className="text-xs text-white/50 mt-0.5">Log an entry for this day</p>
+              </div>
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Inline Create Task Dialog ─── */}
+      {showCreateTask && (
+        <CreateTaskDialog
+          onClose={() => setShowCreateTask(false)}
+          users={users}
+          currentUserId={currentUser?.id ?? ''}
+          teamId='dcel-team'
+          workspaceId='dcel-team'
+          initialDeadline={format(selectedDate, 'yyyy-MM-dd')}
+          initialDeadlineTime={selectedAddHour !== null ? `${String(selectedAddHour).padStart(2, '0')}:00` : ''}
+          isDarkTheme={true}
+        />
+      )}
+
+      {/* ─── Inline Create Reminder Dialog ─── */}
+      {showCreateReminder && (
+        <CreateReminderDialog
+          onClose={() => setShowCreateReminder(false)}
+          initialDateTime={`${format(selectedDate, 'yyyy-MM-dd')}T${selectedAddHour !== null ? String(selectedAddHour).padStart(2, '0') : '12'}:00`}
+        />
+      )}
+
+      {/* ─── Inline Create Daily Journal Dialog ─── */}
+      {showCreateDailyJournal && (
+        <CreateDailyJournalDialog
+          onClose={() => setShowCreateDailyJournal(false)}
+          initialDate={format(selectedDate, 'yyyy-MM-dd')}
+        />
+      )}
     </div>
   );
 }

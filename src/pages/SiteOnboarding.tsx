@@ -1,15 +1,17 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Badge } from '@/src/components/ui/badge';
 import { useAppStore } from '@/src/store/appStore';
-import { SiteQuestionnaire } from '@/src/types/SiteQuestionnaire';
+import { SiteQuestionnaire, SiteAttachment } from '@/src/types/SiteQuestionnaire';
 import { toast } from '@/src/components/ui/toast';
-import { Save, ArrowLeft, CheckCircle2, Building2, MapPin, Calendar, User, LayoutGrid, ChevronDown, ChevronUp, Edit2 } from 'lucide-react';
+import { Save, ArrowLeft, CheckCircle2, Building2, MapPin, Calendar, User, LayoutGrid, ChevronDown, ChevronUp, Edit2, Paperclip, UploadCloud, Trash2, ExternalLink, Loader2, FileText as FileTextIcon, X, Eye } from 'lucide-react';
+import { DocPreviewModal } from '@/src/components/DocPreviewModal';
 import { CreateProjectDialog } from '@/src/components/tasks/CreateProjectDialog';
 import { useAppData } from '@/src/contexts/AppDataContext';
 import { useAuth } from '@/src/hooks/useAuth';
+import { useUserStore } from '@/src/store/userStore';
 import { generateId } from '@/src/lib/utils';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 
@@ -121,9 +123,11 @@ const phaseLabels = [
 
 export function SiteOnboarding() {
   const { id } = useParams();
+  const isNew = id === 'new';
   const navigate = useNavigate();
   const location = useLocation();
 
+  const currentUser = useUserStore((s) => s.getCurrentUser());
   const pendingSites = useAppStore(s => s.pendingSites);
   const sites = useAppStore(s => s.sites);
   const clientProfiles = useAppStore(s => s.clientProfiles);
@@ -144,12 +148,139 @@ export function SiteOnboarding() {
   const [form, setForm] = useState<SiteQuestionnaire>(blankForm());
   const [initialForm, setInitialForm] = useState<SiteQuestionnaire>(blankForm());
   const [activePhase, setActivePhase] = useState<1 | 2 | 3 | 4 | 5>(1);
+  const [showDocuments, setShowDocuments] = useState(false);
   const [showUnsavedModal, setShowUnsavedModal] = useState(false);
   const [isInfoCollapsed, setIsInfoCollapsed] = useState(true);
   const [isEditingHeader, setIsEditingHeader] = useState(false);
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
+  const [isUploadingFile, setIsUploadingFile] = useState(false);
+  const [pendingUploads, setPendingUploads] = useState<{ file: File; caption: string }[]>([]);
+  const [previewDoc, setPreviewDoc] = useState<SiteAttachment | null>(null);
+  const [editingAttachmentId, setEditingAttachmentId] = useState<string | null>(null);
+  const [editCaptionText, setEditCaptionText] = useState<string>('');
+  const [deleteConfirmDoc, setDeleteConfirmDoc] = useState<SiteAttachment | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { createProject, users, projects } = useAppData();
   const { user } = useAuth();
 
+  const MEDIA_SERVER_URL = import.meta.env.VITE_MEDIA_SERVER_URL || 'https://dewaterconstruct.com/dcel-media';
+
+  // ─── File Selection & Validation ─────────────────────────────────────────────
+  const handleFileSelection = useCallback((files: FileList | File[]) => {
+    const fileArray = Array.from(files);
+    if (!fileArray.length || !form.id || isNew) return;
+
+    const validFiles: { file: File; caption: string }[] = [];
+    const allowedMimes = [
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    ];
+    const allowedExts = ['pdf', 'doc', 'docx'];
+
+    for (const file of fileArray) {
+      const ext = file.name.split('.').pop()?.toLowerCase();
+      if (allowedMimes.includes(file.type) || allowedExts.includes(ext || '')) {
+        validFiles.push({ file, caption: '' });
+      } else {
+        toast.error(`"${file.name}" is not allowed. Only PDF and Word Documents (.doc, .docx) are accepted.`);
+      }
+    }
+
+    if (validFiles.length > 0) {
+      setPendingUploads(prev => [...prev, ...validFiles]);
+    }
+  }, [form.id, isNew]);
+
+  // ─── File Upload ─────────────────────────────────────────────────────────────
+  const handleFileUpload = useCallback(async (uploads: { file: File; caption: string }[]) => {
+    if (!uploads.length || !form.id || isNew) return;
+    setIsUploadingFile(true);
+
+    const uploaded: SiteAttachment[] = [];
+    for (const item of uploads) {
+      const { file, caption } = item;
+      const fd = new FormData();
+      fd.append('media', file);
+      fd.append('site_id', form.id);
+      fd.append('asset_id', '0');
+      fd.append('site_name', form.siteName);
+      fd.append('log_date', new Date().toISOString().split('T')[0]);
+      fd.append('uploaded_by', currentUser?.id || 'unknown');
+      fd.append('uploaded_by_name', currentUser?.name || 'Unknown');
+      if (caption.trim()) {
+        fd.append('asset_name', caption.trim());
+      }
+      try {
+        const res = await fetch(`${MEDIA_SERVER_URL}/upload_doc.php`, { method: 'POST', body: fd });
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || `Server responded with status ${res.status}`);
+        }
+        const json = await res.json();
+        uploaded.push({
+          id: json.id ? String(json.id) : generateId(),
+          name: file.name,
+          url: json.url || json.file_url || '',
+          fileType: file.type || 'application/octet-stream',
+          uploadedAt: new Date().toISOString(),
+          uploadedBy: currentUser?.name || 'Unknown',
+          caption: caption.trim() || undefined,
+        });
+      } catch (err: any) {
+        toast.error(`Failed to upload ${file.name}: ${err.message}`);
+      }
+    }
+
+    if (uploaded.length > 0) {
+      const newAttachments = [...(form.attachments || []), ...uploaded];
+      const updatedForm = { ...form, attachments: newAttachments };
+      setForm(updatedForm);
+      setInitialForm(updatedForm);
+      updatePendingSite(form.id, updatedForm);
+      toast.success(`${uploaded.length} file(s) uploaded successfully`);
+    }
+    setIsUploadingFile(false);
+    setPendingUploads([]);
+  }, [form, isNew, currentUser, MEDIA_SERVER_URL, updatePendingSite]);
+
+  const handleSaveCaption = useCallback((attId: string, captionText: string) => {
+    setEditingAttachmentId(null);
+    const updatedAttachments = (form.attachments || []).map(a => 
+      a.id === attId ? { ...a, caption: captionText.trim() || undefined } : a
+    );
+    const updatedForm = { ...form, attachments: updatedAttachments };
+    setForm(updatedForm);
+    setInitialForm(updatedForm);
+    updatePendingSite(form.id, updatedForm);
+    toast.success('Caption updated.');
+  }, [form, updatePendingSite]);
+  const handleDeleteAttachment = useCallback((att: SiteAttachment) => {
+    setDeleteConfirmDoc(att);
+  }, []);
+
+  const executeDeleteAttachment = useCallback(async () => {
+    if (!deleteConfirmDoc) return;
+    const att = deleteConfirmDoc;
+    setDeleteConfirmDoc(null);
+
+    // Delete from media server if we have an id
+    if (att.id && !att.id.includes('-')) { // numeric IDs come from the server; UUIDs are local
+      try {
+        await fetch(`${MEDIA_SERVER_URL}/delete.php`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: Number(att.id) }),
+        });
+      } catch { /* ignore – remove from store anyway */ }
+    }
+    const newAttachments = (form.attachments || []).filter(a => a.id !== att.id);
+    const updatedForm = { ...form, attachments: newAttachments };
+    setForm(updatedForm);
+    setInitialForm(updatedForm);
+    updatePendingSite(form.id, updatedForm);
+    toast.success('File removed');
+  }, [deleteConfirmDoc, form, MEDIA_SERVER_URL, updatePendingSite]);
   const { clientBalanceStatus } = useMemo(() => {
     // 1. Never show for pending sites (per user request)
     // 2. Only show if we have both client and site names
@@ -190,7 +321,6 @@ export function SiteOnboarding() {
   const [wantsProject, setWantsProject] = useState(true);
   const [showProjectDialog, setShowProjectDialog] = useState(false);
 
-  const isNew = id === 'new';
   // Only the identity header (client/site name) is locked once activated
   const headerLocked = form.status === 'Active';
 
@@ -815,10 +945,10 @@ export function SiteOnboarding() {
               return (
                 <button
                   key={phase}
-                  onClick={() => setActivePhase(phase as any)}
+                  onClick={() => { setShowDocuments(false); setActivePhase(phase as any); }}
                   className={`flex-1 py-3 px-3 text-xs font-medium border-b-2 whitespace-nowrap
                     transition-colors flex flex-col items-center gap-0.5 min-w-[100px] sm:min-w-[120px]
-                    ${activePhase === phase
+                    ${!showDocuments && activePhase === phase
                       ? 'border-indigo-600 text-indigo-700 bg-indigo-50/40'
                       : done
                         ? 'border-emerald-400 text-emerald-700 hover:bg-emerald-50/30'
@@ -835,10 +965,292 @@ export function SiteOnboarding() {
                 </button>
               );
             })}
+
+            {/* Documents tab */}
+            <button
+              onClick={() => setShowDocuments(true)}
+              className={`flex-1 py-3 px-3 text-xs font-medium border-b-2 whitespace-nowrap
+                transition-colors flex flex-col items-center gap-0.5 min-w-[100px] sm:min-w-[120px]
+                ${showDocuments
+                  ? 'border-indigo-600 text-indigo-700 bg-indigo-50/40'
+                  : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                }`}
+            >
+              <div className="flex items-center gap-1">
+                <Paperclip className="h-3 w-3" />
+                <span>Documents</span>
+                {(form.attachments?.length ?? 0) > 0 && (
+                  <span className="bg-indigo-100 text-indigo-700 text-[9px] font-black px-1.5 rounded-full">
+                    {form.attachments!.length}
+                  </span>
+                )}
+              </div>
+              <span className="text-[10px] leading-tight text-slate-400 font-normal">Site Files</span>
+            </button>
           </div>
 
+          {/* Documents Panel */}
+          {showDocuments && (
+            <div className="p-6 overflow-y-auto flex-1">
+              <div className="space-y-5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-base font-semibold text-slate-800">Site Documents</h2>
+                    <p className="text-xs text-slate-400 mt-0.5">Upload soil reports, permits, contracts, drawings, and any site-related files.</p>
+                  </div>
+                </div>
+
+                {/* Drop Zone */}
+                <div
+                  onDragOver={e => { e.preventDefault(); setIsDraggingOver(true); }}
+                  onDragLeave={() => setIsDraggingOver(false)}
+                  onDrop={e => { e.preventDefault(); setIsDraggingOver(false); handleFileSelection(e.dataTransfer.files); }}
+                  onClick={() => fileInputRef.current?.click()}
+                  className={`relative border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all
+                    ${isDraggingOver
+                      ? 'border-indigo-400 bg-indigo-50'
+                      : 'border-slate-200 hover:border-indigo-300 hover:bg-slate-50'
+                    }`}
+                >
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    multiple
+                    accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    className="hidden"
+                    onChange={e => e.target.files && handleFileSelection(e.target.files)}
+                  />
+                  {isUploadingFile ? (
+                    <div className="flex flex-col items-center gap-2">
+                      <Loader2 className="h-8 w-8 text-indigo-500 animate-spin" />
+                      <p className="text-sm font-medium text-indigo-600">Uploading files…</p>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center gap-2">
+                      <UploadCloud className="h-9 w-9 text-slate-300" />
+                      <p className="text-sm font-medium text-slate-600">Drag & drop files here, or click to browse</p>
+                      <p className="text-xs text-slate-400">Only PDF and Word Documents (.doc, .docx) are accepted</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* File List */}
+                {(form.attachments?.length ?? 0) === 0 ? (
+                  <p className="text-sm text-slate-400 text-center py-4">No files uploaded yet for this site.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {form.attachments!.map(att => {
+                      const isImage = att.fileType?.startsWith('image/');
+                      return (
+                        <div
+                          key={att.id}
+                          className="flex items-center gap-3 p-3 rounded-xl border border-slate-100 bg-slate-50 hover:bg-white hover:shadow-sm transition-all group"
+                        >
+                          <div className={`h-9 w-9 rounded-lg flex items-center justify-center shrink-0 ${
+                            isImage ? 'bg-sky-100 text-sky-600' : 'bg-indigo-100 text-indigo-600'
+                          }`}>
+                            <FileTextIcon className="h-4 w-4" />
+                          </div>
+                          <div className="flex-1 min-w-0 text-left">
+                            <p className="text-sm font-semibold text-slate-800 truncate">
+                              {att.caption || att.name}
+                            </p>
+                            {att.caption && (
+                              <p className="text-xs text-slate-400 truncate">{att.name}</p>
+                            )}
+                            <p className="text-[10px] text-slate-400 mt-0.5">
+                              {att.uploadedBy} · {new Date(att.uploadedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                            </p>
+                            {/* Inline Caption Editor */}
+                            <div className="mt-1.5 flex items-center gap-2">
+                              {editingAttachmentId === att.id ? (
+                                <div className="flex items-center gap-1.5 w-full max-w-sm" onClick={e => e.stopPropagation()}>
+                                  <input
+                                    type="text"
+                                    placeholder="Enter caption..."
+                                    value={editCaptionText}
+                                    autoFocus
+                                    onChange={e => setEditCaptionText(e.target.value)}
+                                    onKeyDown={e => {
+                                      if (e.key === 'Enter') {
+                                        handleSaveCaption(att.id, editCaptionText);
+                                      }
+                                      if (e.key === 'Escape') {
+                                        setEditingAttachmentId(null);
+                                      }
+                                    }}
+                                    className="text-[11px] border border-indigo-200 rounded px-2 py-0.5 w-full focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white font-medium text-slate-700 animate-in fade-in slide-in-from-top-1 duration-100"
+                                  />
+                                  <button
+                                    onClick={() => handleSaveCaption(att.id, editCaptionText)}
+                                    className="p-1 rounded bg-emerald-50 hover:bg-emerald-100 text-emerald-600 transition-colors"
+                                    title="Save"
+                                  >
+                                    <CheckCircle2 className="h-3.5 w-3.5" />
+                                  </button>
+                                  <button
+                                    onClick={() => setEditingAttachmentId(null)}
+                                    className="p-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors"
+                                    title="Cancel"
+                                  >
+                                    <X className="h-3.5 w-3.5" />
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-1.5 text-xs">
+                                  {att.caption ? (
+                                    <span className="text-[11px] text-slate-600 font-medium bg-slate-100 px-2 py-0.5 rounded-md">
+                                      Caption: {att.caption}
+                                    </span>
+                                  ) : (
+                                    <span className="text-[11px] text-slate-400 italic">
+                                      No caption added
+                                    </span>
+                                  )}
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setEditingAttachmentId(att.id);
+                                      setEditCaptionText(att.caption || '');
+                                    }}
+                                    className="p-1 rounded text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                                    title="Edit Caption"
+                                  >
+                                    <Edit2 className="h-3 w-3" />
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                            {att.url && (
+                              <button
+                                onClick={e => { e.stopPropagation(); setPreviewDoc(att); }}
+                                className="h-8 w-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                                title="Preview"
+                              >
+                                <Eye className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+                            {att.url && (
+                              <a
+                                href={att.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={e => e.stopPropagation()}
+                                className="h-8 w-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                                title="Open in new tab"
+                              >
+                                <ExternalLink className="h-3.5 w-3.5" />
+                              </a>
+                            )}
+                            <button
+                              onClick={() => handleDeleteAttachment(att)}
+                              className="h-8 w-8 rounded-lg flex items-center justify-center text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+                              title="Remove file"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Upload Captions Modal */}
+                {pendingUploads.length > 0 && (
+                  <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-[100] p-4 animate-in fade-in duration-200">
+                    <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-6 max-w-lg w-full max-h-[85vh] flex flex-col">
+                      <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-100">
+                        <h3 className="text-base font-black text-slate-850 flex items-center gap-2">
+                          <UploadCloud className="h-5 w-5 text-indigo-600" />
+                          Caption & Upload Files
+                        </h3>
+                        <button
+                          onClick={() => setPendingUploads([])}
+                          className="text-slate-450 hover:text-slate-700 p-1 rounded-full hover:bg-slate-100"
+                          disabled={isUploadingFile}
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+
+                      <div className="flex-1 overflow-y-auto style-scroll space-y-4 pr-1">
+                        {pendingUploads.map((item, idx) => (
+                          <div key={idx} className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2 text-left">
+                            <div className="flex items-start gap-2.5 min-w-0">
+                              <div className="h-8 w-8 rounded bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0 mt-0.5">
+                                <FileTextIcon className="h-4 w-4" />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="text-xs font-bold text-slate-850 truncate">{item.file.name}</p>
+                                <p className="text-[10px] text-slate-400 mt-0.5">
+                                  {(item.file.size / 1024 / 1024).toFixed(2)} MB
+                                </p>
+                              </div>
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Caption</label>
+                              <Input
+                                type="text"
+                                placeholder="e.g. Soil Geotech Report, Signed Dewatering Contract..."
+                                value={item.caption}
+                                onChange={e => {
+                                  const val = e.target.value;
+                                  setPendingUploads(prev => prev.map((p, i) => i === idx ? { ...p, caption: val } : p));
+                                }}
+                                className="h-8 text-xs bg-white"
+                                disabled={isUploadingFile}
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {isUploadingFile && (
+                        <div className="mt-3 bg-indigo-50 border border-indigo-100 rounded-xl p-3 flex items-center gap-3 animate-in slide-in-from-bottom-2 duration-200 text-left">
+                          <Loader2 className="h-5 w-5 text-indigo-600 animate-spin shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-bold text-indigo-950">Uploading to media server...</p>
+                            <p className="text-[10px] text-indigo-600 mt-0.5">Please wait, saving document securely.</p>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="mt-5 pt-3 border-t border-slate-100 flex gap-3">
+                        <Button
+                          variant="outline"
+                          onClick={() => setPendingUploads([])}
+                          className="flex-1 text-xs font-semibold"
+                          disabled={isUploadingFile}
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          onClick={() => handleFileUpload(pendingUploads)}
+                          className="flex-1 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center gap-1.5"
+                          disabled={isUploadingFile}
+                        >
+                          {isUploadingFile ? (
+                            <>
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              Uploading...
+                            </>
+                          ) : (
+                            `Upload ${pendingUploads.length} File${pendingUploads.length > 1 ? 's' : ''}`
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Content */}
-          <div className="p-6 overflow-y-auto flex-1">
+          {!showDocuments && <div className="p-6 overflow-y-auto flex-1">
 
             {/* ── Phase 1 ── */}
             {activePhase === 1 && (
@@ -1250,7 +1662,7 @@ export function SiteOnboarding() {
               </div>
             )}
 
-          </div>
+          </div>}
         </div>
       )}
 
@@ -1284,6 +1696,34 @@ export function SiteOnboarding() {
             </div>
           </div>
         </div>
+      )}
+
+      {deleteConfirmDoc && (
+        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-[9999] p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-6 animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold text-slate-900 mb-2">Delete Document</h3>
+            <p className="text-sm text-slate-500 mb-6">
+              Are you sure you want to remove <span className="font-semibold text-slate-800">"{deleteConfirmDoc.name}"</span>? This action cannot be undone.
+            </p>
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={() => setDeleteConfirmDoc(null)} className="h-9">
+                Cancel
+              </Button>
+              <Button variant="destructive" onClick={executeDeleteAttachment} className="h-9">
+                Yes, Delete
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {previewDoc && previewDoc.url && (
+        <DocPreviewModal
+          url={previewDoc.url}
+          name={previewDoc.name}
+          caption={previewDoc.caption}
+          onClose={() => setPreviewDoc(null)}
+        />
       )}
     </div>
   );

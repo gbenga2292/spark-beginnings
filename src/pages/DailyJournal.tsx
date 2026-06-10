@@ -15,6 +15,7 @@ import { MediaViewer, type MediaItem } from '@/src/components/ui/MediaViewer';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, isSameDay } from 'date-fns';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { DiaryDetailView } from './DiaryDetailView';
+import { useSearchParams } from 'react-router-dom';
 import { useOperations } from '../contexts/OperationsContext';
 import { DailyLogManager } from './DailyLogManager';
 import { jsPDF } from 'jspdf';
@@ -464,10 +465,18 @@ export function DailyJournal() {
   const currentUser = useUserStore(s => s.getCurrentUser());
   const { dailyJournals, siteJournalEntries, sites, addDailyJournal, updateDailyJournal, deleteDailyJournal, deleteSiteJournalEntry } = useAppStore();
   const { dailyMachineLogs } = useOperations();
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('calendar');
+  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
   const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [diaryDate, setDiaryDate] = useState<string | null>(null);
+  // Initialise from ?date= URL parameter so the floating calendar can deep-link here
+  const [diaryDate, setDiaryDate] = useState<string | null>(() => searchParams.get('date') || null);
+
+  // Keep diaryDate in sync when the URL param changes externally
+  useEffect(() => {
+    const paramDate = searchParams.get('date');
+    setDiaryDate(paramDate || null);
+  }, [searchParams]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formDate, setFormDate] = useState(new Date().toISOString().split('T')[0]);
@@ -619,6 +628,7 @@ export function DailyJournal() {
   };
 
   const openModal = (journal?: DailyJournalType, date?: string) => {
+    setEditingId(journal?.id || null);
     if (journal) {
       setEditingId(journal.id); setFormDate(journal.date);
       setFormEntries(siteJournalEntries.filter(e => e.journalId === journal.id).map(e => ({ ...e, pendingFiles: [] } as any)));
@@ -627,6 +637,22 @@ export function DailyJournal() {
     }
     setIsModalOpen(true);
   };
+
+  useEffect(() => {
+    const action = searchParams.get('action');
+    if (action === 'new') {
+      const dateStr = searchParams.get('date');
+      openModal(undefined, dateStr || undefined);
+      setSearchParams(prev => {
+        const next = new URLSearchParams(prev);
+        next.delete('action');
+        return next;
+      }, { replace: true });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, setSearchParams]);
+
+  const generateId = () => Math.random().toString(36).substring(2, 9);
 
   const confirmDelete = () => {
     if (!deleteConfirm) return;
@@ -760,17 +786,6 @@ export function DailyJournal() {
         )}
         {!diaryDate && (
           <>
-            <div className="flex items-center rounded border border-slate-200 bg-white p-0.5 shadow-sm">
-              {(['list', 'calendar'] as const).map(v => (
-                <button key={v} onClick={() => { setViewMode(v); setDiaryDate(null); }}
-                  className={cn('px-2 sm:px-3 py-1 sm:py-1.5 text-xs font-medium rounded transition-all', viewMode === v && !diaryDate ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700')}
-                  title={v === 'list' ? 'Switch to List' : 'Switch to Calendar'}
-                >
-                  {v === 'list' ? <span className="hidden sm:inline">List</span> : <span className="hidden sm:inline">Calendar</span>}
-                  {v === 'list' ? <List className="h-4 w-4 sm:hidden" /> : <Calendar className="h-4 w-4 sm:hidden" />}
-                </button>
-              ))}
-            </div>
             {currentUser?.privileges?.dailyJournal?.canAdd && (
               <Button size="sm" onClick={() => openModal(undefined, diaryDate || undefined)}
                 className="hidden sm:flex h-8 sm:h-9 px-2 sm:px-4 gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs tracking-tight shadow-sm active:scale-95">
@@ -802,7 +817,7 @@ export function DailyJournal() {
       <>
         <DiaryDetailView
           date={diaryDate}
-          onBack={() => setDiaryDate(null)}
+          onBack={() => { setSearchParams({}); setDiaryDate(null); }}
           onAddSession={openModal.bind(null, undefined)}
           onEditJournal={openModal}
           onDeleteJournal={id => setDeleteConfirm({ id, type: 'journal' })}
@@ -1190,39 +1205,15 @@ export function DailyJournal() {
           </Button>
         )}
       </div>
-      {/* Search (list view only) */}
-      {viewMode === 'list' && (
-        <div className="relative w-full max-w-md">
-          <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-          <Input placeholder="Search by date or author..." className="pl-9 h-10 text-sm border-slate-200 bg-white shadow-sm" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
-          {searchTerm && <button onClick={() => setSearchTerm('')} className="absolute right-3 top-2.5 p-1 rounded-full hover:bg-slate-100"><X className="h-3.5 w-3.5 text-slate-400" /></button>}
-        </div>
-      )}
-
-      {/* Calendar View */}
-      {viewMode === 'calendar' && (
-        <div className="bg-card border border-border rounded-lg overflow-hidden shadow-sm">
-          <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-            <h2 className="text-base font-semibold text-foreground">{format(currentMonth, 'MMMM yyyy')}</h2>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}><ChevronLeft className="h-4 w-4" /></Button>
-              <Button variant="outline" size="sm" className="h-8 text-xs font-medium" onClick={() => setCurrentMonth(new Date())}>Today</Button>
-              <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}><ChevronRight className="h-4 w-4" /></Button>
-            </div>
-          </div>
-          <div className="grid grid-cols-7 border-b border-border bg-muted/30">
-            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
-              <div key={d} className="py-3 text-center text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{d}</div>
-            ))}
-          </div>
-          <div className="grid grid-cols-7 auto-rows-[minmax(100px,1fr)]">
-            {renderCalendar()}
-          </div>
-        </div>
-      )}
+      {/* Search */}
+      <div className="relative w-full max-w-md">
+        <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+        <Input placeholder="Search by date or author..." className="pl-9 h-10 text-sm border-slate-200 bg-white shadow-sm" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+        {searchTerm && <button onClick={() => setSearchTerm('')} className="absolute right-3 top-2.5 p-1 rounded-full hover:bg-slate-100"><X className="h-3.5 w-3.5 text-slate-400" /></button>}
+      </div>
 
       {/* List View */}
-      {viewMode === 'list' && renderListView()}
+      {renderListView()}
 
       {renderModal()}
       {renderDeleteConfirm()}
