@@ -50,7 +50,7 @@ export function DesktopFloatingCalendar() {
 
   return (
     <>
-      <div ref={constraintsRef} className="fixed inset-y-8 right-0 w-16 pointer-events-none z-[140]" />
+      <div ref={constraintsRef} className="fixed inset-y-8 right-0 w-16 pointer-events-none z-[240]" />
       {/* Minimal edge-docked tab — expands on hover */}
       <motion.button
         drag="y"
@@ -61,7 +61,7 @@ export function DesktopFloatingCalendar() {
         onClick={() => setOpen(true)}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
-        className={`pointer-events-auto fixed top-[calc(50vh-22px)] right-0 z-[150] flex items-center gap-2 overflow-hidden rounded-l-xl border border-r-0 shadow-lg backdrop-blur-sm cursor-grab active:cursor-grabbing ${isDark
+        className={`pointer-events-auto fixed top-[calc(50vh-22px)] right-0 z-[250] flex items-center gap-2 overflow-hidden rounded-l-xl border border-r-0 shadow-lg backdrop-blur-sm cursor-grab active:cursor-grabbing ${isDark
           ? 'bg-slate-800/90 border-slate-700 text-slate-300 hover:bg-slate-700/90 hover:text-white'
           : 'bg-white/90 border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900'
           }`}

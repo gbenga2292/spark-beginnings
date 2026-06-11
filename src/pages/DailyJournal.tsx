@@ -484,6 +484,7 @@ export function DailyJournal() {
   const [selectedSiteId, setSelectedSiteId] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; type: 'journal' | 'entry' } | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [searchDate, setSearchDate] = useState('');
   const [showPdfPreview, setShowPdfPreview] = useState(false);
   const [pdfDataUri, setPdfDataUri] = useState('');
   const [pdfExportDate, setPdfExportDate] = useState('');
@@ -505,28 +506,72 @@ export function DailyJournal() {
     const groups: Record<string, DailyJournalType[]> = {};
     dailyJournals.forEach(j => { if (!groups[j.date]) groups[j.date] = []; groups[j.date].push(j); });
     return Object.keys(groups)
-      .filter(d => !searchTerm || d.includes(searchTerm) || groups[d].some(j => j.loggedBy.toLowerCase().includes(searchTerm.toLowerCase())))
+      .filter(d => {
+        const matchesTerm = !searchTerm || d.includes(searchTerm) || groups[d].some(j => j.loggedBy.toLowerCase().includes(searchTerm.toLowerCase()));
+        const matchesDate = !searchDate || d === searchDate;
+        return matchesTerm && matchesDate;
+      })
       .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())
       .map(d => ({ date: d, journals: groups[d] }));
-  }, [dailyJournals, searchTerm]);
+  }, [dailyJournals, searchTerm, searchDate]);
 
   // Logic to find journals matching the advanced export filters
   const matchingExportJournals = useMemo(() => {
-    const matching = dailyJournals.filter(j => {
+    let allJournals = [...dailyJournals];
+    let allEntries = [...siteJournalEntries];
+
+    const machineLogsByDate: Record<string, typeof dailyMachineLogs> = {};
+    dailyMachineLogs.forEach(l => {
+      if (!machineLogsByDate[l.date]) machineLogsByDate[l.date] = [];
+      machineLogsByDate[l.date].push(l);
+    });
+
+    Object.keys(machineLogsByDate).forEach(date => {
+      const machineLogs = machineLogsByDate[date];
+      const baseEntriesForDate = allEntries.filter(e => allJournals.some(j => j.id === e.journalId && j.date === date));
+      const entrySiteIds = new Set(baseEntriesForDate.map(e => e.siteId));
+      const standaloneMachineSites = Array.from(new Set(machineLogs.map(l => l.siteId))).filter(id => !entrySiteIds.has(id));
+
+      if (standaloneMachineSites.length > 0) {
+        const systemSessionId = `system-machine-session-${date}`;
+        allJournals.push({
+          id: systemSessionId,
+          date: date,
+          loggedBy: machineLogs[0]?.loggedBy || 'System Auto-Log',
+          createdAt: machineLogs[0]?.created_at || new Date(`${date}T00:00:00`).toISOString(),
+          generalNotes: ''
+        } as any);
+        
+        standaloneMachineSites.forEach(siteId => {
+          const logsForSite = machineLogs.filter(l => l.siteId === siteId);
+          allEntries.push({
+            id: `standalone-${siteId}-${date}`,
+            journalId: systemSessionId,
+            siteId: siteId,
+            siteName: logsForSite[0]?.siteName || 'Unknown Site',
+            clientName: 'Site Operation',
+            narration: '',
+            loggedBy: logsForSite[0]?.loggedBy || 'System Auto-Log'
+          } as any);
+        });
+      }
+    });
+
+    const matching = allJournals.filter(j => {
       const isDateInRange = j.date >= exportFilters.startDate && j.date <= exportFilters.endDate;
       const matchesAuthor = !exportFilters.author || j.loggedBy === exportFilters.author;
       
-      const dayEntries = siteJournalEntries.filter(e => e.journalId === j.id);
+      const dayEntries = allEntries.filter(e => e.journalId === j.id);
       const matchesSite = !exportFilters.siteId || dayEntries.some(e => e.siteId === exportFilters.siteId);
       
-      return isDateInRange && matchesAuthor && matchesSite;
+      return isDateInRange && matchesAuthor && matchesSite && dayEntries.length > 0;
     });
     
     // Group by date for the report
     const groups: Record<string, DailyJournalType[]> = {};
     matching.forEach(j => { if (!groups[j.date]) groups[j.date] = []; groups[j.date].push(j); });
-    return Object.keys(groups).sort().map(d => ({ date: d, journals: groups[d] }));
-  }, [dailyJournals, siteJournalEntries, exportFilters]);
+    return Object.keys(groups).sort().map(d => ({ date: d, journals: groups[d], entries: allEntries }));
+  }, [dailyJournals, siteJournalEntries, dailyMachineLogs, exportFilters]);
 
   // Main Save Logic with Auto-Upload
   const [isPublishing, setIsPublishing] = useState(false);
@@ -660,7 +705,7 @@ export function DailyJournal() {
     toast.success('Deleted'); setDeleteConfirm(null);
   };
 
-  const generateDiaryPdf = (groupedJournals: {date: string, journals: DailyJournalType[]}[], reportTitle?: string) => {
+  const generateDiaryPdf = (groupedJournals: {date: string, journals: DailyJournalType[], entries?: any[]}[], reportTitle?: string) => {
     const doc = new jsPDF();
     const W = doc.internal.pageSize.getWidth();
     const H = doc.internal.pageSize.getHeight();
@@ -701,7 +746,8 @@ export function DailyJournal() {
 
       let y = 62;
       group.journals.forEach((journal, ji) => {
-        const jEntries = siteJournalEntries.filter(e => e.journalId === journal.id && (!exportFilters.siteId || e.siteId === exportFilters.siteId));
+        const relevantEntries = group.entries || siteJournalEntries;
+        const jEntries = relevantEntries.filter(e => e.journalId === journal.id && (!exportFilters.siteId || e.siteId === exportFilters.siteId));
         if (jEntries.length === 0) return;
 
         if (y > H - 40) { doc.addPage(); y = 30; }
@@ -1205,11 +1251,23 @@ export function DailyJournal() {
           </Button>
         )}
       </div>
-      {/* Search */}
-      <div className="relative w-full max-w-md">
-        <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-        <Input placeholder="Search by date or author..." className="pl-9 h-10 text-sm border-slate-200 bg-white shadow-sm" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
-        {searchTerm && <button onClick={() => setSearchTerm('')} className="absolute right-3 top-2.5 p-1 rounded-full hover:bg-slate-100"><X className="h-3.5 w-3.5 text-slate-400" /></button>}
+      {/* Search & Filter */}
+      <div className="flex flex-col sm:flex-row gap-3 w-full max-w-2xl">
+        <div className="relative w-full sm:max-w-md">
+          <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+          <Input placeholder="Search by author or keywords..." className="pl-9 h-10 text-sm border-slate-200 bg-white shadow-sm" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+          {searchTerm && <button onClick={() => setSearchTerm('')} className="absolute right-3 top-2.5 p-1 rounded-full hover:bg-slate-100"><X className="h-3.5 w-3.5 text-slate-400" /></button>}
+        </div>
+        <div className="relative w-full sm:w-[200px] shrink-0">
+          <Calendar className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+          <Input 
+            type="date" 
+            className="pl-9 pr-9 h-10 text-sm border-slate-200 bg-white shadow-sm text-slate-600" 
+            value={searchDate} 
+            onChange={e => setSearchDate(e.target.value)} 
+          />
+          {searchDate && <button onClick={() => setSearchDate('')} className="absolute right-1 top-1.5 p-1.5 rounded-full hover:bg-slate-100 bg-white"><X className="h-3.5 w-3.5 text-slate-400" /></button>}
+        </div>
       </div>
 
       {/* List View */}

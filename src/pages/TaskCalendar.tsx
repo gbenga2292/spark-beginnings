@@ -125,6 +125,7 @@ export default function CalendarPage({ onNavigate, showCompleted: externalShowCo
   const [showCreateTask, setShowCreateTask] = useState(false);
   const [showCreateReminder, setShowCreateReminder] = useState(false);
   const [showCreateDailyJournal, setShowCreateDailyJournal] = useState(false);
+  const [legendCycleState, setLegendCycleState] = useState<{ key: string, index: number }>({ key: '', index: 0 });
 
   const allEvents = useMemo(() => {
     const events: CalendarEvent[] = [];
@@ -132,6 +133,26 @@ export default function CalendarPage({ onNavigate, showCompleted: externalShowCo
     const today = startOfDay(now);
 
     const activeMainTaskIds = new Set(mainTasks.filter(m => !m.isDeleted).map(m => m.id));
+
+    // Pre-compute maps for O(1) lookups to avoid O(N*M) loops
+    const subtasksByMainId = new Map<string, typeof subtasks>();
+    subtasks.forEach(s => {
+      const mid = s.mainTaskId || (s as any).main_task_id;
+      if (mid) {
+        const arr = subtasksByMainId.get(mid) || [];
+        arr.push(s);
+        subtasksByMainId.set(mid, arr);
+      }
+    });
+
+    const entriesByJournal = new Map<string, typeof siteJournalEntries>();
+    siteJournalEntries.forEach(e => {
+      if (e.journalId) {
+        const arr = entriesByJournal.get(e.journalId) || [];
+        arr.push(e);
+        entriesByJournal.set(e.journalId, arr);
+      }
+    });
 
     // 1. Determine if we should show tasks
     const showTasks = ['all', 'all_tasks'].includes(filterMode);
@@ -168,7 +189,7 @@ export default function CalendarPage({ onNavigate, showCompleted: externalShowCo
         const deadline = new Date(m.deadline!);
         
         // Calculate main task status based on subtasks
-        const taskSubs = subtasks.filter(s => s.main_task_id === m.id || s.mainTaskId === m.id);
+        const taskSubs = subtasksByMainId.get(m.id) || [];
         
         // If the main task has subtasks, skip adding it to the calendar
         // to prevent duplicate visual clutter since the subtasks will be rendered.
@@ -241,7 +262,7 @@ export default function CalendarPage({ onNavigate, showCompleted: externalShowCo
           entryTime = parseISO(`${j.date}T08:00:00`);
         }
         const loggerName = j.loggedBy || 'Unknown';
-        const entries = siteJournalEntries.filter(e => e.journalId === j.id);
+        const entries = entriesByJournal.get(j.id) || [];
         const sites = entries.map(e => e.siteName).filter(Boolean);
         const sitesText = sites.length > 0 ? sites.join(', ') : null;
 
@@ -276,30 +297,18 @@ export default function CalendarPage({ onNavigate, showCompleted: externalShowCo
 
   const visibleLegendKeys = useMemo(() => {
     const keys = new Set<string>(['holiday']); // holiday is always included
-    
-    if (['all', 'all_tasks'].includes(filterMode)) {
-      keys.add('completed');
-      keys.add('overdue');
-      keys.add('in_progress');
-      keys.add('not_started');
-    }
-    
-    if (['all', 'all_reminders'].includes(filterMode)) {
-      keys.add('reminder');
-    }
-    
-    if (['all', 'journal'].includes(filterMode)) {
-      keys.add('journal');
-    }
-    
+    allEvents.forEach(e => {
+      if (e.type === 'journal') keys.add('journal');
+      else if (e.type === 'reminder') {
+        if (!e.id.startsWith('hol-')) keys.add('reminder');
+      } else {
+        // find matching status key
+        const entry = Object.entries(STATUS_STYLES).find(([_, style]) => style.bg === e.colorClass);
+        if (entry) keys.add(entry[0]);
+      }
+    });
     return keys;
-  }, [filterMode]);
-
-  const calDays = useMemo(() => {
-    const monthStart = startOfMonth(calMonth);
-    const monthEnd = endOfMonth(calMonth);
-    return eachDayOfInterval({ start: startOfWeek(monthStart), end: endOfWeek(monthEnd) });
-  }, [calMonth]);
+  }, [allEvents]);
 
   const eventsByDate = useMemo(() => {
     const map = new Map<string, CalendarEvent[]>();
@@ -311,6 +320,43 @@ export default function CalendarPage({ onNavigate, showCompleted: externalShowCo
     });
     return map;
   }, [allEvents]);
+
+  const handleLegendClick = (key: string) => {
+    if (viewMode !== 'day') return;
+    
+    const currentDayEvents = eventsByDate.get(formatDateKey(selectedDate)) || [];
+    let matchedEvents = currentDayEvents.filter(e => {
+      if (key === 'journal') return e.type === 'journal';
+      if (key === 'holiday') return e.id.startsWith('hol-');
+      if (key === 'reminder') return e.type === 'reminder' && !e.id.startsWith('hol-');
+      return e.type === 'task' && e.colorClass === STATUS_STYLES[key]?.bg;
+    });
+    
+    if (matchedEvents.length === 0) return;
+    
+    matchedEvents.sort((a, b) => a.time.getTime() - b.time.getTime());
+
+    let nextIndex = 0;
+    if (legendCycleState.key === key) {
+      nextIndex = (legendCycleState.index + 1) % matchedEvents.length;
+    }
+    
+    setLegendCycleState({ key, index: nextIndex });
+    
+    const targetEvent = matchedEvents[nextIndex];
+    const hour = targetEvent.time.getHours();
+    
+    const element = document.getElementById(`hour-row-${hour}`);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  };
+
+  const calDays = useMemo(() => {
+    const monthStart = startOfMonth(calMonth);
+    const monthEnd = endOfMonth(calMonth);
+    return eachDayOfInterval({ start: startOfWeek(monthStart), end: endOfWeek(monthEnd) });
+  }, [calMonth]);
 
   const dayEvents = useMemo(() => {
     const selectedKey = formatDateKey(selectedDate);
@@ -420,9 +466,14 @@ export default function CalendarPage({ onNavigate, showCompleted: externalShowCo
         {Object.entries(STATUS_STYLES)
           .filter(([key]) => visibleLegendKeys.has(key))
           .map(([key, style]) => (
-            <div key={key} className="flex items-center gap-1.5 animate-in fade-in slide-in-from-left-1 duration-200">
+            <div 
+              key={key} 
+              onClick={() => handleLegendClick(key)}
+              className={`flex items-center gap-1.5 animate-in fade-in slide-in-from-left-1 duration-200 rounded px-1.5 py-1 -ml-1.5 transition-colors ${viewMode === 'day' ? 'cursor-pointer hover:bg-white/10' : ''}`}
+              title={viewMode === 'day' ? `Click to find the next ${style.label} event today` : ''}
+            >
               <span className={`w-2.5 h-2.5 rounded-full ${key === 'journal' ? 'bg-gradient-to-r from-amber-400 to-orange-400' : style.bg}`} />
-              <span className="text-[10px] sm:text-xs text-white/70 font-medium">{style.label}</span>
+              <span className="text-[10px] sm:text-xs text-white/70 font-medium select-none">{style.label}</span>
             </div>
           ))}
       </div>
@@ -571,7 +622,7 @@ export default function CalendarPage({ onNavigate, showCompleted: externalShowCo
               {HOURS.map(hour => {
                 const hourEvents = eventsByHour.get(hour) || [];
                 return (
-                  <div key={hour} className="flex border-b border-white/5 min-h-[48px] sm:min-h-[60px]">
+                  <div key={hour} id={`hour-row-${hour}`} className="flex border-b border-white/5 min-h-[48px] sm:min-h-[60px]">
                     <div className="w-12 sm:w-16 flex-shrink-0 pr-2 pt-0 text-right">
                       <span className="text-[10px] sm:text-[11px] text-white/40 font-medium -mt-2 block">
                         {formatHour(hour)}

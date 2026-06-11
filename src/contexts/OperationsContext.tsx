@@ -72,7 +72,7 @@ interface OperationsContextType {
 
   // Certificates
   maintenanceCertificates: MaintenanceCertificate[];
-  issueCertificate: (cert: Omit<MaintenanceCertificate, 'id'>) => void;
+  issueCertificate: (cert: Omit<MaintenanceCertificate, 'id'>) => Promise<void>;
 }
 
 const OperationsContext = createContext<OperationsContextType | undefined>(undefined);
@@ -322,27 +322,359 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
   }, [user]);
 
   useEffect(() => {
-    const cachedCerts = localStorage.getItem('dcel-maintenance-certificates');
-    if (cachedCerts) {
+    const fetchCertificates = async () => {
       try {
-        setMaintenanceCertificates(JSON.parse(cachedCerts));
-      } catch (e) {
-        console.error('Failed to parse cached certificates:', e);
-      }
-    }
-  }, []);
+        const { data, error } = await supabase
+          .from('maintenance_certificates')
+          .select('*')
+          .order('created_at', { ascending: false });
 
-  const issueCertificate = (cert: Omit<MaintenanceCertificate, 'id'>) => {
-    const newCert: MaintenanceCertificate = {
-      ...cert,
-      id: crypto.randomUUID()
+        if (!error && data) {
+          const certs: MaintenanceCertificate[] = data.map((r: any) => ({
+            id: r.id,
+            certNumber: r.cert_number,
+            machineId: r.machine_id,
+            machineName: r.machine_name,
+            machineCategory: r.machine_category,
+            machineSite: r.machine_site,
+            machineSerial: r.machine_serial,
+            issuedDate: r.issued_date,
+            expiryDate: r.expiry_date,
+            issuedByEmployeeId: r.issued_by_employee_id,
+            issuedByName: r.issued_by_name,
+            issuedByDesignation: r.issued_by_designation,
+            lastServiceDate: r.last_service_date,
+            nextServiceDate: r.next_service_date,
+            totalServices: r.total_services,
+            complianceStandards: r.compliance_standards,
+            conditionsOfOperation: r.conditions_of_operation,
+            manufacturer: r.manufacturer,
+            modelNumber: r.model_number,
+            outcomeRemarks: r.outcome_remarks,
+            lastInspectionDateOverride: r.last_inspection_date_override,
+            issuedDateOverride: r.issued_date_override,
+            criteriaCompliance: r.criteria_compliance,
+          }));
+          setMaintenanceCertificates(certs);
+          // Keep localStorage as offline cache
+          localStorage.setItem('dcel-maintenance-certificates', JSON.stringify(certs));
+          return;
+        }
+      } catch (err) {
+        console.error('Failed to fetch certificates from Supabase:', err);
+      }
+      // Fallback: load from localStorage if Supabase fails
+      const cachedCerts = localStorage.getItem('dcel-maintenance-certificates');
+      if (cachedCerts) {
+        try { setMaintenanceCertificates(JSON.parse(cachedCerts)); } catch (e) {}
+      }
     };
+
+    if (user) fetchCertificates();
+  }, [user]);
+
+  // ── Real-Time Subscriptions for Dewatering Operations & Maintenance ──
+  useEffect(() => {
+    if (!user) return;
+
+    // Helper mappers corresponding to the database to frontend state formats
+    const mapDbAsset = (a: any) => {
+      const quantity = a.quantity || 0;
+      const reservedQuantity = a.reserved_quantity || 0;
+      const usedQuantity = a.used_quantity || 0;
+      const missingQuantity = a.missing_quantity || 0;
+      const damagedQuantity = a.damaged_quantity || 0;
+      const availableQuantity = Math.max(0, quantity - (reservedQuantity + usedQuantity + missingQuantity + damagedQuantity));
+
+      return {
+        id: a.id,
+        name: a.name,
+        category: a.category,
+        type: a.type || 'equipment',
+        quantity,
+        availableQuantity,
+        reservedQuantity,
+        usedQuantity,
+        missingQuantity,
+        damagedQuantity,
+        unitOfMeasurement: a.unit,
+        status: a.status,
+        location: a.location,
+        condition: a.condition,
+        description: a.description,
+        requiresLogging: a.requires_logging,
+        serialNumber: a.serial_number,
+        serviceIntervalMonths: a.service_interval_months || 2,
+        powerSource: a.power_source,
+        cost: a.cost,
+        lowStockLevel: a.low_stock_level,
+        criticalStockLevel: a.critical_stock_level,
+        created_at: a.created_at
+      };
+    };
+
+    const mapDbPumpDate = (p: any) => ({
+      id: p.id,
+      assetId: p.asset_id,
+      siteId: p.site_id,
+      pumpStartDate: p.pump_start_date,
+      pumpStopDate: p.pump_stop_date,
+      created_at: p.created_at
+    });
+
+    const mapDbWaybill = (w: any) => ({
+      id: w.id,
+      type: w.type,
+      status: w.status,
+      siteId: w.site_id,
+      siteName: w.site_name,
+      driverName: w.driver_name,
+      vehicle: w.vehicle,
+      issueDate: w.issue_date,
+      sentToSiteDate: w.sent_to_site_date,
+      items: w.items || [],
+    });
+
+    const mapDbCheckout = (c: any) => ({
+      id: c.id,
+      employeeId: c.employee_id,
+      employeeName: c.employee_name,
+      assetId: c.asset_id,
+      assetName: c.asset_name,
+      quantity: c.quantity,
+      status: c.status,
+      checkoutDate: c.checkout_date,
+      expectedReturnDate: c.expected_return_date,
+      returnedQuantity: c.returned_quantity,
+      returnInDays: c.return_in_days || 0
+    });
+
+    const mapDbDailyLog = (log: any) => ({
+      id: log.id,
+      assetId: log.asset_id,
+      assetName: log.asset_name,
+      siteId: log.site_id,
+      siteName: log.site_name,
+      date: log.date,
+      isActive: log.is_active,
+      operationalDay: log.operational_day,
+      downtimeEntries: log.downtime_entries || [],
+      maintenanceDetails: log.maintenance_details,
+      clientFeedback: log.client_feedback,
+      issuesOnSite: log.issues_on_site,
+      dieselUsage: Number(log.diesel_usage || 0),
+      supervisorOnSite: log.supervisor_on_site,
+      loggedBy: log.logged_by,
+      created_at: log.created_at
+    });
+
+    const mapDbMaintenance = (m: any) => ({
+      id: m.id,
+      date: m.date,
+      type: m.type,
+      technician: m.technician || 'Unknown',
+      generalRemark: m.general_remark || undefined,
+      assets: m.assets || [],
+    });
+
+    const mapDbCertificate = (r: any) => ({
+      id: r.id,
+      certNumber: r.cert_number,
+      machineId: r.machine_id,
+      machineName: r.machine_name,
+      machineCategory: r.machine_category,
+      machineSite: r.machine_site,
+      machineSerial: r.machine_serial,
+      issuedDate: r.issued_date,
+      expiryDate: r.expiry_date,
+      issuedByEmployeeId: r.issued_by_employee_id,
+      issuedByName: r.issued_by_name,
+      issuedByDesignation: r.issued_by_designation,
+      lastServiceDate: r.last_service_date,
+      nextServiceDate: r.next_service_date,
+      totalServices: r.total_services,
+      complianceStandards: r.compliance_standards,
+      conditionsOfOperation: r.conditions_of_operation,
+      manufacturer: r.manufacturer,
+      modelNumber: r.model_number,
+      outcomeRemarks: r.outcome_remarks,
+      lastInspectionDateOverride: r.last_inspection_date_override,
+      issuedDateOverride: r.issued_date_override,
+      criteriaCompliance: r.criteria_compliance,
+    });
+
+    const channel = supabase
+      .channel('operations-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public' },
+        (payload) => {
+          const table = payload.table;
+          const eventType = payload.eventType;
+          const newRow = payload.new as Record<string, any>;
+          const oldRow = payload.old as Record<string, any>;
+
+          switch (table) {
+            case 'operations_assets': {
+              if (eventType === 'INSERT') {
+                setAssets(prev => {
+                  if (prev.some(a => a.id === newRow.id)) return prev;
+                  return [...prev, mapDbAsset(newRow)];
+                });
+              } else if (eventType === 'UPDATE') {
+                setAssets(prev => prev.map(a => a.id === newRow.id ? mapDbAsset(newRow) : a));
+              } else if (eventType === 'DELETE') {
+                setAssets(prev => prev.filter(a => a.id !== oldRow.id));
+              }
+              break;
+            }
+            case 'operations_site_pump_dates': {
+              if (eventType === 'INSERT') {
+                setSitePumpDates(prev => {
+                  if (prev.some(p => p.id === newRow.id)) return prev;
+                  return [...prev, mapDbPumpDate(newRow)];
+                });
+              } else if (eventType === 'UPDATE') {
+                setSitePumpDates(prev => prev.map(p => p.id === newRow.id ? mapDbPumpDate(newRow) : p));
+              } else if (eventType === 'DELETE') {
+                setSitePumpDates(prev => prev.filter(p => p.id !== oldRow.id));
+              }
+              break;
+            }
+            case 'operations_waybills': {
+              if (eventType === 'INSERT') {
+                setWaybills(prev => {
+                  if (prev.some(w => w.id === newRow.id)) return prev;
+                  return [...prev, mapDbWaybill(newRow)];
+                });
+              } else if (eventType === 'UPDATE') {
+                setWaybills(prev => prev.map(w => w.id === newRow.id ? mapDbWaybill(newRow) : w));
+              } else if (eventType === 'DELETE') {
+                setWaybills(prev => prev.filter(w => w.id !== oldRow.id));
+              }
+              break;
+            }
+            case 'operations_checkouts': {
+              if (eventType === 'INSERT') {
+                setCheckouts(prev => {
+                  if (prev.some(c => c.id === newRow.id)) return prev;
+                  return [mapDbCheckout(newRow), ...prev];
+                });
+              } else if (eventType === 'UPDATE') {
+                setCheckouts(prev => prev.map(c => c.id === newRow.id ? mapDbCheckout(newRow) : c));
+              } else if (eventType === 'DELETE') {
+                setCheckouts(prev => prev.filter(c => c.id !== oldRow.id));
+              }
+              break;
+            }
+            case 'operations_daily_logs': {
+              if (eventType === 'INSERT') {
+                setDailyMachineLogs(prev => {
+                  if (prev.some(log => log.id === newRow.id)) return prev;
+                  return [mapDbDailyLog(newRow), ...prev];
+                });
+              } else if (eventType === 'UPDATE') {
+                setDailyMachineLogs(prev => prev.map(log => log.id === newRow.id ? mapDbDailyLog(newRow) : log));
+              } else if (eventType === 'DELETE') {
+                setDailyMachineLogs(prev => prev.filter(log => log.id !== oldRow.id));
+              }
+              break;
+            }
+            case 'operations_maintenance': {
+              if (eventType === 'INSERT') {
+                setMaintenanceSessions(prev => {
+                  if (prev.some(m => m.id === newRow.id)) return prev;
+                  return [...prev, mapDbMaintenance(newRow)];
+                });
+              } else if (eventType === 'UPDATE') {
+                setMaintenanceSessions(prev => prev.map(m => m.id === newRow.id ? mapDbMaintenance(newRow) : m));
+              } else if (eventType === 'DELETE') {
+                setMaintenanceSessions(prev => prev.filter(m => m.id !== oldRow.id));
+              }
+              break;
+            }
+            case 'maintenance_certificates': {
+              if (eventType === 'INSERT') {
+                setMaintenanceCertificates(prev => {
+                  if (prev.some(r => r.id === newRow.id)) return prev;
+                  const updated = [mapDbCertificate(newRow), ...prev];
+                  localStorage.setItem('dcel-maintenance-certificates', JSON.stringify(updated));
+                  return updated;
+                });
+              } else if (eventType === 'UPDATE') {
+                setMaintenanceCertificates(prev => {
+                  const updated = prev.map(r => r.id === newRow.id ? mapDbCertificate(newRow) : r);
+                  localStorage.setItem('dcel-maintenance-certificates', JSON.stringify(updated));
+                  return updated;
+                });
+              } else if (eventType === 'DELETE') {
+                setMaintenanceCertificates(prev => {
+                  const updated = prev.filter(r => r.id !== oldRow.id);
+                  localStorage.setItem('dcel-maintenance-certificates', JSON.stringify(updated));
+                  return updated;
+                });
+              }
+              break;
+            }
+          }
+        }
+      )
+      .subscribe((status, err) => {
+        if (err) {
+          console.error("Error setting up operations realtime:", err);
+        } else {
+          console.log("Operations realtime subscription status:", status);
+        }
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
+
+  const issueCertificate = async (cert: Omit<MaintenanceCertificate, 'id'>) => {
+    const newCert: MaintenanceCertificate = { ...cert, id: crypto.randomUUID() };
+
+    // Optimistic local update
     setMaintenanceCertificates(prev => {
       const updated = [newCert, ...prev];
       localStorage.setItem('dcel-maintenance-certificates', JSON.stringify(updated));
       return updated;
     });
-    toast.success(`Certificate ${newCert.certNumber} issued successfully`);
+
+    // Persist to Supabase
+    try {
+      const { error } = await supabase.from('maintenance_certificates').insert({
+        id: newCert.id,
+        cert_number: newCert.certNumber,
+        machine_id: newCert.machineId,
+        machine_name: newCert.machineName,
+        machine_category: newCert.machineCategory,
+        machine_site: newCert.machineSite,
+        machine_serial: newCert.machineSerial,
+        issued_date: newCert.issuedDate,
+        expiry_date: newCert.expiryDate,
+        issued_by_employee_id: newCert.issuedByEmployeeId,
+        issued_by_name: newCert.issuedByName,
+        issued_by_designation: newCert.issuedByDesignation,
+        last_service_date: newCert.lastServiceDate,
+        next_service_date: newCert.nextServiceDate,
+        total_services: newCert.totalServices,
+        compliance_standards: newCert.complianceStandards,
+        conditions_of_operation: newCert.conditionsOfOperation,
+        manufacturer: newCert.manufacturer,
+        model_number: newCert.modelNumber,
+        outcome_remarks: newCert.outcomeRemarks,
+        last_inspection_date_override: newCert.lastInspectionDateOverride,
+        issued_date_override: newCert.issuedDateOverride,
+        criteria_compliance: newCert.criteriaCompliance,
+      });
+      if (error) throw error;
+      toast.success(`Certificate ${newCert.certNumber} issued & saved`);
+    } catch (err: any) {
+      console.error('Failed to save certificate to Supabase:', err);
+      toast.warning(`Certificate issued locally — sync failed: ${err.message || 'unknown error'}`);
+    }
   };
 
   const persistAsset = async (asset: Asset) => {

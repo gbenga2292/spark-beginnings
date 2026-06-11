@@ -115,6 +115,13 @@ export function dbToInvoice(r: any): Invoice {
     countOffDays: r.count_off_days ?? true,
     technicianDuration: r.technician_duration != null ? Number(r.technician_duration) : undefined,
     technicianDurationSameAsMachine: r.technician_duration_same_as_machine ?? true,
+    technicianNightFee: r.technician_night_fee != null ? Number(r.technician_night_fee) : undefined,
+    technicianAccommodation: r.technician_accommodation != null ? Number(r.technician_accommodation) : undefined,
+    technicianNightDuration: r.technician_night_duration != null ? Number(r.technician_night_duration) : undefined,
+    technicianNightDurationSameAsMachine: r.technician_night_duration_same_as_machine ?? true,
+    noOfTechnicianNight: r.no_of_technician_night != null ? Number(r.no_of_technician_night) : undefined,
+    technicianNightCountSameAsDay: r.technician_night_count_same_as_day ?? true,
+    technicianAccommodationUseNightCount: r.technician_accommodation_use_night_count ?? false,
   };
 }
 
@@ -136,6 +143,13 @@ export function dbToPendingInvoice(r: any): PendingInvoice {
     countOffDays: r.count_off_days ?? true,
     technicianDuration: r.technician_duration != null ? Number(r.technician_duration) : undefined,
     technicianDurationSameAsMachine: r.technician_duration_same_as_machine ?? true,
+    technicianNightFee: r.technician_night_fee != null ? Number(r.technician_night_fee) : undefined,
+    technicianAccommodation: r.technician_accommodation != null ? Number(r.technician_accommodation) : undefined,
+    technicianNightDuration: r.technician_night_duration != null ? Number(r.technician_night_duration) : undefined,
+    technicianNightDurationSameAsMachine: r.technician_night_duration_same_as_machine ?? true,
+    noOfTechnicianNight: r.no_of_technician_night != null ? Number(r.no_of_technician_night) : undefined,
+    technicianNightCountSameAsDay: r.technician_night_count_same_as_day ?? true,
+    technicianAccommodationUseNightCount: r.technician_accommodation_use_night_count ?? false,
   };
 }
 
@@ -601,6 +615,13 @@ function invoiceToDb(i: Invoice) {
     count_off_days: i.countOffDays ?? true,
     technician_duration: i.technicianDuration,
     technician_duration_same_as_machine: i.technicianDurationSameAsMachine ?? true,
+    technician_night_fee: i.technicianNightFee,
+    technician_accommodation: i.technicianAccommodation,
+    technician_night_duration: i.technicianNightDuration,
+    technician_night_duration_same_as_machine: i.technicianNightDurationSameAsMachine ?? true,
+    no_of_technician_night: i.noOfTechnicianNight,
+    technician_night_count_same_as_day: i.technicianNightCountSameAsDay ?? true,
+    technician_accommodation_use_night_count: i.technicianAccommodationUseNightCount ?? false,
   };
 }
 
@@ -621,6 +642,13 @@ function pendingInvoiceToDb(p: PendingInvoice) {
     count_off_days: p.countOffDays ?? true,
     technician_duration: p.technicianDuration,
     technician_duration_same_as_machine: p.technicianDurationSameAsMachine ?? true,
+    technician_night_fee: p.technicianNightFee,
+    technician_accommodation: p.technicianAccommodation,
+    technician_night_duration: p.technicianNightDuration,
+    technician_night_duration_same_as_machine: p.technicianNightDurationSameAsMachine ?? true,
+    no_of_technician_night: p.noOfTechnicianNight,
+    technician_night_count_same_as_day: p.technicianNightCountSameAsDay ?? true,
+    technician_accommodation_use_night_count: p.technicianAccommodationUseNightCount ?? false,
   };
 }
 
@@ -1344,7 +1372,12 @@ export const db = {
         mobDemob: 'mob_demob', rentalCost: 'rental_cost', dieselCost: 'diesel_cost',
         techniciansCost: 'technicians_cost', totalCost: 'total_cost', totalCharge: 'total_charge',
         totalExclusiveOfVat: 'total_exclusive_of_vat', printLayout: 'print_layout', historyLog: 'history_log',
-        machineConfigs: 'machine_configs', countOffDays: 'count_off_days'
+        machineConfigs: 'machine_configs', countOffDays: 'count_off_days',
+        technicianDuration: 'technician_duration', technicianDurationSameAsMachine: 'technician_duration_same_as_machine',
+        technicianNightFee: 'technician_night_fee', technicianAccommodation: 'technician_accommodation',
+        technicianNightDuration: 'technician_night_duration', technicianNightDurationSameAsMachine: 'technician_night_duration_same_as_machine',
+        noOfTechnicianNight: 'no_of_technician_night', technicianNightCountSameAsDay: 'technician_night_count_same_as_day',
+        technicianAccommodationUseNightCount: 'technician_accommodation_use_night_count'
       };
       update[map[k] || k] = v;
     });
@@ -1373,7 +1406,12 @@ export const db = {
         dieselCost: 'diesel_cost', techniciansCost: 'technicians_cost',
         totalCost: 'total_cost', totalCharge: 'total_charge',
         totalExclusiveOfVat: 'total_exclusive_of_vat', printLayout: 'print_layout', historyLog: 'history_log',
-        machineConfigs: 'machine_configs', countOffDays: 'count_off_days'
+        machineConfigs: 'machine_configs', countOffDays: 'count_off_days',
+        technicianDuration: 'technician_duration', technicianDurationSameAsMachine: 'technician_duration_same_as_machine',
+        technicianNightFee: 'technician_night_fee', technicianAccommodation: 'technician_accommodation',
+        technicianNightDuration: 'technician_night_duration', technicianNightDurationSameAsMachine: 'technician_night_duration_same_as_machine',
+        noOfTechnicianNight: 'no_of_technician_night', technicianNightCountSameAsDay: 'technician_night_count_same_as_day',
+        technicianAccommodationUseNightCount: 'technician_accommodation_use_night_count'
       };
       update[map[k] || k] = v;
     });

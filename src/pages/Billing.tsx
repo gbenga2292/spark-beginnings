@@ -5,7 +5,7 @@ import InvoiceLogo from '../../logo/logo-2.png';
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction, AlertDialogCancel } from '@/src/components/task_ui/alert-dialog';
 import { useAppStore, PendingInvoice, Invoice } from '@/src/store/appStore';
 import { toast, showConfirm } from '@/src/components/ui/toast';
-import { Trash2, Edit, CheckCircle, Plus, X, ArrowRightCircle, Upload, Download, Mail, ChevronUp, ChevronDown, ChevronRight, Printer, PlusCircle, ArrowLeft, Save } from 'lucide-react';
+import { Trash2, Edit, CheckCircle, Plus, X, ArrowRightCircle, Upload, Download, Mail, ChevronUp, ChevronDown, ChevronRight, Printer, PlusCircle, ArrowLeft, Save, FileText, Layers, Users, Settings, Truck, Info } from 'lucide-react';
 import { Input } from '@/src/components/ui/input';
 import { Button } from '@/src/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
@@ -106,9 +106,16 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
     noOfMachine: '',
     dailyRentalCost: '',
     noOfTechnician: '',
-    techniciansDailyRate: '',
+    techniciansDailyRate: '', // = Day Rate (existing field, backwards compatible)
+    technicianNightFee: '',   // UI-only until DB migration
+    technicianAccommodation: '', // UI-only until DB migration
     technicianDuration: '',
     technicianDurationSameAsMachine: true,
+    technicianNightDuration: '',
+    technicianNightDurationSameAsMachine: true,
+    noOfTechnicianNight: '',
+    technicianNightCountSameAsDay: true,
+    technicianAccommodationUseNightCount: false,
     dieselCostPerLtr: '',
     dailyUsage: '',
     mobDemob: '',
@@ -207,7 +214,11 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
   const livePreview = useMemo(() => {
     const noOfMachine = parseInt(form.noOfMachine) || 0;
     const noOfTechnician = parseFloat(form.noOfTechnician) || 0;
-    const techniciansDailyRate = parseFloat(form.techniciansDailyRate) || 0;
+    const techDayFee = parseFloat(form.techniciansDailyRate) || 0;
+    const techNightFee = parseFloat(form.technicianNightFee) || 0;
+    const techAccommodation = parseFloat(form.technicianAccommodation) || 0;
+    // Effective daily rate = day fee + night fee + accommodation
+    const effectiveTechDailyRate = techDayFee + techNightFee + techAccommodation;
     const dieselCostPerLtr = parseFloat(form.dieselCostPerLtr) || 0;
     const dailyUsage = parseFloat(form.dailyUsage) || 0;
     const mobDemob = parseFloat(form.mobDemob) || 0;
@@ -225,11 +236,23 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
     }, 0);
 
     const actualTechDuration = form.technicianDurationSameAsMachine ? maxDuration : (parseFloat(form.technicianDuration) || 0);
+    const actualNightDuration = form.technicianNightDurationSameAsMachine ? maxDuration : (parseFloat(form.technicianNightDuration) || 0);
 
     const dieselCost = machineConfigs.length > 0
       ? machineConfigs.reduce((sum, row) => sum + dailyUsage * dieselCostPerLtr * (parseFloat(row.duration) || 0), 0)
       : noOfMachine * dailyUsage * dieselCostPerLtr * maxDuration;
-    const techniciansCost = noOfTechnician * techniciansDailyRate * actualTechDuration;
+
+    // Separate night count logic (backwards compatible: undefined = same as day)
+    const noOfTechnicianNight = form.technicianNightCountSameAsDay ? noOfTechnician : (parseFloat(form.noOfTechnicianNight) || 0);
+    // Accommodation crew basis: use night crew if toggled, otherwise day crew
+    const accomCrewCount = form.technicianAccommodationUseNightCount ? noOfTechnicianNight : noOfTechnician;
+
+    // Calculate technicians cost separately for day, night, and accommodation
+    const techDayCost = noOfTechnician * techDayFee * actualTechDuration;
+    const techNightCost = noOfTechnicianNight * techNightFee * actualNightDuration;
+    const techAccomCost = accomCrewCount * techAccommodation * actualTechDuration;
+    const techniciansCost = techDayCost + techNightCost + techAccomCost;
+
     const instMobDemob = mobDemob + installation;
     const otherCosts = damages;
     const totalCost = rentalCost + dieselCost + techniciansCost + instMobDemob + otherCosts;
@@ -252,13 +275,17 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
       totalCharge = totalCost + vat;
     }
 
-    return { totalCost, vat, totalCharge, vatInc, maxDuration };
+    return { totalCost, vat, totalCharge, vatInc, maxDuration, actualTechDuration, actualNightDuration, techniciansCost, effectiveTechDailyRate, noOfTechnicianNight, accomCrewCount };
   }, [form, machineConfigs, siteRegistry, vatRate]);
 
   const calculateFullInvoiceData = (input: any, configs?: { rate: string; duration: string }[]) => {
     const noOfMachine = parseInt(input.noOfMachine) || 0;
     const noOfTechnician = parseFloat(input.noOfTechnician) || 0;
-    const techniciansDailyRate = parseFloat(input.techniciansDailyRate) || 0;
+    // Compute effective daily rate from day fee + night fee + accommodation
+    const techDayFee = parseFloat(input.techniciansDailyRate) || 0;
+    const techNightFee = parseFloat(input.technicianNightFee) || 0;
+    const techAccommodation = parseFloat(input.technicianAccommodation) || 0;
+    const techniciansDailyRate = techDayFee;
     const dieselCostPerLtr = parseFloat(input.dieselCostPerLtr) || 0;
     const dailyUsage = parseFloat(input.dailyUsage) || 0;
     const mobDemob = parseFloat(input.mobDemob) || 0;
@@ -348,10 +375,26 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
       ? activeCfgs.reduce((sum, row) => sum + (parseFloat(row.rate) || 0) * (parseFloat(row.duration) || 0), 0)
       : (parseInt(input.noOfMachine) || 0) * (parseFloat(input.dailyRentalCost) || 0) * maxDuration;
 
+    const isNightSame = input.technicianNightDurationSameAsMachine ?? true;
+    const actualNightDuration = isNightSame ? maxDuration : (parseFloat(input.technicianNightDuration) || 0);
+
     const dieselCost = activeCfgs
       ? activeCfgs.reduce((sum, row) => sum + dailyUsage * dieselCostPerLtr * (parseFloat(row.duration) || 0), 0)
       : noOfMachine * dailyUsage * dieselCostPerLtr * maxDuration;
-    const techniciansCost = noOfTechnician * techniciansDailyRate * actualTechDuration;
+
+    // Separate night count logic (backwards compatible: undefined = same as day)
+    const isNightCountSame = input.technicianNightCountSameAsDay ?? true;
+    const noOfTechnicianNight = isNightCountSame ? noOfTechnician : (parseFloat(input.noOfTechnicianNight) || 0);
+    // Accommodation crew basis: use night crew if toggled, otherwise day crew
+    const useNightForAccom = input.technicianAccommodationUseNightCount ?? false;
+    const accomCrewCount = useNightForAccom ? noOfTechnicianNight : noOfTechnician;
+
+    // Calculate technicians cost separately for day, night, and accommodation
+    const techDayCost = noOfTechnician * techDayFee * actualTechDuration;
+    const techNightCost = noOfTechnicianNight * techNightFee * actualNightDuration;
+    const techAccomCost = accomCrewCount * techAccommodation * actualTechDuration;
+    const techniciansCost = techDayCost + techNightCost + techAccomCost;
+
     const instMobDemob = mobDemob + installation;
     const otherCosts = damages;
     const totalCost = rentalCost + dieselCost + techniciansCost + instMobDemob + otherCosts;
@@ -388,6 +431,13 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
       countOffDays: input.countOffDays ?? true,
       technicianDuration: isTechSame ? undefined : (parseFloat(input.technicianDuration) || 0),
       technicianDurationSameAsMachine: isTechSame,
+      technicianNightFee: techNightFee,
+      technicianAccommodation: techAccommodation,
+      technicianNightDuration: isNightSame ? undefined : (parseFloat(input.technicianNightDuration) || 0),
+      technicianNightDurationSameAsMachine: isNightSame,
+      noOfTechnicianNight: isNightCountSame ? undefined : noOfTechnicianNight,
+      technicianNightCountSameAsDay: isNightCountSame,
+      technicianAccommodationUseNightCount: useNightForAccom,
     };
   };
 
@@ -453,6 +503,13 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
         countOffDays: data.countOffDays,
         technicianDuration: data.technicianDuration,
         technicianDurationSameAsMachine: data.technicianDurationSameAsMachine,
+        technicianNightFee: data.technicianNightFee,
+        technicianAccommodation: data.technicianAccommodation,
+        technicianNightDuration: data.technicianNightDuration,
+        technicianNightDurationSameAsMachine: data.technicianNightDurationSameAsMachine,
+        noOfTechnicianNight: data.noOfTechnicianNight,
+        technicianNightCountSameAsDay: data.technicianNightCountSameAsDay,
+        technicianAccommodationUseNightCount: data.technicianAccommodationUseNightCount,
       };
 
       if (movingFromQuotationToActive) {
@@ -550,7 +607,15 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
       noOfMachine,
       dailyRentalCost: 'dailyRentalCost' in inv ? String(inv.dailyRentalCost ?? 0) : '0',
       noOfTechnician: 'noOfTechnician' in inv ? String(inv.noOfTechnician ?? 0) : '0',
+      // Existing records: techniciansDailyRate = full rate (treated as Day Fee, night fee/accommodation = 0)
       techniciansDailyRate: 'techniciansDailyRate' in inv ? String(inv.techniciansDailyRate ?? 0) : '0',
+      technicianNightFee: 'technicianNightFee' in inv ? String(inv.technicianNightFee ?? '') : '',
+      technicianAccommodation: 'technicianAccommodation' in inv ? String(inv.technicianAccommodation ?? '') : '',
+      technicianNightDuration: 'technicianNightDuration' in inv ? String(inv.technicianNightDuration ?? '') : '',
+      technicianNightDurationSameAsMachine: 'technicianNightDurationSameAsMachine' in inv ? (inv.technicianNightDurationSameAsMachine ?? true) : true,
+      noOfTechnicianNight: 'noOfTechnicianNight' in inv ? String(inv.noOfTechnicianNight ?? '') : '',
+      technicianNightCountSameAsDay: 'technicianNightCountSameAsDay' in inv ? (inv.technicianNightCountSameAsDay ?? true) : true,
+      technicianAccommodationUseNightCount: 'technicianAccommodationUseNightCount' in inv ? (inv.technicianAccommodationUseNightCount ?? false) : false,
       technicianDuration: 'technicianDuration' in inv ? String(inv.technicianDuration ?? 0) : '0',
       technicianDurationSameAsMachine: 'technicianDurationSameAsMachine' in inv ? (inv.technicianDurationSameAsMachine ?? true) : true,
       dieselCostPerLtr: 'dieselCostPerLtr' in inv ? String(inv.dieselCostPerLtr ?? 0) : '0',
@@ -633,7 +698,14 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
         totalCharge: inv.totalCharge,
         totalExclusiveOfVat: inv.totalExclusiveOfVat,
         technicianDuration: inv.technicianDuration,
-        technicianDurationSameAsMachine: inv.technicianDurationSameAsMachine
+        technicianDurationSameAsMachine: inv.technicianDurationSameAsMachine,
+        technicianNightFee: inv.technicianNightFee,
+        technicianAccommodation: inv.technicianAccommodation,
+        technicianNightDuration: inv.technicianNightDuration,
+        technicianNightDurationSameAsMachine: inv.technicianNightDurationSameAsMachine,
+        noOfTechnicianNight: inv.noOfTechnicianNight,
+        technicianNightCountSameAsDay: inv.technicianNightCountSameAsDay,
+        technicianAccommodationUseNightCount: inv.technicianAccommodationUseNightCount,
       });
       deletePendingInvoice(inv.id);
       if (selectedId === inv.id) handleClear();
@@ -683,6 +755,13 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
       techniciansDailyRate: String(inv.techniciansDailyRate || 0),
       technicianDuration: String(inv.technicianDuration || 0),
       technicianDurationSameAsMachine: inv.technicianDurationSameAsMachine ?? true,
+      technicianNightFee: String(inv.technicianNightFee || 0),
+      technicianAccommodation: String(inv.technicianAccommodation || 0),
+      technicianNightDuration: String(inv.technicianNightDuration || 0),
+      technicianNightDurationSameAsMachine: inv.technicianNightDurationSameAsMachine ?? true,
+      noOfTechnicianNight: String(inv.noOfTechnicianNight || ''),
+      technicianNightCountSameAsDay: inv.technicianNightCountSameAsDay ?? true,
+      technicianAccommodationUseNightCount: inv.technicianAccommodationUseNightCount ?? false,
       dieselCostPerLtr: String(inv.dieselCostPerLtr || 0),
       dailyUsage: String(inv.dailyUsage || 0),
       mobDemob: '0', // Usually mob/demob is one-time, but user can re-input
@@ -1273,6 +1352,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
     <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
       <div className="flex flex-col flex-1 h-full w-full animate-in fade-in duration-300 gap-6">
 
+        {/* ── Table / list view ── */}
         {/* Tab switcher + mobile actions */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 overflow-x-auto no-scrollbar w-full pb-1">
           <div className="flex bg-slate-200/50 p-1 rounded-lg shrink-0">
@@ -2008,284 +2088,698 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
           </div>
         </div>
 
-        {/* Modern Modal Overlay */}
-        {isModalOpen && (
-          <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-white max-w-2xl w-full rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
-              <div className="bg-slate-50/50 p-5 border-b border-slate-100 flex justify-between items-center">
-                <div>
-                  <h2 className="text-lg font-bold text-slate-800">{selectedId ? 'Edit' : 'Create'} {form.destination === 'Active' ? 'Invoice' : 'Quotation'}</h2>
-                  <p className="text-xs text-slate-500">Auto-calculate totals by entering valid numbers.</p>
-                </div>
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-slate-800" onClick={() => setIsModalOpen(false)}>
-                  <X className="w-5 h-5" />
+        {/* ── Full-page Invoice Form (rendered as portal to cover layout header but keep sidebar) ── */}
+        {isModalOpen && document.getElementById('layout-content-wrapper') && createPortal(
+          <div className="absolute inset-0 z-50 bg-slate-100 dark:bg-slate-950 overflow-y-auto animate-in fade-in slide-in-from-bottom-2 duration-300 flex flex-col w-full">
+            {/* Page header — sticky */}
+            <div className="sticky top-0 z-10 bg-slate-100 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 shadow-sm px-6 md:px-8 py-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <Button variant="ghost" size="sm" className="gap-2 h-9 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/50 dark:hover:bg-slate-800 -ml-1 shrink-0 transition-colors" onClick={() => setIsModalOpen(false)}>
+                  <ArrowLeft className="w-4 h-4" />
+                  <span>Back to Invoices</span>
                 </Button>
+                <div className="h-5 w-px bg-slate-300 dark:bg-slate-800" />
+                <div>
+                  <h2 className="text-lg font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
+                    {selectedId ? 'Edit' : 'Create'} {form.destination === 'Active' ? 'Active Invoice' : 'Quotation'}
+                  </h2>
+                  <p className="text-[11px] text-slate-550 dark:text-slate-400">Manage billing rates, crew accommodation, machinery configs, and auto-reminders.</p>
+                </div>
               </div>
+              
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Destination:</span>
+                <select
+                  value={form.destination}
+                  onChange={e => handleChange('destination', e.target.value)}
+                  className="flex h-9 w-40 rounded-lg border border-slate-350 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-1 text-xs outline-none font-bold text-slate-800 dark:text-white shadow-sm focus:ring-2 focus:ring-indigo-500/20"
+                >
+                  <option value="Pending">Quotation</option>
+                  <option value="Active">Active Invoice</option>
+                </select>
+              </div>
+            </div>
+            </div>
 
-              <div className="p-6 overflow-y-auto space-y-6 flex-1">
-
-                <div className="space-y-1.5 p-4 bg-indigo-50/50 border border-indigo-100 rounded-lg pb-5">
-                  <label className="text-xs font-bold uppercase tracking-wider text-indigo-800">Destination</label>
-                  <select
-                    value={form.destination}
-                    onChange={e => handleChange('destination', e.target.value)}
-                    className="flex h-11 w-full rounded-md border border-indigo-200 bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none font-semibold text-slate-700 shadow-sm"
-                  >
-                    <option value="Pending">Quotations</option>
-                    <option value="Active">Active Invoices</option>
-                  </select>
-                  <p className="text-[11px] text-indigo-600 mt-1 pl-1">Select where you want this record to be inserted.</p>
-                </div>
-
-                <div className="grid grid-cols-1 gap-5">
-                  <div className="space-y-1.5 flex flex-col justify-end">
-                    <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Start Date</label>
-                    <Input type="date" value={form.startDate} onChange={e => handleChange('startDate', e.target.value)} className="bg-slate-50 h-11" />
-                    <label className="flex items-center gap-2 mt-2 cursor-pointer">
-                      <input type="checkbox" checked={!!form.countOffDays} onChange={e => handleChange('countOffDays', e.target.checked)} className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
-                      <span className="text-[11px] font-medium text-slate-600">Count off-days as billed days</span>
-                    </label>
-                  </div>
-                </div>
-
-                <div className="space-y-1.5 border-t border-slate-100 pt-5">
-                  <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Invoice No</label>
-                  <Input type="text" value={form.invoiceNo} onChange={e => handleChange('invoiceNo', e.target.value)} placeholder="e.g. 144" className="bg-slate-50 font-semibold text-lg h-11" />
-                </div>
-
-                <div className="grid grid-cols-2 gap-5">
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Client</label>
-                    <select
-                      value={form.client}
-                      onChange={e => {
-                        const val = e.target.value;
-                        const siteForClient = siteRegistry.find(s => s.client === val && s.name === form.site);
-                        setForm(f => ({ 
-                          ...f, 
-                          client: val,
-                          site: '', // Clear site when client changes to re-trigger selection
-                          vatInc: siteForClient ? siteForClient.vat : f.vatInc
-                        }));
-                      }}
-                      className="flex h-11 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-sm"
-                    >
-                      <option value="">Select Client...</option>
-                      {uniqueClients.map((c, i) => <option key={i} value={c}>{c}</option>)}
-                    </select>
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Site</label>
-                    <select
-                      value={form.site}
-                      onChange={e => {
-                        const val = e.target.value;
-                        const siteObj = siteRegistry.find(s => s.name === val && s.client === form.client);
-                        setForm(f => ({ 
-                          ...f, 
-                          site: val,
-                          vatInc: siteObj ? siteObj.vat : f.vatInc
-                        }));
-                      }}
-                      disabled={!form.client}
-                      className="flex h-11 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
-                    >
-                      <option value="">Select Site...</option>
-                      {sitesBySelectedClient.map((s, i) => <option key={i} value={s.name}>{s.name} ({s.type})</option>)}
-                    </select>
-                  </div>
-                </div>
-
-                <div className="pt-5 border-t border-slate-100 space-y-4">
-                  {/* ── Machines row count ─────────────────────────────── */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 items-end">
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">No. of Machines</label>
-                      <Input
-                        type="number" min="0" value={form.noOfMachine}
-                        onChange={e => handleNoOfMachineChange(e.target.value)}
-                        className="bg-slate-50"
-                      />
+            {/* Two-column layout: form left, live preview right */}
+            <div className="p-6 md:p-8 pt-6 flex flex-col gap-6">
+            <div className="grid grid-cols-1 xl:grid-cols-[1fr_340px] gap-6 items-start">
+              {/* Main form column */}
+              <div className="space-y-6">
+                
+                {/* Section 1: Client & Invoice Info */}
+                <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-850 overflow-hidden">
+                  <div className="bg-slate-50/50 dark:bg-slate-900/50 px-6 py-4 border-b border-slate-155 dark:border-slate-850 flex items-center gap-3">
+                    <div className="p-2 bg-indigo-50 dark:bg-indigo-950/40 rounded-lg text-indigo-650 dark:text-indigo-400">
+                      <FileText className="w-4 h-4" />
                     </div>
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Technicians</label>
-                      <Input type="number" min="0" value={form.noOfTechnician} onChange={e => handleChange('noOfTechnician', e.target.value)} className="bg-slate-50" />
+                    <div>
+                      <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wide">Client &amp; Document Details</h3>
+                      <p className="text-[10px] text-slate-400">Client details, location and document identifiers.</p>
                     </div>
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Daily Tech Rate</label>
-                      <NumericFormat customInput={Input} thousandSeparator decimalScale={2} value={form.techniciansDailyRate} onValueChange={(v) => handleChange('techniciansDailyRate', v.value || '')} className="bg-slate-50" />
-                    </div>
-                    <div className="space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Tech Duration</label>
-                        <label className="flex items-center gap-1 text-[9px] text-slate-500 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={form.technicianDurationSameAsMachine}
-                            onChange={e => handleChange('technicianDurationSameAsMachine', e.target.checked)}
-                            className="accent-indigo-600 w-3 h-3"
-                          />
-                          Same as M-1
-                        </label>
+                  </div>
+
+                  <div className="p-6 space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-500 dark:text-slate-450 uppercase tracking-wider">Client Account</label>
+                        <select
+                          value={form.client}
+                          onChange={e => {
+                            const val = e.target.value;
+                            const siteForClient = siteRegistry.find(s => s.client === val && s.name === form.site);
+                            setForm(f => ({ 
+                              ...f, 
+                              client: val,
+                              site: '', 
+                              vatInc: siteForClient ? siteForClient.vat : f.vatInc
+                            }));
+                          }}
+                          className="flex h-11 w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-sm font-semibold text-slate-800 dark:text-white"
+                        >
+                          <option value="">Select Client...</option>
+                          {uniqueClients.map((c, i) => <option key={i} value={c}>{c}</option>)}
+                        </select>
                       </div>
-                      <Input 
-                        type="number" 
-                        min="0" 
-                        value={form.technicianDurationSameAsMachine ? (machineConfigs.length > 0 ? Math.max(...machineConfigs.map(r => parseFloat(r.duration) || 0)) : '') : form.technicianDuration} 
-                        onChange={e => handleChange('technicianDuration', e.target.value)} 
-                        disabled={form.technicianDurationSameAsMachine}
-                        className={form.technicianDurationSameAsMachine ? "bg-slate-100 text-slate-400 cursor-not-allowed" : "bg-slate-50"} 
-                      />
-                    </div>
-                  </div>
 
-                  {/* ── Per-machine rate / duration rows ──────────────── */}
-                  {machineConfigs.length > 0 && (
-                    <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-3 space-y-2">
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Machine Rate &amp; Duration</p>
-                      {machineConfigs.map((row, idx) => (
-                        <div key={idx} className="grid grid-cols-[auto_1fr_1fr] items-center gap-3">
-                          {/* Label */}
-                          <span className="text-xs font-semibold text-slate-600 w-20 shrink-0">
-                            Machine {idx + 1}
-                          </span>
-                          <div className="space-y-0.5">
-                            {idx === 0 ? (
-                              <span className="text-[10px] text-slate-400 font-medium pb-1.5 inline-block">Daily Rate (₦)</span>
-                            ) : (
-                              <label className="flex items-center gap-2 text-[10px] text-slate-500 cursor-pointer pb-1 sm:mt-1">
-                                <input
-                                  type="checkbox"
-                                  checked={row.sameRateAsFirst}
-                                  onChange={e => handleMachineSameToggle(idx, 'rate', e.target.checked)}
-                                  className="accent-indigo-600 w-3 h-3"
-                                />
-                                Same as M-1
-                              </label>
-                            )}
-                            <NumericFormat
-                              customInput={Input}
-                              thousandSeparator decimalScale={2}
-                              value={row.rate}
-                              disabled={idx > 0 && row.sameRateAsFirst}
-                              onValueChange={v => handleMachineRowChange(idx, 'rate', v.value || '')}
-                              className={idx > 0 && row.sameRateAsFirst ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-white'}
-                            />
-                          </div>
-                          {/* Duration */}
-                          <div className="space-y-0.5">
-                            {idx === 0 ? (
-                              <span className="text-[10px] text-slate-400 font-medium pb-1.5 inline-block">Duration (Days)</span>
-                            ) : (
-                              <label className="flex items-center gap-2 text-[10px] text-slate-500 cursor-pointer pb-1 sm:mt-1">
-                                <input
-                                  type="checkbox"
-                                  checked={row.sameDurationAsFirst}
-                                  onChange={e => handleMachineSameToggle(idx, 'duration', e.target.checked)}
-                                  className="accent-indigo-600 w-3 h-3"
-                                />
-                                Same as M-1
-                              </label>
-                            )}
-                            <Input
-                              type="number" min="0"
-                              value={row.duration}
-                              disabled={idx > 0 && row.sameDurationAsFirst}
-                              onChange={e => handleMachineRowChange(idx, 'duration', e.target.value)}
-                              className={idx > 0 && row.sameDurationAsFirst ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-white'}
-                            />
-                          </div>
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-500 dark:text-slate-450 uppercase tracking-wider">Site Location</label>
+                        <select
+                          value={form.site}
+                          onChange={e => {
+                            const val = e.target.value;
+                            const siteObj = siteRegistry.find(s => s.name === val && s.client === form.client);
+                            setForm(f => ({ 
+                              ...f, 
+                              site: val,
+                              vatInc: siteObj ? siteObj.vat : f.vatInc
+                            }));
+                          }}
+                          disabled={!form.client}
+                          className="flex h-11 w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-sm font-semibold text-slate-800 dark:text-white disabled:opacity-60 disabled:cursor-not-allowed"
+                        >
+                          <option value="">Select Site...</option>
+                          {sitesBySelectedClient.map((s, i) => <option key={i} value={s.name}>{s.name} ({s.type})</option>)}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-500 dark:text-slate-450 uppercase tracking-wider">Document / Invoice Number</label>
+                        <Input 
+                          type="text" 
+                          value={form.invoiceNo} 
+                          onChange={e => handleChange('invoiceNo', e.target.value)} 
+                          placeholder="e.g. 144" 
+                          className="bg-white dark:bg-slate-900 border-slate-205 dark:border-slate-800 font-mono font-bold h-11 text-slate-800 dark:text-white" 
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-500 dark:text-slate-450 uppercase tracking-wider">Start Date</label>
+                        <Input 
+                          type="date" 
+                          value={form.startDate} 
+                          onChange={e => handleChange('startDate', e.target.value)} 
+                          className="bg-white dark:bg-slate-900 border-slate-205 dark:border-slate-800 h-11 font-semibold text-slate-800 dark:text-white" 
+                        />
+                      </div>
+                    </div>
+
+                    <div className="pt-3 border-t border-slate-100 dark:border-slate-850 flex items-center">
+                      <label className="flex items-start gap-3.5 cursor-pointer select-none">
+                        <input 
+                          type="checkbox" 
+                          checked={!!form.countOffDays} 
+                          onChange={e => handleChange('countOffDays', e.target.checked)} 
+                          className="mt-0.5 h-4.5 w-4.5 rounded border-slate-300 dark:border-slate-700 text-indigo-650 focus:ring-indigo-500 accent-indigo-650" 
+                        />
+                        <div>
+                          <span className="text-xs font-bold text-slate-700 dark:text-slate-205 block">Count off-days as billed days</span>
+                          <span className="text-[10px] text-slate-450 block">Billed duration will accrue continuously without pausing on client holidays or non-working days.</span>
                         </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* ── Diesel ────────────────────────────────────────── */}
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Daily Usage (L)</label>
-                      <Input type="number" min="0" value={form.dailyUsage} onChange={e => handleChange('dailyUsage', e.target.value)} className="bg-slate-50" />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Diesel Cost / Ltr</label>
-                      <NumericFormat customInput={Input} thousandSeparator decimalScale={2} value={form.dieselCostPerLtr} onValueChange={(v) => handleChange('dieselCostPerLtr', v.value || '')} className="bg-slate-50" />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="pt-5 border-t border-slate-100">
-                  <label className="text-xs font-bold uppercase tracking-wider text-indigo-600 mb-3 block">Other Costs</label>
-                  <div className="grid grid-cols-3 gap-5">
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Mob/Demob</label>
-                      <NumericFormat customInput={Input} thousandSeparator decimalScale={2} value={form.mobDemob} onValueChange={(v) => handleChange('mobDemob', v.value || '')} className="bg-slate-50" />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Install</label>
-                      <NumericFormat customInput={Input} thousandSeparator decimalScale={2} value={form.installation} onValueChange={(v) => handleChange('installation', v.value || '')} className="bg-slate-50" />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Damages</label>
-                      <NumericFormat customInput={Input} thousandSeparator decimalScale={2} value={form.damages} onValueChange={(v) => handleChange('damages', v.value || '')} className="bg-slate-50" />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Automatic Reminder Section */}
-                <div className="pt-5 border-t border-slate-100">
-                  <label className="text-xs font-bold uppercase tracking-wider text-indigo-600 mb-3 block">Follow-Up Reminders</label>
-                  <div className="flex flex-col gap-3">
-                    <label className="flex items-center gap-3 cursor-pointer">
-                      <input type="checkbox" checked={!!form.createReminder} onChange={e => handleChange('createReminder', e.target.checked)} className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
-                      <span className="text-sm font-medium text-slate-700">Auto-create reminder for next invoice date</span>
-                    </label>
-                    {form.createReminder && (
-                      <label className="flex items-center gap-3 cursor-pointer pl-7">
-                        <input type="checkbox" checked={!!form.sendEmailNotification} onChange={e => handleChange('sendEmailNotification', e.target.checked)} className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
-                        <span className="text-sm font-medium text-slate-600 flex items-center gap-2"><Mail className="w-4 h-4" /> Send email notification along with this reminder</span>
                       </label>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Section 2: Equipment & Machinery */}
+                <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-850 overflow-hidden">
+                  <div className="bg-slate-50/50 dark:bg-slate-900/50 px-6 py-4 border-b border-slate-155 dark:border-slate-850 flex items-center gap-3">
+                    <div className="p-2 bg-blue-50 dark:bg-blue-950/40 rounded-lg text-blue-650 dark:text-blue-400">
+                      <Layers className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wide">Equipment &amp; Machinery Lease</h3>
+                      <p className="text-[10px] text-slate-400">Lease pump quantities, config rates and durations.</p>
+                    </div>
+                  </div>
+
+                  <div className="p-6 space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-500 dark:text-slate-450 uppercase tracking-wider">Number of Dewatering Pumps</label>
+                        <Input
+                          type="number" 
+                          min="0" 
+                          value={form.noOfMachine}
+                          onChange={e => handleNoOfMachineChange(e.target.value)}
+                          className="bg-white dark:bg-slate-900 border-slate-205 dark:border-slate-800 h-11 font-bold text-slate-850 dark:text-white"
+                          placeholder="0"
+                        />
+                      </div>
+
+                      {machineConfigs.length === 0 && (
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-bold text-slate-500 dark:text-slate-455 uppercase tracking-wider">Daily Rental Rate (₦ / pump)</label>
+                          <NumericFormat 
+                            customInput={Input} 
+                            thousandSeparator 
+                            decimalScale={2} 
+                            value={form.dailyRentalCost} 
+                            onValueChange={(v) => handleChange('dailyRentalCost', v.value || '')} 
+                            className="bg-white dark:bg-slate-900 border-slate-205 dark:border-slate-800 h-11 font-mono font-semibold text-slate-800 dark:text-white" 
+                            placeholder="0.00" 
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Per-machine configs */}
+                    {machineConfigs.length > 0 && (
+                      <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 p-4 space-y-3">
+                        <div className="flex justify-between items-center pb-2 border-b border-slate-200 dark:border-slate-800">
+                          <p className="text-xs font-bold text-indigo-700 dark:text-indigo-400 uppercase tracking-wide">Machine Configuration Matrix</p>
+                          <span className="text-[10px] bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 px-2.5 py-0.5 rounded-full font-bold">{machineConfigs.length} Pumps Active</span>
+                        </div>
+                        
+                        <div className="space-y-3">
+                          {machineConfigs.map((row, idx) => (
+                            <div key={idx} className="grid grid-cols-1 md:grid-cols-[100px_1fr_1fr] gap-4 items-center p-3 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
+                              <span className="text-xs font-black text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                                <span className="w-2.5 h-2.5 rounded-full bg-blue-500 animate-pulse" />
+                                Pump #{idx + 1}
+                              </span>
+                              
+                              <div className="space-y-1">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-[10px] text-slate-450 font-bold uppercase tracking-wider">Daily Rental (₦)</span>
+                                  {idx > 0 && (
+                                    <label className="flex items-center gap-1 text-[10px] text-indigo-650 dark:text-indigo-455 cursor-pointer select-none font-bold">
+                                      <input
+                                        type="checkbox"
+                                        checked={row.sameRateAsFirst}
+                                        onChange={e => handleMachineSameToggle(idx, 'rate', e.target.checked)}
+                                        className="accent-indigo-650 w-3 h-3 rounded border-slate-350"
+                                      />
+                                      Link to #1
+                                    </label>
+                                  )}
+                                </div>
+                                <NumericFormat
+                                  customInput={Input}
+                                  thousandSeparator 
+                                  decimalScale={2}
+                                  value={row.rate}
+                                  disabled={idx > 0 && row.sameRateAsFirst}
+                                  onValueChange={v => handleMachineRowChange(idx, 'rate', v.value || '')}
+                                  className={idx > 0 && row.sameRateAsFirst ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed h-10 font-mono text-xs' : 'bg-white dark:bg-slate-900 h-10 font-mono text-xs text-slate-800 dark:text-white'}
+                                  placeholder="0.00"
+                                />
+                              </div>
+
+                              <div className="space-y-1">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-[10px] text-slate-455 font-bold uppercase tracking-wider">Lease Duration (Days)</span>
+                                  {idx > 0 && (
+                                    <label className="flex items-center gap-1 text-[10px] text-indigo-655 dark:text-indigo-455 cursor-pointer select-none font-bold">
+                                      <input
+                                        type="checkbox"
+                                        checked={row.sameDurationAsFirst}
+                                        onChange={e => handleMachineSameToggle(idx, 'duration', e.target.checked)}
+                                        className="accent-indigo-650 w-3 h-3 rounded border-slate-350"
+                                      />
+                                      Link to #1
+                                    </label>
+                                  )}
+                                </div>
+                                <Input
+                                  type="number" 
+                                  min="0"
+                                  value={row.duration}
+                                  disabled={idx > 0 && row.sameDurationAsFirst}
+                                  onChange={e => handleMachineRowChange(idx, 'duration', e.target.value)}
+                                  className={idx > 0 && row.sameDurationAsFirst ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed h-10 text-xs font-semibold' : 'bg-white dark:bg-slate-900 h-10 text-xs font-semibold text-slate-800 dark:text-white'}
+                                  placeholder="0"
+                                />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     )}
                   </div>
                 </div>
 
-                {/* Live Preview of Calculation */}
-                <div className="mt-6 border-t border-slate-200 pt-5">
-                  <div className="bg-slate-900 rounded-xl p-5 shadow-inner">
-                    <div className="flex justify-between items-center mb-3">
-                      <span className="text-slate-400 text-xs font-bold uppercase tracking-widest">Live Auto-Calculation</span>
-                      <Badge variant="outline" className={`text-[10px] uppercase font-bold tracking-wider rounded-sm px-2 py-0 border-slate-700 ${livePreview.vatInc === 'Yes' ? 'text-indigo-400 bg-indigo-950/50' : livePreview.vatInc === 'Add' ? 'text-amber-400 bg-amber-950/50' : 'text-slate-400 bg-slate-800'}`}>
-                        VAT: {livePreview.vatInc}
-                      </Badge>
+                {/* Section 3: Crew / Dewatering Staff */}
+                <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-850 overflow-hidden">
+                  <div className="bg-slate-50/50 dark:bg-slate-900/50 px-6 py-4 border-b border-slate-155 dark:border-slate-850 flex items-center gap-3">
+                    <div className="p-2 bg-amber-50 dark:bg-amber-950/40 rounded-lg text-amber-600 dark:text-amber-400">
+                      <Users className="w-4 h-4" />
                     </div>
-                    <div className="grid grid-cols-3 gap-4">
-                      <div className="flex flex-col">
-                        <span className="text-slate-500 text-[10px] uppercase font-bold tracking-wider mb-1">Gross Total</span>
-                        <span className="font-mono text-slate-200 font-medium text-sm">₦{priv?.canViewAmounts === false ? '***' : livePreview.totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    <div>
+                      <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wide">Dewatering Crew &amp; Personnel</h3>
+                      <p className="text-[10px] text-slate-400">Manage technician count, day/night shift rates, and durations.</p>
+                    </div>
+                  </div>
+
+                  <div className="p-6 space-y-5">
+                    {/* Main technician count */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-1.5 col-span-2">
+                        <label className="text-xs font-bold text-slate-500 dark:text-slate-450 uppercase tracking-wider">Number of Technicians On Site</label>
+                        <Input 
+                          type="number" 
+                          min="0" 
+                          value={form.noOfTechnician} 
+                          onChange={e => handleChange('noOfTechnician', e.target.value)} 
+                          className="bg-white dark:bg-slate-900 border-slate-205 dark:border-slate-800 h-11 font-bold text-slate-850 dark:text-white" 
+                          placeholder="0"
+                        />
                       </div>
-                      <div className="flex flex-col border-l border-slate-700 pl-4">
-                        <span className="text-slate-500 text-[10px] uppercase font-bold tracking-wider mb-1">Tax (VAT {livePreview.vatInc})</span>
-                        <span className="font-mono text-indigo-400 font-medium text-sm">₦{priv?.canViewAmounts === false ? '***' : livePreview.vat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Day Shift details card */}
+                      <div className="bg-slate-50/70 dark:bg-slate-900/40 p-4 rounded-xl border border-slate-200 dark:border-slate-800 space-y-4">
+                        <div className="flex items-center gap-2 pb-2 border-b border-slate-200/60 dark:border-slate-800">
+                          <span className="w-2.5 h-2.5 rounded-full bg-amber-450" />
+                          <p className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">Day Shift Settings</p>
+                        </div>
+                        
+                        <div className="space-y-3">
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] font-bold text-slate-455 uppercase tracking-wider">Day Rate (₦ / tech / day)</label>
+                            <NumericFormat 
+                              customInput={Input} 
+                              thousandSeparator 
+                              decimalScale={2} 
+                              value={form.techniciansDailyRate} 
+                              onValueChange={(v) => handleChange('techniciansDailyRate', v.value || '')} 
+                              className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 h-10 font-mono font-semibold text-slate-800 dark:text-white" 
+                              placeholder="0.00" 
+                            />
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <div className="flex items-center justify-between">
+                              <label className="text-[10px] font-bold text-slate-455 uppercase tracking-wider">Day Duration (Days)</label>
+                              <label className="flex items-center gap-1 text-[10px] text-indigo-600 dark:text-indigo-400 cursor-pointer select-none font-bold">
+                                <input
+                                  type="checkbox"
+                                  checked={form.technicianDurationSameAsMachine}
+                                  onChange={e => handleChange('technicianDurationSameAsMachine', e.target.checked)}
+                                  className="accent-indigo-650 w-3 h-3 rounded"
+                                />
+                                Link to M-1
+                              </label>
+                            </div>
+                            <Input 
+                              type="number" 
+                              min="0" 
+                              value={form.technicianDurationSameAsMachine ? (machineConfigs.length > 0 ? Math.max(...machineConfigs.map(r => parseFloat(r.duration) || 0)) : '') : form.technicianDuration} 
+                              onChange={e => handleChange('technicianDuration', e.target.value)} 
+                              disabled={form.technicianDurationSameAsMachine}
+                              className={form.technicianDurationSameAsMachine ? "bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed h-10 font-semibold" : "bg-white dark:bg-slate-900 h-10 font-semibold text-slate-800 dark:text-white"} 
+                            />
+                          </div>
+                        </div>
                       </div>
-                      <div className="flex flex-col border-l border-slate-700 pl-4">
-                        <span className="text-slate-500 text-[10px] uppercase font-bold tracking-wider mb-1">Final Amount Due</span>
-                        <span className="font-mono text-emerald-400 font-bold text-lg leading-none">₦{priv?.canViewAmounts === false ? '***' : livePreview.totalCharge.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+
+                      {/* Night Shift & Accommodation details card */}
+                      <div className="bg-slate-50/70 dark:bg-slate-900/40 p-4 rounded-xl border border-slate-200 dark:border-slate-800 space-y-4">
+                        <div className="flex items-center gap-2 pb-2 border-b border-slate-200/60 dark:border-slate-800">
+                          <span className="w-2.5 h-2.5 rounded-full bg-slate-900 dark:bg-slate-100" />
+                          <p className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">Night Shift &amp; Special Rates</p>
+                        </div>
+                        
+                        <div className="space-y-3">
+                          {/* Night Shift Technician Count */}
+                          <div className="space-y-1.5">
+                            <div className="flex items-center justify-between">
+                              <label className="text-[10px] font-bold text-slate-455 uppercase tracking-wider">Night Shift Technicians</label>
+                              <label className="flex items-center gap-1 text-[10px] text-indigo-600 dark:text-indigo-400 cursor-pointer select-none font-bold">
+                                <input
+                                  type="checkbox"
+                                  checked={form.technicianNightCountSameAsDay}
+                                  onChange={e => handleChange('technicianNightCountSameAsDay', e.target.checked)}
+                                  className="accent-indigo-650 w-3 h-3 rounded"
+                                />
+                                Same as Day Shift
+                              </label>
+                            </div>
+                            <Input
+                              type="number"
+                              min="0"
+                              value={form.technicianNightCountSameAsDay ? (form.noOfTechnician || '') : form.noOfTechnicianNight}
+                              onChange={e => handleChange('noOfTechnicianNight', e.target.value)}
+                              disabled={form.technicianNightCountSameAsDay}
+                              className={form.technicianNightCountSameAsDay ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed h-10 font-semibold' : 'bg-white dark:bg-slate-900 h-10 font-bold text-slate-800 dark:text-white'}
+                              placeholder={form.technicianNightCountSameAsDay ? `Same as Day (${form.noOfTechnician || 0})` : 'Night crew count'}
+                            />
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] font-bold text-slate-455 uppercase tracking-wider">Night Rate (₦ / tech / night)</label>
+                            <NumericFormat
+                              customInput={Input}
+                              thousandSeparator 
+                              decimalScale={2}
+                              value={form.technicianNightFee}
+                              onValueChange={(v) => handleChange('technicianNightFee', v.value || '')}
+                              placeholder="0.00"
+                              className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 h-10 font-mono font-semibold text-slate-800 dark:text-white"
+                            />
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <div className="flex items-center justify-between">
+                              <label className="text-[10px] font-bold text-slate-455 uppercase tracking-wider">Night Duration (Nights)</label>
+                              <label className="flex items-center gap-1 text-[10px] text-indigo-600 dark:text-indigo-400 cursor-pointer select-none font-bold">
+                                <input
+                                  type="checkbox"
+                                  checked={form.technicianNightDurationSameAsMachine}
+                                  onChange={e => handleChange('technicianNightDurationSameAsMachine', e.target.checked)}
+                                  className="accent-indigo-650 w-3 h-3 rounded"
+                                />
+                                Link to M-1
+                              </label>
+                            </div>
+                            <Input
+                              type="number"
+                              min="0"
+                              value={form.technicianNightDurationSameAsMachine ? (machineConfigs.length > 0 ? Math.max(...machineConfigs.map(r => parseFloat(r.duration) || 0)) : '') : form.technicianNightDuration}
+                              onChange={e => handleChange('technicianNightDuration', e.target.value)}
+                              disabled={form.technicianNightDurationSameAsMachine}
+                              className={form.technicianNightDurationSameAsMachine ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed h-10 font-semibold' : 'bg-white dark:bg-slate-900 h-10 font-semibold text-slate-800 dark:text-white'}
+                              placeholder="e.g. 8"
+                            />
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <div className="flex items-center justify-between">
+                              <label className="text-[10px] font-bold text-slate-455 uppercase tracking-wider">Accommodation (₦ / tech / day)</label>
+                            </div>
+                            <NumericFormat
+                              customInput={Input}
+                              thousandSeparator 
+                              decimalScale={2}
+                              value={form.technicianAccommodation}
+                              onValueChange={(v) => handleChange('technicianAccommodation', v.value || '')}
+                              placeholder="0.00"
+                              className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 h-10 font-mono font-semibold text-slate-800 dark:text-white"
+                            />
+                          </div>
+
+                          {/* Accommodation crew basis toggle — only shown when counts differ */}
+                          {!form.technicianNightCountSameAsDay && parseFloat(form.technicianAccommodation) > 0 && (
+                            <div className="flex items-center justify-between p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60">
+                              <div>
+                                <p className="text-[10px] font-bold text-amber-800 dark:text-amber-300 uppercase tracking-wider">Accommodation Crew Basis</p>
+                                <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-0.5">
+                                  {form.technicianAccommodationUseNightCount
+                                    ? `Calculated on Night crew (${form.noOfTechnicianNight || 0} techs)`
+                                    : `Calculated on Day crew (${form.noOfTechnician || 0} techs)`}
+                                </p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => handleChange('technicianAccommodationUseNightCount', !form.technicianAccommodationUseNightCount)}
+                                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none ${form.technicianAccommodationUseNightCount ? 'bg-slate-800 dark:bg-slate-200' : 'bg-amber-400'}`}
+                                title="Toggle accommodation crew basis"
+                              >
+                                <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white dark:bg-slate-900 shadow transition-transform ${form.technicianAccommodationUseNightCount ? 'translate-x-4' : 'translate-x-1'}`} />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Effective Rate Bar */}
+                    <div className="p-4 rounded-xl bg-indigo-50/40 dark:bg-indigo-950/20 border border-indigo-100/60 dark:border-indigo-900/60 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                      <div>
+                        <span className="text-[10px] font-black uppercase tracking-wider text-indigo-700 dark:text-indigo-400">Effective Daily Rate per Crew Member</span>
+                        <p className="text-[10.5px] text-slate-500 dark:text-slate-400 mt-0.5">Sum of Day Rate + Night Rate + Accommodation Rate per technician per day.</p>
+                      </div>
+                      <div className="h-10 px-4 rounded-lg bg-white dark:bg-slate-900 border border-indigo-200 dark:border-indigo-955 flex items-center justify-center font-mono font-bold text-indigo-700 dark:text-indigo-300 text-sm shadow-sm shrink-0">
+                        ₦{livePreview.effectiveTechDailyRate.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </div>
                     </div>
                   </div>
                 </div>
 
+                {/* Section 4: Fuel & Logistics Extra Services */}
+                <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-850 overflow-hidden">
+                  <div className="bg-slate-50/50 dark:bg-slate-900/50 px-6 py-4 border-b border-slate-155 dark:border-slate-850 flex items-center gap-3">
+                    <div className="p-2 bg-orange-50 dark:bg-orange-950/40 rounded-lg text-orange-655 dark:text-orange-400">
+                      <Truck className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wide">Fuel &amp; Logistics Extra Costs</h3>
+                      <p className="text-[10px] text-slate-400">Define fuel consumption rates, mobilization and repairs costs.</p>
+                    </div>
+                  </div>
+
+                  <div className="p-6 space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-500 dark:text-slate-455 uppercase tracking-wider">Daily Fuel Usage (Liters / pump / day)</label>
+                        <Input 
+                          type="number" 
+                          min="0" 
+                          value={form.dailyUsage} 
+                          onChange={e => handleChange('dailyUsage', e.target.value)} 
+                          className="bg-white dark:bg-slate-900 border-slate-205 dark:border-slate-800 h-11 font-semibold text-slate-800 dark:text-white" 
+                          placeholder="e.g. 150" 
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-500 dark:text-slate-455 uppercase tracking-wider">Diesel Price (₦ / Liter)</label>
+                        <NumericFormat 
+                          customInput={Input} 
+                          thousandSeparator 
+                          decimalScale={2} 
+                          value={form.dieselCostPerLtr} 
+                          onValueChange={(v) => handleChange('dieselCostPerLtr', v.value || '')} 
+                          className="bg-white dark:bg-slate-900 border-slate-205 dark:border-slate-800 h-11 font-mono font-semibold text-slate-800 dark:text-white" 
+                          placeholder="0.00" 
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 border-t border-slate-100 dark:border-slate-850">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-500 dark:text-slate-450 uppercase tracking-wider">Mobilization / Demob (₦)</label>
+                        <NumericFormat 
+                          customInput={Input} 
+                          thousandSeparator 
+                          decimalScale={2} 
+                          value={form.mobDemob} 
+                          onValueChange={(v) => handleChange('mobDemob', v.value || '')} 
+                          className="bg-white dark:bg-slate-900 border-slate-205 dark:border-slate-800 h-11 font-mono font-semibold text-slate-800 dark:text-white" 
+                          placeholder="0.00" 
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-500 dark:text-slate-450 uppercase tracking-wider">Installation Fee (₦)</label>
+                        <NumericFormat 
+                          customInput={Input} 
+                          thousandSeparator 
+                          decimalScale={2} 
+                          value={form.installation} 
+                          onValueChange={(v) => handleChange('installation', v.value || '')} 
+                          className="bg-white dark:bg-slate-900 border-slate-205 dark:border-slate-800 h-11 font-mono font-semibold text-slate-800 dark:text-white" 
+                          placeholder="0.00" 
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-500 dark:text-slate-455 uppercase tracking-wider">Damages / Repairs (₦)</label>
+                        <NumericFormat 
+                          customInput={Input} 
+                          thousandSeparator 
+                          decimalScale={2} 
+                          value={form.damages} 
+                          onValueChange={(v) => handleChange('damages', v.value || '')} 
+                          className="bg-white dark:bg-slate-900 border-slate-205 dark:border-slate-800 h-11 font-mono font-semibold text-slate-800 dark:text-white" 
+                          placeholder="0.00" 
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Section 5: Reminders & Alerts */}
+                <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-850 overflow-hidden">
+                  <div className="bg-slate-50/50 dark:bg-slate-900/50 px-6 py-4 border-b border-slate-155 dark:border-slate-850 flex items-center gap-3">
+                    <div className="p-2 bg-slate-100 dark:bg-slate-800 rounded-lg text-slate-650 dark:text-slate-350">
+                      <Settings className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wide">Follow-up &amp; Reminders</h3>
+                      <p className="text-[10px] text-slate-400">Toggle automated email notifications and task alerts.</p>
+                    </div>
+                  </div>
+
+                  <div className="p-6 space-y-4">
+                    <div className="flex flex-col gap-3">
+                      <label className="flex items-start gap-3.5 cursor-pointer p-3 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-900/60 transition-colors border border-transparent hover:border-slate-150 dark:hover:border-slate-800 select-none">
+                        <input 
+                          type="checkbox" 
+                          checked={!!form.createReminder} 
+                          onChange={e => handleChange('createReminder', e.target.checked)} 
+                          className="mt-1 h-5 w-5 rounded border-slate-300 dark:border-slate-700 text-indigo-650 focus:ring-indigo-500 accent-indigo-650" 
+                        />
+                        <div>
+                          <span className="text-sm font-bold text-slate-800 dark:text-slate-200 block">Create Automated Dashboard Reminder</span>
+                          <span className="text-xs text-slate-500 dark:text-slate-400 block mt-0.5">Generates a follow-up task on the projected end date to extend or rebill.</span>
+                        </div>
+                      </label>
+                      {form.createReminder && (
+                        <label className="flex items-center gap-3 cursor-pointer p-3 pl-12 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-900/60 transition-colors border border-transparent hover:border-slate-150 dark:hover:border-slate-800 select-none">
+                          <input 
+                            type="checkbox" 
+                            checked={!!form.sendEmailNotification} 
+                            onChange={e => handleChange('sendEmailNotification', e.target.checked)} 
+                            className="h-4.5 w-4.5 rounded border-slate-300 dark:border-slate-700 text-indigo-650 focus:ring-indigo-500 accent-indigo-650" 
+                          />
+                          <span className="text-xs font-semibold text-slate-655 dark:text-slate-300 flex items-center gap-2">
+                            <Mail className="w-4.5 h-4.5 text-indigo-550 dark:text-indigo-400 animate-bounce" /> 
+                            Send email notification copy along with the dashboard reminder
+                          </span>
+                        </label>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Form Footer Action Bar */}
+                <div className="bg-slate-200/50 dark:bg-slate-900 border border-slate-250 dark:border-slate-800 p-4 rounded-2xl flex gap-4 shadow-sm">
+                  <Button variant="outline" className="flex-1 bg-white dark:bg-slate-950 border-slate-300 dark:border-slate-800 h-12 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-900 font-bold" onClick={() => setIsModalOpen(false)}>
+                    Discard
+                  </Button>
+                  <Button onClick={handleSubmit} className="flex-1 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-600 dark:hover:bg-indigo-700 text-white gap-2 h-12 shadow-md font-bold text-sm">
+                    <CheckCircle className="w-5 h-5" /> {selectedId ? 'Update & Save Changes' : 'Publish Document'}
+                  </Button>
+                </div>
               </div>
 
-              <div className="p-5 border-t border-slate-100 bg-slate-50 flex gap-3">
-                <Button variant="outline" className="flex-1 border-slate-300 h-11 text-slate-600 hover:bg-slate-100" onClick={() => setIsModalOpen(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={handleSubmit} className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white gap-2 h-11 shadow-md">
-                  <CheckCircle className="w-4 h-4" /> {selectedId ? 'Update Invoice' : 'Submit Invoice'}
-                </Button>
+              {/* Live Calculation Sidebar */}
+              <div className="flex flex-col gap-4 sticky top-4">
+                <div className="bg-slate-900 dark:bg-slate-950 rounded-2xl p-6 shadow-xl border border-slate-800">
+                  <div className="flex justify-between items-center mb-5">
+                    <span className="text-slate-400 text-xs font-black uppercase tracking-widest">Live Auto-Calc</span>
+                    <Badge variant="outline" className={`text-[10px] uppercase font-bold tracking-wider rounded-sm px-2.5 py-0.5 border-slate-700 ${
+                      livePreview.vatInc === 'Yes' ? 'text-indigo-400 bg-indigo-950/50 border-indigo-900' :
+                      livePreview.vatInc === 'Add' ? 'text-amber-400 bg-amber-950/50 border-amber-900' :
+                      'text-slate-450 bg-slate-800 border-slate-700'
+                    }`}>
+                      VAT: {livePreview.vatInc}
+                    </Badge>
+                  </div>
+                  <div className="space-y-4">
+                    <div className="flex flex-col">
+                      <span className="text-slate-500 text-[10px] uppercase font-black tracking-wider mb-1">Gross Total</span>
+                      <span className="font-mono text-slate-200 font-bold text-xl">
+                        ₦{priv?.canViewAmounts === false ? '***' : livePreview.totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                    <div className="h-px bg-slate-800" />
+                    <div className="flex flex-col">
+                      <span className="text-slate-500 text-[10px] uppercase font-black tracking-wider mb-1">Tax (VAT {livePreview.vatInc})</span>
+                      <span className="font-mono text-indigo-400 font-bold text-lg">
+                        ₦{priv?.canViewAmounts === false ? '***' : livePreview.vat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                    <div className="h-px bg-slate-800" />
+                    <div className="flex flex-col">
+                      <span className="text-slate-500 text-[10px] uppercase font-black tracking-wider mb-1">Final Amount Due</span>
+                      <span className="font-mono text-emerald-400 font-black text-2xl leading-none tracking-tight">
+                        ₦{priv?.canViewAmounts === false ? '***' : livePreview.totalCharge.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Tech cost breakdown card */}
+                {(parseFloat(form.noOfTechnician) > 0) && (
+                  <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-850 p-5 shadow-sm space-y-4">
+                    <p className="text-[10px] font-black uppercase tracking-wider text-indigo-650 dark:text-indigo-400 border-b border-slate-100 dark:border-slate-800 pb-2">Crew Cost Formula</p>
+                    <div className="space-y-3.5 text-xs">
+                      {/* Day shift line */}
+                      <div className="flex justify-between items-start text-slate-655 dark:text-slate-400 gap-2">
+                        <span className="flex flex-col">
+                          <span className="font-bold text-slate-705 dark:text-slate-350">Day Shift Cost</span>
+                          <span className="text-[10px] text-slate-400 font-medium">
+                            {parseFloat(form.noOfTechnician) || 0} tech{parseFloat(form.noOfTechnician) !== 1 ? 's' : ''} × ₦{(parseFloat(form.techniciansDailyRate) || 0).toLocaleString()}/d × {livePreview.actualTechDuration}d
+                          </span>
+                        </span>
+                        <span className="font-mono font-bold text-slate-850 dark:text-slate-205 shrink-0">
+                          ₦{((parseFloat(form.noOfTechnician) || 0) * (parseFloat(form.techniciansDailyRate) || 0) * livePreview.actualTechDuration).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                      </div>
+
+                      {/* Night shift line */}
+                      {(parseFloat(form.technicianNightFee) > 0) && (
+                        <div className="flex justify-between items-start text-slate-655 dark:text-slate-400 pt-2.5 border-t border-slate-100 dark:border-slate-850 gap-2">
+                          <span className="flex flex-col">
+                            <span className="font-bold text-slate-705 dark:text-slate-350">Night Shift Cost</span>
+                            <span className="text-[10px] text-slate-400 font-medium">
+                              {livePreview.noOfTechnicianNight} tech{livePreview.noOfTechnicianNight !== 1 ? 's' : ''} × ₦{(parseFloat(form.technicianNightFee) || 0).toLocaleString()}/n × {livePreview.actualNightDuration}n
+                            </span>
+                          </span>
+                          <span className="font-mono font-bold text-slate-855 dark:text-slate-205 shrink-0">
+                            ₦{((livePreview.noOfTechnicianNight || 0) * (parseFloat(form.technicianNightFee) || 0) * livePreview.actualNightDuration).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Accommodation line */}
+                      {(parseFloat(form.technicianAccommodation) > 0) && (
+                        <div className="flex justify-between items-start text-slate-655 dark:text-slate-400 pt-2.5 border-t border-slate-100 dark:border-slate-850 gap-2">
+                          <span className="flex flex-col">
+                            <span className="font-bold text-slate-705 dark:text-slate-350">Crew Accommodation</span>
+                            <span className="text-[10px] text-slate-400 font-medium">
+                              {livePreview.accomCrewCount} tech{livePreview.accomCrewCount !== 1 ? 's' : ''}{!form.technicianNightCountSameAsDay ? (form.technicianAccommodationUseNightCount ? ' (night basis)' : ' (day basis)') : ''} × ₦{(parseFloat(form.technicianAccommodation) || 0).toLocaleString()}/d × {livePreview.actualTechDuration}d
+                            </span>
+                          </span>
+                          <span className="font-mono font-bold text-slate-855 dark:text-slate-205 shrink-0">
+                            ₦{((livePreview.accomCrewCount || 0) * (parseFloat(form.technicianAccommodation) || 0) * livePreview.actualTechDuration).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Total Tech line */}
+                      <div className="h-px bg-slate-200 dark:bg-slate-800 my-2" />
+                      <div className="flex justify-between font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-50/50 dark:bg-indigo-950/20 p-2.5 rounded-lg border border-indigo-100 dark:border-indigo-900">
+                        <span>Total Crew Cost</span>
+                        <span className="font-mono">
+                          ₦{livePreview.techniciansCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
-          </div>
+            </div>
+          </div>,
+          document.getElementById('layout-content-wrapper')!
         )}
 
         {/* Next Invoice Machine Selection Dialog */}
@@ -2520,7 +3014,7 @@ export function InvoicePrintModal({ invoice, onClose, ledgerBanks, ledgerBenefic
   };
 
   const [billedToInput, setBilledToInput] = useState(getInitialBilledTo());
-  const [paidToInput, setPaidToInput] = useState(invoice.printLayout?.paidToInput || ('Dewatering Construction Etc Limited\n' + defaultBank));
+  const [paidToInput, setPaidToInput] = useState(invoice.printLayout?.paidToInput || 'STANBIC IBTC BANK\n0021939731\nDewatering Construction etc Limited');
   const [projectText, setProjectText] = useState(invoice.printLayout?.projectText || 'DCEL- SED');
   const [termsText, setTermsText] = useState(invoice.printLayout?.termsText || 'For Immediate Payment');
   
@@ -2705,18 +3199,75 @@ export function InvoicePrintModal({ invoice, onClose, ledgerBanks, ledgerBenefic
       const actualTechDuration = invoice.technicianDurationSameAsMachine !== false 
         ? maxMachineDuration 
         : (parseFloat(invoice.technicianDuration) || invoice.duration || 0);
-      
-      const ratePerTech = (invoice.techniciansDailyRate || 0) * actualTechDuration;
-      
-      list.push({ 
-        id: generateId(), 
-        selected: true, 
-        type: 'technician',
-        desc: `Technician Charge for ${invoice.noOfTechnician || 0} dewatering staff @ N${(invoice.techniciansDailyRate || 0).toLocaleString()} per technician per day for ${actualTechDuration} days.`, 
-        qty: invoice.noOfTechnician || 1, 
-        unitRate: ratePerTech, 
-        amount: invoice.techniciansCost 
-      });
+
+      const actualNightDuration = invoice.technicianNightDurationSameAsMachine !== false
+        ? maxMachineDuration
+        : (parseFloat(invoice.technicianNightDuration) || 0);
+
+      const dayRate   = parseFloat(String(invoice.techniciansDailyRate || 0)) || 0;
+      const nightRate = parseFloat(String((invoice as any).technicianNightFee || 0)) || 0;
+      const accomRate = parseFloat(String((invoice as any).technicianAccommodation || 0)) || 0;
+
+      // Resolve crew counts (backwards compatible: null/undefined night count = same as day)
+      const isNightCountSame = (invoice as any).technicianNightCountSameAsDay !== false;
+      const noOfTechDay  = invoice.noOfTechnician || 0;
+      const noOfTechNight = isNightCountSame ? noOfTechDay : ((invoice as any).noOfTechnicianNight || 0);
+      const useNightForAccom = (invoice as any).technicianAccommodationUseNightCount ?? false;
+      const accomCrewCount = useNightForAccom ? noOfTechNight : noOfTechDay;
+
+      const hasMultiComponent = nightRate > 0 || accomRate > 0;
+
+      if (hasMultiComponent) {
+        // Option B: Separate line items for each component
+        if (dayRate > 0 && noOfTechDay > 0) {
+          const dayCost = noOfTechDay * dayRate * actualTechDuration;
+          list.push({
+            id: generateId(),
+            selected: true,
+            type: 'technician',
+            desc: `Day Shift Technician Charge\n${noOfTechDay} dewatering staff @ ₦${dayRate.toLocaleString()}/tech/day for ${actualTechDuration} day${actualTechDuration !== 1 ? 's' : ''}.`,
+            qty: noOfTechDay,
+            unitRate: dayRate * actualTechDuration,
+            amount: dayCost,
+          });
+        }
+        if (nightRate > 0 && noOfTechNight > 0 && actualNightDuration > 0) {
+          const nightCost = noOfTechNight * nightRate * actualNightDuration;
+          list.push({
+            id: generateId(),
+            selected: true,
+            type: 'technician',
+            desc: `Night Shift Technician Charge\n${noOfTechNight} dewatering staff @ ₦${nightRate.toLocaleString()}/tech/night for ${actualNightDuration} night${actualNightDuration !== 1 ? 's' : ''}.`,
+            qty: noOfTechNight,
+            unitRate: nightRate * actualNightDuration,
+            amount: nightCost,
+          });
+        }
+        if (accomRate > 0 && accomCrewCount > 0) {
+          const accomCost = accomCrewCount * accomRate * actualTechDuration;
+          list.push({
+            id: generateId(),
+            selected: true,
+            type: 'technician',
+            desc: `Crew Accommodation Charge\n${accomCrewCount} staff @ ₦${accomRate.toLocaleString()}/tech/day for ${actualTechDuration} day${actualTechDuration !== 1 ? 's' : ''}.`,
+            qty: accomCrewCount,
+            unitRate: accomRate * actualTechDuration,
+            amount: accomCost,
+          });
+        }
+      } else {
+        // Simple single day-rate line item
+        const techDesc = `Technician Charge for ${noOfTechDay} dewatering staff @ ₦${dayRate.toLocaleString()} per technician per day for ${actualTechDuration} day${actualTechDuration !== 1 ? 's' : ''}.`;
+        list.push({
+          id: generateId(),
+          selected: true,
+          type: 'technician',
+          desc: techDesc,
+          qty: noOfTechDay,
+          unitRate: dayRate * actualTechDuration,
+          amount: invoice.techniciansCost,
+        });
+      }
     }
     
     if (!list.some(item => item.type === 'diesel') && invoice.dieselCost && invoice.dieselCost > 0) {
@@ -2783,7 +3334,7 @@ export function InvoicePrintModal({ invoice, onClose, ledgerBanks, ledgerBenefic
       footerEmail: invoice.printLayout?.footerEmail || 'info@dewaterconstruct.com',
       footerText: invoice.printLayout?.footerText || 'We look forward to your swift response.',
       billedToInput: getInitialBilledTo(),
-      paidToInput: invoice.printLayout?.paidToInput || ('Dewatering Construction Etc Limited\n' + defaultBank),
+      paidToInput: invoice.printLayout?.paidToInput || 'STANBIC IBTC BANK\n0021939731\nDewatering Construction etc Limited',
       projectText: invoice.printLayout?.projectText || 'DCEL- SED',
       termsText: invoice.printLayout?.termsText || 'For Immediate Payment',
       combineDiesel: invoice.printLayout?.combineDiesel || false,
@@ -2906,15 +3457,19 @@ export function InvoicePrintModal({ invoice, onClose, ledgerBanks, ledgerBenefic
         table.pt-table th { font-weight: normal; }
         table.pt-table td { font-weight: normal; }
 
-        table.main-table { width: 100%; border-collapse: collapse !important; font-size: 13.5px; background: white; margin: 0 !important; }
-        table.main-table th { border: 1.5px solid #385296 !important; padding: 8px !important; text-align: center; font-weight: bold; }
-        table.main-table td { border-left: 1.5px solid #385296 !important; border-right: 1.5px solid #385296 !important; padding: 12px !important; vertical-align: top; }
-        table.main-table tr.item-row td { border-top: none !important; }
-
-        .borderless-cell { border: none !important; border-left: hidden !important; border-bottom: hidden !important; background: transparent !important; }
-        .desc-col { width: 65%; }
-        .qty-col { width: 15%; text-align: center !important; }
-        .amt-col { width: 20%; text-align: right !important; padding-right: 10px !important; }
+        table.main-table { width: 100%; border-collapse: collapse !important; font-size: 12px; background: white; margin: 0 !important; }
+        table.main-table th { border: 1.5px solid #385296 !important; padding: 6px 8px !important; text-align: center; font-weight: bold; background: white; }
+        table.main-table td { border: 1.5px solid #385296 !important; padding: 5px 7px !important; vertical-align: middle; }
+        table.main-table tr.category-header td { font-weight: bold; background: white !important; border: 1.5px solid #385296 !important; padding: 5px 8px !important; }
+        table.main-table tr.subtotal-row td { font-weight: bold; border: 1.5px solid #385296 !important; padding: 5px 8px !important; }
+        table.main-table tr.summary-row td { border: 1.5px solid #385296 !important; padding: 5px 8px !important; }
+        table.main-table tr.grand-total-row td { font-weight: bold; border: 1.5px solid #385296 !important; padding: 6px 8px !important; }
+        .borderless-cell { border: none !important; background: transparent !important; }
+        .sn-col { width: 6%; text-align: center !important; }
+        .desc-col { width: 45%; }
+        .unit-col { width: 9%; text-align: center !important; }
+        .rate-col { width: 20%; text-align: right !important; padding-right: 8px !important; }
+        .amt-col { width: 20%; text-align: right !important; padding-right: 8px !important; }
 
         /* padding-top only — no margin-top:auto so footer stays right after content */
         .footer { padding-top: 30px; font-size: 13.5px; line-height: 1.4; font-weight: bold; page-break-inside: avoid; }
@@ -3000,7 +3555,21 @@ export function InvoicePrintModal({ invoice, onClose, ledgerBanks, ledgerBenefic
   };
   
   const handleAddItem = () => {
-    setItems([...items, { id: generateId(), selected: true, desc: 'New Line Item', qty: 1, amount: 0 }]);
+    setItems([...items, { id: generateId(), selected: true, type: 'custom', desc: 'New Line Item', qty: 1, unitRate: 0, amount: 0 }]);
+  };
+
+  const handleAddCapexItem = () => {
+    // Insert after the last capex-typed item so it stays in Part A
+    const capexSet = new Set(['mobDemob', 'installation', 'damages', 'capex']);
+    const lastCapexIdx = items.reduce((acc, it, i) => capexSet.has(it.type) ? i : acc, -1);
+    const insertAt = lastCapexIdx === -1 ? 0 : lastCapexIdx + 1;
+    const next = [...items];
+    next.splice(insertAt, 0, { id: generateId(), selected: true, type: 'capex', desc: 'New CAPEX Item', qty: 1, unitRate: 0, amount: 0 });
+    setItems(next);
+  };
+
+  const handleAddOpexItem = () => {
+    setItems([...items, { id: generateId(), selected: true, type: 'custom', desc: 'New Operational Item', qty: 1, unitRate: 0, amount: 0 }]);
   };
 
   const handleDeleteItem = (index: number) => {
@@ -3177,17 +3746,20 @@ export function InvoicePrintModal({ invoice, onClose, ledgerBanks, ledgerBenefic
             .invoice-canvas table.pt-table th, .invoice-canvas table.pt-table td { border: 1.5px solid #385296 !important; padding: 4px !important; }
             .invoice-canvas table.pt-table th { font-weight: normal; }
             .invoice-canvas table.pt-table td { font-weight: normal; }
-            .invoice-canvas table.main-table { width: 100%; border-collapse: collapse !important; font-size: 13.5px; background: white; margin: 0 !important; }
-            .invoice-canvas table.main-table th { border: 1.5px solid #385296 !important; padding: 8px !important; text-align: center; font-weight: bold; }
-            .invoice-canvas table.main-table td { border-left: 1.5px solid #385296 !important; border-right: 1.5px solid #385296 !important; padding: 12px !important; vertical-align: top; }
-            .invoice-canvas table.main-table tr.item-row td { border-top: none !important; }
-            .invoice-canvas table.main-table td.hide-on-print,
-            .invoice-canvas table.main-table th.hide-on-print { border: none !important; padding: 0 !important; width: 0 !important; overflow: hidden !important; }
-            .invoice-canvas .borderless-cell { border: none !important; border-left: hidden !important; border-bottom: hidden !important; background: transparent !important; }
-            .invoice-canvas .desc-col { width: 65%; }
-            .invoice-canvas .qty-col { width: 15%; text-align: center!important; }
-            .invoice-canvas .amt-col { width: 20%; text-align: right!important; padding-right: 10px!important;}
-            .invoice-canvas .footer { margin-top: auto; padding-top: 40px; font-size: 13.5px; line-height: 1.4; font-weight: bold;}
+            .invoice-canvas table.main-table { width: 100%; border-collapse: collapse !important; font-size: 12px; background: white; margin: 0 !important; }
+            .invoice-canvas table.main-table th { border: 1.5px solid #385296 !important; padding: 6px 8px !important; text-align: center; font-weight: bold; background: white; }
+            .invoice-canvas table.main-table td { border: 1.5px solid #385296 !important; padding: 5px 7px !important; vertical-align: middle; }
+            .invoice-canvas table.main-table tr.category-header td { font-weight: bold; background: white !important; border: 1.5px solid #385296 !important; padding: 5px 8px !important; }
+            .invoice-canvas table.main-table tr.subtotal-row td { font-weight: bold; border: 1.5px solid #385296 !important; padding: 5px 8px !important; }
+            .invoice-canvas table.main-table tr.summary-row td { border: 1.5px solid #385296 !important; padding: 5px 8px !important; }
+            .invoice-canvas table.main-table tr.grand-total-row td { font-weight: bold; border: 1.5px solid #385296 !important; padding: 6px 8px !important; }
+            .invoice-canvas .borderless-cell { border: none !important; background: transparent !important; }
+            .invoice-canvas .sn-col { width: 6%; text-align: center !important; }
+            .invoice-canvas .desc-col { width: 45%; }
+            .invoice-canvas .unit-col { width: 9%; text-align: center !important; }
+            .invoice-canvas .rate-col { width: 20%; text-align: right !important; padding-right: 8px !important; }
+            .invoice-canvas .amt-col { width: 20%; text-align: right !important; padding-right: 8px !important; }
+            .invoice-canvas .footer { margin-top: auto; padding-top: 40px; font-size: 13.5px; line-height: 1.4; font-weight: bold; }
             .invoice-canvas .show-on-print { display: none !important; }
           `}</style>
           <div ref={printRef}>
@@ -3270,126 +3842,216 @@ export function InvoicePrintModal({ invoice, onClose, ledgerBanks, ledgerBenefic
                 </table>
               </div>
 
-              {/* Line Items Table */}
-              <table className="main-table border-t-0" style={{ marginTop: 0 }}>
-                <thead>
-                  <tr>
-                    <th className="hide-on-print" style={{ width: '36px', borderRight: 'none', background: '#f8fafc' }}></th>
-                    <th className="desc-col">Description</th>
-                    <th className="qty-col">Quantity</th>
-                    <th className="amt-col">Amount</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {items.map((item, idx) => (
-                    <tr key={item.id} className="item-row">
-                      <td className="hide-on-print" style={{ borderLeft: 'none', borderRight: '1.5px solid #385296', textAlign: 'center', background: '#fafafa' }}>
-                        <button
-                          onClick={() => handleDeleteItem(idx)}
-                          style={{ color: 'white', fontWeight: 'bold', fontSize: 12, background: '#ef4444', border: 'none', cursor: 'pointer', outline: 'none', borderRadius: '50%', width: 20, height: 20, lineHeight: '20px' }}
-                        >&times;</button>
-                      </td>
-                      <td style={{ borderRight: '1.5px solid #385296' }}>
-                        <textarea
-                          className="hide-on-print"
-                          value={item.desc}
-                          onChange={e => handleUpdateItem(idx, 'desc', e.target.value)}
-                          style={{ width: '100%', minHeight: '60px', border: '1px dashed #c7d2e0', padding: 4, borderRadius: 3, outline: 'none', resize: 'vertical', background: '#f9fafb', fontFamily: 'inherit', fontSize: 'inherit' }}
-                        />
-                        <span className="show-on-print" style={{ display: 'none', whiteSpace: 'pre-wrap' }}>{item.desc}</span>
-                      </td>
-                      <td className="qty-col" style={{ borderRight: '1.5px solid #385296' }}>
-                        <input
-                          className="hide-on-print"
-                          value={item.qty}
-                          onChange={e => handleUpdateItem(idx, 'qty', e.target.value)}
-                          style={{ width: '100%', textAlign: 'center', border: '1px dashed #c7d2e0', padding: 4, borderRadius: 3, outline: 'none', background: '#f9fafb', fontFamily: 'inherit', fontSize: 'inherit' }}
-                        />
-                        <span className="show-on-print" style={{ display: 'none' }}>{item.qty}</span>
-                      </td>
-                      <td className="amt-col" style={{ borderRight: 'none' }}>
-                        <input
-                          className="hide-on-print"
-                          type="number"
-                          value={item.amount}
-                          onChange={e => handleUpdateItem(idx, 'amount', e.target.value)}
-                          style={{ width: '100%', textAlign: 'right', border: '1px dashed #c7d2e0', padding: 4, borderRadius: 3, outline: 'none', background: '#f9fafb', fontFamily: 'inherit', fontSize: 'inherit' }}
-                        />
-                        <span className="show-on-print" style={{ display: 'none' }}>{parseFloat(item.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                      </td>
-                    </tr>
-                  ))}
+              {/* Line Items Table — detailed S/N breakdown layout */}
+              {(() => {
+                // Categorise items
+                const capexTypes = new Set(['mobDemob', 'installation', 'damages', 'capex']);
+                const capexItems = items.filter(it => capexTypes.has(it.type));
+                const opexItems  = items.filter(it => !capexTypes.has(it.type));
+                const capexTotal = capexItems.reduce((s, it) => s + (parseFloat(it.amount) || 0), 0);
+                const opexTotal  = opexItems.reduce((s, it) => s + (parseFloat(it.amount) || 0), 0);
+                const fmt = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-                  {/* VAT Charge line item */}
-                  {vat > 0 && (
-                    <tr className="item-row">
-                      <td className="hide-on-print" style={{ borderLeft: 'none', borderRight: '1.5px solid #385296', textAlign: 'center', background: '#fafafa' }}></td>
-                      <td style={{ borderRight: '1.5px solid #385296', verticalAlign: 'top', padding: '12px' }}>
-                        <span style={{ fontWeight: 'normal' }}>VAT CHARGE{vatIncSetting === 'Yes' ? ' (Incl.)' : ''}</span>
-                      </td>
-                      <td className="qty-col" style={{ borderRight: '1.5px solid #385296' }}></td>
-                      <td className="amt-col" style={{ borderRight: 'none' }}>
-                        <span>{vat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                      </td>
-                    </tr>
-                  )}
+                // Build serial labelling: A, A1, A2… B, B1, B2…
+                let capexCounter = 0;
+                let opexCounter  = 0;
 
-                  {/* Amount-in-words + Add item row */}
-                  <tr className="item-row">
-                    <td className="hide-on-print" style={{ borderLeft: 'none', borderRight: '1.5px solid #385296', background: '#fafafa' }}></td>
-                    <td style={{ borderRight: '1.5px solid #385296', paddingTop: '24px', paddingBottom: '16px' }}>
+                const renderItem = (item: any, idx: number, sn: string, globalIdx: number) => (
+                  <tr key={item.id} className="item-row">
+                    <td className="hide-on-print" style={{ textAlign: 'center', background: '#fafafa' }}>
                       <button
-                        onClick={handleAddItem}
-                        className="hide-on-print"
-                        style={{ color: '#2563eb', textDecoration: 'underline', fontSize: 13, background: 'transparent', border: 'none', cursor: 'pointer', marginBottom: '12px', display: 'block' }}
-                      >+ Add Another Item</button>
+                        onClick={() => handleDeleteItem(globalIdx)}
+                        style={{ color: 'white', fontWeight: 'bold', fontSize: 11, background: '#ef4444', border: 'none', cursor: 'pointer', outline: 'none', borderRadius: '50%', width: 18, height: 18, lineHeight: '18px' }}
+                      >&times;</button>
+                    </td>
+                    <td className="sn-col" style={{ textAlign: 'center' }}>{sn}</td>
+                    <td className="desc-col">
                       <textarea
                         className="hide-on-print"
-                        value={wordsValue}
-                        onChange={e => setCustomWords(e.target.value)}
-                        style={{ width: '100%', minHeight: '50px', border: '1px dashed #c7d2e0', padding: 4, fontWeight: 'bold', borderRadius: 3, outline: 'none', background: '#f9fafb', fontFamily: 'inherit', fontSize: 13 }}
+                        value={item.desc}
+                        onChange={e => handleUpdateItem(globalIdx, 'desc', e.target.value)}
+                        style={{ width: '100%', minHeight: '45px', border: '1px dashed #c7d2e0', padding: 3, borderRadius: 3, outline: 'none', resize: 'vertical', background: '#f9fafb', fontFamily: 'inherit', fontSize: 'inherit' }}
                       />
-                      <span className="show-on-print" style={{ display: 'none', fontWeight: 'bold', fontSize: '13.5px' }}>{wordsValue}</span>
+                      <span className="show-on-print" style={{ display: 'none', whiteSpace: 'pre-wrap' }}>{item.desc}</span>
                     </td>
-                    <td className="qty-col" style={{ borderRight: '1.5px solid #385296' }}></td>
-                    <td className="amt-col" style={{ borderRight: 'none' }}></td>
+                    <td className="unit-col">
+                      <input
+                        className="hide-on-print"
+                        value={item.qty ?? 1}
+                        onChange={e => handleUpdateItem(globalIdx, 'qty', e.target.value)}
+                        style={{ width: '100%', textAlign: 'center', border: '1px dashed #c7d2e0', padding: 3, borderRadius: 3, outline: 'none', background: '#f9fafb', fontFamily: 'inherit', fontSize: 'inherit' }}
+                      />
+                      <span className="show-on-print" style={{ display: 'none' }}>{item.qty ?? 1}</span>
+                    </td>
+                    <td className="rate-col">
+                      <input
+                        className="hide-on-print"
+                        type="number"
+                        value={item.unitRate ?? item.amount}
+                        onChange={e => handleUpdateItem(globalIdx, 'unitRate', e.target.value)}
+                        style={{ width: '100%', textAlign: 'right', border: '1px dashed #c7d2e0', padding: 3, borderRadius: 3, outline: 'none', background: '#f9fafb', fontFamily: 'inherit', fontSize: 'inherit' }}
+                      />
+                      <span className="show-on-print" style={{ display: 'none' }}>{fmt(parseFloat(String(item.unitRate ?? item.amount)) || 0)}</span>
+                    </td>
+                    <td className="amt-col">
+                      <input
+                        className="hide-on-print"
+                        type="number"
+                        value={item.amount}
+                        onChange={e => handleUpdateItem(globalIdx, 'amount', e.target.value)}
+                        style={{ width: '100%', textAlign: 'right', border: '1px dashed #c7d2e0', padding: 3, borderRadius: 3, outline: 'none', background: '#f9fafb', fontFamily: 'inherit', fontSize: 'inherit' }}
+                      />
+                      <span className="show-on-print" style={{ display: 'none' }}>{fmt(parseFloat(item.amount || 0))}</span>
+                    </td>
                   </tr>
+                );
 
-                  {/* Totals — Total Due row with footer text */}
-                  <tr style={{ borderTop: '1.5px solid #385296' }}>
-                    <td className="hide-on-print" style={{ borderLeft: 'none', borderRight: '1.5px solid #385296', background: '#fafafa' }}></td>
-                    <td style={{ borderRight: '1.5px solid #385296', borderBottom: '1.5px solid #385296', padding: '12px', verticalAlign: 'middle' }}>
-                      <input className="hide-on-print" value={footerText} onChange={e => setFooterText(e.target.value)} style={{ width: '100%', border: '1px dashed #c7d2e0', padding: 4, borderRadius: 3, outline: 'none', background: '#f9fafb', fontSize: 13, fontFamily: 'inherit' }} />
-                      <span className="show-on-print" style={{ display: 'none', fontSize: '13.5px' }}>{footerText}</span>
-                    </td>
-                    <td className="qty-col" style={{ borderBottom: '1.5px solid #385296', borderRight: '1.5px solid #385296', textAlign: 'left', fontWeight: 'bold', padding: '10px 12px', ...getLabelStyle('Total Due') }}>Total Due</td>
-                    <td className="amt-col" style={{ borderBottom: '1.5px solid #385296', borderRight: 'none', fontWeight: 'bold', padding: '10px 12px', whiteSpace: 'nowrap', fontSize: '13.5px' }}>NGN {totalCharge.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                  </tr>
-                  <tr>
-                    <td className="hide-on-print borderless-cell"></td>
-                    <td className="borderless-cell"></td>
-                    <td className="qty-col" style={{ borderBottom: '1.5px solid #385296', borderLeft: '1.5px solid #385296', borderRight: '1.5px solid #385296', textAlign: 'left', fontWeight: 'bold', padding: '10px 12px', ...getLabelStyle('Payments/Credits') }}>Payments/Credits</td>
-                    <td className="amt-col" style={{ borderBottom: '1.5px solid #385296', borderRight: 'none', padding: '10px 12px', whiteSpace: 'nowrap', fontWeight: 'normal', fontSize: '11.5px' }}>
-                      <span className="hide-on-print" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 4 }}>
-                        NGN
-                        <input
-                          type="number"
-                          value={paymentsCredits}
-                          onChange={e => setPaymentsCredits(Number(e.target.value))}
-                          style={{ width: '80px', textAlign: 'right', border: '1px dashed #c7d2e0', borderRadius: 3, padding: '2px 4px', outline: 'none', background: '#f9fafb', fontSize: '11.5px' }}
-                        />
-                      </span>
-                      <span className="show-on-print" style={{ display: 'none', fontWeight: 'normal', fontSize: '11.5px' }}>NGN {paymentsCredits.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td className="hide-on-print borderless-cell"></td>
-                    <td className="borderless-cell"></td>
-                    <td className="qty-col" style={{ borderLeft: '1.5px solid #385296', borderRight: '1.5px solid #385296', borderBottom: '1.5px solid #385296', textAlign: 'left', fontWeight: 'bold', padding: '10px 12px', ...getLabelStyle('Balance Due') }}>Balance Due</td>
-                    <td className="amt-col" style={{ borderRight: 'none', borderBottom: '1.5px solid #385296', fontWeight: 'normal', padding: '10px 12px', whiteSpace: 'nowrap', fontSize: '11.5px' }}>NGN {calcBalanceDue.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                  </tr>
-                </tbody>
-              </table>
+                return (
+                  <table className="main-table" style={{ marginTop: 0 }}>
+                    <thead>
+                      <tr>
+                        <th className="hide-on-print" style={{ width: '32px', background: '#f8fafc' }}></th>
+                        <th className="sn-col">S/N</th>
+                        <th className="desc-col" style={{ textAlign: 'left' }}>Description</th>
+                        <th className="unit-col">Unit</th>
+                        <th className="rate-col">Unit Rate (₦)</th>
+                        <th className="amt-col">Total Amount (₦)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+
+                      {/* ── CAPEX section — always visible so user can add to it ── */}
+                      <tr className="category-header">
+                        <td className="hide-on-print" style={{ background: '#f8fafc' }}></td>
+                        <td className="sn-col" style={{ textAlign: 'center' }}>A</td>
+                        <td colSpan={4} style={{ textAlign: 'left' }}>Capital Expenditure (CAPEX)</td>
+                      </tr>
+                      {capexItems.map(item => {
+                        const globalIdx = items.indexOf(item);
+                        capexCounter++;
+                        const sn = `A${capexCounter}`;
+                        return renderItem(item, capexCounter - 1, sn, globalIdx);
+                      })}
+                      <tr>
+                        <td className="hide-on-print" colSpan={6} style={{ border: 'none', padding: '3px 6px' }}>
+                          <button
+                            onClick={handleAddCapexItem}
+                            style={{ color: '#2563eb', textDecoration: 'underline', fontSize: 11, background: 'transparent', border: 'none', cursor: 'pointer' }}
+                          >+ Add to Part A (CAPEX)</button>
+                        </td>
+                      </tr>
+                      {capexItems.length > 0 && (
+                        <tr className="subtotal-row">
+                          <td className="hide-on-print" style={{ background: '#f8fafc' }}></td>
+                          <td colSpan={4} style={{ textAlign: 'right', paddingRight: 8 }}>Subtotal (A)</td>
+                          <td className="amt-col" style={{ fontWeight: 'bold' }}>{fmt(capexTotal)}</td>
+                        </tr>
+                      )}
+
+                      {/* ── OPEX section — always visible so user can add to it ── */}
+                      <tr className="category-header">
+                        <td className="hide-on-print" style={{ background: '#f8fafc' }}></td>
+                        <td className="sn-col" style={{ textAlign: 'center' }}>B</td>
+                        <td colSpan={4} style={{ textAlign: 'left' }}>Operational Expenditure</td>
+                      </tr>
+                      {opexItems.map(item => {
+                        const globalIdx = items.indexOf(item);
+                        opexCounter++;
+                        const sn = `B${opexCounter}`;
+                        return renderItem(item, opexCounter - 1, sn, globalIdx);
+                      })}
+                      <tr>
+                        <td className="hide-on-print" colSpan={6} style={{ border: 'none', padding: '3px 6px' }}>
+                          <button
+                            onClick={handleAddOpexItem}
+                            style={{ color: '#2563eb', textDecoration: 'underline', fontSize: 11, background: 'transparent', border: 'none', cursor: 'pointer' }}
+                          >+ Add to Part B (Operational)</button>
+                        </td>
+                      </tr>
+                      {opexItems.length > 0 && (
+                        <tr className="subtotal-row">
+                          <td className="hide-on-print" style={{ background: '#f8fafc' }}></td>
+                          <td colSpan={4} style={{ textAlign: 'right', paddingRight: 8 }}>Subtotal (B)</td>
+                          <td className="amt-col" style={{ fontWeight: 'bold' }}>{fmt(opexTotal)}</td>
+                        </tr>
+                      )}
+
+                      {/* ── Summary rows ── */}
+                      <tr><td className="hide-on-print" style={{ background: '#f8fafc' }}></td><td colSpan={5} style={{ padding: '3px', border: '1.5px solid #385296' }}></td></tr>
+
+                      {(capexItems.length > 0 && opexItems.length > 0) && (
+                        <tr className="summary-row">
+                          <td className="hide-on-print" style={{ background: '#f8fafc' }}></td>
+                          <td colSpan={4} style={{ textAlign: 'right', paddingRight: 8 }}>Total (A+B)</td>
+                          <td className="amt-col">{fmt(subtotal)}</td>
+                        </tr>
+                      )}
+
+                      {vat > 0 && (
+                        <tr className="summary-row">
+                          <td className="hide-on-print" style={{ background: '#f8fafc' }}></td>
+                          <td colSpan={4} style={{ textAlign: 'right', paddingRight: 8 }}>VAT {vatRate}%{vatIncSetting === 'Yes' ? ' (Incl.)' : ''}</td>
+                          <td className="amt-col">{fmt(vat)}</td>
+                        </tr>
+                      )}
+
+                      <tr className="grand-total-row">
+                        <td className="hide-on-print" style={{ background: '#f8fafc' }}></td>
+                        <td colSpan={4} style={{ textAlign: 'right', paddingRight: 8, fontWeight: 'bold' }}>GRAND TOTAL</td>
+                        <td className="amt-col" style={{ fontWeight: 'bold' }}>{fmt(totalCharge)}</td>
+                      </tr>
+
+                    </tbody>
+                  </table>
+                );
+              })()}
+
+              {/* ── TOTAL AMOUNT IN WORD — standalone paragraph below table ── */}
+              <div style={{ marginTop: 14, fontSize: 12 }}>
+                <textarea
+                  className="hide-on-print"
+                  value={wordsValue}
+                  onChange={e => setCustomWords(e.target.value)}
+                  style={{ width: '100%', minHeight: '40px', border: '1px dashed #c7d2e0', padding: '5px 8px', fontWeight: 'bold', borderRadius: 3, outline: 'none', background: '#f9fafb', fontFamily: 'inherit', fontSize: 12 }}
+                />
+                <span className="show-on-print" style={{ display: 'none', fontWeight: 'bold', fontSize: '12px' }}>{wordsValue}</span>
+              </div>
+
+              {/* ── Footer note + Payments / Balance Due ── */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 24, marginTop: 14 }}>
+                <div style={{ flex: 1 }}>
+                  <input
+                    className="hide-on-print"
+                    value={footerText}
+                    onChange={e => setFooterText(e.target.value)}
+                    style={{ width: '100%', border: '1px dashed #c7d2e0', padding: '4px 6px', borderRadius: 3, outline: 'none', background: '#f9fafb', fontSize: 12, fontFamily: 'inherit' }}
+                  />
+                  <span className="show-on-print" style={{ display: 'none', fontSize: '12px' }}>{footerText}</span>
+                </div>
+                <table style={{ borderCollapse: 'collapse', fontSize: 12, flexShrink: 0 }}>
+                  <tbody>
+                    <tr>
+                      <td style={{ border: '1.5px solid #385296', padding: '5px 14px', fontWeight: 'bold', ...getLabelStyle('Payments/Credits') }}>Payments/Credits</td>
+                      <td style={{ border: '1.5px solid #385296', padding: '5px 10px', textAlign: 'right', minWidth: 150 }}>
+                        <span className="hide-on-print" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 4 }}>
+                          NGN
+                          <input
+                            type="number"
+                            value={paymentsCredits}
+                            onChange={e => setPaymentsCredits(Number(e.target.value))}
+                            style={{ width: '90px', textAlign: 'right', border: '1px dashed #c7d2e0', borderRadius: 3, padding: '2px 4px', outline: 'none', background: '#f9fafb', fontSize: '11.5px' }}
+                          />
+                        </span>
+                        <span className="show-on-print" style={{ display: 'none' }}>NGN {paymentsCredits.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style={{ border: '1.5px solid #385296', padding: '5px 14px', fontWeight: 'bold', ...getLabelStyle('Balance Due') }}>Balance Due</td>
+                      <td style={{ border: '1.5px solid #385296', padding: '5px 10px', textAlign: 'right' }}>NGN {calcBalanceDue.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
 
               {/* Footer */}
               <div className="footer">

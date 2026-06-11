@@ -3,7 +3,7 @@ import { useAppStore, DEFAULT_OFFBOARDING_TASKS, DEFAULT_LEAVE_TYPES } from '@/s
 import { useUserStore, NO_ACCESS, UserPrivileges } from '@/src/store/userStore';
 import { fetchAllAppData, fetchAllUsers, fetchPresets, db } from '@/src/lib/supabaseService';
 import { supabase } from '@/src/integrations/supabase/client';
-import { dbToSite, dbToEmployee, dbToAttendance, dbToInvoice, dbToPendingInvoice, dbToSalaryAdvance, dbToLoan, dbToPayment, dbToVatPayment, dbToLeave, dbToProfile, dbToDisciplinary, dbToEvaluation, dbToCommLog, dbToCompanyExpense, dbToPendingSite, dbToLedgerEntry, dbToClientProfile, dbToDailyJournal, dbToSiteJournalEntry, dbToVehicle, dbToVehicleMovement, dbToVehicleDocumentType, dbToInterviewCandidate } from '@/src/lib/supabaseService';
+import { dbToSite, dbToEmployee, dbToAttendance, dbToInvoice, dbToPendingInvoice, dbToSalaryAdvance, dbToLoan, dbToPayment, dbToVatPayment, dbToLeave, dbToProfile, dbToDisciplinary, dbToEvaluation, dbToCommLog, dbToCompanyExpense, dbToPendingSite, dbToLedgerEntry, dbToClientProfile, dbToDailyJournal, dbToSiteJournalEntry, dbToVehicle, dbToVehicleMovement, dbToVehicleDocumentType, dbToInterviewCandidate, dbToLeaveType, dbToStaffMerit } from '@/src/lib/supabaseService';
 import { generateId } from '@/src/lib/utils';
 import { cacheSet, cacheGet } from '@/src/lib/offlineCache';
 import { useNetworkStore } from '@/src/store/networkStore';
@@ -743,6 +743,154 @@ export function useRealtimeData(isAuthenticated: boolean) {
                 useAppStore.setState({ interviewCandidates: current.map(c => c.id === updated.id ? updated : c) });
               } else if (eventType === 'DELETE') {
                 useAppStore.setState({ interviewCandidates: current.filter(c => c.id !== oldRow.id) });
+              }
+              break;
+            }
+            case 'positions': {
+              const current = appState.positions;
+              const mapPos = (p: any) => ({
+                id: p.id,
+                title: p.title || p.name,
+                departmentId: p.department_id || null,
+              });
+              if (eventType === 'INSERT') {
+                if (!current.some(c => c.id === newRow.id)) {
+                  useAppStore.setState({ positions: [...current, mapPos(newRow)] });
+                }
+              } else if (eventType === 'UPDATE') {
+                const updated = mapPos(newRow);
+                useAppStore.setState({ positions: current.map(c => c.id === updated.id ? updated : c) });
+              } else if (eventType === 'DELETE') {
+                useAppStore.setState({ positions: current.filter(c => c.id !== oldRow.id) });
+              }
+              break;
+            }
+            case 'departments': {
+              const current = appState.departments;
+              const mapDept = (d: any) => ({
+                id: d.id,
+                name: d.name,
+                staffType: d.staff_type || 'OFFICE',
+                workDaysPerWeek: d.work_days_per_week || 5,
+                parentDepartmentId: d.parent_department_id || null,
+              });
+              if (eventType === 'INSERT') {
+                if (!current.some(c => c.id === newRow.id)) {
+                  useAppStore.setState({ departments: [...current, mapDept(newRow)] });
+                }
+              } else if (eventType === 'UPDATE') {
+                const updated = mapDept(newRow);
+                useAppStore.setState({ departments: current.map(c => c.id === updated.id ? updated : c) });
+              } else if (eventType === 'DELETE') {
+                useAppStore.setState({ departments: current.filter(c => c.id !== oldRow.id) });
+              }
+              break;
+            }
+            case 'leave_types': {
+              const current = appState.leaveTypes;
+              if (eventType === 'INSERT') {
+                if (!current.some(c => c.id === newRow.id)) {
+                  useAppStore.setState({ leaveTypes: [...current, dbToLeaveType(newRow)] });
+                }
+              } else if (eventType === 'UPDATE') {
+                const updated = dbToLeaveType(newRow);
+                useAppStore.setState({ leaveTypes: current.map(c => c.id === updated.id ? updated : c) });
+              } else if (eventType === 'DELETE') {
+                useAppStore.setState({ leaveTypes: current.filter(c => c.id !== oldRow.id) });
+              }
+              break;
+            }
+            case 'public_holidays': {
+              const current = appState.publicHolidays;
+              const mapHoliday = (h: any) => ({
+                id: h.id,
+                date: h.date,
+                name: h.name,
+              });
+              if (eventType === 'INSERT') {
+                if (!current.some(c => c.id === newRow.id)) {
+                  useAppStore.setState({ publicHolidays: [...current, mapHoliday(newRow)] });
+                }
+              } else if (eventType === 'UPDATE') {
+                const updated = mapHoliday(newRow);
+                useAppStore.setState({ publicHolidays: current.map(c => c.id === updated.id ? updated : c) });
+              } else if (eventType === 'DELETE') {
+                useAppStore.setState({ publicHolidays: current.filter(c => c.id !== oldRow.id) });
+              }
+              break;
+            }
+            case 'department_tasks': {
+              const current = appState.departmentTasksList;
+              const mapDeptTask = (d: any) => ({
+                department: d.department,
+                onboardingTasks: d.onboarding_tasks || [],
+                offboardingTasks: d.offboarding_tasks || [],
+              });
+              if (eventType === 'INSERT') {
+                if (!current.some(c => c.department === newRow.department)) {
+                  useAppStore.setState({ departmentTasksList: [...current, mapDeptTask(newRow)] });
+                }
+              } else if (eventType === 'UPDATE') {
+                const updated = mapDeptTask(newRow);
+                useAppStore.setState({ departmentTasksList: current.map(c => c.department === updated.department ? updated : c) });
+              } else if (eventType === 'DELETE') {
+                useAppStore.setState({ departmentTasksList: current.filter(c => c.department !== oldRow.department) });
+              }
+              break;
+            }
+            case 'staff_merit_record': {
+              const current = appState.staffMeritRecords;
+              if (eventType === 'INSERT') {
+                if (!current.some(c => c.id === newRow.id)) {
+                  useAppStore.setState({ staffMeritRecords: [...current, dbToStaffMerit(newRow)] });
+                }
+              } else if (eventType === 'UPDATE') {
+                const updated = dbToStaffMerit(newRow);
+                useAppStore.setState({ staffMeritRecords: current.map(c => c.id === updated.id ? updated : c) });
+              } else if (eventType === 'DELETE') {
+                useAppStore.setState({ staffMeritRecords: current.filter(c => c.id !== oldRow.id) });
+              }
+              break;
+            }
+            case 'privilege_presets': {
+              const userStoreState = useUserStore.getState();
+              const current = userStoreState.presets;
+              const mapPreset = (p: any) => ({
+                id: p.id,
+                name: p.name,
+                privileges: p.privileges,
+              });
+              if (eventType === 'INSERT') {
+                if (!current.some(c => c.id === newRow.id)) {
+                  useUserStore.setState({ presets: [...current, mapPreset(newRow)] });
+                }
+              } else if (eventType === 'UPDATE') {
+                const updated = mapPreset(newRow);
+                useUserStore.setState({ presets: current.map(c => c.id === updated.id ? updated : c) });
+              } else if (eventType === 'DELETE') {
+                useUserStore.setState({ presets: current.filter(c => c.id !== oldRow.id) });
+              }
+              break;
+            }
+            case 'app_settings': {
+              if (eventType === 'INSERT' || eventType === 'UPDATE') {
+                const payload: any = {};
+                if (newRow.payroll_variables !== undefined) payload.payrollVariables = newRow.payroll_variables;
+                if (newRow.paye_tax_variables !== undefined) payload.payeTaxVariables = newRow.paye_tax_variables;
+                if (newRow.month_values !== undefined) payload.monthValues = newRow.month_values;
+                if (newRow.hr_variables !== undefined) payload.hrVariables = newRow.hr_variables;
+                if (newRow.onboarding_templates !== undefined) payload.onboardingTemplates = newRow.onboarding_templates;
+                if (newRow.super_admin_created !== undefined) payload.superAdminCreated = newRow.super_admin_created;
+                if (newRow.super_admin_signup_enabled !== undefined) payload.superAdminSignupEnabled = newRow.super_admin_signup_enabled;
+                if (newRow.id !== undefined) payload.settingsId = newRow.id;
+                
+                useAppStore.setState(payload);
+                if (newRow.super_admin_created !== undefined || newRow.super_admin_signup_enabled !== undefined) {
+                  useUserStore.setState({
+                    superAdminCreated: newRow.super_admin_created ?? false,
+                    superAdminSignupEnabled: newRow.super_admin_signup_enabled ?? true,
+                  });
+                }
               }
               break;
             }

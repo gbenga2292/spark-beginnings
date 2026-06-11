@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { Suspense, lazy, useState } from 'react';
 import { useOperations } from '../contexts/OperationsContext';
 import { supabase } from '@/src/integrations/supabase/client';
 import { MaintenanceCertificate } from '../types/operations';
@@ -21,7 +21,8 @@ import {
   RefreshCw,
   ShieldCheck,
   ShieldAlert,
-  Printer
+  Printer,
+  Search
 } from 'lucide-react';
 import { Card, CardContent } from '@/src/components/ui/card';
 import { Button } from '@/src/components/ui/button';
@@ -29,10 +30,11 @@ import { cn } from '@/src/lib/utils';
 import { MaintenanceDashboard } from '@/src/pages/MaintenanceDashboard';
 import { MaintenanceAssetGrid } from '@/src/pages/MaintenanceAssetGrid';
 import { LogMaintenanceForm } from '@/src/pages/LogMaintenanceForm';
-import { MaintenanceCertificateModal } from '@/src/components/maintenance/MaintenanceCertificateModal';
 import { toast } from '@/src/components/ui/toast';
 import { Badge } from '@/src/components/ui/badge';
 import { formatDisplayDate } from '@/src/lib/dateUtils';
+
+const MaintenanceCertificateModal = lazy(() => import('@/src/components/maintenance/MaintenanceCertificateModal').then(m => ({ default: m.MaintenanceCertificateModal })));
 
 type MaintenanceTab = 'dashboard' | 'machines' | 'vehicles' | 'log' | 'certificates';
 
@@ -45,6 +47,9 @@ export function MaintenanceManager() {
   const [logAssetId, setLogAssetId] = useState<string | null>(null);
   const [previousTab, setPreviousTab] = useState<MaintenanceTab>('dashboard');
   const [regenCert, setRegenCert] = useState<MaintenanceCertificate | null>(null);
+  const [generateCertAsset, setGenerateCertAsset] = useState<string | null>(null);
+  const [showAssetPicker, setShowAssetPicker] = useState(false);
+  const [assetSearch, setAssetSearch] = useState('');
   const { maintenanceAssets, maintenanceSessions, maintenanceCertificates } = useOperations();
   
   const handleLogAsset = (id: string) => {
@@ -61,7 +66,7 @@ export function MaintenanceManager() {
   // ── Direct print: renders the saved certificate as pure HTML in a new window.
   // No html2canvas — fires the print dialog in < 1 second.
   const handleDirectPrint = async (cert: MaintenanceCertificate) => {
-    toast.loading('Opening print dialog...');
+    toast.info('Opening print dialog...');
 
     // Fetch company info with fallback defaults
     let company = {
@@ -98,35 +103,42 @@ export function MaintenanceManager() {
       : true;
 
     const CRITERIA_LIST = [
-      { id: 'structural', label: 'Structural Integrity',        desc: 'Checks for any physical damage or wear that could compromise safety.' },
-      { id: 'performance', label: 'Performance Testing',         desc: 'Assesses the functionality under simulated usage conditions.' },
-      { id: 'standards',   label: 'Compliance with Standards',   desc: 'Verification against relevant health and safety standards.' },
-      { id: 'training',    label: 'User Training Verification',  desc: 'Confirmation of proper training provided to equipment users.' },
-      { id: 'maintenance', label: 'Maintenance Review',          desc: 'Review of regular maintenance and repairs conducted.' },
+      { id: 'structural', label: 'Structural Integrity',       desc: 'Checks for any physical damage or wear that could compromise safety.' },
+      { id: 'performance', label: 'Performance Testing',        desc: 'Assesses the functionality under simulated usage conditions.' },
+      { id: 'standards',   label: 'Compliance with Standards',  desc: 'Verification against relevant health and safety standards.' },
+      { id: 'training',    label: 'User Training Verification', desc: 'Confirmation of proper training provided to equipment users.' },
+      { id: 'maintenance', label: 'Maintenance Review',         desc: 'Review of regular maintenance and repairs conducted.' },
     ];
 
-    const criteriaRows = CRITERIA_LIST.map((c, i) => {
-      const ok = cert.criteriaCompliance?.[c.id] !== false;
-      return `<tr style="background:${i % 2 === 0 ? '#fff' : '#f9fafb'}">
-        <td style="border:1px solid #e5e7eb;padding:7px 10px;font-weight:700;color:#0a1628;font-size:8px">${c.label}</td>
-        <td style="border:1px solid #e5e7eb;padding:7px 10px;color:#374151;font-size:8px;line-height:1.5">${c.desc}</td>
-        <td style="border:1px solid #e5e7eb;padding:7px 10px;text-align:center">
-          <span style="padding:2px 8px;border-radius:4px;font-weight:900;font-size:7.5px;text-transform:uppercase;background:${ok ? '#d1fae5' : '#fee2e2'};color:${ok ? '#065f46' : '#991b1b'}">${ok ? '✓ Yes' : '✗ No'}</span>
-        </td></tr>`;
-    }).join('');
-
-    // HTML snippet helpers (local to keep template readable)
+    // SectionTitle: text LEFT, fading line RIGHT — matches modal SectionTitle component
     const sectionTitle = (t: string) =>
-      `<div style="display:flex;align-items:center;gap:8px">` +
-      `<div style="flex:1;height:1.5px;background:rgba(10,22,40,0.15)"></div>` +
-      `<p style="font-size:8.5px;font-weight:900;text-transform:uppercase;letter-spacing:0.18em;color:#0a1628;padding:0 4px">${t}</p>` +
-      `<div style="flex:1;height:1.5px;background:#c9a84c"></div></div>`;
+      `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <p style="font-size:11pt;font-weight:900;text-transform:uppercase;letter-spacing:0.2em;color:#0a1628;white-space:nowrap;flex-shrink:0">${t}</p>
+        <div style="flex:1;height:1px;background:linear-gradient(to right,rgba(10,22,40,0.3),transparent)"></div>
+      </div>`;
 
     const th = (label: string, extra = '') =>
-      `<th style="border:1px solid #1e3a5f;padding:7px 10px;text-align:left;font-weight:700;text-transform:uppercase;font-size:7.5px;${extra}">${label}</th>`;
+      `<th style="padding:4px 8px;text-align:left;font-weight:700;text-transform:uppercase;font-size:8pt;border-right:1px solid rgba(10,22,40,0.1);${extra}">${label}</th>`;
+
+    const td = (content: string, extra = '') =>
+      `<td style="padding:6px 8px;font-size:9pt;color:#374151;border-right:1px solid rgba(10,22,40,0.1);${extra}">${content}</td>`;
+
+    const tdBold = (content: string, extra = '') =>
+      `<td style="padding:6px 8px;font-size:9pt;font-weight:700;color:#0a1628;border-right:1px solid rgba(10,22,40,0.1);${extra}">${content}</td>`;
+
+    const criteriaRows = CRITERIA_LIST.map(c => {
+      const ok = cert.criteriaCompliance?.[c.id] !== false;
+      return `<tr style="border-bottom:1px solid rgba(10,22,40,0.1)">
+        ${tdBold(c.label)}
+        ${td(c.desc, 'line-height:1.5')}
+        <td style="padding:6px 8px;text-align:center">
+          <span style="display:inline-flex;align-items:center;gap:4px;padding:2px 6px;border-radius:4px;font-weight:700;font-size:8pt;text-transform:uppercase;background:${ok ? '#d1fae5' : '#fee2e2'};color:${ok ? '#065f46' : '#991b1b'}">${ok ? '✓ Pass' : '✗ Fail'}</span>
+        </td>
+      </tr>`;
+    }).join('');
 
     const logoSrc = `${window.location.origin}/logo/logo-2.png`;
-    const shieldSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0a1628" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>`;
+    const tHeadRow = `background:rgba(248,249,250,0.8);border-bottom:1px solid rgba(10,22,40,0.2);color:#0a1628`;
 
     const html = `<!DOCTYPE html><html><head>
   <meta charset="utf-8"/>
@@ -135,138 +147,140 @@ export function MaintenanceManager() {
     @page{size:A4 portrait;margin:0}
     *{box-sizing:border-box;margin:0;padding:0}
     body{background:#fff;font-family:Arial,sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    table{border-collapse:collapse;width:100%}
   </style>
 </head><body>
+
 <div style="width:210mm;min-height:297mm;background:#fff;position:relative;font-family:Arial,sans-serif">
+  <!-- Navy outer border -->
   <div style="position:absolute;inset:0;border:10px solid #0a1628;pointer-events:none;z-index:10"></div>
-  <div style="position:absolute;inset:14px;border:1.5px solid #c9a84c;pointer-events:none;z-index:10"></div>
-  <!-- watermark -->
+  <!-- Gold inner line at 10mm -->
+  <div style="position:absolute;inset:10mm;border:1.5px solid #c9a84c;pointer-events:none;z-index:10"></div>
+  <!-- Thin inner navy line -->
+  <div style="position:absolute;top:10mm;bottom:13mm;left:13mm;right:13mm;border:1px solid rgba(10,22,40,0.2);pointer-events:none;z-index:10"></div>
+
+  <!-- Background watermark -->
   <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;z-index:1">
-    <img src="${logoSrc}" style="width:60%;opacity:0.07;object-fit:contain" onerror="this.style.display='none'"/>
+    <img src="${logoSrc}" style="width:70%;opacity:0.15;filter:grayscale(100%);object-fit:contain" onerror="this.style.display='none'"/>
   </div>
-  <div style="position:absolute;inset:24px;display:flex;flex-direction:column;z-index:5">
+
+  <!-- Content: 0.5in top, 1in sides/bottom -->
+  <div style="position:absolute;top:0.5in;bottom:1in;left:1in;right:1in;display:flex;flex-direction:column;gap:10px;z-index:5">
 
     <!-- HEADER -->
-    <div style="display:flex;align-items:center;justify-content:space-between;padding-bottom:11px;border-bottom:2px solid #0a1628">
-      <img src="${logoSrc}" style="height:60px;object-fit:contain" onerror="this.style.display='none'"/>
-      <div style="text-align:center;flex:1;padding:0 14px">
-        <h1 style="font-size:14px;font-weight:900;color:#0a1628;text-transform:uppercase;letter-spacing:0.05em;line-height:1.2">${company.name}</h1>
-        <p style="font-size:8px;color:#6b7280;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;margin-top:2px">RC No: ${company.regNumber} &nbsp;·&nbsp; ${company.address}</p>
-        <div style="height:2px;background:linear-gradient(to right,transparent,#c9a84c,transparent);margin:5px 0"></div>
-        <h2 style="font-size:12px;font-weight:900;color:#0a1628;text-transform:uppercase;letter-spacing:0.12em">Equipment Certification Form</h2>
-        <p style="font-size:7.5px;color:#6b7280;margin-top:2px;font-style:italic;font-family:Georgia,serif">An official document for maintaining compliance with equipment operational and safety regulations</p>
-      </div>
-      <div style="text-align:right;font-size:7.5px;color:#6b7280;min-width:95px">
-        <p style="font-weight:700;color:#0a1628;font-size:8.5px">Cert Reference</p>
-        <p style="font-family:monospace;font-weight:700;color:#0a1628;background:#f8f5e4;border:1px solid rgba(201,168,76,0.5);padding:2px 7px;border-radius:3px">${cert.certNumber}</p>
-        <p style="margin-top:3px">Date Issued:</p>
-        <p style="font-weight:700;color:#0a1628">${issuedFmt}</p>
-      </div>
-    </div>
-
-    <!-- SECTION 1 -->
-    <div style="margin-top:11px">
-      ${sectionTitle('1. Equipment Details')}
-      <table style="width:100%;border-collapse:collapse;font-size:8px;margin-top:5px">
-        <thead><tr style="background:#0a1628;color:#fff">
-          ${th('Equipment Type')}${th('Manufacturer')}${th('Model No.')}${th('Last Inspection Date')}
-        </tr></thead>
-        <tbody>
-          <tr style="background:#fff">
-            <td style="border:1px solid #e5e7eb;padding:7px 10px;font-weight:700;color:#0a1628">${cert.machineName}</td>
-            <td style="border:1px solid #e5e7eb;padding:7px 10px;color:#374151">${cert.manufacturer || '—'}</td>
-            <td style="border:1px solid #e5e7eb;padding:7px 10px;color:#374151">${cert.modelNumber || '—'}</td>
-            <td style="border:1px solid #e5e7eb;padding:7px 10px;color:#374151">${inspFmt}</td>
-          </tr>
-          ${cert.machineSerial ? `<tr style="background:#f9fafb">
-            <td style="border:1px solid #e5e7eb;padding:7px 10px;color:#6b7280;font-size:8px">Serial / Registration</td>
-            <td colspan="2" style="border:1px solid #e5e7eb;padding:7px 10px;font-weight:700;color:#0a1628">${cert.machineSerial}</td>
-            <td style="border:1px solid #e5e7eb;padding:7px 10px;color:#6b7280;font-size:8px">Site: <span style="font-weight:700;color:#0a1628">${cert.machineSite}</span></td>
-          </tr>` : ''}
-        </tbody>
-      </table>
-    </div>
-
-    <!-- SECTION 2 -->
-    <div style="margin-top:11px">
-      ${sectionTitle('2. Certification Criteria')}
-      <table style="width:100%;border-collapse:collapse;font-size:8px;margin-top:5px">
-        <thead><tr style="background:#0a1628;color:#fff">
-          <th style="border:1px solid #1e3a5f;padding:7px 10px;text-align:left;font-weight:700;text-transform:uppercase;font-size:7.5px;width:32%">Criteria</th>
-          <th style="border:1px solid #1e3a5f;padding:7px 10px;text-align:left;font-weight:700;text-transform:uppercase;font-size:7.5px">Description</th>
-          <th style="border:1px solid #1e3a5f;padding:7px 10px;text-align:center;font-weight:700;text-transform:uppercase;font-size:7.5px;width:14%">Compliance</th>
-        </tr></thead>
-        <tbody>${criteriaRows}</tbody>
-      </table>
-    </div>
-
-    <!-- SECTION 3 -->
-    <div style="margin-top:11px">
-      ${sectionTitle('3. Certification Outcome')}
-      <table style="width:100%;border-collapse:collapse;font-size:8px;margin-top:5px">
-        <thead><tr style="background:#0a1628;color:#fff">
-          ${th('Equipment Type')}${th('Certification Status', 'text-align:center')}${th('Certified Until', 'text-align:center')}${th('Remarks')}
-        </tr></thead>
-        <tbody><tr style="background:#fff">
-          <td style="border:1px solid #e5e7eb;padding:9px 10px;font-weight:700;color:#0a1628">${cert.machineName}${cert.modelNumber ? ' ' + cert.modelNumber : ''}</td>
-          <td style="border:1px solid #e5e7eb;padding:9px 10px;text-align:center">
-            <span style="padding:3px 10px;border-radius:4px;font-weight:900;font-size:8px;text-transform:uppercase;background:${allCompliant ? '#d1fae5' : '#fee2e2'};color:${allCompliant ? '#065f46' : '#991b1b'};border:1px solid ${allCompliant ? '#6ee7b7' : '#fca5a5'}">${allCompliant ? '✓ Certified' : '✗ Not Certified'}</span>
-          </td>
-          <td style="border:1px solid #e5e7eb;padding:9px 10px;text-align:center;font-weight:700;color:#0a1628">${expiryFmt}</td>
-          <td style="border:1px solid #e5e7eb;padding:9px 10px;color:#374151">${cert.outcomeRemarks || '—'}</td>
-        </tr></tbody>
-      </table>
-    </div>
-
-    <!-- SECTION 4 -->
-    <div style="margin-top:11px">
-      ${sectionTitle('4. Declaration')}
-      <div style="margin-top:5px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:4px;padding:10px;font-size:8px;color:#374151;line-height:1.6;font-family:Georgia,serif;font-style:italic">
-        I hereby certify that the above-mentioned equipment has been inspected according to the company&#39;s operational standards and procedures. The information provided in this form is accurate to the best of my knowledge and belief.
-        ${cert.conditionsOfOperation ? `<p style="margin-top:5px;font-style:normal"><span style="font-weight:700;color:#0a1628">Operating Conditions:</span> ${cert.conditionsOfOperation}</p>` : ''}
-        ${cert.complianceStandards ? `<p style="margin-top:3px;font-style:normal"><span style="font-weight:700;color:#0a1628">Standards Referenced:</span> ${cert.complianceStandards}</p>` : ''}
-      </div>
-    </div>
-
-    <!-- FOOTER -->
-    <div style="margin-top:auto;padding-top:14px;border-top:2px solid #0a1628;display:flex;align-items:flex-end;justify-content:space-between;gap:14px">
-      <!-- Signature -->
-      <div style="flex:1">
-        <div style="height:36px;border-bottom:2px solid rgba(10,22,40,0.4);margin-bottom:5px"></div>
-        <p style="font-size:8.5px;font-weight:900;color:#0a1628;text-transform:uppercase;letter-spacing:0.05em">${cert.issuedByName || '____________________________'}</p>
-        <p style="font-size:7.5px;color:#6b7280;text-transform:uppercase;letter-spacing:0.1em;margin-top:2px">${cert.issuedByDesignation || ''}</p>
-        <p style="font-size:7px;color:#9ca3af;margin-top:2px">Authorized Certification Officer</p>
-      </div>
-      <!-- Seal -->
-      <div style="display:flex;flex-direction:column;align-items:center;margin-bottom:-2px">
-        <p style="font-size:5px;font-weight:900;text-transform:uppercase;letter-spacing:0.18em;color:#c9a84c;white-space:nowrap;margin-bottom:3px">✦ OFFICIAL SEAL ✦</p>
-        <div style="width:64px;height:64px;border-radius:50%;border:3px solid #c9a84c;display:flex;align-items:center;justify-content:center;background:#fff;position:relative">
-          <div style="width:54px;height:54px;border-radius:50%;border:1px solid rgba(201,168,76,0.6);display:flex;align-items:center;justify-content:center;background:#fefdf8">
-            <div style="text-align:center">${shieldSvg}<p style="font-size:4.5px;font-weight:900;color:#0a1628;text-transform:uppercase;letter-spacing:0.12em;margin-top:1px">DCEL</p></div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between">
+        <div style="display:flex;align-items:center;gap:12px;flex:1;padding-right:8px">
+          <img src="${logoSrc}" style="height:70px;max-width:150px;object-fit:contain;flex-shrink:0;margin-left:-24px" onerror="this.style.display='none'"/>
+          <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1">
+            <h1 style="font-size:10pt;font-weight:900;color:#0a1628;text-transform:uppercase;line-height:1.2;white-space:nowrap;text-align:center">${company.name}</h1>
+            <p style="font-size:8pt;color:#6b7280;margin-top:2px;text-align:center;max-width:400px;line-height:1.4">${company.address}</p>
           </div>
         </div>
-      </div>
-      <!-- Cert box -->
-      <div style="flex:1;text-align:right">
-        <div style="display:inline-block;background:#0a1628;color:#fff;padding:7px 11px;border-radius:4px;margin-bottom:3px">
-          <p style="font-size:6.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:#c9a84c">Certificate No.</p>
-          <p style="font-size:8.5px;font-weight:900;letter-spacing:0.05em;font-family:monospace">${cert.certNumber}</p>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0">
+          <div style="background:#f8f5e4;border:1px solid rgba(201,168,76,0.4);padding:2px 8px;border-radius:3px;text-align:right">
+            <p style="font-size:6.5pt;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:#c9a84c">Certificate No.</p>
+            <p style="font-family:monospace;font-weight:700;color:#0a1628;font-size:8.5pt;letter-spacing:0.05em;margin-top:2px;white-space:nowrap">${cert.certNumber}</p>
+          </div>
+          <p style="font-size:7.5pt;color:#6b7280;margin-top:4px;white-space:nowrap">Date Issued: <span style="font-weight:700;color:#0a1628">${issuedFmt}</span></p>
         </div>
-        <p style="font-size:7px;color:#6b7280;font-weight:600">${company.email}</p>
-        <p style="font-size:7px;color:#9ca3af">${company.phone}</p>
-        <p style="font-size:6.5px;color:#9ca3af;margin-top:2px">Verified ✓ &nbsp;|&nbsp; Valid until: ${expiryFmt}</p>
+      </div>
+      <div style="text-align:center;margin-top:2px">
+        <div style="height:2px;background:linear-gradient(to right,transparent,rgba(201,168,76,0.6),transparent);margin-bottom:8px"></div>
+        <h2 style="font-size:16pt;font-weight:900;color:#0a1628;text-transform:uppercase;letter-spacing:0.15em">Equipment Certification</h2>
+        <p style="font-size:10pt;color:#6b7280;margin-top:2px;font-style:italic;font-family:Georgia,serif">An official document for maintaining compliance with equipment operational and safety regulations</p>
       </div>
     </div>
-  </div>
-</div>
-<script>window.onload=function(){setTimeout(function(){window.focus();window.print();},200)};<\/script>
+
+    <!-- SECTION 1: Equipment Details -->
+    <div>
+      ${sectionTitle('Equipment Details')}
+      <div style="border:1px solid rgba(10,22,40,0.2);border-radius:4px;overflow:hidden">
+        <table>
+          <thead><tr style="${tHeadRow}">${th('Equipment Type')}${th('Manufacturer')}${th('Model No.')}${th('Last Inspection Date','border-right:none')}</tr></thead>
+          <tbody>
+            <tr style="border-bottom:1px solid rgba(10,22,40,0.1)">
+              ${tdBold(cert.machineName)}${td(cert.manufacturer||'—')}${td(cert.modelNumber||'—')}${td(inspFmt,'border-right:none')}
+            </tr>
+            ${cert.machineSerial?`<tr>${td('<span style="color:#6b7280;font-style:italic">Serial / Registration</span>')}
+              <td colspan="2" style="padding:6px 8px;font-size:9pt;font-weight:700;color:#0a1628;border-right:1px solid rgba(10,22,40,0.1)">${cert.machineSerial}</td>
+              ${td(`Site: <span style="font-weight:700;color:#0a1628">${cert.machineSite}</span>`,'border-right:none;color:#6b7280;font-style:italic')}</tr>`:''}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- SECTION 2: Certification Criteria -->
+    <div>
+      ${sectionTitle('Certification Criteria')}
+      <div style="border:1px solid rgba(10,22,40,0.2);border-radius:4px;overflow:hidden">
+        <table>
+          <thead><tr style="${tHeadRow}">${th('Criteria','width:28%')}${th('Description')}${th('Compliance','width:14%;text-align:center;border-right:none')}</tr></thead>
+          <tbody>${criteriaRows}</tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- SECTION 3: Certification Outcome -->
+    <div>
+      ${sectionTitle('Certification Outcome')}
+      <div style="border:1px solid rgba(10,22,40,0.2);border-radius:4px;overflow:hidden">
+        <table>
+          <thead><tr style="${tHeadRow}">${th('Equipment Designation')}${th('Status','text-align:center')}${th('Certified Until','text-align:center')}${th('Remarks','border-right:none')}</tr></thead>
+          <tbody><tr>
+            ${tdBold(`${cert.machineName}${cert.modelNumber?' '+cert.modelNumber:''}`)}
+            <td style="padding:6px 8px;text-align:center;border-right:1px solid rgba(10,22,40,0.1)">
+              <span style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:4px;font-weight:900;font-size:8pt;text-transform:uppercase;background:${allCompliant?'#d1fae5':'#fee2e2'};color:${allCompliant?'#065f46':'#991b1b'};border:1px solid ${allCompliant?'#6ee7b7':'#fca5a5'}">${allCompliant?'✓ Certified':'✗ Not Certified'}</span>
+            </td>
+            <td style="padding:6px 8px;text-align:center;font-weight:700;color:#0a1628;font-size:9pt;border-right:1px solid rgba(10,22,40,0.1)">${expiryFmt}</td>
+            ${td(cert.outcomeRemarks||'—','border-right:none')}
+          </tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- SECTION 4: Declaration -->
+    <div>
+      ${sectionTitle('Declaration')}
+      <div style="background:rgba(248,249,250,0.5);border:1px solid rgba(10,22,40,0.15);border-radius:4px;padding:10px;font-size:9pt;color:#374151;line-height:1.6;font-family:Georgia,serif;font-style:italic">
+        I hereby certify that the above-mentioned equipment has been thoroughly inspected in accordance with the company&#39;s operational standards, safety protocols, and applicable industry regulations. The information provided in this document is accurate to the best of my knowledge and professional judgment.
+        ${cert.conditionsOfOperation ? `<p style="margin-top:6px;font-style:normal"><span style="font-weight:700;color:#0a1628;text-transform:uppercase;font-size:8pt;letter-spacing:0.05em">Operating Conditions:</span> ${cert.conditionsOfOperation}</p>` : ''}
+        ${cert.complianceStandards ? `<p style="margin-top:4px;font-style:normal"><span style="font-weight:700;color:#0a1628;text-transform:uppercase;font-size:8pt;letter-spacing:0.05em">Standards Referenced:</span> ${cert.complianceStandards}</p>` : ''}
+      </div>
+    </div>
+
+    <!-- FOOTER: no top border — matches modal exactly -->
+    <div style="margin-top:auto;padding-top:8px;display:flex;align-items:flex-end;justify-content:space-between">
+      <!-- Signature block -->
+      <div style="display:flex;align-items:center;gap:24px">
+        <div style="width:240px">
+          <div style="height:40px;border-bottom:1px solid rgba(10,22,40,0.4);position:relative;margin-bottom:6px">
+            <span style="position:absolute;bottom:2px;right:0;font-size:7pt;color:rgba(10,22,40,0.3);font-style:italic;font-family:Georgia,serif">Sign Here</span>
+          </div>
+          <p style="font-size:10pt;font-weight:900;color:#0a1628;text-transform:uppercase;letter-spacing:0.05em;line-height:1.2">${cert.issuedByName || '____________________________'}</p>
+          <p style="font-size:8pt;color:#6b7280;text-transform:uppercase;letter-spacing:0.1em;margin-top:2px">${cert.issuedByDesignation || ''}</p>
+          <p style="font-size:8pt;color:#9ca3af;margin-top:2px">Authorized Certification Officer</p>
+        </div>
+      </div>
+      <!-- Company info -->
+      <div style="text-align:right;padding-bottom:4px">
+        <p style="font-size:9pt;font-weight:700;color:#0a1628;line-height:1.3">${company.name}</p>
+        <p style="font-size:8pt;color:#6b7280;margin-top:2px">${company.email}</p>
+        <p style="font-size:8pt;color:#6b7280">${company.phone}</p>
+        <span style="display:inline-flex;align-items:center;gap:4px;margin-top:6px;font-size:8pt;color:#065f46;font-weight:700;background:#d1fae5;border:1px solid #6ee7b7;padding:2px 8px;border-radius:999px">✓ Valid until: ${expiryFmt}</span>
+      </div>
+    </div>
+
+  </div><!-- end content -->
+</div><!-- end page -->
+<script>window.onload=function(){setTimeout(function(){window.focus();window.print();},200)};</script>
 </body></html>`;
 
-    toast.dismiss();
     const win = window.open('', '_blank', 'width=950,height=750');
     if (!win) { toast.error('Pop-up blocked — please allow pop-ups and try again'); return; }
     win.document.write(html);
     win.document.close();
+    toast.success('Print dialog opened');
   };
 
   const handleExport = () => {
@@ -398,6 +412,13 @@ export function MaintenanceManager() {
                 <h2 className="text-lg font-bold text-slate-800 dark:text-white">Issued Certificates</h2>
                 <p className="text-xs text-slate-400 mt-0.5">{maintenanceCertificates.length} certificate{maintenanceCertificates.length !== 1 ? 's' : ''} on record</p>
               </div>
+              <Button
+                size="sm"
+                className="gap-2 h-9 bg-blue-600 hover:bg-blue-700 text-white shadow-sm font-bold"
+                onClick={() => { setAssetSearch(''); setShowAssetPicker(true); }}
+              >
+                <Plus className="h-4 w-4" /> Generate Certificate
+              </Button>
             </div>
 
             {maintenanceCertificates.length === 0 ? (
@@ -407,8 +428,15 @@ export function MaintenanceManager() {
                 </div>
                 <p className="text-sm font-bold text-slate-500 dark:text-slate-400">No certificates issued yet</p>
                 <p className="text-xs text-slate-400 mt-1 max-w-xs">
-                  Generate a certificate from a machine or vehicle's detail page to get started.
+                  Click <span className="font-bold text-amber-600">Generate Certificate</span> above to issue your first one.
                 </p>
+                <Button
+                  size="sm"
+                  className="mt-4 gap-2 h-9 bg-blue-600 hover:bg-blue-700 text-white shadow-sm font-bold"
+                  onClick={() => { setAssetSearch(''); setShowAssetPicker(true); }}
+                >
+                  <Plus className="h-4 w-4" /> Generate Certificate
+                </Button>
               </div>
             ) : (
               <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
@@ -499,6 +527,77 @@ export function MaintenanceManager() {
         )}
       </div>
 
+      {/* Asset Picker Modal */}
+      {showAssetPicker && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => setShowAssetPicker(false)}>
+          <div className="bg-white dark:bg-[#0d1117] rounded-2xl border border-slate-200 dark:border-white/10 shadow-2xl w-full max-w-md mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
+            {/* Header */}
+            <div className="px-5 py-4 border-b border-slate-100 dark:border-white/5 flex items-center justify-between">
+              <div>
+                <p className="font-black text-slate-900 dark:text-white text-sm">Select Asset</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">Choose a machine or vehicle to certify</p>
+              </div>
+              <button onClick={() => setShowAssetPicker(false)} className="h-7 w-7 rounded-lg bg-slate-100 dark:bg-white/5 hover:bg-slate-200 flex items-center justify-center">
+                <span className="text-slate-500 text-lg leading-none">&times;</span>
+              </button>
+            </div>
+            {/* Search */}
+            <div className="px-4 pt-3 pb-2">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <input
+                  autoFocus
+                  value={assetSearch}
+                  onChange={e => setAssetSearch(e.target.value)}
+                  placeholder="Search machines & vehicles..."
+                  className="w-full pl-9 pr-4 py-2 rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 outline-none focus:border-blue-500/60"
+                />
+              </div>
+            </div>
+            {/* Asset List */}
+            <div className="overflow-y-auto max-h-72 px-2 pb-3">
+              {maintenanceAssets
+                .filter(a => a.name.toLowerCase().includes(assetSearch.toLowerCase()) || a.category.toLowerCase().includes(assetSearch.toLowerCase()))
+                .map(asset => (
+                  <button
+                    key={asset.id}
+                    onClick={() => { setGenerateCertAsset(asset.id); setShowAssetPicker(false); }}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-blue-50 dark:hover:bg-blue-900/10 text-left transition-colors group"
+                  >
+                    <div className="h-9 w-9 rounded-lg bg-slate-100 dark:bg-white/5 flex items-center justify-center shrink-0 group-hover:bg-blue-100 dark:group-hover:bg-blue-900/20 transition-colors">
+                      {asset.category === 'vehicle' ? <Truck className="h-4 w-4 text-slate-500 group-hover:text-blue-600" /> : <Activity className="h-4 w-4 text-slate-500 group-hover:text-blue-600" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-slate-800 dark:text-white truncate group-hover:text-blue-700 dark:group-hover:text-blue-400">{asset.name}</p>
+                      <p className="text-[11px] text-slate-400 capitalize">{asset.category} · {asset.site}</p>
+                    </div>
+                    <Award className="h-4 w-4 text-slate-300 group-hover:text-blue-500 shrink-0" />
+                  </button>
+                ))}
+              {maintenanceAssets.filter(a => a.name.toLowerCase().includes(assetSearch.toLowerCase())).length === 0 && (
+                <p className="text-center text-sm text-slate-400 py-8">No assets found</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Generate Certificate Modal (from Certificates tab) */}
+      {generateCertAsset && (() => {
+        const asset = maintenanceAssets.find(a => a.id === generateCertAsset);
+        const sessions = maintenanceSessions.filter(s => s.assets.some(a => a.assetId === generateCertAsset));
+        return asset ? (
+          <Suspense fallback={<div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40"><div className="rounded-full bg-slate-900/95 text-white px-4 py-2 text-sm">Loading certificate editor...</div></div>}>
+            <MaintenanceCertificateModal
+              asset={asset}
+              sessions={sessions}
+              isOpen={!!generateCertAsset}
+              onClose={() => setGenerateCertAsset(null)}
+            />
+          </Suspense>
+        ) : null;
+      })()}
+
       {/* Re-generate Certificate Modal */}
       {regenCert && (() => {
         const relatedAsset = maintenanceAssets.find(a => a.id === regenCert.machineId);
@@ -506,13 +605,15 @@ export function MaintenanceManager() {
           s => s.assets.some(a => a.assetId === regenCert.machineId)
         );
         return relatedAsset ? (
-          <MaintenanceCertificateModal
-            asset={relatedAsset}
-            sessions={relatedSessions}
-            isOpen={!!regenCert}
-            onClose={() => setRegenCert(null)}
-            presetCertificate={regenCert}
-          />
+          <Suspense fallback={<div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40"><div className="rounded-full bg-slate-900/95 text-white px-4 py-2 text-sm">Loading certificate editor...</div></div>}>
+            <MaintenanceCertificateModal
+              asset={relatedAsset}
+              sessions={relatedSessions}
+              isOpen={!!regenCert}
+              onClose={() => setRegenCert(null)}
+              presetCertificate={regenCert}
+            />
+          </Suspense>
         ) : null;
       })()}
     </div>

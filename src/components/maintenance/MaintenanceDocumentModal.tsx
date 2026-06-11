@@ -9,8 +9,6 @@ import { formatDisplayDate } from '@/src/lib/dateUtils';
 import { Button } from '@/src/components/ui/button';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/src/components/ui/dialog';
 import { toast } from 'sonner';
-import html2canvas from 'html2canvas';
-import { jsPDF } from 'jspdf';
 
 interface MaintenanceDocumentModalProps {
   asset: MaintenanceAsset;
@@ -104,10 +102,12 @@ export function MaintenanceDocumentModal({ asset, sessions, isOpen, onClose }: M
   const handleGeneratePdf = async () => {
     if (!printRef.current) return;
     setIsGenerating(true);
-    toast.loading('Generating report PDF...');
+    toast.info('Generating report PDF...');
 
     try {
       // Create PDF
+      const html2canvas = (await import('html2canvas')).default;
+      const { jsPDF } = await import('jspdf');
       const element = printRef.current;
       const canvas = await html2canvas(element, {
         scale: 2,
@@ -137,11 +137,9 @@ export function MaintenanceDocumentModal({ asset, sessions, isOpen, onClose }: M
 
       const fileName = `${asset.name.replace(/\s+/g, '_')}_Maintenance_Report.pdf`;
       pdf.save(fileName);
-      toast.dismiss();
       toast.success('Report downloaded successfully');
     } catch (error) {
       console.error('Failed to generate PDF:', error);
-      toast.dismiss();
       toast.error('Failed to generate report PDF');
     } finally {
       setIsGenerating(false);

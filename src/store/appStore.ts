@@ -534,6 +534,13 @@ export interface PendingInvoice {
   countOffDays?: boolean;
   technicianDuration?: number;
   technicianDurationSameAsMachine?: boolean;
+  technicianNightFee?: number;
+  technicianAccommodation?: number;
+  technicianNightDuration?: number;
+  technicianNightDurationSameAsMachine?: boolean;
+  noOfTechnicianNight?: number;
+  technicianNightCountSameAsDay?: boolean;
+  technicianAccommodationUseNightCount?: boolean;
 }
 
 export interface Invoice {
@@ -575,6 +582,13 @@ export interface Invoice {
   countOffDays?: boolean;
   technicianDuration?: number;
   technicianDurationSameAsMachine?: boolean;
+  technicianNightFee?: number;
+  technicianAccommodation?: number;
+  technicianNightDuration?: number;
+  technicianNightDurationSameAsMachine?: boolean;
+  noOfTechnicianNight?: number;
+  technicianNightCountSameAsDay?: boolean;
+  technicianAccommodationUseNightCount?: boolean;
 }
 
 export interface SalaryAdvance {

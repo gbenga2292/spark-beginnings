@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { Suspense, lazy, useMemo, useState } from 'react';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { 
   ArrowLeft, Calendar, FileText, 
@@ -21,8 +21,9 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, 
   Tooltip, ResponsiveContainer
 } from 'recharts';
-import { MaintenanceDocumentModal } from '@/src/components/maintenance/MaintenanceDocumentModal';
-import { MaintenanceCertificateModal } from '@/src/components/maintenance/MaintenanceCertificateModal';
+
+const MaintenanceDocumentModal = lazy(() => import('@/src/components/maintenance/MaintenanceDocumentModal').then(m => ({ default: m.MaintenanceDocumentModal })));
+const MaintenanceCertificateModal = lazy(() => import('@/src/components/maintenance/MaintenanceCertificateModal').then(m => ({ default: m.MaintenanceCertificateModal })));
 
 interface MaintenanceAssetDetailViewProps {
   asset: MaintenanceAsset;
@@ -455,19 +456,27 @@ export function MaintenanceAssetDetailView({ asset, onBack, onLogService }: Main
         </DialogContent>
       </Dialog>
 
-      <MaintenanceDocumentModal
-        asset={asset}
-        sessions={assetSessions}
-        isOpen={showDocumentModal}
-        onClose={() => setShowDocumentModal(false)}
-      />
+      {showDocumentModal && (
+        <Suspense fallback={<div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40"><div className="rounded-full bg-slate-900/95 text-white px-4 py-2 text-sm">Loading document preview...</div></div>}>
+          <MaintenanceDocumentModal
+            asset={asset}
+            sessions={assetSessions}
+            isOpen={showDocumentModal}
+            onClose={() => setShowDocumentModal(false)}
+          />
+        </Suspense>
+      )}
 
-      <MaintenanceCertificateModal
-        asset={asset}
-        sessions={assetSessions}
-        isOpen={showCertificateModal}
-        onClose={() => setShowCertificateModal(false)}
-      />
+      {showCertificateModal && (
+        <Suspense fallback={<div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40"><div className="rounded-full bg-slate-900/95 text-white px-4 py-2 text-sm">Loading certificate editor...</div></div>}>
+          <MaintenanceCertificateModal
+            asset={asset}
+            sessions={assetSessions}
+            isOpen={showCertificateModal}
+            onClose={() => setShowCertificateModal(false)}
+          />
+        </Suspense>
+      )}
     </div>
   );
 }

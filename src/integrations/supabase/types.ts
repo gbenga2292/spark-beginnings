@@ -63,6 +63,7 @@ export type Database = {
           hr_variables: Json | null
           id: string
           month_values: Json
+          onboarding_templates: Json | null
           paye_tax_variables: Json
           payroll_variables: Json
           super_admin_created: boolean
@@ -78,6 +79,7 @@ export type Database = {
           hr_variables?: Json | null
           id?: string
           month_values?: Json
+          onboarding_templates?: Json | null
           paye_tax_variables?: Json
           payroll_variables?: Json
           super_admin_created?: boolean
@@ -93,6 +95,7 @@ export type Database = {
           hr_variables?: Json | null
           id?: string
           month_values?: Json
+          onboarding_templates?: Json | null
           paye_tax_variables?: Json
           payroll_variables?: Json
           super_admin_created?: boolean
@@ -335,19 +338,34 @@ export type Database = {
       }
       clients: {
         Row: {
+          address: string | null
+          contact_person: string | null
+          contact_phone: string | null
           created_at: string
           id: string
           name: string
+          start_date: string | null
+          tin_number: string | null
         }
         Insert: {
+          address?: string | null
+          contact_person?: string | null
+          contact_phone?: string | null
           created_at?: string
           id?: string
           name: string
+          start_date?: string | null
+          tin_number?: string | null
         }
         Update: {
+          address?: string | null
+          contact_person?: string | null
+          contact_phone?: string | null
           created_at?: string
           id?: string
           name?: string
+          start_date?: string | null
+          tin_number?: string | null
         }
         Relationships: []
       }
@@ -363,9 +381,12 @@ export type Database = {
           follow_up_date: string | null
           follow_up_done: boolean
           id: string
+          is_internal: boolean | null
           logged_by: string
           notes: string
           outcome: string | null
+          parent_id: string | null
+          reported_by: string[] | null
           site_id: string | null
           site_name: string | null
           subject: string | null
@@ -383,9 +404,12 @@ export type Database = {
           follow_up_date?: string | null
           follow_up_done?: boolean
           id?: string
+          is_internal?: boolean | null
           logged_by?: string
           notes?: string
           outcome?: string | null
+          parent_id?: string | null
+          reported_by?: string[] | null
           site_id?: string | null
           site_name?: string | null
           subject?: string | null
@@ -403,16 +427,27 @@ export type Database = {
           follow_up_date?: string | null
           follow_up_done?: boolean
           id?: string
+          is_internal?: boolean | null
           logged_by?: string
           notes?: string
           outcome?: string | null
+          parent_id?: string | null
+          reported_by?: string[] | null
           site_id?: string | null
           site_name?: string | null
           subject?: string | null
           time?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "comm_logs_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "comm_logs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       company_expenses: {
         Row: {
@@ -509,6 +544,33 @@ export type Database = {
           },
         ]
       }
+      daily_journals: {
+        Row: {
+          created_at: string | null
+          date: string
+          general_notes: string | null
+          id: string
+          logged_by: string | null
+          workspace_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          date: string
+          general_notes?: string | null
+          id?: string
+          logged_by?: string | null
+          workspace_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          date?: string
+          general_notes?: string | null
+          id?: string
+          logged_by?: string | null
+          workspace_id?: string | null
+        }
+        Relationships: []
+      }
       department_tasks: {
         Row: {
           created_at: string
@@ -567,6 +629,51 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      dewatering_layouts: {
+        Row: {
+          areas: Json
+          background_image_url: string | null
+          components: Json
+          created_at: string
+          dimensions: Json
+          hoses: Json
+          id: string
+          levels: Json
+          lines: Json
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          areas?: Json
+          background_image_url?: string | null
+          components?: Json
+          created_at?: string
+          dimensions?: Json
+          hoses?: Json
+          id?: string
+          levels?: Json
+          lines?: Json
+          name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          areas?: Json
+          background_image_url?: string | null
+          components?: Json
+          created_at?: string
+          dimensions?: Json
+          hoses?: Json
+          id?: string
+          levels?: Json
+          lines?: Json
+          name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       disciplinary_records: {
         Row: {
@@ -705,6 +812,7 @@ export type Database = {
           start_date: string
           start_month_of_pay: string | null
           status: string
+          subject_to_pension: boolean | null
           surname: string
           tax_id: string
           tentative_start_date: string | null
@@ -752,6 +860,7 @@ export type Database = {
           start_date?: string
           start_month_of_pay?: string | null
           status?: string
+          subject_to_pension?: boolean | null
           surname: string
           tax_id?: string
           tentative_start_date?: string | null
@@ -799,6 +908,7 @@ export type Database = {
           start_date?: string
           start_month_of_pay?: string | null
           status?: string
+          subject_to_pension?: boolean | null
           surname?: string
           tax_id?: string
           tentative_start_date?: string | null
@@ -884,10 +994,15 @@ export type Database = {
           date: string
           employee_comment: string | null
           employee_id: string | null
+          evaluation_role: string | null
           id: string
+          invited_panelists: Json | null
+          main_task_id: string | null
           manager_notes: string | null
           overall_score: number | null
+          panel_conclusion: string | null
           scores: Json | null
+          session_id: string | null
           status: string | null
           type: string
           updated_at: string | null
@@ -899,10 +1014,15 @@ export type Database = {
           date: string
           employee_comment?: string | null
           employee_id?: string | null
+          evaluation_role?: string | null
           id: string
+          invited_panelists?: Json | null
+          main_task_id?: string | null
           manager_notes?: string | null
           overall_score?: number | null
+          panel_conclusion?: string | null
           scores?: Json | null
+          session_id?: string | null
           status?: string | null
           type: string
           updated_at?: string | null
@@ -914,10 +1034,15 @@ export type Database = {
           date?: string
           employee_comment?: string | null
           employee_id?: string | null
+          evaluation_role?: string | null
           id?: string
+          invited_panelists?: Json | null
+          main_task_id?: string | null
           manager_notes?: string | null
           overall_score?: number | null
+          panel_conclusion?: string | null
           scores?: Json | null
+          session_id?: string | null
           status?: string | null
           type?: string
           updated_at?: string | null
@@ -928,6 +1053,13 @@ export type Database = {
             columns: ["employee_id"]
             isOneToOne: false
             referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "evaluations_main_task_id_fkey"
+            columns: ["main_task_id"]
+            isOneToOne: false
+            referencedRelation: "main_tasks"
             referencedColumns: ["id"]
           },
         ]
@@ -983,11 +1115,96 @@ export type Database = {
         }
         Relationships: []
       }
+      interview_candidates: {
+        Row: {
+          applied_role: string
+          callback_date: string | null
+          candidate_name: string
+          created_at: string
+          cv_qualifications: Json | null
+          cv_work_experience: Json | null
+          decision: string | null
+          department: string | null
+          email: string | null
+          follow_up_interview_id: string | null
+          id: string
+          invited_by: string
+          onboarding_employee_id: string | null
+          phone: string | null
+          rejection_note: string | null
+          remarks: string | null
+          scheduled_date: string
+          scheduled_time: string | null
+          scoresheet: Json | null
+          scoresheets: Json | null
+          source: string | null
+          stage: string
+          status: string
+          updated_at: string | null
+          workspace_id: string
+        }
+        Insert: {
+          applied_role: string
+          callback_date?: string | null
+          candidate_name: string
+          created_at?: string
+          cv_qualifications?: Json | null
+          cv_work_experience?: Json | null
+          decision?: string | null
+          department?: string | null
+          email?: string | null
+          follow_up_interview_id?: string | null
+          id: string
+          invited_by: string
+          onboarding_employee_id?: string | null
+          phone?: string | null
+          rejection_note?: string | null
+          remarks?: string | null
+          scheduled_date: string
+          scheduled_time?: string | null
+          scoresheet?: Json | null
+          scoresheets?: Json | null
+          source?: string | null
+          stage?: string
+          status?: string
+          updated_at?: string | null
+          workspace_id?: string
+        }
+        Update: {
+          applied_role?: string
+          callback_date?: string | null
+          candidate_name?: string
+          created_at?: string
+          cv_qualifications?: Json | null
+          cv_work_experience?: Json | null
+          decision?: string | null
+          department?: string | null
+          email?: string | null
+          follow_up_interview_id?: string | null
+          id?: string
+          invited_by?: string
+          onboarding_employee_id?: string | null
+          phone?: string | null
+          rejection_note?: string | null
+          remarks?: string | null
+          scheduled_date?: string
+          scheduled_time?: string | null
+          scoresheet?: Json | null
+          scoresheets?: Json | null
+          source?: string | null
+          stage?: string
+          status?: string
+          updated_at?: string | null
+          workspace_id?: string
+        }
+        Relationships: []
+      }
       invoices: {
         Row: {
           amount: number
           billing_cycle: string
           client: string
+          count_off_days: boolean | null
           created_at: string
           daily_rental_cost: number | null
           daily_usage: number | null
@@ -997,18 +1214,30 @@ export type Database = {
           diesel_cost_per_ltr: number | null
           due_date: string
           duration: number | null
+          history_log: Json | null
           id: string
           installation: number | null
           invoice_number: string
+          machine_configs: Json | null
           mob_demob: number | null
           no_of_machine: number | null
           no_of_technician: number | null
+          no_of_technician_night: number | null
+          print_layout: Json | null
           project: string
           reminder_date: string
           rental_cost: number | null
           site_id: string
           site_name: string
           status: string
+          technician_accommodation: number | null
+          technician_duration: number | null
+          technician_duration_same_as_machine: boolean | null
+          technician_accommodation_use_night_count: boolean | null
+          technician_night_count_same_as_day: boolean | null
+          technician_night_duration: number | null
+          technician_night_duration_same_as_machine: boolean | null
+          technician_night_fee: number | null
           technicians_cost: number | null
           technicians_daily_rate: number | null
           total_charge: number | null
@@ -1021,6 +1250,7 @@ export type Database = {
           amount?: number
           billing_cycle?: string
           client: string
+          count_off_days?: boolean | null
           created_at?: string
           daily_rental_cost?: number | null
           daily_usage?: number | null
@@ -1030,18 +1260,30 @@ export type Database = {
           diesel_cost_per_ltr?: number | null
           due_date?: string
           duration?: number | null
+          history_log?: Json | null
           id?: string
           installation?: number | null
           invoice_number?: string
+          machine_configs?: Json | null
           mob_demob?: number | null
           no_of_machine?: number | null
           no_of_technician?: number | null
+          no_of_technician_night?: number | null
+          print_layout?: Json | null
           project?: string
           reminder_date?: string
           rental_cost?: number | null
           site_id?: string
           site_name?: string
           status?: string
+          technician_accommodation?: number | null
+          technician_duration?: number | null
+          technician_duration_same_as_machine?: boolean | null
+          technician_accommodation_use_night_count?: boolean | null
+          technician_night_count_same_as_day?: boolean | null
+          technician_night_duration?: number | null
+          technician_night_duration_same_as_machine?: boolean | null
+          technician_night_fee?: number | null
           technicians_cost?: number | null
           technicians_daily_rate?: number | null
           total_charge?: number | null
@@ -1054,6 +1296,7 @@ export type Database = {
           amount?: number
           billing_cycle?: string
           client?: string
+          count_off_days?: boolean | null
           created_at?: string
           daily_rental_cost?: number | null
           daily_usage?: number | null
@@ -1063,18 +1306,30 @@ export type Database = {
           diesel_cost_per_ltr?: number | null
           due_date?: string
           duration?: number | null
+          history_log?: Json | null
           id?: string
           installation?: number | null
           invoice_number?: string
+          machine_configs?: Json | null
           mob_demob?: number | null
           no_of_machine?: number | null
           no_of_technician?: number | null
+          no_of_technician_night?: number | null
+          print_layout?: Json | null
           project?: string
           reminder_date?: string
           rental_cost?: number | null
           site_id?: string
           site_name?: string
           status?: string
+          technician_accommodation?: number | null
+          technician_accommodation_use_night_count?: boolean | null
+          technician_duration?: number | null
+          technician_duration_same_as_machine?: boolean | null
+          technician_night_count_same_as_day?: boolean | null
+          technician_night_duration?: number | null
+          technician_night_duration_same_as_machine?: boolean | null
+          technician_night_fee?: number | null
           technicians_cost?: number | null
           technicians_daily_rate?: number | null
           total_charge?: number | null
@@ -1088,16 +1343,19 @@ export type Database = {
       leave_types: {
         Row: {
           created_at: string
+          default_days: number | null
           id: string
           name: string
         }
         Insert: {
           created_at?: string
+          default_days?: number | null
           id?: string
           name: string
         }
         Update: {
           created_at?: string
+          default_days?: number | null
           id?: string
           name?: string
         }
@@ -1430,61 +1688,172 @@ export type Database = {
       }
       main_tasks: {
         Row: {
+          approver_id: string | null
           assigned_to: string | null
           assignedTo: string | null
+          client_id: string | null
           completed_at: string | null
           created_at: string | null
           created_by: string | null
           createdBy: string | null
           deadline: string | null
+          deleted_at: string | null
           description: string | null
           id: string
           is_deleted: boolean | null
-          deleted_at: string | null
+          is_hr_task: boolean | null
           is_project: boolean | null
           priority: string | null
+          requires_approval: boolean | null
+          site_id: string | null
           teamId: string | null
           title: string | null
           updated_at: string | null
           workspaceId: string | null
         }
         Insert: {
+          approver_id?: string | null
           assigned_to?: string | null
           assignedTo?: string | null
+          client_id?: string | null
           completed_at?: string | null
           created_at?: string | null
           created_by?: string | null
           createdBy?: string | null
           deadline?: string | null
+          deleted_at?: string | null
           description?: string | null
           id?: string
           is_deleted?: boolean | null
-          deleted_at?: string | null
+          is_hr_task?: boolean | null
           is_project?: boolean | null
           priority?: string | null
+          requires_approval?: boolean | null
+          site_id?: string | null
           teamId?: string | null
           title?: string | null
           updated_at?: string | null
           workspaceId?: string | null
         }
         Update: {
+          approver_id?: string | null
           assigned_to?: string | null
           assignedTo?: string | null
+          client_id?: string | null
           completed_at?: string | null
           created_at?: string | null
           created_by?: string | null
           createdBy?: string | null
           deadline?: string | null
+          deleted_at?: string | null
           description?: string | null
           id?: string
           is_deleted?: boolean | null
-          deleted_at?: string | null
+          is_hr_task?: boolean | null
           is_project?: boolean | null
           priority?: string | null
+          requires_approval?: boolean | null
+          site_id?: string | null
           teamId?: string | null
           title?: string | null
           updated_at?: string | null
           workspaceId?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "main_tasks_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "main_tasks_site_id_fkey"
+            columns: ["site_id"]
+            isOneToOne: false
+            referencedRelation: "sites"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      maintenance_certificates: {
+        Row: {
+          cert_number: string
+          compliance_standards: string | null
+          conditions_of_operation: string | null
+          created_at: string | null
+          criteria_compliance: Json | null
+          expiry_date: string
+          id: string
+          issued_by_designation: string | null
+          issued_by_employee_id: string | null
+          issued_by_name: string
+          issued_date: string
+          issued_date_override: string | null
+          last_inspection_date_override: string | null
+          last_service_date: string | null
+          machine_category: string
+          machine_id: string
+          machine_name: string
+          machine_serial: string | null
+          machine_site: string | null
+          manufacturer: string | null
+          model_number: string | null
+          next_service_date: string | null
+          outcome_remarks: string | null
+          total_services: number | null
+        }
+        Insert: {
+          cert_number: string
+          compliance_standards?: string | null
+          conditions_of_operation?: string | null
+          created_at?: string | null
+          criteria_compliance?: Json | null
+          expiry_date: string
+          id?: string
+          issued_by_designation?: string | null
+          issued_by_employee_id?: string | null
+          issued_by_name: string
+          issued_date: string
+          issued_date_override?: string | null
+          last_inspection_date_override?: string | null
+          last_service_date?: string | null
+          machine_category: string
+          machine_id: string
+          machine_name: string
+          machine_serial?: string | null
+          machine_site?: string | null
+          manufacturer?: string | null
+          model_number?: string | null
+          next_service_date?: string | null
+          outcome_remarks?: string | null
+          total_services?: number | null
+        }
+        Update: {
+          cert_number?: string
+          compliance_standards?: string | null
+          conditions_of_operation?: string | null
+          created_at?: string | null
+          criteria_compliance?: Json | null
+          expiry_date?: string
+          id?: string
+          issued_by_designation?: string | null
+          issued_by_employee_id?: string | null
+          issued_by_name?: string
+          issued_date?: string
+          issued_date_override?: string | null
+          last_inspection_date_override?: string | null
+          last_service_date?: string | null
+          machine_category?: string
+          machine_id?: string
+          machine_name?: string
+          machine_serial?: string | null
+          machine_site?: string | null
+          manufacturer?: string | null
+          model_number?: string | null
+          next_service_date?: string | null
+          outcome_remarks?: string | null
+          total_services?: number | null
         }
         Relationships: []
       }
@@ -1634,6 +2003,318 @@ export type Database = {
         }
         Relationships: []
       }
+      operations_assets: {
+        Row: {
+          available_quantity: number
+          category: string
+          condition: string | null
+          cost: number | null
+          created_at: string | null
+          critical_stock_level: number | null
+          damaged_quantity: number | null
+          description: string | null
+          id: string
+          location: string | null
+          low_stock_level: number | null
+          missing_quantity: number | null
+          name: string
+          power_source: string | null
+          quantity: number
+          requires_logging: boolean | null
+          reserved_quantity: number
+          serial_number: string | null
+          service_interval_months: number | null
+          status: string | null
+          type: string | null
+          unit: string | null
+          updated_at: string | null
+          used_quantity: number
+        }
+        Insert: {
+          available_quantity?: number
+          category: string
+          condition?: string | null
+          cost?: number | null
+          created_at?: string | null
+          critical_stock_level?: number | null
+          damaged_quantity?: number | null
+          description?: string | null
+          id: string
+          location?: string | null
+          low_stock_level?: number | null
+          missing_quantity?: number | null
+          name: string
+          power_source?: string | null
+          quantity?: number
+          requires_logging?: boolean | null
+          reserved_quantity?: number
+          serial_number?: string | null
+          service_interval_months?: number | null
+          status?: string | null
+          type?: string | null
+          unit?: string | null
+          updated_at?: string | null
+          used_quantity?: number
+        }
+        Update: {
+          available_quantity?: number
+          category?: string
+          condition?: string | null
+          cost?: number | null
+          created_at?: string | null
+          critical_stock_level?: number | null
+          damaged_quantity?: number | null
+          description?: string | null
+          id?: string
+          location?: string | null
+          low_stock_level?: number | null
+          missing_quantity?: number | null
+          name?: string
+          power_source?: string | null
+          quantity?: number
+          requires_logging?: boolean | null
+          reserved_quantity?: number
+          serial_number?: string | null
+          service_interval_months?: number | null
+          status?: string | null
+          type?: string | null
+          unit?: string | null
+          updated_at?: string | null
+          used_quantity?: number
+        }
+        Relationships: []
+      }
+      operations_checkouts: {
+        Row: {
+          asset_id: string | null
+          asset_name: string | null
+          checkout_date: string | null
+          created_at: string | null
+          employee_id: string | null
+          employee_name: string | null
+          expected_return_date: string | null
+          id: string
+          quantity: number
+          return_in_days: number | null
+          returned_quantity: number
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          asset_id?: string | null
+          asset_name?: string | null
+          checkout_date?: string | null
+          created_at?: string | null
+          employee_id?: string | null
+          employee_name?: string | null
+          expected_return_date?: string | null
+          id: string
+          quantity?: number
+          return_in_days?: number | null
+          returned_quantity?: number
+          status: string
+          updated_at?: string | null
+        }
+        Update: {
+          asset_id?: string | null
+          asset_name?: string | null
+          checkout_date?: string | null
+          created_at?: string | null
+          employee_id?: string | null
+          employee_name?: string | null
+          expected_return_date?: string | null
+          id?: string
+          quantity?: number
+          return_in_days?: number | null
+          returned_quantity?: number
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      operations_daily_logs: {
+        Row: {
+          asset_id: string
+          asset_name: string
+          client_feedback: string | null
+          created_at: string | null
+          date: string
+          diesel_usage: number | null
+          downtime_entries: Json | null
+          id: string
+          is_active: boolean | null
+          issues_on_site: string | null
+          logged_by: string | null
+          maintenance_details: string | null
+          operational_day: string | null
+          site_id: string | null
+          site_name: string
+          supervisor_on_site: string | null
+        }
+        Insert: {
+          asset_id: string
+          asset_name: string
+          client_feedback?: string | null
+          created_at?: string | null
+          date: string
+          diesel_usage?: number | null
+          downtime_entries?: Json | null
+          id?: string
+          is_active?: boolean | null
+          issues_on_site?: string | null
+          logged_by?: string | null
+          maintenance_details?: string | null
+          operational_day?: string | null
+          site_id?: string | null
+          site_name: string
+          supervisor_on_site?: string | null
+        }
+        Update: {
+          asset_id?: string
+          asset_name?: string
+          client_feedback?: string | null
+          created_at?: string | null
+          date?: string
+          diesel_usage?: number | null
+          downtime_entries?: Json | null
+          id?: string
+          is_active?: boolean | null
+          issues_on_site?: string | null
+          logged_by?: string | null
+          maintenance_details?: string | null
+          operational_day?: string | null
+          site_id?: string | null
+          site_name?: string
+          supervisor_on_site?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "operations_daily_logs_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "operations_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "operations_daily_logs_site_id_fkey"
+            columns: ["site_id"]
+            isOneToOne: false
+            referencedRelation: "sites"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      operations_maintenance: {
+        Row: {
+          assets: Json
+          cost: number | null
+          created_at: string | null
+          date: string | null
+          description: string | null
+          id: string
+          next_service_date: string | null
+          technician: string | null
+          type: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          assets?: Json
+          cost?: number | null
+          created_at?: string | null
+          date?: string | null
+          description?: string | null
+          id: string
+          next_service_date?: string | null
+          technician?: string | null
+          type?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          assets?: Json
+          cost?: number | null
+          created_at?: string | null
+          date?: string | null
+          description?: string | null
+          id?: string
+          next_service_date?: string | null
+          technician?: string | null
+          type?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      operations_site_pump_dates: {
+        Row: {
+          asset_id: string
+          created_at: string | null
+          id: string
+          pump_start_date: string
+          pump_stop_date: string | null
+          site_id: string
+        }
+        Insert: {
+          asset_id: string
+          created_at?: string | null
+          id?: string
+          pump_start_date: string
+          pump_stop_date?: string | null
+          site_id: string
+        }
+        Update: {
+          asset_id?: string
+          created_at?: string | null
+          id?: string
+          pump_start_date?: string
+          pump_stop_date?: string | null
+          site_id?: string
+        }
+        Relationships: []
+      }
+      operations_waybills: {
+        Row: {
+          created_at: string | null
+          driver_name: string | null
+          id: string
+          issue_date: string | null
+          items: Json
+          sent_to_site_date: string | null
+          site_id: string | null
+          site_name: string | null
+          status: string
+          type: string
+          updated_at: string | null
+          vehicle: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          driver_name?: string | null
+          id: string
+          issue_date?: string | null
+          items?: Json
+          sent_to_site_date?: string | null
+          site_id?: string | null
+          site_name?: string | null
+          status: string
+          type: string
+          updated_at?: string | null
+          vehicle?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          driver_name?: string | null
+          id?: string
+          issue_date?: string | null
+          items?: Json
+          sent_to_site_date?: string | null
+          site_id?: string | null
+          site_name?: string | null
+          status?: string
+          type?: string
+          updated_at?: string | null
+          vehicle?: string | null
+        }
+        Relationships: []
+      }
       payments: {
         Row: {
           amount: number
@@ -1682,6 +2363,7 @@ export type Database = {
       pending_invoices: {
         Row: {
           client: string
+          count_off_days: boolean | null
           created_at: string
           daily_rental_cost: number
           daily_usage: number
@@ -1690,15 +2372,27 @@ export type Database = {
           diesel_cost_per_ltr: number
           duration: number
           end_date: string
+          history_log: Json | null
           id: string
           installation: number
           invoice_no: string
+          machine_configs: Json | null
           mob_demob: number
           no_of_machine: number
           no_of_technician: number
+          no_of_technician_night: number | null
+          print_layout: Json | null
           rental_cost: number
           site: string
           start_date: string
+          technician_accommodation: number | null
+          technician_duration: number | null
+          technician_duration_same_as_machine: boolean | null
+          technician_accommodation_use_night_count: boolean | null
+          technician_night_count_same_as_day: boolean | null
+          technician_night_duration: number | null
+          technician_night_duration_same_as_machine: boolean | null
+          technician_night_fee: number | null
           technicians_cost: number
           technicians_daily_rate: number
           total_charge: number
@@ -1709,6 +2403,7 @@ export type Database = {
         }
         Insert: {
           client: string
+          count_off_days?: boolean | null
           created_at?: string
           daily_rental_cost?: number
           daily_usage?: number
@@ -1717,15 +2412,27 @@ export type Database = {
           diesel_cost_per_ltr?: number
           duration?: number
           end_date?: string
+          history_log?: Json | null
           id?: string
           installation?: number
           invoice_no?: string
+          machine_configs?: Json | null
           mob_demob?: number
           no_of_machine?: number
           no_of_technician?: number
+          no_of_technician_night?: number | null
+          print_layout?: Json | null
           rental_cost?: number
           site?: string
           start_date?: string
+          technician_accommodation?: number | null
+          technician_duration?: number | null
+          technician_duration_same_as_machine?: boolean | null
+          technician_accommodation_use_night_count?: boolean | null
+          technician_night_count_same_as_day?: boolean | null
+          technician_night_duration?: number | null
+          technician_night_duration_same_as_machine?: boolean | null
+          technician_night_fee?: number | null
           technicians_cost?: number
           technicians_daily_rate?: number
           total_charge?: number
@@ -1736,6 +2443,7 @@ export type Database = {
         }
         Update: {
           client?: string
+          count_off_days?: boolean | null
           created_at?: string
           daily_rental_cost?: number
           daily_usage?: number
@@ -1744,15 +2452,27 @@ export type Database = {
           diesel_cost_per_ltr?: number
           duration?: number
           end_date?: string
+          history_log?: Json | null
           id?: string
           installation?: number
           invoice_no?: string
+          machine_configs?: Json | null
           mob_demob?: number
           no_of_machine?: number
           no_of_technician?: number
+          no_of_technician_night?: number | null
+          print_layout?: Json | null
           rental_cost?: number
           site?: string
           start_date?: string
+          technician_accommodation?: number | null
+          technician_accommodation_use_night_count?: boolean | null
+          technician_duration?: number | null
+          technician_duration_same_as_machine?: boolean | null
+          technician_night_count_same_as_day?: boolean | null
+          technician_night_duration?: number | null
+          technician_night_duration_same_as_machine?: boolean | null
+          technician_night_fee?: number | null
           technicians_cost?: number
           technicians_daily_rate?: number
           total_charge?: number
@@ -2129,7 +2849,7 @@ export type Database = {
             foreignKeyName: "reminders_main_task_id_fkey"
             columns: ["main_task_id"]
             isOneToOne: false
-            referencedRelation: "tasks"
+            referencedRelation: "main_tasks"
             referencedColumns: ["id"]
           },
           {
@@ -2275,6 +2995,50 @@ export type Database = {
           },
         ]
       }
+      site_journal_entries: {
+        Row: {
+          client_name: string | null
+          created_at: string | null
+          id: string
+          journal_id: string | null
+          logged_by: string | null
+          narration: string | null
+          site_id: string | null
+          site_name: string | null
+          workspace_id: string | null
+        }
+        Insert: {
+          client_name?: string | null
+          created_at?: string | null
+          id?: string
+          journal_id?: string | null
+          logged_by?: string | null
+          narration?: string | null
+          site_id?: string | null
+          site_name?: string | null
+          workspace_id?: string | null
+        }
+        Update: {
+          client_name?: string | null
+          created_at?: string | null
+          id?: string
+          journal_id?: string | null
+          logged_by?: string | null
+          narration?: string | null
+          site_id?: string | null
+          site_name?: string | null
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "site_journal_entries_journal_id_fkey"
+            columns: ["journal_id"]
+            isOneToOne: false
+            referencedRelation: "daily_journals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       site_transactions: {
         Row: {
           asset_id: string
@@ -2350,6 +3114,7 @@ export type Database = {
           location: string | null
           name: string
           phone: string | null
+          position: string | null
           service: string | null
           start_date: string
           status: string
@@ -2366,6 +3131,7 @@ export type Database = {
           location?: string | null
           name: string
           phone?: string | null
+          position?: string | null
           service?: string | null
           start_date?: string
           status?: string
@@ -2382,6 +3148,7 @@ export type Database = {
           location?: string | null
           name?: string
           phone?: string | null
+          position?: string | null
           service?: string | null
           start_date?: string
           status?: string
@@ -2443,20 +3210,24 @@ export type Database = {
       subtasks: {
         Row: {
           approvedBy: string | null
+          approver_id: string | null
           assigned_to: string | null
           assignedTo: string | null
+          client_id: string | null
           completed_at: string | null
           created_at: string | null
           deadline: string | null
+          deleted_at: string | null
           description: string | null
           id: string
           is_deleted: boolean | null
-          deleted_at: string | null
           main_task_id: string | null
           mainTaskId: string | null
           pendingApprovalSince: string | null
           priority: string | null
           rejectedAt: string | null
+          requires_approval: boolean | null
+          site_id: string | null
           status: string | null
           title: string | null
           updated_at: string | null
@@ -2464,20 +3235,24 @@ export type Database = {
         }
         Insert: {
           approvedBy?: string | null
+          approver_id?: string | null
           assigned_to?: string | null
           assignedTo?: string | null
+          client_id?: string | null
           completed_at?: string | null
           created_at?: string | null
           deadline?: string | null
+          deleted_at?: string | null
           description?: string | null
           id?: string
           is_deleted?: boolean | null
-          deleted_at?: string | null
           main_task_id?: string | null
           mainTaskId?: string | null
           pendingApprovalSince?: string | null
           priority?: string | null
           rejectedAt?: string | null
+          requires_approval?: boolean | null
+          site_id?: string | null
           status?: string | null
           title?: string | null
           updated_at?: string | null
@@ -2485,20 +3260,24 @@ export type Database = {
         }
         Update: {
           approvedBy?: string | null
+          approver_id?: string | null
           assigned_to?: string | null
           assignedTo?: string | null
+          client_id?: string | null
           completed_at?: string | null
           created_at?: string | null
           deadline?: string | null
+          deleted_at?: string | null
           description?: string | null
           id?: string
           is_deleted?: boolean | null
-          deleted_at?: string | null
           main_task_id?: string | null
           mainTaskId?: string | null
           pendingApprovalSince?: string | null
           priority?: string | null
           rejectedAt?: string | null
+          requires_approval?: boolean | null
+          site_id?: string | null
           status?: string | null
           title?: string | null
           updated_at?: string | null
@@ -2506,10 +3285,24 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "subtasks_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "subtasks_main_task_id_fkey"
             columns: ["main_task_id"]
             isOneToOne: false
             referencedRelation: "main_tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subtasks_site_id_fkey"
+            columns: ["site_id"]
+            isOneToOne: false
+            referencedRelation: "sites"
             referencedColumns: ["id"]
           },
         ]
@@ -2662,6 +3455,27 @@ export type Database = {
         }
         Relationships: []
       }
+      vehicle_document_types: {
+        Row: {
+          created_at: string | null
+          id: string
+          name: string
+          workspace_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          name: string
+          workspace_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          name?: string
+          workspace_id?: string | null
+        }
+        Relationships: []
+      }
       vehicle_movement_log: {
         Row: {
           arrival_time: string | null
@@ -2728,6 +3542,7 @@ export type Database = {
       vehicles: {
         Row: {
           created_at: string | null
+          documents: Json | null
           id: string
           name: string
           registration_number: string | null
@@ -2737,6 +3552,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          documents?: Json | null
           id?: string
           name: string
           registration_number?: string | null
@@ -2746,6 +3562,7 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          documents?: Json | null
           id?: string
           name?: string
           registration_number?: string | null

@@ -361,15 +361,66 @@ export function InvoiceDetailDialog({ invoice, invoiceList, open, onClose, onNav
                   <div className="font-mono font-bold text-slate-800 text-sm">₦{fmt(invoice.dailyRentalCost ?? 0)}<span className="text-xs font-normal text-slate-400">/day</span></div>
                 </div>
               )}
-              {(invoice.noOfTechnician ?? 0) > 0 && (
-                <div className="flex items-center justify-between bg-slate-50 border border-slate-100 rounded-lg px-4 py-2.5">
-                  <div className="flex items-center gap-2">
-                    <div className="h-7 w-7 rounded-full bg-amber-100 flex items-center justify-center text-amber-700 text-xs font-black">T</div>
-                    <span className="text-sm font-medium text-slate-700">{invoice.noOfTechnician} × Technician(s)</span>
+              {(invoice.noOfTechnician ?? 0) > 0 && (() => {
+                const hasNightOrAccommodation = 'technicianNightFee' in inv || 'technicianAccommodation' in inv;
+                const dayRate = invoice.techniciansDailyRate || 0;
+                const nightRate = parseFloat(inv.technicianNightFee) || 0;
+                const accommodationRate = parseFloat(inv.technicianAccommodation) || 0;
+                
+                const noOfTechnician = invoice.noOfTechnician || 0;
+                const noOfTechnicianNight = inv.technicianNightCountSameAsDay !== false
+                  ? noOfTechnician
+                  : (parseFloat(inv.noOfTechnicianNight) || 0);
+                const countsDiffer = noOfTechnician !== noOfTechnicianNight;
+                const accommodatedTechs = Math.max(noOfTechnician, noOfTechnicianNight);
+
+                const totalRate = dayRate + nightRate + accommodationRate;
+                
+                const actualTechDuration = inv.technicianDurationSameAsMachine !== false 
+                  ? invoiceDuration 
+                  : (parseFloat(inv.technicianDuration) || invoiceDuration);
+                const actualNightDuration = inv.technicianNightDurationSameAsMachine !== false 
+                  ? invoiceDuration 
+                  : (parseFloat(inv.technicianNightDuration) || invoiceDuration);
+
+                return (
+                  <div className="bg-slate-50 border border-slate-100 rounded-lg p-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="h-7 w-7 rounded-full bg-amber-100 flex items-center justify-center text-amber-700 text-xs font-black">T</div>
+                        <span className="text-sm font-semibold text-slate-700">
+                          {countsDiffer ? `${noOfTechnician} Day / ${noOfTechnicianNight} Night Crew` : `${noOfTechnician} × Technician(s)`}
+                        </span>
+                      </div>
+                      <div className="text-right">
+                        {!countsDiffer && <div className="font-mono font-bold text-slate-800 text-sm">₦{fmt(totalRate)}<span className="text-xs font-normal text-slate-400">/day total</span></div>}
+                        <div className="text-xs text-slate-500 font-medium">Cost: ₦{fmt(invoice.techniciansCost ?? 0)}</div>
+                      </div>
+                    </div>
+                    
+                    {hasNightOrAccommodation && (
+                      <div className="pl-9 pt-2 border-t border-slate-200/40 space-y-1 text-xs text-slate-500">
+                        <div className="flex justify-between">
+                          <span>Day Rate: {countsDiffer ? `${noOfTechnician} × ` : ''}₦{fmt(dayRate)}/day</span>
+                          <span className="font-medium text-slate-400">Duration: {actualTechDuration} days</span>
+                        </div>
+                        {nightRate > 0 && (
+                          <div className="flex justify-between">
+                            <span>Night Rate: {countsDiffer ? `${noOfTechnicianNight} × ` : ''}₦{fmt(nightRate)}/night</span>
+                            <span className="font-medium text-slate-400">Duration: {actualNightDuration} nights</span>
+                          </div>
+                        )}
+                        {accommodationRate > 0 && (
+                          <div className="flex justify-between">
+                            <span>Accommodation: {countsDiffer ? `${accommodatedTechs} × ` : ''}₦{fmt(accommodationRate)}/day</span>
+                            <span className="font-medium text-slate-400">Duration: {actualTechDuration} days</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
-                  <div className="font-mono font-bold text-slate-800 text-sm">₦{fmt(invoice.techniciansDailyRate ?? 0)}<span className="text-xs font-normal text-slate-400">/day</span></div>
-                </div>
-              )}
+                );
+              })()}
               {(invoice.dailyUsage ?? 0) > 0 && (
                 <div className="flex items-center justify-between bg-slate-50 border border-slate-100 rounded-lg px-4 py-2.5">
                   <div className="flex items-center gap-2">
