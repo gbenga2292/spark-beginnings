@@ -161,6 +161,7 @@ export interface AppUser {
   email: string;
   password: string; // Not used with Supabase auth, kept for interface compat
   avatar?: string;
+  signature?: string;
   avatarColor?: string;
   role?: string;
   department?: string;
@@ -380,6 +381,7 @@ export const useUserStore = create<UserStore>()(
         if (data.name !== undefined) update.name = data.name;
         if (data.email !== undefined) update.email = data.email;
         if (data.avatar !== undefined) update.avatar = data.avatar;
+        if (data.signature !== undefined) update.signature = data.signature;
         if (data.privileges !== undefined) update.privileges = data.privileges;
         if (data.isActive !== undefined) update.is_active = data.isActive;
         if (Object.keys(update).length > 0) db.updateProfile(id, update);

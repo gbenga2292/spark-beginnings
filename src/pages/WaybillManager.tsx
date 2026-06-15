@@ -9,6 +9,7 @@ import { useTheme } from '@/src/hooks/useTheme';
 import { Waybill, WaybillStatus } from '../types/operations';
 import { WaybillDetailView } from './WaybillDetailView';
 import { WaybillForm } from './WaybillForm';
+import { CreateReturnWaybill } from './CreateReturnWaybill';
 
 import { Card } from '@/src/components/ui/card';
 import { Button } from '@/src/components/ui/button';
@@ -126,6 +127,9 @@ export function WaybillManager() {
   }
 
   if (editingWaybill) {
+    if (editingWaybill.type === 'return') {
+      return <CreateReturnWaybill editWaybill={editingWaybill} onBack={() => setEditingWaybill(null)} />;
+    }
     return <WaybillForm onClose={() => setEditingWaybill(null)} editWaybill={editingWaybill} />;
   }
 
@@ -296,7 +300,7 @@ export function WaybillManager() {
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             )}
-                            {wb.status === 'sent_to_site' && canUndo && (
+                            {wb.status === 'return_completed' && canUndo && (
                               <Button variant="ghost" size="icon" className="h-8 w-8 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20"
                                 title="Undo Return Process"
                                 onClick={() => updateWaybillStatus(wb.id, 'outstanding')}>
@@ -425,7 +429,7 @@ export function WaybillManager() {
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       )}
-                      {wb.status === 'sent_to_site' && canUndo && (
+                      {wb.status === 'return_completed' && canUndo && (
                         <Button variant="ghost" size="icon" className="h-8 w-8 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20"
                           title="Undo Return Process"
                           onClick={() => updateWaybillStatus(wb.id, 'outstanding')}>

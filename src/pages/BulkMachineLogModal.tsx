@@ -22,7 +22,7 @@ interface BulkMachineLogModalProps {
 }
 
 export function BulkMachineLogModal({ isOpen, onClose, siteId, siteName, machines, date }: BulkMachineLogModalProps) {
-  const { logDailyActivity, dailyMachineLogs } = useOperations();
+  const { logDailyActivity, dailyMachineLogs, sitePumpDates } = useOperations();
   const { employees, attendanceRecords } = useAppStore();
 
   const dewateringStaff = employees.filter(e => 
@@ -220,10 +220,17 @@ export function BulkMachineLogModal({ isOpen, onClose, siteId, siteName, machine
       }
 
       const promises = datesToLog.flatMap(logDate => {
-        return machines.map(m => {
+        return machines.flatMap(m => {
+          // Skip if date is outside the configured pump date range
+          const pd = sitePumpDates?.find(p => p.assetId === m.id && p.siteId === siteId);
+          if (pd && pd.pumpStartDate) {
+            if (logDate < pd.pumpStartDate) return [];
+            if (pd.pumpStopDate && logDate > pd.pumpStopDate) return [];
+          }
+
           const data = machineData[m.id] || { operationalDay: 'full' as OperationalDay, dieselUsage: '' };
           const isActive = data.operationalDay !== 'none';
-          return logDailyActivity({
+          return [logDailyActivity({
             assetId: m.id,
             assetName: m.name,
             siteId,
@@ -237,7 +244,7 @@ export function BulkMachineLogModal({ isOpen, onClose, siteId, siteName, machine
             maintenanceDetails: isActive ? maintenanceDetails : '',
             supervisorOnSite: isActive ? supervisorOnSite : '',
             downtimeEntries: []
-          });
+          })];
         });
       });
 

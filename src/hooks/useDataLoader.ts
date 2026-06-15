@@ -125,16 +125,37 @@ export function useDataLoader(isAuthenticated: boolean) {
           processedDeptTasks.push({ department: 'ALL', onboardingTasks: [], offboardingTasks: [...DEFAULT_OFFBOARDING_TASKS] });
         }
 
+        // Pre-populate clientContacts from commLogs
+        const uniqueContacts = new Map<string, any>();
+        (appData.commLogs || []).forEach((l: any) => {
+          if (l.isInternal || !l.contactPerson || !l.client) return;
+          const key = `${l.client.trim().toLowerCase()}||${l.contactPerson.trim().toLowerCase()}`;
+          if (!uniqueContacts.has(key)) {
+            uniqueContacts.set(key, {
+              id: generateId(),
+              name: l.contactPerson.trim(),
+              clientName: l.client.trim(),
+              siteIds: l.siteId ? [l.siteId] : [],
+              siteNames: l.siteName ? [l.siteName] : [],
+              isActive: true,
+              createdAt: l.date || new Date().toISOString(),
+              updatedAt: l.date || new Date().toISOString(),
+            });
+          } else {
+            const existing = uniqueContacts.get(key)!;
+            if (l.siteId && !existing.siteIds.includes(l.siteId)) existing.siteIds.push(l.siteId);
+            if (l.siteName && !existing.siteNames.includes(l.siteName)) existing.siteNames.push(l.siteName);
+          }
+        });
+        const clientContacts = Array.from(uniqueContacts.values());
+
         // Build the app state payload
         const appStatePayload = {
           commLogs: appData.commLogs || [],
+          clientContacts,
           sites: appData.sites,
           clients: appData.clients,
           clientProfiles: appData.clientProfiles || [],
-          employees: appData.employees,
-          attendanceRecords: appData.attendanceRecords,
-          invoices: appData.invoices,
-          pendingInvoices: appData.pendingInvoices,
           salaryAdvances: appData.salaryAdvances,
           loans: appData.loans,
           payments: appData.payments,
@@ -157,21 +178,10 @@ export function useDataLoader(isAuthenticated: boolean) {
           })(),
           disciplinaryRecords: appData.disciplinaryRecords,
           evaluations: appData.evaluations,
-          companyExpenses: appData.companyExpenses,
           positions: appData.positions.length > 0 ? appData.positions : useAppStore.getState().positions,
           departments: appData.departments.length > 0 ? appData.departments : useAppStore.getState().departments,
           pendingSites: appData.pendingSites || [],
-          // ── Ledger variables ───────────────────────────────────────────
-          ledgerCategories: appData.ledgerCategories.length > 0 ? appData.ledgerCategories : useAppStore.getState().ledgerCategories,
-          ledgerVendors: appData.ledgerVendors.length > 0 ? appData.ledgerVendors : useAppStore.getState().ledgerVendors,
-          ledgerBanks: appData.ledgerBanks.length > 0 ? appData.ledgerBanks : useAppStore.getState().ledgerBanks,
-          ledgerBeneficiaryBanks: appData.ledgerBeneficiaryBanks.length > 0 ? appData.ledgerBeneficiaryBanks : useAppStore.getState().ledgerBeneficiaryBanks,
-          ledgerEntries: appData.ledgerEntries || [],
           staffMeritRecords: appData.staffMeritRecords || [],
-          dailyJournals: appData.dailyJournals || [],
-          siteJournalEntries: appData.siteJournalEntries || [],
-          vehicles: appData.vehicles || [],
-          vehicleTrips: appData.vehicleTrips || [],
           vehicleDocumentTypes: appData.vehicleDocumentTypes || [],
           interviewCandidates: appData.interviewCandidates || [],
           ...(appData.payrollVariables ? { payrollVariables: appData.payrollVariables as any } : {}),
@@ -180,7 +190,7 @@ export function useDataLoader(isAuthenticated: boolean) {
           // Mark the current year as fully loaded (all pages fetched via pagination).
           // This prevents fetchAttendanceYearIfNeeded from re-fetching on first navigation
           // while still allowing lazy loads for past years (e.g. 2025) on demand.
-          loadedAttendanceYears: [new Date().getFullYear()],
+          loadedAttendanceYears: [],
         };
 
         // Hydrate appStore
@@ -307,23 +317,26 @@ export function useRealtimeData(isAuthenticated: boolean) {
   useEffect(() => {
     if (!isAuthenticated) return;
 
-    // We create a global channel to listen to all public schema changes
-    // Alternatively, you can create one channel per table
-    const channel = supabase
-      .channel('app-realtime-global')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public' },
-        (payload) => {
-          const table = payload.table;
-          const eventType = payload.eventType;
-          const newRow = payload.new as Record<string, any>;
-          const oldRow = payload.old as Record<string, any>;
+    const ACTIVE_TABLES = [
+      'employees', 'attendance_records', 'profiles', 'payments', 'vat_payments', 'comm_logs', 
+      'company_expenses', 'pending_sites', 'clients', 'ledger_categories', 
+      'ledger_vendors', 'ledger_banks', 'ledger_beneficiary_banks', 'ledger_entries', 
+      'daily_journals', 'site_journal_entries', 'vehicles', 'vehicle_movement_log', 
+      'vehicle_document_types', 'interview_candidates', 'positions', 'departments', 
+      'leave_types', 'public_holidays', 'department_tasks', 'staff_merit_record', 
+      'privilege_presets', 'app_settings'
+    ];
 
-          // Task-related tables are exclusively managed by AppDataContext's own
-          // realtime channel ('app-realtime'). Skip them here to avoid double-processing.
-          const TASK_TABLES = ['main_tasks', 'subtasks', 'task_updates', 'reminders'];
-          if (TASK_TABLES.includes(table)) return;
+    const handler = (payload: any) => {
+      const table = payload.table;
+      const eventType = payload.eventType;
+      const newRow = payload.new as Record<string, any>;
+      const oldRow = payload.old as Record<string, any>;
+
+      // Task-related tables are exclusively managed by AppDataContext's own
+      // realtime channel ('app-realtime'). Skip them here to avoid double-processing.
+      const TASK_TABLES = ['main_tasks', 'subtasks', 'task_updates', 'reminders'];
+      if (TASK_TABLES.includes(table)) return;
 
           // Helper to get current state safely
           const appState = useAppStore.getState();
@@ -494,7 +507,11 @@ export function useRealtimeData(isAuthenticated: boolean) {
 
                   // Case 2: Privileges were changed → update store (ProtectedRoute
                   // automatically re-checks on next render). Show a notification.
-                  if (newRow.privileges) {
+                  const oldUser = currentUsers.find(u => u.id === updated.id);
+                  const normalizedOld = JSON.stringify(backfillPrivileges(NO_ACCESS, oldUser?.privileges || {}));
+                  const normalizedNew = JSON.stringify(backfillPrivileges(NO_ACCESS, updated.privileges || {}));
+
+                  if (normalizedOld !== normalizedNew) {
                     console.warn('[Auth] Current user privileges were updated by an admin.');
                     // Dispatch a browser custom event so the UI can show a toast/banner
                     window.dispatchEvent(new CustomEvent('privileges-updated', {
@@ -544,7 +561,45 @@ export function useRealtimeData(isAuthenticated: boolean) {
               const current = appState.commLogs;
               if (eventType === 'INSERT') {
                 if (!current.some(l => l.id === newRow.id)) {
-                  useAppStore.setState({ commLogs: [...current, dbToCommLog(newRow)] });
+                  const log = dbToCommLog(newRow);
+                  const updatedLogs = [...current, log];
+                  
+                  // Update clientContacts dynamically in store
+                  let updatedContacts = [...appState.clientContacts];
+                  if (!log.isInternal && log.contactPerson && log.client) {
+                    const contactName = log.contactPerson.trim();
+                    const clientName = log.client.trim();
+                    const contactLower = contactName.toLowerCase();
+                    const clientLower = clientName.toLowerCase();
+                    
+                    const existingIdx = updatedContacts.findIndex(
+                      c => c.clientName.trim().toLowerCase() === clientLower && c.name.trim().toLowerCase() === contactLower
+                    );
+                    
+                    if (existingIdx === -1) {
+                      updatedContacts.push({
+                        id: generateId(),
+                        name: contactName,
+                        clientName: clientName,
+                        siteIds: log.siteId ? [log.siteId] : [],
+                        siteNames: log.siteName ? [log.siteName] : [],
+                        isActive: true,
+                        createdAt: log.date || new Date().toISOString(),
+                        updatedAt: log.date || new Date().toISOString(),
+                      });
+                    } else {
+                      const existing = updatedContacts[existingIdx];
+                      const newSiteIds = log.siteId && !existing.siteIds.includes(log.siteId) ? [...existing.siteIds, log.siteId] : existing.siteIds;
+                      const newSiteNames = log.siteName && !existing.siteNames.includes(log.siteName) ? [...existing.siteNames, log.siteName] : existing.siteNames;
+                      updatedContacts[existingIdx] = {
+                        ...existing,
+                        siteIds: newSiteIds,
+                        siteNames: newSiteNames,
+                        updatedAt: new Date().toISOString(),
+                      };
+                    }
+                  }
+                  useAppStore.setState({ commLogs: updatedLogs, clientContacts: updatedContacts });
                 }
               } else if (eventType === 'UPDATE') {
                 const updated = dbToCommLog(newRow);
@@ -895,15 +950,21 @@ export function useRealtimeData(isAuthenticated: boolean) {
               break;
             }
           }
-        }
-      )
-      .subscribe((status, err) => {
-        if (err) {
-          console.error("Error setting up realtime:", err);
-        } else {
-          console.log("Realtime subscription status:", status);
-        }
-      });
+    };
+
+    let channel = supabase.channel('app-realtime-global');
+
+    ACTIVE_TABLES.forEach(t => {
+      channel = channel.on('postgres_changes', { event: '*', schema: 'public', table: t }, handler);
+    });
+
+    channel.subscribe((status, err) => {
+      if (err) {
+        console.error("Error setting up realtime:", err);
+      } else {
+        console.log("Realtime subscription status:", status);
+      }
+    });
 
     return () => {
       supabase.removeChannel(channel);

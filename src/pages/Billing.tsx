@@ -5,7 +5,7 @@ import InvoiceLogo from '../../logo/logo-2.png';
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction, AlertDialogCancel } from '@/src/components/task_ui/alert-dialog';
 import { useAppStore, PendingInvoice, Invoice } from '@/src/store/appStore';
 import { toast, showConfirm } from '@/src/components/ui/toast';
-import { Trash2, Edit, CheckCircle, Plus, X, ArrowRightCircle, Upload, Download, Mail, ChevronUp, ChevronDown, ChevronRight, Printer, PlusCircle, ArrowLeft, Save, FileText, Layers, Users, Settings, Truck, Info } from 'lucide-react';
+import { Trash2, Edit, CheckCircle, Plus, X, ArrowRightCircle, Upload, Download, Mail, ChevronUp, ChevronDown, ChevronRight, Printer, PlusCircle, ArrowLeft, Save, FileText, Layers, Users, Settings, Truck, Info, Calculator } from 'lucide-react';
 import { Input } from '@/src/components/ui/input';
 import { Button } from '@/src/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
@@ -13,13 +13,16 @@ import { Badge } from '@/src/components/ui/badge';
 import { usePriv } from '@/src/hooks/usePriv';
 import { useAppData } from '@/src/contexts/AppDataContext';
 import { useAuth } from '@/src/hooks/useAuth';
-import { useSetPageTitle } from '@/src/contexts/PageContext';
+import { useSetPageTitle, useHideLayout } from '@/src/contexts/PageContext';
 import { generateId, cn } from '@/src/lib/utils';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel } from '@/src/components/ui/dropdown-menu';
 import { NumericFormat } from 'react-number-format';
 import { supabase } from '@/src/integrations/supabase/client';
 import { InvoiceDetailDialog } from './InvoiceDetailDialog';
+import { LogisticsEstimatorDialog } from './LogisticsEstimatorDialog';
+import { fetchInvoicesData } from '@/src/lib/supabaseService';
 import { useOperations } from '@/src/contexts/OperationsContext';
+
 
 export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: string; setFullPageContent?: (content: React.ReactNode) => void }) {
   const sites = useAppStore((state) => state.sites);
@@ -73,6 +76,19 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
   const [nextInvoiceSource, setNextInvoiceSource] = useState<Invoice | null>(null);
   const [selectedNextMachines, setSelectedNextMachines] = useState<number[]>([]);
   const [detailInvoice, setDetailInvoice] = useState<Invoice | null>(null);
+  const [showEstimator, setShowEstimator] = useState(false);
+
+  React.useEffect(() => {
+    if (invoices.length === 0 && pendingInvoices.length === 0) {
+      fetchInvoicesData()
+        .then((data) => {
+          useAppStore.setState(data);
+        })
+        .catch((err) => {
+          console.error('[Billing] Failed to load invoices:', err);
+        });
+    }
+  }, [invoices.length, pendingInvoices.length]);
 
 
   // ── Master Site Registry ────────────────────────────────────
@@ -1282,6 +1298,15 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
            </div>
         </div>
       );
+    } else if (showEstimator && setFullPageContent) {
+      setFullPageContent(
+        <div className="flex flex-col w-full h-full mx-auto px-2 pb-4 pt-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
+          <LogisticsEstimatorDialog
+            open={true}
+            onClose={() => setShowEstimator(false)}
+          />
+        </div>
+      );
     } else if (setFullPageContent) {
       setFullPageContent(null);
     }
@@ -1289,11 +1314,13 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
     return () => {
       if (setFullPageContent) setFullPageContent(null);
     };
-  }, [printInvoiceTarget, setFullPageContent, ledgerBanks, ledgerBeneficiaryBanks]);
+  }, [printInvoiceTarget, showEstimator, setFullPageContent, ledgerBanks, ledgerBeneficiaryBanks]);
+
+  useHideLayout(!!printInvoiceTarget || showEstimator);
 
   useSetPageTitle(
-    printInvoiceTarget ? null : (activeTab === 'all' ? 'All Invoices' : activeTab === 'active' ? 'Active Invoices' : activeTab === 'quotations' ? 'Quotations' : activeTab === 'unpaid' ? 'Unpaid Site Records' : 'Completed Invoices'),
-    printInvoiceTarget ? '' : (activeTab === 'all'
+    (printInvoiceTarget || showEstimator) ? null : (activeTab === 'all' ? 'All Invoices' : activeTab === 'active' ? 'Active Invoices' : activeTab === 'quotations' ? 'Quotations' : activeTab === 'unpaid' ? 'Unpaid Site Records' : 'Completed Invoices'),
+    (printInvoiceTarget || showEstimator) ? '' : (activeTab === 'all'
       ? 'View every historical invoice record'
       : activeTab === 'active'
       ? 'Invoices for sites currently in progress'
@@ -1302,7 +1329,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
       : activeTab === 'quotations' 
       ? 'Review and process quotation drafts'
       : 'Review invoices for sites with consolidated payments'),
-    printInvoiceTarget ? null : (
+    (printInvoiceTarget || showEstimator) ? null : (
       <>
       {priv.canExport && (
         <DropdownMenu>
@@ -1344,8 +1371,18 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
           <Plus className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Create Invoice</span>
         </Button>
       )}
+      {priv.canCreate && (
+        <Button
+          size="sm"
+          className="gap-2 h-9 px-3 bg-amber-500 hover:bg-amber-600 text-white font-bold text-[11px] uppercase tracking-tight shadow-md transition-all active:scale-95"
+          onClick={() => setShowEstimator(true)}
+          title="Logistics Estimator"
+        >
+          <Calculator className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Estimator</span>
+        </Button>
+      )}
       </>),
-    [activeTab, priv, siteRegistry, pendingInvoices, completedSites, unpaidSites, currentList, printInvoiceTarget]
+    [activeTab, priv, siteRegistry, pendingInvoices, completedSites, unpaidSites, currentList, printInvoiceTarget, showEstimator]
   );
 
   return (
@@ -3013,16 +3050,117 @@ export function InvoicePrintModal({ invoice, onClose, ledgerBanks, ledgerBenefic
     return defaultAddress;
   };
 
+  const getInitialProjectText = () => {
+    if (invoice.printLayout?.projectText) return invoice.printLayout.projectText;
+    const clientName = invoice.client;
+    if (!clientName) return 'DCEL- SED';
+    
+    const cleanName = clientName.replace(/[^a-zA-Z0-9\s]/g, '');
+    let words = cleanName.trim().split(/\s+/).filter(Boolean);
+    
+    const suffixes = ['limited', 'ltd', 'plc', 'incorporated', 'inc', 'co', 'company', 'corp', 'corporation'];
+    const filteredWords = words.filter(w => !suffixes.includes(w.toLowerCase()));
+    if (filteredWords.length > 0) {
+      words = filteredWords;
+    }
+    
+    let abbreviation = '';
+    if (words.length >= 3) {
+      abbreviation = words.map(w => w[0]).join('').toUpperCase();
+    } else if (words.length === 2) {
+      const first = words[0];
+      const second = words[1];
+      const part1 = first.substring(0, Math.min(2, first.length));
+      const part2 = second.substring(0, Math.max(1, 3 - part1.length));
+      abbreviation = (part1 + part2).toUpperCase();
+    } else if (words.length === 1) {
+      const word = words[0];
+      abbreviation = word.substring(0, Math.min(3, word.length)).toUpperCase().padEnd(3, 'X');
+    } else {
+      abbreviation = 'SED';
+    }
+    
+    return `DCEL- ${abbreviation}`;
+  };
+
+  const getInitialPaymentsCredits = () => {
+    if (invoice.printLayout?.paymentsCredits !== undefined) {
+      return invoice.printLayout.paymentsCredits;
+    }
+
+    const allPayments = useAppStore.getState().payments || [];
+    const invClient = (invoice.client || '').trim().toLowerCase();
+    const invSite = ((invoice as any).siteName || (invoice as any).site || '').trim().toLowerCase();
+    
+    // Filter payments for this client and site
+    const clientSitePayments = allPayments.filter(p => 
+      p.client?.trim().toLowerCase() === invClient &&
+      p.site?.trim().toLowerCase() === invSite
+    );
+
+    if (clientSitePayments.length === 0) return 0;
+
+    // Filter all invoices for this client and site
+    const allInvoices = [
+      ...(useAppStore.getState().invoices || []),
+      ...(useAppStore.getState().pendingInvoices || [])
+    ];
+    
+    const clientSiteInvoices = allInvoices.filter(i => 
+      i.client?.trim().toLowerCase() === invClient &&
+      (((i as any).siteName || (i as any).site || '').trim().toLowerCase() === invSite)
+    );
+
+    // Sort chronologically by date
+    const sortedInvs = [...clientSiteInvoices].sort((a, b) => {
+      const dateAStr = (a as any).date || (a as any).startDate || '';
+      const dateBStr = (b as any).date || (b as any).startDate || '';
+      const dateA = dateAStr ? new Date(normalizeDate(dateAStr)).getTime() : 0;
+      const dateB = dateBStr ? new Date(normalizeDate(dateBStr)).getTime() : 0;
+      return dateA - dateB;
+    });
+
+    const curIndex = sortedInvs.findIndex(i => i.id === invoice.id);
+    if (curIndex === -1) return 0;
+
+    const curInvDateStr = (sortedInvs[curIndex] as any).date || (sortedInvs[curIndex] as any).startDate || '';
+    const curInvDate = curInvDateStr ? new Date(normalizeDate(curInvDateStr)).getTime() : 0;
+    
+    // Window starts 5 days before this invoice date
+    const windowStart = curInvDate - (5 * 24 * 60 * 60 * 1000);
+    
+    // Window ends 5 days before the next invoice date (if one exists)
+    let windowEnd = Infinity;
+    if (curIndex < sortedInvs.length - 1) {
+      const nextInvDateStr = (sortedInvs[curIndex + 1] as any).date || (sortedInvs[curIndex + 1] as any).startDate || '';
+      const nextInvDate = nextInvDateStr ? new Date(normalizeDate(nextInvDateStr)).getTime() : 0;
+      windowEnd = nextInvDate - (5 * 24 * 60 * 60 * 1000);
+    }
+
+    // Filter payments in this window
+    const matchedPayments = clientSitePayments.filter(p => {
+      const pDate = p.date ? new Date(normalizeDate(p.date)).getTime() : 0;
+      return pDate >= windowStart && pDate < windowEnd;
+    });
+
+    if (matchedPayments.length > 0) {
+      return matchedPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
+    }
+
+    return 0;
+  };
+
   const [billedToInput, setBilledToInput] = useState(getInitialBilledTo());
   const [paidToInput, setPaidToInput] = useState(invoice.printLayout?.paidToInput || 'STANBIC IBTC BANK\n0021939731\nDewatering Construction etc Limited');
-  const [projectText, setProjectText] = useState(invoice.printLayout?.projectText || 'DCEL- SED');
+  const [projectText, setProjectText] = useState(getInitialProjectText());
   const [termsText, setTermsText] = useState(invoice.printLayout?.termsText || 'For Immediate Payment');
   
   const [invoiceDate, setInvoiceDate] = useState(invoice.printLayout?.invoiceDate || invoice.date || invoice.startDate || '');
   const [invoiceNo, setInvoiceNo] = useState(invoice.printLayout?.invoiceNo || invoice.invoiceNumber || invoice.invoiceNo || '');
-  const [paymentsCredits, setPaymentsCredits] = useState<number>(invoice.printLayout?.paymentsCredits || 0);
+  const [paymentsCredits, setPaymentsCredits] = useState<number>(getInitialPaymentsCredits());
   
   const [combineDiesel, setCombineDiesel] = useState(invoice.printLayout?.combineDiesel || false);
+  const [combineIdenticalPumps, setCombineIdenticalPumps] = useState(invoice.printLayout?.combineIdenticalPumps || false);
 
   const generateDieselItems = (combine: boolean, maxMachineDuration: number) => {
     const list: any[] = [];
@@ -3134,6 +3272,69 @@ export function InvoicePrintModal({ invoice, onClose, ledgerBanks, ledgerBenefic
       const nextItems = [...nonDieselItems];
       nextItems.splice(insertIndex, 0, ...newDiesels);
       return nextItems;
+    });
+  };
+
+  // Helper: merge rental items that share the same unitRate into qty>1 lines
+  const applyIdenticalPumpMerge = (allItems: any[], combine: boolean): any[] => {
+    if (!combine) return allItems;
+    const rentals = allItems.filter(i => i.type === 'rental');
+    const others  = allItems.filter(i => i.type !== 'rental');
+    // Group rentals by unitRate (same rate+duration produces same unitRate)
+    const groups = new Map<number, any[]>();
+    rentals.forEach(r => {
+      const key = r.unitRate;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(r);
+    });
+    const merged: any[] = [];
+    groups.forEach((group) => {
+      if (group.length === 1) {
+        merged.push(group[0]);
+      } else {
+        const base = group[0];
+        const n = group.length;
+        // Rewrite description: replace "Pump N: Lease of 1" with "Lease of N"
+        const newDesc = base.desc
+          .replace(/^Pump \d+: Lease of 1 /i, `Lease of ${n} `)
+          .replace(/Pump \d+: /i, '');
+        merged.push({
+          ...base,
+          desc: newDesc,
+          qty: n,
+          amount: base.unitRate * n,
+        });
+      }
+    });
+    // Rebuild: rentals first, then others
+    return [...merged, ...others];
+  };
+
+  const handleToggleCombineIdenticalPumps = (checked: boolean) => {
+    setCombineIdenticalPumps(checked);
+    setItems(prev => {
+      // First, fully expand any previously merged rental back to individual lines
+      const expanded: any[] = [];
+      prev.forEach(item => {
+        if (item.type === 'rental' && item.qty > 1) {
+          // re-expand into individual pump lines
+          for (let i = 0; i < item.qty; i++) {
+            expanded.push({
+              ...item,
+              id: generateId(),
+              desc: item.desc
+                .replace(/Lease of \d+ /i, 'Lease of 1 ')
+                .replace(/^/, `Pump ${i + 1}: `),
+              qty: 1,
+              amount: item.unitRate,
+            });
+          }
+        } else {
+          expanded.push(item);
+        }
+      });
+      if (!checked) return expanded;
+      return applyIdenticalPumpMerge(expanded, true);
     });
   };
 
@@ -3328,16 +3529,17 @@ export function InvoicePrintModal({ invoice, onClose, ledgerBanks, ledgerBenefic
       invoiceDate: invoice.printLayout?.invoiceDate || invoice.date || invoice.startDate || '',
       invoiceNo: invoice.printLayout?.invoiceNo || invoice.invoiceNumber || invoice.invoiceNo || '',
       customWords: invoice.printLayout?.customWords || null,
-      paymentsCredits: invoice.printLayout?.paymentsCredits || 0,
+      paymentsCredits: getInitialPaymentsCredits(),
       footerCompany: invoice.printLayout?.footerCompany || 'DEWATERING CONSTRUCTION ETC LIMITED',
       footerContact: invoice.printLayout?.footerContact || '09030002182, 08028280712',
       footerEmail: invoice.printLayout?.footerEmail || 'info@dewaterconstruct.com',
       footerText: invoice.printLayout?.footerText || 'We look forward to your swift response.',
       billedToInput: getInitialBilledTo(),
       paidToInput: invoice.printLayout?.paidToInput || 'STANBIC IBTC BANK\n0021939731\nDewatering Construction etc Limited',
-      projectText: invoice.printLayout?.projectText || 'DCEL- SED',
+      projectText: getInitialProjectText(),
       termsText: invoice.printLayout?.termsText || 'For Immediate Payment',
       combineDiesel: invoice.printLayout?.combineDiesel || false,
+      combineIdenticalPumps: invoice.printLayout?.combineIdenticalPumps || false,
     })
   );
 
@@ -3345,7 +3547,7 @@ export function InvoicePrintModal({ invoice, onClose, ledgerBanks, ledgerBenefic
     items, invoiceDate, invoiceNo, customWords, paymentsCredits,
     footerCompany, footerContact, footerEmail, footerText,
     billedToInput, paidToInput, projectText, termsText,
-    combineDiesel,
+    combineDiesel, combineIdenticalPumps,
   });
 
   const hasUnsavedChanges = currentSnapshot !== initialSnapshot.current;
@@ -3510,6 +3712,7 @@ export function InvoicePrintModal({ invoice, onClose, ledgerBanks, ledgerBenefic
       projectText,
       termsText,
       combineDiesel,
+      combineIdenticalPumps,
     };
 
     const actionLog = {
@@ -3700,6 +3903,15 @@ export function InvoicePrintModal({ invoice, onClose, ledgerBanks, ledgerBenefic
               className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
             />
             Combine Diesel Supply Items
+          </label>
+          <label className="flex items-center gap-2.5 text-xs font-bold text-slate-600 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={combineIdenticalPumps}
+              onChange={(e) => handleToggleCombineIdenticalPumps(e.target.checked)}
+              className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+            />
+            Combine Identical Pump Items
           </label>
         </div>
         <div className="text-[11px] text-slate-400 font-medium">
@@ -4006,28 +4218,8 @@ export function InvoicePrintModal({ invoice, onClose, ledgerBanks, ledgerBenefic
                 );
               })()}
 
-              {/* ── TOTAL AMOUNT IN WORD — standalone paragraph below table ── */}
-              <div style={{ marginTop: 14, fontSize: 12 }}>
-                <textarea
-                  className="hide-on-print"
-                  value={wordsValue}
-                  onChange={e => setCustomWords(e.target.value)}
-                  style={{ width: '100%', minHeight: '40px', border: '1px dashed #c7d2e0', padding: '5px 8px', fontWeight: 'bold', borderRadius: 3, outline: 'none', background: '#f9fafb', fontFamily: 'inherit', fontSize: 12 }}
-                />
-                <span className="show-on-print" style={{ display: 'none', fontWeight: 'bold', fontSize: '12px' }}>{wordsValue}</span>
-              </div>
-
-              {/* ── Footer note + Payments / Balance Due ── */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 24, marginTop: 14 }}>
-                <div style={{ flex: 1 }}>
-                  <input
-                    className="hide-on-print"
-                    value={footerText}
-                    onChange={e => setFooterText(e.target.value)}
-                    style={{ width: '100%', border: '1px dashed #c7d2e0', padding: '4px 6px', borderRadius: 3, outline: 'none', background: '#f9fafb', fontSize: 12, fontFamily: 'inherit' }}
-                  />
-                  <span className="show-on-print" style={{ display: 'none', fontSize: '12px' }}>{footerText}</span>
-                </div>
+              {/* ── Payments / Balance Due Table (Right-aligned) ── */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14 }}>
                 <table style={{ borderCollapse: 'collapse', fontSize: 12, flexShrink: 0 }}>
                   <tbody>
                     <tr>
@@ -4051,6 +4243,28 @@ export function InvoicePrintModal({ invoice, onClose, ledgerBanks, ledgerBenefic
                     </tr>
                   </tbody>
                 </table>
+              </div>
+
+              {/* ── TOTAL AMOUNT IN WORD — standalone paragraph below table ── */}
+              <div style={{ marginTop: 14, fontSize: 12 }}>
+                <textarea
+                  className="hide-on-print"
+                  value={wordsValue}
+                  onChange={e => setCustomWords(e.target.value)}
+                  style={{ width: '100%', minHeight: '40px', border: '1px dashed #c7d2e0', padding: '5px 8px', fontWeight: 'bold', borderRadius: 3, outline: 'none', background: '#f9fafb', fontFamily: 'inherit', fontSize: 12 }}
+                />
+                <span className="show-on-print" style={{ display: 'none', fontWeight: 'bold', fontSize: '12px' }}>{wordsValue}</span>
+              </div>
+
+              {/* ── Footer note ── */}
+              <div style={{ marginTop: 14 }}>
+                <input
+                  className="hide-on-print"
+                  value={footerText}
+                  onChange={e => setFooterText(e.target.value)}
+                  style={{ width: '100%', border: '1px dashed #c7d2e0', padding: '4px 6px', borderRadius: 3, outline: 'none', background: '#f9fafb', fontSize: 12, fontFamily: 'inherit' }}
+                />
+                <span className="show-on-print" style={{ display: 'none', fontSize: '12px' }}>{footerText}</span>
               </div>
 
               {/* Footer */}

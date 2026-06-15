@@ -19,6 +19,7 @@ import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { getPositionIndex } from '@/src/lib/hierarchy';
 import { normalizeDate, formatDisplayDate } from '@/src/lib/dateUtils';
 import { generateId } from '@/src/lib/utils';
+import { fetchEmployeesData } from '@/src/lib/supabaseService';
 
 
 export function Beneficiaries() {
@@ -49,7 +50,27 @@ export function Beneficiaries() {
   const evaluations = useAppStore((state) => state.evaluations);
   const bulkUpdateEmployees = useAppStore(state => state.bulkUpdateEmployees);
   const hrVariables = useAppStore((state) => state.hrVariables);
+  const fetchAttendanceYearIfNeeded = useAppStore((state) => state.fetchAttendanceYearIfNeeded);
   const { reminders } = useAppData();
+
+  useEffect(() => {
+    if (employees.length === 0) {
+      fetchEmployeesData()
+        .then((data) => useAppStore.setState({ employees: data }))
+        .catch(console.error);
+    }
+  }, [employees.length]);
+
+  useEffect(() => {
+    if (activeTabYear !== 'All') {
+      const year = parseInt(activeTabYear, 10);
+      if (!isNaN(year)) {
+        fetchAttendanceYearIfNeeded(year);
+      }
+    } else {
+      fetchAttendanceYearIfNeeded(new Date().getFullYear());
+    }
+  }, [activeTabYear, fetchAttendanceYearIfNeeded]);
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isBulkEditing, setIsBulkEditing] = useState(false);

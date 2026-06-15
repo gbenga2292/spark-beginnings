@@ -244,6 +244,7 @@ export function Client360() {
   const [selectedInvoiceForDetail, setSelectedInvoiceForDetail] = useState<any>(null);
   const [financialsSubTab, setFinancialsSubTab] = useState<'invoices' | 'payments'>('invoices');
   const [hideFullySettled, setHideFullySettled] = useState(false);
+  const [collapsedMonths, setCollapsedMonths] = useState<Set<string>>(new Set());
   const [showOnlyUnpaidInvoices, setShowOnlyUnpaidInvoices] = useState(false);
   const [invoiceSort, setInvoiceSort] = useState<{ key: string; direction: 'asc' | 'desc' }>({ key: 'date', direction: 'desc' });
 
@@ -640,9 +641,7 @@ export function Client360() {
       let vatAmount = p.vat || 0;
       if (!vatAmount && p.payVat && p.payVat !== 'No') {
         const base = (p.amount || 0) - (p.damages || 0);
-        if (p.payVat === 'Add') {
-          vatAmount = base * (vatRate / 100);
-        } else if (p.payVat === 'Yes') {
+        if (p.payVat === 'Add' || p.payVat === 'Yes') {
           vatAmount = (base / (100 + vatRate)) * vatRate;
         }
       }
@@ -673,9 +672,7 @@ export function Client360() {
       let vatAmount = p.vat || 0;
       if (!vatAmount && p.payVat && p.payVat !== 'No') {
         const base = (p.amount || 0) - (p.damages || 0);
-        if (p.payVat === 'Add') {
-          vatAmount = base * (vatRate / 100);
-        } else if (p.payVat === 'Yes') {
+        if (p.payVat === 'Add' || p.payVat === 'Yes') {
           vatAmount = (base / (100 + vatRate)) * vatRate;
         }
       }
@@ -683,8 +680,10 @@ export function Client360() {
       const totalDueForMonth = key ? (vatDueByMonthYear[key] || 0) : 0;
       const totalPaidForMonth = key ? (vatPaymentsByMonthYear[key] || 0) : 0;
 
-      let settlementStatus: 'Fully Settled' | 'Partially Settled' | 'Unsettled' = 'Unsettled';
-      if (totalPaidForMonth >= totalDueForMonth && totalDueForMonth > 0) {
+      let settlementStatus: 'Fully Settled' | 'Partially Settled' | 'Unsettled' | 'No VAT Due' = 'Unsettled';
+      if (totalDueForMonth < 0.05) {
+        settlementStatus = 'No VAT Due';
+      } else if (totalPaidForMonth + 1 >= totalDueForMonth) {
         settlementStatus = 'Fully Settled';
       } else if (totalPaidForMonth > 0) {
         settlementStatus = 'Partially Settled';
@@ -1723,7 +1722,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                         .filter(p => p.payVat !== 'No')
                         .sort((a, b) => new Date(normalizeDate(a.date) || a.date).getTime() - new Date(normalizeDate(b.date) || b.date).getTime());
                       const filteredPayments = hideFullySettled
-                        ? allVatPayments.filter(p => p.settlementStatus !== 'Fully Settled')
+                        ? allVatPayments.filter(p => p.settlementStatus !== 'Fully Settled' && p.settlementStatus !== 'No VAT Due')
                         : allVatPayments;
                       return allVatPayments.length > 0 ? (
                       <div className="overflow-x-auto style-scroll rounded-xl border border-slate-100 dark:border-slate-800">
@@ -1760,55 +1759,145 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                               <th className="p-3 text-right">Amount for VAT Owe</th>
                             </tr>
                           </thead>
-                          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                            {filteredPayments.map((p, idx) => {
-                              const settlementColor = 
-                                p.settlementStatus === 'Fully Settled' ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/50' :
-                                p.settlementStatus === 'Partially Settled' ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-900/50' :
-                                'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/20 dark:text-rose-400 dark:border-rose-900/50';
+                          <tbody>
+                            {(() => {
+                              // Group payments by VAT filing month (key = "monthname-year")
+                              const groupMap = new Map<string, Array<typeof filteredPayments[0]>>();
+                              filteredPayments.forEach(p => {
+                                const k = p.key || `nk-${p.date}`;
+                                if (!groupMap.has(k)) groupMap.set(k, []);
+                                groupMap.get(k)!.push(p);
+                              });
 
-                              return (
-                                <tr key={p.id || idx} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
-                                  <td className="p-3 font-medium text-slate-900 dark:text-white">
-                                    {new Date(normalizeDate(p.date) || p.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
-                                  </td>
-                                  <td className="p-3 text-slate-650 dark:text-slate-350 font-semibold">{p.site}</td>
-                                  <td className="p-3 text-right font-bold text-slate-850 dark:text-slate-150">
-                                    ₦{(p.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                  </td>
-                                  <td className="p-3 text-center">
-                                    <Badge variant="outline" className={cn("text-[9px] sm:text-[10px] px-1.5 sm:px-2 whitespace-nowrap", 
-                                      p.payVat === 'Add' ? 'text-indigo-600 bg-indigo-50 border-indigo-200 dark:bg-indigo-950/30 dark:text-indigo-400 dark:border-indigo-900' :
-                                      p.payVat === 'Yes' ? 'text-teal-650 bg-teal-50 border-teal-200 dark:bg-teal-950/30 dark:text-teal-400 dark:border-teal-900' :
-                                      'text-slate-500 bg-slate-50 border-slate-200 dark:bg-slate-850 dark:text-slate-400 dark:border-slate-800'
-                                    )}>
-                                      {p.payVat === 'Add' ? `Add ${vatRate}%` : p.payVat === 'Yes' ? `Incl. ${vatRate}%` : <><span className="inline sm:hidden">Exempt</span><span className="hidden sm:inline">Exempt / No VAT</span></>}
-                                    </Badge>
-                                  </td>
-                                  <td className="p-3 text-right font-black text-indigo-600 dark:text-indigo-400">
-                                    ₦{(p.vatAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                  </td>
-                                  <td className="p-3 text-center text-slate-650 dark:text-slate-350 font-medium">
-                                    {p.monthName} {p.yearStr}
-                                  </td>
-                                  <td className="p-3 text-center">
-                                    <div className="flex flex-col items-center gap-1">
-                                      <Badge className={cn("text-[9px] sm:text-[10px] py-0.5 px-1.5 sm:px-2 font-bold whitespace-nowrap", settlementColor)}>
-                                        {p.settlementStatus}
-                                      </Badge>
-                                      {p.key && (
-                                        <span className="text-[10px] text-slate-400 font-semibold">
-                                          Remitted: ₦{p.totalPaidForMonth.toLocaleString(undefined, { maximumFractionDigits: 0 })} / ₦{p.totalDueForMonth.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                              return Array.from(groupMap.entries()).map(([groupKey, groupPayments]) => {
+                                const first = groupPayments[0];
+                                const { settlementStatus, totalDueForMonth, totalPaidForMonth, monthName, yearStr, key } = first;
+                                const rawOwed = totalDueForMonth - totalPaidForMonth;
+                                const amountOwed = rawOwed < 1 ? 0 : rawOwed;
+                                const groupVatTotal = groupPayments.reduce((s, p) => s + (p.vatAmount || 0), 0);
+
+                                // Colours shared between header and row accent
+                                const settlementColor =
+                                  settlementStatus === 'Fully Settled' || settlementStatus === 'No VAT Due'
+                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/50'
+                                    : settlementStatus === 'Partially Settled'
+                                    ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-900/50'
+                                    : 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/20 dark:text-rose-400 dark:border-rose-900/50';
+
+                                const headerBg =
+                                  settlementStatus === 'Fully Settled' || settlementStatus === 'No VAT Due'
+                                    ? (isDark ? 'bg-emerald-950/20' : 'bg-emerald-50/80')
+                                    : settlementStatus === 'Partially Settled'
+                                    ? (isDark ? 'bg-amber-950/20' : 'bg-amber-50/80')
+                                    : (isDark ? 'bg-rose-950/20' : 'bg-rose-50/80');
+
+                                // Left-border colour accent for Rec 3 — visually groups rows to their month
+                                const borderAccent =
+                                  settlementStatus === 'Fully Settled' || settlementStatus === 'No VAT Due' ? 'border-l-emerald-400' :
+                                  settlementStatus === 'Partially Settled' ? 'border-l-amber-400'   :
+                                  'border-l-rose-400';
+
+                                const isCollapsed = collapsedMonths.has(groupKey);
+                                const toggleCollapse = () => setCollapsedMonths(prev => {
+                                  const next = new Set(prev);
+                                  if (next.has(groupKey)) next.delete(groupKey);
+                                  else next.add(groupKey);
+                                  return next;
+                                });
+
+                                return [
+                                  // ── Month Group Header Row (clickable to collapse) ────────
+                                  <tr
+                                    key={`hdr-${groupKey}`}
+                                    onClick={toggleCollapse}
+                                    className={cn(
+                                      "border-t-2 border-b cursor-pointer select-none transition-colors",
+                                      headerBg,
+                                      isDark ? "border-slate-700 hover:brightness-110" : "border-slate-200 hover:brightness-95"
+                                    )}
+                                  >
+                                    <td colSpan={2} className="p-2.5 pl-3">
+                                      <div className="flex items-center gap-2">
+                                        {isCollapsed
+                                          ? <ChevronRight className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                                          : <ChevronDown className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />}
+                                        <span className="text-[11px] font-black uppercase tracking-widest text-slate-700 dark:text-slate-200">
+                                          {monthName} {yearStr}
                                         </span>
+                                        <span className="text-[10px] text-slate-400 font-medium">
+                                          · {groupPayments.length} payment{groupPayments.length !== 1 ? 's' : ''}
+                                        </span>
+                                      </div>
+                                    </td>
+                                    <td className="p-2.5 text-right">
+                                      <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">
+                                        VAT Due: ₦{totalDueForMonth.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                                      </span>
+                                    </td>
+                                    <td className="p-2.5 text-center" />
+                                    <td className="p-2.5 text-right">
+                                      <span className="text-[10px] font-semibold text-indigo-500 dark:text-indigo-400">
+                                        ₦{groupVatTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                      </span>
+                                    </td>
+                                    <td className="p-2.5 text-center" />
+                                    <td className="p-2.5 text-center">
+                                      <div className="flex flex-col items-center gap-0.5">
+                                        <Badge className={cn("text-[9px] sm:text-[10px] py-0.5 px-1.5 sm:px-2 font-bold whitespace-nowrap", settlementColor)}>
+                                          {settlementStatus}
+                                        </Badge>
+                                        {key && (
+                                          <span className="text-[10px] text-slate-400 font-semibold">
+                                            Remitted: ₦{totalPaidForMonth.toLocaleString(undefined, { maximumFractionDigits: 0 })} / ₦{totalDueForMonth.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </td>
+                                    <td className="p-2.5 text-right font-black text-xs">
+                                      <span className={amountOwed > 0 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"}>
+                                        ₦{amountOwed.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                      </span>
+                                    </td>
+                                  </tr>,
+
+                                  // ── Individual Payment Rows (hidden when collapsed) ──────
+                                  ...(isCollapsed ? [] : groupPayments.map((p, idx) => (
+                                    <tr
+                                      key={p.id || `${groupKey}-${idx}`}
+                                      className={cn(
+                                        "hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors border-l-4",
+                                        borderAccent,
+                                        isDark ? "border-b border-slate-800" : "border-b border-slate-100"
                                       )}
-                                    </div>
-                                  </td>
-                                  <td className="p-3 text-right font-bold text-rose-600 dark:text-rose-450">
-                                    ₦{Math.max(0, p.totalDueForMonth - p.totalPaidForMonth).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                  </td>
-                                </tr>
-                              );
-                            })}
+                                    >
+                                      <td className="p-3 pl-5 font-medium text-slate-900 dark:text-white">
+                                        {new Date(normalizeDate(p.date) || p.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                      </td>
+                                      <td className="p-3 pl-5 text-slate-650 dark:text-slate-350 font-semibold">{p.site}</td>
+                                      <td className="p-3 text-right font-bold text-slate-850 dark:text-slate-150">
+                                        ₦{(p.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                      </td>
+                                      <td className="p-3 text-center">
+                                        <Badge variant="outline" className={cn("text-[9px] sm:text-[10px] px-1.5 sm:px-2 whitespace-nowrap",
+                                          p.payVat === 'Add' ? 'text-indigo-600 bg-indigo-50 border-indigo-200 dark:bg-indigo-950/30 dark:text-indigo-400 dark:border-indigo-900' :
+                                          p.payVat === 'Yes' ? 'text-teal-650 bg-teal-50 border-teal-200 dark:bg-teal-950/30 dark:text-teal-400 dark:border-teal-900' :
+                                          'text-slate-500 bg-slate-50 border-slate-200 dark:bg-slate-850 dark:text-slate-400 dark:border-slate-800'
+                                        )}>
+                                          {p.payVat === 'Add' ? `Add ${vatRate}%` : p.payVat === 'Yes' ? `Incl. ${vatRate}%` : <><span className="inline sm:hidden">Exempt</span><span className="hidden sm:inline">Exempt / No VAT</span></>}
+                                        </Badge>
+                                      </td>
+                                      <td className="p-3 text-right font-black text-indigo-600 dark:text-indigo-400">
+                                        ₦{(p.vatAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                      </td>
+                                      {/* VAT Period, Settlement Status, Amount Owe — shown on group header only */}
+                                      <td className="p-3 text-center text-slate-300 dark:text-slate-700 text-[10px]">—</td>
+                                      <td className="p-3 text-center text-slate-300 dark:text-slate-700 text-[10px]">—</td>
+                                      <td className="p-3 text-center text-slate-300 dark:text-slate-700 text-[10px]">—</td>
+                                    </tr>
+                                  ))),
+                                ];
+                              });
+                            })()}
                           </tbody>
                           <tfoot>
                             <tr className={cn("border-t-2 font-bold text-xs", isDark ? "border-slate-700 bg-slate-800/60" : "border-slate-200 bg-slate-50")}>
@@ -1836,15 +1925,17 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                                   const totalRemitted = uniquePeriods.reduce((sum, period) => sum + period.paid, 0);
                                   const totalDue = uniquePeriods.reduce((sum, period) => sum + period.due, 0);
 
-                                  let totalSettlementStatus: 'Fully Settled' | 'Partially Settled' | 'Unsettled' = 'Unsettled';
-                                  if (totalRemitted >= totalDue && totalDue > 0) {
+                                  let totalSettlementStatus: 'Fully Settled' | 'Partially Settled' | 'Unsettled' | 'No VAT Due' = 'Unsettled';
+                                  if (totalDue < 0.05) {
+                                    totalSettlementStatus = 'No VAT Due';
+                                  } else if (totalRemitted + 1 >= totalDue) {
                                     totalSettlementStatus = 'Fully Settled';
                                   } else if (totalRemitted > 0) {
                                     totalSettlementStatus = 'Partially Settled';
                                   }
 
                                   const totalSettlementColor = 
-                                    totalSettlementStatus === 'Fully Settled' ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/50' :
+                                    totalSettlementStatus === 'Fully Settled' || totalSettlementStatus === 'No VAT Due' ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/50' :
                                     totalSettlementStatus === 'Partially Settled' ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-900/50' :
                                     'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/20 dark:text-rose-400 dark:border-rose-900/50';
 
@@ -1871,7 +1962,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                                   );
                                   const totalOwed = uniquePeriods.reduce((sum, period) => sum + Math.max(0, period.due - period.paid), 0);
                               
-                                  return totalOwed.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                                  return (totalOwed < 1 ? 0 : totalOwed).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                                 })()}
                               </td>
                             </tr>

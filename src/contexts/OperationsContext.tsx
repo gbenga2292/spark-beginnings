@@ -94,6 +94,7 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
   const [maintenanceCertificates, setMaintenanceCertificates] = useState<MaintenanceCertificate[]>([]);
 
   const { 
+    sites,
     vehicles, 
     vehicleTrips, 
     vehicleDocumentTypes,
@@ -130,12 +131,49 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
         if (now > nextDate) status = 'overdue';
         else if (nextDate.getTime() - now.getTime() < 14 * 24 * 60 * 60 * 1000) status = 'due_soon';
 
+        // Resolve current site by looking at ALL waybills for this machine (outbound + return),
+        // sorted by most recent date. The most recent action tells us where it is right now.
+        //
+        // Bug fix: outbound waybills never change status when a return waybill completes,
+        // so filtering only "active outbound" was wrong — it ignored completed returns.
+        const allAssetWaybills = waybills
+          .filter(wb => wb.items.some(item => item.assetId === a.id))
+          .sort((x, y) => {
+            const dx = new Date(x.sentToSiteDate || x.issueDate).getTime();
+            const dy = new Date(y.sentToSiteDate || y.issueDate).getTime();
+            return dy - dx;
+          });
+
+        let resolvedSite = 'Warehouse';
+
+        if (allAssetWaybills.length > 0) {
+          const latest = allAssetWaybills[0];
+          // Machine is on site only if the most recent waybill is an active outbound dispatch
+          if (
+            latest.type === 'waybill' &&
+            ['sent_to_site', 'partial_returned', 'outstanding', 'open'].includes(latest.status)
+          ) {
+            resolvedSite = latest.siteName || 'Warehouse';
+          }
+          // If the most recent is a return waybill (any status) OR a fully-returned outbound → Warehouse
+        } else {
+          // No waybills at all — fall back to recent daily log (within 45 days)
+          const recentLog = dailyMachineLogs
+            .filter(log => log.assetId === a.id)
+            .sort((x, y) => new Date(y.date).getTime() - new Date(x.date).getTime())[0];
+          if (recentLog) {
+            const daysSinceLog = (Date.now() - new Date(recentLog.date).getTime()) / (1000 * 60 * 60 * 24);
+            resolvedSite = daysSinceLog <= 45 ? recentLog.siteName : 'Warehouse';
+          }
+        }
+
+
         return {
           id: a.id,
           name: a.name,
           serialNumber: a.serialNumber,
           category: 'machine' as const,
-          site: a.location || 'Main Store',
+          site: resolvedSite,
           lastServiceDate: lastSession?.date || '',
           nextServiceDate: nextDate.toISOString(),
           serviceIntervalMonths: a.serviceIntervalMonths || 2,
@@ -181,7 +219,7 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
       });
 
     return [...machines, ...mappedVehicles];
-  }, [assets, vehicles, maintenanceSessions]);
+  }, [assets, vehicles, maintenanceSessions, dailyMachineLogs, waybills]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -433,6 +471,7 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
       issueDate: w.issue_date,
       sentToSiteDate: w.sent_to_site_date,
       items: w.items || [],
+      signature: w.signature,
     });
 
     const mapDbCheckout = (c: any) => ({
@@ -724,7 +763,8 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
       vehicle: waybill.vehicle,
       issue_date: waybill.issueDate,
       sent_to_site_date: waybill.sentToSiteDate,
-      items: waybill.items
+      items: waybill.items,
+      signature: waybill.signature
     });
   };
 
@@ -931,6 +971,34 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
         }));
       }
 
+      if (waybill.type === 'return' && status === 'outstanding' && waybill.status === 'return_completed') {
+        setAssets(assetsPrev => assetsPrev.map(asset => {
+          const item = waybill.items.find(i => i.assetId === asset.id);
+          if (item) {
+            const returnedGood = item.returnedGood || item.quantity;
+            const returnedDamaged = item.returnedDamaged || 0;
+            const returnedMissing = item.returnedMissing || 0;
+
+            const reservedQuantity = asset.reservedQuantity + item.quantity;
+            const damagedQuantity = Math.max(0, (asset.damagedQuantity || 0) - returnedDamaged);
+            const missingQuantity = Math.max(0, (asset.missingQuantity || 0) - returnedMissing);
+            const usedQuantity = asset.usedQuantity || 0;
+
+            const updated: Asset = {
+              ...asset,
+              reservedQuantity,
+              damagedQuantity,
+              missingQuantity,
+              usedQuantity,
+              availableQuantity: Math.max(0, asset.quantity - (reservedQuantity + damagedQuantity + missingQuantity + usedQuantity)),
+            };
+            persistAsset(updated);
+            return updated;
+          }
+          return asset;
+        }));
+      }
+
       const updatedWaybill = { 
         ...waybill, 
         status, 
@@ -938,14 +1006,19 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
           sentToSiteDate,
           issueDate: sentToSiteDate
         } : {}),
-        ...(returnConditions ? { 
+        ...(status === 'outstanding' && waybill.type === 'return' ? {
+          items: waybill.items.map(item => {
+            const { returnedGood, returnedDamaged, returnedMissing, ...rest } = item;
+            return rest;
+          })
+        } : (returnConditions ? { 
           items: waybill.items.map(item => ({
             ...item,
             returnedGood: returnConditions[item.assetId]?.good || item.quantity,
             returnedDamaged: returnConditions[item.assetId]?.damaged || 0,
             returnedMissing: returnConditions[item.assetId]?.missing || 0,
           }))
-        } : {})
+        } : {}))
       };
       
       persistWaybill(updatedWaybill);

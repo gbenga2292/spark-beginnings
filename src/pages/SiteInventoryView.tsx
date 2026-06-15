@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useOperations } from '../contexts/OperationsContext';
 import { useAppStore, Site } from '@/src/store/appStore';
 import { SiteQuestionnaire } from '@/src/types/SiteQuestionnaire';
@@ -34,6 +34,8 @@ interface SiteInventoryViewProps {
   questionnaire: SiteQuestionnaire | null;
   onBack: () => void;
   onSiteChange?: (site: Site) => void;
+  initialMachineId?: string;
+  initialTab?: TabId;
 }
 
 type TabId = 'materials' | 'machines' | 'consumables' | 'waybills';
@@ -48,12 +50,12 @@ interface SiteItem {
   pendingReturnQuantity?: number;
 }
 
-export function SiteInventoryView({ site, questionnaire, onBack, onSiteChange }: SiteInventoryViewProps) {
+export function SiteInventoryView({ site, questionnaire, onBack, onSiteChange, initialMachineId, initialTab }: SiteInventoryViewProps) {
   const { waybills, assets, maintenanceAssets, dailyMachineLogs, sitePumpDates, persistSitePumpDates } = useOperations();
   const allSites = useAppStore(s => s.sites);
   const activeSites = filterOperationalSites(allSites).filter(s => s.status === 'Active');
   
-  const [activeTab, setActiveTab] = useState<TabId>('materials');
+  const [activeTab, setActiveTab] = useState<TabId>(initialTab || 'materials');
   const [showReturnWaybill, setShowReturnWaybill] = useState(false);
   const [showTransactions, setShowTransactions] = useState(false);
   const [showReportDialog, setShowReportDialog] = useState(false);
@@ -64,6 +66,18 @@ export function SiteInventoryView({ site, questionnaire, onBack, onSiteChange }:
   const [showMachineBulkLog, setShowMachineBulkLog] = useState(false);
   const [showMachineAnalytics, setShowMachineAnalytics] = useState(false);
   const [viewingWaybill, setViewingWaybill] = useState<any | null>(null);
+
+  // Auto-open machine log if navigated from dashboard
+  useEffect(() => {
+    if (initialMachineId) {
+      const machine = assets.find(a => a.id === initialMachineId);
+      if (machine) {
+        setActiveTab('machines');
+        setSelectedMachine({ id: machine.id, name: machine.name });
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialMachineId]);
 
   // States for configuring pump dates
   const [isConfiguringPumpDates, setIsConfiguringPumpDates] = useState(false);
@@ -441,7 +455,7 @@ export function SiteInventoryView({ site, questionnaire, onBack, onSiteChange }:
                       <div>
                         <div className="flex items-center gap-2 flex-wrap">
                           <p className="text-sm font-semibold text-slate-800 dark:text-white">{item.assetName}</p>
-                          {item.pendingReturnQuantity && item.pendingReturnQuantity > 0 && (
+                          {(item.pendingReturnQuantity ?? 0) > 0 && (
                             <Badge 
                               variant="outline" 
                               className="bg-amber-50 dark:bg-amber-950/20 text-amber-600 dark:text-amber-400 border-amber-200/60 dark:border-amber-900/50 font-bold px-1.5 py-0 text-[10px] rounded shrink-0"

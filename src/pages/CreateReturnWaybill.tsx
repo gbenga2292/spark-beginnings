@@ -1,7 +1,8 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { useOperations } from '../contexts/OperationsContext';
 import { useAppStore, Site } from '@/src/store/appStore';
+import { useUserStore } from '@/src/store/userStore';
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Label } from '@/src/components/ui/label';
@@ -9,6 +10,7 @@ import { toast } from '@/src/components/ui/toast';
 import { Circle, CheckCircle2, ChevronDown, Package, Search } from 'lucide-react';
 import { cn, formatUnit } from '@/src/lib/utils';
 import { getPositionIndex } from '@/src/lib/hierarchy';
+import { Waybill } from '../types/operations';
 
 export interface SiteItem {
   assetId: string;
@@ -21,27 +23,103 @@ export interface SiteItem {
 }
 
 interface CreateReturnWaybillProps {
-  site: Site;
-  inventoryItems: SiteItem[];
+  site?: Site;
+  inventoryItems?: SiteItem[];
   onBack: () => void;
+  editWaybill?: Waybill;
 }
 
 const SERVICES = ['Dewatering', 'Waterproofing', 'Jetting', 'Tiling', 'General'] as const;
 
-export function CreateReturnWaybill({ site, inventoryItems, onBack }: CreateReturnWaybillProps) {
-  const { createWaybill, vehicles } = useOperations();
-  const { employees } = useAppStore();
+export function CreateReturnWaybill({ site, inventoryItems, onBack, editWaybill }: CreateReturnWaybillProps) {
+  const { createWaybill, updateWaybill, vehicles, waybills, assets } = useOperations();
+  const { employees, consumableLogs } = useAppStore();
+  const sites = useAppStore(s => s.sites);
+  const currentUser = useUserStore(s => s.getCurrentUser());
+
+  const resolvedSite = site || (editWaybill ? sites.find(s => s.id === editWaybill.siteId) : null);
+
+  const resolvedInventoryItems = useMemo(() => {
+    if (inventoryItems) return inventoryItems;
+    if (!resolvedSite) return [];
+
+    // All waybills for this site
+    const siteWaybills = waybills.filter(w =>
+      (w.siteName?.toLowerCase() === resolvedSite.name.toLowerCase() ||
+      w.siteId === resolvedSite.id) &&
+      (w.status !== 'outstanding' || w.type === 'return')
+    );
+
+    // Build site inventory by aggregating all waybill items
+    const inventoryMap = new Map<string, SiteItem>();
+    siteWaybills
+      .filter(w => w.type === 'waybill' && w.status !== 'outstanding')
+      .forEach(wb => {
+        wb.items.forEach(item => {
+          const existing = inventoryMap.get(item.assetId);
+          const assetMeta = assets.find(a => a.id === item.assetId);
+          if (existing) {
+            existing.quantity += item.quantity;
+            existing.lastUpdated = wb.issueDate;
+          } else {
+            inventoryMap.set(item.assetId, {
+              assetId: item.assetId,
+              assetName: item.assetName,
+              quantity: item.quantity,
+              unit: assetMeta?.unitOfMeasurement || 'pcs',
+              type: assetMeta?.type || 'non-consumable',
+              lastUpdated: wb.issueDate,
+              pendingReturnQuantity: 0,
+            });
+          }
+        });
+      });
+
+    // Subtract returns and track pending returns
+    siteWaybills
+      .filter(w => w.type === 'return')
+      .forEach(wb => {
+        wb.items.forEach(item => {
+          const existing = inventoryMap.get(item.assetId);
+          if (existing) {
+            if (wb.status === 'return_completed') {
+              existing.quantity = Math.max(0, existing.quantity - item.quantity);
+            } else {
+              if (!editWaybill || wb.id !== editWaybill.id) {
+                existing.pendingReturnQuantity = (existing.pendingReturnQuantity || 0) + item.quantity;
+              }
+            }
+          }
+        });
+      });
+
+    // Subtract consumed usages
+    const siteConsumableLogs = consumableLogs.filter(log => log.siteId === resolvedSite.id);
+    siteConsumableLogs.forEach(log => {
+      const existing = inventoryMap.get(log.assetId);
+      if (existing) {
+        existing.quantity = Math.max(0, existing.quantity - log.quantityUsed);
+      }
+    });
+
+    return Array.from(inventoryMap.values()).filter(i => i.quantity > 0);
+  }, [inventoryItems, resolvedSite, waybills, assets, consumableLogs, editWaybill]);
 
   const [purpose, setPurpose] = useState('Material Return');
-  const [driverName, setDriverName] = useState('');
+  const [driverName, setDriverName] = useState(editWaybill?.driverName || '');
   const [driverSearch, setDriverSearch] = useState('');
   const [driverDropdownOpen, setDriverDropdownOpen] = useState(false);
   const driverComboRef = useRef<HTMLDivElement>(null);
-  const [vehicleName, setVehicleName] = useState('');
+  const [vehicleName, setVehicleName] = useState(editWaybill?.vehicle || '');
   const [service, setService] = useState('Dewatering');
   const [expectedReturnDate, setExpectedReturnDate] = useState('');
   const [returnTo, setReturnTo] = useState('Office');
-  const [addSignature, setAddSignature] = useState(false);
+  const [addSignature, setAddSignature] = useState(() => {
+    if (editWaybill) {
+      return !!editWaybill.signature;
+    }
+    return !!currentUser?.signature;
+  });
 
   // Close driver dropdown on outside click
   useEffect(() => {
@@ -55,9 +133,18 @@ export function CreateReturnWaybill({ site, inventoryItems, onBack }: CreateRetu
   }, []);
 
   // Key: assetId, Value: quantity to return
-  const [selectedItems, setSelectedItems] = useState<Record<string, number>>({});
+  const [selectedItems, setSelectedItems] = useState<Record<string, number>>(() => {
+    if (editWaybill) {
+      const initial: Record<string, number> = {};
+      editWaybill.items.forEach(item => {
+        initial[item.assetId] = item.quantity;
+      });
+      return initial;
+    }
+    return {};
+  });
 
-  const returnableItems = inventoryItems.filter(i => (i.quantity - (i.pendingReturnQuantity || 0)) > 0);
+  const returnableItems = resolvedInventoryItems.filter(i => (i.quantity - (i.pendingReturnQuantity || 0)) > 0);
   const allSelected = returnableItems.length > 0 && returnableItems.every(i => !!selectedItems[i.assetId]);
 
   const toggleSelectAll = () => {
@@ -123,9 +210,13 @@ export function CreateReturnWaybill({ site, inventoryItems, onBack }: CreateRetu
       toast.error('Please select both Driver and Vehicle');
       return;
     }
+    if (!resolvedSite) {
+      toast.error('Site information is missing');
+      return;
+    }
 
     const itemsToReturn = itemIds.map(id => {
-      const asset = inventoryItems.find(i => i.assetId === id);
+      const asset = resolvedInventoryItems.find(i => i.assetId === id);
       return {
         assetId: id,
         assetName: asset?.assetName || 'Unknown',
@@ -133,23 +224,35 @@ export function CreateReturnWaybill({ site, inventoryItems, onBack }: CreateRetu
       };
     });
 
-    createWaybill({
-      siteId: site.id,
-      siteName: site.name,
-      type: 'return',
-      issueDate: new Date().toISOString(),
-      driverName,
-      vehicle: vehicleName,
-      items: itemsToReturn,
-    });
-    
-    toast.success('Return waybill created successfully!');
+    if (editWaybill) {
+      updateWaybill(editWaybill.id, {
+        driverName,
+        vehicle: vehicleName,
+        items: itemsToReturn,
+        signature: addSignature ? (editWaybill.signature || currentUser?.signature || '') : '',
+      });
+      toast.success('Return waybill updated successfully!');
+    } else {
+      createWaybill({
+        siteId: resolvedSite.id,
+        siteName: resolvedSite.name,
+        type: 'return',
+        issueDate: new Date().toISOString(),
+        driverName,
+        vehicle: vehicleName,
+        items: itemsToReturn,
+        signature: addSignature ? (currentUser?.signature || '') : '',
+      } as any);
+      toast.success('Return waybill created successfully!');
+    }
     onBack();
   };
 
+  const isEditing = !!editWaybill;
+
   useSetPageTitle(
-    `Create Return Waybill - ${site.name}`,
-    'Create a return waybill for materials from this site',
+    isEditing ? `Edit Return Waybill - ${resolvedSite?.name}` : `Create Return Waybill - ${resolvedSite?.name}`,
+    isEditing ? `Editing return waybill ${editWaybill?.id}` : 'Create a return waybill for materials from this site',
     (
       <div className="flex items-center gap-3">
         <Button 
@@ -163,11 +266,11 @@ export function CreateReturnWaybill({ site, inventoryItems, onBack }: CreateRetu
           onClick={handleSubmit}
           className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white shadow-md font-semibold h-9"
         >
-          <Package className="h-4 w-4" /> Create Return
+          <Package className="h-4 w-4" /> {isEditing ? 'Save Changes' : 'Create Return'}
         </Button>
       </div>
     ),
-    [site.name, onBack, handleSubmit]
+    [resolvedSite?.name, onBack, handleSubmit, isEditing, editWaybill?.id]
   );
 
   return (
@@ -325,11 +428,11 @@ export function CreateReturnWaybill({ site, inventoryItems, onBack }: CreateRetu
               )}
             </div>
             <div className="space-y-3">
-              {inventoryItems.filter(i => (i.quantity - (i.pendingReturnQuantity || 0)) > 0).length === 0 ? (
+              {resolvedInventoryItems.filter(i => (i.quantity - (i.pendingReturnQuantity || 0)) > 0).length === 0 ? (
                 <div className="p-8 text-center border-2 border-dashed border-slate-100 rounded-xl">
                   <p className="text-slate-400 font-medium">No returnable materials currently logged at this site.</p>
                 </div>
-              ) : inventoryItems.filter(i => (i.quantity - (i.pendingReturnQuantity || 0)) > 0).map(item => {
+              ) : resolvedInventoryItems.filter(i => (i.quantity - (i.pendingReturnQuantity || 0)) > 0).map(item => {
                 const isSelected = !!selectedItems[item.assetId];
                 const availableToReturn = item.quantity - (item.pendingReturnQuantity || 0);
                 return (
@@ -389,12 +492,19 @@ export function CreateReturnWaybill({ site, inventoryItems, onBack }: CreateRetu
             </div>
           </div>
 
-          <label className="flex items-center gap-2 cursor-pointer w-fit pt-2">
-            <div onClick={() => setAddSignature(!addSignature)}>
-              {addSignature ? <CheckCircle2 className="h-5 w-5 text-blue-500" /> : <Circle className="h-5 w-5 text-slate-300" />}
-            </div>
-            <span className="text-sm font-bold text-slate-700 select-none pb-0.5" onClick={() => setAddSignature(!addSignature)}>Add my signature to return waybill PDF</span>
-          </label>
+          <div 
+            onClick={() => {
+              if (!addSignature && !currentUser?.signature) {
+                toast.error('Please upload your signature in Profile settings first.');
+                return;
+              }
+              setAddSignature(!addSignature);
+            }}
+            className="flex items-center gap-2 cursor-pointer w-fit pt-2 select-none"
+          >
+            {addSignature ? <CheckCircle2 className="h-5 w-5 text-blue-500" /> : <Circle className="h-5 w-5 text-slate-300" />}
+            <span className="text-sm font-bold text-slate-700 pb-0.5">Add my signature to return waybill PDF</span>
+          </div>
 
           </div>
         </div>

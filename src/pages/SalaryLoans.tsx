@@ -1,5 +1,5 @@
 import { formatDisplayDate, normalizeDate } from '@/src/lib/dateUtils';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/src/components/ui/card';
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
@@ -10,6 +10,7 @@ import {
   Banknote, User, CreditCard, Clock, XCircle, ShieldCheck, Download, Upload, Trash2
 } from 'lucide-react';
 import { useAppStore, SalaryAdvance, Loan } from '@/src/store/appStore';
+import { fetchEmployeesData } from '@/src/lib/supabaseService';
 import { toast, showConfirm } from '@/src/components/ui/toast';
 import { usePriv } from '@/src/hooks/usePriv';
 import { useAppData } from '@/src/contexts/AppDataContext';
@@ -40,10 +41,19 @@ export function SalaryLoans({ setPreviewModal }: { setPreviewModal?: (val: any) 
   const [viewMode, setViewMode] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
 
-  const employees = useAppStore((state) => state.employees).filter(e => e.status === 'Active' || e.status === 'On Leave');
+  const rawEmployees = useAppStore((state) => state.employees);
+  const employees = useMemo(() => rawEmployees.filter(e => e.status === 'Active' || e.status === 'On Leave'), [rawEmployees]);
   const departments = useAppStore((state) => state.departments);
   const salaryAdvances = useAppStore((state) => state.salaryAdvances);
   const loans = useAppStore((state) => state.loans);
+
+  useEffect(() => {
+    if (rawEmployees.length === 0) {
+      fetchEmployeesData()
+        .then((data) => useAppStore.setState({ employees: data }))
+        .catch(console.error);
+    }
+  }, [rawEmployees.length]);
 
   // Compute internal employees (Office and Field)
   const internalEmployees = employees.filter(e => {

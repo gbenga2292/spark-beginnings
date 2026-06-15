@@ -15,6 +15,7 @@ import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/src/components/ui/dropdown-menu';
 import { calculateAttendanceMetrics, getStaffDateWorkedMap } from '@/src/lib/attendanceLogic';
 import { supabase } from '@/src/integrations/supabase/client';
+import { fetchEmployeesData } from '@/src/lib/supabaseService';
 
 interface PayrollRecord {
   id: string;
@@ -64,7 +65,8 @@ const fm = (v: number) => typeof v === 'number' ? v.toLocaleString(undefined, { 
 const fmT = fm;
 
 export function Payroll() {
-  const employees = useAppStore((state) => state.employees).filter(e => e.status !== 'Terminated');
+  const rawEmployees = useAppStore((state) => state.employees);
+  const employees = useMemo(() => rawEmployees.filter(e => e.status !== 'Terminated'), [rawEmployees]);
   const salaryAdvances = useAppStore((state) => state.salaryAdvances);
   const loans = useAppStore((state) => state.loans);
   const payrollVariables = useAppStore((state) => state.payrollVariables);
@@ -74,6 +76,14 @@ export function Payroll() {
   const fetchAttendanceYearIfNeeded = useAppStore((state) => state.fetchAttendanceYearIfNeeded);
   const publicHolidays = useAppStore((state) => state.publicHolidays);
   const departments = useAppStore((state) => state.departments);
+
+  useEffect(() => {
+    if (rawEmployees.length === 0) {
+      fetchEmployeesData()
+        .then((data) => useAppStore.setState({ employees: data }))
+        .catch(console.error);
+    }
+  }, [rawEmployees.length]);
 
   const [selectedMonth, setSelectedMonth] = useState(() => {
     const defaultMonthKey = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'][new Date().getMonth()];

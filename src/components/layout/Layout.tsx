@@ -10,6 +10,9 @@ import { TaskPopupNotifications } from '../tasks/TaskPopupNotifications';
 import { ConnectionBanner } from '@/src/components/offline/ConnectionBanner';
 import { startNetworkMonitor } from '@/src/store/networkStore';
 import { ShieldAlert, RefreshCw, X } from 'lucide-react';
+import { usePage } from '@/src/contexts/PageContext';
+import { useAppStore } from '@/src/store/appStore';
+import { fetchEmployeesData, fetchInvoicesData, fetchLedgerData, fetchOperationsData } from '@/src/lib/supabaseService';
 
 export function Layout() {
   const { user, loading } = useAuth();
@@ -20,9 +23,10 @@ export function Layout() {
   const [reloadCountdown, setReloadCountdown] = useState<number | null>(null);
   const mainRef = useRef<HTMLElement>(null);
   const location = useLocation();
+  const { hideLayout } = usePage();
 
   // On the /home launchpad, hide the sidebar entirely
-  const isHomePage = location.pathname === '/home';
+  const isHomePage = location.pathname === '/home' || hideLayout;
 
   // Start network monitoring
   useEffect(() => {
@@ -52,6 +56,42 @@ export function Layout() {
     }, 1000);
     return () => clearTimeout(timer);
   }, [reloadCountdown, privBannerVisible]);
+
+  // Pre-fetch lazy-loaded tables in background to speed up navigation
+  useEffect(() => {
+    if (!user) return;
+    
+    // We run this after a short delay so it doesn't compete with initial rendering
+    const timer = setTimeout(async () => {
+      const state = useAppStore.getState();
+      
+      if (state.employees.length === 0) {
+        fetchEmployeesData()
+          .then((data) => useAppStore.setState({ employees: data }))
+          .catch(console.error);
+      }
+      
+      if (state.invoices.length === 0 && state.pendingInvoices.length === 0) {
+        fetchInvoicesData()
+          .then((data) => useAppStore.setState(data))
+          .catch(console.error);
+      }
+      
+      if (state.ledgerEntries.length === 0) {
+        fetchLedgerData()
+          .then((data) => useAppStore.setState(data))
+          .catch(console.error);
+      }
+      
+      if (state.dailyJournals.length === 0) {
+        fetchOperationsData()
+          .then((data) => useAppStore.setState(data))
+          .catch(console.error);
+      }
+    }, 1000);
+    
+    return () => clearTimeout(timer);
+  }, [user]);
 
   // Still loading the Supabase session — don't redirect yet
   if (loading) return null;

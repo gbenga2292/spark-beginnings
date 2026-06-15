@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useOperations } from '../contexts/OperationsContext';
 import { useAppStore } from '@/src/store/appStore';
+import { useUserStore } from '@/src/store/userStore';
 import { 
   X, Plus, Trash2, Truck, FileText, GripVertical,
-  MapPin, Package, Search, CheckCircle2, ChevronDown
+  MapPin, Package, Search, CheckCircle2, ChevronDown, Circle
 } from 'lucide-react';
 import { cn, formatUnit } from '@/src/lib/utils';
 import { WaybillType, Waybill } from '../types/operations';
@@ -28,8 +29,16 @@ const SERVICES = ['Dewatering', 'Waterproofing', 'Jetting', 'Tiling', 'General']
 export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName = '', editWaybill }: WaybillFormProps) {
   const { assets, createWaybill, updateWaybill, vehicles } = useOperations();
   const { sites, employees } = useAppStore();
+  const currentUser = useUserStore(s => s.getCurrentUser());
 
   const isEditing = !!editWaybill;
+
+  const [addSignature, setAddSignature] = useState(() => {
+    if (editWaybill) {
+      return !!editWaybill.signature;
+    }
+    return !!currentUser?.signature;
+  });
 
   const [purpose, setPurpose] = useState('Operational Activities');
   const [siteName, setSiteName] = useState(editWaybill?.siteName || prefillSiteName);
@@ -151,6 +160,7 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
         driverName,
         vehicle: vehicleName,
         items: mappedItems,
+        signature: addSignature ? (editWaybill.signature || currentUser?.signature || '') : '',
       });
       toast.success(`Waybill ${editWaybill.id} updated successfully`);
     } else {
@@ -162,6 +172,7 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
         driverName,
         vehicle: vehicleName,
         items: mappedItems,
+        signature: addSignature ? (currentUser?.signature || '') : '',
       });
       toast.success(`Waybill created successfully for ${siteName}`);
     }
@@ -312,6 +323,29 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
                     {SERVICES.map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
                   <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                </div>
+              </div>
+
+              {/* Signature checkbox */}
+              <div className="md:col-span-2 pt-2">
+                <div 
+                  onClick={() => {
+                    if (!addSignature && !currentUser?.signature) {
+                      toast.error('Please upload your signature in Profile settings first.');
+                      return;
+                    }
+                    setAddSignature(!addSignature);
+                  }}
+                  className="flex items-center gap-2 cursor-pointer w-fit select-none"
+                >
+                  {addSignature ? (
+                    <CheckCircle2 className="h-5 w-5 text-blue-500" />
+                  ) : (
+                    <Circle className="h-5 w-5 text-slate-300" />
+                  )}
+                  <span className="text-sm font-bold text-slate-700 pb-0.5">
+                    Add my signature to waybill PDF
+                  </span>
                 </div>
               </div>
             </div>

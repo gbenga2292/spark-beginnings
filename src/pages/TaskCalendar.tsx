@@ -13,6 +13,7 @@ import { useNavigate } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose, DialogFooter } from '@/src/components/ui/dialog';
 import { Button } from '@/src/components/ui/button';
 import { useAppStore } from '@/src/store/appStore';
+import { fetchOperationsData } from '@/src/lib/supabaseService';
 import { CreateTaskDialog } from '@/src/pages/Tasks/CreateTaskDialog';
 import { CreateReminderDialog } from '@/src/pages/Tasks/CreateReminderDialog';
 import { CreateDailyJournalDialog } from '@/src/pages/DailyJournal/CreateDailyJournalDialog';
@@ -111,6 +112,16 @@ export default function CalendarPage({ onNavigate, showCompleted: externalShowCo
   const holidays = useAppStore(state => state.publicHolidays);
   const dailyJournals = useAppStore(state => state.dailyJournals);
   const siteJournalEntries = useAppStore(state => state.siteJournalEntries);
+
+  useEffect(() => {
+    if (dailyJournals.length === 0) {
+      fetchOperationsData()
+        .then((data) => {
+          useAppStore.setState(data);
+        })
+        .catch(console.error);
+    }
+  }, [dailyJournals.length]);
   
   // Update local state if external prop changes
   useMemo(() => {

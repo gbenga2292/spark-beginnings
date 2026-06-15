@@ -15,6 +15,7 @@ import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import { usePriv } from '@/src/hooks/usePriv';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
+import { fetchEmployeesData } from '@/src/lib/supabaseService';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/src/components/ui/dialog';
 import { Badge } from '@/src/components/ui/badge';
 import { filterOperationalSites } from '@/src/lib/siteUtils';
@@ -32,6 +33,16 @@ const getBase64ImageFromUrl = async (imageUrl: string) => {
 
 export function Reports() {
   const priv = usePriv('reports');
+  const rawEmployees = useAppStore((state) => state.employees);
+
+  React.useEffect(() => {
+    if (rawEmployees.length === 0) {
+      fetchEmployeesData()
+        .then((data) => useAppStore.setState({ employees: data }))
+        .catch(console.error);
+    }
+  }, [rawEmployees.length]);
+
   const departments = useAppStore(useShallow((state) => state.departments));
   const nonEmployeeDeptNames = useMemo(() => new Set(departments.filter(d => d.staffType === 'NON-EMPLOYEE').map(d => d.name)), [departments]);
 

@@ -16,6 +16,7 @@ import * as XLSX from 'xlsx';
 import { toast, showConfirm } from '@/src/components/ui/toast';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { generateId } from '@/src/lib/utils';
+import { fetchLedgerData } from '@/src/lib/supabaseService';
 
 type EntryItem = {
   id?: string;
@@ -57,6 +58,14 @@ export function Ledger() {
   const addLedgerVendor = useAppStore((state) => state.addLedgerVendor);
   const updateLedgerVendor = useAppStore((state) => state.updateLedgerVendor);
   const removeLedgerVendor = useAppStore((state) => state.removeLedgerVendor);
+
+  useEffect(() => {
+    if (ledgerEntries.length === 0) {
+      fetchLedgerData().then(data => {
+        useAppStore.setState(data);
+      }).catch(console.error);
+    }
+  }, [ledgerEntries.length]);
 
   const [tab, setTab] = useState('entry');
 
@@ -612,6 +621,18 @@ export function Ledger() {
     });
     return data;
   }, [filteredEntries, sortField, sortOrder]);
+
+  const [page, setPage] = useState(1);
+  const pageSize = 50;
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, searchKey, fromDate, toDate, dateFilterType]);
+
+  const paginatedEntries = useMemo(() => {
+    return sortedEntries.slice((page - 1) * pageSize, page * pageSize);
+  }, [sortedEntries, page, pageSize]);
+  const totalPages = Math.ceil(sortedEntries.length / pageSize);
 
   const filteredTotal = useMemo(() => {
     return filteredEntries.reduce((sum, entry) => sum + (Number(entry.amount) || 0), 0);
@@ -1402,6 +1423,7 @@ export function Ledger() {
           <CardContent className="p-0">
             <div className="overflow-x-auto">
               {historyViewMode === 'detailed' ? (
+                <>
                 <table className="w-full text-sm">
                   <thead className="bg-slate-50 border-b border-slate-200">
                     <tr>
@@ -1461,7 +1483,7 @@ export function Ledger() {
                         </td>
                       </tr>
                     ) : (
-                      sortedEntries.map((entry, idx) => (
+                      paginatedEntries.map((entry, idx) => (
                         <tr
                           key={entry.id || `flat-${idx}`}
                           className={`border-b border-slate-100 hover:bg-indigo-50/30 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'}`}
@@ -1536,6 +1558,19 @@ export function Ledger() {
                     )}
                   </tbody>
                 </table>
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between px-4 py-3 border-t border-slate-200">
+                    <span className="text-sm text-slate-500">
+                      Showing {(page - 1) * pageSize + 1} to {Math.min(page * pageSize, sortedEntries.length)} of {sortedEntries.length} entries
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" size="sm" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>Previous</Button>
+                      <span className="text-sm font-medium">Page {page} of {totalPages}</span>
+                      <Button variant="outline" size="sm" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}>Next</Button>
+                    </div>
+                  </div>
+                )}
+                </>
               ) : (
                 /* ── GROUPED VOUCHER VIEW ── */
                 <>

@@ -13,6 +13,7 @@ import * as XLSX from 'xlsx';
 import { usePriv } from '@/src/hooks/usePriv';
 import { formatDisplayDate, normalizeDate } from '@/src/lib/dateUtils';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
+import { fetchEmployeesData } from '@/src/lib/supabaseService';
 import { generateId, isValidUUID } from '@/src/lib/utils';
 import { useDebounce } from '@/src/hooks/useDebounce';
 import {
@@ -282,6 +283,14 @@ export function Attendance() {
       }
     }
   }, [registerDate, fetchAttendanceYearIfNeeded]);
+
+  useEffect(() => {
+    if (allEmployees.length === 0) {
+      fetchEmployeesData()
+        .then((data) => useAppStore.setState({ employees: data }))
+        .catch(console.error);
+    }
+  }, [allEmployees.length]);
 
   const [dbPage, setDbPage] = useState(1);
   const dbPageSize = 100;

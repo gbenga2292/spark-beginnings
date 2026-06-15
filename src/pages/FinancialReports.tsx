@@ -25,6 +25,7 @@ import * as XLSX from 'xlsx';
 import { usePayrollCalculator } from '@/src/hooks/usePayrollCalculator';
 import { usePriv } from '@/src/hooks/usePriv';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
+import { fetchInvoicesData, fetchLedgerData, fetchEmployeesData } from '@/src/lib/supabaseService';
 import { SiteSummary } from './SiteSummary';
 import { AccountsReportBuilder } from '@/src/components/financial/AccountsReportBuilder';
 
@@ -240,6 +241,8 @@ export function FinancialReports() {
   const ledgerEntries = useAppStore(state => state.ledgerEntries);
   const clientProfiles = useAppStore(state => state.clientProfiles);
   const pendingSites = useAppStore(state => state.pendingSites);
+  const employees = useAppStore(state => state.employees);
+  const fetchAttendanceYearIfNeeded = useAppStore(state => state.fetchAttendanceYearIfNeeded);
 
   // O(1) TIN Lookup
   const tinDictionary = useMemo(() => {
@@ -263,6 +266,41 @@ export function FinancialReports() {
   const [ledgerSummaryView, setLedgerSummaryView] = useState<'category' | 'bank' | 'client' | 'site'>('category');
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [fullScreenTable, setFullScreenTable] = useState<'ledger' | 'payroll' | 'ledger-breakdown' | null>(null);
+
+  useEffect(() => {
+    if (rawInvoices.length === 0) {
+      fetchInvoicesData()
+        .then((data) => {
+          useAppStore.setState(data);
+        })
+        .catch(console.error);
+    }
+    if (ledgerEntries.length === 0) {
+      fetchLedgerData()
+        .then((data) => {
+          useAppStore.setState(data);
+        })
+        .catch(console.error);
+    }
+    if (employees.length === 0) {
+      fetchEmployeesData()
+        .then((data) => {
+          useAppStore.setState({ employees: data });
+        })
+        .catch(console.error);
+    }
+  }, [rawInvoices.length, ledgerEntries.length, employees.length]);
+
+  useEffect(() => {
+    selectedYears.forEach(yearStr => {
+      const year = parseInt(yearStr, 10);
+      if (!isNaN(year)) {
+        fetchAttendanceYearIfNeeded(year);
+      }
+    });
+    // Also ensure current year is loaded as a fallback
+    fetchAttendanceYearIfNeeded(new Date().getFullYear());
+  }, [selectedYears, fetchAttendanceYearIfNeeded]);
 
   const toggleFullScreen = async (tableName: 'ledger' | 'payroll' | 'ledger-breakdown') => {
     if (fullScreenTable === tableName) {

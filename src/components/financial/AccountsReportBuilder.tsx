@@ -245,7 +245,7 @@ const BUILT_IN_PRESETS: ReportPreset[] = [
 ];
 
 const fm = (v: number | null | undefined) => {
-  if (typeof v !== 'number' || v === 0) return '-';
+  if (typeof v !== 'number') return '0.00';
   return v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 };
 
@@ -643,7 +643,8 @@ export function AccountsReportBuilder({
         });
         // Calculate balance after summing all events
         groupedMap.forEach(g => {
-          g._raw.vatBalDue = g._raw.vatOwed - g._raw.vatPaid;
+          const bal = g._raw.vatOwed - g._raw.vatPaid;
+          g._raw.vatBalDue = Math.abs(bal) < 0.005 ? 0 : bal;
         });
         return Array.from(groupedMap.values()).sort((a, b) => a._raw.client.localeCompare(b._raw.client));
       }
@@ -1054,16 +1055,19 @@ export function AccountsReportBuilder({
   }, []);
 
   const getColTotal = useCallback((colId: string): number => {
+    let rawSum = 0;
     if (isMultiSource) {
-      return aggregatedRows.reduce((sum, row, i) => {
+      rawSum = aggregatedRows.reduce((sum, row, i) => {
         const v = getAggValue(colId, row, i);
         return sum + (typeof v === 'number' ? v : 0);
       }, 0);
+    } else {
+      rawSum = recordsToPrint.reduce((sum, rec, i) => {
+        const v = getTxnValue(colId, rec, i);
+        return sum + (typeof v === 'number' ? v : 0);
+      }, 0);
     }
-    return recordsToPrint.reduce((sum, rec, i) => {
-      const v = getTxnValue(colId, rec, i);
-      return sum + (typeof v === 'number' ? v : 0);
-    }, 0);
+    return Math.abs(rawSum) < 0.005 ? 0 : rawSum;
   }, [isMultiSource, aggregatedRows, recordsToPrint, getAggValue, getTxnValue]);
 
   // isNumericCol is now a stable module-level function above the component

@@ -77,6 +77,7 @@ export interface Waybill {
   issueDate: string;
   sentToSiteDate?: string;
   items: WaybillItem[];
+  signature?: string;
   created_at?: string;
 }
 

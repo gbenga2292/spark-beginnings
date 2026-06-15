@@ -17,6 +17,7 @@ import { useUserStore } from '@/src/store/userStore';
 import { Avatar, AvatarFallback } from '@/src/components/ui/avatar';
 import { filterAndSortEmployeesExcludingCEO } from '@/src/lib/hierarchy';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
+import { fetchEmployeesData } from '@/src/lib/supabaseService';
 import { useTheme } from '@/src/hooks/useTheme';
 import { formatDisplayDate } from '@/src/lib/dateUtils';
 import { useAppData } from '@/src/contexts/AppDataContext';
@@ -44,6 +45,14 @@ export function Evaluations() {
   const allUsers = useUserStore(s => s.users);
   const priv = usePriv('evaluations');
   const { updateSubtaskStatus, postComment } = useAppData();
+
+  useEffect(() => {
+    if (employees.length === 0) {
+      fetchEmployeesData()
+        .then((data) => useAppStore.setState({ employees: data }))
+        .catch(console.error);
+    }
+  }, [employees.length]);
 
   const internalEmployees = filterAndSortEmployeesExcludingCEO(
     employees.filter(e => 

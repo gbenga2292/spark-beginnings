@@ -12,6 +12,7 @@ import { computeWorkDays, computeWorkDaysInRange, MONTH_INDEX } from '@/src/lib/
 import { toast, showConfirm } from '@/src/components/ui/toast';
 import { usePriv } from '@/src/hooks/usePriv';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
+import { fetchEmployeesData, fetchInvoicesData, fetchLedgerData } from '@/src/lib/supabaseService';
 import { formatDisplayDate, normalizeDate, getPayrollPeriodDates } from '@/src/lib/dateUtils';
 import { generateId } from '@/src/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/src/components/ui/dialog';
@@ -77,6 +78,25 @@ export function Variables() {
 
   useEffect(() => {
     return () => setIsDirty(false);
+  }, []);
+
+  useEffect(() => {
+    const state = useAppStore.getState();
+    if (state.employees.length === 0) {
+      fetchEmployeesData()
+        .then((data) => useAppStore.setState({ employees: data }))
+        .catch(console.error);
+    }
+    if (state.invoices.length === 0 && state.pendingInvoices.length === 0) {
+      fetchInvoicesData()
+        .then((data) => useAppStore.setState(data))
+        .catch(console.error);
+    }
+    if (state.ledgerEntries.length === 0) {
+      fetchLedgerData()
+        .then((data) => useAppStore.setState(data))
+        .catch(console.error);
+    }
   }, []);
 
   const onboardingTemplates = useAppStore(s => s.onboardingTemplates);

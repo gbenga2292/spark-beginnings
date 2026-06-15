@@ -12,6 +12,7 @@ import { toast, showConfirm } from '@/src/components/ui/toast';
 import { usePriv } from '@/src/hooks/usePriv';
 import { useAuth } from '@/src/hooks/useAuth';
 import { useRedaction } from '@/src/hooks/useRedaction';
+import { fetchEmployeesData, fetchAttendanceData } from '@/src/lib/supabaseService';
 import { Dialog } from '@/src/components/ui/dialog';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel } from '@/src/components/ui/dropdown-menu';
 import { useAppData } from '@/src/contexts/AppDataContext';
@@ -57,6 +58,15 @@ export function Employees() {
   const hrVariables = useAppStore((state) => state.hrVariables);
   const { addDisciplinaryRecord, deleteDisciplinaryRecord, setEmployeeFormDirty } = useAppStore();
   const { reminders, addReminder, updateReminder, users } = useAppData();
+
+  useEffect(() => {
+    if (employees.length === 0) {
+      fetchEmployeesData().then(data => useAppStore.setState({ employees: data })).catch(console.error);
+    }
+    if (attendanceRecords.length === 0) {
+      fetchAttendanceData().then(data => useAppStore.setState({ attendanceRecords: data })).catch(console.error);
+    }
+  }, [employees.length, attendanceRecords.length]);
 
   // Derive the profile IDs of all HR department employees so LASHMA reminders
   // are sent to the whole HR team instead of only the current logged-in user.
@@ -109,6 +119,18 @@ export function Employees() {
       return 0;
     });
   }, [employees, debouncedSearch, activeTab, sortBy]);
+
+  const [page, setPage] = useState(1);
+  const pageSize = 50;
+
+  useEffect(() => {
+    setPage(1);
+  }, [searchTerm, activeTab, sortBy]);
+
+  const paginatedEmployees = useMemo(() => {
+    return filteredEmployees.slice((page - 1) * pageSize, page * pageSize);
+  }, [filteredEmployees, page, pageSize]);
+  const totalPages = Math.ceil(filteredEmployees.length / pageSize);
 
   const [formData, setFormData] = useState<Partial<Employee>>({
     staffType: 'OFFICE',
@@ -2304,7 +2326,7 @@ export function Employees() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredEmployees.map((employee) => (
+            {paginatedEmployees.map((employee) => (
               <TableRow key={employee.id} className={`${selectedIds.includes(employee.id) ? 'bg-indigo-50/50' : ''} hover:bg-slate-50/50 transition-colors`}>
                 <TableCell>
                   <Checkbox 
@@ -2386,11 +2408,23 @@ export function Employees() {
             ))}
           </TableBody>
         </Table>
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between px-4 py-3 border-t border-slate-200">
+            <span className="text-sm text-slate-500">
+              Showing {(page - 1) * pageSize + 1} to {Math.min(page * pageSize, filteredEmployees.length)} of {filteredEmployees.length} employees
+            </span>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>Previous</Button>
+              <span className="text-sm font-medium">Page {page} of {totalPages}</span>
+              <Button variant="outline" size="sm" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}>Next</Button>
+            </div>
+          </div>
+        )}
         </div>
 
         {/* Mobile View: Cards */}
         <div className="md:hidden flex flex-col divide-y divide-slate-100 dark:divide-slate-800">
-          {filteredEmployees.map((employee) => (
+          {paginatedEmployees.map((employee) => (
             <div key={`mobile-${employee.id}`} className={`p-4 flex flex-col gap-3 ${selectedIds.includes(employee.id) ? 'bg-indigo-50/50 dark:bg-indigo-900/20' : ''}`}>
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-3">
@@ -2470,6 +2504,13 @@ export function Employees() {
               </div>
             </div>
           ))}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-2 py-4 mt-4">
+              <Button variant="outline" size="sm" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>Prev</Button>
+              <span className="text-sm font-medium">{page} / {totalPages}</span>
+              <Button variant="outline" size="sm" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}>Next</Button>
+            </div>
+          )}
         </div>
       </div>
       {renderBulkEditModal()}

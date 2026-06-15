@@ -26,7 +26,9 @@ import {
   Check,
   LayoutTemplate,
   CalendarDays,
-  Fingerprint
+  Fingerprint,
+  Upload,
+  Trash2
 } from 'lucide-react';
 import { BiometricAuth } from '@aparajita/capacitor-biometric-auth';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
@@ -67,6 +69,10 @@ export function Profile() {
   const [avatarPreview, setAvatarPreview] = useState<string | undefined>(currentUser?.avatar || user?.avatar);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  const [signaturePreview, setSignaturePreview] = useState<string | undefined>(currentUser?.signature || (user as any)?.signature);
+  const [isUploadingSignature, setIsUploadingSignature] = useState(false);
+  const signatureInputRef = useRef<HTMLInputElement>(null);
   
   // Form states
   const [name, setName] = useState(currentUser?.name || user?.name || '');
@@ -220,6 +226,73 @@ export function Profile() {
 
   const handleAvatarClick = () => {
     fileInputRef.current?.click();
+  };
+
+  const handleSignatureClick = () => {
+    signatureInputRef.current?.click();
+  };
+
+  const handleSignatureChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !currentUser) return;
+
+    setIsUploadingSignature(true);
+    setErrorMessage('');
+    setSuccessMessage('');
+
+    try {
+      // Show local preview immediately
+      const localUrl = URL.createObjectURL(file);
+      setSignaturePreview(localUrl);
+
+      // Upload to webserver (same as DailyJournal photo uploads)
+      const MEDIA_SERVER_URL = import.meta.env.VITE_MEDIA_SERVER_URL || 'https://dewaterconstruct.com/dcel-media';
+      const formData = new FormData();
+      formData.append('media', file);
+      formData.append('type', 'signature');
+      formData.append('uploaded_by', currentUser.id);
+      formData.append('uploaded_by_name', currentUser.name);
+
+      const response = await fetch(`${MEDIA_SERVER_URL}/upload-signature.php`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) throw new Error(`Upload failed: ${response.statusText}`);
+
+      const result = await response.json();
+      const publicUrl: string = result.url || result.path || result.file_url;
+      if (!publicUrl) throw new Error('Server did not return a file URL');
+
+      // Save URL to profiles table + local store
+      updateUser(currentUser.id, { signature: publicUrl });
+      login({ ...user!, signature: publicUrl } as any);
+      setSignaturePreview(publicUrl);
+
+      setSuccessMessage('Signature uploaded successfully');
+    } catch (err: any) {
+      setErrorMessage(`Failed to upload signature: ${err.message ?? 'Unknown error'}`);
+      setSignaturePreview(currentUser?.signature || (user as any)?.signature); // revert preview on failure
+    } finally {
+      setIsUploadingSignature(false);
+      // Reset the input so the same file can be re-selected if needed
+      if (signatureInputRef.current) signatureInputRef.current.value = '';
+    }
+  };
+
+
+  const handleRemoveSignature = async () => {
+    if (!currentUser) return;
+    setErrorMessage('');
+    setSuccessMessage('');
+    try {
+      updateUser(currentUser.id, { signature: '' });
+      login({ ...user!, signature: '' } as any);
+      setSignaturePreview(undefined);
+      setSuccessMessage('Signature removed successfully');
+    } catch (err: any) {
+      setErrorMessage(`Failed to remove signature: ${err.message ?? 'Unknown error'}`);
+    }
   };
 
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -406,6 +479,60 @@ export function Profile() {
               <Building2 className="h-3.5 w-3.5" />
               {user?.role || 'Employee'}
             </div>
+          </CardContent>
+        </Card>
+
+        {/* User Signature Card */}
+        <Card className="lg:col-span-1 h-fit overflow-hidden border-slate-200 dark:border-slate-800 shadow-sm rounded-2xl">
+          <CardHeader className="text-center pb-3 border-b border-slate-100 dark:border-slate-800 mb-6 bg-slate-50/50 dark:bg-slate-900/50">
+            <CardTitle className="text-sm font-semibold text-slate-800 dark:text-slate-200">My Signature</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col items-center pt-2 pb-8">
+            <div className="relative mb-6 w-full max-w-[200px] aspect-[2/1] border border-dashed border-slate-200 dark:border-slate-800 rounded-xl flex items-center justify-center bg-slate-50/50 dark:bg-slate-950/50 overflow-hidden">
+              {signaturePreview ? (
+                <img src={signaturePreview} alt="Signature Preview" className="max-h-full max-w-full object-contain" />
+              ) : (
+                <span className="text-xs text-slate-400 font-medium">No signature uploaded</span>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleSignatureClick}
+                disabled={isUploadingSignature}
+                className="gap-2 h-9 rounded-xl border-slate-200 dark:border-slate-800 hover:bg-slate-50 font-semibold text-xs"
+              >
+                {isUploadingSignature ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Upload className="h-4 w-4 text-indigo-600" />
+                )}
+                Upload Signature
+              </Button>
+              {signaturePreview && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleRemoveSignature}
+                  className="h-9 rounded-xl text-rose-600 hover:bg-rose-50 hover:text-rose-700 font-semibold text-xs"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+            <input
+              ref={signatureInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleSignatureChange}
+              className="hidden"
+            />
+            <p className="text-[10px] text-slate-400 dark:text-slate-500 text-center mt-3 max-w-[180px]">
+              Upload a transparent PNG or clean image of your signature to include on return sheets.
+            </p>
           </CardContent>
         </Card>
 

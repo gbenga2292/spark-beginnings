@@ -18,6 +18,7 @@ import {
   format, startOfDay, addMonths, subMonths 
 } from 'date-fns';
 import { usePriv } from '../hooks/usePriv';
+import { fetchOperationsData } from '@/src/lib/supabaseService';
 import { useEffect } from 'react';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/src/components/ui/card';
@@ -47,6 +48,16 @@ export function VehicleManager() {
   const [importType, setImportType] = useState<'vehicles' | 'logs'>('vehicles');
   const [importMode, setImportMode] = useState<'append' | 'replace'>('append');
   const [isImporting, setIsImporting] = useState(false);
+
+  useEffect(() => {
+    if (vehicles.length === 0) {
+      fetchOperationsData()
+        .then((data) => {
+          useAppStore.setState(data);
+        })
+        .catch(console.error);
+    }
+  }, [vehicles.length]);
 
   // Ensure user is on a permitted tab
   useEffect(() => {

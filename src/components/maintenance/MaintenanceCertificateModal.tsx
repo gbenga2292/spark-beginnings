@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   X, Download, ShieldCheck, Settings,
   CheckCircle2, XCircle, ClipboardList, Printer
@@ -84,7 +84,7 @@ export function MaintenanceCertificateModal({ asset, sessions, isOpen, onClose, 
   const printRef = useRef<HTMLDivElement>(null);
   const { issueCertificate } = useOperations();
   const allUsers = useUserStore(s => s.users);
-  const users = allUsers.filter(u => u.isActive);
+  const users = useMemo(() => allUsers.filter(u => u.isActive), [allUsers]);
 
   const [isGenerating, setIsGenerating] = useState(false);
   const [companyInfo, setCompanyInfo] = useState({
@@ -113,6 +113,17 @@ export function MaintenanceCertificateModal({ asset, sessions, isOpen, onClose, 
   const [criteriaCompliance, setCriteriaCompliance] = useState<Record<string, boolean>>(
     Object.fromEntries(CRITERIA.map(c => [c.id, true]))
   );
+
+  const [isConfigOpen, setIsConfigOpen] = useState(true);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsConfigOpen(window.innerWidth > 768);
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     if (isOpen) {
@@ -335,8 +346,19 @@ export function MaintenanceCertificateModal({ asset, sessions, isOpen, onClose, 
   return (
     <div className="fixed inset-0 z-[200] flex bg-black/30 dark:bg-black/70 backdrop-blur-sm">
 
+      {/* Mobile Backdrop for config panel */}
+      {isConfigOpen && (
+        <div 
+          className="fixed inset-0 z-10 bg-black/20 md:hidden" 
+          onClick={() => setIsConfigOpen(false)} 
+        />
+      )}
+
       {/* ── LEFT CONFIG PANEL ─────────────────────────────────────────── */}
-      <div className="w-[320px] shrink-0 h-full bg-white dark:bg-[#0d1117] border-r border-slate-200 dark:border-white/5 flex flex-col overflow-hidden">
+      <div className={`
+        absolute md:relative z-20 h-full bg-white dark:bg-[#0d1117] border-r border-slate-200 dark:border-white/5 flex flex-col overflow-hidden transition-all duration-300
+        ${isConfigOpen ? 'translate-x-0 w-[320px]' : '-translate-x-full w-[320px] md:w-0 md:border-none'}
+      `}>
         {/* Header */}
         <div className="px-5 py-4 border-b border-slate-200 dark:border-white/5 flex items-center justify-between shrink-0">
           <div>
@@ -346,8 +368,20 @@ export function MaintenanceCertificateModal({ asset, sessions, isOpen, onClose, 
             <p className="text-[10px] text-slate-500 mt-0.5 truncate max-w-[200px]">{asset.name}</p>
           </div>
           <button
+            onClick={() => {
+              if (window.innerWidth < 768) {
+                setIsConfigOpen(false);
+              } else {
+                onClose();
+              }
+            }}
+            className="md:hidden h-7 w-7 rounded-md bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 flex items-center justify-center transition-colors"
+          >
+            <X className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+          </button>
+          <button
             onClick={onClose}
-            className="h-7 w-7 rounded-md bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 flex items-center justify-center transition-colors"
+            className="hidden md:flex h-7 w-7 rounded-md bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 items-center justify-center transition-colors"
           >
             <X className="h-4 w-4 text-slate-500 dark:text-slate-400" />
           </button>
@@ -489,28 +523,44 @@ export function MaintenanceCertificateModal({ asset, sessions, isOpen, onClose, 
       </div>
 
       {/* ── RIGHT PREVIEW PANEL ───────────────────────────────────────── */}
-      <div className="flex-1 h-full bg-slate-100 dark:bg-[#070b0f] overflow-y-auto flex flex-col items-center py-8 px-6 gap-6">
+      <div className="flex-1 h-full bg-slate-100 dark:bg-[#070b0f] overflow-y-auto flex flex-col items-center py-4 md:py-8 px-4 md:px-6 gap-4 md:gap-6 min-w-0">
 
         {/* Top bar */}
-        <div className="w-full max-w-[780px] flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="h-8 w-8 rounded-lg bg-blue-600/10 border border-blue-600/20 flex items-center justify-center">
+        <div className="w-full max-w-[780px] flex items-center justify-between shrink-0 gap-2">
+          <div className="flex items-center gap-2 md:gap-3">
+            <button
+              onClick={() => setIsConfigOpen(!isConfigOpen)}
+              className="p-2 rounded-md bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-white/10 transition-colors shadow-sm"
+              title="Toggle Configuration Panel"
+            >
+              <Settings className="h-4 w-4 text-slate-600 dark:text-slate-400" />
+            </button>
+            <div className="hidden sm:flex h-8 w-8 rounded-lg bg-blue-600/10 border border-blue-600/20 items-center justify-center">
               <ShieldCheck className="h-4 w-4 text-blue-600 dark:text-blue-500" />
             </div>
             <div>
-              <p className="text-sm font-bold text-slate-900 dark:text-white">Equipment Certification Form</p>
-              <p className="text-[10px] text-slate-500">Portrait A4 · Print-ready · Official format</p>
+              <p className="text-sm font-bold text-slate-900 dark:text-white leading-tight">Equipment Certification Form</p>
+              <p className="text-[10px] text-slate-500 hidden sm:block">Portrait A4 · Print-ready · Official format</p>
             </div>
           </div>
-          <div className="flex items-center gap-2 text-[10px] text-slate-600 dark:text-slate-500 font-mono bg-white dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-lg px-3 py-1.5 shadow-sm dark:shadow-none">
-            <CheckCircle2 className="h-3 w-3 text-emerald-600 dark:text-emerald-500" />
-            {certNumber}
+          <div className="flex items-center gap-2">
+            <div className="hidden sm:flex items-center gap-2 text-[10px] text-slate-600 dark:text-slate-500 font-mono bg-white dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-lg px-3 py-1.5 shadow-sm dark:shadow-none">
+              <CheckCircle2 className="h-3 w-3 text-emerald-600 dark:text-emerald-500" />
+              {certNumber}
+            </div>
+            <button
+              onClick={onClose}
+              className={`h-8 w-8 rounded-md bg-white dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 flex items-center justify-center transition-colors border border-slate-200 dark:border-white/10 shadow-sm ${isConfigOpen ? 'md:hidden' : ''}`}
+              title="Close"
+            >
+              <X className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+            </button>
           </div>
         </div>
 
         {/* ── CERTIFICATE / FORM SHEET ── */}
-        <div className="overflow-x-auto w-full flex justify-center pb-10">
-          <div className="shadow-2xl">
+        <div className="overflow-x-auto w-full flex md:justify-center pb-10">
+          <div className="shadow-2xl min-w-max">
             <div
               ref={printRef}
               className="bg-white relative"

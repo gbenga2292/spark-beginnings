@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
-import { subDays, subMonths, isPast, format, startOfWeek, addWeeks, isAfter, isBefore, parseISO } from "https://esm.sh/date-fns@2.30.0"
+import { subDays, isPast, format, startOfWeek, addWeeks, isAfter, isBefore, parseISO } from "https://esm.sh/date-fns@2.30.0"
 
 // System injected Postgres vars
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
@@ -187,7 +187,6 @@ serve(async (req) => {
         const reminderTitle = `Reminder: Renewal of ${subtaskTitle}`;
         
         const now = new Date();
-        const oneMonthBefore = subMonths(expiryDate, 1);
         const oneWeekBefore = subDays(expiryDate, 7);
         const isExpired = isPast(expiryDate);
 
@@ -236,8 +235,8 @@ serve(async (req) => {
 
         // Reminders
         const existingRem = (reminders || []).find((r: any) => r.main_task_id === mainVehicleTask!.id && r.title === reminderTitle && r.is_active);
-        if (!existingRem && isAfter(now, oneMonthBefore) && !isPast(expiryDate)) {
-          const firstMonday = getNextMonday(oneMonthBefore);
+        if (!existingRem && isAfter(now, oneWeekBefore) && !isPast(expiryDate)) {
+          const firstMonday = getNextMonday(oneWeekBefore);
           
           await supabase.from('reminders').insert({
             title: reminderTitle,

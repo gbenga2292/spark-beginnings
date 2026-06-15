@@ -6,6 +6,7 @@ interface PageState {
   headerButtons: ReactNode | null;
   subtitle: ReactNode;
   showBackButton: boolean | (() => void);
+  hideLayout: boolean;
 }
 
 // Dispatch definition
@@ -14,6 +15,7 @@ interface PageDispatch {
   setHeaderButtons: (buttons: ReactNode | null) => void;
   setSubtitle: (subtitle: ReactNode) => void;
   setShowBackButton: (show: boolean | (() => void)) => void;
+  setHideLayout: (hide: boolean) => void;
 }
 
 const PageStateContext = createContext<PageState | undefined>(undefined);
@@ -24,9 +26,10 @@ export function PageProvider({ children }: { children: ReactNode }) {
   const [subtitle, setSubtitle] = useState<ReactNode>('');
   const [headerButtons, setHeaderButtons] = useState<ReactNode | null>(null);
   const [showBackButton, setShowBackButton] = useState<boolean | (() => void)>(false);
+  const [hideLayout, setHideLayout] = useState<boolean>(false);
 
-  const stateValue = useMemo(() => ({ title, subtitle, headerButtons, showBackButton }), [title, subtitle, headerButtons, showBackButton]);
-  const dispatchValue = useMemo(() => ({ setTitle, setSubtitle, setHeaderButtons, setShowBackButton }), []);
+  const stateValue = useMemo(() => ({ title, subtitle, headerButtons, showBackButton, hideLayout }), [title, subtitle, headerButtons, showBackButton, hideLayout]);
+  const dispatchValue = useMemo(() => ({ setTitle, setSubtitle, setHeaderButtons, setShowBackButton, setHideLayout }), []);
 
   return (
     <PageStateContext.Provider value={stateValue}>
@@ -116,4 +119,19 @@ export function useSetPageTitle(
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dispatch, title, subtitle, ...deps]);
+}
+
+/**
+ * Hook to hide the layout header and sidebar (e.g. for full screen modals/previews).
+ */
+export function useHideLayout(shouldHide: boolean) {
+  const dispatch = useContext(PageDispatchContext);
+  
+  useEffect(() => {
+    if (!dispatch) return;
+    dispatch.setHideLayout(shouldHide);
+    return () => {
+      dispatch.setHideLayout(false);
+    };
+  }, [dispatch, shouldHide]);
 }

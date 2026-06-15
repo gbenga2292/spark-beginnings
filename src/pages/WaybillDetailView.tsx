@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { formatDisplayDate } from '@/src/lib/dateUtils';
 import {
   ArrowLeft, Download, Eye, Calendar, User, Car, MapPin, Package, X, FileText, Share2, CheckCircle2, Printer
@@ -33,6 +33,39 @@ export function WaybillDetailView({ waybill: propWaybill, onClose }: WaybillDeta
       : new Date().toISOString().split('T')[0]
   );
   const [returnConditions, setReturnConditions] = useState<Record<string, { good: number, damaged: number, missing: number }>>({});
+  const [signatureBase64, setSignatureBase64] = useState<string>('');
+
+  useEffect(() => {
+    if (waybill.signature) {
+      if (waybill.signature.startsWith('data:')) {
+        setSignatureBase64(waybill.signature);
+      } else {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0);
+            try {
+              const dataURL = canvas.toDataURL('image/png');
+              setSignatureBase64(dataURL);
+            } catch (e) {
+              console.error('Failed to convert signature URL to base64:', e);
+            }
+          }
+        };
+        img.onerror = (err) => {
+          console.error('Failed to load signature image:', err);
+        };
+        img.src = waybill.signature;
+      }
+    } else {
+      setSignatureBase64('');
+    }
+  }, [waybill.signature]);
 
   const generatePdfDoc = () => {
     const doc = new jsPDF();
@@ -84,6 +117,15 @@ export function WaybillDetailView({ waybill: propWaybill, onClose }: WaybillDeta
     });
 
     // Signature
+    const sig = signatureBase64 || waybill.signature;
+    if (sig) {
+      try {
+        doc.addImage(sig, 'PNG', 20, 235, 45, 20);
+      } catch (err) {
+        console.error('Error rendering signature in PDF:', err);
+      }
+    }
+
     doc.line(20, 262, 100, 262);
     doc.setFont('times', 'bold');
     doc.setFontSize(11);

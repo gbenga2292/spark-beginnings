@@ -23,6 +23,7 @@ import logoSrc from '@/logo/logo-2.png';
 import { PdfViewer } from '@/src/components/PdfViewer';
 
 import { BulkConsumableLogModal } from './BulkConsumableLogModal';
+import { fetchOperationsData } from '@/src/lib/supabaseService';
 import { BulkMachineLogModal } from './BulkMachineLogModal';
 import { CustomCamera } from '@/src/components/ui/CustomCamera';
 
@@ -466,6 +467,16 @@ export function DailyJournal() {
   const { dailyJournals, siteJournalEntries, sites, addDailyJournal, updateDailyJournal, deleteDailyJournal, deleteSiteJournalEntry } = useAppStore();
   const { dailyMachineLogs } = useOperations();
   const [searchParams, setSearchParams] = useSearchParams();
+
+  useEffect(() => {
+    if (dailyJournals.length === 0) {
+      fetchOperationsData()
+        .then((data) => {
+          useAppStore.setState(data);
+        })
+        .catch(console.error);
+    }
+  }, [dailyJournals.length]);
 
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
   const [currentMonth, setCurrentMonth] = useState(new Date());

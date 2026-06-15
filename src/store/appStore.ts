@@ -4,6 +4,25 @@ import { db, fetchAttendanceByYear } from '@/src/lib/supabaseService';
 import { SiteQuestionnaire } from '@/src/types/SiteQuestionnaire';
 import { Vehicle, VehicleTripLeg, VehicleDocumentType, ConsumableUsageLog } from '@/src/types/operations';
 import { InterviewCandidate } from '@/src/types/interviews';
+import { openDB } from 'idb';
+
+const dbPromise = openDB('dcel-hr-db', 1, {
+  upgrade(db) {
+    db.createObjectStore('keyval');
+  },
+});
+
+const idbStorage = {
+  getItem: async (name: string): Promise<string | null> => {
+    return (await dbPromise).get('keyval', name) || null;
+  },
+  setItem: async (name: string, value: string): Promise<void> => {
+    await (await dbPromise).put('keyval', value, name);
+  },
+  removeItem: async (name: string): Promise<void> => {
+    await (await dbPromise).delete('keyval', name);
+  },
+};
 
 export interface CommLog {
   id: string;
@@ -1565,7 +1584,7 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'dcel-hr-storage',
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() => idbStorage),
     }
   )
 );

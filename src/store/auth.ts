@@ -8,6 +8,7 @@ export interface User {
   email: string;
   role: Role;
   avatar?: string;
+  signature?: string;
 }
 
 interface AuthState {
