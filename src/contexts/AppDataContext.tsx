@@ -246,7 +246,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                             if (unread.length === 1) {
                                 const actionObj = unread[0].mainTaskId ? {
                                     label: 'View',
-                                    onClick: () => { window.location.href = `/tasks?openTask=${unread[0].mainTaskId}`; }
+                                    onClick: () => { window.location.hash = `#/tasks?openTask=${unread[0].mainTaskId}`; }
                                 } : undefined;
                                 
                                 const msgTitle = unread[0].title === 'New Task Created' ? `New Task: ${unread[0].body}` : unread[0].title;

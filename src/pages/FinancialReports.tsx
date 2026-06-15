@@ -291,16 +291,6 @@ export function FinancialReports() {
     }
   }, [rawInvoices.length, ledgerEntries.length, employees.length]);
 
-  useEffect(() => {
-    selectedYears.forEach(yearStr => {
-      const year = parseInt(yearStr, 10);
-      if (!isNaN(year)) {
-        fetchAttendanceYearIfNeeded(year);
-      }
-    });
-    // Also ensure current year is loaded as a fallback
-    fetchAttendanceYearIfNeeded(new Date().getFullYear());
-  }, [selectedYears, fetchAttendanceYearIfNeeded]);
 
   const toggleFullScreen = async (tableName: 'ledger' | 'payroll' | 'ledger-breakdown') => {
     if (fullScreenTable === tableName) {
@@ -609,6 +599,17 @@ export function FinancialReports() {
     if (!filterYear) return [];
     return filterYear.split(',').map((year) => year.trim()).filter(Boolean);
   }, [filterYear, availableYears]);
+
+  useEffect(() => {
+    selectedYears.forEach(yearStr => {
+      const year = parseInt(yearStr, 10);
+      if (!isNaN(year)) {
+        fetchAttendanceYearIfNeeded(year);
+      }
+    });
+    // Also ensure current year is loaded as a fallback
+    fetchAttendanceYearIfNeeded(new Date().getFullYear());
+  }, [selectedYears, fetchAttendanceYearIfNeeded]);
 
   const selectedMonths = useMemo(() => {
     if (filterMonth === 'All') return MONTHS_LIST.map(m => m.value);
