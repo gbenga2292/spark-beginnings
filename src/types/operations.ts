@@ -104,7 +104,7 @@ export interface Checkout {
   assetName: string;
   quantity: number;
   returnedQuantity: number;
-  employeeId: string;
+  employeeId: string | null;
   employeeName: string;
   checkoutDate: string;
   returnInDays: number;

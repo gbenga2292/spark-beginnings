@@ -28,6 +28,7 @@ export function QuickCheckout() {
   const [quantity, setQuantity] = useState<number>(1);
   const [returnDays, setReturnDays] = useState<number>(7);
   const [selectedEmployee, setSelectedEmployee] = useState<string>('');
+  const [customEmployeeName, setCustomEmployeeName] = useState<string>('');
   const [hoveredCheckout, setHoveredCheckout] = useState<string | null>(null);
   const [activityFilter, setActivityFilter] = useState('all');
 
@@ -74,22 +75,43 @@ export function QuickCheckout() {
       toast.error('Please select both an asset and an employee');
       return;
     }
+    if (selectedEmployee === 'other' && !customEmployeeName.trim()) {
+      toast.error('Please enter a custom employee name');
+      return;
+    }
     const asset = assets.find(a => a.id === selectedAsset);
-    const emp = opsStaff.find(e => e.id === selectedEmployee);
-    if (!asset || !emp) return;
+    if (!asset) return;
 
-    addCheckout({
-      assetId: asset.id,
-      assetName: asset.name,
-      quantity,
-      employeeId: emp.id,
-      employeeName: `${emp.firstname} ${emp.surname}`,
-      returnInDays: returnDays
-    });
+    if (selectedEmployee === 'other') {
+      addCheckout({
+        assetId: asset.id,
+        assetName: asset.name,
+        quantity,
+        employeeId: null,
+        employeeName: customEmployeeName.trim(),
+        returnInDays: returnDays
+      });
 
-    toast.success(`${asset.name} checked out to ${emp.firstname}`);
+      toast.success(`${asset.name} checked out to ${customEmployeeName.trim()}`);
+    } else {
+      const emp = opsStaff.find(e => e.id === selectedEmployee);
+      if (!emp) return;
+
+      addCheckout({
+        assetId: asset.id,
+        assetName: asset.name,
+        quantity,
+        employeeId: emp.id,
+        employeeName: `${emp.firstname} ${emp.surname}`,
+        returnInDays: returnDays
+      });
+
+      toast.success(`${asset.name} checked out to ${emp.firstname}`);
+    }
+
     setSelectedAsset('');
     setSelectedEmployee('');
+    setCustomEmployeeName('');
     setQuantity(1);
     setReturnDays(7);
   };
@@ -157,6 +179,11 @@ export function QuickCheckout() {
                       <div className="flex items-center gap-2 text-xs text-slate-400 mt-1">
                         <Users className="h-3 w-3" />
                         <span>{c.employeeName}</span>
+                        {!c.employeeId && (
+                          <Badge variant="outline" className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 font-bold text-[9px] px-1 py-0 rounded">
+                            External
+                          </Badge>
+                        )}
                         <span>•</span>
                         <span>{c.quantity} units {c.returnedQuantity > 0 && `(Returned: ${c.returnedQuantity})`}</span>
                       </div>
@@ -226,20 +253,40 @@ export function QuickCheckout() {
               <div className="space-y-2">
                 <label className="text-xs font-bold uppercase tracking-wider text-slate-500 ml-1">Assign To *</label>
                 <select 
-                  value={selectedEmployee} onChange={(e) => setSelectedEmployee(e.target.value)}
+                  value={selectedEmployee} 
+                  onChange={(e) => {
+                    setSelectedEmployee(e.target.value);
+                    if (e.target.value !== 'other') {
+                      setCustomEmployeeName('');
+                    }
+                  }}
                   className="w-full h-11 rounded-md bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-blue-500/20 font-medium text-slate-600 dark:text-slate-300 px-3 outline-none text-sm"
                 >
                   <option value="" disabled>Select site personnel</option>
                   {opsStaff.map(emp => (
                     <option key={emp.id} value={emp.id}>{emp.firstname} {emp.surname} ({emp.position})</option>
                   ))}
+                  <option value="other">Other (Type name...)</option>
                 </select>
               </div>
+
+              {selectedEmployee === 'other' && (
+                <div className="space-y-2 animate-in slide-in-from-top-2 duration-200">
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-500 ml-1">Name *</label>
+                  <Input 
+                    type="text" 
+                    placeholder="Enter full name of non-employee" 
+                    value={customEmployeeName} 
+                    onChange={(e) => setCustomEmployeeName(e.target.value)}
+                    className="h-11 rounded-md bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 focus:ring-blue-500/20 font-semibold text-sm"
+                  />
+                </div>
+              )}
             </div>
 
             <Button 
               onClick={handleCheckout}
-              disabled={!selectedAsset || !selectedEmployee}
+              disabled={!selectedAsset || !selectedEmployee || (selectedEmployee === 'other' && !customEmployeeName.trim())}
               className="w-full h-11 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm gap-2 shadow-sm disabled:opacity-50 mt-2"
             >
               <ShoppingCart className="h-4 w-4" />
@@ -274,10 +321,17 @@ export function QuickCheckout() {
                   <div className="flex items-start justify-between">
                     <div>
                       <h4 className="font-semibold text-slate-800 dark:text-white text-sm">{c.assetName}</h4>
-                      <p className="text-xs text-slate-400 mt-1">
-                        {c.employeeName} • {formatDisplayDate(c.checkoutDate)}
+                      <div className="text-xs text-slate-400 mt-1 flex items-center gap-1.5 flex-wrap">
+                        <span>{c.employeeName}</span>
+                        {!c.employeeId && (
+                          <Badge variant="outline" className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 font-bold text-[9px] px-1 py-0 rounded">
+                            External
+                          </Badge>
+                        )}
+                        <span>•</span>
+                        <span>{formatDisplayDate(c.checkoutDate)}</span>
                         {c.returnedQuantity > 0 && <span className="text-blue-500 ml-2">Returned: {c.returnedQuantity}</span>}
-                      </p>
+                      </div>
                     </div>
                     <div className="flex flex-col items-end gap-1">
                       <span className="font-bold text-slate-600 dark:text-slate-400">×{c.quantity}</span>

@@ -291,7 +291,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
       totalCharge = totalCost + vat;
     }
 
-    return { totalCost, vat, totalCharge, vatInc, maxDuration, actualTechDuration, actualNightDuration, techniciansCost, effectiveTechDailyRate, noOfTechnicianNight, accomCrewCount };
+    return { totalCost, vat, totalCharge, vatInc, maxDuration, actualTechDuration, actualNightDuration, techniciansCost, effectiveTechDailyRate, noOfTechnicianNight, accomCrewCount, dieselCost, rentalCost, mobDemob, installation, damages };
   }, [form, machineConfigs, siteRegistry, vatRate]);
 
   const calculateFullInvoiceData = (input: any, configs?: { rate: string; duration: string }[]) => {
@@ -2808,6 +2808,137 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                         <span className="font-mono">
                           ₦{livePreview.techniciansCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Diesel Calculation breakdown card */}
+                {(livePreview.dieselCost > 0) && (
+                  <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-850 p-5 shadow-sm space-y-4">
+                    <p className="text-[10px] font-black uppercase tracking-wider text-orange-600 dark:text-orange-400 border-b border-slate-100 dark:border-slate-800 pb-2">Diesel Calculation</p>
+                    <div className="space-y-3.5 text-xs">
+                      {machineConfigs.length > 0 ? (
+                        machineConfigs.map((row, idx) => (
+                          (parseFloat(row.duration) > 0) && (
+                            <div key={idx} className="flex justify-between items-start text-slate-655 dark:text-slate-400 gap-2">
+                              <span className="flex flex-col">
+                                <span className="font-bold text-slate-705 dark:text-slate-350">Machine {idx + 1} Diesel</span>
+                                <span className="text-[10px] text-slate-400 font-medium">
+                                  {parseFloat(form.dailyUsage) || 0}L/d × ₦{(parseFloat(form.dieselCostPerLtr) || 0).toLocaleString()}/L × {parseFloat(row.duration) || 0}d
+                                </span>
+                              </span>
+                              <span className="font-mono font-bold text-slate-850 dark:text-slate-205 shrink-0">
+                                ₦{((parseFloat(form.dailyUsage) || 0) * (parseFloat(form.dieselCostPerLtr) || 0) * (parseFloat(row.duration) || 0)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </span>
+                            </div>
+                          )
+                        ))
+                      ) : (
+                        <div className="flex justify-between items-start text-slate-655 dark:text-slate-400 gap-2">
+                          <span className="flex flex-col">
+                            <span className="font-bold text-slate-705 dark:text-slate-350">Diesel Cost</span>
+                            <span className="text-[10px] text-slate-400 font-medium">
+                              {parseInt(form.noOfMachine) || 0} machine{parseInt(form.noOfMachine) !== 1 ? 's' : ''} × {parseFloat(form.dailyUsage) || 0}L/d × ₦{(parseFloat(form.dieselCostPerLtr) || 0).toLocaleString()}/L × {livePreview.maxDuration}d
+                            </span>
+                          </span>
+                          <span className="font-mono font-bold text-slate-850 dark:text-slate-205 shrink-0">
+                            ₦{livePreview.dieselCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      )}
+                      <div className="h-px bg-slate-200 dark:bg-slate-800 my-2" />
+                      <div className="flex justify-between font-bold text-orange-700 dark:text-orange-300 bg-orange-50/50 dark:bg-orange-950/20 p-2.5 rounded-lg border border-orange-100 dark:border-orange-900">
+                        <span>Total Diesel Cost</span>
+                        <span className="font-mono">₦{livePreview.dieselCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Machine Rental breakdown card */}
+                {(livePreview.rentalCost > 0) && (
+                  <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-850 p-5 shadow-sm space-y-4">
+                    <p className="text-[10px] font-black uppercase tracking-wider text-emerald-700 dark:text-emerald-400 border-b border-slate-100 dark:border-slate-800 pb-2">Machine Calculation</p>
+                    <div className="space-y-3.5 text-xs">
+                      {machineConfigs.length > 0 ? (
+                        machineConfigs.map((row, idx) => (
+                          (parseFloat(row.rate) > 0 || parseFloat(row.duration) > 0) && (
+                            <div key={idx} className="flex justify-between items-start text-slate-655 dark:text-slate-400 gap-2">
+                              <span className="flex flex-col">
+                                <span className="font-bold text-slate-705 dark:text-slate-350">Machine {idx + 1}</span>
+                                <span className="text-[10px] text-slate-400 font-medium">
+                                  ₦{(parseFloat(row.rate) || 0).toLocaleString()}/d × {parseFloat(row.duration) || 0}d
+                                </span>
+                              </span>
+                              <span className="font-mono font-bold text-slate-850 dark:text-slate-205 shrink-0">
+                                ₦{((parseFloat(row.rate) || 0) * (parseFloat(row.duration) || 0)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </span>
+                            </div>
+                          )
+                        ))
+                      ) : (
+                        <div className="flex justify-between items-start text-slate-655 dark:text-slate-400 gap-2">
+                          <span className="flex flex-col">
+                            <span className="font-bold text-slate-705 dark:text-slate-350">Rental Cost</span>
+                            <span className="text-[10px] text-slate-400 font-medium">No machine config set</span>
+                          </span>
+                          <span className="font-mono font-bold text-slate-850 dark:text-slate-205 shrink-0">
+                            ₦{livePreview.rentalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      )}
+                      <div className="h-px bg-slate-200 dark:bg-slate-800 my-2" />
+                      <div className="flex justify-between font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50/50 dark:bg-emerald-950/20 p-2.5 rounded-lg border border-emerald-100 dark:border-emerald-900">
+                        <span>Total Machine Cost</span>
+                        <span className="font-mono">₦{livePreview.rentalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Other Charges breakdown card (Mob/Demob, Installation, Damages) */}
+                {(livePreview.mobDemob > 0 || livePreview.installation > 0 || livePreview.damages > 0) && (
+                  <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-850 p-5 shadow-sm space-y-4">
+                    <p className="text-[10px] font-black uppercase tracking-wider text-rose-600 dark:text-rose-400 border-b border-slate-100 dark:border-slate-800 pb-2">Other Charges</p>
+                    <div className="space-y-3.5 text-xs">
+                      {livePreview.mobDemob > 0 && (
+                        <div className="flex justify-between items-start text-slate-655 dark:text-slate-400 gap-2">
+                          <span className="flex flex-col">
+                            <span className="font-bold text-slate-705 dark:text-slate-350">Mob / Demob</span>
+                            <span className="text-[10px] text-slate-400 font-medium">Mobilisation &amp; demobilisation fee</span>
+                          </span>
+                          <span className="font-mono font-bold text-slate-850 dark:text-slate-205 shrink-0">
+                            ₦{livePreview.mobDemob.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      )}
+                      {livePreview.installation > 0 && (
+                        <div className="flex justify-between items-start text-slate-655 dark:text-slate-400 pt-2.5 border-t border-slate-100 dark:border-slate-850 gap-2">
+                          <span className="flex flex-col">
+                            <span className="font-bold text-slate-705 dark:text-slate-350">Installation</span>
+                            <span className="text-[10px] text-slate-400 font-medium">Installation &amp; setup charges</span>
+                          </span>
+                          <span className="font-mono font-bold text-slate-850 dark:text-slate-205 shrink-0">
+                            ₦{livePreview.installation.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      )}
+                      {livePreview.damages > 0 && (
+                        <div className="flex justify-between items-start text-slate-655 dark:text-slate-400 pt-2.5 border-t border-slate-100 dark:border-slate-850 gap-2">
+                          <span className="flex flex-col">
+                            <span className="font-bold text-slate-705 dark:text-slate-350">Damages</span>
+                            <span className="text-[10px] text-slate-400 font-medium">Damage &amp; repair charges</span>
+                          </span>
+                          <span className="font-mono font-bold text-slate-850 dark:text-slate-205 shrink-0">
+                            ₦{livePreview.damages.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      )}
+                      <div className="h-px bg-slate-200 dark:bg-slate-800 my-2" />
+                      <div className="flex justify-between font-bold text-rose-700 dark:text-rose-300 bg-rose-50/50 dark:bg-rose-950/20 p-2.5 rounded-lg border border-rose-100 dark:border-rose-900">
+                        <span>Total Other Charges</span>
+                        <span className="font-mono">₦{(livePreview.mobDemob + livePreview.installation + livePreview.damages).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                       </div>
                     </div>
                   </div>

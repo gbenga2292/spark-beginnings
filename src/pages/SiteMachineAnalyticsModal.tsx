@@ -69,14 +69,13 @@ export function SiteMachineAnalyticsModal({ isOpen, onClose, site, machines }: S
     let dieselChartEntries: { label: string; value: number; isAvg?: boolean }[] = [];
 
     if (selectedMonth === 'all') {
-      // 12-month average diesel per active day
+      // 12-month average diesel per day on site
       dieselChartEntries = MONTHS.map((monthName, mIdx) => {
         const mLogs = filteredLogs.filter(l => new Date(l.date).getMonth() === mIdx);
-        const activeLogs = mLogs.filter(l => l.dieselUsage > 0);
-        const avg = activeLogs.length > 0
-          ? mLogs.reduce((acc, l) => acc + (Number(l.dieselUsage) || 0), 0) / activeLogs.length
+        const avg = mLogs.length > 0
+          ? mLogs.reduce((acc, l) => acc + (Number(l.dieselUsage) || 0), 0) / mLogs.length
           : 0;
-        return { label: monthName, value: avg, isAvg: true };
+        return { label: MONTHS[mIdx], value: avg, isAvg: true };
       });
     } else {
       // Per-day within the selected month
@@ -168,27 +167,29 @@ export function SiteMachineAnalyticsModal({ isOpen, onClose, site, machines }: S
                 </h3>
               </div>
               {selectedMonth === 'all' && (
-                <span className="text-[10px] font-bold text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">Avg L/active day</span>
+                <span className="text-[10px] font-bold text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">Avg L/day on site</span>
               )}
             </div>
             <div className="h-36 flex items-end gap-1.5 px-1">
               {dieselChartEntries.map((entry, i) => {
                 const h = entry.value > 0 ? Math.max(6, (entry.value / maxDiesel) * 100) : 0;
                 return (
-                  <div key={i} className="flex-1 flex flex-col items-center gap-1 group relative">
-                    {entry.value > 0 && (
-                      <div className="absolute -top-7 left-1/2 -translate-x-1/2 bg-amber-600 text-white text-[9px] py-0.5 px-1.5 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10">
-                        {entry.isAvg ? `avg ${entry.value.toFixed(1)}L` : `${entry.value.toFixed(1)}L`}
-                      </div>
-                    )}
-                    <div
-                      className={`w-full rounded-t-md transition-colors ${
-                        entry.value > 0
-                          ? 'bg-amber-400 hover:bg-amber-500'
-                          : 'bg-slate-100 dark:bg-slate-800'
-                      }`}
-                      style={{ height: h > 0 ? `${h}%` : '4px' }}
-                    />
+                  <div key={i} className="flex-1 flex flex-col items-center gap-1 group relative h-full justify-end">
+                    <div className="relative w-full flex-1 flex items-end">
+                      <div
+                        className={`w-full rounded-t-md transition-colors ${
+                          entry.value > 0
+                            ? 'bg-amber-400 hover:bg-amber-500'
+                            : 'bg-slate-100 dark:bg-slate-800'
+                        }`}
+                        style={{ height: h > 0 ? `${h}%` : '4px' }}
+                      />
+                      {entry.value > 0 && (
+                        <div className="absolute -top-7 left-1/2 -translate-x-1/2 bg-amber-600 text-white text-[9px] py-0.5 px-1.5 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10">
+                          {entry.isAvg ? `avg ${entry.value.toFixed(1)}L` : `${entry.value.toFixed(1)}L`}
+                        </div>
+                      )}
+                    </div>
                     <span className="text-[9px] font-bold text-slate-400 truncate w-full text-center">{entry.label}</span>
                   </div>
                 );
@@ -204,7 +205,7 @@ export function SiteMachineAnalyticsModal({ isOpen, onClose, site, machines }: S
                 <strong className="text-amber-600 ml-1">
                   {selectedMonth === 'all'
                     ? `${dieselChartEntries.reduce((a, b) => a.value > b.value ? a : b, { label: '—', value: 0 }).label}`
-                    : `${filteredLogs.filter(l => l.dieselUsage > 0).length > 0 ? (stats.totalDiesel / filteredLogs.filter(l => l.dieselUsage > 0).length).toFixed(1) : '0'} L`}
+                    : `${filteredLogs.length > 0 ? (stats.totalDiesel / filteredLogs.length).toFixed(1) : '0'} L`}
                 </strong>
               </span>
             </div>

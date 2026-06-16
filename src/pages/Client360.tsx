@@ -1600,8 +1600,71 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                       });
 
                       return displayedInvoices.length > 0 ? (
-                      <div className="overflow-x-auto style-scroll rounded-xl border border-slate-100 dark:border-slate-800">
-                        <table className="w-full text-left text-xs border-collapse min-w-[640px]">
+                      <div className="rounded-xl border border-slate-100 dark:border-slate-800 overflow-hidden">
+                        {/* Mobile Card View */}
+                        <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800">
+                          {displayedInvoices.map((inv, idx) => (
+                            <div key={inv.id || idx} className="p-4 hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors cursor-pointer active:bg-slate-100 dark:active:bg-slate-800 touch-manipulation" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedInvoiceForDetail(inv); }}>
+                              <div className="flex justify-between items-start mb-3">
+                                <div>
+                                  <div className="font-bold text-sm text-slate-900 dark:text-white">{inv.invoiceNumber || '-'}</div>
+                                  <div className="text-xs text-slate-500 mt-0.5">{inv.siteName || '-'}</div>
+                                </div>
+                                <div className="text-right flex flex-col items-end">
+                                  <div className="font-bold text-sm text-slate-850 dark:text-slate-150">
+                                    ₦{(inv.totalCharge || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </div>
+                                  <Badge variant="outline" className={cn(
+                                    "mt-1.5 text-[9px] px-1.5 py-0.5",
+                                    inv.status === 'Paid' ? 'text-emerald-600 bg-emerald-50 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-900' :
+                                    inv.status === 'Overdue' ? 'text-rose-600 bg-rose-50 border-rose-200 dark:bg-rose-950/30 dark:text-rose-400 dark:border-rose-900' :
+                                    'text-amber-600 bg-amber-50 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-900'
+                                  )}>
+                                    {inv.status}
+                                  </Badge>
+                                </div>
+                              </div>
+                              <div className="grid grid-cols-2 gap-y-3 gap-x-4 text-[11px] bg-slate-50/50 dark:bg-slate-800/20 rounded-lg p-3">
+                                <div>
+                                  <span className="text-slate-400 block mb-0.5 uppercase tracking-wider text-[9px] font-bold">Date Sent</span>
+                                  <span className="font-medium text-slate-700 dark:text-slate-300">
+                                    {inv.date ? new Date(normalizeDate(inv.date)).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
+                                  </span>
+                                </div>
+                                <div>
+                                  <span className="text-slate-400 block mb-0.5 uppercase tracking-wider text-[9px] font-bold">Duration</span>
+                                  <span className="font-medium text-slate-700 dark:text-slate-300">
+                                    {inv.duration ? `${inv.duration} days` : '—'}
+                                  </span>
+                                </div>
+                                <div>
+                                  <span className="text-slate-400 block mb-0.5 uppercase tracking-wider text-[9px] font-bold">Due Date</span>
+                                  <span className="font-medium text-slate-700 dark:text-slate-300">
+                                    {inv.dueDate ? new Date(normalizeDate(inv.dueDate)).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
+                                  </span>
+                                </div>
+                                <div>
+                                  <span className="text-slate-400 block mb-0.5 uppercase tracking-wider text-[9px] font-bold">Next Billing</span>
+                                  <span className="font-medium text-slate-700 dark:text-slate-300">
+                                    {inv.siteStatus === 'Ended' ? (
+                                      <span className="text-slate-400 italic">Site Ended</span>
+                                    ) : inv.nextBillingDate ? (
+                                      <span className="text-indigo-600 dark:text-indigo-400 font-bold">
+                                        {new Date(inv.nextBillingDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                      </span>
+                                    ) : (
+                                      <span className="text-slate-400">—</span>
+                                    )}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Desktop Table View */}
+                        <div className="hidden md:block overflow-x-auto style-scroll">
+                          <table className="w-full text-left text-xs border-collapse min-w-[640px]">
                           <thead>
                             <tr className={cn("border-b font-bold text-slate-500 uppercase tracking-wider text-[10px]", isDark ? "bg-slate-800/40 border-slate-800" : "bg-slate-50 border-slate-100")}>
                               {[
@@ -1688,6 +1751,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                             ))}
                           </tbody>
                         </table>
+                        </div>
                       </div>
                     ) : (
                       <div className="py-12 flex flex-col items-center justify-center text-center text-slate-500">
@@ -1697,7 +1761,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                           {showOnlyUnpaidInvoices ? "No unpaid invoices found for this client." : "No invoices have been recorded for this client within the selected filter period."}
                         </p>
                       </div>
-                    );
+                    )
                   })()}
                   </div>
                   )}
@@ -1725,8 +1789,8 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                         ? allVatPayments.filter(p => p.settlementStatus !== 'Fully Settled' && p.settlementStatus !== 'No VAT Due')
                         : allVatPayments;
                       return allVatPayments.length > 0 ? (
-                      <div className="overflow-x-auto style-scroll rounded-xl border border-slate-100 dark:border-slate-800">
-                        <div className="flex items-center gap-2 px-4 py-2.5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/30">
+                      <div className="rounded-xl border border-slate-100 dark:border-slate-800 overflow-hidden">
+                        <div className="flex flex-wrap items-center gap-y-2 gap-x-3 px-3 sm:px-4 py-3 border-b border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/30">
                           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Showing:</span>
                           <span className="text-[10px] font-bold text-slate-600 dark:text-slate-300">VAT-Applicable Payments (Excluding No VAT)</span>
                           <button
@@ -1744,9 +1808,151 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                             )} />
                             {hideFullySettled ? "Showing Unsettled Only" : "Hide Fully Settled"}
                           </button>
-                          <span className="ml-auto text-[10px] font-semibold text-indigo-500">{filteredPayments.length} record{filteredPayments.length !== 1 ? 's' : ''} · Sorted by Date ↓</span>
+                          <span className="w-full sm:w-auto sm:ml-auto text-[10px] font-semibold text-indigo-500">{filteredPayments.length} record{filteredPayments.length !== 1 ? 's' : ''} · Sorted by Date ↓</span>
                         </div>
-                        <table className="w-full text-left text-xs border-collapse min-w-[640px]">
+
+                        {/* Mobile Card View */}
+                        <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800">
+                          {(() => {
+                            const groupMap = new Map<string, Array<typeof filteredPayments[0]>>();
+                            filteredPayments.forEach(p => {
+                              const k = p.key || `nk-${p.date}`;
+                              if (!groupMap.has(k)) groupMap.set(k, []);
+                              groupMap.get(k)!.push(p);
+                            });
+
+                            return Array.from(groupMap.entries()).map(([groupKey, groupPayments]) => {
+                                const first = groupPayments[0];
+                                const { settlementStatus, totalDueForMonth, totalPaidForMonth, monthName, yearStr, key } = first;
+                                const groupVatTotal = groupPayments.reduce((s, p) => s + (p.vatAmount || 0), 0);
+
+                                const settlementColor =
+                                  settlementStatus === 'Fully Settled' || settlementStatus === 'No VAT Due'
+                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/50'
+                                    : settlementStatus === 'Partially Settled'
+                                    ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-900/50'
+                                    : 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/20 dark:text-rose-400 dark:border-rose-900/50';
+
+                                const headerBg =
+                                  settlementStatus === 'Fully Settled' || settlementStatus === 'No VAT Due'
+                                    ? (isDark ? 'bg-emerald-950/20' : 'bg-emerald-50/80')
+                                    : settlementStatus === 'Partially Settled'
+                                    ? (isDark ? 'bg-amber-950/20' : 'bg-amber-50/80')
+                                    : (isDark ? 'bg-rose-950/20' : 'bg-rose-50/80');
+
+                                const isCollapsed = collapsedMonths.has(groupKey);
+                                const toggleCollapse = (e?: React.MouseEvent) => {
+                                  if (e) {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                  }
+                                  setCollapsedMonths(prev => {
+                                    const next = new Set(prev);
+                                    if (next.has(groupKey)) next.delete(groupKey);
+                                    else next.add(groupKey);
+                                    return next;
+                                  });
+                                };
+
+                                return (
+                                  <div key={`mob-${groupKey}`} className="flex flex-col">
+                                    <div
+                                      onClick={toggleCollapse}
+                                      className={cn(
+                                        "p-4 cursor-pointer touch-manipulation select-none transition-colors active:opacity-70",
+                                        headerBg
+                                      )}
+                                    >
+                                      <div className="flex justify-between items-center mb-2">
+                                        <div className="flex items-center gap-2">
+                                          {isCollapsed
+                                            ? <ChevronRight className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                                            : <ChevronDown className="w-4 h-4 text-slate-400 flex-shrink-0" />}
+                                          <span className="text-xs font-black uppercase tracking-widest text-slate-700 dark:text-slate-200">
+                                            {monthName} {yearStr}
+                                          </span>
+                                        </div>
+                                        <Badge className={cn("text-[9px] py-0.5 px-1.5 font-bold whitespace-nowrap", settlementColor)}>
+                                          {settlementStatus}
+                                        </Badge>
+                                      </div>
+                                      <div className="flex justify-between items-end pl-6">
+                                        <div>
+                                          <div className="text-[10px] text-slate-500 mb-0.5">VAT Due: ₦{(totalDueForMonth || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
+                                          {key && (
+                                            <div className="text-[10px] text-slate-400 font-semibold">
+                                              Remitted: ₦{(totalPaidForMonth || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                                            </div>
+                                          )}
+                                        </div>
+                                        <div className="text-right">
+                                          <div className="text-[10px] text-slate-500 mb-0.5">Total VAT</div>
+                                          <div className="font-bold text-xs text-indigo-600 dark:text-indigo-400">
+                                            ₦{groupVatTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                    
+                                    {!isCollapsed && (
+                                      <div className="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800">
+                                        {groupPayments.map((p, idx) => (
+                                          <div key={p.id || `${groupKey}-${idx}`} className="p-4 pl-6 flex flex-col gap-2 border-l-4 border-l-slate-200 dark:border-l-slate-700">
+                                            <div className="flex justify-between items-start">
+                                              <div>
+                                                <div className="font-bold text-sm text-slate-850 dark:text-slate-150">
+                                                  ₦{(p.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                </div>
+                                                <div className="text-xs text-slate-500 mt-0.5">{p.site}</div>
+                                              </div>
+                                              <div className="text-right">
+                                                <div className="font-bold text-xs text-indigo-600 dark:text-indigo-400">
+                                                  VAT: ₦{(p.vatAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                </div>
+                                                <Badge variant="outline" className={cn("mt-1 text-[9px] px-1.5 whitespace-nowrap",
+                                                  p.payVat === 'Add' ? 'text-indigo-600 bg-indigo-50 border-indigo-200 dark:bg-indigo-950/30 dark:text-indigo-400 dark:border-indigo-900' :
+                                                  p.payVat === 'Yes' ? 'text-teal-650 bg-teal-50 border-teal-200 dark:bg-teal-950/30 dark:text-teal-400 dark:border-teal-900' :
+                                                  'text-slate-500 bg-slate-50 border-slate-200 dark:bg-slate-850 dark:text-slate-400 dark:border-slate-800'
+                                                )}>
+                                                  {p.payVat === 'Add' ? `Add ${vatRate}%` : p.payVat === 'Yes' ? `Incl. ${vatRate}%` : "Exempt"}
+                                                </Badge>
+                                              </div>
+                                            </div>
+                                            <div className="text-[10px] text-slate-400 font-medium">
+                                              Paid: {new Date(normalizeDate(p.date) || p.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                            });
+                          })()}
+                        </div>
+
+                        {/* Mobile Grand Totals */}
+                        <div className="md:hidden border-t-2 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 p-4">
+                          <div className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-3">Grand Totals</div>
+                          <div className="grid grid-cols-2 gap-3 text-sm">
+                            <div>
+                              <div className="text-[10px] text-slate-400 mb-0.5">Total Amount</div>
+                              <div className="font-black text-slate-800 dark:text-slate-100">
+                                ₦{filteredPayments.reduce((sum, p) => sum + (p.amount || 0), 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </div>
+                            </div>
+                            <div>
+                              <div className="text-[10px] text-slate-400 mb-0.5">Total VAT</div>
+                              <div className="font-black text-indigo-600 dark:text-indigo-400">
+                                ₦{filteredPayments.reduce((sum, p) => sum + (p.vatAmount || 0), 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Desktop Table View */}
+                        <div className="hidden md:block overflow-x-auto style-scroll">
+                          <table className="w-full text-left text-xs border-collapse min-w-[640px]">
                           <thead>
                             <tr className={cn("border-b font-bold text-slate-500 uppercase tracking-wider text-[10px]", isDark ? "bg-slate-800/40 border-slate-800" : "bg-slate-50 border-slate-100")}>
                               <th className="p-3">Payment Date</th>
@@ -1969,13 +2175,14 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                           </tfoot>
                         </table>
                       </div>
+                    </div>
                       ) : (
                         <div className="py-12 flex flex-col items-center justify-center text-center text-slate-500">
                           <DollarSign className="w-12 h-12 text-slate-300 dark:text-slate-700 mb-3" />
                           <p className="font-semibold text-sm">No VAT-Applicable Payments</p>
                           <p className="text-xs text-slate-400 mt-1">All payments for this client have a 'No VAT' policy, or none have been recorded in the selected period.</p>
                         </div>
-                      );
+                      )
                     })() : (
                       <div className="py-12 flex flex-col items-center justify-center text-center text-slate-500">
                         <DollarSign className="w-12 h-12 text-slate-300 dark:text-slate-700 mb-3" />

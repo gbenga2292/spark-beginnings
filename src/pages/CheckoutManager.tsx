@@ -316,8 +316,15 @@ export function CheckoutManager() {
                       {log.employeeName.split(' ').map(n => n[0]).join('')}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-bold text-slate-700 dark:text-slate-300 truncate">{log.employeeName}</p>
-                      <p className="text-xs text-slate-400 flex items-center gap-1">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-xs font-bold text-slate-700 dark:text-slate-300 truncate">{log.employeeName}</span>
+                        {!log.employeeId && (
+                          <Badge variant="outline" className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 font-bold text-[9px] px-1 py-0 rounded leading-none">
+                            External
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-400 flex items-center gap-1 mt-0.5">
                         {log.quantity}x {log.assetName} • {new Date(log.checkoutDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </p>
                     </div>

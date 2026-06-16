@@ -402,9 +402,9 @@ export function HomePage() {
         </button>
       </div>
 
-      {/* ── Compact Bento Grid ─────────────────────────────────────────────────────── */}
-      <div className="px-4 py-4 md:px-8 md:py-8 max-w-screen-xl mx-auto">
-        <div className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-4 space-y-4">
+      {/* ── Compact Grid ─────────────────────────────────────────────────────── */}
+      <div className="w-full px-4 py-4 md:px-8 md:py-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {navigation.map((category) => {
             // Web build filtering
             if (IS_LIMITED_WEB_WEB) {
@@ -422,11 +422,11 @@ export function HomePage() {
             if (isStandalone) {
               const item = visibleItems[0];
               return (
-                <div key={category.name} className="break-inside-avoid">
+                <div key={category.name} className="w-full">
                   <Link
                     to={item.href}
                     className={cn(
-                      'group flex items-center justify-between rounded-xl border p-4 transition-all duration-200',
+                      'group flex w-full items-center justify-between rounded-xl border p-4 transition-all duration-200',
                       'hover:scale-[1.02] hover:shadow-md active:scale-[0.98]',
                       isDark
                         ? cn('border-slate-800 hover:border-slate-700', category.bgDark)
@@ -450,9 +450,9 @@ export function HomePage() {
 
             // Render standard category as a card containing a list of modules
             return (
-              <div key={category.name} className="break-inside-avoid">
+              <div key={category.name} className="w-full">
                 <div className={cn(
-                   'rounded-xl border p-4 shadow-sm',
+                   'w-full rounded-xl border p-4 shadow-sm',
                    isDark ? 'border-slate-800 bg-slate-900/50' : 'border-slate-200 bg-white'
                 )}>
                   {/* Category Header */}
@@ -472,7 +472,7 @@ export function HomePage() {
                            key={item.href + item.name}
                            to={item.href}
                            className={cn(
-                             'group flex items-center justify-between rounded-lg px-2.5 py-2 transition-colors',
+                             'group flex w-full items-center justify-between rounded-lg px-2.5 py-2 transition-colors',
                              isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-50'
                            )}
                          >
