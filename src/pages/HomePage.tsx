@@ -404,7 +404,7 @@ export function HomePage() {
 
       {/* ── Compact Grid ─────────────────────────────────────────────────────── */}
       <div className="w-full px-4 py-4 md:px-8 md:py-8">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <div className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-4">
           {navigation.map((category) => {
             // Web build filtering
             if (IS_LIMITED_WEB_WEB) {
@@ -422,7 +422,7 @@ export function HomePage() {
             if (isStandalone) {
               const item = visibleItems[0];
               return (
-                <div key={category.name} className="w-full">
+                <div key={category.name} className="w-full break-inside-avoid mb-4">
                   <Link
                     to={item.href}
                     className={cn(
@@ -450,7 +450,7 @@ export function HomePage() {
 
             // Render standard category as a card containing a list of modules
             return (
-              <div key={category.name} className="w-full">
+              <div key={category.name} className="w-full break-inside-avoid mb-4">
                 <div className={cn(
                    'w-full rounded-xl border p-4 shadow-sm',
                    isDark ? 'border-slate-800 bg-slate-900/50' : 'border-slate-200 bg-white'

@@ -3,7 +3,7 @@ import {
   Asset, Waybill, AssetCategory, AssetType, AssetStatus, WaybillStatus, WaybillType, 
   Checkout, MaintenanceAsset, MaintenanceSession, MaintenanceLogType, ServiceStatus,
   Vehicle, VehicleTripLeg, VehicleDocumentType, DailyMachineLog, AssetPumpDate,
-  MaintenanceCertificate
+  MaintenanceCertificate, VehicleFuelLog
 } from '../types/operations';
 import { supabase } from '@/src/integrations/supabase/client';
 import { useAppStore } from '../store/appStore';
@@ -73,6 +73,12 @@ interface OperationsContextType {
   // Certificates
   maintenanceCertificates: MaintenanceCertificate[];
   issueCertificate: (cert: Omit<MaintenanceCertificate, 'id'>) => Promise<void>;
+
+  // Fuel Logs
+  vehicleFuelLogs: VehicleFuelLog[];
+  addVehicleFuelLog: (log: Omit<VehicleFuelLog, 'id' | 'created_at'>) => Promise<void>;
+  updateVehicleFuelLog: (id: string, updates: Partial<VehicleFuelLog>) => Promise<void>;
+  deleteVehicleFuelLog: (id: string) => Promise<void>;
 }
 
 const OperationsContext = createContext<OperationsContextType | undefined>(undefined);
@@ -92,6 +98,7 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
   const [dailyMachineLogs, setDailyMachineLogs] = useState<DailyMachineLog[]>([]);
   const [sitePumpDates, setSitePumpDates] = useState<AssetPumpDate[]>([]);
   const [maintenanceCertificates, setMaintenanceCertificates] = useState<MaintenanceCertificate[]>([]);
+  const [vehicleFuelLogs, setVehicleFuelLogs] = useState<VehicleFuelLog[]>([]);
 
   const { 
     sites,
@@ -230,14 +237,16 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
           { data: dbCheckouts }, 
           { data: dbMaintenance },
           { data: dbDailyLogs },
-          { data: dbPumpDates }
+          { data: dbPumpDates },
+          { data: dbFuelLogs }
         ] = await Promise.all([
           supabase.from('operations_assets').select('*'),
           supabase.from('operations_waybills').select('*'),
           supabase.from('operations_checkouts').select('*'),
           supabase.from('operations_maintenance').select('*'),
           supabase.from('operations_daily_logs').select('*'),
-          supabase.from('operations_site_pump_dates').select('*')
+          supabase.from('operations_site_pump_dates').select('*'),
+          supabase.from('vehicle_fuel_logs').select('*').order('date', { ascending: false })
         ]);
 
         if (dbAssets) {
@@ -348,6 +357,22 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
             technician: m.technician || 'Unknown',
             generalRemark: m.general_remark || undefined,
             assets: m.assets || [],
+          })));
+        }
+
+        if (dbFuelLogs) {
+          setVehicleFuelLogs(dbFuelLogs.map((f: any) => ({
+            id: f.id,
+            vehicle_id: f.vehicle_id,
+            vehicle_reg: f.vehicle_reg,
+            date: f.date,
+            rate_per_litre: Number(f.rate_per_litre || 0),
+            litres: Number(f.litres || 0),
+            total_cost: Number(f.total_cost || 0),
+            odometer: f.odometer ? Number(f.odometer) : undefined,
+            filled_by: f.filled_by,
+            notes: f.notes,
+            created_at: f.created_at
           })));
         }
       } catch (error) {
@@ -652,6 +677,32 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
                   localStorage.setItem('dcel-maintenance-certificates', JSON.stringify(updated));
                   return updated;
                 });
+              }
+              break;
+            }
+            case 'vehicle_fuel_logs': {
+              const mapFuel = (f: any): VehicleFuelLog => ({
+                id: f.id,
+                vehicle_id: f.vehicle_id,
+                vehicle_reg: f.vehicle_reg,
+                date: f.date,
+                rate_per_litre: Number(f.rate_per_litre || 0),
+                litres: Number(f.litres || 0),
+                total_cost: Number(f.total_cost || 0),
+                odometer: f.odometer ? Number(f.odometer) : undefined,
+                filled_by: f.filled_by,
+                notes: f.notes,
+                created_at: f.created_at
+              });
+              if (eventType === 'INSERT') {
+                setVehicleFuelLogs(prev => {
+                  if (prev.some(f => f.id === newRow.id)) return prev;
+                  return [mapFuel(newRow), ...prev];
+                });
+              } else if (eventType === 'UPDATE') {
+                setVehicleFuelLogs(prev => prev.map(f => f.id === newRow.id ? mapFuel(newRow) : f));
+              } else if (eventType === 'DELETE') {
+                setVehicleFuelLogs(prev => prev.filter(f => f.id !== oldRow.id));
               }
               break;
             }
@@ -1571,6 +1622,65 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
         } catch (error) {
           console.error('Error deleting daily log:', error);
           throw error;
+        }
+      },
+
+      // ── Fuel Logs ──
+      vehicleFuelLogs,
+      addVehicleFuelLog: async (log: Omit<VehicleFuelLog, 'id' | 'created_at'>) => {
+        const newLog: VehicleFuelLog = { ...log, id: crypto.randomUUID(), created_at: new Date().toISOString() };
+        setVehicleFuelLogs(prev => [newLog, ...prev]);
+        try {
+          const { error } = await supabase.from('vehicle_fuel_logs').insert({
+            id: newLog.id,
+            vehicle_id: newLog.vehicle_id,
+            vehicle_reg: newLog.vehicle_reg,
+            date: newLog.date,
+            rate_per_litre: newLog.rate_per_litre,
+            litres: newLog.litres,
+            total_cost: newLog.total_cost,
+            odometer: newLog.odometer ?? null,
+            filled_by: newLog.filled_by ?? null,
+            notes: newLog.notes ?? null,
+            created_at: newLog.created_at
+          });
+          if (error) throw error;
+          toast.success('Fuel log saved');
+        } catch (err: any) {
+          console.error('Failed to save fuel log:', err);
+          toast.warning(`Fuel log saved locally — sync failed`);
+        }
+      },
+      updateVehicleFuelLog: async (id: string, updates: Partial<VehicleFuelLog>) => {
+        setVehicleFuelLogs(prev => prev.map(f => f.id === id ? { ...f, ...updates } : f));
+        try {
+          const { error } = await supabase.from('vehicle_fuel_logs').update({
+            vehicle_id: updates.vehicle_id,
+            vehicle_reg: updates.vehicle_reg,
+            date: updates.date,
+            rate_per_litre: updates.rate_per_litre,
+            litres: updates.litres,
+            total_cost: updates.total_cost,
+            odometer: updates.odometer ?? null,
+            filled_by: updates.filled_by ?? null,
+            notes: updates.notes ?? null
+          }).eq('id', id);
+          if (error) throw error;
+          toast.success('Fuel log updated');
+        } catch (err: any) {
+          console.error('Failed to update fuel log:', err);
+          toast.warning('Fuel log updated locally — sync failed');
+        }
+      },
+      deleteVehicleFuelLog: async (id: string) => {
+        setVehicleFuelLogs(prev => prev.filter(f => f.id !== id));
+        try {
+          const { error } = await supabase.from('vehicle_fuel_logs').delete().eq('id', id);
+          if (error) throw error;
+          toast.success('Fuel log deleted');
+        } catch (err: any) {
+          console.error('Failed to delete fuel log:', err);
+          toast.warning('Fuel log deleted locally — sync failed');
         }
       }
     }}>

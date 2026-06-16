@@ -5,12 +5,17 @@ import {
   Plus, Search, Truck, MapPin, Clock, Calendar, 
   Edit2, Trash2, History, AlertCircle, ChevronRight,
   MoreHorizontal, PlusCircle, X, Check, ClipboardList,
-  LayoutGrid, List, ChevronLeft, Download, Upload, FileSpreadsheet
+  LayoutGrid, List, ChevronLeft, Download, Upload, FileSpreadsheet,
+  Fuel, TrendingUp, BarChart3, Filter
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import {
+  AreaChart, Area, BarChart, Bar, LineChart, Line,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ComposedChart
+} from 'recharts';
 import { cn } from '@/src/lib/utils';
 import { useTheme } from '@/src/hooks/useTheme';
-import { Vehicle, VehicleTripLeg, VehicleDocumentType } from '../types/operations';
+import { Vehicle, VehicleTripLeg, VehicleDocumentType, VehicleFuelLog } from '../types/operations';
 import { formatDisplayDate, normalizeDate } from '@/src/lib/dateUtils';
 import { 
   isSameMonth, isBefore, startOfMonth, endOfMonth, 
@@ -31,19 +36,72 @@ import {
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/src/components/ui/dropdown-menu";
 import { Label } from '@/src/components/ui/label';
-import { useSetPageTitle } from '@/src/contexts/PageContext';
+import { useSetPageTitle, useHideLayout } from '@/src/contexts/PageContext';
+
+const VEHICLE_COLORS = [
+  '#3b82f6', // blue
+  '#10b981', // emerald
+  '#f59e0b', // amber
+  '#ef4444', // rose
+  '#8b5cf6', // violet
+  '#06b6d4', // cyan
+  '#ec4899', // pink
+  '#6366f1'  // indigo
+];
+
+const CustomTooltip = ({ active, payload, label, valType }: any) => {
+  if (active && payload && payload.length) {
+    const filteredPayload = payload.filter((entry: any) => entry.name !== 'Total Litres' && entry.name !== 'Total Cost');
+    const sortedPayload = [...filteredPayload].sort((a, b) => b.value - a.value);
+    const total = filteredPayload.length > 0 
+      ? filteredPayload.reduce((sum: number, entry: any) => sum + (Number(entry.value) || 0), 0)
+      : payload.reduce((sum: number, entry: any) => sum + (Number(entry.value) || 0), 0);
+    const divisor = filteredPayload.length > 0 ? filteredPayload.length : payload.length;
+    
+    return (
+      <div className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 p-3.5 rounded-xl shadow-xl space-y-2 max-h-80 overflow-y-auto min-w-[220px]">
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">{label}</p>
+        <div className="border-b border-slate-100 dark:border-slate-800 pb-1.5 mb-1.5 flex justify-between items-center font-extrabold text-xs">
+          <span className="text-slate-800 dark:text-slate-200">Total</span>
+          <span className="text-slate-900 dark:text-slate-100 font-extrabold">
+            {valType === 'litres' ? `${total.toFixed(1)} L` : valType === 'cost' ? `₦${total.toLocaleString()}` : `₦${(total/divisor).toFixed(2)}/L`}
+          </span>
+        </div>
+        <div className="space-y-1">
+          {sortedPayload.map((entry: any, index: number) => {
+            const cleanName = entry.name.replace(/_cost|_rate/, '');
+            return (
+              <div key={index} className="flex justify-between items-center gap-4 text-[11px] leading-normal">
+                <div className="flex items-center gap-1.5 truncate max-w-[150px]">
+                  <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: entry.color }} />
+                  <span className="text-slate-600 dark:text-slate-300 font-bold truncate">{cleanName}</span>
+                </div>
+                <span className="font-extrabold text-slate-700 dark:text-slate-200 shrink-0">
+                  {valType === 'litres' ? `${Number(entry.value).toFixed(1)} L` : valType === 'cost' ? `₦${Number(entry.value).toLocaleString()}` : `₦${Number(entry.value).toFixed(2)}/L`}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
 
 export function VehicleManager() {
   const { 
     vehicles, vehicleTrips, addVehicle, updateVehicle, deleteVehicle, addVehicleTripRecords,
     updateVehicleTripRecord, deleteVehicleTripRecord,
     vehicleDocumentTypes, updateVehicleDocument,
-    insertVehicles, setVehicles, setVehicleTripRecords
+    insertVehicles, setVehicles, setVehicleTripRecords,
+    vehicleFuelLogs, addVehicleFuelLog, updateVehicleFuelLog, deleteVehicleFuelLog
   } = useOperations();
   const { sites, pendingSites, employees } = useAppStore();
   const priv = usePriv('opsVehicles');
   
-  const [activeTab, setActiveTab] = useState<'fleet' | 'logs' | 'documents'>('logs');
+  const [activeTab, setActiveTab] = useState<'fleet' | 'logs' | 'documents' | 'fuel'>('logs');
+  const [activeChartTab, setActiveChartTab] = useState<'litres' | 'cost' | 'trend'>('litres');
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [importType, setImportType] = useState<'vehicles' | 'logs'>('vehicles');
   const [importMode, setImportMode] = useState<'append' | 'replace'>('append');
@@ -61,17 +119,26 @@ export function VehicleManager() {
 
   // Ensure user is on a permitted tab
   useEffect(() => {
-    if (activeTab === 'logs' && !priv.canViewLogs) {
+    const hasLogsAccess = priv.canViewLogs || priv.canViewFuel;
+    if (activeTab === 'logs' && !hasLogsAccess) {
       if (priv.canViewFleet) setActiveTab('fleet');
       else if (priv.canViewDocuments) setActiveTab('documents');
+      else if (priv.canViewFuelAnalytics) setActiveTab('fuel');
     } else if (activeTab === 'fleet' && !priv.canViewFleet) {
-      if (priv.canViewLogs) setActiveTab('logs');
+      if (hasLogsAccess) setActiveTab('logs');
       else if (priv.canViewDocuments) setActiveTab('documents');
+      else if (priv.canViewFuelAnalytics) setActiveTab('fuel');
     } else if (activeTab === 'documents' && !priv.canViewDocuments) {
-      if (priv.canViewLogs) setActiveTab('logs');
+      if (hasLogsAccess) setActiveTab('logs');
       else if (priv.canViewFleet) setActiveTab('fleet');
+      else if (priv.canViewFuelAnalytics) setActiveTab('fuel');
+    } else if (activeTab === 'fuel' && !priv.canViewFuelAnalytics) {
+      if (hasLogsAccess) setActiveTab('logs');
+      else if (priv.canViewFleet) setActiveTab('fleet');
+      else if (priv.canViewDocuments) setActiveTab('documents');
     }
   }, [priv, activeTab]);
+
 
   // Document Expiry Notifications
   useEffect(() => {
@@ -123,6 +190,383 @@ export function VehicleManager() {
   const [search, setSearch] = useState('');
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
+  // ── Unified Logs State ──
+  const [logsSubTab, setLogsSubTab] = useState<'all' | 'movement' | 'fuel'>('all');
+  const [logsSearch, setLogsSearch] = useState('');
+
+  // Synchronize sub-tab selection with permissions
+  useEffect(() => {
+    if (logsSubTab === 'all' && (!priv.canViewLogs || !priv.canViewFuel)) {
+      if (priv.canViewLogs) setLogsSubTab('movement');
+      else if (priv.canViewFuel) setLogsSubTab('fuel');
+    } else if (logsSubTab === 'movement' && !priv.canViewLogs) {
+      if (priv.canViewFuel) setLogsSubTab('fuel');
+    } else if (logsSubTab === 'fuel' && !priv.canViewFuel) {
+      if (priv.canViewLogs) setLogsSubTab('movement');
+    }
+  }, [priv.canViewLogs, priv.canViewFuel, logsSubTab]);
+
+  // ── Fuel Log State ──
+  const [showFuelForm, setShowFuelForm] = useState(false);
+  const [editingFuelLog, setEditingFuelLog] = useState<VehicleFuelLog | null>(null);
+  const [fuelForm, setFuelForm] = useState({
+    vehicle_id: '',
+    vehicle_reg: '',
+    date: new Date().toISOString().split('T')[0],
+    rate_per_litre: '' as string | number,
+    litres: '' as string | number,
+    total_cost: '' as string | number,
+    odometer: '' as string | number,
+    filled_by: '',
+    notes: '',
+    lastComputed: '' as 'litres' | 'total_cost' | 'rate_per_litre' | ''
+  });
+
+  // Fuel Analytics Filter State
+  const [showFuelAnalytics, setShowFuelAnalytics] = useState(false);
+  const [fuelFilterVehicle, setFuelFilterVehicle] = useState<string>('');
+  const [fuelFilterYear, setFuelFilterYear] = useState(new Date().getFullYear());
+  const [fuelFilterMonth, setFuelFilterMonth] = useState<number | null>(null);
+  const [fuelFilterWeek, setFuelFilterWeek] = useState<number | null>(null);
+
+  // Bidirectional fuel calculator with priority preservation
+  const handleFuelFormChange = (field: string, value: string) => {
+    setFuelForm(prev => {
+      const updated = { ...prev, [field]: value };
+      
+      const litresNum = Number(updated.litres);
+      const rateNum = Number(updated.rate_per_litre);
+      const costNum = Number(updated.total_cost);
+
+      if (field === 'total_cost') {
+        if (value !== '' && costNum > 0) {
+          if (litresNum > 0) {
+            updated.rate_per_litre = (costNum / litresNum).toFixed(2);
+            updated.lastComputed = 'rate_per_litre';
+          } else if (rateNum > 0) {
+            updated.litres = (costNum / rateNum).toFixed(4);
+            updated.lastComputed = 'litres';
+          }
+        }
+      } else if (field === 'litres') {
+        if (value !== '' && litresNum > 0) {
+          if (costNum > 0) {
+            // Preserve cost (source of truth) and calculate rate
+            updated.rate_per_litre = (costNum / litresNum).toFixed(2);
+            updated.lastComputed = 'rate_per_litre';
+          } else if (rateNum > 0) {
+            updated.total_cost = (litresNum * rateNum).toFixed(2);
+            updated.lastComputed = 'total_cost';
+          }
+        }
+      } else if (field === 'rate_per_litre') {
+        if (value !== '' && rateNum > 0) {
+          if (costNum > 0) {
+            // Preserve cost (source of truth) and calculate litres
+            updated.litres = (costNum / rateNum).toFixed(4);
+            updated.lastComputed = 'litres';
+          } else if (litresNum > 0) {
+            updated.total_cost = (litresNum * rateNum).toFixed(2);
+            updated.lastComputed = 'total_cost';
+          }
+        }
+      }
+      return updated;
+    });
+  };
+
+  const handleFuelVehicleSelect = (vehicleId: string) => {
+    const v = vehicles.find(v => v.id === vehicleId);
+    setFuelForm(prev => ({ ...prev, vehicle_id: vehicleId, vehicle_reg: v?.registration_number || '' }));
+  };
+
+  const handleSaveFuelLog = async () => {
+    if (!fuelForm.vehicle_id || !fuelForm.date || !fuelForm.rate_per_litre || !fuelForm.litres) return;
+    const payload = {
+      vehicle_id: fuelForm.vehicle_id,
+      vehicle_reg: fuelForm.vehicle_reg,
+      date: fuelForm.date,
+      rate_per_litre: Number(fuelForm.rate_per_litre),
+      litres: Number(fuelForm.litres),
+      total_cost: Number(fuelForm.total_cost),
+      odometer: fuelForm.odometer !== '' ? Number(fuelForm.odometer) : undefined,
+      filled_by: fuelForm.filled_by || undefined,
+      notes: fuelForm.notes || undefined
+    };
+    if (editingFuelLog) {
+      await updateVehicleFuelLog(editingFuelLog.id, payload);
+    } else {
+      await addVehicleFuelLog(payload);
+    }
+    setShowFuelForm(false);
+    setEditingFuelLog(null);
+    setFuelForm({ vehicle_id: '', vehicle_reg: '', date: new Date().toISOString().split('T')[0], rate_per_litre: '', litres: '', total_cost: '', odometer: '', filled_by: '', notes: '', lastComputed: '' });
+  };
+
+  const handleEditFuelLog = (log: VehicleFuelLog) => {
+    setEditingFuelLog(log);
+    setFuelForm({
+      vehicle_id: log.vehicle_id,
+      vehicle_reg: log.vehicle_reg,
+      date: log.date,
+      rate_per_litre: log.rate_per_litre,
+      litres: log.litres,
+      total_cost: log.total_cost,
+      odometer: log.odometer ?? '',
+      filled_by: log.filled_by ?? '',
+      notes: log.notes ?? '',
+      lastComputed: ''
+    });
+    setShowFuelForm(true);
+  };
+
+  // Fuel Analytics Helpers
+  const getISOWeek = (date: Date) => {
+    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+  };
+
+  const getWeeksInMonth = (year: number, month: number) => {
+    const weeks = new Set<number>();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    for (let d = 1; d <= daysInMonth; d++) {
+      weeks.add(getISOWeek(new Date(year, month, d)));
+    }
+    return Array.from(weeks).sort((a, b) => a - b);
+  };
+
+  const filteredFuelLogs = vehicleFuelLogs.filter(f => {
+    const d = new Date(f.date);
+    if (d.getFullYear() !== fuelFilterYear) return false;
+    if (fuelFilterMonth !== null && d.getMonth() !== fuelFilterMonth) return false;
+    if (fuelFilterWeek !== null && getISOWeek(d) !== fuelFilterWeek) return false;
+    if (fuelFilterVehicle !== '' && f.vehicle_id !== fuelFilterVehicle) return false;
+    return true;
+  });
+
+  const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  const getVehicleName = (reg: string) => {
+    const v = vehicles.find(x => x.registration_number === reg || x.id === reg);
+    return v ? v.name : reg;
+  };
+
+  const monthlyData = MONTH_NAMES.map((name, i) => {
+    const logs = vehicleFuelLogs.filter(f => {
+      const d = new Date(f.date);
+      if (d.getFullYear() !== fuelFilterYear || d.getMonth() !== i) return false;
+      if (fuelFilterVehicle !== '' && f.vehicle_id !== fuelFilterVehicle) return false;
+      return true;
+    });
+
+    const breakdown: Record<string, number> = {};
+    const costBreakdown: Record<string, number> = {};
+    const rateBreakdown: Record<string, number> = {};
+    const vehicleStats: Record<string, { litres: number; cost: number }> = {};
+
+    logs.forEach(f => {
+      const vehicleName = getVehicleName(f.vehicle_reg);
+      if (!vehicleStats[vehicleName]) vehicleStats[vehicleName] = { litres: 0, cost: 0 };
+      vehicleStats[vehicleName].litres += f.litres;
+      vehicleStats[vehicleName].cost += f.total_cost;
+    });
+
+    Object.entries(vehicleStats).forEach(([k, v]) => {
+      breakdown[k] = v.litres;
+      costBreakdown[`${k}_cost`] = v.cost;
+      rateBreakdown[`${k}_rate`] = v.litres > 0 ? v.cost / v.litres : 0;
+    });
+
+    return {
+      name,
+      month: i,
+      litres: logs.reduce((s, f) => s + f.litres, 0),
+      cost: logs.reduce((s, f) => s + f.total_cost, 0),
+      ...breakdown,
+      ...costBreakdown,
+      ...rateBreakdown
+    };
+  });
+
+  const weeklyData = fuelFilterMonth !== null ? (() => {
+    const weeks = getWeeksInMonth(fuelFilterYear, fuelFilterMonth);
+    return weeks.map(w => {
+      const logs = vehicleFuelLogs.filter(f => {
+        const d = new Date(f.date);
+        if (d.getFullYear() !== fuelFilterYear || d.getMonth() !== fuelFilterMonth || getISOWeek(d) !== w) return false;
+        if (fuelFilterVehicle !== '' && f.vehicle_id !== fuelFilterVehicle) return false;
+        return true;
+      });
+
+      const breakdown: Record<string, number> = {};
+      const costBreakdown: Record<string, number> = {};
+      const rateBreakdown: Record<string, number> = {};
+      const vehicleStats: Record<string, { litres: number; cost: number }> = {};
+
+      logs.forEach(f => {
+        const vehicleName = getVehicleName(f.vehicle_reg);
+        if (!vehicleStats[vehicleName]) vehicleStats[vehicleName] = { litres: 0, cost: 0 };
+        vehicleStats[vehicleName].litres += f.litres;
+        vehicleStats[vehicleName].cost += f.total_cost;
+      });
+
+      Object.entries(vehicleStats).forEach(([k, v]) => {
+        breakdown[k] = v.litres;
+        costBreakdown[`${k}_cost`] = v.cost;
+        rateBreakdown[`${k}_rate`] = v.litres > 0 ? v.cost / v.litres : 0;
+      });
+
+      return {
+        label: `Wk ${w}`,
+        week: w,
+        litres: logs.reduce((s, f) => s + f.litres, 0),
+        cost: logs.reduce((s, f) => s + f.total_cost, 0),
+        ...breakdown,
+        ...costBreakdown,
+        ...rateBreakdown
+      };
+    });
+  })() : [];
+
+  const chartData = fuelFilterMonth !== null
+    ? weeklyData.map(w => ({ ...w, label: w.label, rate: w.litres > 0 ? w.cost / w.litres : 0 }))
+    : monthlyData.map(m => ({ ...m, label: m.name, rate: m.litres > 0 ? m.cost / m.litres : 0 }));
+
+  const maxLitres = Math.max(...chartData.map(d => d.litres), 1);
+  const maxCost = Math.max(...chartData.map(d => d.cost), 1);
+  const maxRate = Math.max(...chartData.map(d => d.rate), 1);
+
+  const totalFuelLitres = filteredFuelLogs.reduce((s, f) => s + f.litres, 0);
+  const totalFuelCost = filteredFuelLogs.reduce((s, f) => s + f.total_cost, 0);
+  const avgRate = totalFuelLitres > 0 ? totalFuelCost / totalFuelLitres : 0;
+  const vehicleFuelCount = filteredFuelLogs.reduce((acc, f) => { acc[f.vehicle_reg] = (acc[f.vehicle_reg] || 0) + f.litres; return acc; }, {} as Record<string, number>);
+  const topVehicle = Object.entries(vehicleFuelCount).sort((a, b) => b[1] - a[1])[0]?.[0] || '—';
+  const topVehicleName = topVehicle !== '—' ? getVehicleName(topVehicle) : '—';
+  const activeVehicleNames = Array.from(new Set(filteredFuelLogs.map(f => getVehicleName(f.vehicle_reg))));
+
+  const topVehiclesData = Object.entries(vehicleFuelCount)
+    .map(([reg, litres]) => {
+      const cost = filteredFuelLogs.filter(f => f.vehicle_reg === reg).reduce((s, f) => s + f.total_cost, 0);
+      return { reg, litres, cost };
+    })
+    .sort((a, b) => b.cost - a.cost)
+    .slice(0, 5);
+  const maxTopVehicleCost = Math.max(...topVehiclesData.map(v => v.cost), 1);
+
+  const fuelYears = Array.from(new Set([new Date().getFullYear(), ...vehicleFuelLogs.map(f => new Date(f.date).getFullYear())])).sort((a, b) => b - a);
+  const weeksInSelectedMonth = fuelFilterMonth !== null ? getWeeksInMonth(fuelFilterYear, fuelFilterMonth) : [];
+
+  // Fuel Efficiency Helper
+  const getFuelEfficiency = () => {
+    if (fuelFilterVehicle === '') return null;
+    const vehicleLogs = vehicleFuelLogs
+      .filter(f => f.vehicle_id === fuelFilterVehicle && f.odometer !== undefined && f.odometer !== null && Number(f.odometer) > 0)
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    
+    if (vehicleLogs.length < 2) return null;
+    
+    const firstOdo = Number(vehicleLogs[0].odometer);
+    const lastOdo = Number(vehicleLogs[vehicleLogs.length - 1].odometer);
+    const distance = lastOdo - firstOdo;
+    
+    if (distance <= 0) return null;
+    
+    const litresConsumed = vehicleLogs.slice(1).reduce((sum, f) => sum + f.litres, 0);
+    if (litresConsumed <= 0) return null;
+    
+    const kmPerLitre = distance / litresConsumed;
+    const lPer100km = (litresConsumed / distance) * 100;
+    
+    return {
+      distance,
+      kmPerLitre,
+      lPer100km
+    };
+  };
+  const efficiency = getFuelEfficiency();
+
+  const getFleetEfficiency = () => {
+    let totalDistance = 0;
+    let totalLitres = 0;
+
+    const vehiclesWithLogs = new Set(vehicleFuelLogs.map(f => f.vehicle_id));
+    vehiclesWithLogs.forEach(vid => {
+      const vLogs = vehicleFuelLogs
+        .filter(f => f.vehicle_id === vid && f.odometer !== undefined && f.odometer !== null && Number(f.odometer) > 0)
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      
+      if (vLogs.length >= 2) {
+        const distance = Number(vLogs[vLogs.length - 1].odometer) - Number(vLogs[0].odometer);
+        const litres = vLogs.slice(1).reduce((sum, f) => sum + f.litres, 0);
+        if (distance > 0 && litres > 0) {
+          totalDistance += distance;
+          totalLitres += litres;
+        }
+      }
+    });
+
+    if (totalDistance <= 0 || totalLitres <= 0) return null;
+    return {
+      distance: totalDistance,
+      kmPerLitre: totalDistance / totalLitres,
+      lPer100km: (totalLitres / totalDistance) * 100
+    };
+  };
+  const fleetEfficiency = getFleetEfficiency();
+
+  // Combined activity log data
+  const combinedLogs = [
+    ...vehicleTrips.map(t => ({
+      id: t.id,
+      type: 'trip' as const,
+      date: new Date(t.departure_time),
+      rawDateStr: t.departure_time,
+      vehicleReg: t.vehicle_reg,
+      person: t.driver_name,
+      details: t,
+    })),
+    ...vehicleFuelLogs.map(f => ({
+      id: f.id,
+      type: 'fuel' as const,
+      date: new Date(f.date),
+      rawDateStr: f.date,
+      vehicleReg: f.vehicle_reg,
+      person: f.filled_by || '—',
+      details: f,
+    }))
+  ].sort((a, b) => b.date.getTime() - a.date.getTime());
+
+  const filteredCombinedLogs = combinedLogs.filter(log => {
+    // 1. Filter by user permission
+    if (log.type === 'fuel' && !priv.canViewFuel) return false;
+    if (log.type === 'trip' && !priv.canViewLogs) return false;
+
+    // 2. Filter by sub-tab type
+    if (logsSubTab === 'movement' && log.type !== 'trip') return false;
+    if (logsSubTab === 'fuel' && log.type !== 'fuel') return false;
+
+    // 2. Filter by search query
+    if (logsSearch.trim() !== '') {
+      const q = logsSearch.toLowerCase();
+      const matchVehicle = log.vehicleReg.toLowerCase().includes(q);
+      const matchPerson = log.person.toLowerCase().includes(q);
+      
+      if (log.type === 'trip') {
+        const matchSite = log.details.site_name.toLowerCase().includes(q);
+        const matchPurpose = log.details.purpose.toLowerCase().includes(q);
+        const matchRemark = (log.details.remark || '').toLowerCase().includes(q);
+        return matchVehicle || matchPerson || matchSite || matchPurpose || matchRemark;
+      } else {
+        const matchNotes = (log.details.notes || '').toLowerCase().includes(q);
+        return matchVehicle || matchPerson || matchNotes;
+      }
+    }
+    return true;
+  });
+
+
   // 1. Vehicle Form State
   const [vForm, setVForm] = useState({
     name: '',
@@ -147,51 +591,156 @@ export function VehicleManager() {
   ];
 
   useSetPageTitle(
-    'Vehicle Management',
-    'Manage company fleet and track daily movement logs',
-    <div className="flex items-center gap-2 md:gap-3">
-      {priv.canImport && (
-        <Button 
-          variant="outline" size="sm" 
-          className="gap-2 h-9 px-2 sm:px-3 border-slate-200 bg-white text-slate-600 hover:bg-slate-50 font-bold text-[11px] uppercase tracking-tight shadow-sm"
-          onClick={() => {
-            setImportType(activeTab === 'logs' ? 'logs' : 'vehicles');
-            setShowImportDialog(true);
-          }}
+    activeTab === 'fuel' ? 'Fuel Analytics' : 'Vehicle Management',
+    activeTab === 'fuel'
+      ? 'Fuel consumption & cost trends across your fleet'
+      : 'Manage company fleet and track daily movement logs',
+    activeTab === 'fuel' ? (
+      <div className="flex items-center gap-2">
+        <select
+          className="h-8 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 py-1 text-xs font-medium text-slate-700 dark:text-slate-200"
+          value={fuelFilterVehicle}
+          onChange={e => setFuelFilterVehicle(e.target.value)}
         >
-          <Download className="h-3.5 w-3.5 text-indigo-500" /> <span className="hidden sm:inline">Import</span>
-        </Button>
-      )}
-      {priv.canExport && (
-        <Button 
-          variant="outline" size="sm" 
-          className="gap-2 h-9 px-2 sm:px-3 border-slate-200 bg-white text-slate-600 hover:bg-slate-50 font-bold text-[11px] uppercase tracking-tight shadow-sm"
-          onClick={() => handleExport()}
+          <option value="">All Vehicles</option>
+          {vehicles.map(v => <option key={v.id} value={v.id}>{v.name} ({v.registration_number})</option>)}
+        </select>
+        <select
+          className="h-8 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 py-1 text-xs font-medium text-slate-700 dark:text-slate-200"
+          value={fuelFilterYear}
+          onChange={e => { setFuelFilterYear(Number(e.target.value)); setFuelFilterMonth(null); setFuelFilterWeek(null); }}
         >
-          <Upload className="h-3.5 w-3.5 text-emerald-500" /> <span className="hidden sm:inline">Export</span>
-        </Button>
-      )}
-      {activeTab === 'logs' && priv.canAddLogs && (
-        <Button 
-          variant="outline" size="sm" className="gap-2 h-9 px-2 sm:px-3"
-          onClick={() => setShowTripForm(true)}
+          {fuelYears.map(y => <option key={y} value={y}>{y}</option>)}
+        </select>
+        <select
+          className="h-8 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 py-1 text-xs font-medium text-slate-700 dark:text-slate-200"
+          value={fuelFilterMonth ?? ''}
+          onChange={e => { setFuelFilterMonth(e.target.value === '' ? null : Number(e.target.value)); setFuelFilterWeek(null); }}
         >
-          <ClipboardList className="h-4 w-4" /> <span className="hidden sm:inline">Record Trip</span>
-        </Button>
-      )}
-      {activeTab === 'fleet' && priv.canAddFleet && (
-        <Button 
-          size="sm" className="gap-2 bg-blue-600 hover:bg-blue-700 text-white h-9 px-2 sm:px-3"
-          onClick={() => {
-            setEditingVehicle(null);
-            setVForm({ name: '', registration_number: '', type: 'van', status: 'active' });
-            setShowVehicleForm(true);
-          }}
-        >
-          <Plus className="h-4 w-4" /> <span className="hidden sm:inline">Add Vehicle</span>
-        </Button>
-      )}
-    </div>
+          <option value="">All Months</option>
+          {MONTH_NAMES.map((m, i) => <option key={i} value={i}>{m}</option>)}
+        </select>
+        {fuelFilterMonth !== null && (
+          <select
+            className="h-8 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950 dark:border-amber-700 px-2 py-1 text-xs font-medium text-amber-700"
+            value={fuelFilterWeek ?? ''}
+            onChange={e => setFuelFilterWeek(e.target.value === '' ? null : Number(e.target.value))}
+          >
+            <option value="">All Weeks</option>
+            {weeksInSelectedMonth.map(w => <option key={w} value={w}>Week {w}</option>)}
+          </select>
+        )}
+        {(fuelFilterMonth !== null || fuelFilterWeek !== null || fuelFilterVehicle !== '') && (
+          <Button
+            variant="ghost" size="sm"
+            className="h-8 px-2 text-xs text-slate-400 hover:text-slate-600"
+            onClick={() => { setFuelFilterMonth(null); setFuelFilterWeek(null); setFuelFilterVehicle(''); }}
+          >
+            Reset
+          </Button>
+        )}
+        {priv.canAddFuel && (
+          <Button
+            size="sm"
+            className="h-8 w-8 p-0 bg-amber-500 hover:bg-amber-600 text-white"
+            onClick={() => {
+              setEditingFuelLog(null);
+              setFuelForm({ vehicle_id: '', vehicle_reg: '', date: new Date().toISOString().split('T')[0], rate_per_litre: '', litres: '', total_cost: '', odometer: '', filled_by: '', notes: '', lastComputed: '' });
+              setShowFuelForm(true);
+            }}
+            title="Log Fuel"
+          >
+            <Fuel className="h-3.5 w-3.5" />
+          </Button>
+        )}
+      </div>
+    ) : (
+      <div className="flex items-center gap-2 md:gap-3">
+        {priv.canImport && (
+          <Button
+            variant="outline" size="sm"
+            className="flex items-center gap-1.5 h-9 px-2 sm:px-3 border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 shadow-sm"
+            onClick={() => {
+              setImportType(activeTab === 'logs' ? 'logs' : 'vehicles');
+              setShowImportDialog(true);
+            }}
+            title="Import"
+          >
+            <Download className="h-3.5 w-3.5 text-indigo-500" />
+            <span className="text-xs font-medium">Import</span>
+          </Button>
+        )}
+        {priv.canExport && (
+          <Button
+            variant="outline" size="sm"
+            className="flex items-center gap-1.5 h-9 px-2 sm:px-3 border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 shadow-sm"
+            onClick={() => handleExport()}
+            title="Export"
+          >
+            <Upload className="h-3.5 w-3.5 text-emerald-500" />
+            <span className="text-xs font-medium">Export</span>
+          </Button>
+        )}
+        {activeTab === 'logs' && (
+          <div className="flex items-center gap-2">
+            {priv.canAddLogs && (
+              <Button
+                variant="outline" size="sm"
+                className="flex items-center gap-1.5 h-9 px-2 sm:px-3 text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+                onClick={() => setShowTripForm(true)}
+                title="Record Trip"
+              >
+                <ClipboardList className="h-4 w-4 text-blue-500" />
+                <span className="text-xs font-medium hidden">Log Trip</span>
+              </Button>
+            )}
+            {priv.canAddFuel && (
+              <Button
+                variant="outline" size="sm"
+                className="flex items-center gap-1.5 h-9 px-2 sm:px-3 text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+                onClick={() => {
+                  setEditingFuelLog(null);
+                  setFuelForm({ vehicle_id: '', vehicle_reg: '', date: new Date().toISOString().split('T')[0], rate_per_litre: '', litres: '', total_cost: '', odometer: '', filled_by: '', notes: '', lastComputed: '' });
+                  setShowFuelForm(true);
+                }}
+                title="Log Fuel"
+              >
+                <Fuel className="h-4 w-4 text-amber-500" />
+                <span className="text-xs font-medium hidden">Log Fuel</span>
+              </Button>
+            )}
+            {priv.canViewFuelAnalytics && (
+              <Button
+                variant="outline" size="sm"
+                className="flex items-center gap-1.5 h-9 px-2 sm:px-3 border-amber-200 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-400 dark:hover:bg-amber-950/30 shadow-sm"
+                onClick={() => setActiveTab('fuel')}
+                title="Fuel Analytics"
+              >
+                <BarChart3 className="h-4 w-4 text-amber-600" />
+                <span className="text-xs font-medium hidden">Analytics</span>
+              </Button>
+            )}
+          </div>
+        )}
+        {activeTab === 'fleet' && priv.canAddFleet && (
+          <Button
+            size="sm"
+            className="flex items-center gap-1.5 h-9 px-2 sm:px-3 bg-blue-600 hover:bg-blue-700 text-white"
+            onClick={() => {
+              setEditingVehicle(null);
+              setVForm({ name: '', registration_number: '', type: 'van', status: 'active' });
+              setShowVehicleForm(true);
+            }}
+            title="Add Vehicle"
+          >
+            <Plus className="h-4 w-4" />
+            <span className="text-xs font-medium">Add Vehicle</span>
+          </Button>
+        )}
+      </div>
+    ),
+    [activeTab, fuelFilterVehicle, fuelFilterYear, fuelFilterMonth, fuelFilterWeek],
+    activeTab === 'fuel' ? () => setActiveTab('logs') : false
   );
 
   const handleSaveVehicle = () => {
@@ -428,7 +977,9 @@ export function VehicleManager() {
   };
 
   return (
-    <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
+    <>
+
+      <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
       {/* Vehicle Form Modal */}
       {showVehicleForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
@@ -709,33 +1260,148 @@ export function VehicleManager() {
         </div>
       )}
 
-      {/* Tabs */}
-      <div className="flex border-b border-slate-200 dark:border-slate-800 gap-8 px-2 mx-1">
-        {priv.canViewLogs && (
-          <button 
-            className={`pb-3 text-sm font-bold transition-all border-b-2 ${activeTab === 'logs' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
-            onClick={() => setActiveTab('logs')}
-          >
-            Movement Logs
-          </button>
-        )}
-        {priv.canViewFleet && (
-          <button 
-            className={`pb-3 text-sm font-bold transition-all border-b-2 ${activeTab === 'fleet' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
-            onClick={() => setActiveTab('fleet')}
-          >
-            Vehicle Fleet
-          </button>
-        )}
-        {priv.canViewDocuments && (
-          <button 
-            className={`pb-3 text-sm font-bold transition-all border-b-2 ${activeTab === 'documents' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
-            onClick={() => setActiveTab('documents')}
-          >
-            Vehicle Documents
-          </button>
-        )}
-      </div>
+      {/* Fuel Log Modal */}
+      {showFuelForm && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 backdrop-blur-sm p-0 sm:p-4 overflow-y-auto">
+          <Card className="w-full h-full sm:h-auto sm:max-h-[90vh] max-w-lg shadow-2xl rounded-none sm:rounded-xl flex flex-col animate-in slide-in-from-bottom-4 duration-300">
+            <CardHeader className="bg-slate-50 dark:bg-slate-800 border-b shrink-0">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center text-amber-600">
+                    <Fuel className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-lg font-bold">{editingFuelLog ? 'Edit Fuel Record' : 'Log Fuel Refill'}</CardTitle>
+                    <p className="text-xs text-slate-500">Record a vehicle fuel refill entry</p>
+                  </div>
+                </div>
+                <Button variant="ghost" size="icon" onClick={() => { setShowFuelForm(false); setEditingFuelLog(null); }}><X className="h-4 w-4" /></Button>
+              </div>
+            </CardHeader>
+            <CardContent className="p-6 space-y-4 flex-1 overflow-y-auto sm:max-h-[60vh]">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2 md:col-span-2">
+                  <Label>Vehicle</Label>
+                  <select
+                    className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-950"
+                    value={fuelForm.vehicle_id}
+                    onChange={e => handleFuelVehicleSelect(e.target.value)}
+                  >
+                    <option value="">Select Vehicle</option>
+                    {vehicles.map(v => <option key={v.id} value={v.id}>{v.name} ({v.registration_number})</option>)}
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Date</Label>
+                  <Input type="date" value={fuelForm.date} onChange={e => handleFuelFormChange('date', e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Filled By</Label>
+                  <Input
+                    list="fuel-driver-list"
+                    placeholder="Person who filled"
+                    value={fuelForm.filled_by}
+                    onChange={e => handleFuelFormChange('filled_by', e.target.value)}
+                  />
+                  <datalist id="fuel-driver-list">
+                    {employees.map(emp => <option key={emp.id} value={`${emp.firstname} ${emp.surname}`} />)}
+                  </datalist>
+                </div>
+              </div>
+
+              {/* Fuel Calculator */}
+              <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-900/20 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Fuel Calculator</p>
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">
+                      Total Cost (₦)
+                    </Label>
+                    <Input
+                      type="number"
+                      placeholder="e.g. 25000"
+                      value={fuelForm.total_cost}
+                      onChange={e => handleFuelFormChange('total_cost', e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Litres (L)</Label>
+                    <Input
+                      type="number"
+                      placeholder="e.g. 40"
+                      value={fuelForm.litres}
+                      onChange={e => handleFuelFormChange('litres', e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Rate (₦/L)</Label>
+                    <Input
+                      type="number"
+                      placeholder="e.g. 625"
+                      value={fuelForm.rate_per_litre}
+                      onChange={e => handleFuelFormChange('rate_per_litre', e.target.value)}
+                    />
+                  </div>
+                </div>
+                {Number(fuelForm.litres) > 0 && Number(fuelForm.rate_per_litre) > 0 && (
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+                    {Number(fuelForm.litres).toFixed(2)} L × ₦{Number(fuelForm.rate_per_litre).toLocaleString()}/L = ₦{(Number(fuelForm.litres) * Number(fuelForm.rate_per_litre)).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                  </p>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Odometer Reading (km)</Label>
+                  <Input type="number" placeholder="Optional" value={fuelForm.odometer} onChange={e => handleFuelFormChange('odometer', e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Notes</Label>
+                  <Input placeholder="Optional notes..." value={fuelForm.notes} onChange={e => handleFuelFormChange('notes', e.target.value)} />
+                </div>
+              </div>
+            </CardContent>
+            <CardHeader className="bg-slate-50 dark:bg-slate-800 border-t flex flex-row gap-3 pt-4 shrink-0">
+              <Button className="flex-1 bg-amber-500 hover:bg-amber-600 text-white" onClick={handleSaveFuelLog}>
+                {editingFuelLog ? 'Update Record' : 'Save Fuel Log'}
+              </Button>
+              <Button variant="outline" className="flex-1" onClick={() => { setShowFuelForm(false); setEditingFuelLog(null); }}>Discard</Button>
+            </CardHeader>
+          </Card>
+        </div>
+      )}
+
+      {/* Tabs — hidden when on Fuel Analytics */}
+      {activeTab !== 'fuel' && (
+        <div className="flex border-b border-slate-200 dark:border-slate-800 gap-8 px-2 mx-1">
+          {(priv.canViewLogs || priv.canViewFuel) && (
+            <button
+              className={`pb-3 text-sm font-bold transition-all border-b-2 ${activeTab === 'logs' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+              onClick={() => setActiveTab('logs')}
+            >
+              Operations Logs
+            </button>
+          )}
+          {priv.canViewFleet && (
+            <button
+              className={`pb-3 text-sm font-bold transition-all border-b-2 ${activeTab === 'fleet' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+              onClick={() => setActiveTab('fleet')}
+            >
+              Vehicle Fleet
+            </button>
+          )}
+          {priv.canViewDocuments && (
+            <button
+              className={`pb-3 text-sm font-bold transition-all border-b-2 ${activeTab === 'documents' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+              onClick={() => setActiveTab('documents')}
+            >
+              Vehicle Documents
+            </button>
+          )}
+        </div>
+      )}
 
       {activeTab === 'fleet' ? (
         <div className="space-y-6">
@@ -997,163 +1663,62 @@ export function VehicleManager() {
             </div>
           )}
         </div>
-      ) : (
+      ) : activeTab === 'fuel' ? null : (
         <div className="space-y-6">
-          <div className="flex items-center justify-between px-1">
-             <h3 className="font-bold text-slate-700 dark:text-slate-200 text-sm flex items-center gap-2">
-              <History className="h-4 w-4 text-blue-500" /> {viewMode === 'list' ? 'Recent Movements' : 'Monthly Movement Calendar'}
-            </h3>
-            <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
-              <Button 
-                variant={viewMode === 'list' ? 'secondary' : 'ghost'} 
-                size="sm" className="h-7 px-3 gap-2 text-[10px] font-bold uppercase"
-                onClick={() => setViewMode('list')}
-              >
-                <List className="h-3 w-3" /> List
-              </Button>
-              <Button 
-                variant={viewMode === 'calendar' ? 'secondary' : 'ghost'} 
-                size="sm" className="h-7 px-3 gap-2 text-[10px] font-bold uppercase"
-                onClick={() => setViewMode('calendar')}
-              >
-                <LayoutGrid className="h-3 w-3" /> Calendar
-              </Button>
-            </div>
+          {/* Sub-tab selection row */}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 px-1 pb-2 border-b border-slate-100 dark:border-slate-800">
+            {priv.canViewLogs && priv.canViewFuel && (
+              <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
+                <Button
+                  variant={logsSubTab === 'all' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  className="h-8 text-[11px] font-bold uppercase tracking-wider px-3"
+                  onClick={() => setLogsSubTab('all')}
+                >
+                  <History className="h-3.5 w-3.5 mr-1" /> All Activity
+                </Button>
+                <Button
+                  variant={logsSubTab === 'movement' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  className="h-8 text-[11px] font-bold uppercase tracking-wider px-3"
+                  onClick={() => setLogsSubTab('movement')}
+                >
+                  <MapPin className="h-3.5 w-3.5 mr-1 text-blue-500" /> Movements
+                </Button>
+                <Button
+                  variant={logsSubTab === 'fuel' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  className="h-8 text-[11px] font-bold uppercase tracking-wider px-3"
+                  onClick={() => setLogsSubTab('fuel')}
+                >
+                  <Fuel className="h-3.5 w-3.5 mr-1 text-amber-500" /> Fuel Logs
+                </Button>
+              </div>
+            )}
+
+            {/* List/Calendar Toggle (only when movements/all is selected) */}
+            {logsSubTab !== 'fuel' && (
+              <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
+                <Button 
+                  variant={viewMode === 'list' ? 'secondary' : 'ghost'} 
+                  size="sm" className="h-8 px-3 gap-2 text-[10px] font-bold uppercase"
+                  onClick={() => setViewMode('list')}
+                >
+                  <List className="h-3.5 w-3.5" /> List
+                </Button>
+                <Button 
+                  variant={viewMode === 'calendar' ? 'secondary' : 'ghost'} 
+                  size="sm" className="h-8 px-3 gap-2 text-[10px] font-bold uppercase"
+                  onClick={() => setViewMode('calendar')}
+                >
+                  <LayoutGrid className="h-3.5 w-3.5" /> Calendar
+                </Button>
+              </div>
+            )}
           </div>
 
-          {viewMode === 'list' ? (
-            <Card className="border-none shadow-sm overflow-hidden bg-white dark:bg-slate-900">
-              <div className="hidden md:block overflow-x-auto">
-                <table className="w-full text-left">
-                  <thead>
-                    <tr className="bg-slate-100 dark:bg-slate-800/50 text-[10px] uppercase font-bold tracking-wider text-slate-500">
-                      <th className="px-6 py-3">Vehicle & Driver</th>
-                      <th className="px-6 py-3">Destination & Purpose</th>
-                      <th className="px-6 py-3">Times</th>
-                      <th className="px-6 py-3">Mileage</th>
-                      <th className="px-6 py-3">Remark</th>
-                      <th className="px-6 py-3 text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                    {sortedTrips.length === 0 ? (
-                      <tr>
-                        <td colSpan={6} className="px-6 py-10 text-center text-slate-400 text-sm italic">No logs recorded yet</td>
-                      </tr>
-                    ) : (
-                      sortedTrips.map(trip => (
-                        <tr key={trip.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
-                          <td className="px-6 py-4">
-                            <div className="flex flex-col">
-                              <span className="font-bold text-slate-700 dark:text-slate-200 text-xs uppercase">{trip.vehicle_reg}</span>
-                              <span className="text-[10px] font-semibold text-slate-400">{trip.driver_name}</span>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="flex flex-col">
-                              <span className="font-bold text-blue-600 dark:text-blue-400 text-xs flex items-center gap-1">
-                                <MapPin className="h-3 w-3" /> {trip.site_name}
-                              </span>
-                              <span className="text-[10px] text-slate-500 italic">{trip.purpose}</span>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="flex flex-col text-[10px] font-bold text-slate-600 dark:text-slate-300">
-                              <div className="flex items-center gap-1"><span className="text-slate-400 uppercase text-[8px]">Dep:</span> {new Date(trip.departure_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
-                              <div className="flex items-center gap-1"><span className="text-slate-400 uppercase text-[8px]">Arr:</span> {trip.arrival_time ? new Date(trip.arrival_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '—'}</div>
-                              <div className="text-[8px] text-slate-400 mt-0.5">{formatDisplayDate(trip.departure_time)}</div>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="flex flex-col text-[10px] font-bold text-slate-600 dark:text-slate-300">
-                              <div className="flex items-center gap-1"><span className="text-slate-400 uppercase text-[8px]">Start:</span> {trip.odometer_start || '—'}</div>
-                              <div className="flex items-center gap-1"><span className="text-slate-400 uppercase text-[8px]">End:</span> {trip.odometer_end || '—'}</div>
-                              {trip.odometer_start && trip.odometer_end && (
-                                <div className="text-[8px] text-blue-500 mt-0.5">Total: {trip.odometer_end - trip.odometer_start} km</div>
-                              )}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4">
-                            <p className="text-[10px] text-slate-500 max-w-[150px] truncate" title={trip.remark}>{trip.remark || '—'}</p>
-                          </td>
-                          <td className="px-6 py-4 text-right">
-                            <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                              {priv.canEditLogs && (
-                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEditTrip(trip)}>
-                                  <Edit2 className="h-3.5 w-3.5" />
-                                </Button>
-                              )}
-                              {priv.canDeleteLogs && (
-                                <Button variant="ghost" size="icon" className="h-7 w-7 text-rose-500" onClick={() => deleteVehicleTripRecord(trip.id)}>
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </Button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-              
-              {/* Mobile View: Cards */}
-              <div className="md:hidden flex flex-col divide-y divide-slate-100 dark:divide-slate-800">
-                {sortedTrips.length === 0 ? (
-                  <div className="px-6 py-10 text-center text-slate-400 text-sm italic">No logs recorded yet</div>
-                ) : (
-                  sortedTrips.map(trip => (
-                    <div key={`mobile-${trip.id}`} className="p-4 flex flex-col gap-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
-                      <div className="flex items-start justify-between">
-                         <div className="flex flex-col">
-                           <span className="font-bold text-slate-700 dark:text-slate-200 text-xs uppercase">{trip.vehicle_reg}</span>
-                           <span className="text-[10px] font-semibold text-slate-400">{trip.driver_name}</span>
-                         </div>
-                         <div className="flex flex-col items-end">
-                           <span className="font-bold text-blue-600 dark:text-blue-400 text-xs flex items-center gap-1">
-                             <MapPin className="h-3 w-3" /> {trip.site_name}
-                           </span>
-                           <span className="text-[10px] text-slate-500 italic">{trip.purpose}</span>
-                         </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-2 mt-1">
-                         <div className="flex flex-col text-[10px] font-bold text-slate-600 dark:text-slate-300">
-                           <div className="flex items-center gap-1"><span className="text-slate-400 uppercase text-[8px]">Dep:</span> {new Date(trip.departure_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
-                           <div className="flex items-center gap-1"><span className="text-slate-400 uppercase text-[8px]">Arr:</span> {trip.arrival_time ? new Date(trip.arrival_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '—'}</div>
-                           <div className="text-[8px] text-slate-400 mt-0.5">{formatDisplayDate(trip.departure_time)}</div>
-                         </div>
-                         <div className="flex flex-col text-[10px] font-bold text-slate-600 dark:text-slate-300">
-                           <div className="flex items-center gap-1"><span className="text-slate-400 uppercase text-[8px]">Start:</span> {trip.odometer_start || '—'}</div>
-                           <div className="flex items-center gap-1"><span className="text-slate-400 uppercase text-[8px]">End:</span> {trip.odometer_end || '—'}</div>
-                           {trip.odometer_start && trip.odometer_end && (
-                             <div className="text-[8px] text-blue-500 mt-0.5">Total: {trip.odometer_end - trip.odometer_start} km</div>
-                           )}
-                         </div>
-                      </div>
-                      
-                      {trip.remark && (
-                          <p className="text-[10px] text-slate-500 mt-1 line-clamp-2" title={trip.remark}>{trip.remark}</p>
-                      )}
-
-                      <div className="flex items-center justify-end gap-1 mt-2 border-t border-slate-100 dark:border-slate-800 pt-2">
-                        {priv.canEditLogs && (
-                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEditTrip(trip)}>
-                            <Edit2 className="h-3.5 w-3.5" />
-                          </Button>
-                        )}
-                        {priv.canDeleteLogs && (
-                          <Button variant="ghost" size="icon" className="h-7 w-7 text-rose-500" onClick={() => deleteVehicleTripRecord(trip.id)}>
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </Card>
-          ) : (
+          {/* Render Calendar View for Movement Logs */}
+          {logsSubTab !== 'fuel' && viewMode === 'calendar' ? (
             <Card className="border-none shadow-sm bg-white dark:bg-slate-900 overflow-hidden">
               <div className="p-4 bg-slate-50 dark:bg-slate-800/50 border-b dark:border-slate-800 flex items-center justify-between">
                 <div className="flex items-center gap-4">
@@ -1220,8 +1785,8 @@ export function VehicleManager() {
                                 {format(new Date(trip.departure_time), 'HH:mm')}
                               </span>
                             </div>
-                            <p className="text-[7px] text-slate-500 truncate leading-tight" title={`${trip.vehicle_reg} - ${trip.driver_name}`}>
-                              {trip.vehicle_reg}
+                            <p className="text-[7px] text-slate-500 truncate leading-tight font-semibold" title={`${getVehicleName(trip.vehicle_reg)} (${trip.vehicle_reg}) - ${trip.driver_name}`}>
+                              {getVehicleName(trip.vehicle_reg)}
                             </p>
                           </div>
                         ))}
@@ -1231,9 +1796,462 @@ export function VehicleManager() {
                 })}
               </div>
             </Card>
+          ) : (
+            /* Unified Desktop and Mobile Activity Feed */
+            <Card className="border-none shadow-sm overflow-hidden bg-white dark:bg-slate-900">
+              <div className="p-4 bg-slate-50/50 dark:bg-slate-800/30 flex flex-col sm:flex-row gap-4 justify-between items-center border-b dark:border-slate-800">
+                <h3 className="font-bold text-slate-700 dark:text-slate-200 text-sm flex items-center gap-2">
+                  <History className="h-4 w-4 text-blue-500" /> 
+                  {logsSubTab === 'all' && 'All Activity Logs'}
+                  {logsSubTab === 'movement' && 'Movement Logs'}
+                  {logsSubTab === 'fuel' && 'Fuel Logs'}
+                  <span className="ml-1 text-[10px] font-normal text-slate-400">({filteredCombinedLogs.length} entries)</span>
+                </h3>
+                <div className="relative w-full sm:w-64">
+                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                  <Input 
+                    placeholder="Search logs by vehicle, person, site..." 
+                    className="pl-9 h-9 text-sm" 
+                    value={logsSearch} 
+                    onChange={e => setLogsSearch(e.target.value)} 
+                  />
+                </div>
+              </div>
+              
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="bg-slate-100 dark:bg-slate-800/50 text-[10px] uppercase font-bold tracking-wider text-slate-500">
+                      <th className="px-6 py-3">Date</th>
+                      <th className="px-6 py-3">Type</th>
+                      <th className="px-6 py-3">Vehicle & Operator</th>
+                      <th className="px-6 py-3">Details / Route</th>
+                      <th className="px-6 py-3">Metrics / Cost</th>
+                      <th className="px-6 py-3 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {filteredCombinedLogs.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="px-6 py-10 text-center text-slate-400 text-sm italic">No records found</td>
+                      </tr>
+                    ) : (
+                      filteredCombinedLogs.map(log => {
+                        if (log.type === 'trip') {
+                          const trip = log.details;
+                          return (
+                            <tr key={trip.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
+                              <td className="px-6 py-4 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                                {formatDisplayDate(trip.departure_time)}
+                              </td>
+                              <td className="px-6 py-4">
+                                <Badge variant="outline" className="text-[10px] font-bold bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 border-blue-200">
+                                  Trip
+                                </Badge>
+                              </td>
+                              <td className="px-6 py-4">
+                                <div className="flex flex-col">
+                                  <span className="font-bold text-slate-700 dark:text-slate-200 text-xs">{getVehicleName(trip.vehicle_reg)}</span>
+                                  <span className="text-[10px] font-semibold text-slate-400">{trip.driver_name} <span className="text-slate-300 dark:text-slate-600 font-normal">({trip.vehicle_reg})</span></span>
+                                </div>
+                              </td>
+                              <td className="px-6 py-4">
+                                <div className="flex flex-col">
+                                  <span className="font-bold text-blue-600 dark:text-blue-400 text-xs flex items-center gap-1">
+                                    <MapPin className="h-3 w-3" /> {trip.site_name}
+                                  </span>
+                                  <span className="text-[10px] text-slate-500 italic">{trip.purpose}</span>
+                                  {trip.remark && <span className="text-[9px] text-slate-400 max-w-[200px] truncate mt-0.5 block" title={trip.remark}>{trip.remark}</span>}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4">
+                                <div className="flex flex-col text-[10px] font-bold text-slate-600 dark:text-slate-300">
+                                  <div className="flex items-center gap-1"><span className="text-slate-400 uppercase text-[8px]">Dep:</span> {new Date(trip.departure_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
+                                  <div className="flex items-center gap-1"><span className="text-slate-400 uppercase text-[8px]">Arr:</span> {trip.arrival_time ? new Date(trip.arrival_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '—'}</div>
+                                  {trip.odometer_start && trip.odometer_end && (
+                                    <div className="text-[9px] text-blue-500 mt-0.5">Total: {trip.odometer_end - trip.odometer_start} km</div>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 text-right">
+                                <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  {priv.canEditLogs && (
+                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEditTrip(trip)}>
+                                      <Edit2 className="h-3.5 w-3.5" />
+                                    </Button>
+                                  )}
+                                  {priv.canDeleteLogs && (
+                                    <Button variant="ghost" size="icon" className="h-7 w-7 text-rose-500" onClick={() => deleteVehicleTripRecord(trip.id)}>
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </Button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        } else {
+                          const fuelLog = log.details;
+                          return (
+                            <tr key={fuelLog.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
+                              <td className="px-6 py-4 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                                {formatDisplayDate(fuelLog.date)}
+                              </td>
+                              <td className="px-6 py-4">
+                                <Badge variant="outline" className="text-[10px] font-bold bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400 border-amber-200">
+                                  Fuel
+                                </Badge>
+                              </td>
+                              <td className="px-6 py-4">
+                                <div className="flex flex-col">
+                                  <span className="font-bold text-slate-700 dark:text-slate-200 text-xs">{getVehicleName(fuelLog.vehicle_reg)}</span>
+                                  <span className="text-[10px] font-semibold text-slate-400">{fuelLog.filled_by || '—'} <span className="text-slate-300 dark:text-slate-600 font-normal">({fuelLog.vehicle_reg})</span></span>
+                                </div>
+                              </td>
+                              <td className="px-6 py-4">
+                                <div className="flex flex-col">
+                                  <span className="font-bold text-amber-600 dark:text-amber-500 text-xs flex items-center gap-1">
+                                    <Fuel className="h-3 w-3" /> {fuelLog.litres.toFixed(2)} Litres
+                                  </span>
+                                  <span className="text-[10px] text-slate-500">Rate: ₦{fuelLog.rate_per_litre.toLocaleString()}/L</span>
+                                  {fuelLog.notes && <span className="text-[9px] text-slate-400 max-w-[200px] truncate mt-0.5 block" title={fuelLog.notes}>{fuelLog.notes}</span>}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4">
+                                <div className="flex flex-col text-[10px] font-bold">
+                                  <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                                    ₦{fuelLog.total_cost.toLocaleString()}
+                                  </span>
+                                  {fuelLog.odometer && (
+                                    <span className="text-[8px] text-slate-400 mt-0.5">Odo: {fuelLog.odometer.toLocaleString()} km</span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 text-right">
+                                <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  {priv.canEditFuel && (
+                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEditFuelLog(fuelLog)}>
+                                      <Edit2 className="h-3.5 w-3.5" />
+                                    </Button>
+                                  )}
+                                  {priv.canDeleteFuel && (
+                                    <Button variant="ghost" size="icon" className="h-7 w-7 text-rose-500" onClick={() => deleteVehicleFuelLog(fuelLog.id)}>
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </Button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        }
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile View: Cards */}
+              <div className="md:hidden flex flex-col divide-y divide-slate-100 dark:divide-slate-800">
+                {filteredCombinedLogs.length === 0 ? (
+                  <div className="px-6 py-10 text-center text-slate-400 text-sm italic">No records found</div>
+                ) : (
+                  filteredCombinedLogs.map(log => {
+                    if (log.type === 'trip') {
+                      const trip = log.details;
+                      return (
+                        <div key={`m-trip-${trip.id}`} className="p-4 flex flex-col gap-2 hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                          <div className="flex items-start justify-between">
+                            <div className="flex flex-col">
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-slate-700 dark:text-slate-200 text-xs">{getVehicleName(trip.vehicle_reg)}</span>
+                                <Badge variant="outline" className="text-[8px] h-4 font-bold bg-blue-50 text-blue-600 border-blue-200">Trip</Badge>
+                              </div>
+                              <span className="text-[10px] font-semibold text-slate-400">{trip.driver_name} <span className="text-slate-300 dark:text-slate-600 font-normal">({trip.vehicle_reg})</span></span>
+                            </div>
+                            <div className="flex flex-col items-end">
+                              <span className="font-bold text-blue-600 text-xs flex items-center gap-1">
+                                <MapPin className="h-3 w-3" /> {trip.site_name}
+                              </span>
+                              <span className="text-[10px] text-slate-500 italic">{trip.purpose}</span>
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2 text-[10px] text-slate-600 font-medium">
+                            <div>Dep: {new Date(trip.departure_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
+                            <div>Arr: {trip.arrival_time ? new Date(trip.arrival_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '—'}</div>
+                          </div>
+                          {trip.odometer_start && trip.odometer_end && (
+                            <div className="text-[10px] text-blue-500 font-bold">Distance: {trip.odometer_end - trip.odometer_start} km</div>
+                          )}
+                          {trip.remark && <p className="text-[10px] text-slate-400 italic mt-1">{trip.remark}</p>}
+                          <div className="flex items-center justify-end gap-1 mt-2 border-t border-slate-100 dark:border-slate-800 pt-2">
+                            {priv.canEditLogs && (
+                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEditTrip(trip)}>
+                                <Edit2 className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                            {priv.canDeleteLogs && (
+                              <Button variant="ghost" size="icon" className="h-7 w-7 text-rose-500" onClick={() => deleteVehicleTripRecord(trip.id)}>
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    } else {
+                      const fuelLog = log.details;
+                      return (
+                        <div key={`m-fuel-${fuelLog.id}`} className="p-4 flex flex-col gap-2 hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                          <div className="flex items-start justify-between">
+                            <div className="flex flex-col">
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-slate-700 dark:text-slate-200 text-xs">{getVehicleName(fuelLog.vehicle_reg)}</span>
+                                <Badge variant="outline" className="text-[8px] h-4 font-bold bg-amber-50 text-amber-700 border-amber-200">Fuel</Badge>
+                              </div>
+                              <span className="text-[10px] font-semibold text-slate-400">{fuelLog.filled_by || '—'} <span className="text-slate-300 dark:text-slate-600 font-normal">({fuelLog.vehicle_reg})</span></span>
+                            </div>
+                            <div className="flex flex-col items-end">
+                              <span className="text-xs font-bold text-amber-600">{fuelLog.litres.toFixed(2)} L</span>
+                              <span className="text-xs font-bold text-emerald-600">₦{fuelLog.total_cost.toLocaleString()}</span>
+                            </div>
+                          </div>
+                          <div className="flex justify-between items-center text-[10px] text-slate-500">
+                            <span>Rate: ₦{fuelLog.rate_per_litre.toLocaleString()}/L</span>
+                            {fuelLog.odometer && <span>Odo: {fuelLog.odometer.toLocaleString()} km</span>}
+                          </div>
+                          {fuelLog.notes && <p className="text-[10px] text-slate-400 italic mt-1">{fuelLog.notes}</p>}
+                          <div className="flex items-center justify-end gap-1 mt-2 border-t border-slate-100 dark:border-slate-800 pt-2">
+                            {priv.canEditFuel && (
+                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEditFuelLog(fuelLog)}>
+                                <Edit2 className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                            {priv.canDeleteFuel && (
+                              <Button variant="ghost" size="icon" className="h-7 w-7 text-rose-500" onClick={() => deleteVehicleFuelLog(fuelLog.id)}>
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    }
+                  })
+                )}
+              </div>
+            </Card>
           )}
         </div>
       )}
+
+      {/* ── Fuel Analytics ── */}
+      {activeTab === 'fuel' && priv.canViewFuelAnalytics && (
+        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+          {/* Metrics */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {([
+              { label: 'Total Litres', value: `${totalFuelLitres.toFixed(1)} L`, icon: Fuel, color: 'amber' },
+              { label: 'Total Cost', value: `₦${totalFuelCost.toLocaleString(undefined, { maximumFractionDigits: 0 })}`, icon: TrendingUp, color: 'emerald' },
+              { label: 'Avg Rate', value: `₦${avgRate.toFixed(0)}/L`, icon: BarChart3, color: 'blue' },
+              { label: fuelFilterVehicle === '' ? 'Top Vehicle' : 'Vehicle Odo Span', value: fuelFilterVehicle === '' ? topVehicleName : efficiency ? `${efficiency.distance.toLocaleString()} km` : '\u2014', icon: Truck, color: 'blue' }
+            ] as const).map(({ label, value, icon: Icon, color }) => (
+              <Card key={label} className="border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900/50">
+                <CardContent className="p-4 flex items-center gap-3">
+                  <div className={`h-9 w-9 rounded-lg flex items-center justify-center bg-${color}-100 dark:bg-${color}-900/30 text-${color}-600`}>
+                    <Icon className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">{label}</p>
+                    <p className="text-sm font-bold text-slate-700 dark:text-slate-200 truncate max-w-[120px]">{value}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+          {/* Efficiency Banner */}
+          {(fuelFilterVehicle !== '' ? efficiency : fleetEfficiency) && (
+            <div className="p-4 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="h-9 w-9 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-600"><TrendingUp className="h-4 w-4" /></div>
+                <div>
+                  <h4 className="text-xs font-bold text-emerald-800 dark:text-emerald-300">
+                    {fuelFilterVehicle !== '' ? 'Vehicle Fuel Efficiency' : 'Fleet-Wide Fuel Efficiency'}
+                  </h4>
+                  <p className="text-[10px] text-slate-500">
+                    Based on {(fuelFilterVehicle !== '' ? efficiency : fleetEfficiency)?.distance.toLocaleString()} km of logged travel
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-6">
+                <div className="text-right">
+                  <p className="text-sm font-bold text-emerald-700 dark:text-emerald-400">{(fuelFilterVehicle !== '' ? efficiency : fleetEfficiency)?.kmPerLitre.toFixed(2)} km/L</p>
+                  <p className="text-[8px] uppercase font-bold text-slate-400">km per Litre</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-bold text-emerald-700 dark:text-emerald-400">{(fuelFilterVehicle !== '' ? efficiency : fleetEfficiency)?.lPer100km.toFixed(2)} L/100km</p>
+                  <p className="text-[8px] uppercase font-bold text-slate-400">Litres per 100km</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+
+            {/* Tabbed Analytics Charts */}
+            <Card className="border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm overflow-hidden rounded-xl">
+              <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 p-4 bg-slate-50/50 dark:bg-slate-800/20">
+                <div>
+                  <CardTitle className="text-sm font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                    <BarChart3 className="h-4 w-4 text-blue-500" /> 
+                    {activeChartTab === 'litres' ? 'Fuel Consumed (Litres)' : activeChartTab === 'cost' ? 'Total Expenditures (₦)' : 'Average Fuel Rate (₦/L)'}
+                  </CardTitle>
+                  <CardDescription className="text-xs">
+                    {activeChartTab === 'litres' ? 'Track fuel quantities consumed across the fleet' : activeChartTab === 'cost' ? 'Monitor costs of refueling records' : 'Price fluctuations and rate per litre over time'}
+                  </CardDescription>
+                </div>
+                <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl shrink-0 self-start sm:self-center">
+                  <Button
+                    variant={activeChartTab === 'litres' ? 'secondary' : 'ghost'}
+                    size="sm"
+                    className="h-8 text-[11px] font-bold uppercase tracking-wider px-3 rounded-lg"
+                    onClick={() => setActiveChartTab('litres')}
+                  >
+                    <Fuel className="h-3.5 w-3.5 mr-1 text-amber-500" /> Litres
+                  </Button>
+                  <Button
+                    variant={activeChartTab === 'cost' ? 'secondary' : 'ghost'}
+                    size="sm"
+                    className="h-8 text-[11px] font-bold uppercase tracking-wider px-3 rounded-lg"
+                    onClick={() => setActiveChartTab('cost')}
+                  >
+                    <TrendingUp className="h-3.5 w-3.5 mr-1 text-emerald-500" /> Cost
+                  </Button>
+                  <Button
+                    variant={activeChartTab === 'trend' ? 'secondary' : 'ghost'}
+                    size="sm"
+                    className="h-8 text-[11px] font-bold uppercase tracking-wider px-3 rounded-lg"
+                    onClick={() => setActiveChartTab('trend')}
+                  >
+                    <BarChart3 className="h-3.5 w-3.5 mr-1 text-blue-500" /> Price Trend
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="p-6">
+                {chartData.length === 0 || (activeChartTab === 'litres' && chartData.every(d => d.litres === 0)) || (activeChartTab === 'cost' && chartData.every(d => d.cost === 0)) || (activeChartTab === 'trend' && chartData.every(d => d.rate === 0)) ? (
+                  <div className="h-64 flex items-center justify-center text-sm text-slate-400 italic border border-dashed rounded-lg">No data available for this period</div>
+                ) : (
+                  <div className="w-full h-80 min-h-[300px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      {activeChartTab === 'litres' ? (
+                        <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }} barCategoryGap="0%" barGap={0}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                          <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} dy={10} />
+                          <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} />
+                          <Tooltip content={<CustomTooltip valType="litres" />} cursor={{ fill: 'rgba(0,0,0,0.02)' }} />
+                          {fuelFilterVehicle !== '' ? (
+                            <Bar dataKey="litres" name={getVehicleName(fuelFilterVehicle)} fill="#fbbf24" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                          ) : (
+                            <>
+                              {activeVehicleNames.map((name, idx) => (
+                                <Bar
+                                  key={name}
+                                  dataKey={name}
+                                  name={name}
+                                  fill={VEHICLE_COLORS[idx % VEHICLE_COLORS.length]}
+                                  radius={[0, 0, 0, 0]}
+                                />
+                              ))}
+                              <Line type="monotone" dataKey="litres" name="Total Litres" stroke="#06b6d4" strokeWidth={2.5} dot={{ r: 3, strokeWidth: 1 }} activeDot={{ r: 5 }} />
+                            </>
+                          )}
+                        </ComposedChart>
+                      ) : activeChartTab === 'cost' ? (
+                        <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }} barCategoryGap="0%" barGap={0}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                          <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} dy={10} />
+                          <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} tickFormatter={(value) => `₦${(value/1000)}k`} />
+                          <Tooltip content={<CustomTooltip valType="cost" />} cursor={{ fill: 'rgba(0,0,0,0.02)' }} />
+                          {fuelFilterVehicle !== '' ? (
+                            <Bar dataKey="cost" name={getVehicleName(fuelFilterVehicle)} fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                          ) : (
+                            <>
+                              {activeVehicleNames.map((name, idx) => (
+                                <Bar
+                                  key={name}
+                                  dataKey={`${name}_cost`}
+                                  name={name}
+                                  fill={VEHICLE_COLORS[idx % VEHICLE_COLORS.length]}
+                                  radius={[0, 0, 0, 0]}
+                                />
+                              ))}
+                              <Line type="monotone" dataKey="cost" name="Total Cost" stroke="#06b6d4" strokeWidth={2.5} dot={{ r: 3, strokeWidth: 1 }} activeDot={{ r: 5 }} />
+                            </>
+                          )}
+                        </ComposedChart>
+                      ) : (
+                        <LineChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                          <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} dy={10} />
+                          <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} domain={['auto', 'auto']} />
+                          <Tooltip content={<CustomTooltip valType="trend" />} />
+                          {fuelFilterVehicle !== '' ? (
+                            <Line type="monotone" dataKey="rate" name={getVehicleName(fuelFilterVehicle)} stroke="#3b82f6" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }} />
+                          ) : (
+                            activeVehicleNames.map((name, idx) => (
+                              <Line 
+                                key={name} 
+                                type="monotone" 
+                                dataKey={`${name}_rate`} 
+                                name={name} 
+                                stroke={VEHICLE_COLORS[idx % VEHICLE_COLORS.length]} 
+                                strokeWidth={2} 
+                                dot={{ r: 3, strokeWidth: 1.5 }} 
+                                activeDot={{ r: 5 }} 
+                              />
+                            ))
+                          )}
+                        </LineChart>
+                      )}
+                    </ResponsiveContainer>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Top Consuming Vehicles */}
+            <Card className="border-none shadow-sm overflow-hidden bg-white dark:bg-slate-900">
+              <div className="p-4 bg-slate-50/50 dark:bg-slate-800/30 border-b dark:border-slate-800 flex flex-col sm:flex-row gap-4 justify-between items-center">
+                <h3 className="font-bold text-slate-700 dark:text-slate-200 text-sm flex items-center gap-2">
+                  <Truck className="h-4 w-4 text-blue-500" /> Top Consuming Vehicles
+                  <span className="ml-1 text-[10px] font-normal text-slate-400">(By Total Cost)</span>
+                </h3>
+              </div>
+              <div className="p-4 space-y-4">
+                {topVehiclesData.length === 0 ? (
+                  <div className="py-6 text-center text-slate-400 text-sm italic">No vehicle data for this period</div>
+                ) : (
+                  topVehiclesData.map((v, i) => (
+                    <div key={v.reg} className="flex items-center gap-4">
+                      <div className="w-6 text-right text-xs font-bold text-slate-400">#{i + 1}</div>
+                      <div className="flex-1">
+                        <div className="flex justify-between items-end mb-1">
+                          <span className="text-xs font-bold text-slate-700 dark:text-slate-200">
+                            {getVehicleName(v.reg)} <span className="text-[10px] font-normal text-slate-400">({v.reg})</span>
+                          </span>
+                          <span className="text-[10px] font-semibold text-emerald-600">₦{v.cost.toLocaleString()}</span>
+                        </div>
+                        <div className="w-full h-2 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden flex">
+                          <div 
+                            className="h-full bg-blue-500 rounded-full" 
+                            style={{ width: `${Math.max((v.cost / maxTopVehicleCost) * 100, 2)}%` }}
+                          />
+                        </div>
+                        <p className="text-[9px] text-slate-400 mt-1 text-right">{v.litres.toFixed(1)} L total</p>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </Card>
+        </div>
+      )}
     </div>
+  </>
   );
 }

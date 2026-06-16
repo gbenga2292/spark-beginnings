@@ -2004,20 +2004,25 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                                   'border-l-rose-400';
 
                                 const isCollapsed = collapsedMonths.has(groupKey);
-                                const toggleCollapse = () => setCollapsedMonths(prev => {
-                                  const next = new Set(prev);
-                                  if (next.has(groupKey)) next.delete(groupKey);
-                                  else next.add(groupKey);
-                                  return next;
-                                });
+                                const toggleCollapse = (e: React.MouseEvent) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  setCollapsedMonths(prev => {
+                                    const next = new Set(prev);
+                                    if (next.has(groupKey)) next.delete(groupKey);
+                                    else next.add(groupKey);
+                                    return next;
+                                  });
+                                };
 
                                 return [
                                   // ── Month Group Header Row (clickable to collapse) ────────
                                   <tr
                                     key={`hdr-${groupKey}`}
                                     onClick={toggleCollapse}
+                                    onMouseDown={(e) => e.preventDefault()}
                                     className={cn(
-                                      "border-t-2 border-b cursor-pointer select-none transition-colors",
+                                      "border-t-2 border-b cursor-pointer select-none touch-manipulation transition-colors",
                                       headerBg,
                                       isDark ? "border-slate-700 hover:brightness-110" : "border-slate-200 hover:brightness-95"
                                     )}

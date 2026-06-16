@@ -140,6 +140,12 @@ const PRIV_GROUPS: PG[] = [
           { key: 'canAddLogs', label: 'Record Trips', special: true },
           { key: 'canEditLogs', label: 'Edit Logs' },
           { key: 'canDeleteLogs', label: 'Delete Logs', danger: true },
+          // Fuel
+          { key: 'canViewFuel', label: 'View Fuel Logs' },
+          { key: 'canAddFuel', label: 'Log Fuel', special: true },
+          { key: 'canEditFuel', label: 'Edit Fuel' },
+          { key: 'canDeleteFuel', label: 'Delete Fuel', danger: true },
+          { key: 'canViewFuelAnalytics', label: 'View Fuel Analytics' },
           // Fleet
           { key: 'canViewFleet', label: 'View Fleet' },
           { key: 'canAddFleet', label: 'Add Vehicle', special: true },

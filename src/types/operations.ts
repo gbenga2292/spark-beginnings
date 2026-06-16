@@ -210,6 +210,20 @@ export interface VehicleDailyLog {
   driver_employee_id?: string;
   legs: VehicleTripLeg[];
 }
+
+export interface VehicleFuelLog {
+  id: string;
+  vehicle_id: string;
+  vehicle_reg: string;
+  date: string;           // ISO date YYYY-MM-DD
+  rate_per_litre: number; // ₦ per litre
+  litres: number;
+  total_cost: number;
+  odometer?: number;
+  filled_by?: string;
+  notes?: string;
+  created_at?: string;
+}
 export interface DowntimeEntry {
   id: string;
   reason: string;
