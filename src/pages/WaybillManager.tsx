@@ -218,7 +218,12 @@ export function WaybillManager() {
                     <td className="px-5 py-4">
                       <div className="flex flex-col">
                         <span className="font-semibold text-slate-700 dark:text-slate-200 text-xs">{wb.siteName}</span>
-                        <span className="text-xs text-slate-400">from Warehouse</span>
+                        <span className="text-xs text-slate-400">
+                          {wb.transferSiteName 
+                            ? (wb.type === 'waybill' ? `from ${wb.transferSiteName}` : `to ${wb.transferSiteName}`)
+                            : (wb.type === 'waybill' ? 'from Warehouse' : 'to Warehouse')
+                          }
+                        </span>
                       </div>
                     </td>
                     <td className="px-5 py-4 font-medium text-slate-600 dark:text-slate-300 whitespace-nowrap text-xs">
@@ -351,7 +356,12 @@ export function WaybillManager() {
                   <div className="flex flex-col">
                     <span className="text-[10px] uppercase font-bold text-slate-400">{activeTab === 'waybill' ? 'Destination' : 'Source Site'}</span>
                     <span className="font-semibold text-slate-700 dark:text-slate-200 text-xs mt-0.5 truncate">{wb.siteName}</span>
-                    <span className="text-xs text-slate-400">from Warehouse</span>
+                    <span className="text-xs text-slate-400">
+                      {wb.transferSiteName 
+                        ? (wb.type === 'waybill' ? `from ${wb.transferSiteName}` : `to ${wb.transferSiteName}`)
+                        : (wb.type === 'waybill' ? 'from Warehouse' : 'to Warehouse')
+                      }
+                    </span>
                   </div>
                 </div>
                 
@@ -452,9 +462,13 @@ export function WaybillManager() {
           <DialogContent className="sm:max-w-[450px] p-6 rounded-2xl max-h-[80vh] overflow-auto">
             <div className="space-y-6">
               <div>
-                <h2 className="text-xl font-bold text-slate-800 dark:text-white">Process Return Sheet</h2>
+                <h2 className="text-xl font-bold text-slate-800 dark:text-white">
+                  {waybillToProcess.transferSiteName ? 'Process Site Transfer' : 'Process Return Sheet'}
+                </h2>
                 <p className="text-sm text-slate-500 mt-1">
-                  Record the condition of items being returned to the warehouse.
+                  {waybillToProcess.transferSiteName
+                    ? `Confirm that materials have left ${waybillToProcess.siteName} for ${waybillToProcess.transferSiteName}. The receiving site waybill must be confirmed separately.`
+                    : 'Record the condition of items being returned to the warehouse.'}
                 </p>
               </div>
 

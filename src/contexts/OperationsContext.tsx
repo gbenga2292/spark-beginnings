@@ -28,7 +28,7 @@ interface OperationsContextType {
   restockAssets: (items: { assetId: string, quantity: number, totalCost: number }[]) => void;
   
   // Waybill methods
-  createWaybill: (waybill: Omit<Waybill, 'id' | 'status'>) => void;
+  createWaybill: (waybill: Omit<Waybill, 'id' | 'status'> & { id?: string; status?: WaybillStatus }) => void;
   updateWaybill: (id: string, updates: Partial<Omit<Waybill, 'id' | 'status'>>) => void;
   updateWaybillStatus: (id: string, status: WaybillStatus, sentToSiteDate?: string, returnConditions?: Record<string, { good: number, damaged: number, missing: number }>) => void;
   deleteWaybill: (id: string) => void;
@@ -309,6 +309,8 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
             issueDate: w.issue_date,
             sentToSiteDate: w.sent_to_site_date,
             items: w.items || [],
+            transferSiteId: w.transfer_site_id,
+            transferSiteName: w.transfer_site_name,
           })));
         }
 
@@ -497,6 +499,8 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
       sentToSiteDate: w.sent_to_site_date,
       items: w.items || [],
       signature: w.signature,
+      transferSiteId: w.transfer_site_id,
+      transferSiteName: w.transfer_site_name,
     });
 
     const mapDbCheckout = (c: any) => ({
@@ -815,7 +819,9 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
       issue_date: waybill.issueDate,
       sent_to_site_date: waybill.sentToSiteDate,
       items: waybill.items,
-      signature: waybill.signature
+      signature: waybill.signature,
+      transfer_site_id: waybill.transferSiteId,
+      transfer_site_name: waybill.transferSiteName
     });
   };
 
@@ -963,18 +969,33 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
     }));
   };
 
-  const createWaybill = (waybill: Omit<Waybill, 'id' | 'status'>) => {
+  const createWaybill = (waybill: Omit<Waybill, 'id' | 'status'> & { id?: string; status?: WaybillStatus }) => {
     const newWaybill: Waybill = {
       ...waybill,
-      id: `WB-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`,
-      status: 'outstanding',
+      id: waybill.id || `WB-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`,
+      status: waybill.status || 'outstanding',
     };
 
-    if (waybill.type === 'waybill') {
+    if (newWaybill.type === 'waybill') {
       setAssets(prev => prev.map(asset => {
-        const item = waybill.items.find(i => i.assetId === asset.id);
+        const item = newWaybill.items.find(i => i.assetId === asset.id);
         if (item) {
           const reservedQuantity = asset.reservedQuantity + item.quantity;
+          const updated: Asset = {
+            ...asset,
+            reservedQuantity,
+            availableQuantity: Math.max(0, asset.quantity - (reservedQuantity + (asset.missingQuantity || 0) + (asset.damagedQuantity || 0) + (asset.usedQuantity || 0))),
+          };
+          persistAsset(updated);
+          return updated;
+        }
+        return asset;
+      }));
+    } else if (newWaybill.type === 'return' && newWaybill.status === 'return_completed') {
+      setAssets(assetsPrev => assetsPrev.map(asset => {
+        const item = newWaybill.items.find(i => i.assetId === asset.id);
+        if (item) {
+          const reservedQuantity = Math.max(0, asset.reservedQuantity - item.quantity);
           const updated: Asset = {
             ...asset,
             reservedQuantity,

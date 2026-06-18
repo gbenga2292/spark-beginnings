@@ -1426,6 +1426,47 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
 
 export function useAppData(): AppDataContextType {
     const ctx = useContext(TaskContext);
-    if (!ctx) throw new Error('useAppData must be used within TaskProvider');
+    if (!ctx) {
+        if (import.meta.env.DEV) {
+            console.warn('useAppData is being used outside of a TaskProvider. Returning fallback mock context.');
+        }
+        return {
+            mainTasks: [],
+            subtasks: [],
+            users: [],
+            comments: [],
+            projects: [],
+            reminders: [],
+            workspaces: [],
+            addReminder: async () => {},
+            updateReminder: async () => {},
+            deleteReminder: async () => {},
+            toggleReminderActive: async () => {},
+            snoozeReminder: async () => {},
+            createProject: async () => {},
+            createMainTask: async () => ({}),
+            updateMainTask: async () => {},
+            deleteMainTask: async () => {},
+            addSubtask: async () => {},
+            updateSubtask: async () => {},
+            deleteSubtask: async () => {},
+            restoreMainTask: async () => {},
+            restoreSubtask: async () => {},
+            deleteMainTaskPermanently: async () => {},
+            deleteSubtaskPermanently: async () => {},
+            assignSubtask: async () => {},
+            updateSubtaskStatus: async () => {},
+            approveSubtask: async () => {},
+            rejectSubtask: async () => {},
+            postComment: async () => {},
+            updateComment: async () => {},
+            deleteComment: async () => {},
+            getMainTaskComments: () => [],
+            getSubtaskComments: () => [],
+            getMainTaskWorkflow: () => [],
+            fetchArchivedSubtasks: async () => [],
+            fetchArchivedMainTasks: async () => [],
+        };
+    }
     return ctx;
 }

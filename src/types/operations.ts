@@ -72,12 +72,15 @@ export interface Waybill {
   status: WaybillStatus;
   siteId: string;
   siteName?: string;
+  purpose?: string;
   driverName?: string;
   vehicle?: string;
   issueDate: string;
   sentToSiteDate?: string;
   items: WaybillItem[];
   signature?: string;
+  transferSiteId?: string;
+  transferSiteName?: string;
   created_at?: string;
 }
 

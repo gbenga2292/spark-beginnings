@@ -58,6 +58,7 @@ export interface ClientContact {
   siteIds?: string[];
   siteNames?: string[];
   isActive: boolean;
+  isPrincipal?: boolean; // If true, contact appears on ALL sites for this client regardless of siteIds
   createdAt: string;
   updatedAt: string;
 }

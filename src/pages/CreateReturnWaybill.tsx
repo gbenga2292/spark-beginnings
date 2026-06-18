@@ -11,6 +11,7 @@ import { Circle, CheckCircle2, ChevronDown, Package, Search } from 'lucide-react
 import { cn, formatUnit } from '@/src/lib/utils';
 import { getPositionIndex } from '@/src/lib/hierarchy';
 import { Waybill } from '../types/operations';
+import { filterOperationalSites } from '@/src/lib/siteUtils';
 
 export interface SiteItem {
   assetId: string;
@@ -114,6 +115,7 @@ export function CreateReturnWaybill({ site, inventoryItems, onBack, editWaybill 
   const [service, setService] = useState('Dewatering');
   const [expectedReturnDate, setExpectedReturnDate] = useState('');
   const [returnTo, setReturnTo] = useState('Office');
+  const [destinationSiteId, setDestinationSiteId] = useState('');
   const [addSignature, setAddSignature] = useState(() => {
     if (editWaybill) {
       return !!editWaybill.signature;
@@ -214,6 +216,10 @@ export function CreateReturnWaybill({ site, inventoryItems, onBack, editWaybill 
       toast.error('Site information is missing');
       return;
     }
+    if (returnTo === 'Other Site' && !destinationSiteId) {
+      toast.error('Please select a Destination Site');
+      return;
+    }
 
     const itemsToReturn = itemIds.map(id => {
       const asset = resolvedInventoryItems.find(i => i.assetId === id);
@@ -233,17 +239,59 @@ export function CreateReturnWaybill({ site, inventoryItems, onBack, editWaybill 
       });
       toast.success('Return waybill updated successfully!');
     } else {
-      createWaybill({
-        siteId: resolvedSite.id,
-        siteName: resolvedSite.name,
-        type: 'return',
-        issueDate: new Date().toISOString(),
-        driverName,
-        vehicle: vehicleName,
-        items: itemsToReturn,
-        signature: addSignature ? (currentUser?.signature || '') : '',
-      } as any);
-      toast.success('Return waybill created successfully!');
+      if (returnTo === 'Other Site') {
+        const destSite = sites.find(s => s.id === destinationSiteId);
+        if (!destSite) {
+          toast.error('Destination Site not found');
+          return;
+        }
+
+        // 1. Create return waybill for source site (starts as outstanding, user will process return manually)
+        createWaybill({
+          siteId: resolvedSite.id,
+          siteName: resolvedSite.name,
+          type: 'return',
+          status: 'outstanding',
+          purpose: `Site Transfer to ${destSite.name}`,
+          issueDate: new Date().toISOString(),
+          driverName,
+          vehicle: vehicleName,
+          items: itemsToReturn,
+          signature: addSignature ? (currentUser?.signature || '') : '',
+          transferSiteId: destSite.id,
+          transferSiteName: destSite.name,
+        });
+
+        // 2. Create outbound waybill for destination site (starts as outstanding, user will confirm send/delivery manually)
+        createWaybill({
+          siteId: destSite.id,
+          siteName: destSite.name,
+          type: 'waybill',
+          status: 'outstanding',
+          purpose: `Site Transfer from ${resolvedSite.name}`,
+          issueDate: new Date().toISOString(),
+          driverName,
+          vehicle: vehicleName,
+          items: itemsToReturn,
+          signature: addSignature ? (currentUser?.signature || '') : '',
+          transferSiteId: resolvedSite.id,
+          transferSiteName: resolvedSite.name,
+        });
+
+        toast.success(`Materials transferred to ${destSite.name} successfully!`);
+      } else {
+        createWaybill({
+          siteId: resolvedSite.id,
+          siteName: resolvedSite.name,
+          type: 'return',
+          issueDate: new Date().toISOString(),
+          driverName,
+          vehicle: vehicleName,
+          items: itemsToReturn,
+          signature: addSignature ? (currentUser?.signature || '') : '',
+        });
+        toast.success('Return waybill created successfully!');
+      }
     }
     onBack();
   };
@@ -476,20 +524,48 @@ export function CreateReturnWaybill({ site, inventoryItems, onBack, editWaybill 
             </div>
           </div>
 
-          <div className="space-y-2 pt-2 md:w-1/3">
-            <Label className="text-xs font-bold text-slate-700">Return To</Label>
-            <div className="relative">
-              <select
-                value={returnTo}
-                onChange={e => setReturnTo(e.target.value)}
-                className="w-full h-11 rounded-xl border border-slate-200 bg-slate-50/50 px-4 text-sm font-semibold text-slate-800 transition-colors focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 appearance-none"
-              >
-                <option value="Office">Office</option>
-                <option value="Main Warehouse">Main Warehouse</option>
-                <option value="Other Site">Other Site</option>
-              </select>
-              <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+            <div className="space-y-2">
+              <Label className="text-xs font-bold text-slate-700">Return To</Label>
+              <div className="relative">
+                <select
+                  value={returnTo}
+                  onChange={e => {
+                    setReturnTo(e.target.value);
+                    if (e.target.value !== 'Other Site') {
+                      setDestinationSiteId('');
+                    }
+                  }}
+                  className="w-full h-11 rounded-xl border border-slate-200 bg-slate-50/50 px-4 text-sm font-semibold text-slate-800 transition-colors focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 appearance-none"
+                >
+                  <option value="Office">Office</option>
+                  <option value="Main Warehouse">Main Warehouse</option>
+                  <option value="Other Site">Other Site</option>
+                </select>
+                <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+              </div>
             </div>
+
+            {returnTo === 'Other Site' && (
+              <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-200">
+                <Label className="text-xs font-bold text-slate-700">Destination Site *</Label>
+                <div className="relative">
+                  <select
+                    value={destinationSiteId}
+                    onChange={e => setDestinationSiteId(e.target.value)}
+                    className="w-full h-11 rounded-xl border border-slate-200 bg-slate-50/50 px-4 text-sm font-semibold text-slate-800 transition-colors focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 appearance-none"
+                  >
+                    <option value="">Select Destination Site</option>
+                    {filterOperationalSites(sites)
+                      .filter(s => s.id !== resolvedSite?.id && s.status === 'Active')
+                      .map(s => (
+                        <option key={s.id} value={s.id}>{s.name} ({s.client})</option>
+                      ))}
+                  </select>
+                  <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+                </div>
+              </div>
+            )}
           </div>
 
           <div 

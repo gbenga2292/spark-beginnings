@@ -38,6 +38,7 @@ export function useDataLoader(isAuthenticated: boolean) {
   useEffect(() => {
     if (!isAuthenticated || loaded.current) return;
     loaded.current = true;
+    let cancelled = false;
 
     const timeoutId = setTimeout(async () => {
       const networkStatus = useNetworkStore.getState().connectionStatus;
@@ -255,12 +256,14 @@ export function useDataLoader(isAuthenticated: boolean) {
 
         console.log('[DataLoader] All data loaded from Supabase and cached');
       } catch (err: any) {
+        if (cancelled) return;
         useNetworkStore.getState().setSyncing(false);
-        // Silently ignore abort errors typical of strict-mode or concurrent lock breakage
+        // Silently ignore abort errors from Strict Mode double-mount / lock conflicts.
+        // Do NOT reset loaded.current here — doing so causes an infinite abort→retry loop
+        // because the second Strict Mode mount immediately steals the Web Lock again.
         if (err?.name === 'AbortError' || err?.message?.includes('AbortError') || err?.message?.includes('Lock')) {
-             console.warn('[DataLoader] Ignored AbortError/Lock issue (likely Strict Mode overlap).');
-             loaded.current = false; // Allow it to retry if remounted
-             return;
+          console.warn('[DataLoader] Ignored AbortError/Lock issue (likely Strict Mode overlap).');
+          return;
         }
         console.error('[DataLoader] Failed to load data:', err);
 
@@ -276,9 +279,12 @@ export function useDataLoader(isAuthenticated: boolean) {
           console.log('[DataLoader] Fell back to cached data');
         } catch {}
       }
-    }, 50); // Small delay to prevent lock-stealing conflicts with other providers
+    }, 200); // Delay to outlast React Strict Mode's double-mount cycle (~100ms) and avoid Web Lock conflicts
 
-    return () => clearTimeout(timeoutId);
+    return () => {
+      cancelled = true;
+      clearTimeout(timeoutId);
+    };
   }, [isAuthenticated]);
 
   // Reset on logout

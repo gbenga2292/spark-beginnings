@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { Waybill } from '../types/operations';
 import { useOperations } from '../contexts/OperationsContext';
+import { useAppStore } from '@/src/store/appStore';
 import { Button } from '@/src/components/ui/button';
 import { Badge } from '@/src/components/ui/badge';
 import { Dialog, DialogContent } from '@/src/components/ui/dialog';
@@ -22,6 +23,7 @@ interface WaybillDetailViewProps {
 
 export function WaybillDetailView({ waybill: propWaybill, onClose }: WaybillDetailViewProps) {
   const { waybills, updateWaybillStatus } = useOperations();
+  const { sites } = useAppStore();
   const waybill = waybills.find(w => w.id === propWaybill.id) || propWaybill;
 
   const [showPdfPreview, setShowPdfPreview] = useState(false);
@@ -88,8 +90,27 @@ export function WaybillDetailView({ waybill: propWaybill, onClose }: WaybillDeta
     doc.text(`Driver Name: ${waybill.driverName}`, 20, 62);
     doc.text(`Vehicle: ${waybill.vehicle || 'L200'}`, 20, 69);
 
-    const fromText = waybill.type === 'waybill' ? 'DCEL Warehouse' : (waybill.siteName || 'Site');
-    const toText   = waybill.type === 'waybill' ? (waybill.siteName || 'Site') : 'DCEL Warehouse';
+    const site = sites.find(s => s.id === waybill.siteId || s.name === waybill.siteName);
+    const clientSuffix = site?.client ? ` (${site.client})` : '';
+
+    let fromText = '';
+    let toText = '';
+
+    if (waybill.transferSiteName) {
+      const transferSite = sites.find(s => s.id === waybill.transferSiteId || s.name === waybill.transferSiteName);
+      const transferClientSuffix = transferSite?.client ? ` (${transferSite.client})` : '';
+      
+      if (waybill.type === 'waybill') {
+        fromText = `${waybill.transferSiteName}${transferClientSuffix}`;
+        toText = `${waybill.siteName || 'Site'}${clientSuffix}`;
+      } else {
+        fromText = `${waybill.siteName || 'Site'}${clientSuffix}`;
+        toText = `${waybill.transferSiteName}${transferClientSuffix}`;
+      }
+    } else {
+      fromText = waybill.type === 'waybill' ? 'Office / Warehouse' : `${waybill.siteName || 'Site'}${clientSuffix}`;
+      toText   = waybill.type === 'waybill' ? `${waybill.siteName || 'Site'}${clientSuffix}` : 'Office / Warehouse';
+    }
 
     doc.setFont('times', 'bold');
     const subtitle = `Materials ${waybill.type === 'waybill' ? 'Waybill' : 'Returns'} from ${fromText} to ${toText}`;
@@ -341,6 +362,45 @@ export function WaybillDetailView({ waybill: propWaybill, onClose }: WaybillDeta
               </div>
             ))}
           </div>
+
+          {/* From / To row – shown for all waybills */}
+          {(() => {
+            const site = sites.find(s => s.id === waybill.siteId || s.name === waybill.siteName);
+            const clientSuffix = site?.client ? ` (${site.client})` : '';
+            let from = '';
+            let to = '';
+            if (waybill.transferSiteName) {
+              const tSite = sites.find(s => s.id === waybill.transferSiteId || s.name === waybill.transferSiteName);
+              const tSuffix = tSite?.client ? ` (${tSite.client})` : '';
+              if (waybill.type === 'waybill') {
+                from = `${waybill.transferSiteName}${tSuffix}`;
+                to   = `${waybill.siteName || 'Site'}${clientSuffix}`;
+              } else {
+                from = `${waybill.siteName || 'Site'}${clientSuffix}`;
+                to   = `${waybill.transferSiteName}${tSuffix}`;
+              }
+            } else {
+              from = waybill.type === 'waybill' ? 'Office / Warehouse' : `${waybill.siteName || 'Site'}${clientSuffix}`;
+              to   = waybill.type === 'waybill' ? `${waybill.siteName || 'Site'}${clientSuffix}` : 'Office / Warehouse';
+            }
+            return (
+              <div className="col-span-full border-t border-slate-100 dark:border-slate-800 px-5 py-4 flex items-center gap-3 flex-wrap">
+                <div className="flex items-center gap-2 min-w-0">
+                  <MapPin className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 shrink-0">From</span>
+                  <span className="text-sm font-bold text-slate-800 dark:text-white truncate">{from}</span>
+                </div>
+                <ArrowLeft className="h-4 w-4 text-slate-300 rotate-180 shrink-0" />
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 shrink-0">To</span>
+                  <span className="text-sm font-bold text-slate-800 dark:text-white truncate">{to}</span>
+                  {waybill.transferSiteName && (
+                    <span className="ml-1 px-1.5 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 text-[10px] font-bold uppercase tracking-wide shrink-0">Site Transfer</span>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
         </div>
 
         {/* ── Items table ───────────────────────────────────────────────────── */}
@@ -418,9 +478,11 @@ export function WaybillDetailView({ waybill: propWaybill, onClose }: WaybillDeta
                   {waybill.type === 'waybill' ? 'Mark as Sent to Site' : 'Complete Return'}
                 </h2>
                 <p className="text-sm text-slate-500 mt-1">
-                  {waybill.type === 'waybill' 
+                  {waybill.type === 'waybill'
                     ? 'Select the date the assets were delivered to the site. This will transfer the inventory stock.'
-                    : 'Select the date the assets were returned to the warehouse. This will restore the inventory stock.'}
+                    : waybill.transferSiteName
+                      ? `Select the date the assets left ${waybill.siteName} and confirm the transfer to ${waybill.transferSiteName}.`
+                      : 'Select the date the assets were returned to the warehouse. This will restore the inventory stock.'}
                 </p>
               </div>
 

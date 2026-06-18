@@ -1734,10 +1734,12 @@ Answer site-specific questions using this context only. Be concise.`;
                 <ClientContactsPanel
                   clientName={site.client || site.name}
                   onClose={() => setActiveTab('financials')}
+                  siteId={site.id}
                   inline
                 />
               </div>
             )}
+
           </div>
 
           <InvoiceDetailDialog
