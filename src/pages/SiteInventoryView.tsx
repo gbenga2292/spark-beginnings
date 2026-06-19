@@ -535,6 +535,16 @@ export function SiteInventoryView({ site, questionnaire, onBack, onSiteChange, i
                               ? machineLogs.reduce((acc, log) => log.date < acc ? log.date : acc, machineLogs[0].date)
                               : null;
 
+                            const activeDaysCount = machineLogs.filter(l => {
+                              const day = l.operationalDay ?? (l.isActive ? 'full' : 'none');
+                              return day === 'full' || day === 'half';
+                            }).length;
+
+                            const offDaysCount = machineLogs.filter(l => {
+                              const day = l.operationalDay ?? (l.isActive ? 'full' : 'none');
+                              return day === 'none';
+                            }).length;
+
                             const isFallback = !configured?.pumpStartDate;
                             const pumpStart = configured?.pumpStartDate || earliestLogDate;
                             const pumpStop = configured?.pumpStopDate || null;
@@ -590,22 +600,30 @@ export function SiteInventoryView({ site, questionnaire, onBack, onSiteChange, i
                                   </div>
 
                                   {/* Stats row */}
-                                  <div className="p-4 grid grid-cols-3 divide-x divide-slate-100 dark:divide-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
-                                    <div className="flex flex-col items-center justify-center px-2">
-                                      <p className="text-xs text-slate-500 mb-1">Next Service</p>
+                                  <div className="p-4 grid grid-cols-5 divide-x divide-slate-100 dark:divide-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
+                                    <div className="flex flex-col items-center justify-center px-1">
+                                      <p className="text-[10px] sm:text-[11px] text-slate-500 mb-1 whitespace-nowrap">Next Service</p>
                                       <p className="text-[11px] font-bold text-slate-800 dark:text-slate-200 text-center">
                                         {mAsset ? new Date(mAsset.nextServiceDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '—'}
                                       </p>
                                     </div>
-                                    <div className="flex flex-col items-center justify-center px-2">
-                                      <p className="text-xs text-slate-500 mb-1">Interval</p>
-                                      <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
+                                    <div className="flex flex-col items-center justify-center px-1">
+                                      <p className="text-[10px] sm:text-[11px] text-slate-500 mb-1 whitespace-nowrap">Interval</p>
+                                      <p className="text-[11px] sm:text-xs font-bold text-slate-800 dark:text-slate-200">
                                         {mAsset ? `${mAsset.serviceIntervalMonths}mo` : '—'}
                                       </p>
                                     </div>
-                                    <div className="flex flex-col items-center justify-center px-2">
-                                      <p className="text-xs text-slate-500 mb-1">Log Days</p>
-                                      <p className="text-sm font-bold text-slate-800 dark:text-slate-200">{machineLogCount}</p>
+                                    <div className="flex flex-col items-center justify-center px-1">
+                                      <p className="text-[10px] sm:text-[11px] text-slate-500 mb-1 whitespace-nowrap">Log Days</p>
+                                      <p className="text-[11px] sm:text-xs font-bold text-slate-800 dark:text-slate-200">{machineLogCount}</p>
+                                    </div>
+                                    <div className="flex flex-col items-center justify-center px-1">
+                                      <p className="text-[10px] sm:text-[11px] text-slate-500 mb-1 whitespace-nowrap">Active Days</p>
+                                      <p className="text-[11px] sm:text-xs font-bold text-emerald-600 dark:text-emerald-400">{activeDaysCount}</p>
+                                    </div>
+                                    <div className="flex flex-col items-center justify-center px-1">
+                                      <p className="text-[10px] sm:text-[11px] text-slate-500 mb-1 whitespace-nowrap">Off Days</p>
+                                      <p className="text-[11px] sm:text-xs font-bold text-rose-600 dark:text-rose-400">{offDaysCount}</p>
                                     </div>
                                   </div>
 

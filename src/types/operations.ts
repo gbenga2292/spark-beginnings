@@ -298,3 +298,30 @@ export interface MaintenanceCertificate {
   criteriaCompliance?: Record<string, boolean>;
 }
 
+
+export interface DieselRefillAllocation {
+  assetId: string;
+  assetName: string;
+  allocatedLitres: number;
+  /** Syncs two-way with DailyMachineLog.dieselUsage */
+  actualUsed: number;
+  siteId?: string;
+  siteName?: string;
+  notes?: string;
+}
+
+export interface DieselRefill {
+  id: string;
+  date: string;           // YYYY-MM-DD
+  siteId: string;
+  siteName: string;
+  totalLitres: number;
+  pricePerLitre?: number;
+  totalCost?: number;
+  purchasedBy?: string;
+  supplier?: string;
+  notes?: string;
+  machineAllocations: DieselRefillAllocation[];
+  created_at?: string;
+  updated_at?: string;
+}

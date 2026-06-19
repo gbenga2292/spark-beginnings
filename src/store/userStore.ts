@@ -66,6 +66,8 @@ export interface OpsVehiclesPriv {
 }
 // Ops Site Manager
 export interface OpsSitesPriv { canView: boolean; }
+// Ops Diesel Refill
+export interface OpsDieselPriv { canView: boolean; canAdd: boolean; canEdit: boolean; canDelete: boolean; }
 
 // ─── Account ─────────────────────────────────────────────────
 export interface BillingPriv  { canView: boolean; canCreate: boolean; canEdit: boolean; canDelete: boolean; canViewAmounts: boolean; canImport: boolean; canExport: boolean; }
@@ -147,6 +149,7 @@ export interface UserPrivileges {
   opsMaintenance:    OpsMaintenancePriv;
   opsVehicles:       OpsVehiclesPriv;
   opsSites:          OpsSitesPriv;
+  opsDiesel:         OpsDieselPriv;
   activityLog:       ActivityLogPriv;
   commLog:           CommLogPriv;
   beneficiaries:     BeneficiariesPriv;
@@ -215,6 +218,7 @@ export const FULL_ACCESS: UserPrivileges = {
     canImport: true, canExport: true
   },
   opsSites:         { canView: true },
+  opsDiesel:        { canView: true, canAdd: true, canEdit: true, canDelete: true },
   activityLog:      { canView: true, canExport: true },
   commLog:          { canView: true, canAdd: true, canEdit: true, canDelete: true, canExport: true },
   beneficiaries:    { canView: true, canAdd: true, canEdit: true, canDelete: true, canImport: true, canExport: true },
@@ -261,6 +265,7 @@ export const NO_ACCESS: UserPrivileges = {
     canImport: false, canExport: false
   },
   opsSites:         { canView: false },
+  opsDiesel:        { canView: false, canAdd: false, canEdit: false, canDelete: false },
   activityLog:      { canView: false, canExport: false },
   commLog:          { canView: false, canAdd: false, canEdit: false, canDelete: false, canExport: false },
   beneficiaries:    { canView: false, canAdd: false, canEdit: false, canDelete: false, canImport: false, canExport: false },
@@ -334,6 +339,7 @@ const DEFAULT_PRESETS: PrivilegePreset[] = [
       opsMaintenance:   { canView: true, canAdd: false, canEdit: false, canDelete: false },
       opsVehicles:      { canView: true, canAdd: false, canEdit: false, canDelete: false, canViewFleet: true, canAddFleet: false, canEditFleet: false, canDeleteFleet: false, canViewLogs: true, canAddLogs: false, canEditLogs: false, canDeleteLogs: false, canViewFuel: true, canAddFuel: false, canEditFuel: false, canDeleteFuel: false, canViewFuelAnalytics: true, canViewDocuments: true, canEditDocuments: false, canImport: false, canExport: false },
       opsSites:         { canView: true },
+      opsDiesel:        { canView: true, canAdd: false, canEdit: false, canDelete: false },
       activityLog:      { canView: true, canExport: false },
       commLog:          { canView: false, canAdd: false, canEdit: false, canDelete: false, canExport: false },
       beneficiaries:    { canView: true, canAdd: false, canEdit: false, canDelete: false, canImport: false, canExport: false },

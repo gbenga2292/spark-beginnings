@@ -1,7 +1,7 @@
 import { formatDisplayDate } from '@/src/lib/dateUtils';
 import { useOperations } from '../contexts/OperationsContext';
 import { useAppStore } from '@/src/store/appStore';
-import { Package, Truck, ArrowRightLeft, AlertCircle, TrendingUp, Clock, Wrench, HardHat, Bell, CalendarRange, ChevronRight, ExternalLink } from 'lucide-react';
+import { Package, Truck, ArrowRightLeft, AlertCircle, TrendingUp, Clock, Wrench, HardHat, Bell, CalendarRange, ChevronRight, ExternalLink, Fuel } from 'lucide-react';
 import { Badge } from '@/src/components/ui/badge';
 import { useTheme } from '@/src/hooks/useTheme';
 import { cn, formatUnit } from '@/src/lib/utils';
@@ -29,6 +29,7 @@ export function Dashboard() {
   const opsCheckout  = usePriv('opsCheckout');
   const opsMaintenance = usePriv('opsMaintenance');
   const opsInventory = usePriv('opsInventory');
+  const opsDiesel = usePriv('opsDiesel');
 
   const stats = getAssetAnalytics();
   const maintenanceStats = getMaintenanceStats();
@@ -293,6 +294,11 @@ export function Dashboard() {
         {opsMaintenance?.canAdd && (
           <button onClick={() => navigate('/operations/maintenance')} className="flex items-center gap-2 px-4 py-2 bg-amber-50 text-amber-700 hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-300 dark:hover:bg-amber-900/50 rounded-lg text-sm font-medium transition-colors">
             <Wrench className="h-4 w-4" /> Log Maintenance
+          </button>
+        )}
+        {opsDiesel?.canAdd && (
+          <button onClick={() => navigate('/operations/diesel')} className="flex items-center gap-2 px-4 py-2 bg-orange-50 text-orange-700 hover:bg-orange-100 dark:bg-orange-900/30 dark:text-orange-300 dark:hover:bg-orange-900/50 rounded-lg text-sm font-medium transition-colors">
+            <Fuel className="h-4 w-4" /> Diesel Refill
           </button>
         )}
         {opsInventory?.canAdd && (

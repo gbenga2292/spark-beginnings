@@ -1038,7 +1038,10 @@ export const useAppStore = create<AppState>()(
       deleteCommLog: (id) => { set((s) => ({ commLogs: s.commLogs.filter(l => l.id !== id) })); db.deleteCommLog(id); },
 
       // Client Contacts
-      addClientContact: (contact) => set((s) => ({ clientContacts: [...s.clientContacts, contact] })),
+      addClientContact: (contact) => {
+        set((s) => ({ clientContacts: [...s.clientContacts, contact] }));
+        db.insertClientContact(contact).catch(err => console.error('addClientContact DB sync failed:', err));
+      },
       updateClientContact: (id, updates) => set((s) => {
         const oldContact = s.clientContacts.find(c => c.id === id);
         const updatedContacts = s.clientContacts.map(c => c.id === id ? { ...c, ...updates, updatedAt: new Date().toISOString() } : c);
@@ -1046,9 +1049,13 @@ export const useAppStore = create<AppState>()(
         const updatedLogs = (updates.name && oldContact && updates.name !== oldContact.name)
           ? s.commLogs.map(l => (!l.isInternal && l.contactPerson === oldContact.name) ? { ...l, contactPerson: updates.name } : l)
           : s.commLogs;
+        db.updateClientContact(id, updates).catch(err => console.error('updateClientContact DB sync failed:', err));
         return { clientContacts: updatedContacts, commLogs: updatedLogs };
       }),
-      deleteClientContact: (id) => set((s) => ({ clientContacts: s.clientContacts.filter(c => c.id !== id) })),
+      deleteClientContact: (id) => {
+        set((s) => ({ clientContacts: s.clientContacts.filter(c => c.id !== id) }));
+        db.deleteClientContact(id).catch(err => console.error('deleteClientContact DB sync failed:', err));
+      },
       setClientContacts: (contacts) => set({ clientContacts: contacts }),
 
       // Daily Journals

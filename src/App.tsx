@@ -65,6 +65,7 @@ const TaskArchive = lazy(() => import('./pages/TaskArchive').then(m => ({ defaul
 const OperationsDashboard = lazy(() => import('./pages/OperationsDashboard').then(m => ({ default: m.Dashboard })));
 const AssetManager = lazy(() => import('./pages/AssetManager').then(m => ({ default: m.AssetManager })));
 const WaybillManager = lazy(() => import('./pages/WaybillManager').then(m => ({ default: m.WaybillManager })));
+const DieselRefillManager = lazy(() => import('./pages/DieselRefillManager').then(m => ({ default: m.DieselRefillManager })));
 const SiteManager = lazy(() => import('./pages/SiteManager').then(m => ({ default: m.SiteManager })));
 const QuickCheckout = lazy(() => import('./pages/QuickCheckout').then(m => ({ default: m.QuickCheckout })));
 const MaintenanceManager = lazy(() => import('./pages/MaintenanceManager').then(m => ({ default: m.MaintenanceManager })));
@@ -247,6 +248,7 @@ function AppContent() {
                       <Route path="waybills" element={<ProtectedRoute requiredModule="opsWaybills"><WaybillManager /></ProtectedRoute>} />
                       <Route path="checkout" element={<ProtectedRoute requiredModule="opsCheckout"><QuickCheckout /></ProtectedRoute>} />
                       <Route path="maintenance" element={<ProtectedRoute requiredModule="opsMaintenance"><MaintenanceManager /></ProtectedRoute>} />
+                      <Route path="diesel" element={<ProtectedRoute requiredModule="opsDiesel"><DieselRefillManager /></ProtectedRoute>} />
                       <Route path="vehicles" element={<ProtectedRoute requiredModule="opsVehicles"><VehicleManager /></ProtectedRoute>} />
                       <Route path="sites" element={<ProtectedRoute requiredModule="opsSites"><SiteManager /></ProtectedRoute>} />
                       <Route path="analytics" element={<ProtectedRoute requiredModule="opsCheckout"><EmployeeAnalytics /></ProtectedRoute>} />

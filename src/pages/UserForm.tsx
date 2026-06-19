@@ -157,6 +157,13 @@ const PRIV_GROUPS: PG[] = [
         ] },
       { key: 'opsSites', label: 'Ops Site Manager', parentKey: 'opsSites', masterField: 'canView',
         fields: [{ key: 'canView', label: 'View Assigned Sites' }] },
+      { key: 'opsDiesel', label: 'Diesel Refill', parentKey: 'opsDiesel', masterField: 'canView',
+        fields: [
+          { key: 'canView', label: 'View Refills' },
+          { key: 'canAdd', label: 'Log Refill', special: true },
+          { key: 'canEdit', label: 'Edit Refill' },
+          { key: 'canDelete', label: 'Delete Refill', danger: true },
+        ] },
       { key: 'simulator', label: 'Layout Simulator', parentKey: 'simulator', masterField: 'canView',
         fields: [
           { key: 'canView', label: 'View' },

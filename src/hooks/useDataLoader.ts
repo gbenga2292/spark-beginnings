@@ -3,7 +3,7 @@ import { useAppStore, DEFAULT_OFFBOARDING_TASKS, DEFAULT_LEAVE_TYPES } from '@/s
 import { useUserStore, NO_ACCESS, UserPrivileges } from '@/src/store/userStore';
 import { fetchAllAppData, fetchAllUsers, fetchPresets, db } from '@/src/lib/supabaseService';
 import { supabase } from '@/src/integrations/supabase/client';
-import { dbToSite, dbToEmployee, dbToAttendance, dbToInvoice, dbToPendingInvoice, dbToSalaryAdvance, dbToLoan, dbToPayment, dbToVatPayment, dbToLeave, dbToProfile, dbToDisciplinary, dbToEvaluation, dbToCommLog, dbToCompanyExpense, dbToPendingSite, dbToLedgerEntry, dbToClientProfile, dbToDailyJournal, dbToSiteJournalEntry, dbToVehicle, dbToVehicleMovement, dbToVehicleDocumentType, dbToInterviewCandidate, dbToLeaveType, dbToStaffMerit } from '@/src/lib/supabaseService';
+import { dbToSite, dbToEmployee, dbToAttendance, dbToInvoice, dbToPendingInvoice, dbToSalaryAdvance, dbToLoan, dbToPayment, dbToVatPayment, dbToLeave, dbToProfile, dbToDisciplinary, dbToEvaluation, dbToCommLog, dbToCompanyExpense, dbToPendingSite, dbToLedgerEntry, dbToClientProfile, dbToDailyJournal, dbToSiteJournalEntry, dbToVehicle, dbToVehicleMovement, dbToVehicleDocumentType, dbToInterviewCandidate, dbToLeaveType, dbToStaffMerit, dbToClientContact } from '@/src/lib/supabaseService';
 import { generateId } from '@/src/lib/utils';
 import { cacheSet, cacheGet } from '@/src/lib/offlineCache';
 import { useNetworkStore } from '@/src/store/networkStore';
@@ -126,29 +126,39 @@ export function useDataLoader(isAuthenticated: boolean) {
           processedDeptTasks.push({ department: 'ALL', onboardingTasks: [], offboardingTasks: [...DEFAULT_OFFBOARDING_TASKS] });
         }
 
-        // Pre-populate clientContacts from commLogs
-        const uniqueContacts = new Map<string, any>();
+        // Load client contacts from DB; auto-migrate any contacts found only in commLogs
+        const dbContacts = appData.clientContacts || [];
+        const dbContactKeys = new Set(
+          dbContacts.map((c: any) => `${c.clientName.trim().toLowerCase()}||${c.name.trim().toLowerCase()}`)
+        );
+
+        // Build contacts from commLogs that are missing from the DB
+        const commLogContacts: any[] = [];
         (appData.commLogs || []).forEach((l: any) => {
           if (l.isInternal || !l.contactPerson || !l.client) return;
           const key = `${l.client.trim().toLowerCase()}||${l.contactPerson.trim().toLowerCase()}`;
-          if (!uniqueContacts.has(key)) {
-            uniqueContacts.set(key, {
+          if (!dbContactKeys.has(key) && !commLogContacts.some((c: any) => `${c.clientName.trim().toLowerCase()}||${c.name.trim().toLowerCase()}` === key)) {
+            commLogContacts.push({
               id: generateId(),
               name: l.contactPerson.trim(),
               clientName: l.client.trim(),
               siteIds: l.siteId ? [l.siteId] : [],
               siteNames: l.siteName ? [l.siteName] : [],
               isActive: true,
+              isPrincipal: false,
               createdAt: l.date || new Date().toISOString(),
               updatedAt: l.date || new Date().toISOString(),
             });
-          } else {
-            const existing = uniqueContacts.get(key)!;
-            if (l.siteId && !existing.siteIds.includes(l.siteId)) existing.siteIds.push(l.siteId);
-            if (l.siteName && !existing.siteNames.includes(l.siteName)) existing.siteNames.push(l.siteName);
           }
         });
-        const clientContacts = Array.from(uniqueContacts.values());
+
+        // Auto-migrate commLog-only contacts to the database (fire and forget)
+        if (commLogContacts.length > 0) {
+          db.upsertClientContacts(commLogContacts)
+            .catch(err => console.warn('[DataLoader] Auto-migrate commLog contacts failed:', err));
+        }
+
+        const clientContacts = [...dbContacts, ...commLogContacts];
 
         // Build the app state payload
         const appStatePayload = {
@@ -330,7 +340,7 @@ export function useRealtimeData(isAuthenticated: boolean) {
       'daily_journals', 'site_journal_entries', 'vehicles', 'vehicle_movement_log', 
       'vehicle_document_types', 'interview_candidates', 'positions', 'departments', 
       'leave_types', 'public_holidays', 'department_tasks', 'staff_merit_record', 
-      'privilege_presets', 'app_settings'
+      'privilege_presets', 'app_settings', 'client_contacts'
     ];
 
     const handler = (payload: any) => {
@@ -952,6 +962,20 @@ export function useRealtimeData(isAuthenticated: boolean) {
                     superAdminSignupEnabled: newRow.super_admin_signup_enabled ?? true,
                   });
                 }
+              }
+              break;
+            }
+            case 'client_contacts': {
+              const current = appState.clientContacts;
+              if (eventType === 'INSERT') {
+                if (!current.some(c => c.id === newRow.id)) {
+                  useAppStore.setState({ clientContacts: [...current, dbToClientContact(newRow)] });
+                }
+              } else if (eventType === 'UPDATE') {
+                const updated = dbToClientContact(newRow);
+                useAppStore.setState({ clientContacts: current.map(c => c.id === updated.id ? updated : c) });
+              } else if (eventType === 'DELETE') {
+                useAppStore.setState({ clientContacts: current.filter(c => c.id !== oldRow.id) });
               }
               break;
             }

@@ -989,12 +989,11 @@ Answer site-specific questions using this context only. Be concise.`;
             {activeTab === 'financials' && (
               <div className="animate-in fade-in zoom-in-[0.98] duration-200 ease-out space-y-5">
                 {/* Financial Sub-Tabs */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
+                <div className="grid grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
                   {[
                     { id: 'invoices', label: 'Invoices', count: data.siteInvoices.length, amount: currentUser?.privileges?.billing?.canViewAmounts ? `₦${Math.round(data.totalBilled).toLocaleString()}` : '***', icon: FileText },
                     { id: 'payments', label: 'Payments', count: data.sitePayments.length, amount: currentUser?.privileges?.billing?.canViewAmounts ? `₦${Math.round(data.totalReceived).toLocaleString()}` : '***', icon: DollarSign },
                     { id: 'expenses', label: 'Expenses', count: data.siteCosts.length, amount: currentUser?.privileges?.billing?.canViewAmounts ? `₦${Math.round(data.totalCost).toLocaleString()}` : '***', icon: FileText },
-                    { id: 'vat', label: 'VAT Remitted', count: null, amount: currentUser?.privileges?.billing?.canViewAmounts ? `₦${Math.round(data.periodVatRemitted).toLocaleString()}` : '***', icon: CheckCircle2 },
                   ].map(t => (
                     <button
                       key={t.id}
@@ -1025,41 +1024,7 @@ Answer site-specific questions using this context only. Be concise.`;
                 </div>
 
                 {/* Tab Content */}
-                {finTab === 'vat' && (
-                  <div className={cn(card, "bg-gradient-to-br from-indigo-50/50 via-white to-purple-50/50 dark:from-indigo-950/20 dark:via-slate-900 dark:to-purple-950/20 border-indigo-100 dark:border-indigo-900/50")}>
-                    <h3 className="font-bold mb-4 flex items-center gap-2 text-lg text-indigo-950 dark:text-indigo-300">
-                      <CheckCircle2 className="w-5 h-5 text-indigo-500" /> VAT Intelligence & Compliance
-                    </h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                      <div className="p-4 rounded-xl bg-white/80 dark:bg-slate-800/80 border border-slate-100 dark:border-slate-700/50 shadow-sm flex flex-col justify-between">
-                        <div>
-                          <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">VAT Collected (Selected Period)</p>
-                          <p className="text-xl font-black text-sky-600 dark:text-sky-400">{currentUser?.privileges?.billing?.canViewAmounts ? `₦${data.periodVatCollected.toLocaleString()}` : '***'}</p>
-                          <p className="text-xs text-slate-400 mt-1">Derived from client payments received</p>
-                        </div>
-                        <div className="mt-3">
-                          <Badge className="bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300 font-semibold text-xs py-1 px-2.5">
-                            {filterMonth === 'all' && filterYear === 'all' ? 'All-Time Payments' : 'Period Payments'}
-                          </Badge>
-                        </div>
-                      </div>
 
-                      <div className="p-4 rounded-xl bg-white/80 dark:bg-slate-800/80 border border-slate-100 dark:border-slate-700/50 shadow-sm flex flex-col justify-between">
-                        <div>
-                          <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Prior Unpaid VAT (Brought Forward)</p>
-                          <p className="text-xl font-black text-amber-600 dark:text-amber-400">{currentUser?.privileges?.billing?.canViewAmounts ? `₦${data.unpaidVatBroughtForward.toLocaleString()}` : '***'}</p>
-                          <p className="text-xs text-slate-400 mt-1">Accumulated unpaid VAT from previous periods</p>
-                        </div>
-                        <div className="mt-3">
-                          <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300 font-semibold text-xs py-1 px-2.5">
-                            Accumulated Liability
-                          </Badge>
-                        </div>
-                      </div>
-
-                    </div>
-                  </div>
-                )}
 
                 {finTab === 'invoices' && (
                   <div className={cn(card, "")}>

@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS public.client_contacts (
     site_ids TEXT[],
     site_names TEXT[],
     is_active BOOLEAN NOT NULL DEFAULT true,
+    is_principal BOOLEAN NOT NULL DEFAULT false,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -38,3 +39,7 @@ CREATE POLICY "Enable delete for authenticated users only" ON public.client_cont
     FOR DELETE
     TO authenticated
     USING (true);
+
+-- Enable Realtime
+ALTER PUBLICATION supabase_realtime ADD TABLE client_contacts;
+

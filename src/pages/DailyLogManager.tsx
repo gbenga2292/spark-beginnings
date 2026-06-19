@@ -549,9 +549,6 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
           </button>
         </div>
       )}
-      <Button variant="outline" size="sm" className="h-8 gap-1.5 rounded-lg border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800" onClick={onBack}>
-        <ArrowLeft className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Back</span>
-      </Button>
       {!isEmbedded && view !== 'form' && view !== 'detail' && (
         <Button 
           size="sm"
@@ -565,7 +562,8 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
         </Button>
       )}
     </div>,
-    [view, assetName, siteName, isEmbedded]
+    [view, assetName, siteName, isEmbedded],
+    onBack
   );
 
   return (

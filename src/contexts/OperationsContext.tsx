@@ -3,7 +3,7 @@ import {
   Asset, Waybill, AssetCategory, AssetType, AssetStatus, WaybillStatus, WaybillType, 
   Checkout, MaintenanceAsset, MaintenanceSession, MaintenanceLogType, ServiceStatus,
   Vehicle, VehicleTripLeg, VehicleDocumentType, DailyMachineLog, AssetPumpDate,
-  MaintenanceCertificate, VehicleFuelLog
+  MaintenanceCertificate, VehicleFuelLog, DieselRefill
 } from '../types/operations';
 import { supabase } from '@/src/integrations/supabase/client';
 import { useAppStore } from '../store/appStore';
@@ -79,6 +79,12 @@ interface OperationsContextType {
   addVehicleFuelLog: (log: Omit<VehicleFuelLog, 'id' | 'created_at'>) => Promise<void>;
   updateVehicleFuelLog: (id: string, updates: Partial<VehicleFuelLog>) => Promise<void>;
   deleteVehicleFuelLog: (id: string) => Promise<void>;
+
+  // Diesel Refills
+  dieselRefills: DieselRefill[];
+  addDieselRefill: (refill: Omit<DieselRefill, 'id' | 'created_at' | 'updated_at'>) => Promise<void>;
+  updateDieselRefill: (id: string, updates: Partial<Omit<DieselRefill, 'id' | 'created_at'>>) => Promise<void>;
+  deleteDieselRefill: (id: string) => Promise<void>;
 }
 
 const OperationsContext = createContext<OperationsContextType | undefined>(undefined);
@@ -99,6 +105,7 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
   const [sitePumpDates, setSitePumpDates] = useState<AssetPumpDate[]>([]);
   const [maintenanceCertificates, setMaintenanceCertificates] = useState<MaintenanceCertificate[]>([]);
   const [vehicleFuelLogs, setVehicleFuelLogs] = useState<VehicleFuelLog[]>([]);
+  const [dieselRefills, setDieselRefills] = useState<DieselRefill[]>([]);
 
   const { 
     sites,
@@ -238,7 +245,8 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
           { data: dbMaintenance },
           { data: dbDailyLogs },
           { data: dbPumpDates },
-          { data: dbFuelLogs }
+          { data: dbFuelLogs },
+          { data: dbDieselRefills }
         ] = await Promise.all([
           supabase.from('operations_assets').select('*'),
           supabase.from('operations_waybills').select('*'),
@@ -246,7 +254,8 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
           supabase.from('operations_maintenance').select('*'),
           supabase.from('operations_daily_logs').select('*'),
           supabase.from('operations_site_pump_dates').select('*'),
-          supabase.from('vehicle_fuel_logs').select('*').order('date', { ascending: false })
+          supabase.from('vehicle_fuel_logs').select('*').order('date', { ascending: false }),
+          supabase.from('diesel_refills').select('*').order('date', { ascending: false })
         ]);
 
         if (dbAssets) {
@@ -375,6 +384,24 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
             filled_by: f.filled_by,
             notes: f.notes,
             created_at: f.created_at
+          })));
+        }
+
+        if (dbDieselRefills) {
+          setDieselRefills(dbDieselRefills.map((r: any): DieselRefill => ({
+            id: r.id,
+            date: r.date,
+            siteId: r.site_id || '',
+            siteName: r.site_name || '',
+            totalLitres: Number(r.total_litres || 0),
+            pricePerLitre: r.price_per_litre ? Number(r.price_per_litre) : undefined,
+            totalCost: r.total_cost ? Number(r.total_cost) : undefined,
+            purchasedBy: r.purchased_by,
+            supplier: r.supplier,
+            notes: r.notes,
+            machineAllocations: r.machine_allocations || [],
+            created_at: r.created_at,
+            updated_at: r.updated_at,
           })));
         }
       } catch (error) {
@@ -707,6 +734,34 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
                 setVehicleFuelLogs(prev => prev.map(f => f.id === newRow.id ? mapFuel(newRow) : f));
               } else if (eventType === 'DELETE') {
                 setVehicleFuelLogs(prev => prev.filter(f => f.id !== oldRow.id));
+              }
+              break;
+            }
+            case 'diesel_refills': {
+              const mapRefill = (r: any): DieselRefill => ({
+                id: r.id,
+                date: r.date,
+                siteId: r.site_id || '',
+                siteName: r.site_name || '',
+                totalLitres: Number(r.total_litres || 0),
+                pricePerLitre: r.price_per_litre ? Number(r.price_per_litre) : undefined,
+                totalCost: r.total_cost ? Number(r.total_cost) : undefined,
+                purchasedBy: r.purchased_by,
+                supplier: r.supplier,
+                notes: r.notes,
+                machineAllocations: r.machine_allocations || [],
+                created_at: r.created_at,
+                updated_at: r.updated_at,
+              });
+              if (eventType === 'INSERT') {
+                setDieselRefills(prev => {
+                  if (prev.some(r => r.id === newRow.id)) return prev;
+                  return [mapRefill(newRow), ...prev];
+                });
+              } else if (eventType === 'UPDATE') {
+                setDieselRefills(prev => prev.map(r => r.id === newRow.id ? mapRefill(newRow) : r));
+              } else if (eventType === 'DELETE') {
+                setDieselRefills(prev => prev.filter(r => r.id !== oldRow.id));
               }
               break;
             }
@@ -1703,7 +1758,72 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
           console.error('Failed to delete fuel log:', err);
           toast.warning('Fuel log deleted locally — sync failed');
         }
-      }
+      },
+
+      // ── Diesel Refills ──────────────────────────────────────────────────────
+      dieselRefills,
+      addDieselRefill: async (refill) => {
+        const newRefill: DieselRefill = {
+          ...refill,
+          id: crypto.randomUUID(),
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        setDieselRefills(prev => [newRefill, ...prev]);
+        try {
+          const { error } = await supabase.from('diesel_refills').insert({
+            id: newRefill.id,
+            date: newRefill.date,
+            site_id: newRefill.siteId,
+            site_name: newRefill.siteName,
+            total_litres: newRefill.totalLitres,
+            price_per_litre: newRefill.pricePerLitre ?? null,
+            total_cost: newRefill.totalCost ?? null,
+            purchased_by: newRefill.purchasedBy ?? null,
+            supplier: newRefill.supplier ?? null,
+            notes: newRefill.notes ?? null,
+            machine_allocations: newRefill.machineAllocations,
+          });
+          if (error) throw error;
+          toast.success('Diesel refill logged');
+        } catch (err: any) {
+          console.error('Failed to save diesel refill:', err);
+          toast.warning('Refill saved locally — sync failed');
+        }
+      },
+      updateDieselRefill: async (id, updates) => {
+        setDieselRefills(prev => prev.map(r => r.id === id ? { ...r, ...updates, updated_at: new Date().toISOString() } : r));
+        try {
+          const dbUpdates: Record<string, any> = { updated_at: new Date().toISOString() };
+          if (updates.date !== undefined) dbUpdates.date = updates.date;
+          if (updates.siteId !== undefined) dbUpdates.site_id = updates.siteId;
+          if (updates.siteName !== undefined) dbUpdates.site_name = updates.siteName;
+          if (updates.totalLitres !== undefined) dbUpdates.total_litres = updates.totalLitres;
+          if (updates.pricePerLitre !== undefined) dbUpdates.price_per_litre = updates.pricePerLitre;
+          if (updates.totalCost !== undefined) dbUpdates.total_cost = updates.totalCost;
+          if (updates.purchasedBy !== undefined) dbUpdates.purchased_by = updates.purchasedBy;
+          if (updates.supplier !== undefined) dbUpdates.supplier = updates.supplier;
+          if (updates.notes !== undefined) dbUpdates.notes = updates.notes;
+          if (updates.machineAllocations !== undefined) dbUpdates.machine_allocations = updates.machineAllocations;
+          const { error } = await supabase.from('diesel_refills').update(dbUpdates).eq('id', id);
+          if (error) throw error;
+          toast.success('Diesel refill updated');
+        } catch (err: any) {
+          console.error('Failed to update diesel refill:', err);
+          toast.warning('Refill updated locally — sync failed');
+        }
+      },
+      deleteDieselRefill: async (id) => {
+        setDieselRefills(prev => prev.filter(r => r.id !== id));
+        try {
+          const { error } = await supabase.from('diesel_refills').delete().eq('id', id);
+          if (error) throw error;
+          toast.success('Diesel refill deleted');
+        } catch (err: any) {
+          console.error('Failed to delete diesel refill:', err);
+          toast.warning('Refill deleted locally — sync failed');
+        }
+      },
     }}>
       {children}
     </OperationsContext.Provider>

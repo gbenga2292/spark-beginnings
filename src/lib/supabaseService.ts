@@ -8,7 +8,7 @@ import type {
   SalaryAdvance, Loan, Payment, VatPayment, LeaveRecord, DepartmentTasks,
   DisciplinaryRecord, EvaluationRecord, Department, Position,
   LedgerCategory, LedgerVendor, LedgerBank, LedgerBeneficiaryBank, LedgerEntry, CommLog,
-  CompanyExpense, StaffMeritRecord, LeaveType, DailyJournal, SiteJournalEntry
+  CompanyExpense, StaffMeritRecord, LeaveType, DailyJournal, SiteJournalEntry, ClientContact
 } from '@/src/store/appStore';
 import { useUserStore, type AppUser, type PrivilegePreset } from '@/src/store/userStore';
 import type { InterviewCandidate } from '@/src/types/interviews';
@@ -350,6 +350,42 @@ export function dbToCommLog(r: any): CommLog {
     parentId: r.parent_id ?? undefined,
     reportedBy: r.reported_by || [],
     createdAt: r.created_at ?? new Date().toISOString(),
+  };
+}
+
+export function dbToClientContact(r: any): ClientContact {
+  return {
+    id: r.id,
+    name: r.name,
+    phone: r.phone ?? undefined,
+    email: r.email ?? undefined,
+    position: r.position ?? undefined,
+    note: r.note ?? undefined,
+    clientName: r.client_name,
+    siteIds: r.site_ids ?? [],
+    siteNames: r.site_names ?? [],
+    isActive: r.is_active ?? true,
+    isPrincipal: r.is_principal ?? false,
+    createdAt: r.created_at ?? new Date().toISOString(),
+    updatedAt: r.updated_at ?? new Date().toISOString(),
+  };
+}
+
+function clientContactToDb(c: ClientContact): any {
+  return {
+    id: c.id,
+    name: c.name,
+    phone: c.phone || null,
+    email: c.email || null,
+    position: c.position || null,
+    note: c.note || null,
+    client_name: c.clientName,
+    site_ids: c.siteIds || [],
+    site_names: c.siteNames || [],
+    is_active: c.isActive,
+    is_principal: c.isPrincipal ?? false,
+    created_at: c.createdAt,
+    updated_at: c.updatedAt,
   };
 }
 
@@ -939,6 +975,7 @@ export async function fetchAllAppData(privs?: any) {
     staffMeritRes,
     vehicleDocTypesRes,
     interviewRes,
+    clientContactsRes,
   ] = await Promise.all([
     supabase.from('sites').select('*').order('created_at'),
     supabase.from('clients').select('*').order('name'),
@@ -960,6 +997,7 @@ export async function fetchAllAppData(privs?: any) {
     supabase.from('staff_merit_record').select('*').order('incident_date', { ascending: false }),
     supabase.from('vehicle_document_types').select('*').order('name'),
     supabase.from('interview_candidates').select('*').order('created_at', { ascending: false }),
+    supabase.from('client_contacts').select('*').order('name'),
   ]);
 
   const settings = settingsRes.data;
@@ -968,6 +1006,7 @@ export async function fetchAllAppData(privs?: any) {
   // to prevent it from blocking application startup.
   return {
     commLogs: (commLogsRes.data || []).map(dbToCommLog),
+    clientContacts: (clientContactsRes.data || []).map(dbToClientContact),
     pendingSites: (pendingSitesRes.data || []).map(dbToPendingSite),
     sites: (sitesRes.data || []).map(dbToSite),
     clients: (clientsRes.data || []).map((c: any) => c.name),
@@ -2197,6 +2236,41 @@ export const db = {
   async deleteDewateringLayout(id: string) {
     const { error } = await supabase.from('dewatering_layouts').delete().eq('id', id);
     if (error) { console.error('deleteDewateringLayout:', error); throw error; }
+  },
+
+  // Client Contacts
+  async fetchClientContacts(): Promise<ClientContact[]> {
+    const { data, error } = await supabase.from('client_contacts').select('*').order('name');
+    if (error) { console.error('fetchClientContacts:', error); throw error; }
+    return (data || []).map(dbToClientContact);
+  },
+  async insertClientContact(c: ClientContact) {
+    const { error } = await supabase.from('client_contacts').insert(clientContactToDb(c));
+    if (error) { console.error('insertClientContact:', error); throw error; }
+  },
+  async upsertClientContacts(contacts: ClientContact[]) {
+    if (contacts.length === 0) return;
+    const { error } = await supabase.from('client_contacts').upsert(contacts.map(clientContactToDb), { onConflict: 'id' });
+    if (error) { console.error('upsertClientContacts:', error); throw error; }
+  },
+  async updateClientContact(id: string, updates: Partial<ClientContact>) {
+    const patch: any = { updated_at: new Date().toISOString() };
+    if (updates.name !== undefined) patch.name = updates.name;
+    if (updates.phone !== undefined) patch.phone = updates.phone || null;
+    if (updates.email !== undefined) patch.email = updates.email || null;
+    if (updates.position !== undefined) patch.position = updates.position || null;
+    if (updates.note !== undefined) patch.note = updates.note || null;
+    if (updates.clientName !== undefined) patch.client_name = updates.clientName;
+    if (updates.siteIds !== undefined) patch.site_ids = updates.siteIds || [];
+    if (updates.siteNames !== undefined) patch.site_names = updates.siteNames || [];
+    if (updates.isActive !== undefined) patch.is_active = updates.isActive;
+    if (updates.isPrincipal !== undefined) patch.is_principal = updates.isPrincipal;
+    const { error } = await supabase.from('client_contacts').update(patch).eq('id', id);
+    if (error) { console.error('updateClientContact:', error); throw error; }
+  },
+  async deleteClientContact(id: string) {
+    const { error } = await supabase.from('client_contacts').delete().eq('id', id);
+    if (error) { console.error('deleteClientContact:', error); throw error; }
   },
 };
 
