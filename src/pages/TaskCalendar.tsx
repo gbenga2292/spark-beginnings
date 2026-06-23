@@ -13,6 +13,7 @@ import { useNavigate } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose, DialogFooter } from '@/src/components/ui/dialog';
 import { Button } from '@/src/components/ui/button';
 import { useAppStore } from '@/src/store/appStore';
+import { useOperations } from '@/src/contexts/OperationsContext';
 import { fetchOperationsData, fetchJournalsByDateRange } from '@/src/lib/supabaseService';
 import { CreateTaskDialog } from '@/src/pages/Tasks/CreateTaskDialog';
 import { CreateReminderDialog } from '@/src/pages/Tasks/CreateReminderDialog';
@@ -112,6 +113,7 @@ export default function CalendarPage({ onNavigate, showCompleted: externalShowCo
   const holidays = useAppStore(state => state.publicHolidays);
   const dailyJournals = useAppStore(state => state.dailyJournals);
   const siteJournalEntries = useAppStore(state => state.siteJournalEntries);
+  const { dailyMachineLogs } = useOperations();
 
   useEffect(() => {
     fetchOperationsData()
@@ -325,10 +327,34 @@ export default function CalendarPage({ onNavigate, showCompleted: externalShowCo
           colorClass: STATUS_STYLES.journal.bg,
         });
       });
+
+      // Also add standalone machine-log-only days (no manual journal on that date) as Operational Log events
+      const journalDates = new Set(dailyJournals.map(j => j.date));
+      const machineOnlyDates = new Map<string, typeof dailyMachineLogs>();
+      dailyMachineLogs.forEach(l => {
+        if (!journalDates.has(l.date)) {
+          const arr = machineOnlyDates.get(l.date) || [];
+          arr.push(l);
+          machineOnlyDates.set(l.date, arr);
+        }
+      });
+      machineOnlyDates.forEach((logs, date) => {
+        const siteNames = [...new Set(logs.map(l => l.siteName).filter(Boolean))];
+        const sitesText = siteNames.join(', ');
+        const machineNames = [...new Set(logs.map(l => l.assetName).filter(Boolean))];
+        events.push({
+          id: `machine-only-${date}`,
+          title: sitesText ? `Ops Log: ${sitesText.slice(0, 40)}` : 'Operational Log',
+          time: parseISO(`${date}T07:00:00`),
+          type: 'journal',
+          body: machineNames.length > 0 ? `Machines: ${machineNames.join(', ')}` : 'Machine activity recorded',
+          colorClass: STATUS_STYLES.journal.bg,
+        });
+      });
     }
 
     return events;
-  }, [reminders, subtasks, mainTasks, currentUser, filterMode, showCompleted, holidays, dailyJournals, siteJournalEntries, isExternalHr]);
+  }, [reminders, subtasks, mainTasks, currentUser, filterMode, showCompleted, holidays, dailyJournals, siteJournalEntries, dailyMachineLogs, isExternalHr]);
 
 
   const visibleLegendKeys = useMemo(() => {
@@ -733,7 +759,7 @@ export default function CalendarPage({ onNavigate, showCompleted: externalShowCo
               if (previewEvent.type === 'reminder') {
                  navigate(`/tasks/reminders?view=${previewEvent.id}`);
               } else if (previewEvent.type === 'journal') {
-                 navigate(`/daily-journal`);
+                 navigate(`/daily-journal?date=${format(previewEvent.time, 'yyyy-MM-dd')}`);
               } else if (previewEvent.isMain) {
                  navigate(`/tasks?openTask=${previewEvent.id}`);
               } else {

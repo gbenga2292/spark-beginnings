@@ -16,7 +16,7 @@ import type { InterviewCandidate } from '@/src/types/interviews';
 // Workspace identifier — update this if this app is ever redeployed for another organisation.
 const getWS = () => useUserStore.getState().getCurrentUser()?.workspaceId || 'dcel-team';
 import type { SiteQuestionnaire } from '@/src/types/SiteQuestionnaire';
-import type { Vehicle, VehicleTripLeg } from '@/src/types/operations';
+import type { Vehicle, VehicleTripLeg, DailyMachineLog } from '@/src/types/operations';
 
 // ─── Mappers: DB → App ──────────────────────────────────────
 
@@ -1119,6 +1119,87 @@ export async function fetchSiteDiaryEntries(siteId: string) {
   return {
     dailyJournals: (journals || []).map(dbToDailyJournal),
     siteJournalEntries: entries.map(dbToSiteJournalEntry),
+  };
+}
+
+export function dbToDailyMachineLog(log: any): DailyMachineLog {
+  return {
+    id: log.id,
+    assetId: log.asset_id,
+    assetName: log.asset_name,
+    siteId: log.site_id || '',
+    siteName: log.site_name || '',
+    date: log.date,
+    isActive: log.is_active ?? true,
+    operationalDay: log.operational_day || 'full',
+    downtimeEntries: log.downtime_entries || [],
+    maintenanceDetails: log.maintenance_details || undefined,
+    clientFeedback: log.client_feedback || undefined,
+    issuesOnSite: log.issues_on_site || undefined,
+    dieselUsage: Number(log.diesel_usage || 0),
+    supervisorOnSite: log.supervisor_on_site || undefined,
+    loggedBy: log.logged_by || undefined,
+    created_at: log.created_at || undefined
+  };
+}
+
+export async function fetchSiteDiaryEntriesByYear(
+  siteId: string,
+  year: number
+): Promise<{
+  siteJournalEntries: SiteJournalEntry[];
+  dailyJournals: DailyJournal[];
+  machineLogs: DailyMachineLog[];
+  hasMore: boolean;
+}> {
+  const ws = getWS();
+  const startDateStr = `${year}-01-01T00:00:00Z`;
+  const endDateStr = `${year}-12-31T23:59:59.999Z`;
+
+
+
+  // 1. Fetch site journal entries for the given year
+  const { data: entries, error: err1 } = await supabase
+    .from('site_journal_entries')
+    .select('*')
+    .eq('site_id', siteId)
+    .eq('workspace_id', ws)
+    .gte('created_at', startDateStr)
+    .lte('created_at', endDateStr)
+    .order('created_at', { ascending: false });
+
+  if (err1) { console.error('fetchSiteDiaryEntriesByYear (entries):', err1); throw err1; }
+
+  // 2. Fetch corresponding daily journals
+  let dailyJournals: DailyJournal[] = [];
+  const journalIds = [...new Set((entries || []).map((e: any) => e.journal_id).filter(Boolean))];
+  if (journalIds.length > 0) {
+    const { data: jData, error: err2 } = await supabase
+      .from('daily_journals')
+      .select('*')
+      .in('id', journalIds);
+    if (err2) console.error('fetchSiteDiaryEntriesByYear (journals):', err2);
+    dailyJournals = (jData || []).map(dbToDailyJournal);
+  }
+
+  // Machine logs are sourced from OperationsContext (client-side) and NOT fetched here
+  // because operations_daily_logs RLS requires operations.canView privilege.
+
+  // Check if there are earlier journal entries (pre-dating this year) to set hasMore
+  const { count: earlierJournals } = await supabase
+    .from('site_journal_entries')
+    .select('id', { count: 'exact', head: true })
+    .eq('site_id', siteId)
+    .eq('workspace_id', ws)
+    .lt('created_at', startDateStr);
+
+  const hasMore = (earlierJournals || 0) > 0;
+
+  return {
+    siteJournalEntries: (entries || []).map(dbToSiteJournalEntry),
+    dailyJournals,
+    machineLogs: [], // sourced from OperationsContext in the UI layer
+    hasMore,
   };
 }
 

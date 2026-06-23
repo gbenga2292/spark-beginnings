@@ -591,21 +591,8 @@ export function DailyJournal() {
   const activeSites = useMemo(() => sites.filter(s => s.status === 'Active'), [sites]);
   const authors = useMemo(() => [...new Set(dailyJournals.map(j => j.loggedBy))], [dailyJournals]);
 
-  const grouped = useMemo(() => {
-    const groups: Record<string, DailyJournalType[]> = {};
-    dailyJournals.forEach(j => { if (!groups[j.date]) groups[j.date] = []; groups[j.date].push(j); });
-    return Object.keys(groups)
-      .filter(d => {
-        const matchesTerm = !searchTerm || d.includes(searchTerm) || groups[d].some(j => j.loggedBy.toLowerCase().includes(searchTerm.toLowerCase()));
-        const matchesDate = !searchDate || d === searchDate;
-        return matchesTerm && matchesDate;
-      })
-      .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())
-      .map(d => ({ date: d, journals: groups[d] }));
-  }, [dailyJournals, searchTerm, searchDate]);
-
-  // Logic to find journals matching the advanced export filters
-  const matchingExportJournals = useMemo(() => {
+  // Centralised logic to combine manual journal sessions and standalone machine logs into a single data stream
+  const { combinedJournals, combinedEntries } = useMemo(() => {
     let allJournals = [...dailyJournals];
     let allEntries = [...siteJournalEntries];
 
@@ -646,11 +633,29 @@ export function DailyJournal() {
       }
     });
 
-    const matching = allJournals.filter(j => {
+    return { combinedJournals: allJournals, combinedEntries: allEntries };
+  }, [dailyJournals, siteJournalEntries, dailyMachineLogs]);
+
+  const grouped = useMemo(() => {
+    const groups: Record<string, DailyJournalType[]> = {};
+    combinedJournals.forEach(j => { if (!groups[j.date]) groups[j.date] = []; groups[j.date].push(j); });
+    return Object.keys(groups)
+      .filter(d => {
+        const matchesTerm = !searchTerm || d.includes(searchTerm) || groups[d].some(j => j.loggedBy.toLowerCase().includes(searchTerm.toLowerCase()));
+        const matchesDate = !searchDate || d === searchDate;
+        return matchesTerm && matchesDate;
+      })
+      .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())
+      .map(d => ({ date: d, journals: groups[d] }));
+  }, [combinedJournals, searchTerm, searchDate]);
+
+  // Logic to find journals matching the advanced export filters
+  const matchingExportJournals = useMemo(() => {
+    const matching = combinedJournals.filter(j => {
       const isDateInRange = j.date >= exportFilters.startDate && j.date <= exportFilters.endDate;
       const matchesAuthor = !exportFilters.author || j.loggedBy === exportFilters.author;
       
-      const dayEntries = allEntries.filter(e => e.journalId === j.id);
+      const dayEntries = combinedEntries.filter(e => e.journalId === j.id);
       const matchesSite = !exportFilters.siteId || dayEntries.some(e => e.siteId === exportFilters.siteId);
       
       return isDateInRange && matchesAuthor && matchesSite && dayEntries.length > 0;
@@ -659,8 +664,8 @@ export function DailyJournal() {
     // Group by date for the report
     const groups: Record<string, DailyJournalType[]> = {};
     matching.forEach(j => { if (!groups[j.date]) groups[j.date] = []; groups[j.date].push(j); });
-    return Object.keys(groups).sort().map(d => ({ date: d, journals: groups[d], entries: allEntries }));
-  }, [dailyJournals, siteJournalEntries, dailyMachineLogs, exportFilters]);
+    return Object.keys(groups).sort().map(d => ({ date: d, journals: groups[d], entries: combinedEntries }));
+  }, [combinedJournals, combinedEntries, exportFilters]);
 
   // Main Save Logic with Auto-Upload
   const [isPublishing, setIsPublishing] = useState(false);
@@ -835,7 +840,7 @@ export function DailyJournal() {
 
       let y = 62;
       group.journals.forEach((journal, ji) => {
-        const relevantEntries = group.entries || siteJournalEntries;
+        const relevantEntries = group.entries || combinedEntries;
         const jEntries = relevantEntries.filter(e => e.journalId === journal.id && (!exportFilters.siteId || e.siteId === exportFilters.siteId));
         if (jEntries.length === 0) return;
 
@@ -905,7 +910,7 @@ export function DailyJournal() {
           <ArrowLeft className="w-4 h-4 shrink-0" /> <span className="hidden sm:inline">Back</span>
         </Button>
         <Button size="sm" onClick={() => {
-          const doc = generateDiaryPdf(matchingExportJournals.length > 0 ? matchingExportJournals : [{date: pdfExportDate, journals: dailyJournals.filter(j => j.date === pdfExportDate)}]);
+          const doc = generateDiaryPdf(matchingExportJournals.length > 0 ? matchingExportJournals : [{date: pdfExportDate, journals: combinedJournals.filter(j => j.date === pdfExportDate), entries: combinedEntries}]);
           doc.save(`SiteDiary-Report.pdf`);
         }}
           className="h-8 sm:h-9 gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3 sm:px-5 shadow-sm uppercase tracking-tight">
@@ -958,8 +963,8 @@ export function DailyJournal() {
           onDeleteJournal={id => setDeleteConfirm({ id, type: 'journal' })}
           onDeleteEntry={id => setDeleteConfirm({ id, type: 'entry' })}
           onExportPdf={() => {
-            const single = dailyJournals.filter(j => j.date === diaryDate);
-            const grouped = [{ date: diaryDate, journals: single }];
+            const single = combinedJournals.filter(j => j.date === diaryDate);
+            const grouped = [{ date: diaryDate, journals: single, entries: combinedEntries }];
             setPdfDataUri(generateDiaryPdf(grouped).output('datauristring'));
             setPdfExportDate(diaryDate);
             setShowPdfPreview(true);
@@ -982,16 +987,11 @@ export function DailyJournal() {
     ));
     const cells = eachDayOfInterval({ start, end }).map(day => {
       const ds = format(day, 'yyyy-MM-dd');
-      const dayJs = dailyJournals.filter(j => j.date === ds);
-      const baseEntryCount = siteJournalEntries.filter(e => dayJs.some(j => j.id === e.journalId)).length;
+      const dayJs = combinedJournals.filter(j => j.date === ds);
+      const entriesForDay = combinedEntries.filter(e => dayJs.some(j => j.id === e.journalId));
       
-      const machineLogsForDay = dailyMachineLogs.filter(l => l.date === ds);
-      const uniqueMachineSites = new Set(machineLogsForDay.map(l => l.siteId)).size;
-      const entrySiteIds = new Set(siteJournalEntries.filter(e => dayJs.some(j => j.id === e.journalId)).map(e => e.siteId));
-      const standaloneMachineSites = Array.from(new Set(machineLogsForDay.map(l => l.siteId))).filter(id => !entrySiteIds.has(id));
-      
-      const totalEntries = baseEntryCount + standaloneMachineSites.length;
-      const totalSessions = dayJs.length + (standaloneMachineSites.length > 0 ? 1 : 0);
+      const totalEntries = entriesForDay.length;
+      const totalSessions = dayJs.length;
       
       const isT = isSameDay(day, new Date());
       return (
@@ -1039,7 +1039,7 @@ export function DailyJournal() {
     ) : (
       <div className="space-y-2">
         {grouped.map(group => {
-          const entries = siteJournalEntries.filter(e => group.journals.some(j => j.id === e.journalId));
+          const entries = combinedEntries.filter(e => group.journals.some(j => j.id === e.journalId));
           return (
             <button key={group.date} onClick={() => setDiaryDate(group.date)}
               className="w-full text-left bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 sm:p-4 hover:shadow-md transition-all flex flex-col gap-3 group">
