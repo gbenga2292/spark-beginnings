@@ -23,7 +23,7 @@ import logoSrc from '@/logo/logo-2.png';
 import { PdfViewer } from '@/src/components/PdfViewer';
 
 import { BulkConsumableLogModal } from './BulkConsumableLogModal';
-import { fetchOperationsData } from '@/src/lib/supabaseService';
+import { fetchOperationsData, fetchJournalsByDateRange } from '@/src/lib/supabaseService';
 import { BulkMachineLogModal } from './BulkMachineLogModal';
 import { CustomCamera } from '@/src/components/ui/CustomCamera';
 
@@ -469,14 +469,12 @@ export function DailyJournal() {
   const [searchParams, setSearchParams] = useSearchParams();
 
   useEffect(() => {
-    if (dailyJournals.length === 0) {
-      fetchOperationsData()
-        .then((data) => {
-          useAppStore.setState(data);
-        })
-        .catch(console.error);
-    }
-  }, [dailyJournals.length]);
+    fetchOperationsData()
+      .then((data) => {
+        useAppStore.setState(data);
+      })
+      .catch(console.error);
+  }, []);
 
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -509,6 +507,86 @@ export function DailyJournal() {
     siteId: '',
     author: ''
   });
+
+  // Load journals for the currently viewed month range (including adjacent months for calendar safety)
+  useEffect(() => {
+    let cancelled = false;
+    const start = format(startOfMonth(subMonths(currentMonth, 1)), 'yyyy-MM-dd');
+    const end = format(endOfMonth(addMonths(currentMonth, 1)), 'yyyy-MM-dd');
+
+    fetchJournalsByDateRange(start, end)
+      .then((data) => {
+        if (cancelled) return;
+        useAppStore.setState((s) => ({
+          dailyJournals: [
+            ...s.dailyJournals.filter(j => !data.dailyJournals.some(dj => dj.id === j.id)),
+            ...data.dailyJournals
+          ],
+          siteJournalEntries: [
+            ...s.siteJournalEntries.filter(e => !data.siteJournalEntries.some(de => de.id === e.id)),
+            ...data.siteJournalEntries
+          ]
+        }));
+      })
+      .catch(console.error);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentMonth]);
+
+  // Load journals when export date filters change
+  useEffect(() => {
+    let cancelled = false;
+    const start = exportFilters.startDate;
+    const end = exportFilters.endDate;
+    if (!start || !end) return;
+
+    fetchJournalsByDateRange(start, end)
+      .then((data) => {
+        if (cancelled) return;
+        useAppStore.setState((s) => ({
+          dailyJournals: [
+            ...s.dailyJournals.filter(j => !data.dailyJournals.some(dj => dj.id === j.id)),
+            ...data.dailyJournals
+          ],
+          siteJournalEntries: [
+            ...s.siteJournalEntries.filter(e => !data.siteJournalEntries.some(de => de.id === e.id)),
+            ...data.siteJournalEntries
+          ]
+        }));
+      })
+      .catch(console.error);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [exportFilters.startDate, exportFilters.endDate]);
+
+  // Load journals when search date changes
+  useEffect(() => {
+    if (!searchDate) return;
+    let cancelled = false;
+    fetchJournalsByDateRange(searchDate, searchDate)
+      .then((data) => {
+        if (cancelled) return;
+        useAppStore.setState((s) => ({
+          dailyJournals: [
+            ...s.dailyJournals.filter(j => !data.dailyJournals.some(dj => dj.id === j.id)),
+            ...data.dailyJournals
+          ],
+          siteJournalEntries: [
+            ...s.siteJournalEntries.filter(e => !data.siteJournalEntries.some(de => de.id === e.id)),
+            ...data.siteJournalEntries
+          ]
+        }));
+      })
+      .catch(console.error);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [searchDate]);
 
   const activeSites = useMemo(() => sites.filter(s => s.status === 'Active'), [sites]);
   const authors = useMemo(() => [...new Set(dailyJournals.map(j => j.loggedBy))], [dailyJournals]);

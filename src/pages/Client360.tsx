@@ -606,23 +606,7 @@ export function Client360() {
     const clientInvoicesFiltered = invoices.filter(i => i.client?.trim() === selectedClient && isWithinTimeFilter(i.date));
     const totalRevenue = clientInvoicesFiltered.reduce((acc, i) => acc + (i.totalCharge || i.amount || 0), 0);
 
-    const totalVatGenerated = clientInvoicesFiltered.reduce((acc, i) => {
-      if (i.vat !== undefined) return acc + i.vat;
-      const baseAmount = (i.totalCost || i.amount || 0) - (i.damages || 0);
-      const vatInc = i.vatInc || 'No';
-      let vat = 0;
-      if (vatInc === 'Yes') {
-        vat = (baseAmount / (100 + vatRate)) * vatRate;
-      } else if (vatInc === 'Add') {
-        vat = baseAmount * (vatRate / 100);
-      }
-      return acc + Math.round(vat * 100) / 100;
-    }, 0);
-
     const clientVatPayments = vatPayments.filter(vp => vp.client?.trim() === selectedClient && isWithinTimeFilter(vp.date));
-    const totalVatPaid = clientVatPayments.reduce((acc, vp) => acc + (vp.amount || 0), 0);
-    const vatDeficit = totalVatGenerated - totalVatPaid;
-    
     const vatMonthsIncluded = Array.from(new Set(clientVatPayments.map(vp => `${vp.month} ${vp.year}`)));
 
     const vatDueByMonthYear: Record<string, number> = {};
@@ -700,6 +684,15 @@ export function Client360() {
         settlementStatus
       };
     });
+
+    const uniquePeriodsForDeficit = Array.from(
+      new Map(
+        paymentsWithVatStatus
+          .filter(p => p.key && p.payVat !== 'No')
+          .map(p => [p.key, { due: p.totalDueForMonth || 0, paid: p.totalPaidForMonth || 0 }])
+      ).values()
+    );
+    const vatDeficit = uniquePeriodsForDeficit.reduce((sum, period) => sum + Math.max(0, period.due - period.paid), 0);
 
     const clientCosts = ledgerEntries.filter(l => l.client?.trim() === selectedClient && isWithinTimeFilter(l.date));
     const totalCost = clientCosts.reduce((acc, l) => acc + (l.amount || 0), 0);
@@ -2004,7 +1997,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                                   'border-l-rose-400';
 
                                 const isCollapsed = collapsedMonths.has(groupKey);
-                                const toggleCollapse = (e: React.MouseEvent) => {
+                                const toggleCollapse = (e: React.MouseEvent | React.KeyboardEvent) => {
                                   e.preventDefault();
                                   e.stopPropagation();
                                   setCollapsedMonths(prev => {
@@ -2020,9 +2013,16 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                                   <tr
                                     key={`hdr-${groupKey}`}
                                     onClick={toggleCollapse}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter' || e.key === ' ') {
+                                        toggleCollapse(e);
+                                      }
+                                    }}
                                     onMouseDown={(e) => e.preventDefault()}
+                                    role="button"
+                                    tabIndex={0}
                                     className={cn(
-                                      "border-t-2 border-b cursor-pointer select-none touch-manipulation transition-colors",
+                                      "border-t-2 border-b cursor-pointer select-none touch-manipulation transition-colors no-drag",
                                       headerBg,
                                       isDark ? "border-slate-700 hover:brightness-110" : "border-slate-200 hover:brightness-95"
                                     )}

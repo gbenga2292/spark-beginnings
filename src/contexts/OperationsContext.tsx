@@ -137,13 +137,37 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
         const lastSession = sessions.sort((x, y) => new Date(y.date).getTime() - new Date(x.date).getTime())[0];
         const lastRoutineSession = routineSessions.sort((x, y) => new Date(y.date).getTime() - new Date(x.date).getTime())[0];
         
-        const nextDate = lastRoutineSession ? new Date(lastRoutineSession.date) : (a.created_at ? new Date(a.created_at) : new Date());
-        nextDate.setMonth(nextDate.getMonth() + (a.serviceIntervalMonths || 2));
+        const lastRoutineDate = lastRoutineSession ? new Date(lastRoutineSession.date) : (a.created_at ? new Date(a.created_at) : new Date());
         
-        const now = new Date();
+        const logsSinceLastMaintenance = dailyMachineLogs.filter(log => 
+          log.assetId === a.id && 
+          new Date(log.date).getTime() > lastRoutineDate.getTime() &&
+          log.isActive
+        );
+        
+        let activeDaysCount = 0;
+        logsSinceLastMaintenance.forEach(log => {
+          if (log.operationalDay === 'full') activeDaysCount += 1;
+          else if (log.operationalDay === 'half') activeDaysCount += 0.5;
+          else activeDaysCount += 1;
+        });
+
+        // Convert the configured months to operational days (assuming 1 month = 30 days)
+        const intervalMonths = a.serviceIntervalMonths || 2;
+        const OPERATIONAL_DAYS_LIMIT = intervalMonths * 30;
+        const OPERATIONAL_DAYS_WARNING = OPERATIONAL_DAYS_LIMIT - 10;
+        
+        // Smart Estimate: Push the date forward dynamically based on remaining days
+        const daysLeft = Math.max(0, OPERATIONAL_DAYS_LIMIT - activeDaysCount);
+        const nextDate = new Date();
+        nextDate.setDate(nextDate.getDate() + daysLeft);
+        
         let status: ServiceStatus = 'ok';
-        if (now > nextDate) status = 'overdue';
-        else if (nextDate.getTime() - now.getTime() < 14 * 24 * 60 * 60 * 1000) status = 'due_soon';
+        if (activeDaysCount >= OPERATIONAL_DAYS_LIMIT) {
+          status = 'overdue';
+        } else if (activeDaysCount >= OPERATIONAL_DAYS_WARNING) {
+          status = 'due_soon';
+        }
 
         // Resolve current site by looking at ALL waybills for this machine (outbound + return),
         // sorted by most recent date. The most recent action tells us where it is right now.

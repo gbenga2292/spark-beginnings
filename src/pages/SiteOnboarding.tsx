@@ -131,6 +131,7 @@ export function SiteOnboarding() {
   const pendingSites = useAppStore(s => s.pendingSites);
   const sites = useAppStore(s => s.sites);
   const clientProfiles = useAppStore(s => s.clientProfiles);
+  const clientContactsStore = useAppStore(s => s.clientContacts);
   const clients = useMemo(() => Array.from(new Set(sites.map(s => s.client))).sort(), [sites]);
   const addPendingSite = useAppStore(s => s.addPendingSite);
   const updatePendingSite = useAppStore(s => s.updatePendingSite);
@@ -149,6 +150,43 @@ export function SiteOnboarding() {
   const [initialForm, setInitialForm] = useState<SiteQuestionnaire>(blankForm());
   const [activePhase, setActivePhase] = useState<1 | 2 | 3 | 4 | 5>(1);
   const [showDocuments, setShowDocuments] = useState(false);
+
+  const upd = (patch: Partial<SiteQuestionnaire>) => setForm(p => ({ ...p, ...patch }));
+  const updPhase = <K extends 'phase1' | 'phase2' | 'phase3' | 'phase4' | 'phase5'>(
+    key: K, patch: Partial<SiteQuestionnaire[K]>
+  ) => setForm(p => ({ ...p, [key]: { ...p[key], ...(patch as any) } }));
+
+  const currentClientContacts = useMemo(() => {
+    if (!form.clientName) return [];
+    return clientContactsStore.filter(c => c.clientName.trim().toLowerCase() === form.clientName.trim().toLowerCase());
+  }, [clientContactsStore, form.clientName]);
+
+  const selectedContactId = useMemo(() => {
+    if (!form.contactPersonName) return 'new';
+    const match = currentClientContacts.find(c => c.name.trim().toLowerCase() === form.contactPersonName.trim().toLowerCase());
+    return match ? match.id : 'new';
+  }, [currentClientContacts, form.contactPersonName]);
+
+  const isExistingContact = selectedContactId !== 'new';
+
+  const handleContactSelect = (contactId: string) => {
+    if (contactId === 'new') {
+      upd({
+        contactPersonName: '',
+        contactPersonPhone: '',
+        contactPersonPosition: '',
+      });
+    } else {
+      const contact = currentClientContacts.find(c => c.id === contactId);
+      if (contact) {
+        upd({
+          contactPersonName: contact.name,
+          contactPersonPhone: contact.phone || '',
+          contactPersonPosition: contact.position || '',
+        });
+      }
+    }
+  };
   const [showUnsavedModal, setShowUnsavedModal] = useState(false);
   const [isInfoCollapsed, setIsInfoCollapsed] = useState(true);
   const [isEditingHeader, setIsEditingHeader] = useState(false);
@@ -406,10 +444,6 @@ export function SiteOnboarding() {
   }, [id]);
 
   // ─── Updaters ──────────────────────────────────────────────────────────────
-  const upd = (patch: Partial<SiteQuestionnaire>) => setForm(p => ({ ...p, ...patch }));
-  const updPhase = <K extends 'phase1' | 'phase2' | 'phase3' | 'phase4' | 'phase5'>(
-    key: K, patch: Partial<SiteQuestionnaire[K]>
-  ) => setForm(p => ({ ...p, [key]: { ...p[key], ...(patch as any) } }));
 
   const markDone = (phase: 1 | 2 | 3 | 4 | 5) => {
     const updatedForm = {
@@ -453,17 +487,74 @@ export function SiteOnboarding() {
       });
     }
 
-    // 2. Sync ClientContact
-    if (updatedForm.contactPersonName) {
+    const pendingId = updatedForm.id;
+    const activeId = updatedForm.siteId;
+
+    // 2. Unlink old contact if it was changed or removed
+    if (initialForm.contactPersonName && 
+        initialForm.contactPersonName.trim().toLowerCase() !== (updatedForm.contactPersonName || '').trim().toLowerCase()) {
+      const clientContacts = useAppStore.getState().clientContacts;
+      const oldContact = clientContacts.find(
+        c => c.clientName.trim().toLowerCase() === updatedForm.clientName.trim().toLowerCase() &&
+             c.name.trim().toLowerCase() === initialForm.contactPersonName.trim().toLowerCase()
+      );
+      if (oldContact) {
+        const idsToRemove = [pendingId];
+        if (activeId) idsToRemove.push(activeId);
+        
+        const newSiteIds = (oldContact.siteIds || []).filter(id => !idsToRemove.includes(id));
+        const newSiteNames = (oldContact.siteNames || []).filter(name => {
+          const cleanName = name.replace(' (Pending)', '').trim().toLowerCase();
+          return cleanName !== updatedForm.siteName.trim().toLowerCase();
+        });
+
+        updateClientContact(oldContact.id, {
+          siteIds: newSiteIds,
+          siteNames: newSiteNames
+        });
+      }
+    }
+
+    // 3. Sync and Link the new contact
+    if (updatedForm.contactPersonName && updatedForm.contactPersonName.trim()) {
       const clientContacts = useAppStore.getState().clientContacts;
       const existingContact = clientContacts.find(
         c => c.clientName.trim().toLowerCase() === updatedForm.clientName.trim().toLowerCase() &&
              c.name.trim().toLowerCase() === updatedForm.contactPersonName.trim().toLowerCase()
       );
+
+      // Determine the correct site ID and Name to associate
+      const targetSiteId = updatedForm.status === 'Active' && activeId ? activeId : pendingId;
+      const targetSiteName = updatedForm.status === 'Active' ? updatedForm.siteName : `${updatedForm.siteName} (Pending)`;
+
       if (existingContact) {
+        // Build updated siteIds and siteNames lists, ensuring no duplicates
+        let newSiteIds = [...(existingContact.siteIds || [])];
+        let newSiteNames = [...(existingContact.siteNames || [])];
+
+        // If the site is now active, we should also clean up the old pending ID if it is present
+        if (updatedForm.status === 'Active') {
+          newSiteIds = newSiteIds.filter(id => id !== pendingId);
+          newSiteNames = newSiteNames.filter(name => {
+            const cleanName = name.replace(' (Pending)', '').trim().toLowerCase();
+            return cleanName !== updatedForm.siteName.trim().toLowerCase();
+          });
+        }
+
+        if (!newSiteIds.includes(targetSiteId)) {
+          newSiteIds.push(targetSiteId);
+        }
+        
+        const cleanTargetNameLower = targetSiteName.trim().toLowerCase();
+        if (!newSiteNames.some(name => name.trim().toLowerCase() === cleanTargetNameLower)) {
+          newSiteNames.push(targetSiteName);
+        }
+
         updateClientContact(existingContact.id, {
           phone: updatedForm.contactPersonPhone || existingContact.phone,
           position: updatedForm.contactPersonPosition || existingContact.position,
+          siteIds: newSiteIds,
+          siteNames: newSiteNames,
         });
       } else {
         addClientContact({
@@ -472,13 +563,15 @@ export function SiteOnboarding() {
           phone: updatedForm.contactPersonPhone || '',
           position: updatedForm.contactPersonPosition || '',
           clientName: updatedForm.clientName,
+          siteIds: [targetSiteId],
+          siteNames: [targetSiteName],
           isActive: true,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         });
       }
     }
-  }, [clientProfiles, updateClientProfile, addClientProfile, updateClientContact, addClientContact]);
+  }, [clientProfiles, updateClientProfile, addClientProfile, updateClientContact, addClientContact, initialForm.contactPersonName]);
 
   // ─── Save ──────────────────────────────────────────────────────────────────
   const executeSave = useCallback(() => {
@@ -576,8 +669,10 @@ export function SiteOnboarding() {
   const handleActivate = () => {
     if (!canActivate) return;
     if (!clients.includes(form.clientName)) addClient(form.clientName);
+    
+    const activeSiteId = generateId();
     addSite({
-      id: generateId(),
+      id: activeSiteId,
       name: form.siteName,
       client: form.clientName,
       status: 'Active',
@@ -589,7 +684,8 @@ export function SiteOnboarding() {
       contactPhone: form.contactPersonPhone || '',
       position: form.contactPersonPosition || ''
     });
-    const activated = { ...form, status: 'Active' as const, updatedAt: new Date().toISOString() };
+
+    const activated = { ...form, siteId: activeSiteId, status: 'Active' as const, updatedAt: new Date().toISOString() };
     updatePendingSite(form.id, activated);
     // Sync contact and client profile as well
     syncOnboardingToAllStores(activated);
@@ -708,19 +804,46 @@ export function SiteOnboarding() {
                         onChange={e => upd({ address: e.target.value })}
                       />
                     </div>
-                    <div className="space-y-1">
-                      <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Contact Person</label>
-                      <Input
-                        placeholder="e.g. Mr. Adeyemi"
-                        value={form.contactPersonName || ''}
-                        onChange={e => upd({ contactPersonName: e.target.value })}
-                      />
-                    </div>
+                    {currentClientContacts.length > 0 ? (
+                      <div className="space-y-1">
+                        <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Contact Person</label>
+                        <select
+                          className="flex h-10 w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+                          value={selectedContactId}
+                          onChange={e => handleContactSelect(e.target.value)}
+                        >
+                          <option value="new">-- Type a new contact --</option>
+                          {currentClientContacts.map(c => (
+                            <option key={c.id} value={c.id}>{c.name} {c.position ? `(${c.position})` : ''}</option>
+                          ))}
+                        </select>
+                        {selectedContactId === 'new' && (
+                          <div className="mt-1">
+                            <Input
+                              placeholder="Enter contact name"
+                              value={form.contactPersonName || ''}
+                              onChange={e => upd({ contactPersonName: e.target.value })}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="space-y-1">
+                        <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Contact Person</label>
+                        <Input
+                          placeholder="e.g. Mr. Adeyemi"
+                          value={form.contactPersonName || ''}
+                          onChange={e => upd({ contactPersonName: e.target.value })}
+                        />
+                      </div>
+                    )}
                     <div className="space-y-1">
                       <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Contact Phone</label>
                       <Input
                         placeholder="e.g. 08012345678"
                         value={form.contactPersonPhone || ''}
+                        readOnly={isExistingContact}
+                        className={isExistingContact ? "bg-slate-100 dark:bg-slate-900 border-dashed text-slate-500 cursor-not-allowed" : ""}
                         onChange={e => {
                           const digits = e.target.value.replace(/[^0-9+\-\s]/g, '');
                           upd({ contactPersonPhone: digits });
@@ -732,6 +855,8 @@ export function SiteOnboarding() {
                       <Input
                         placeholder="e.g. Project Manager"
                         value={form.contactPersonPosition || ''}
+                        readOnly={isExistingContact}
+                        className={isExistingContact ? "bg-slate-100 dark:bg-slate-900 border-dashed text-slate-500 cursor-not-allowed" : ""}
                         onChange={e => upd({ contactPersonPosition: e.target.value })}
                       />
                     </div>
@@ -886,20 +1011,46 @@ export function SiteOnboarding() {
               />
             </div>
             {/* Initial Contact Person */}
-            <div className="space-y-1">
-              <label className="text-sm font-medium text-slate-700">Initial Contact Person</label>
-              <Input
-                placeholder="e.g. Mr. Adeyemi"
-                value={form.contactPersonName || ''}
-                onChange={e => upd({ contactPersonName: e.target.value })}
-              />
-            </div>
+            {currentClientContacts.length > 0 ? (
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-slate-700">Initial Contact Person</label>
+                <select
+                  className="flex h-10 w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+                  value={selectedContactId}
+                  onChange={e => handleContactSelect(e.target.value)}
+                >
+                  <option value="new">-- Type a new contact --</option>
+                  {currentClientContacts.map(c => (
+                    <option key={c.id} value={c.id}>{c.name} {c.position ? `(${c.position})` : ''}</option>
+                  ))}
+                </select>
+                {selectedContactId === 'new' && (
+                  <div className="mt-1">
+                    <Input
+                      placeholder="Enter contact name"
+                      value={form.contactPersonName || ''}
+                      onChange={e => upd({ contactPersonName: e.target.value })}
+                    />
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-slate-700">Initial Contact Person</label>
+                <Input
+                  placeholder="e.g. Mr. Adeyemi"
+                  value={form.contactPersonName || ''}
+                  onChange={e => upd({ contactPersonName: e.target.value })}
+                />
+              </div>
+            )}
             <div className="space-y-1">
               <label className="text-sm font-medium text-slate-700">Contact Phone</label>
               <Input
                 placeholder="e.g. 08012345678"
                 value={form.contactPersonPhone || ''}
-                inputMode="numeric"
+                readOnly={isExistingContact}
+                className={isExistingContact ? "bg-slate-100 dark:bg-slate-900 border-dashed text-slate-500 cursor-not-allowed" : ""}
                 onChange={e => {
                   // numbers only
                   const digits = e.target.value.replace(/[^0-9+\-\s]/g, '');
@@ -913,6 +1064,8 @@ export function SiteOnboarding() {
               <Input
                 placeholder="e.g. Project Manager"
                 value={form.contactPersonPosition || ''}
+                readOnly={isExistingContact}
+                className={isExistingContact ? "bg-slate-100 dark:bg-slate-900 border-dashed text-slate-500 cursor-not-allowed" : ""}
                 onChange={e => upd({ contactPersonPosition: e.target.value })}
               />
             </div>

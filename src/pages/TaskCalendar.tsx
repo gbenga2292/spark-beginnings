@@ -13,7 +13,7 @@ import { useNavigate } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose, DialogFooter } from '@/src/components/ui/dialog';
 import { Button } from '@/src/components/ui/button';
 import { useAppStore } from '@/src/store/appStore';
-import { fetchOperationsData } from '@/src/lib/supabaseService';
+import { fetchOperationsData, fetchJournalsByDateRange } from '@/src/lib/supabaseService';
 import { CreateTaskDialog } from '@/src/pages/Tasks/CreateTaskDialog';
 import { CreateReminderDialog } from '@/src/pages/Tasks/CreateReminderDialog';
 import { CreateDailyJournalDialog } from '@/src/pages/DailyJournal/CreateDailyJournalDialog';
@@ -114,14 +114,39 @@ export default function CalendarPage({ onNavigate, showCompleted: externalShowCo
   const siteJournalEntries = useAppStore(state => state.siteJournalEntries);
 
   useEffect(() => {
-    if (dailyJournals.length === 0) {
-      fetchOperationsData()
-        .then((data) => {
-          useAppStore.setState(data);
-        })
-        .catch(console.error);
-    }
-  }, [dailyJournals.length]);
+    fetchOperationsData()
+      .then((data) => {
+        useAppStore.setState(data);
+      })
+      .catch(console.error);
+  }, []);
+
+  // Load journals for the currently viewed month range (including adjacent months for calendar safety)
+  useEffect(() => {
+    let cancelled = false;
+    const start = format(startOfMonth(subMonths(calMonth, 1)), 'yyyy-MM-dd');
+    const end = format(endOfMonth(addMonths(calMonth, 1)), 'yyyy-MM-dd');
+
+    fetchJournalsByDateRange(start, end)
+      .then((data) => {
+        if (cancelled) return;
+        useAppStore.setState((s) => ({
+          dailyJournals: [
+            ...s.dailyJournals.filter(j => !data.dailyJournals.some(dj => dj.id === j.id)),
+            ...data.dailyJournals
+          ],
+          siteJournalEntries: [
+            ...s.siteJournalEntries.filter(e => !data.siteJournalEntries.some(de => de.id === e.id)),
+            ...data.siteJournalEntries
+          ]
+        }));
+      })
+      .catch(console.error);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [calMonth]);
   
   // Update local state if external prop changes
   useMemo(() => {

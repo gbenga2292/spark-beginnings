@@ -308,6 +308,7 @@ export interface DieselRefillAllocation {
   siteId?: string;
   siteName?: string;
   notes?: string;
+  refillDate?: string;
 }
 
 export interface DieselRefill {

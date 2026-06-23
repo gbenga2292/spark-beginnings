@@ -83,11 +83,46 @@ function RefillForm({ editing, onClose, onSave }: RefillFormProps) {
   const allActiveMachines = useAllActiveMachines();
 
   const [allocations, setAllocations] = useState<DieselRefillAllocation[]>(() => {
-    if (editing?.machineAllocations?.length) return editing.machineAllocations;
+    if (editing?.machineAllocations?.length) {
+      return editing.machineAllocations.map(a => ({
+        ...a,
+        refillDate: a.refillDate || editing.date
+      }));
+    }
     return [];
   });
 
   const [selectedMachineToAdd, setSelectedMachineToAdd] = useState('');
+
+  const handleDateChange = (newDate: string) => {
+    const prevDate = date;
+    setDate(newDate);
+    setAllocations(prev => prev.map(a => {
+      if (!a.refillDate || a.refillDate === prevDate) {
+        const existingLog = dailyMachineLogs.find(
+          l => l.assetId === a.assetId && l.siteId === a.siteId && l.date === newDate
+        );
+        return {
+          ...a,
+          refillDate: newDate,
+          actualUsed: existingLog?.dieselUsage ?? 0
+        };
+      }
+      return a;
+    }));
+  };
+
+  const handleRowDateChange = (idx: number, newRowDate: string) => {
+    const alloc = allocations[idx];
+    const existingLog = dailyMachineLogs.find(
+      l => l.assetId === alloc.assetId && l.siteId === alloc.siteId && l.date === newRowDate
+    );
+    setAllocations(prev => prev.map((a, i) => i === idx ? {
+      ...a,
+      refillDate: newRowDate,
+      actualUsed: existingLog?.dieselUsage ?? 0
+    } : a));
+  };
 
   const addMachine = (machineId: string) => {
     if (!machineId) return;
@@ -107,7 +142,8 @@ function RefillForm({ editing, onClose, onSave }: RefillFormProps) {
       siteName: machine.siteName,
       allocatedLitres: 0,
       actualUsed: existingLog?.dieselUsage ?? 0,
-      notes: ''
+      notes: '',
+      refillDate: date
     }]);
     setSelectedMachineToAdd('');
   };
@@ -128,7 +164,8 @@ function RefillForm({ editing, onClose, onSave }: RefillFormProps) {
         siteName: m.siteName,
         allocatedLitres: 0,
         actualUsed: existingLog?.dieselUsage ?? 0,
-        notes: ''
+        notes: '',
+        refillDate: date
       };
     });
 
@@ -169,16 +206,17 @@ function RefillForm({ editing, onClose, onSave }: RefillFormProps) {
     setIsSaving(true);
     try {
       for (const alloc of allocations) {
+        const targetDate = alloc.refillDate || date;
         if (alloc.actualUsed > 0 || alloc.allocatedLitres > 0) {
           const existingLog = dailyMachineLogs.find(
-            l => l.assetId === alloc.assetId && l.siteId === alloc.siteId && l.date === date
+            l => l.assetId === alloc.assetId && l.siteId === alloc.siteId && l.date === targetDate
           );
           await logDailyActivity({
             assetId: alloc.assetId,
             assetName: alloc.assetName,
             siteId: alloc.siteId || '',
             siteName: alloc.siteName || '',
-            date,
+            date: targetDate,
             isActive: existingLog?.isActive ?? true,
             operationalDay: existingLog?.operationalDay ?? 'full',
             downtimeEntries: existingLog?.downtimeEntries ?? [],
@@ -247,7 +285,7 @@ function RefillForm({ editing, onClose, onSave }: RefillFormProps) {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           <div>
             <label className={label}>Date *</label>
-            <input type="date" value={date} onChange={e => setDate(e.target.value)} className={inp} />
+            <input type="date" value={date} onChange={e => handleDateChange(e.target.value)} className={inp} />
           </div>
           <div>
             <label className={label}>Total Litres *</label>
@@ -324,10 +362,11 @@ function RefillForm({ editing, onClose, onSave }: RefillFormProps) {
           </div>
         ) : (
           <div className={cn('rounded-xl border overflow-x-auto', isDark ? 'border-slate-700' : 'border-slate-200')}>
-            <table className="w-full text-left text-sm whitespace-nowrap min-w-[700px]">
+            <table className="w-full text-left text-sm whitespace-nowrap min-w-[750px]">
               <thead className={cn('text-xs font-bold uppercase tracking-wider', isDark ? 'bg-slate-800 text-slate-400' : 'bg-slate-50 text-slate-500')}>
                 <tr>
                   <th className="px-4 py-2">Machine & Site</th>
+                  <th className="px-4 py-2 w-32">Refill Date</th>
                   <th className="px-4 py-2 w-28 text-right">Bought (L)</th>
                   <th className="px-4 py-2 w-28 text-right">Actual Used (L)</th>
                   <th className="px-4 py-2 w-24 text-right">Remains (L)</th>
@@ -345,6 +384,14 @@ function RefillForm({ editing, onClose, onSave }: RefillFormProps) {
                       <td className="px-4 py-3">
                         <p className={cn('font-semibold text-sm', isDark ? 'text-white' : 'text-slate-900')}>{alloc.assetName}</p>
                         <p className="text-[10px] text-slate-400">{alloc.siteName}</p>
+                      </td>
+                      <td className="px-4 py-2">
+                        <input
+                          type="date"
+                          value={alloc.refillDate || date}
+                          onChange={e => handleRowDateChange(idx, e.target.value)}
+                          className={cn('rounded-lg border px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-amber-500 w-full', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-200')}
+                        />
                       </td>
                       <td className="px-4 py-2">
                         <input
@@ -439,7 +486,8 @@ function RefillCard({ refill, onEdit, onDelete, canEdit, canDelete }: RefillCard
   // Read live actualUsed from daily logs for each allocation
   const enrichedAllocations = useMemo(() => {
     return refill.machineAllocations.map(alloc => {
-      const log = dailyMachineLogs.find(l => l.assetId === alloc.assetId && l.siteId === refill.siteId && l.date === refill.date);
+      const targetDate = alloc.refillDate || refill.date;
+      const log = dailyMachineLogs.find(l => l.assetId === alloc.assetId && l.siteId === refill.siteId && l.date === targetDate);
       return { ...alloc, actualUsed: log?.dieselUsage ?? alloc.actualUsed };
     });
   }, [refill, dailyMachineLogs]);
@@ -542,7 +590,14 @@ function RefillCard({ refill, onEdit, onDelete, canEdit, canDelete }: RefillCard
                       const balance = (alloc.allocatedLitres || 0) - (alloc.actualUsed || 0);
                       return (
                         <div key={alloc.assetId} className={cn('grid grid-cols-[1fr_90px_90px_80px] gap-2 items-center px-3 py-2.5 border-t text-sm', isDark ? 'border-slate-800' : 'border-slate-100')}>
-                          <span className={cn('font-medium', isDark ? 'text-slate-200' : 'text-slate-700')}>{alloc.assetName}</span>
+                          <div>
+                            <p className={cn('font-medium', isDark ? 'text-slate-200' : 'text-slate-700')}>{alloc.assetName}</p>
+                            {alloc.refillDate && alloc.refillDate !== refill.date && (
+                              <p className="text-[10px] text-amber-500 font-medium">
+                                Refilled: {new Date(alloc.refillDate + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                              </p>
+                            )}
+                          </div>
                           <span className="text-right text-slate-500">{fmt(alloc.allocatedLitres)}L</span>
                           <span className="text-right text-emerald-600 font-semibold">{fmt(alloc.actualUsed)}L</span>
                           <span className={cn('text-right font-semibold text-xs', balance > 0 ? 'text-blue-500' : balance < 0 ? 'text-red-500' : 'text-slate-400')}>
@@ -777,10 +832,12 @@ function MachineAnalyticsView({ refills }: { refills: DieselRefill[] }) {
     // First, gather all relevant history entries from refills
     refills.forEach(r => {
       if (selectedSiteId !== 'all' && r.siteId !== selectedSiteId) return;
-      if (dateFrom && r.date < dateFrom) return;
-      if (dateTo && r.date > dateTo) return;
 
       r.machineAllocations.forEach(a => {
+        const dateStr = a.refillDate || r.date;
+        if (dateFrom && dateStr < dateFrom) return;
+        if (dateTo && dateStr > dateTo) return;
+
         if (!machineMap.has(a.assetId)) {
           machineMap.set(a.assetId, {
             assetId: a.assetId,
@@ -790,7 +847,6 @@ function MachineAnalyticsView({ refills }: { refills: DieselRefill[] }) {
           });
         }
         const m = machineMap.get(a.assetId);
-        const dateStr = r.date;
         if (!m.historyMap.has(dateStr)) {
             m.historyMap.set(dateStr, { 
                 date: dateStr, 
@@ -854,7 +910,7 @@ function MachineAnalyticsView({ refills }: { refills: DieselRefill[] }) {
     // Now, calculate the average usage based on active days within the refill/usage range
     return Array.from(machineMap.values())
       .map(m => {
-        const history = Array.from(m.historyMap.values()).sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        const history: any[] = Array.from(m.historyMap.values()).sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
         
         // Find the date range of refills/usages for this machine
         // These are dates where there is either a refill or a daily log with usage

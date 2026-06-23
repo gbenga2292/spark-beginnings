@@ -333,15 +333,6 @@ export function useRealtimeData(isAuthenticated: boolean) {
   useEffect(() => {
     if (!isAuthenticated) return;
 
-    const ACTIVE_TABLES = [
-      'employees', 'attendance_records', 'profiles', 'payments', 'vat_payments', 'comm_logs', 
-      'company_expenses', 'pending_sites', 'clients', 'ledger_categories', 
-      'ledger_vendors', 'ledger_banks', 'ledger_beneficiary_banks', 'ledger_entries', 
-      'daily_journals', 'site_journal_entries', 'vehicles', 'vehicle_movement_log', 
-      'vehicle_document_types', 'interview_candidates', 'positions', 'departments', 
-      'leave_types', 'public_holidays', 'department_tasks', 'staff_merit_record', 
-      'privilege_presets', 'app_settings', 'client_contacts'
-    ];
 
     const handler = (payload: any) => {
       const table = payload.table;
@@ -982,11 +973,8 @@ export function useRealtimeData(isAuthenticated: boolean) {
           }
     };
 
-    let channel = supabase.channel('app-realtime-global');
-
-    ACTIVE_TABLES.forEach(t => {
-      channel = channel.on('postgres_changes', { event: '*', schema: 'public', table: t }, handler);
-    });
+    const channel = supabase.channel('app-realtime-global')
+      .on('postgres_changes', { event: '*', schema: 'public' }, handler);
 
     channel.subscribe((status, err) => {
       if (err) {

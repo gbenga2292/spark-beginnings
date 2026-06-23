@@ -977,27 +977,27 @@ export async function fetchAllAppData(privs?: any) {
     interviewRes,
     clientContactsRes,
   ] = await Promise.all([
-    supabase.from('sites').select('*').order('created_at'),
-    supabase.from('clients').select('*').order('name'),
+    supabase.from('sites').select('*').order('created_at').limit(50000),
+    supabase.from('clients').select('*').order('name').limit(50000),
     canView('salaryLoans') ? supabase.from('salary_advances').select('*').order('request_date', { ascending: false }) : Promise.resolve({ data: [] }),
     canView('salaryLoans') ? supabase.from('loans').select('*').order('start_date', { ascending: false }) : Promise.resolve({ data: [] }),
     canView('payments') ? supabase.from('payments').select('*').order('date', { ascending: false }) : Promise.resolve({ data: [] }),
     canView('payments') ? supabase.from('vat_payments').select('*').order('date', { ascending: false }) : Promise.resolve({ data: [] }),
     supabase.from('public_holidays').select('*').order('date'),
-    supabase.from('department_tasks').select('*'),
+    supabase.from('department_tasks').select('*').limit(50000),
     canView('leaves') ? supabase.from('leaves').select('*').order('start_date', { ascending: false }) : Promise.resolve({ data: [] }),
     supabase.from('leave_types').select('*').order('name'),
     supabase.from('app_settings').select('*').limit(1).maybeSingle(),
     supabase.from('positions').select('*').order('title'),
     supabase.from('departments').select('*').order('name'),
-    canView('disciplinary') ? supabase.from('disciplinary_records').select('*').order('date', { ascending: false }) : Promise.resolve({ data: [] }),
-    canView('evaluations') ? supabase.from('evaluations').select('*').order('date', { ascending: false }) : Promise.resolve({ data: [] }),
-    supabase.from('comm_logs').select('*').order('date', { ascending: false }),
-    supabase.from('pending_sites').select('*').order('created_at'),
-    supabase.from('staff_merit_record').select('*').order('incident_date', { ascending: false }),
-    supabase.from('vehicle_document_types').select('*').order('name'),
-    supabase.from('interview_candidates').select('*').order('created_at', { ascending: false }),
-    supabase.from('client_contacts').select('*').order('name'),
+    canView('disciplinary') ? supabase.from('disciplinary_records').select('*').order('date', { ascending: false }).limit(50000) : Promise.resolve({ data: [] }),
+    canView('evaluations') ? supabase.from('evaluations').select('*').order('date', { ascending: false }).limit(50000) : Promise.resolve({ data: [] }),
+    supabase.from('comm_logs').select('*').order('date', { ascending: false }).limit(50000),
+    supabase.from('pending_sites').select('*').order('created_at').limit(50000),
+    supabase.from('staff_merit_record').select('*').order('incident_date', { ascending: false }).limit(50000),
+    supabase.from('vehicle_document_types').select('*').order('name').limit(50000),
+    supabase.from('interview_candidates').select('*').order('created_at', { ascending: false }).limit(50000),
+    supabase.from('client_contacts').select('*').order('name').limit(50000),
   ]);
 
   const settings = settingsRes.data;
@@ -1052,7 +1052,7 @@ export async function fetchAllAppData(privs?: any) {
 }
 
 export async function fetchEmployeesData() {
-  const employeesRes = await supabase.from('employees').select('*').order('surname');
+  const employeesRes = await supabase.from('employees').select('*').order('surname').limit(50000);
   return (employeesRes.data || []).map(dbToEmployee);
 }
 
@@ -1063,12 +1063,12 @@ export async function fetchAttendanceData() {
 
 export async function fetchLedgerData() {
   const [lCatRes, lVenRes, lBankRes, lBenBankRes, lEntRes, compExpRes] = await Promise.all([
-    supabase.from('ledger_categories').select('*').order('name'),
-    supabase.from('ledger_vendors').select('*').order('name'),
-    supabase.from('ledger_banks').select('*').order('name'),
-    supabase.from('ledger_beneficiary_banks').select('*').order('name'),
-    supabase.from('ledger_entries').select('*').order('date', { ascending: false }),
-    supabase.from('company_expenses').select('*').order('date', { ascending: false })
+    supabase.from('ledger_categories').select('*').order('name').limit(50000),
+    supabase.from('ledger_vendors').select('*').order('name').limit(50000),
+    supabase.from('ledger_banks').select('*').order('name').limit(50000),
+    supabase.from('ledger_beneficiary_banks').select('*').order('name').limit(50000),
+    supabase.from('ledger_entries').select('*').order('date', { ascending: false }).limit(50000),
+    supabase.from('company_expenses').select('*').order('date', { ascending: false }).limit(50000)
   ]);
   
   return {
@@ -1083,10 +1083,10 @@ export async function fetchLedgerData() {
 
 export async function fetchOperationsData() {
   const [vehiclesRes, vehicleTripsRes, dailyJournalsRes, siteJournalEntriesRes] = await Promise.all([
-    supabase.from('vehicles').select('*').order('name'),
-    supabase.from('vehicle_movement_log').select('*').order('departure_time', { ascending: false }).limit(500),
-    supabase.from('daily_journals').select('*').order('date', { ascending: false }),
-    supabase.from('site_journal_entries').select('*'),
+    supabase.from('vehicles').select('*').order('name').limit(50000),
+    supabase.from('vehicle_movement_log').select('*').order('departure_time', { ascending: false }).limit(50000),
+    supabase.from('daily_journals').select('*').order('date', { ascending: false }).limit(100),
+    supabase.from('site_journal_entries').select('*').order('created_at', { ascending: false }).limit(200),
   ]);
 
   return {
@@ -1097,10 +1097,107 @@ export async function fetchOperationsData() {
   };
 }
 
+export async function fetchSiteDiaryEntries(siteId: string) {
+  const { data: entries, error: err1 } = await supabase
+    .from('site_journal_entries')
+    .select('*')
+    .eq('site_id', siteId)
+    .order('created_at', { ascending: false });
+  if (err1) throw err1;
+
+  if (!entries || entries.length === 0) {
+    return { dailyJournals: [], siteJournalEntries: [] };
+  }
+
+  const journalIds = Array.from(new Set(entries.map(e => e.journal_id).filter(Boolean)));
+  const { data: journals, error: err2 } = await supabase
+    .from('daily_journals')
+    .select('*')
+    .in('id', journalIds);
+  if (err2) throw err2;
+
+  return {
+    dailyJournals: (journals || []).map(dbToDailyJournal),
+    siteJournalEntries: entries.map(dbToSiteJournalEntry),
+  };
+}
+
+export async function fetchSiteDiaryEntriesPaginated(
+  siteId: string,
+  page: number,
+  pageSize: number = 20
+): Promise<{
+  siteJournalEntries: SiteJournalEntry[];
+  dailyJournals: DailyJournal[];
+  hasMore: boolean;
+  total: number;
+}> {
+  const ws = getWS();
+  const from = page * pageSize;
+  const to = from + pageSize - 1;
+
+  const { data: entries, error: err1, count } = await supabase
+    .from('site_journal_entries')
+    .select('*', { count: 'exact' })
+    .eq('site_id', siteId)
+    .eq('workspace_id', ws)
+    .order('created_at', { ascending: false })
+    .range(from, to);
+
+  if (err1) { console.error('fetchSiteDiaryEntriesPaginated:', err1); throw err1; }
+
+  const journalIds = [...new Set((entries || []).map((e: any) => e.journal_id).filter(Boolean))];
+  let journals: any[] = [];
+  if (journalIds.length > 0) {
+    const { data: jData, error: err2 } = await supabase
+      .from('daily_journals')
+      .select('*')
+      .in('id', journalIds);
+    if (err2) console.error('fetchSiteDiaryEntriesPaginated (journals):', err2);
+    journals = jData || [];
+  }
+
+  const total = count ?? 0;
+  const hasMore = from + (entries?.length ?? 0) < total;
+
+  return {
+    siteJournalEntries: (entries || []).map(dbToSiteJournalEntry),
+    dailyJournals: journals.map(dbToDailyJournal),
+    hasMore,
+    total,
+  };
+}
+
+export async function fetchJournalsByDateRange(startDate: string, endDate: string) {
+  const { data: journals, error: err1 } = await supabase
+    .from('daily_journals')
+    .select('*')
+    .gte('date', startDate)
+    .lte('date', endDate)
+    .order('date', { ascending: false });
+  if (err1) throw err1;
+
+  if (!journals || journals.length === 0) {
+    return { dailyJournals: [], siteJournalEntries: [] };
+  }
+
+  const journalIds = journals.map(j => j.id);
+  const { data: entries, error: err2 } = await supabase
+    .from('site_journal_entries')
+    .select('*')
+    .in('journal_id', journalIds);
+  if (err2) throw err2;
+
+  return {
+    dailyJournals: journals.map(dbToDailyJournal),
+    siteJournalEntries: (entries || []).map(dbToSiteJournalEntry),
+  };
+}
+
 export async function fetchInvoicesData() {
   const [invoicesRes, pendingInvRes] = await Promise.all([
-    supabase.from('invoices').select('*').order('date', { ascending: false }),
-    supabase.from('pending_invoices').select('*').order('created_at'),
+    supabase.from('invoices').select('*').order('date', { ascending: false }).limit(50000),
+    supabase.from('pending_invoices').select('*').order('created_at').limit(50000),
   ]);
 
   return {
@@ -1137,7 +1234,7 @@ export async function fetchAttendanceByYear(year: number): Promise<AttendanceRec
 }
 
 export async function fetchAllUsers(privs?: any) {
-  const { data } = await supabase.from('profiles').select('*').order('created_at');
+  const { data } = await supabase.from('profiles').select('*').order('created_at').limit(50000);
   return (data || []).map(dbToProfile);
 }
 
@@ -2229,7 +2326,7 @@ export const db = {
     if (error) { console.error('saveDewateringLayout:', error); throw error; }
   },
   async getDewateringLayouts(userId: string) {
-    const { data, error } = await supabase.from('dewatering_layouts').select('*').eq('user_id', userId).order('created_at', { ascending: false });
+    const { data, error } = await supabase.from('dewatering_layouts').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(50000);
     if (error) { console.error('getDewateringLayouts:', error); throw error; }
     return data;
   },
@@ -2240,7 +2337,7 @@ export const db = {
 
   // Client Contacts
   async fetchClientContacts(): Promise<ClientContact[]> {
-    const { data, error } = await supabase.from('client_contacts').select('*').order('name');
+    const { data, error } = await supabase.from('client_contacts').select('*').order('name').limit(50000);
     if (error) { console.error('fetchClientContacts:', error); throw error; }
     return (data || []).map(dbToClientContact);
   },
@@ -2273,4 +2370,5 @@ export const db = {
     if (error) { console.error('deleteClientContact:', error); throw error; }
   },
 };
+
 

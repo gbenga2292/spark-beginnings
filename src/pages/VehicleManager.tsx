@@ -108,14 +108,12 @@ export function VehicleManager() {
   const [isImporting, setIsImporting] = useState(false);
 
   useEffect(() => {
-    if (vehicles.length === 0) {
-      fetchOperationsData()
-        .then((data) => {
-          useAppStore.setState(data);
-        })
-        .catch(console.error);
-    }
-  }, [vehicles.length]);
+    fetchOperationsData()
+      .then((data) => {
+        useAppStore.setState(data);
+      })
+      .catch(console.error);
+  }, []);
 
   // Ensure user is on a permitted tab
   useEffect(() => {

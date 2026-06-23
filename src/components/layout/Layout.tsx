@@ -38,7 +38,7 @@ export function Layout() {
   useEffect(() => {
     const handler = () => {
       setPrivBannerVisible(true);
-      setReloadCountdown(10); // 10 second auto-reload
+      setReloadCountdown(5); // 5 second auto-reload
     };
     window.addEventListener('privileges-updated', handler);
     return () => window.removeEventListener('privileges-updated', handler);
@@ -65,29 +65,21 @@ export function Layout() {
     const timer = setTimeout(async () => {
       const state = useAppStore.getState();
       
-      if (state.employees.length === 0) {
-        fetchEmployeesData()
-          .then((data) => useAppStore.setState({ employees: data }))
-          .catch(console.error);
-      }
+      fetchEmployeesData()
+        .then((data) => useAppStore.setState({ employees: data }))
+        .catch(console.error);
       
-      if (state.invoices.length === 0 && state.pendingInvoices.length === 0) {
-        fetchInvoicesData()
-          .then((data) => useAppStore.setState(data))
-          .catch(console.error);
-      }
+      fetchInvoicesData()
+        .then((data) => useAppStore.setState(data))
+        .catch(console.error);
       
-      if (state.ledgerEntries.length === 0) {
-        fetchLedgerData()
-          .then((data) => useAppStore.setState(data))
-          .catch(console.error);
-      }
+      fetchLedgerData()
+        .then((data) => useAppStore.setState(data))
+        .catch(console.error);
       
-      if (state.dailyJournals.length === 0) {
-        fetchOperationsData()
-          .then((data) => useAppStore.setState(data))
-          .catch(console.error);
-      }
+      fetchOperationsData()
+        .then((data) => useAppStore.setState(data))
+        .catch(console.error);
     }, 1000);
     
     return () => clearTimeout(timer);
@@ -116,10 +108,10 @@ export function Layout() {
             <ShieldAlert className="h-4 w-4 shrink-0" />
             <div className="flex-1 text-xs sm:text-sm font-medium leading-tight">
               <span className="hidden sm:inline">
-                Your permissions have been updated by an administrator. Reload the page to apply the changes.
+                Your permissions have been updated. The page will reload in {reloadCountdown !== null ? `${reloadCountdown}s` : 'a moment'} to apply changes.
               </span>
               <span className="sm:hidden">
-                Permissions updated. Reload to apply.
+                Permissions updated. Reloading in {reloadCountdown !== null ? `${reloadCountdown}s` : ''}...
               </span>
             </div>
             <button
@@ -127,8 +119,8 @@ export function Layout() {
               className="flex items-center gap-1 sm:gap-1.5 bg-white/20 hover:bg-white/30 rounded px-2 sm:px-3 py-1 text-[10px] sm:text-xs font-semibold transition-colors whitespace-nowrap"
             >
               <RefreshCw className="h-3 sm:h-3.5 w-3 sm:w-3.5 shrink-0" /> 
-              <span className="hidden sm:inline">{reloadCountdown !== null ? `Reloading in ${reloadCountdown}s...` : 'Reload Now'}</span>
-              <span className="sm:hidden">{reloadCountdown !== null ? `in ${reloadCountdown}s` : 'Reload'}</span>
+              <span className="hidden sm:inline">Reload Now</span>
+              <span className="sm:hidden">Reload</span>
             </button>
             <button
               onClick={() => {

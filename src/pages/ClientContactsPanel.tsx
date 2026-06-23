@@ -157,6 +157,7 @@ export function ClientContactsPanel({ clientName, onClose, inline = false, siteI
   const { isDark } = useTheme();
   const contacts = useAppStore(s => s.clientContacts);
   const sites = useAppStore(s => s.sites);
+  const pendingSites = useAppStore(s => s.pendingSites);
   const addClientContact = useAppStore(s => s.addClientContact);
   const updateClientContact = useAppStore(s => s.updateClientContact);
   const deleteClientContact = useAppStore(s => s.deleteClientContact);
@@ -169,7 +170,18 @@ export function ClientContactsPanel({ clientName, onClose, inline = false, siteI
     ? allClientContacts.filter(c => c.isPrincipal || (c.siteIds || []).includes(siteId))
     : allClientContacts;
 
-  const clientSites = sites.filter(s => s.client === clientName);
+  const clientSites = [
+    ...sites.filter(s => s.client.trim().toLowerCase() === clientName.trim().toLowerCase()).map(s => ({
+      id: s.id,
+      name: s.name,
+      isPending: false,
+    })),
+    ...pendingSites.filter(ps => ps.clientName.trim().toLowerCase() === clientName.trim().toLowerCase() && ps.status === 'Pending').map(ps => ({
+      id: ps.id,
+      name: `${ps.siteName} (Pending)`,
+      isPending: true,
+    }))
+  ];
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);

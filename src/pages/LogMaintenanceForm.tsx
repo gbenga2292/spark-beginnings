@@ -136,7 +136,7 @@ export function LogMaintenanceForm({ initialAssetId, editSessionId, onSuccess, o
   const handleAddInventoryPart = (assetId: string, part: any) => {
     const qty = inventoryAddQty[part.id] || 1;
     const existingParts = assetData[assetId]?.parts || [];
-    updateAssetData(assetId, 'parts', [...existingParts, { ...part, type: 'inventory', addedQty: qty }]);
+    updateAssetData(assetId, 'parts', [...existingParts, { ...part, type: 'inventory', quantity: qty, addedQty: qty }]);
     setIsInventoryPartModalOpen(false);
     toast.success(`${qty}x ${part.name} added to parts!`);
     setInventoryAddQty(prev => ({ ...prev, [part.id]: 1 }));
