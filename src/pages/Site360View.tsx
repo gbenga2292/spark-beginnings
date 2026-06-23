@@ -688,11 +688,10 @@ Answer site-specific questions using this context only. Be concise.`;
         <AnimatePresence initial={false}>
           {expandedTasks.has(task.id) && (
             <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
+              initial={{ height: 0, opacity: 0, overflow: "hidden" }}
+              animate={{ height: 'auto', opacity: 1, transitionEnd: { overflow: "visible" } }}
+              exit={{ height: 0, opacity: 0, overflow: "hidden" }}
               transition={{ duration: 0.2 }}
-              className="overflow-hidden"
             >
               <div className="pl-7 pr-2 space-y-2 pt-1 pb-2">
                 {taskSubs.length === 0 ? (

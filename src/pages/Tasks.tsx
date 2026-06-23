@@ -430,8 +430,11 @@ function PersonalTasksView() {
                       {/* Subtasks */}
                       <AnimatePresence>
                         {isExpanded && (
-                          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }}
-                            exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }} className="overflow-hidden">
+                          <motion.div 
+                            initial={{ height: 0, opacity: 0, overflow: "hidden" }} 
+                            animate={{ height: "auto", opacity: 1, transitionEnd: { overflow: "visible" } }}
+                            exit={{ height: 0, opacity: 0, overflow: "hidden" }} 
+                            transition={{ duration: 0.2 }}>
                             <div className="border-t border-indigo-100 dark:border-indigo-900/30">
                               {subs.length === 0 && (
                                 <p className="px-5 py-4 text-xs text-muted-foreground italic">No subtasks yet.</p>
@@ -1132,8 +1135,12 @@ function AdminTasksView() {
                       {/* Subtasks View */}
                       <AnimatePresence>
                         {isExpanded && mt && (
-                          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }}
-                            exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }} className="overflow-hidden bg-card/50">
+                          <motion.div 
+                            initial={{ height: 0, opacity: 0, overflow: "hidden" }} 
+                            animate={{ height: "auto", opacity: 1, transitionEnd: { overflow: "visible" } }}
+                            exit={{ height: 0, opacity: 0, overflow: "hidden" }} 
+                            transition={{ duration: 0.2 }} 
+                            className="bg-card/50">
                             <div className="border-t border-border">
                               {projSubs.length === 0 && (
                                 <p className="px-5 py-4 text-xs text-muted-foreground italic">No subtasks yet.</p>
@@ -1468,7 +1475,7 @@ function AdminTasksView() {
 
                 return (
                   <div key={mt.id} id={`task-row-${mt.id}`}
-                    className={`bg-card border border-border rounded-xl overflow-hidden transition-colors border-l-4 ${mt.priority && PRIORITY_CONFIG[mt.priority as TaskPriority] ? PRIORITY_CONFIG[mt.priority as TaskPriority].border : 'border-l-transparent'
+                    className={`bg-card border border-border rounded-xl overflow-visible transition-colors border-l-4 ${mt.priority && PRIORITY_CONFIG[mt.priority as TaskPriority] ? PRIORITY_CONFIG[mt.priority as TaskPriority].border : 'border-l-transparent'
                       } hover:shadow-sm`}>
                     {/* Main task header */}
                     <div role="button" tabIndex={0}
@@ -1546,8 +1553,11 @@ function AdminTasksView() {
                     {/* Subtask rows */}
                     <AnimatePresence>
                       {isExpanded && (
-                        <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }}
-                          exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }} className="overflow-hidden">
+                        <motion.div 
+                          initial={{ height: 0, opacity: 0, overflow: "hidden" }} 
+                          animate={{ height: "auto", opacity: 1, transitionEnd: { overflow: "visible" } }}
+                          exit={{ height: 0, opacity: 0, overflow: "hidden" }} 
+                          transition={{ duration: 0.2 }}>
                           <div className="border-t border-border">
                             {subs.length === 0 && (
                               <p className="px-5 py-4 text-xs text-muted-foreground italic">No subtasks yet.</p>
@@ -2459,10 +2469,10 @@ function EditSubtaskDialog({ subtask, users, onClose, onSave }: {
                     <span className="truncate">{assignedTo.length > 0 ? `${assignedTo.length} selected` : 'Unassigned'}</span>
                     <ChevronDown className="w-3.5 h-3.5 text-muted-foreground opacity-50 shrink-0" />
                   </button>
-                  {openSubDrop && (
-                    <>
-                      <div className="fixed inset-0 z-[100]" onClick={() => setOpenSubDrop(false)} />
-                      <div className="absolute top-full left-0 mt-1 min-w-[200px] w-max max-w-[350px] max-h-[320px] overflow-y-auto bg-card border border-border rounded-lg shadow-xl z-[101] pt-1 pb-12">
+                      {openSubDrop && (
+                        <>
+                          <div className="fixed inset-0 z-[100]" onClick={() => setOpenSubDrop(false)} />
+                          <div className="absolute top-full left-0 mt-1 min-w-[200px] w-max max-w-[350px] max-h-[150px] overflow-y-auto bg-card border border-border rounded-lg shadow-xl z-[101] pt-1 pb-3 custom-dropdown-scrollbar">
                         <label className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted transition-colors border-b border-border">
                           <input type="checkbox"
                             checked={assignedTo.length === users.filter(u => u.isActive !== false).length && users.filter(u => u.isActive !== false).length > 0}

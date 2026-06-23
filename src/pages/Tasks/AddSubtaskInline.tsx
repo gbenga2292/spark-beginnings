@@ -70,7 +70,7 @@ export function AddSubtaskInline({ mainTaskId, users, isPersonal, onAdd }: AddSu
             {openSubDrop && (
               <>
                 <div className="fixed inset-0 z-[100]" onClick={() => setOpenSubDrop(false)} />
-                <div className="absolute top-full left-0 mt-1 min-w-[200px] w-max max-w-[350px] max-h-[320px] overflow-y-auto bg-card border border-border rounded-lg shadow-xl z-[101] pt-1 pb-12">
+                <div className="absolute top-full left-0 mt-1 min-w-[200px] w-max max-w-[350px] max-h-[150px] overflow-y-auto bg-card border border-border rounded-lg shadow-xl z-[101] pt-1 pb-3 custom-dropdown-scrollbar">
                   <label className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted transition-colors border-b border-border">
                     <input type="checkbox"
                       checked={assignedTo.length === users.filter(u => u.isActive !== false).length && users.filter(u => u.isActive !== false).length > 0}

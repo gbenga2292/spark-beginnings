@@ -495,7 +495,7 @@ export function CreateTaskDialog({
                             {openSubDropdown === i && (
                               <>
                                 <div className="fixed inset-0 z-[100]" onClick={() => setOpenSubDropdown(null)} />
-                                <div className={`absolute top-full left-0 mt-1 min-w-[200px] w-max max-w-[350px] max-h-[200px] overflow-y-auto border rounded-lg shadow-xl z-[101] py-1 hide-scrollbar ${
+                                <div className={`absolute top-full left-0 mt-1 min-w-[200px] w-max max-w-[350px] max-h-[150px] overflow-y-auto border rounded-lg shadow-xl z-[101] pt-1 pb-3 custom-dropdown-scrollbar ${
                                   isDarkTheme ? "bg-[#141622] border-white/10 text-white" : "bg-card border-border text-foreground"
                                 }`}>
                                   {activeUsers.map(u => (

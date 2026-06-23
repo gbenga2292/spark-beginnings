@@ -177,6 +177,36 @@
   display: none;
 }
 
+/* Custom scrollbar specifically for assignee/dropdowns to be more visible */
+.custom-dropdown-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--theme-primary-500, #3b82f6) rgba(0, 0, 0, 0.05);
+}
+.custom-dropdown-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+.custom-dropdown-scrollbar::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.02);
+  border-radius: 9999px;
+}
+.custom-dropdown-scrollbar::-webkit-scrollbar-thumb {
+  background-color: var(--theme-primary-400, #60a5fa);
+  border-radius: 9999px;
+  border: 1px solid transparent;
+}
+.custom-dropdown-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: var(--theme-primary-600, #2563eb);
+}
+.dark .custom-dropdown-scrollbar::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.02);
+}
+.dark .custom-dropdown-scrollbar::-webkit-scrollbar-thumb {
+  background-color: var(--theme-primary-500, #6366f1);
+}
+.dark .custom-dropdown-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: var(--theme-primary-400, #818cf8);
+}
+
 
 /* ══════════════════════════════════════════════════════════════════════
    COLOR THEME SYSTEM
