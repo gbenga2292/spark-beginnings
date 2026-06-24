@@ -541,7 +541,10 @@ export function Attendance() {
       const loadedData: Record<string, { day: string, night: string, overtime: boolean, overtimeDetails: string }> = {};
       existingRecords.forEach(r => {
         loadedData[r.staffId] = {
-          day: r.daySite || r.absentStatus || '',
+          // absentStatus takes priority: when "Absent with Permit" is saved,
+          // applyOverride stores daySite="Office" but absentStatus holds the real reason.
+          // Without this, navigating back would show "Office" instead of the absent status.
+          day: r.absentStatus || r.daySite || '',
           night: r.nightSite || '',
           overtime: !!r.overtimeDetails,
           overtimeDetails: r.overtimeDetails || ''

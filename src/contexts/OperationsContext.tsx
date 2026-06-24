@@ -1184,31 +1184,32 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
       if (!waybill || waybill.status !== 'outstanding') return prev;
 
       if (waybill.type === 'waybill') {
-        setAssets(assetsPrev => assetsPrev.map(asset => {
-          const oldItem = waybill.items.find(i => i.assetId === asset.id);
-          if (oldItem) {
-            return {
-              ...asset,
-              availableQuantity: asset.availableQuantity + oldItem.quantity,
-              reservedQuantity: Math.max(0, asset.reservedQuantity - oldItem.quantity),
-            };
-          }
-          return asset;
-        }));
-      }
+        const newItems = updates.items || waybill.items;
+        
+        // Find all unique asset IDs from old and new items
+        const oldItemIds = waybill.items.map(i => i.assetId);
+        const newItemIds = newItems.map(i => i.assetId);
+        const allAffectedIds = Array.from(new Set([...oldItemIds, ...newItemIds]));
 
-      const newItems = updates.items || waybill.items;
-      if (waybill.type === 'waybill') {
         setAssets(assetsPrev => assetsPrev.map(asset => {
-          const newItem = newItems.find(i => i.assetId === asset.id);
-          if (newItem) {
-            const updated = {
-              ...asset,
-              availableQuantity: Math.max(0, asset.availableQuantity - newItem.quantity),
-              reservedQuantity: asset.reservedQuantity + newItem.quantity,
-            };
-            persistAsset(updated);
-            return updated;
+          if (allAffectedIds.includes(asset.id)) {
+            const oldItem = waybill.items.find(i => i.assetId === asset.id);
+            const newItem = newItems.find(i => i.assetId === asset.id);
+            
+            const oldQty = oldItem ? oldItem.quantity : 0;
+            const newQty = newItem ? newItem.quantity : 0;
+            const delta = newQty - oldQty;
+
+            if (delta !== 0) {
+              const reservedQuantity = Math.max(0, (asset.reservedQuantity || 0) + delta);
+              const updated: Asset = {
+                ...asset,
+                reservedQuantity,
+                availableQuantity: Math.max(0, asset.quantity - (reservedQuantity + (asset.missingQuantity || 0) + (asset.damagedQuantity || 0) + (asset.usedQuantity || 0))),
+              };
+              persistAsset(updated);
+              return updated;
+            }
           }
           return asset;
         }));
@@ -1222,6 +1223,25 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const deleteWaybill = (id: string) => {
+    const waybill = waybills.find(w => w.id === id);
+    if (waybill && waybill.status === 'outstanding' && waybill.type === 'waybill') {
+      // Release reservations of items on deleted waybill
+      setAssets(assetsPrev => assetsPrev.map(asset => {
+        const item = waybill.items.find(i => i.assetId === asset.id);
+        if (item) {
+          const reservedQuantity = Math.max(0, (asset.reservedQuantity || 0) - item.quantity);
+          const updated: Asset = {
+            ...asset,
+            reservedQuantity,
+            availableQuantity: Math.max(0, asset.quantity - (reservedQuantity + (asset.missingQuantity || 0) + (asset.damagedQuantity || 0) + (asset.usedQuantity || 0))),
+          };
+          persistAsset(updated);
+          return updated;
+        }
+        return asset;
+      }));
+    }
+
     setWaybills(prev => prev.filter(w => w.id !== id));
     supabase.from('operations_waybills').delete().eq('id', id).then();
   };
@@ -1289,6 +1309,24 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const deleteCheckout = (id: string) => {
+    const checkout = checkouts.find(c => c.id === id);
+    if (checkout && checkout.status === 'outstanding') {
+      // Release reservations of items on deleted checkout
+      setAssets(assetsPrev => assetsPrev.map(asset => {
+        if (asset.id === checkout.assetId) {
+          const reservedQuantity = Math.max(0, (asset.reservedQuantity || 0) - checkout.quantity);
+          const updated: Asset = {
+            ...asset,
+            reservedQuantity,
+            availableQuantity: Math.max(0, asset.quantity - (reservedQuantity + (asset.missingQuantity || 0) + (asset.damagedQuantity || 0) + (asset.usedQuantity || 0))),
+          };
+          persistAsset(updated);
+          return updated;
+        }
+        return asset;
+      }));
+    }
+
     setCheckouts(prev => prev.filter(c => c.id !== id));
     supabase.from('operations_checkouts').delete().eq('id', id).then();
   };
