@@ -314,6 +314,7 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
               cost: a.cost,
               lowStockLevel: a.low_stock_level,
               criticalStockLevel: a.critical_stock_level,
+              restockHistory: a.restock_history || [],
               created_at: a.created_at
             };
           }));
@@ -525,6 +526,7 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
         cost: a.cost,
         lowStockLevel: a.low_stock_level,
         criticalStockLevel: a.critical_stock_level,
+        restockHistory: a.restock_history || [],
         created_at: a.created_at
       };
     };
@@ -875,6 +877,7 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
         cost: asset.cost,
         low_stock_level: asset.lowStockLevel,
         critical_stock_level: asset.criticalStockLevel,
+        restock_history: asset.restockHistory || [],
         updated_at: new Date().toISOString()
       });
 
@@ -986,7 +989,8 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
       power_source: asset.powerSource,
       cost: asset.cost,
       low_stock_level: asset.lowStockLevel,
-      critical_stock_level: asset.criticalStockLevel
+      critical_stock_level: asset.criticalStockLevel,
+      restock_history: asset.restockHistory || []
     }))).then();
   };
 
