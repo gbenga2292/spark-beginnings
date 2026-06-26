@@ -1,12 +1,16 @@
-import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { useAppStore } from '@/src/store/appStore';
 import { useOperations } from '@/src/contexts/OperationsContext';
 import type { SiteJournalEntry, DailyJournal } from '@/src/store/appStore';
 import type { DailyMachineLog } from '@/src/types/operations';
-import { fetchSiteDiaryEntriesByYear } from '@/src/lib/supabaseService';
-import { Calendar, BookOpen, Image as ImageIcon, FileVideo, Play, ChevronDown, Loader2, Wrench } from 'lucide-react';
+import { fetchSiteDiaryEntriesByYear, fetchSiteDiaryEntries, db } from '@/src/lib/supabaseService';
+import { useNetworkStore } from '@/src/store/networkStore';
+import { toast } from '@/src/components/ui/toast';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogClose, DialogFooter } from '@/src/components/ui/dialog';
+import { cacheSet } from '@/src/lib/offlineCache';
+import { Calendar, BookOpen, Image as ImageIcon, FileVideo, Play, ChevronDown, Loader2, Wrench, RefreshCw, Download, Upload } from 'lucide-react';
 import { Button } from '@/src/components/ui/button';
 import { format } from 'date-fns';
 import { cn } from '@/src/lib/utils';
@@ -220,7 +224,154 @@ export function SiteDiary() {
   const [hasMore, setHasMore] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const importInputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
+  const [pendingUploads, setPendingUploads] = useState<{ journals: DailyJournal[], entries: SiteJournalEntry[] }>({ journals: [], entries: [] });
+  const [isComparisonOpen, setIsComparisonOpen] = useState(false);
+
+  const { connectionStatus } = useNetworkStore();
+
+  const handleSync = useCallback(async () => {
+    if (!siteId) return;
+    if (connectionStatus === 'offline') {
+      toast.warning('You are offline. Connect to the internet to sync diary logs.');
+      return;
+    }
+    setIsSyncing(true);
+    toast.info('Syncing all site diary logs...');
+    try {
+      // 1. Fetch remote Supabase records
+      const { siteJournalEntries, dailyJournals } = await fetchSiteDiaryEntries(siteId);
+
+      // 2. Identify local-only entries in the global Zustand store (IndexedDB cache)
+      const cachedEntries = useAppStore.getState().siteJournalEntries.filter(e => e.siteId === siteId);
+      const cachedJournalIds = new Set(cachedEntries.map(e => e.journalId));
+      const cachedJournals = useAppStore.getState().dailyJournals.filter(j => cachedJournalIds.has(j.id));
+
+      const dbEntryIds = new Set(siteJournalEntries.map(e => e.id));
+      const localOnlyEntries = cachedEntries.filter(e => !dbEntryIds.has(e.id));
+      const dbJournalIds = new Set(dailyJournals.map(j => j.id));
+      const localOnlyJournals = cachedJournals.filter(j => !dbJournalIds.has(j.id));
+
+      if (localOnlyJournals.length > 0 || localOnlyEntries.length > 0) {
+        setPendingUploads({ journals: localOnlyJournals, entries: localOnlyEntries });
+        setIsComparisonOpen(true);
+      } else {
+        // No local-only entries, proceed with regular pull sync
+        setLocalEntries(siteJournalEntries);
+        setLocalJournals(dailyJournals);
+        setHasMore(false);
+        if (siteJournalEntries.length > 0) {
+          const oldest = siteJournalEntries.reduce((min, e) => {
+            const y = new Date(e.createdAt).getFullYear();
+            return y < min ? y : min;
+          }, new Date().getFullYear());
+          setCurrentYear(oldest);
+          setOldestLoadedYear(oldest);
+        }
+        toast.success(`Synced ${siteJournalEntries.length} diary entr${siteJournalEntries.length === 1 ? 'y' : 'ies'} successfully.`);
+      }
+    } catch (err) {
+      console.error('SiteDiary handleSync error:', err);
+      toast.error('Sync failed. Please try again.');
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [siteId, connectionStatus]);
+
+  const handleUploadPending = useCallback(async () => {
+    if (!siteId) return;
+    setIsComparisonOpen(false);
+    setIsSyncing(true);
+    toast.info('Uploading offline entries...');
+    try {
+      // Insert all local-only journals + entries
+      for (const journal of pendingUploads.journals) {
+        const journalEntries = pendingUploads.entries.filter(e => e.journalId === journal.id);
+        await db.insertDailyJournal(journal, journalEntries);
+      }
+
+      // Re-fetch all entries to update the view & local store cache
+      const { siteJournalEntries, dailyJournals } = await fetchSiteDiaryEntries(siteId);
+
+      // Update global Zustand store so we have a unified state
+      useAppStore.setState((s) => {
+        const otherEntries = s.siteJournalEntries.filter(e => e.siteId !== siteId);
+        const otherJournals = s.dailyJournals.filter(j => !s.siteJournalEntries.some(e => e.siteId === siteId && e.journalId === j.id));
+        const nextState = {
+          siteJournalEntries: [...otherEntries, ...siteJournalEntries],
+          dailyJournals: [...otherJournals, ...dailyJournals],
+        };
+        cacheSet('appData', { ...s, ...nextState }).catch(err => console.warn('cacheSet failed:', err));
+        return nextState;
+      });
+
+      // Update component state
+      setLocalEntries(siteJournalEntries);
+      setLocalJournals(dailyJournals);
+      setHasMore(false);
+      if (siteJournalEntries.length > 0) {
+        const oldest = siteJournalEntries.reduce((min, e) => {
+          const y = new Date(e.createdAt).getFullYear();
+          return y < min ? y : min;
+        }, new Date().getFullYear());
+        setCurrentYear(oldest);
+        setOldestLoadedYear(oldest);
+      }
+
+      toast.success(`Successfully uploaded ${pendingUploads.journals.length} offline sessions and synced.`);
+      setPendingUploads({ journals: [], entries: [] });
+    } catch (err) {
+      console.error('handleUploadPending error:', err);
+      toast.error('Failed to upload offline entries. Please try again.');
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [siteId, pendingUploads]);
+
+  const handleDiscardPending = useCallback(async () => {
+    if (!siteId) return;
+    setIsComparisonOpen(false);
+    setIsSyncing(true);
+    toast.info('Discarding offline entries and syncing...');
+    try {
+      // Remove pending entries/journals from global Zustand store
+      useAppStore.setState((s) => {
+        const filteredEntries = s.siteJournalEntries.filter(e => !pendingUploads.entries.some(p => p.id === e.id));
+        const filteredJournals = s.dailyJournals.filter(j => !pendingUploads.journals.some(p => p.id === j.id));
+        const nextState = {
+          siteJournalEntries: filteredEntries,
+          dailyJournals: filteredJournals,
+        };
+        cacheSet('appData', { ...s, ...nextState }).catch(err => console.warn('cacheSet failed:', err));
+        return nextState;
+      });
+
+      // Fetch from Supabase
+      const { siteJournalEntries, dailyJournals } = await fetchSiteDiaryEntries(siteId);
+      setLocalEntries(siteJournalEntries);
+      setLocalJournals(dailyJournals);
+      setHasMore(false);
+      if (siteJournalEntries.length > 0) {
+        const oldest = siteJournalEntries.reduce((min, e) => {
+          const y = new Date(e.createdAt).getFullYear();
+          return y < min ? y : min;
+        }, new Date().getFullYear());
+        setCurrentYear(oldest);
+        setOldestLoadedYear(oldest);
+      }
+      toast.success('Offline entries discarded. Database state synced.');
+      setPendingUploads({ journals: [], entries: [] });
+    } catch (err) {
+      console.error('handleDiscardPending error:', err);
+      toast.error('Sync failed. Please try again.');
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [siteId, pendingUploads]);
 
   const site = useMemo(() => sites.find(s => s.id === siteId), [sites, siteId]);
 
@@ -328,11 +479,167 @@ export function SiteDiary() {
     );
   }, [commLogs, localEntries, localJournals, allMachineLogs, siteId, oldestLoadedYear]);
 
+  // ─── Export: downloads all loaded journal entries for this site as JSON ──────
+  const handleExport = useCallback(async () => {
+    if (!siteId || !site) return;
+    setIsExporting(true);
+    try {
+      const payload = {
+        exportedAt: new Date().toISOString(),
+        siteId,
+        siteName: site.name,
+        dailyJournals: localJournals,
+        siteJournalEntries: localEntries,
+      };
+      const json = JSON.stringify(payload, null, 2);
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `SiteDiary_${site.name.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success(`Exported ${localEntries.length} diary entries.`);
+    } catch (err) {
+      console.error('Export error:', err);
+      toast.error('Export failed. Please try again.');
+    } finally {
+      setIsExporting(false);
+    }
+  }, [siteId, site, localJournals, localEntries]);
+
+  // ─── Import: reads JSON, skips duplicates by ID, inserts only new entries ────
+  const handleImportFile = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (importInputRef.current) importInputRef.current.value = '';
+    setIsImporting(true);
+    try {
+      const text = await file.text();
+      const payload = JSON.parse(text);
+
+      if (!payload?.dailyJournals || !payload?.siteJournalEntries) {
+        toast.error('Invalid file format. Please use a file exported from this app.');
+        return;
+      }
+
+      const journals: DailyJournal[] = payload.dailyJournals;
+      const entries: SiteJournalEntry[] = payload.siteJournalEntries;
+
+      if (journals.length === 0) {
+        toast.info('No journal entries found in this file.');
+        return;
+      }
+
+      // Simpler approach: use the supabase client directly
+      const { supabase } = await import('@/src/integrations/supabase/client');
+      const { data: existingRows } = await supabase
+        .from('daily_journals')
+        .select('id')
+        .in('id', journals.map(j => j.id));
+
+      const existingIds = new Set((existingRows ?? []).map((r: any) => r.id));
+      const newJournals = journals.filter(j => !existingIds.has(j.id));
+      const newEntries = entries.filter(e => newJournals.some(j => j.id === e.journalId));
+
+      if (newJournals.length === 0) {
+        toast.info('All entries in this file already exist in the database. Nothing to import.');
+        return;
+      }
+
+      // Insert new journals + their entries one by one so FK constraint is satisfied
+      let inserted = 0;
+      for (const journal of newJournals) {
+        const journalEntries = newEntries.filter(e => e.journalId === journal.id);
+        await db.insertDailyJournal(journal, journalEntries);
+        inserted++;
+      }
+
+      toast.success(`Imported ${inserted} new journal entr${inserted === 1 ? 'y' : 'ies'} (${journals.length - newJournals.length} skipped as duplicates).`);
+
+      // Refresh the view
+      await handleSync();
+    } catch (err) {
+      console.error('Import error:', err);
+      toast.error('Import failed. The file may be corrupted or in an invalid format.');
+    } finally {
+      setIsImporting(false);
+    }
+  }, [handleSync]);
+
+  const headerActions = (
+    <div className="flex items-center gap-2">
+      {/* Import */}
+      <label
+        id="site-diary-import-btn"
+        className={cn(
+          'flex items-center gap-1.5 h-8 px-2.5 rounded-md border text-xs font-semibold transition-all cursor-pointer active:scale-95',
+          'border-indigo-200 text-indigo-700 hover:bg-indigo-50 hover:border-indigo-400',
+          'dark:border-indigo-800 dark:text-indigo-400 dark:hover:bg-indigo-900/20',
+          isImporting && 'opacity-70 cursor-not-allowed pointer-events-none'
+        )}
+      >
+        {isImporting
+          ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          : <Download className="h-3.5 w-3.5" />}
+        <span className="hidden sm:inline">{isImporting ? 'Importing…' : 'Import'}</span>
+        <input
+          ref={importInputRef}
+          type="file"
+          accept=".json"
+          className="hidden"
+          onChange={handleImportFile}
+          disabled={isImporting}
+        />
+      </label>
+
+      {/* Export */}
+      <Button
+        id="site-diary-export-btn"
+        size="sm"
+        variant="outline"
+        onClick={handleExport}
+        disabled={isExporting || localEntries.length === 0}
+        className={cn(
+          'h-8 gap-1.5 border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-400',
+          'dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800',
+          'font-semibold text-xs transition-all active:scale-95',
+          (isExporting || localEntries.length === 0) && 'opacity-50 cursor-not-allowed'
+        )}
+      >
+        {isExporting
+          ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          : <Upload className="h-3.5 w-3.5" />}
+        <span className="hidden sm:inline">{isExporting ? 'Exporting…' : 'Export'}</span>
+      </Button>
+
+      {/* Sync */}
+      <Button
+        id="site-diary-sync-btn"
+        size="sm"
+        variant="outline"
+        onClick={handleSync}
+        disabled={isSyncing}
+        className={cn(
+          'h-8 gap-1.5 border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:border-emerald-400',
+          'dark:border-emerald-800 dark:text-emerald-400 dark:hover:bg-emerald-900/20',
+          'font-semibold text-xs transition-all active:scale-95',
+          isSyncing && 'opacity-70 cursor-not-allowed'
+        )}
+      >
+        <RefreshCw
+          className={cn('h-3.5 w-3.5 transition-transform duration-500', isSyncing && 'animate-spin')}
+        />
+        {isSyncing ? 'Syncing…' : 'Sync Now'}
+      </Button>
+    </div>
+  );
+
   useSetPageTitle(
     site ? `${site.name} (${site.client})` : 'Site Diary',
     site ? `Client: ${site.client}` : 'View aggregated daily journal entries',
-    null,
-    [site],
+    headerActions,
+    [site, isSyncing, handleSync, isExporting, isImporting, localEntries.length, handleExport, handleImportFile],
     () => navigate(-1)
   );
 
@@ -517,7 +824,81 @@ export function SiteDiary() {
           )}
         </div>
       </div>
+      {renderComparisonModal()}
     </div>
   );
+
+  function renderComparisonModal() {
+    return (
+      <Dialog open={isComparisonOpen} onOpenChange={setIsComparisonOpen} fullScreenMobile>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col p-0">
+          <DialogHeader className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 flex-shrink-0 flex flex-row items-center justify-between">
+            <div>
+              <DialogTitle className="text-lg font-bold text-slate-900 dark:text-slate-100">Sync Comparison (Pending Uploads)</DialogTitle>
+              <DialogDescription className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                The following logs exist on this device but are missing from the database.
+              </DialogDescription>
+            </div>
+            <DialogClose className="h-8 w-8 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors" />
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4 bg-white dark:bg-slate-950">
+            <div className="p-3.5 rounded-lg border border-indigo-100 bg-indigo-50/50 dark:border-indigo-900/30 dark:bg-indigo-950/20 text-xs text-indigo-800 dark:text-indigo-300 leading-relaxed">
+              <strong>Offline Logs Detected:</strong> We found <strong>{pendingUploads.journals.length}</strong> unsynced field activity session(s). Choose <strong>Upload & Sync</strong> to merge these logs into the company database, or <strong>Discard Local Logs</strong> to overwrite the local cache with the database state.
+            </div>
+
+            <div className="space-y-3">
+              {pendingUploads.entries.map((entry) => {
+                const journal = pendingUploads.journals.find(j => j.id === entry.journalId);
+                const dateLabel = journal ? new Date(journal.date + 'T00:00:00').toLocaleDateString(undefined, {
+                  weekday: 'short', month: 'short', day: 'numeric', year: 'numeric'
+                }) : 'Unknown Date';
+                
+                return (
+                  <div key={entry.id} className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 hover:border-slate-300 transition-all flex flex-col gap-2">
+                    <div className="flex justify-between items-center pb-2 border-b border-slate-100 dark:border-slate-800/80">
+                      <div className="flex flex-col">
+                        <span className="font-bold text-slate-800 dark:text-slate-200 text-sm">{dateLabel}</span>
+                        <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider mt-0.5">Local Log Entry</span>
+                      </div>
+                      <span className="text-xs text-slate-400 italic">by {entry.loggedBy}</span>
+                    </div>
+                    <p className="text-slate-600 dark:text-slate-300 text-xs leading-relaxed whitespace-pre-line font-normal italic">
+                      "{entry.narration || 'No narrative provided.'}"
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <DialogFooter className="px-6 py-4 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-2.5 shrink-0 bg-slate-50/50 dark:bg-slate-900/20">
+            <Button
+              variant="outline"
+              onClick={() => setIsComparisonOpen(false)}
+              className="h-9 px-4 text-xs font-semibold hover:bg-slate-100 dark:hover:bg-slate-800"
+            >
+              Cancel
+            </Button>
+            
+            <Button
+              variant="outline"
+              onClick={handleDiscardPending}
+              className="h-9 px-4 text-xs font-semibold border-rose-200 text-rose-700 hover:bg-rose-50 hover:border-rose-400 dark:border-rose-900/50 dark:text-rose-400 dark:hover:bg-rose-950/20"
+            >
+              Discard Local Logs
+            </Button>
+            
+            <Button
+              onClick={handleUploadPending}
+              className="h-9 px-4 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm flex items-center gap-1.5 active:scale-95 transition-all"
+            >
+              Upload & Sync
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 }
 

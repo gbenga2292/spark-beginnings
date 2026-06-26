@@ -976,6 +976,10 @@ export async function fetchAllAppData(privs?: any) {
     vehicleDocTypesRes,
     interviewRes,
     clientContactsRes,
+    employeesRes, attendanceRes,
+    invoicesRes, pendingInvoicesRes,
+    ledgerCategoriesRes, ledgerVendorsRes, ledgerBanksRes, ledgerBeneficiaryBanksRes, ledgerEntriesRes, companyExpensesRes,
+    vehiclesRes, vehicleTripsRes, dailyJournalsRes, siteJournalEntriesRes
   ] = await Promise.all([
     supabase.from('sites').select('*').order('created_at').limit(50000),
     supabase.from('clients').select('*').order('name').limit(50000),
@@ -998,12 +1002,24 @@ export async function fetchAllAppData(privs?: any) {
     supabase.from('vehicle_document_types').select('*').order('name').limit(50000),
     supabase.from('interview_candidates').select('*').order('created_at', { ascending: false }).limit(50000),
     supabase.from('client_contacts').select('*').order('name').limit(50000),
+    canView('employees') ? supabase.from('employees').select('*').order('surname').limit(50000) : Promise.resolve({ data: [] }),
+    canView('attendance') ? fetchAttendanceByYearRaw(new Date().getFullYear()) : Promise.resolve([]),
+    canView('invoices') ? supabase.from('invoices').select('*').order('date', { ascending: false }).limit(50000) : Promise.resolve({ data: [] }),
+    canView('invoices') ? supabase.from('pending_invoices').select('*').order('created_at').limit(50000) : Promise.resolve({ data: [] }),
+    canView('ledger') ? supabase.from('ledger_categories').select('*').order('name').limit(50000) : Promise.resolve({ data: [] }),
+    canView('ledger') ? supabase.from('ledger_vendors').select('*').order('name').limit(50000) : Promise.resolve({ data: [] }),
+    canView('ledger') ? supabase.from('ledger_banks').select('*').order('name').limit(50000) : Promise.resolve({ data: [] }),
+    canView('ledger') ? supabase.from('ledger_beneficiary_banks').select('*').order('name').limit(50000) : Promise.resolve({ data: [] }),
+    canView('ledger') ? supabase.from('ledger_entries').select('*').order('date', { ascending: false }).limit(50000) : Promise.resolve({ data: [] }),
+    canView('ledger') ? supabase.from('company_expenses').select('*').order('date', { ascending: false }).limit(50000) : Promise.resolve({ data: [] }),
+    supabase.from('vehicles').select('*').order('name').limit(50000),
+    supabase.from('vehicle_movement_log').select('*').order('departure_time', { ascending: false }).limit(50000),
+    supabase.from('daily_journals').select('*').order('date', { ascending: false }).limit(10000),
+    supabase.from('site_journal_entries').select('*').order('created_at', { ascending: false }).limit(10000),
   ]);
 
   const settings = settingsRes.data;
 
-  // We are removing employees, attendance, invoices, ledger, vehicles, daily_journals from the initial monolithic fetch
-  // to prevent it from blocking application startup.
   return {
     commLogs: (commLogsRes.data || []).map(dbToCommLog),
     clientContacts: (clientContactsRes.data || []).map(dbToClientContact),
@@ -1048,6 +1064,22 @@ export async function fetchAllAppData(privs?: any) {
     superAdminCreated: settings?.super_admin_created ?? false,
     superAdminSignupEnabled: settings?.super_admin_signup_enabled ?? true,
     settingsId: settings?.id,
+
+    // Reverted tables:
+    employees: (employeesRes.data || []).map(dbToEmployee),
+    attendanceRecords: (attendanceRes || []).map(dbToAttendance),
+    invoices: (invoicesRes.data || []).map(dbToInvoice),
+    pendingInvoices: (pendingInvoicesRes.data || []).map(dbToPendingInvoice),
+    ledgerCategories: (ledgerCategoriesRes.data || []).map(dbToLedgerCategory),
+    ledgerVendors: (ledgerVendorsRes.data || []).map(dbToLedgerVendor),
+    ledgerBanks: (ledgerBanksRes.data || []).map(dbToLedgerBank),
+    ledgerBeneficiaryBanks: (ledgerBeneficiaryBanksRes.data || []).map(dbToLedgerBeneficiaryBank),
+    ledgerEntries: (ledgerEntriesRes.data || []).map(dbToLedgerEntry),
+    companyExpenses: (companyExpensesRes.data || []).map(dbToCompanyExpense),
+    vehicles: (vehiclesRes.data || []).map(dbToVehicle),
+    vehicleTrips: (vehicleTripsRes.data || []).map(dbToVehicleMovement),
+    dailyJournals: (dailyJournalsRes.data || []).map(dbToDailyJournal),
+    siteJournalEntries: (siteJournalEntriesRes.data || []).map(dbToSiteJournalEntry),
   };
 }
 
@@ -1082,11 +1114,14 @@ export async function fetchLedgerData() {
 }
 
 export async function fetchOperationsData() {
+  const currentYear = new Date().getFullYear();
+  const startOfYear = `${currentYear}-01-01`;
+
   const [vehiclesRes, vehicleTripsRes, dailyJournalsRes, siteJournalEntriesRes] = await Promise.all([
     supabase.from('vehicles').select('*').order('name').limit(50000),
     supabase.from('vehicle_movement_log').select('*').order('departure_time', { ascending: false }).limit(50000),
-    supabase.from('daily_journals').select('*').order('date', { ascending: false }).limit(100),
-    supabase.from('site_journal_entries').select('*').order('created_at', { ascending: false }).limit(200),
+    supabase.from('daily_journals').select('*').order('date', { ascending: false }).limit(10000),
+    supabase.from('site_journal_entries').select('*').order('created_at', { ascending: false }).limit(10000),
   ]);
 
   return {

@@ -686,7 +686,7 @@ interface AppState {
 
   dailyJournals: DailyJournal[];
   siteJournalEntries: SiteJournalEntry[];
-  addDailyJournal: (journal: DailyJournal, entries: SiteJournalEntry[]) => void;
+  addDailyJournal: (journal: DailyJournal, entries: SiteJournalEntry[]) => Promise<void>;
   updateDailyJournal: (journalId: string, journal: Partial<DailyJournal>, newEntries: SiteJournalEntry[]) => void;
   deleteDailyJournal: (journalId: string) => void;
   deleteSiteJournalEntry: (entryId: string) => void;
@@ -1059,12 +1059,14 @@ export const useAppStore = create<AppState>()(
       setClientContacts: (contacts) => set({ clientContacts: contacts }),
 
       // Daily Journals
-      addDailyJournal: (journal, entries) => {
+      addDailyJournal: async (journal, entries) => {
+        // Persist to DB first — if it fails, we do NOT update local state
+        // so the UI catch block can show a real error instead of a false success
+        await db.insertDailyJournal(journal, entries);
         set((s) => ({
           dailyJournals: [...s.dailyJournals, journal],
           siteJournalEntries: [...s.siteJournalEntries, ...entries],
         }));
-        db.insertDailyJournal(journal, entries);
       },
       updateDailyJournal: (journalId, journal, newEntries) => {
         set((s) => ({

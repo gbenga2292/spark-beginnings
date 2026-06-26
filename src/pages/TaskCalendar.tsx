@@ -124,31 +124,7 @@ export default function CalendarPage({ onNavigate, showCompleted: externalShowCo
   }, []);
 
   // Load journals for the currently viewed month range (including adjacent months for calendar safety)
-  useEffect(() => {
-    let cancelled = false;
-    const start = format(startOfMonth(subMonths(calMonth, 1)), 'yyyy-MM-dd');
-    const end = format(endOfMonth(addMonths(calMonth, 1)), 'yyyy-MM-dd');
-
-    fetchJournalsByDateRange(start, end)
-      .then((data) => {
-        if (cancelled) return;
-        useAppStore.setState((s) => ({
-          dailyJournals: [
-            ...s.dailyJournals.filter(j => !data.dailyJournals.some(dj => dj.id === j.id)),
-            ...data.dailyJournals
-          ],
-          siteJournalEntries: [
-            ...s.siteJournalEntries.filter(e => !data.siteJournalEntries.some(de => de.id === e.id)),
-            ...data.siteJournalEntries
-          ]
-        }));
-      })
-      .catch(console.error);
-
-    return () => {
-      cancelled = true;
-    };
-  }, [calMonth]);
+  // Removed partial data fetch effects to rely on full data loaded by fetchOperationsData
   
   // Update local state if external prop changes
   useMemo(() => {

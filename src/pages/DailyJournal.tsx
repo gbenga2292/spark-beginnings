@@ -9,7 +9,7 @@ import { toast } from '@/src/components/ui/toast';
 import { 
   Search, Plus, Calendar, MapPin, X, ChevronLeft, ChevronRight, List,
   FileText, Download, Filter, Wrench, CheckCircle2, AlertTriangle, 
-  Package, Image as ImageIcon, Video, UploadCloud, FileVideo, Eye, Camera, Play, ArrowLeft
+  Package, Image as ImageIcon, Video, UploadCloud, FileVideo, Eye, Camera, Play, ArrowLeft, RefreshCw
 } from 'lucide-react';
 import { MediaViewer, type MediaItem } from '@/src/components/ui/MediaViewer';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, isSameDay } from 'date-fns';
@@ -478,6 +478,21 @@ export function DailyJournal() {
 
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  const handleSync = async () => {
+    setIsSyncing(true);
+    try {
+      const data = await fetchOperationsData();
+      useAppStore.setState(data);
+      toast.success('Journals synced successfully');
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to sync journals');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
   // Initialise from ?date= URL parameter so the floating calendar can deep-link here
   const [diaryDate, setDiaryDate] = useState<string | null>(() => searchParams.get('date') || null);
 
@@ -508,85 +523,7 @@ export function DailyJournal() {
     author: ''
   });
 
-  // Load journals for the currently viewed month range (including adjacent months for calendar safety)
-  useEffect(() => {
-    let cancelled = false;
-    const start = format(startOfMonth(subMonths(currentMonth, 1)), 'yyyy-MM-dd');
-    const end = format(endOfMonth(addMonths(currentMonth, 1)), 'yyyy-MM-dd');
-
-    fetchJournalsByDateRange(start, end)
-      .then((data) => {
-        if (cancelled) return;
-        useAppStore.setState((s) => ({
-          dailyJournals: [
-            ...s.dailyJournals.filter(j => !data.dailyJournals.some(dj => dj.id === j.id)),
-            ...data.dailyJournals
-          ],
-          siteJournalEntries: [
-            ...s.siteJournalEntries.filter(e => !data.siteJournalEntries.some(de => de.id === e.id)),
-            ...data.siteJournalEntries
-          ]
-        }));
-      })
-      .catch(console.error);
-
-    return () => {
-      cancelled = true;
-    };
-  }, [currentMonth]);
-
-  // Load journals when export date filters change
-  useEffect(() => {
-    let cancelled = false;
-    const start = exportFilters.startDate;
-    const end = exportFilters.endDate;
-    if (!start || !end) return;
-
-    fetchJournalsByDateRange(start, end)
-      .then((data) => {
-        if (cancelled) return;
-        useAppStore.setState((s) => ({
-          dailyJournals: [
-            ...s.dailyJournals.filter(j => !data.dailyJournals.some(dj => dj.id === j.id)),
-            ...data.dailyJournals
-          ],
-          siteJournalEntries: [
-            ...s.siteJournalEntries.filter(e => !data.siteJournalEntries.some(de => de.id === e.id)),
-            ...data.siteJournalEntries
-          ]
-        }));
-      })
-      .catch(console.error);
-
-    return () => {
-      cancelled = true;
-    };
-  }, [exportFilters.startDate, exportFilters.endDate]);
-
-  // Load journals when search date changes
-  useEffect(() => {
-    if (!searchDate) return;
-    let cancelled = false;
-    fetchJournalsByDateRange(searchDate, searchDate)
-      .then((data) => {
-        if (cancelled) return;
-        useAppStore.setState((s) => ({
-          dailyJournals: [
-            ...s.dailyJournals.filter(j => !data.dailyJournals.some(dj => dj.id === j.id)),
-            ...data.dailyJournals
-          ],
-          siteJournalEntries: [
-            ...s.siteJournalEntries.filter(e => !data.siteJournalEntries.some(de => de.id === e.id)),
-            ...data.siteJournalEntries
-          ]
-        }));
-      })
-      .catch(console.error);
-
-    return () => {
-      cancelled = true;
-    };
-  }, [searchDate]);
+  // Removed partial data fetch effects to rely on full data loaded by fetchOperationsData
 
   const activeSites = useMemo(() => sites.filter(s => s.status === 'Active'), [sites]);
   const authors = useMemo(() => [...new Set(dailyJournals.map(j => j.loggedBy))], [dailyJournals]);
@@ -791,7 +728,7 @@ export function DailyJournal() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, setSearchParams]);
 
-  const generateId = () => Math.random().toString(36).substring(2, 9);
+  const generateId = () => crypto.randomUUID();
 
   const confirmDelete = () => {
     if (!deleteConfirm) return;
@@ -919,6 +856,21 @@ export function DailyJournal() {
       </div>
     ) : (
       <div className="flex items-center gap-2 md:gap-3">
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={handleSync}
+          disabled={isSyncing}
+          className={cn(
+            'h-8 sm:h-9 px-2 sm:px-4 gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:border-emerald-400',
+            'dark:border-emerald-800 dark:text-emerald-400 dark:hover:bg-emerald-900/20',
+            'font-bold text-[11px] uppercase tracking-tight transition-all active:scale-95',
+            isSyncing && 'opacity-70 cursor-not-allowed'
+          )}
+        >
+          <RefreshCw className={cn('h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0 transition-transform duration-500', isSyncing && 'animate-spin')} />
+          <span className="hidden sm:inline">{isSyncing ? 'Syncing...' : 'Sync'}</span>
+        </Button>
         {currentUser?.privileges?.dailyJournal?.canExport && (
           <Button variant="outline" size="sm" onClick={() => setIsExportModalOpen(true)} className="h-8 sm:h-9 px-2 sm:px-4 gap-2 border-slate-200 text-slate-600 hover:bg-slate-50 font-bold text-[11px] uppercase tracking-tight">
             <FileText className="w-4 h-4 shrink-0" /> <span className="hidden sm:inline">Export Report</span>
@@ -936,7 +888,7 @@ export function DailyJournal() {
         )}
       </div>
     ), 
-    [viewMode, diaryDate, dailyJournals, currentUser, showPdfPreview, matchingExportJournals, pdfExportDate]
+    [viewMode, diaryDate, dailyJournals, currentUser, showPdfPreview, matchingExportJournals, pdfExportDate, isSyncing]
   );
 
   if (showPdfPreview) {

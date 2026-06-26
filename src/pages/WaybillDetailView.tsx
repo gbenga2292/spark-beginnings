@@ -22,9 +22,16 @@ interface WaybillDetailViewProps {
 }
 
 export function WaybillDetailView({ waybill: propWaybill, onClose }: WaybillDetailViewProps) {
-  const { waybills, updateWaybillStatus } = useOperations();
+  const { waybills, updateWaybillStatus, vehicles } = useOperations();
   const { sites } = useAppStore();
   const waybill = waybills.find(w => w.id === propWaybill.id) || propWaybill;
+
+  /** Returns "REG - Name" when a registration number is on file, else just the name. */
+  const formatVehicle = (name: string | undefined) => {
+    const raw = name || 'L200';
+    const match = vehicles.find(v => v.name === raw);
+    return match?.registration_number ? `${match.registration_number} - ${raw}` : raw;
+  };
 
   const [showPdfPreview, setShowPdfPreview] = useState(false);
   const [pdfDataUri, setPdfDataUri] = useState<string>('');
@@ -88,7 +95,7 @@ export function WaybillDetailView({ waybill: propWaybill, onClose }: WaybillDeta
     doc.text(`Waybill No: REF-${waybill.id.substring(0, 8).toUpperCase()}`, 20, 48);
     doc.text(`Date: ${formatDisplayDate(waybill.sentToSiteDate || waybill.issueDate)}`, 20, 55);
     doc.text(`Driver Name: ${waybill.driverName}`, 20, 62);
-    doc.text(`Vehicle: ${waybill.vehicle || 'L200'}`, 20, 69);
+    doc.text(`Vehicle: ${formatVehicle(waybill.vehicle)}`, 20, 69);
 
     const site = sites.find(s => s.id === waybill.siteId || s.name === waybill.siteName);
     const clientSuffix = site?.client ? ` (${site.client})` : '';
@@ -349,7 +356,7 @@ export function WaybillDetailView({ waybill: propWaybill, onClose }: WaybillDeta
             {[
               { icon: Calendar, label: 'Date', value: formatDisplayDate(waybill.sentToSiteDate || waybill.issueDate) },
               { icon: User,     label: 'Driver',     value: waybill.driverName },
-              { icon: Car,      label: 'Vehicle',    value: waybill.vehicle || 'L200' },
+              { icon: Car,      label: 'Vehicle',    value: formatVehicle(waybill.vehicle) },
             ].map((cell, i) => (
               <div key={i} className="flex items-center gap-4 px-5 py-4">
                 <div className="h-9 w-9 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 shrink-0">

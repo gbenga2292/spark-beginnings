@@ -57,33 +57,7 @@ export function Layout() {
     return () => clearTimeout(timer);
   }, [reloadCountdown, privBannerVisible]);
 
-  // Pre-fetch lazy-loaded tables in background to speed up navigation
-  useEffect(() => {
-    if (!user) return;
-    
-    // We run this after a short delay so it doesn't compete with initial rendering
-    const timer = setTimeout(async () => {
-      const state = useAppStore.getState();
-      
-      fetchEmployeesData()
-        .then((data) => useAppStore.setState({ employees: data }))
-        .catch(console.error);
-      
-      fetchInvoicesData()
-        .then((data) => useAppStore.setState(data))
-        .catch(console.error);
-      
-      fetchLedgerData()
-        .then((data) => useAppStore.setState(data))
-        .catch(console.error);
-      
-      fetchOperationsData()
-        .then((data) => useAppStore.setState(data))
-        .catch(console.error);
-    }, 1000);
-    
-    return () => clearTimeout(timer);
-  }, [user]);
+
 
   // Still loading the Supabase session — don't redirect yet
   if (loading) return null;
