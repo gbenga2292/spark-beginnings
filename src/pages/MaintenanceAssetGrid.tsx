@@ -18,6 +18,7 @@ interface MaintenanceAssetGridProps {
   logViewAssetId: string | null;
   onSetLogViewAssetId: (id: string | null) => void;
   onLogAsset?: (id: string) => void;
+  onEditLog?: (sessionId: string) => void;
 }
 
 
@@ -27,7 +28,8 @@ export function MaintenanceAssetGrid({
   onSelectAsset, 
   logViewAssetId,
   onSetLogViewAssetId,
-  onLogAsset 
+  onLogAsset,
+  onEditLog
 }: MaintenanceAssetGridProps) {
   const { maintenanceAssets } = useOperations();
   const [searchTerm, setSearchTerm] = useState('');
@@ -70,6 +72,7 @@ export function MaintenanceAssetGrid({
         asset={selectedAsset}
         onBack={() => onSelectAsset(null)}
         onLogService={() => onLogAsset?.(selectedAsset.id)}
+        onEditService={onEditLog}
       />
     );
   }

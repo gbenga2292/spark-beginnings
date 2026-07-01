@@ -45,6 +45,7 @@ export function MaintenanceManager() {
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
   const [logViewAssetId, setLogViewAssetId] = useState<string | null>(null);
   const [logAssetId, setLogAssetId] = useState<string | null>(null);
+  const [editSessionId, setEditSessionId] = useState<string | null>(null);
   const [previousTab, setPreviousTab] = useState<MaintenanceTab>('dashboard');
   const [regenCert, setRegenCert] = useState<MaintenanceCertificate | null>(null);
   const [generateCertAsset, setGenerateCertAsset] = useState<string | null>(null);
@@ -55,6 +56,16 @@ export function MaintenanceManager() {
   const handleLogAsset = (id: string) => {
     setPreviousTab(activeTab);
     setLogAssetId(id);
+    setEditSessionId(null);
+    setActiveTab('log');
+    setSelectedAssetId(null);
+    setLogViewAssetId(null);
+  };
+  
+  const handleEditLog = (sessionId: string) => {
+    setPreviousTab(activeTab);
+    setEditSessionId(sessionId);
+    setLogAssetId(null);
     setActiveTab('log');
     setSelectedAssetId(null);
     setLogViewAssetId(null);
@@ -385,6 +396,7 @@ export function MaintenanceManager() {
             logViewAssetId={logViewAssetId}
             onSetLogViewAssetId={setLogViewAssetId}
             onLogAsset={handleLogAsset}
+            onEditLog={handleEditLog}
           />
         )}
         {activeTab === 'vehicles' && (
@@ -395,13 +407,15 @@ export function MaintenanceManager() {
             logViewAssetId={logViewAssetId}
             onSetLogViewAssetId={setLogViewAssetId}
             onLogAsset={handleLogAsset}
+            onEditLog={handleEditLog}
           />
         )}
         {activeTab === 'log' && (
           <LogMaintenanceForm 
             initialAssetId={logAssetId} 
-            onSuccess={() => setActiveTab(previousTab)} 
-            onCancel={() => setActiveTab(previousTab)}
+            editSessionId={editSessionId}
+            onSuccess={() => { setActiveTab(previousTab); setEditSessionId(null); }} 
+            onCancel={() => { setActiveTab(previousTab); setEditSessionId(null); }}
           />
         )}
         {activeTab === 'certificates' && (

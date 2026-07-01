@@ -8,7 +8,7 @@ import {
   Building2, ArrowLeft, MapPin, DollarSign, Activity, Wrench, MessagesSquare,
   AlertTriangle, Clock, Fuel, Calendar, FileText, Users, Settings2,
   ChevronDown, Sparkles, RefreshCcw, Send, ChevronUp, Filter, CheckCircle2, Plus, Pencil, ChevronRight,
-  CheckSquare, ShieldAlert, ShieldCheck, ClipboardList, Package, Truck, X, Phone, Mail
+  CheckSquare, ShieldAlert, ShieldCheck, ClipboardList, Package, Truck, X, Phone, Mail, Droplets
 } from 'lucide-react';
 import { Badge } from '@/src/components/ui/badge';
 import { Button } from '@/src/components/ui/button';
@@ -194,7 +194,7 @@ export function Site360View({ site, clientSites, onSiteChange, onBack, onEditSit
   const commLogs = useAppStore(s => s.commLogs);
   const addCommLog = useAppStore(s => s.addCommLog);
   const clientContacts = useAppStore(s => s.clientContacts);
-  const { dailyMachineLogs, maintenanceAssets, maintenanceSessions, waybills, assets } = useOperations();
+  const { dailyMachineLogs, maintenanceAssets, maintenanceSessions, waybills, assets, sitePumpDates } = useOperations();
   const { mainTasks, subtasks } = useAppData();
 
   const getInvoiceDates = (inv: any) => {
@@ -507,6 +507,86 @@ export function Site360View({ site, clientSites, onSiteChange, onBack, onEditSit
     if (siteMaintAssets.some(a => a.status === 'overdue')) alerts.push({ title: 'Overdue maintenance on one or more assets', type: 'danger' });
     if (siteTasks.length > 3) alerts.push({ title: `${siteTasks.length} pending tasks`, type: 'warning' });
 
+    // ── Pump summary for this site ──────────────────────────────────────
+    const physicalPumpsOnSite = assets.filter(a => 
+      a.type === 'equipment' && 
+      a.requiresLogging && 
+      /pump/i.test(a.name || '') &&
+      (inventoryMap.get(a.id) || 0) > 0
+    );
+
+    const sitePumps = sitePumpDates.filter(pd => pd.siteId === site.id);
+
+    const mergedPumpsMap = new Map<string, {
+      id: string;
+      assetId: string;
+      name: string;
+      pumpStartDate: string | null;
+      pumpStopDate: string | null;
+      isPhysical: boolean;
+    }>();
+
+    physicalPumpsOnSite.forEach(p => {
+      const configured = sitePumps.find(pd => pd.assetId === p.id);
+      
+      const machineLogs = dailyMachineLogs.filter(l => l.assetId === p.id && l.siteId === site.id);
+      const earliestLogDate = machineLogs.length > 0
+        ? machineLogs.reduce((acc, log) => log.date < acc ? log.date : acc, machineLogs[0].date)
+        : null;
+
+      const pumpWaybills = siteWaybills.filter(w => w.type === 'waybill' && w.items.some(i => i.assetId === p.id));
+      const earliestWaybillDate = pumpWaybills.length > 0
+        ? pumpWaybills.reduce((acc, wb) => {
+            const date = wb.sentToSiteDate || wb.issueDate;
+            if (!date) return acc;
+            if (!acc) return date;
+            return date < acc ? date : acc;
+          }, null as string | null)
+        : null;
+
+      const fallbackStart = earliestLogDate || earliestWaybillDate;
+
+      mergedPumpsMap.set(p.id, {
+        id: configured?.id || `temp-${p.id}`,
+        assetId: p.id,
+        name: p.name,
+        pumpStartDate: configured?.pumpStartDate || fallbackStart,
+        pumpStopDate: configured?.pumpStopDate || null,
+        isPhysical: true,
+      });
+    });
+
+    sitePumps.forEach(pd => {
+      if (!mergedPumpsMap.has(pd.assetId)) {
+        const asset = assets.find(a => a.id === pd.assetId);
+        mergedPumpsMap.set(pd.assetId, {
+          id: pd.id,
+          assetId: pd.assetId,
+          name: asset?.name || 'Unknown Pump',
+          pumpStartDate: pd.pumpStartDate,
+          pumpStopDate: pd.pumpStopDate,
+          isPhysical: false,
+        });
+      }
+    });
+
+    const pumpsOnSite = Array.from(mergedPumpsMap.values());
+
+    const pumpsWithStart = pumpsOnSite.filter(p => p.pumpStartDate);
+    const earliestPumpStart = pumpsWithStart.length > 0
+      ? pumpsWithStart.reduce((min, p) => (p.pumpStartDate! < min ? p.pumpStartDate! : min), pumpsWithStart[0].pumpStartDate!)
+      : null;
+
+    const latestPumpStop = pumpsOnSite.length > 0
+      ? pumpsOnSite.reduce((latest, p) => {
+          if (!p.pumpStopDate) return null; // null means still running → no overall stop
+          if (latest === null) return null;
+          return p.pumpStopDate > latest ? p.pumpStopDate : latest;
+        }, pumpsOnSite[0].pumpStopDate as string | null)
+      : null;
+
+    const activePumpsCount = pumpsOnSite.filter(p => !p.pumpStopDate).length;
+
     return {
       siteInvoices, sitePayments, siteCosts, totalBilled, totalReceived, outstanding, vatGenerated, totalCost,
       periodVatCollected, unpaidVatBroughtForward, periodVatRemitted, totalVatRemitted,
@@ -514,9 +594,10 @@ export function Site360View({ site, clientSites, onSiteChange, onBack, onEditSit
       siteWaybills, materialsOnSite: assets.filter(a => (inventoryMap.get(a.id) || 0) > 0).map(a => ({ ...a, quantity: inventoryMap.get(a.id) || 0 })),
       siteMaintAssets, siteMaintSessions, totalMaintenanceCost,
       siteTasks, pendingSiteTasks, approvalSiteTasks, completedSiteTasks, siteComms, siteContacts, alerts,
-      profit: totalBilled - totalCost
+      profit: totalBilled - totalCost,
+      pumpsOnSite, earliestPumpStart, latestPumpStop, activePumpsCount,
     };
-  }, [site, filterMonth, filterYear, invoices, payments, vatPayments, ledgerEntries, vatRate, dailyMachineLogs, maintenanceAssets, maintenanceSessions, mainTasks, subtasks, commLogs, clientContacts, waybills, assets]);
+  }, [site, filterMonth, filterYear, invoices, payments, vatPayments, ledgerEntries, vatRate, dailyMachineLogs, maintenanceAssets, maintenanceSessions, mainTasks, subtasks, commLogs, clientContacts, waybills, assets, sitePumpDates]);
 
   const card = cn('p-5 rounded-2xl border shadow-sm', isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200');
 
@@ -933,6 +1014,49 @@ Answer site-specific questions using this context only. Be concise.`;
                             <p className="text-[8px] font-mono text-slate-400 truncate hidden sm:block mt-0.5">{data.siteMaintAssets.length} ASSETS</p>
                           </div>
                         </div>
+
+                        {/* Pumps Full Width Row */}
+                        <div 
+                          onClick={() => setActiveTab('operations')}
+                          className={cn('border p-3 group transition-all duration-200 cursor-pointer hover:-translate-y-0.5 flex flex-col gap-2', isDark ? 'border-cyan-900/60 hover:border-cyan-700 bg-slate-900/30' : 'border-cyan-200 hover:border-cyan-400 bg-cyan-50/20')}
+                        >
+                          <div className="flex items-center justify-between w-full gap-3">
+                            <div className="flex items-center gap-3">
+                              <div className="p-1.5 bg-cyan-100 dark:bg-cyan-950/60 text-cyan-600 dark:text-cyan-400 rounded-lg shrink-0">
+                                <Droplets className="w-4 h-4" />
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-[9px] font-bold uppercase tracking-wider text-cyan-600 dark:text-cyan-400">Pumps on Site</p>
+                                <div className="flex items-center gap-1.5 mt-0.5">
+                                  <span className="text-sm font-black text-slate-800 dark:text-slate-100 leading-none">
+                                    {data.pumpsOnSite.length}
+                                  </span>
+                                  <Badge className={cn(
+                                    "text-[8px] font-bold uppercase tracking-wider px-1 py-0 border shrink-0",
+                                    data.activePumpsCount > 0 
+                                      ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800/50"
+                                      : "bg-slate-50 text-slate-600 border-slate-200 dark:bg-slate-900/50 dark:text-slate-400 dark:border-slate-800"
+                                  )}>
+                                    {data.activePumpsCount > 0 ? `${data.activePumpsCount} Active` : 'Inactive'}
+                                  </Badge>
+                                </div>
+                              </div>
+                            </div>
+                            
+                            <span className="text-[10px] bg-cyan-100 dark:bg-cyan-900/50 px-2.5 py-1 rounded-xl text-cyan-600 dark:text-cyan-400 font-extrabold group-hover:bg-cyan-200 dark:group-hover:bg-cyan-800 transition-colors">Details</span>
+                          </div>
+                          
+                          {data.pumpsOnSite.length > 0 && (
+                            <div className="flex items-center justify-between w-full border-t border-slate-100 dark:border-slate-800/40 pt-2 mt-0.5">
+                              <span className="text-[8px] font-bold uppercase tracking-wider text-slate-400">Operation Window</span>
+                              <span className="text-[10px] font-mono font-bold text-slate-600 dark:text-slate-300">
+                                {data.earliestPumpStart ? formatDisplayDate(data.earliestPumpStart) : '—'}
+                                {' → '}
+                                {data.latestPumpStop ? formatDisplayDate(data.latestPumpStop) : 'Running'}
+                              </span>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </motion.div>
@@ -1136,6 +1260,87 @@ Answer site-specific questions using this context only. Be concise.`;
             {/* OPERATIONS */}
             {activeTab === 'operations' && (
               <div className="animate-in fade-in zoom-in-[0.98] duration-200 ease-out space-y-5">
+
+                {/* ── Pumps on Site Panel ── */}
+                <div className={cn(card, 'border-cyan-200 dark:border-cyan-900/60')}>
+                  <div className="flex items-center justify-between mb-4 pb-2 border-b border-cyan-100 dark:border-cyan-900/40 flex-wrap gap-2">
+                    <h3 className="font-bold text-lg flex items-center gap-2 text-cyan-700 dark:text-cyan-300">
+                      <Droplets className="w-5 h-5" /> Pumps on Site
+                      <span className={cn(
+                        'text-xs font-extrabold px-2 py-0.5 rounded-full',
+                        isDark ? 'bg-cyan-900/50 text-cyan-300' : 'bg-cyan-100 text-cyan-700'
+                      )}>{data.pumpsOnSite.length}</span>
+                    </h3>
+                    {/* Site-wide operation window */}
+                    {data.pumpsOnSite.length > 0 && (
+                      <div className={cn(
+                        'flex items-center gap-2 text-xs font-semibold px-3 py-1.5 rounded-xl border',
+                        isDark ? 'bg-cyan-950/30 border-cyan-900/60 text-cyan-300' : 'bg-cyan-50 border-cyan-200 text-cyan-700'
+                      )}>
+                        <Clock className="w-3.5 h-3.5 shrink-0" />
+                        <span>
+                          {data.earliestPumpStart
+                            ? new Date(data.earliestPumpStart).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+                            : '—'}
+                          {' → '}
+                          {data.latestPumpStop
+                            ? new Date(data.latestPumpStop).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+                            : <span className="text-emerald-600 dark:text-emerald-400 font-bold">Running</span>}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {data.pumpsOnSite.length > 0 ? (
+                    <div className="divide-y divide-cyan-50 dark:divide-cyan-900/30">
+                      {data.pumpsOnSite.map(pump => {
+                        const isRunning = !pump.pumpStopDate;
+                        return (
+                          <div key={pump.id} className="py-3 flex items-start justify-between gap-3">
+                            <div className="flex items-start gap-2.5 min-w-0">
+                              <div className={cn(
+                                'mt-0.5 p-1.5 rounded-lg shrink-0',
+                                isRunning
+                                  ? (isDark ? 'bg-emerald-900/40' : 'bg-emerald-50')
+                                  : (isDark ? 'bg-slate-800' : 'bg-slate-100')
+                              )}>
+                                <Droplets className={cn('w-4 h-4', isRunning ? 'text-emerald-500' : 'text-slate-400')} />
+                              </div>
+                              <div className="min-w-0">
+                                <p className="font-semibold text-sm text-slate-800 dark:text-slate-100 truncate">{pump.name}</p>
+                                <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1.5">
+                                  <span className="text-slate-400">Start:</span>
+                                  <span className="font-medium">
+                                    {pump.pumpStartDate ? new Date(pump.pumpStartDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
+                                  </span>
+                                  <span className="text-slate-300 dark:text-slate-600">·</span>
+                                  <span className="text-slate-400">Stop:</span>
+                                  {pump.pumpStopDate
+                                    ? <span className="font-medium">{new Date(pump.pumpStopDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                                    : <span className="font-bold text-emerald-600 dark:text-emerald-400">Ongoing</span>}
+                                </p>
+                              </div>
+                            </div>
+                            <Badge className={cn(
+                              'shrink-0 text-[10px] font-bold uppercase tracking-wide',
+                              isRunning
+                                ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
+                                : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
+                            )}>
+                              {isRunning ? 'Active' : 'Stopped'}
+                            </Badge>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-center py-10 flex flex-col items-center gap-2">
+                      <Droplets className="w-10 h-10 text-cyan-300 opacity-50" />
+                      <p className="text-slate-500 font-medium text-sm">No pumps configured for this site</p>
+                      <p className="text-slate-400 text-xs">Pump dates are set in the Site Inventory view.</p>
+                    </div>
+                  )}
+                </div>
 
                 <div className={card}>
                   <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-100 dark:border-slate-800 flex-wrap gap-2">

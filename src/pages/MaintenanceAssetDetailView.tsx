@@ -29,9 +29,10 @@ interface MaintenanceAssetDetailViewProps {
   asset: MaintenanceAsset;
   onBack: () => void;
   onLogService?: () => void;
+  onEditService?: (sessionId: string) => void;
 }
 
-export function MaintenanceAssetDetailView({ asset, onBack, onLogService }: MaintenanceAssetDetailViewProps) {
+export function MaintenanceAssetDetailView({ asset, onBack, onLogService, onEditService }: MaintenanceAssetDetailViewProps) {
   const { 
     maintenanceSessions, dailyMachineLogs, vehicleTrips,
     deleteDailyLog, deleteVehicleTripRecord
@@ -42,6 +43,9 @@ export function MaintenanceAssetDetailView({ asset, onBack, onLogService }: Main
   const [activeTab, setActiveTab] = useState<'maintenance' | 'operational'>('maintenance');
   const [showDocumentModal, setShowDocumentModal] = useState(false);
   const [showCertificateModal, setShowCertificateModal] = useState(false);
+  const [selectedLog, setSelectedLog] = useState<any | null>(null);
+  const [logPage, setLogPage] = useState(1);
+  const logsPerPage = 100;
 
   const assetSessions = useMemo(() => {
     return maintenanceSessions
@@ -52,9 +56,16 @@ export function MaintenanceAssetDetailView({ asset, onBack, onLogService }: Main
   const logs: any[] = useMemo(() => {
     return assetSessions.map(s => {
       const assetLog = s.assets.find(a => a.assetId === asset.id);
-      return { ...assetLog!, date: s.date, technician: s.technician, type: s.type };
+      return { ...assetLog!, date: s.date, technician: s.technician, type: s.type, generalRemark: s.generalRemark, sessionId: s.id };
     });
   }, [assetSessions, asset.id]);
+
+  const paginatedLogs = useMemo(() => {
+    const start = (logPage - 1) * logsPerPage;
+    return logs.slice(start, start + logsPerPage);
+  }, [logs, logPage]);
+
+  const totalLogPages = Math.ceil(logs.length / logsPerPage);
 
   const stats = useMemo(() => {
     const totalCost = logs.reduce((acc, log) => acc + (Number(log.cost) || 0), 0);
@@ -264,7 +275,7 @@ export function MaintenanceAssetDetailView({ asset, onBack, onLogService }: Main
             ) : (
               <div className="divide-y divide-slate-50">
                 {logs.slice(0, 3).map((log, i) => (
-                  <LogEntry key={i} log={log} />
+                  <LogEntry key={i} log={log} onClick={() => setSelectedLog(log)} />
                 ))}
               </div>
             )}
@@ -449,10 +460,200 @@ export function MaintenanceAssetDetailView({ asset, onBack, onLogService }: Main
                 <Clock className="h-8 w-8 text-slate-200" />
                 <p className="text-sm text-slate-400 font-medium">No history yet</p>
               </div>
-            ) : logs.map((log, i) => (
-              <LogEntry key={i} log={log} detailed />
+            ) : paginatedLogs.map((log, i) => (
+              <LogEntry key={i} log={log} detailed onClick={() => setSelectedLog(log)} />
             ))}
           </div>
+          {totalLogPages > 1 && (
+            <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between shrink-0 bg-slate-50/50">
+              <span className="text-xs font-medium text-slate-500">
+                Showing {((logPage - 1) * logsPerPage) + 1} to {Math.min(logPage * logsPerPage, logs.length)} of {logs.length}
+              </span>
+              <div className="flex items-center gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  disabled={logPage === 1}
+                  onClick={() => setLogPage(p => Math.max(1, p - 1))}
+                  className="h-8 text-xs font-bold"
+                >
+                  Previous
+                </Button>
+                <span className="text-xs font-bold text-slate-700 bg-white border px-3 py-1.5 rounded-md">
+                  {logPage} / {totalLogPages}
+                </span>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  disabled={logPage === totalLogPages}
+                  onClick={() => setLogPage(p => Math.min(totalLogPages, p + 1))}
+                  className="h-8 text-xs font-bold"
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Selected Log Details Dialog */}
+      <Dialog open={!!selectedLog} onOpenChange={(open) => !open && setSelectedLog(null)}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col p-0 rounded-2xl">
+          {selectedLog && (
+            <>
+              <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0 bg-slate-50">
+                <div className="flex items-center gap-3">
+                  <div className={cn(
+                    "h-10 w-10 rounded-xl flex items-center justify-center",
+                    selectedLog.type === 'repair' ? 'bg-rose-100 text-rose-600' :
+                    selectedLog.type === 'routine' ? 'bg-emerald-100 text-emerald-600' :
+                    selectedLog.type === 'emergency' ? 'bg-amber-100 text-amber-600' :
+                    'bg-blue-100 text-blue-600'
+                  )}>
+                    <Wrench className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h2 className="text-base font-bold text-slate-800">Maintenance Details</h2>
+                    <p className="text-xs text-slate-500 font-medium flex items-center gap-2 mt-0.5">
+                      <span>{formatDisplayDate(selectedLog.date)}</span>
+                      <span className="w-1 h-1 rounded-full bg-slate-300"></span>
+                      <span className="capitalize">{selectedLog.type}</span>
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  {onEditService && selectedLog.sessionId && (
+                    <Button 
+                      onClick={() => onEditService(selectedLog.sessionId)}
+                      variant="outline"
+                      size="sm"
+                      className="h-8 gap-1.5 text-blue-600 border-blue-200 hover:bg-blue-50 font-bold px-3"
+                    >
+                      <Wrench className="h-3.5 w-3.5" /> Edit Log
+                    </Button>
+                  )}
+                  <button onClick={() => setSelectedLog(null)}
+                    className="h-8 w-8 rounded-lg bg-white border shadow-sm hover:bg-slate-50 flex items-center justify-center transition-colors">
+                    <X className="h-4 w-4 text-slate-500" />
+                  </button>
+                </div>
+              </div>
+              <div className="p-6 overflow-y-auto space-y-6">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="bg-white border rounded-xl p-3 shadow-sm">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Technician</p>
+                    <p className="text-sm font-semibold text-slate-800 flex items-center gap-1.5">
+                      <User className="h-3.5 w-3.5 text-blue-500" />
+                      {selectedLog.technician}
+                    </p>
+                  </div>
+                  <div className="bg-white border rounded-xl p-3 shadow-sm">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Cost</p>
+                    <p className="text-sm font-black text-slate-800 flex items-center gap-1.5">
+                      <DollarSign className="h-3.5 w-3.5 text-emerald-500" />
+                      ₦{(selectedLog.cost || 0).toLocaleString()}
+                    </p>
+                  </div>
+                  <div className="bg-white border rounded-xl p-3 shadow-sm">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Location</p>
+                    <p className="text-sm font-semibold text-slate-800 flex items-center gap-1.5">
+                      <MapPin className="h-3.5 w-3.5 text-amber-500" />
+                      {selectedLog.location || asset.site}
+                    </p>
+                  </div>
+                  <div className="bg-white border rounded-xl p-3 shadow-sm">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Status</p>
+                    <p className="text-sm font-semibold flex items-center gap-1.5">
+                      {selectedLog.shutdown ? (
+                        <span className="text-rose-600 flex items-center gap-1"><AlertCircle className="h-3.5 w-3.5" /> Shutdown</span>
+                      ) : (
+                        <span className="text-emerald-600 flex items-center gap-1"><CheckCircle2 className="h-3.5 w-3.5" /> Operational</span>
+                      )}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  {(selectedLog.workDone || selectedLog.remark || selectedLog.generalRemark) && (
+                    <div className="bg-slate-50 border rounded-xl p-4">
+                      <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-3 flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-slate-400" /> Work Description
+                      </h3>
+                      {selectedLog.workDone && (
+                        <div className="mb-3 last:mb-0">
+                          <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Work Done</p>
+                          <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{selectedLog.workDone}</p>
+                        </div>
+                      )}
+                      {selectedLog.remark && (
+                        <div className="mb-3 last:mb-0">
+                          <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Asset Remark</p>
+                          <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{selectedLog.remark}</p>
+                        </div>
+                      )}
+                      {selectedLog.generalRemark && (
+                        <div className="last:mb-0">
+                          <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Session General Remark</p>
+                          <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{selectedLog.generalRemark}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="bg-slate-50 border rounded-xl p-4">
+                    <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-3 flex items-center gap-2">
+                      <Package className="h-4 w-4 text-slate-400" /> Parts & Consumables Used
+                    </h3>
+                    {!selectedLog.parts || selectedLog.parts.length === 0 ? (
+                      <div className="py-6 flex flex-col items-center justify-center text-center">
+                        <Package className="h-8 w-8 text-slate-200 mb-2" />
+                        <p className="text-sm text-slate-500 font-medium">No parts recorded for this service</p>
+                      </div>
+                    ) : (
+                      <div className="border bg-white rounded-lg overflow-hidden">
+                        <table className="w-full text-left text-sm">
+                          <thead className="bg-slate-50 border-b">
+                            <tr>
+                              <th className="px-4 py-2 font-bold text-slate-600">Part Name</th>
+                              <th className="px-4 py-2 font-bold text-slate-600 text-center w-24">Qty</th>
+                              <th className="px-4 py-2 font-bold text-slate-600 text-right">Unit Cost</th>
+                              <th className="px-4 py-2 font-bold text-slate-600 text-right">Total</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-50">
+                            {selectedLog.parts.map((p: any, idx: number) => {
+                              const totalPartCost = p.cost * p.quantity;
+                              return (
+                                <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                                  <td className="px-4 py-3 font-medium text-slate-800">{p.name}</td>
+                                  <td className="px-4 py-3 text-center text-slate-600">
+                                    <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded font-semibold text-xs">
+                                      {p.quantity}
+                                    </span>
+                                  </td>
+                                  <td className="px-4 py-3 text-right text-slate-600">₦{p.cost.toLocaleString()}</td>
+                                  <td className="px-4 py-3 text-right font-bold text-slate-800">₦{totalPartCost.toLocaleString()}</td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                          <tfoot className="bg-slate-50 border-t">
+                            <tr>
+                              <td colSpan={3} className="px-4 py-3 text-right font-bold text-slate-600 uppercase text-xs">Total Parts Cost</td>
+                              <td className="px-4 py-3 text-right font-black text-slate-800">
+                                ₦{selectedLog.parts.reduce((sum: number, p: any) => sum + (p.cost * p.quantity), 0).toLocaleString()}
+                              </td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
         </DialogContent>
       </Dialog>
 
@@ -481,7 +682,7 @@ export function MaintenanceAssetDetailView({ asset, onBack, onLogService }: Main
   );
 }
 
-function LogEntry({ log, detailed = false }: { log: any; detailed?: boolean }) {
+function LogEntry({ log, detailed = false, onClick }: { log: any; detailed?: boolean; onClick?: () => void }) {
   const typeColors: Record<string, string> = {
     scheduled: 'bg-blue-50 text-blue-600 border-blue-100',
     repair: 'bg-rose-50 text-rose-600 border-rose-100',
@@ -490,7 +691,10 @@ function LogEntry({ log, detailed = false }: { log: any; detailed?: boolean }) {
   };
 
   return (
-    <div className="px-6 py-4 hover:bg-slate-50/60 transition-colors">
+    <div 
+      className={cn("px-6 py-4 transition-colors", onClick ? "cursor-pointer hover:bg-slate-50/80 active:bg-slate-100" : "hover:bg-slate-50/60")}
+      onClick={onClick}
+    >
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-3">
           <div className="h-9 w-9 rounded-xl bg-slate-100 flex items-center justify-center shrink-0 mt-0.5">
