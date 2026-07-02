@@ -492,13 +492,27 @@ function RefillCard({ refill, onEdit, onDelete, canEdit, canDelete }: RefillCard
   const enrichedAllocations = useMemo(() => {
     return refill.machineAllocations.map(alloc => {
       const targetDate = alloc.refillDate || refill.date;
-      const log = dailyMachineLogs.find(l => l.assetId === alloc.assetId && l.siteId === refill.siteId && l.date === targetDate);
+      const log = dailyMachineLogs.find(
+        l => l.assetId === alloc.assetId &&
+             (l.siteId === (alloc.siteId || refill.siteId)) &&
+             l.date === targetDate
+      );
       return { ...alloc, actualUsed: log?.dieselUsage ?? alloc.actualUsed };
     });
   }, [refill, dailyMachineLogs]);
 
   const totalActual = enrichedAllocations.reduce((s, a) => s + (a.actualUsed || 0), 0);
   const totalAlloc = enrichedAllocations.reduce((s, a) => s + (a.allocatedLitres || 0), 0);
+
+  // Derive display site names: expand "Multiple Sites" into actual sites from allocations
+  const isMultiple = refill.siteName?.toLowerCase() === 'multiple sites';
+  const uniqueSiteNames: string[] = useMemo(() => {
+    if (!isMultiple) return [refill.siteName];
+    const names = refill.machineAllocations
+      .map(a => a.siteName)
+      .filter((n): n is string => !!n);
+    return [...new Set(names)];
+  }, [isMultiple, refill.siteName, refill.machineAllocations]);
 
   return (
     <motion.div
@@ -515,9 +529,25 @@ function RefillCard({ refill, onEdit, onDelete, canEdit, canDelete }: RefillCard
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <p className={cn('font-bold text-sm truncate', isDark ? 'text-white' : 'text-slate-900')}>
-              {refill.siteName}
-            </p>
+            {uniqueSiteNames.length > 0 ? (
+              <div className="flex items-center gap-1 flex-wrap">
+                {uniqueSiteNames.map(name => (
+                  <span
+                    key={name}
+                    className={cn(
+                      'font-bold text-sm px-2 py-0.5 rounded-lg',
+                      isDark ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-900'
+                    )}
+                  >
+                    {name}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <p className={cn('font-bold text-sm truncate', isDark ? 'text-white' : 'text-slate-900')}>
+                {refill.siteName}
+              </p>
+            )}
             <span className={cn('text-xs px-2 py-0.5 rounded-full font-semibold', isDark ? 'bg-amber-500/10 text-amber-400' : 'bg-amber-50 text-amber-700 border border-amber-100')}>
               {fmt(refill.totalLitres)}L
             </span>

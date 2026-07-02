@@ -1555,20 +1555,20 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                   <TableHead className="px-4 py-2.5 text-right">
                     <div className="flex flex-col items-end gap-1">
                       <div className="text-[9px] font-bold text-slate-400 uppercase">
-                        {activeTab === 'completed' || activeTab === 'unpaid' ? 'Total Charge' : 'Gross Sum'}
+                        {activeTab === 'completed' || activeTab === 'unpaid' ? 'Gross Sum' : 'Total Charge'}
                       </div>
                       <div className="text-[11px] font-mono font-bold text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-100 shadow-sm">
-                        ₦{formatSum(activeTab === 'completed' || activeTab === 'unpaid' ? tableSums.totalCharge : tableSums.totalCost)}
+                        ₦{formatSum(activeTab === 'completed' || activeTab === 'unpaid' ? tableSums.totalCost : tableSums.totalCharge)}
                       </div>
                     </div>
                   </TableHead>
                   <TableHead className="px-4 py-2.5 text-right">
                     <div className="flex flex-col items-end gap-1">
                       <div className="text-[9px] font-bold text-slate-400 uppercase">
-                        {activeTab === 'completed' || activeTab === 'unpaid' ? 'Amount Paid' : 'Total Charge'}
+                        {activeTab === 'completed' || activeTab === 'unpaid' ? 'Amount Paid' : 'Gross Sum'}
                       </div>
                       <div className="text-[12px] font-mono font-black text-indigo-700 bg-white px-2 py-0.5 rounded border border-indigo-100 shadow-sm">
-                        ₦{formatSum(activeTab === 'completed' || activeTab === 'unpaid' ? tableSums.amountPaid : tableSums.totalCharge)}
+                        ₦{formatSum(activeTab === 'completed' || activeTab === 'unpaid' ? tableSums.amountPaid : tableSums.totalCost)}
                       </div>
                     </div>
                   </TableHead>

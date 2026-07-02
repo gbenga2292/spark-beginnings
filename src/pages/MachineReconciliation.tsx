@@ -241,12 +241,32 @@ export function MachineReconciliation() {
   // ── Diesel summary per site ─────────────────────────────────────────────────
   const dieselSummary = useMemo(() => {
     const siteMap = new Map<string, { siteName: string; refilled: number; logged: number }>();
+
+    const credit = (siteId: string, siteName: string, litres: number) => {
+      const e = siteMap.get(siteId) ?? { siteName, refilled: 0, logged: 0 };
+      e.refilled += litres;
+      siteMap.set(siteId, e);
+    };
+
     dieselRefills.forEach(r => {
       if (hasDateFilter && r.date && (r.date < filterFrom || r.date > filterTo)) return;
-      const e = siteMap.get(r.siteId) ?? { siteName: r.siteName, refilled: 0, logged: 0 };
-      e.refilled += r.totalLitres;
-      siteMap.set(r.siteId, e);
+
+      // If allocations carry individual site info, break down by actual site
+      const allocsWithSite = r.machineAllocations?.filter(a => a.siteId && a.siteName) ?? [];
+      if (allocsWithSite.length > 0) {
+        allocsWithSite.forEach(a => {
+          credit(a.siteId!, a.siteName!, a.allocatedLitres);
+        });
+        // Any unallocated remainder goes to the top-level site
+        const allocatedTotal = allocsWithSite.reduce((s, a) => s + a.allocatedLitres, 0);
+        const remainder = r.totalLitres - allocatedTotal;
+        if (remainder > 0) credit(r.siteId, r.siteName, remainder);
+      } else {
+        // No per-site allocations — credit the whole amount to the top-level site
+        credit(r.siteId, r.siteName, r.totalLitres);
+      }
     });
+
     dailyMachineLogs.forEach(l => {
       if (!l.siteId) return;
       if (hasDateFilter && (l.date < filterFrom || l.date > filterTo)) return;
@@ -254,6 +274,7 @@ export function MachineReconciliation() {
       e.logged += l.dieselUsage || 0;
       siteMap.set(l.siteId, e);
     });
+
     return Array.from(siteMap.values()).filter(s => s.refilled > 0 || s.logged > 0);
   }, [dieselRefills, dailyMachineLogs, hasDateFilter, filterFrom, filterTo]);
 
@@ -781,8 +802,8 @@ export function MachineReconciliation() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Site</TableHead>
-                    <TableHead className="text-right">Refilled (L)</TableHead>
-                    <TableHead className="text-right">Logged Usage (L)</TableHead>
+                    <TableHead className="text-right">Diesel Purchased (L)</TableHead>
+                    <TableHead className="text-right">Refilled into Machine (L)</TableHead>
                     <TableHead className="text-right">Delta (L)</TableHead>
                   </TableRow>
                 </TableHeader>
