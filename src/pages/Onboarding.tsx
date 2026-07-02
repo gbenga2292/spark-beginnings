@@ -195,10 +195,36 @@ function CheckRow({ label, checked, onChange, disabled, hint }: {
 }
 
 // ─── UI: Labeled Input ────────────────────────────────────────
+// Buffers keystrokes locally; only commits to the store on blur to prevent
+// real-time state thrashing when typing fast (e.g. addresses, numbers).
+// Date inputs are excluded because date-picker widgets need immediate commits.
 function LabeledInput({ label, value, onChange, placeholder, type = 'text', disabled }: {
   label: string; value: string; onChange: (v: string) => void;
   placeholder?: string; type?: string; disabled?: boolean;
 }) {
+  const isDate = type === 'date';
+  const [local, setLocal] = useState(value ?? '');
+
+  // Keep local in sync when the external value changes (e.g. employee switch)
+  useEffect(() => { setLocal(value ?? ''); }, [value]);
+
+  if (isDate) {
+    // Date pickers commit immediately so the unlock logic responds at once
+    return (
+      <div className="space-y-1">
+        <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">{label}</label>
+        <Input
+          type="date"
+          className="h-9 text-sm bg-slate-50 dark:bg-slate-800 dark:text-slate-100 border-slate-200 dark:border-slate-700 focus:bg-white dark:focus:bg-slate-700"
+          placeholder={placeholder}
+          value={value ?? ''}
+          onChange={e => onChange(e.target.value)}
+          disabled={disabled}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-1">
       <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">{label}</label>
@@ -206,8 +232,9 @@ function LabeledInput({ label, value, onChange, placeholder, type = 'text', disa
         type={type}
         className="h-9 text-sm bg-slate-50 dark:bg-slate-800 dark:text-slate-100 border-slate-200 dark:border-slate-700 focus:bg-white dark:focus:bg-slate-700"
         placeholder={placeholder}
-        value={value ?? ''}
-        onChange={e => onChange(e.target.value)}
+        value={local}
+        onChange={e => setLocal(e.target.value)}
+        onBlur={() => { if (local !== value) onChange(local); }}
         disabled={disabled}
       />
     </div>
@@ -221,7 +248,48 @@ function DoneBadge({ done }: { done: boolean }) {
     : <span className="text-[10px] font-bold text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5 flex items-center gap-1"><Clock className="h-2.5 w-2.5" />Pending</span>;
 }
 
-// ─── Main Component ───────────────────────────────────────────
+// ─── Guarantor helpers (blur-committed, avoids per-keystroke store writes) ───
+/** Text input that commits its value to the store only when the user leaves the field. */
+function GuarantorTextInput({ label, value, placeholder, onCommit }: {
+  label: string; value: string; placeholder?: string; onCommit: (v: string) => void;
+}) {
+  const [local, setLocal] = useState(value);
+  useEffect(() => { setLocal(value); }, [value]);
+  return (
+    <div className="space-y-1">
+      <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">{label}</label>
+      <Input
+        className="h-9 text-sm bg-slate-50 dark:bg-slate-800 dark:text-slate-100 border-slate-200 dark:border-slate-700 focus:bg-white dark:focus:bg-slate-700"
+        placeholder={placeholder}
+        value={local}
+        onChange={e => setLocal(e.target.value)}
+        onBlur={() => { if (local !== value) onCommit(local); }}
+      />
+    </div>
+  );
+}
+
+/** Phone input that buffers digits locally and commits on blur. */
+function GuarantorPhoneInput({ value, onCommit }: {
+  value: string; onCommit: (v: string) => void;
+}) {
+  const [local, setLocal] = useState(value);
+  useEffect(() => { setLocal(value); }, [value]);
+  return (
+    <Input
+      type="tel"
+      inputMode="numeric"
+      pattern="[0-9]*"
+      className="h-9 text-sm bg-slate-50 dark:bg-slate-800 dark:text-slate-100 border-slate-200 dark:border-slate-700 focus:bg-white dark:focus:bg-slate-700"
+      placeholder="e.g. 08012345678"
+      value={local}
+      onChange={e => setLocal(e.target.value.replace(/\D/g, ''))}
+      onBlur={() => { if (local !== value) onCommit(local); }}
+    />
+  );
+}
+
+// ─── Main Component ────────────────────────────────────────
 export function Onboarding() {
   const employees = useAppStore(s => s.employees);
   const updateEmployee = useAppStore(s => s.updateEmployee);
@@ -1238,23 +1306,19 @@ export function Onboarding() {
                             }
                           </div>
                           <div className="grid grid-cols-2 gap-2">
-                            <LabeledInput label="Full Name *" value={g.name}
-                              onChange={v => { updateGuarantor(i, 'name', v); if (!v.trim()) updateGuarantor(i, 'verified', false); }}
-                              placeholder="e.g. Jane Smith" />
+                            {/* Guarantor name — blur-committed to avoid per-keystroke store writes */}
+                            <GuarantorTextInput
+                              label="Full Name *"
+                              value={g.name}
+                              placeholder="e.g. Jane Smith"
+                              onCommit={v => { updateGuarantor(i, 'name', v); if (!v.trim()) updateGuarantor(i, 'verified', false); }}
+                            />
                             <div className="space-y-1">
                               <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Phone Number *</label>
-                              <Input
-                                type="tel"
-                                inputMode="numeric"
-                                pattern="[0-9]*"
-                                className="h-9 text-sm bg-slate-50 dark:bg-slate-800 dark:text-slate-100 border-slate-200 dark:border-slate-700 focus:bg-white dark:focus:bg-slate-700"
-                                placeholder="e.g. 08012345678"
+                              {/* Guarantor phone — blur-committed, digits only */}
+                              <GuarantorPhoneInput
                                 value={g.phone}
-                                onChange={e => {
-                                  const v = e.target.value.replace(/\D/g, '');
-                                  updateGuarantor(i, 'phone', v);
-                                  if (!v.trim()) updateGuarantor(i, 'verified', false);
-                                }}
+                                onCommit={v => { updateGuarantor(i, 'phone', v); if (!v.trim()) updateGuarantor(i, 'verified', false); }}
                               />
                             </div>
                           </div>

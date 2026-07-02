@@ -125,6 +125,16 @@ const navigation: NavCategory[] = [
       { name: 'Simulator', href: '/operations/simulator', icon: HardHat, privKey: 'simulator', privField: 'canView' },
     ],
   },
+  // ── Machine Reconciliation — standalone direct link ─────────────────────
+  {
+    name: 'Machine Recon',
+    icon: Package,
+    standalone: true,
+    standaloneHref: '/operations/machine-reconciliation',
+    items: [
+      { name: 'Machine Recon', href: '/operations/machine-reconciliation', icon: Package, privKey: 'opsMachineRecon', privField: 'canView' },
+    ],
+  },
   // ── Tasks ────────────────────────────────────────────────────────
   {
     name: 'Tasks',

@@ -256,10 +256,16 @@ export function SiteInventoryView({ site, questionnaire, onBack, onSiteChange, i
   };
 
   const currentMachines = machineItems;
+  // Broaden history detection: check ALL waybills for this site (any status, any type)
+  // so machines returned via return waybill are always captured — even if the original
+  // outbound waybill was never moved past 'outstanding'.
+  const allSiteWaybills = waybills.filter(w =>
+    w.siteName?.toLowerCase() === site.name.toLowerCase() || w.siteId === site.id
+  );
   const historyMachines = assets.filter(a => 
     a.type === 'equipment' && 
     a.requiresLogging && 
-    siteWaybills.some(w => w.type === 'waybill' && w.items.some(i => i.assetId === a.id)) &&
+    allSiteWaybills.some(w => w.items.some(i => i.assetId === a.id)) &&
     !currentMachines.find(c => c.id === a.id)
   );
 

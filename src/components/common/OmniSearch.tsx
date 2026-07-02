@@ -96,6 +96,7 @@ export const OmniSearch: React.FC<OmniSearchProps> = ({ isOpen, onClose, isDark 
     { label: 'Inventory', desc: 'Assets & tools', href: '/operations/assets', icon: Package, pK: 'opsInventory', pF: 'canView' },
     { label: 'Waybills', desc: 'Dispatch & returns', href: '/operations/waybills', icon: Truck, pK: 'opsWaybills', pF: 'canView' },
     { label: 'Layout Simulator', desc: 'Dewatering layout CAD & 3D simulator', href: '/operations/simulator', icon: HardHat, pK: 'simulator', pF: 'canView' },
+    { label: 'Machine Reconciliation', desc: 'Equipment reconciliation & active days', href: '/operations/machine-reconciliation', icon: Activity, pK: 'opsMachineRecon', pF: 'canView' },
   ], []);
 
   const searchResults = useMemo(() => {

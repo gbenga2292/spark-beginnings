@@ -894,9 +894,10 @@ Answer site-specific questions using this context only. Be concise.`;
                   {/* Status Badges Overlayed Top */}
                   <div className="flex items-center gap-2 flex-wrap mt-1">
                     <span className={cn('text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 border',
+                      (site.status === 'Active' && !site.startDate) ? 'bg-amber-50 text-amber-700 border-amber-600 dark:bg-amber-950/30 dark:text-amber-400' :
                       site.status === 'Active' ? 'bg-emerald-50 text-emerald-700 border-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-400' :
                         site.status === 'Ended' ? 'bg-rose-50 text-rose-700 border-rose-600 dark:bg-rose-950/30 dark:text-rose-400' : 'bg-slate-100 text-slate-600 border-slate-400 dark:bg-slate-800'
-                    )}>{site.status}</span>
+                    )}>{(site.status === 'Active' && !site.startDate) ? 'Pending' : site.status}</span>
                     <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 border border-slate-300 dark:border-slate-700">VAT: {site.vat}</span>
                     <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 border border-slate-300 dark:border-slate-700 max-w-[150px] sm:max-w-[200px] truncate">
                       CLIENT: {site.client}

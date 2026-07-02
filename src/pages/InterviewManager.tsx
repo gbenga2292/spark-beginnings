@@ -765,7 +765,7 @@ export default function InterviewManager() {
     toast.success(`Verdict recorded: ${decision}`);
   };
 
-  const forwardToOnboarding = (candidate: InterviewCandidate, finalizedSheet?: InterviewScoresheet) => {
+  const forwardToOnboarding = async (candidate: InterviewCandidate, finalizedSheet?: InterviewScoresheet) => {
     const verdict = finalizedSheet?.suitabilityVerdict || candidate.scoresheet?.suitabilityVerdict;
     const isApplicable = verdict === 'Good Candidate' || verdict === 'Potential Star' || candidate.decision === 'Applicable';
 
@@ -780,29 +780,33 @@ export default function InterviewManager() {
     const firstname = nameParts[0] || 'Unknown';
     const surname = nameParts.length > 1 ? nameParts.slice(1).join(' ') : 'Unknown';
 
-    addEmployee({
-      id: newEmpId,
-      firstname,
-      surname,
-      role: candidate.appliedRole,
-      department: candidate.department || 'Unassigned',
-      status: 'Onboarding',
-      joinedDate: today(),
-      contactNumber: candidate.phone,
-      email: candidate.email,
-      qualifications: sheet?.qualifications || [],
-      workExperience: sheet?.workExperience || [],
-      onboardingNotes: `Interview Verdict: ${verdict}\nPresent Salary: ${sheet?.presentSalary || 'N/A'}\nAsking Salary: ${sheet?.askingSalary || 'N/A'}\n\nNotes: ${sheet?.otherComments || 'None'}`,
-    } as any);
-    
-    updateInterviewCandidate(candidate.id, { 
-      decision: 'Forwarded to Onboarding', 
-      status: 'Completed',
-      onboardingEmployeeId: newEmpId,
-      scoresheet: sheet
-    });
-    
-    toast.success(`${candidate.candidateName} successfully forwarded to Onboarding! Check the Employee Directory to complete their setup.`);
+    try {
+      await addEmployee({
+        id: newEmpId,
+        firstname,
+        surname,
+        position: candidate.appliedRole,
+        department: candidate.department || 'Unassigned',
+        status: 'Onboarding',
+        startDate: today(),
+        phone: candidate.phone,
+        email: candidate.email,
+        qualifications: sheet?.qualifications || [],
+        workExperience: sheet?.workExperience || [],
+        onboardingNotes: `Interview Verdict: ${verdict}\nPresent Salary: ${sheet?.presentSalary || 'N/A'}\nAsking Salary: ${sheet?.askingSalary || 'N/A'}\n\nNotes: ${sheet?.otherComments || 'None'}`,
+      } as any);
+
+      updateInterviewCandidate(candidate.id, { 
+        decision: 'Forwarded to Onboarding', 
+        status: 'Completed',
+        onboardingEmployeeId: newEmpId,
+        scoresheet: sheet
+      });
+      
+      toast.success(`${candidate.candidateName} successfully forwarded to Onboarding! Check the Employee Directory to complete their setup.`);
+    } catch (err: any) {
+      toast.error(`Failed to save to database: ${err?.message || 'Unknown error'}. Please check your Supabase schema and try again.`);
+    }
   };
 
   return (

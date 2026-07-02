@@ -115,6 +115,19 @@ const navigation: NavCategory[] = [
     ],
   },
   {
+    name: 'Machine Recon',
+    icon: ArrowRightLeft,
+    color: 'from-teal-500 to-cyan-500',
+    bgLight: 'bg-teal-50 hover:bg-teal-100',
+    bgDark: 'dark:bg-teal-950/40 dark:hover:bg-teal-900/60',
+    iconColor: 'text-teal-600 dark:text-teal-400',
+    standalone: true,
+    standaloneHref: '/operations/machine-reconciliation',
+    items: [
+      { name: 'Machine Reconciliation', href: '/operations/machine-reconciliation', icon: ArrowRightLeft, privKey: 'opsMachineRecon', privField: 'canView' },
+    ],
+  },
+  {
     name: 'Tasks',
     icon: ListTodo,
     color: 'from-violet-500 to-purple-600',

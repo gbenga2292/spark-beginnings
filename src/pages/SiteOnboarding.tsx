@@ -5,8 +5,8 @@ import { Input } from '@/src/components/ui/input';
 import { Badge } from '@/src/components/ui/badge';
 import { useAppStore } from '@/src/store/appStore';
 import { SiteQuestionnaire, SiteAttachment } from '@/src/types/SiteQuestionnaire';
-import { toast } from '@/src/components/ui/toast';
-import { Save, ArrowLeft, CheckCircle2, Building2, MapPin, Calendar, User, LayoutGrid, ChevronDown, ChevronUp, Edit2, Paperclip, UploadCloud, Trash2, ExternalLink, Loader2, FileText as FileTextIcon, X, Eye } from 'lucide-react';
+import { toast, showConfirm } from '@/src/components/ui/toast';
+import { Save, ArrowLeft, CheckCircle2, Building2, MapPin, Calendar, User, LayoutGrid, ChevronDown, ChevronUp, Edit2, Paperclip, UploadCloud, Trash2, ExternalLink, Loader2, FileText as FileTextIcon, X, Eye, RotateCcw } from 'lucide-react';
 import { DocPreviewModal } from '@/src/components/DocPreviewModal';
 import { CreateProjectDialog } from '@/src/components/tasks/CreateProjectDialog';
 import { useAppData } from '@/src/contexts/AppDataContext';
@@ -137,6 +137,7 @@ export function SiteOnboarding() {
   const updatePendingSite = useAppStore(s => s.updatePendingSite);
   const addSite = useAppStore(s => s.addSite);
   const updateSite = useAppStore(s => s.updateSite);
+  const deleteSite = useAppStore(s => s.deleteSite);
   const addClient = useAppStore(s => s.addClient);
   const getServiceTemplates = useAppStore(s => s.getServiceTemplates);
   const invoices = useAppStore(s => s.invoices);
@@ -666,8 +667,15 @@ export function SiteOnboarding() {
     form.phase4.proposalAccepted &&
     form.phase5.stage1AdvanceReceived;
 
-  const handleActivate = () => {
+  const handleActivate = async () => {
     if (!canActivate) return;
+
+    const confirm = await showConfirm(
+      `Are you sure you want to activate "${form.siteName}"? This will create an active site record and unlock operations tracking.`,
+      { title: 'Activate Site', confirmLabel: 'Activate', cancelLabel: 'Cancel' }
+    );
+    if (!confirm) return;
+
     if (!clients.includes(form.clientName)) addClient(form.clientName);
     
     const activeSiteId = generateId();
@@ -692,6 +700,33 @@ export function SiteOnboarding() {
     setForm(activated);
     setInitialForm(activated);
     toast.success(`🎉 ${form.siteName} is now an Active Site!`);
+    navigate('/sites');
+  };
+
+  const handleRevertToPending = async () => {
+    if (form.status !== 'Active') return;
+    
+    const confirm = await showConfirm(
+      `Are you sure you want to revert "${form.siteName}" back to Pending? This will remove it from the active site list.`,
+      { variant: 'danger', confirmLabel: 'Revert', cancelLabel: 'Cancel' }
+    );
+    if (!confirm) return;
+
+    if (form.siteId) {
+      deleteSite(form.siteId);
+    }
+
+    const reverted = {
+      ...form,
+      siteId: undefined,
+      status: 'Pending' as const,
+      updatedAt: new Date().toISOString()
+    };
+
+    updatePendingSite(form.id, reverted);
+    setForm(reverted);
+    setInitialForm(reverted);
+    toast.success(`↩️ ${form.siteName} has been reverted to Pending.`);
     navigate('/sites');
   };
 
@@ -723,6 +758,11 @@ export function SiteOnboarding() {
               <LayoutGrid className="h-4 w-4" /> Create Workspace
             </Button>
           ) : null}
+          {form.status === 'Active' && (
+            <Button onClick={handleRevertToPending} variant="outline" className="text-rose-600 hover:text-rose-700 hover:bg-rose-50 border-rose-200 gap-2 h-9">
+              <RotateCcw className="h-4 w-4" /> Revert to Pending
+            </Button>
+          )}
           <Button variant="outline" onClick={handleSave} className="gap-2 h-9">
             <Save className="h-4 w-4" /> Save Progress
           </Button>
@@ -1731,11 +1771,28 @@ export function SiteOnboarding() {
 
                 {/* Already-active notice */}
                 {form.status === 'Active' && (
-                  <div className="p-4 bg-indigo-50 border border-indigo-200 rounded-xl flex items-center gap-3">
-                    <CheckCircle2 className="h-5 w-5 text-indigo-600 flex-shrink-0" />
-                    <p className="text-sm text-indigo-800 font-medium">
-                      This site was activated via Phase 4. You can still update any phase fields above and save.
-                    </p>
+                  <div className="p-4 bg-indigo-50 border border-indigo-200 rounded-xl flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <CheckCircle2 className="h-5 w-5 text-indigo-600 flex-shrink-0" />
+                      <p className="text-sm text-indigo-800 font-medium">
+                        This site was activated via Phase 4. You can still update any phase fields above and save.
+                      </p>
+                    </div>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="border-indigo-300 text-indigo-700 hover:bg-indigo-100"
+                      onClick={() => {
+                        if (confirm("Are you sure you want to revert this site to Pending? Note: This will not delete the generated active site if one was created.")) {
+                          const dataToSave = { ...form, status: 'Pending' as const, siteId: undefined };
+                          setForm(dataToSave);
+                          updatePendingSite(form.id, dataToSave);
+                          toast.success("Site reverted to Pending status.");
+                        }
+                      }}
+                    >
+                      <RotateCcw className="h-4 w-4 mr-2" /> Revert to Pending
+                    </Button>
                   </div>
                 )}
               </div>

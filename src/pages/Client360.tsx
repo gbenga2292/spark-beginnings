@@ -582,7 +582,7 @@ export function Client360() {
   }, [sites, selectedClient, filterMonth, filterYear]);
 
   const activeSites = useMemo(() => {
-    return clientSites.filter(s => s.status === 'Active');
+    return clientSites.filter(s => s.status === 'Active' && s.startDate);
   }, [clientSites]);
 
   // 2. Financial Calculations
@@ -702,7 +702,7 @@ export function Client360() {
     const clientInvoices = rawClientInvoices.map(inv => {
       const site = clientSites.find(s => s.id === inv.siteId || s.name === inv.siteName);
       let nextBillingDate = null;
-      let siteStatus = site?.status || 'Ended'; 
+      let siteStatus = site ? (!site.startDate ? 'Pending' : site.status) : 'Ended'; 
       if (siteStatus !== 'Ended' && (inv.dueDate || inv.date)) {
         const d = new Date(normalizeDate(inv.dueDate || inv.date));
         if (!isNaN(d.getTime())) {
@@ -2258,9 +2258,9 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                   {/* Secondary Tab Switcher */}
                   <div className="flex border-b border-slate-200 dark:border-slate-800 mb-2 overflow-x-auto style-scroll pb-px gap-1">
                     {[
-                      { id: 'portfolio', label: 'Active', count: clientData.clientSites.filter((s: any) => s.status === 'Active').length, color: 'text-indigo-650 bg-indigo-50 dark:bg-indigo-950/20 dark:text-indigo-400', icon: MapPin },
+                      { id: 'portfolio', label: 'Active', count: clientData.clientSites.filter((s: any) => s.status === 'Active' && s.startDate).length, color: 'text-indigo-650 bg-indigo-50 dark:bg-indigo-950/20 dark:text-indigo-400', icon: MapPin },
                       { id: 'onboarding', label: 'Onboarding', count: clientPendingSites.length, color: 'text-amber-700 bg-amber-50 dark:bg-amber-950/20 dark:text-amber-400', icon: Clock },
-                      { id: 'pending', label: 'Pending', count: clientData.clientSites.filter((s: any) => s.status === 'Inactive').length, color: 'text-blue-650 bg-blue-50 dark:bg-blue-950/20 dark:text-blue-400', icon: Hourglass },
+                      { id: 'pending', label: 'Pending', count: clientData.clientSites.filter((s: any) => s.status === 'Inactive' || (s.status === 'Active' && !s.startDate)).length, color: 'text-blue-650 bg-blue-50 dark:bg-blue-950/20 dark:text-blue-400', icon: Hourglass },
                       { id: 'closed', label: 'Closed', count: clientData.clientSites.filter((s: any) => s.status === 'Ended').length, color: 'text-slate-600 bg-slate-100 dark:bg-slate-800 dark:text-slate-300', icon: CheckCircle2 }
                     ].map(subTab => {
                       const isActive = sitesSubTab === subTab.id;
@@ -2290,7 +2290,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
 
                   {/* Sub-tab: Active Sites */}
                   {sitesSubTab === 'portfolio' && (() => {
-                    const activeSitesList = clientData.clientSites.filter((s: any) => s.status === 'Active');
+                    const activeSitesList = clientData.clientSites.filter((s: any) => s.status === 'Active' && s.startDate);
                     return (
                       <div className={cn("p-6 rounded-2xl border shadow-sm flex flex-col", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
                         <h3 className="text-lg font-bold mb-4 flex items-center gap-2"><MapPin className="w-5 h-5 text-indigo-500"/> Site Portfolio ({activeSitesList.length})</h3>
@@ -2506,7 +2506,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
 
                   {/* Sub-tab: Pending Sites */}
                   {sitesSubTab === 'pending' && (() => {
-                    const inactiveSites = clientData.clientSites.filter((s: any) => s.status === 'Inactive');
+                    const inactiveSites = clientData.clientSites.filter((s: any) => s.status === 'Inactive' || (s.status === 'Active' && !s.startDate));
                     return (
                       <div className={cn("p-6 rounded-2xl border shadow-sm flex flex-col", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
                         <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
@@ -2524,7 +2524,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                                   <span className="font-semibold text-sm">{site.name}</span>
                                 </div>
                                 <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                                  <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-950/20 dark:text-amber-400 border border-amber-200 dark:border-amber-900/30">{site.status}</Badge>
+                                  <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-950/20 dark:text-amber-400 border border-amber-200 dark:border-amber-900/30">Pending</Badge>
                                   <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
                                       <Button

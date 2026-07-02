@@ -66,6 +66,8 @@ export interface OpsVehiclesPriv {
 }
 // Ops Site Manager
 export interface OpsSitesPriv { canView: boolean; }
+// Machine Reconciliation
+export interface OpsMachineReconPriv { canView: boolean; }
 // Ops Diesel Refill
 export interface OpsDieselPriv { canView: boolean; canAdd: boolean; canEdit: boolean; canDelete: boolean; }
 
@@ -149,6 +151,7 @@ export interface UserPrivileges {
   opsMaintenance:    OpsMaintenancePriv;
   opsVehicles:       OpsVehiclesPriv;
   opsSites:          OpsSitesPriv;
+  opsMachineRecon:   OpsMachineReconPriv;
   opsDiesel:         OpsDieselPriv;
   activityLog:       ActivityLogPriv;
   commLog:           CommLogPriv;
@@ -218,6 +221,7 @@ export const FULL_ACCESS: UserPrivileges = {
     canImport: true, canExport: true
   },
   opsSites:         { canView: true },
+  opsMachineRecon:  { canView: true },
   opsDiesel:        { canView: true, canAdd: true, canEdit: true, canDelete: true },
   activityLog:      { canView: true, canExport: true },
   commLog:          { canView: true, canAdd: true, canEdit: true, canDelete: true, canExport: true },
@@ -265,6 +269,7 @@ export const NO_ACCESS: UserPrivileges = {
     canImport: false, canExport: false
   },
   opsSites:         { canView: false },
+  opsMachineRecon:  { canView: false },
   opsDiesel:        { canView: false, canAdd: false, canEdit: false, canDelete: false },
   activityLog:      { canView: false, canExport: false },
   commLog:          { canView: false, canAdd: false, canEdit: false, canDelete: false, canExport: false },

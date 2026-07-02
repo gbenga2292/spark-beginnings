@@ -81,6 +81,8 @@ export function dbToEmployee(r: any): Employee {
     onboardingMainTaskId: r.onboarding_main_task_id || undefined,
     onboardingSuspended: r.onboarding_suspended ?? false,
     secondaryDepartments: r.secondary_departments || [],
+    onboardingNotes: r.onboarding_notes || undefined,
+    offboardingRemarks: r.offboarding_remarks || undefined,
   };
 }
 
@@ -390,12 +392,16 @@ function clientContactToDb(c: ClientContact): any {
 }
 
 export function dbToPendingSite(r: any): SiteQuestionnaire {
+  // Destructure top-level columns that are stored separately from the data blob.
+  // We must exclude 'status' from the spread so the DB column takes precedence
+  // over any stale 'status' that may be embedded inside the data JSON blob.
+  const { status: _dataStatus, id: _dataId, clientName: _dn, siteName: _dsn, createdAt: _dc, updatedAt: _du, ...restData } = r.data || {};
   return {
     id: r.id,
     clientName: r.client_name,
     siteName: r.site_name,
     status: r.status,
-    ...r.data,
+    ...restData,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
@@ -618,6 +624,10 @@ function employeeToDb(e: Employee) {
     lashma_expiry_date: e.lashmaExpiryDate || null,
     onboarding_main_task_id: e.onboardingMainTaskId || null,
     onboarding_suspended: e.onboardingSuspended ?? false,
+    phone: e.phone || null,
+    email: e.email || null,
+    onboarding_notes: e.onboardingNotes || null,
+    offboarding_remarks: e.offboardingRemarks || null,
   };
 }
 

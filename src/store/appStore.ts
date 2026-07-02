@@ -1116,7 +1116,17 @@ export const useAppStore = create<AppState>()(
       deleteClientProfile: (id) => { set((s) => ({ clientProfiles: s.clientProfiles.filter((p) => p.id !== id) })); db.deleteClientProfile(id); },
 
       // Employees
-      addEmployee: (employee) => { set((s) => ({ employees: [...s.employees, employee] })); db.insertEmployee(employee); },
+      addEmployee: async (employee) => {
+        set((s) => ({ employees: [...s.employees, employee] }));
+        try {
+          await db.insertEmployee(employee);
+        } catch (err: any) {
+          // Roll back optimistic update
+          set((s) => ({ employees: s.employees.filter(e => e.id !== employee.id) }));
+          console.error('[addEmployee] DB insert failed – rolled back local state:', err);
+          throw err;
+        }
+      },
       updateEmployee: (id, updatedEmployee) => { set((s) => ({ employees: s.employees.map(emp => emp.id === id ? { ...emp, ...updatedEmployee } : emp) })); db.updateEmployee(id, updatedEmployee); },
       bulkUpdateEmployees: (ids, updates) => { set((s) => ({ employees: s.employees.map(emp => ids.includes(emp.id) ? { ...emp, ...updates } : emp) })); db.bulkUpdateEmployees(ids, updates); },
       deleteEmployee: (id) => { set((s) => ({ employees: s.employees.filter(emp => emp.id !== id) })); db.deleteEmployee(id); },

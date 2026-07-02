@@ -23,39 +23,44 @@ function useAllActiveMachines() {
   const { assets, waybills } = useOperations();
   const sites = useAppStore(s => s.sites);
   return useMemo(() => {
-    const locations = new Map<string, { quantity: number; siteId: string }>();
+    const locations = new Map<string, number>();
 
-    const sorted = [...waybills].sort((a, b) => new Date(a.sentToSiteDate || a.issueDate).getTime() - new Date(b.sentToSiteDate || b.issueDate).getTime());
-
-    sorted.forEach(wb => {
-      if (wb.type === 'waybill' && ['sent_to_site', 'partial_returned', 'open'].includes(wb.status)) {
+    waybills.forEach(wb => {
+      if (wb.type === 'waybill' && wb.status !== 'outstanding') {
         wb.items.forEach(item => {
-          locations.set(item.assetId, { quantity: (locations.get(item.assetId)?.quantity || 0) + item.quantity, siteId: wb.siteId || '' });
+          const key = `${item.assetId}::${wb.siteId || ''}`;
+          locations.set(key, (locations.get(key) || 0) + item.quantity);
         });
-      } else if (wb.type === 'return') {
+      } else if (wb.type === 'return' && wb.status === 'return_completed') {
         wb.items.forEach(item => {
-          const cur = locations.get(item.assetId);
-          if (cur) {
-            const newQty = Math.max(0, cur.quantity - item.quantity);
-            if (newQty === 0) locations.delete(item.assetId);
-            else locations.set(item.assetId, { quantity: newQty, siteId: cur.siteId });
-          }
+          const key = `${item.assetId}::${wb.siteId || ''}`;
+          const cur = locations.get(key) || 0;
+          locations.set(key, Math.max(0, cur - item.quantity));
         });
       }
     });
 
-    return assets
-      .filter(a => a.type === 'equipment' && a.requiresLogging && locations.has(a.id))
-      .map(a => {
-         const loc = locations.get(a.id)!;
-         const site = sites.find(s => s.id === loc.siteId);
+    const activePairs: { assetId: string, siteId: string, quantity: number }[] = [];
+    locations.forEach((quantity, key) => {
+      if (quantity > 0) {
+        const [assetId, siteId] = key.split('::');
+        activePairs.push({ assetId, siteId, quantity });
+      }
+    });
+
+    return activePairs
+      .map(pair => {
+         const a = assets.find(x => x.id === pair.assetId);
+         if (!a || a.type !== 'equipment' || !a.requiresLogging) return null;
+         const site = sites.find(s => s.id === pair.siteId);
          return {
            assetId: a.id,
            assetName: a.name,
            siteId: site?.id || '',
            siteName: site?.name || 'Unknown Site',
          };
-      });
+      })
+      .filter((x): x is NonNullable<typeof x> => x !== null);
   }, [assets, waybills, sites]);
 }
 

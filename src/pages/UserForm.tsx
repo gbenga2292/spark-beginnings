@@ -157,6 +157,8 @@ const PRIV_GROUPS: PG[] = [
         ] },
       { key: 'opsSites', label: 'Ops Site Manager', parentKey: 'opsSites', masterField: 'canView',
         fields: [{ key: 'canView', label: 'View Assigned Sites' }] },
+      { key: 'opsMachineRecon', label: 'Machine Reconciliation', parentKey: 'opsMachineRecon', masterField: 'canView',
+        fields: [{ key: 'canView', label: 'View Machine Reconciliation' }] },
       { key: 'opsDiesel', label: 'Diesel Refill', parentKey: 'opsDiesel', masterField: 'canView',
         fields: [
           { key: 'canView', label: 'View Refills' },
