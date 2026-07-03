@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import {
   Asset, Waybill, AssetCategory, AssetType, AssetStatus, WaybillStatus, WaybillType, 
   Checkout, MaintenanceAsset, MaintenanceSession, MaintenanceLogType, ServiceStatus,
+  OperationalStatus,
   Vehicle, VehicleTripLeg, VehicleDocumentType, DailyMachineLog, AssetPumpDate,
   MaintenanceCertificate, VehicleFuelLog, DieselRefill
 } from '../types/operations';
@@ -41,6 +42,7 @@ interface OperationsContextType {
   // Maintenance methods
   logMaintenance: (session: Omit<MaintenanceSession, 'id'>) => void;
   updateMaintenance: (id: string, updates: Partial<Omit<MaintenanceSession, 'id'>>) => void;
+  updateAssetOperationalStatus: (id: string, status: OperationalStatus) => Promise<void>;
   
   // Analytics
   getAssetAnalytics: () => any;
@@ -85,6 +87,8 @@ interface OperationsContextType {
   addDieselRefill: (refill: Omit<DieselRefill, 'id' | 'created_at' | 'updated_at'>) => Promise<void>;
   updateDieselRefill: (id: string, updates: Partial<Omit<DieselRefill, 'id' | 'created_at'>>) => Promise<void>;
   deleteDieselRefill: (id: string) => Promise<void>;
+  
+  isLoaded: boolean;
 }
 
 const OperationsContext = createContext<OperationsContextType | undefined>(undefined);
@@ -106,6 +110,7 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
   const [maintenanceCertificates, setMaintenanceCertificates] = useState<MaintenanceCertificate[]>([]);
   const [vehicleFuelLogs, setVehicleFuelLogs] = useState<VehicleFuelLog[]>([]);
   const [dieselRefills, setDieselRefills] = useState<DieselRefill[]>([]);
+  const [isLoaded, setIsLoaded] = useState(false);
 
   const { 
     sites,
@@ -169,41 +174,77 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
           status = 'due_soon';
         }
 
-        // Resolve current site by looking at ALL waybills for this machine (outbound + return),
-        // sorted by most recent date. The most recent action tells us where it is right now.
-        //
-        // Bug fix: outbound waybills never change status when a return waybill completes,
-        // so filtering only "active outbound" was wrong — it ignored completed returns.
-        const allAssetWaybills = waybills
-          .filter(wb => wb.items.some(item => item.assetId === a.id))
-          .sort((x, y) => {
-            const dx = new Date(x.sentToSiteDate || x.issueDate).getTime();
-            const dy = new Date(y.sentToSiteDate || y.issueDate).getTime();
-            return dy - dx;
+        // Resolve current site by checking net inventory (dispatches - returns)
+        // across all active operational sites to align with the active sites table.
+        const activeSites = sites.filter(s => s.status === 'Active' && !isInternalSite(s));
+        const candidateSites: { siteName: string; latestDate: string }[] = [];
+
+        activeSites.forEach(s => {
+          const siteWaybills = waybills.filter(w =>
+            (w.siteName?.toLowerCase() === s.name.toLowerCase() || w.siteId === s.id) &&
+            (w.status !== 'outstanding' || w.type === 'return')
+          );
+
+          let qtyOnSite = 0;
+          let latestDate = '';
+
+          siteWaybills.forEach(wb => {
+            const item = wb.items.find(i => i.assetId === a.id);
+            if (item) {
+              const wbDate = wb.sentToSiteDate || wb.issueDate || '';
+              if (wb.type === 'waybill' && wb.status !== 'outstanding') {
+                qtyOnSite += item.quantity;
+                if (wbDate && wbDate > latestDate) {
+                  latestDate = wbDate;
+                }
+              } else if (wb.type === 'return' && wb.status === 'return_completed') {
+                qtyOnSite = Math.max(0, qtyOnSite - item.quantity);
+                if (wbDate && wbDate > latestDate) {
+                  latestDate = wbDate;
+                }
+              }
+            }
           });
 
-        let resolvedSite = 'Warehouse';
-
-        if (allAssetWaybills.length > 0) {
-          const latest = allAssetWaybills[0];
-          // Machine is on site only if the most recent waybill is an active outbound dispatch
-          if (
-            latest.type === 'waybill' &&
-            ['sent_to_site', 'partial_returned', 'outstanding', 'open'].includes(latest.status)
-          ) {
-            resolvedSite = latest.siteName || 'Warehouse';
+          if (qtyOnSite > 0) {
+            candidateSites.push({ siteName: s.name, latestDate });
           }
-          // If the most recent is a return waybill (any status) OR a fully-returned outbound → Warehouse
+        });
+
+        let resolvedSite = 'Warehouse';
+        if (candidateSites.length > 0) {
+          // Sort by latest waybill date descending to get the most recent deployment
+          candidateSites.sort((x, y) => y.latestDate.localeCompare(x.latestDate));
+          resolvedSite = candidateSites[0].siteName;
         } else {
-          // No waybills at all — fall back to recent daily log (within 45 days)
-          const recentLog = dailyMachineLogs
-            .filter(log => log.assetId === a.id)
-            .sort((x, y) => new Date(y.date).getTime() - new Date(x.date).getTime())[0];
-          if (recentLog) {
-            const daysSinceLog = (Date.now() - new Date(recentLog.date).getTime()) / (1000 * 60 * 60 * 24);
-            resolvedSite = daysSinceLog <= 45 ? recentLog.siteName : 'Warehouse';
+          // If not found in active sites inventory, fall back to the most recent waybill/log logic
+          const allAssetWaybills = waybills
+            .filter(wb => wb.items.some(item => item.assetId === a.id))
+            .sort((x, y) => {
+              const dx = new Date(x.sentToSiteDate || x.issueDate).getTime();
+              const dy = new Date(y.sentToSiteDate || y.issueDate).getTime();
+              return dy - dx;
+            });
+
+          if (allAssetWaybills.length > 0) {
+            const latest = allAssetWaybills[0];
+            if (
+              latest.type === 'waybill' &&
+              ['sent_to_site', 'partial_returned', 'outstanding', 'open'].includes(latest.status)
+            ) {
+              resolvedSite = latest.siteName || 'Warehouse';
+            }
+          } else {
+            const recentLog = dailyMachineLogs
+              .filter(log => log.assetId === a.id)
+              .sort((x, y) => new Date(y.date).getTime() - new Date(x.date).getTime())[0];
+            if (recentLog) {
+              const daysSinceLog = (Date.now() - new Date(recentLog.date).getTime()) / (1000 * 60 * 60 * 24);
+              resolvedSite = daysSinceLog <= 45 ? recentLog.siteName : 'Warehouse';
+            }
           }
         }
+
 
 
         return {
@@ -216,6 +257,7 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
           nextServiceDate: nextDate.toISOString(),
           serviceIntervalMonths: a.serviceIntervalMonths || 2,
           status,
+          operationalStatus: (a.operationalStatus as OperationalStatus) || 'active',
           pattern: 'Routine',
           totalMaintenanceRecords: sessions.length,
           isActive: a.status === 'active'
@@ -224,7 +266,6 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
 
     // 2. Vehicles: All vehicles from the vehicle page
     const mappedVehicles = vehicles
-      .filter(v => !isInternalSite({ name: 'Main Office' }))
       .map(v => {
         const sessions = maintenanceSessions.filter(s => s.assets.some(sa => sa.assetId === v.id));
         const routineSessions = sessions.filter(s => s.type === 'routine' || s.type === 'scheduled');
@@ -304,6 +345,7 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
               damagedQuantity,
               unitOfMeasurement: a.unit,
               status: a.status,
+              operationalStatus: (a.operational_status as OperationalStatus) || 'active',
               location: a.location,
               condition: a.condition,
               description: a.description,
@@ -424,6 +466,7 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
             purchasedBy: r.purchased_by,
             supplier: r.supplier,
             notes: r.notes,
+            linkedLedgerIds: r.linked_ledger_ids || [],
             machineAllocations: r.machine_allocations || [],
             created_at: r.created_at,
             updated_at: r.updated_at,
@@ -431,6 +474,8 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
         }
       } catch (error) {
         console.error("Error fetching operations data:", error);
+      } finally {
+        setIsLoaded(true);
       }
     };
     if (user) {
@@ -516,6 +561,7 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
         damagedQuantity,
         unitOfMeasurement: a.unit,
         status: a.status,
+        operationalStatus: (a.operational_status as OperationalStatus) || 'active',
         location: a.location,
         condition: a.condition,
         description: a.description,
@@ -775,6 +821,7 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
                 purchasedBy: r.purchased_by,
                 supplier: r.supplier,
                 notes: r.notes,
+                linkedLedgerIds: r.linked_ledger_ids || [],
                 machineAllocations: r.machine_allocations || [],
                 created_at: r.created_at,
                 updated_at: r.updated_at,
@@ -1581,6 +1628,23 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
     };
   };
 
+  const updateAssetOperationalStatus = async (id: string, opStatus: OperationalStatus): Promise<void> => {
+    // Optimistic update
+    setAssets(prev => prev.map(a => a.id === id ? { ...a, operationalStatus: opStatus } : a));
+    try {
+      const { error } = await supabase
+        .from('operations_assets')
+        .update({ operational_status: opStatus, updated_at: new Date().toISOString() })
+        .eq('id', id);
+      if (error) throw error;
+    } catch (err: any) {
+      // Roll back on failure
+      setAssets(prev => prev.map(a => a.id === id ? { ...a, operationalStatus: undefined as any } : a));
+      toast.error(`Failed to update status: ${err.message || 'Unknown error'}`);
+      throw err;
+    }
+  };
+
   const persistSitePumpDates = async (assetId: string, siteId: string, pumpStartDate: string, pumpStopDate: string | null) => {
     try {
       const existing = sitePumpDates.find(p => p.assetId === assetId && p.siteId === siteId);
@@ -1655,6 +1719,7 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
       deleteCheckout,
       logMaintenance,
       updateMaintenance,
+      updateAssetOperationalStatus,
       getAssetAnalytics,
       getSiteAnalytics,
       getMaintenanceStats,
@@ -1848,6 +1913,7 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
             purchased_by: newRefill.purchasedBy ?? null,
             supplier: newRefill.supplier ?? null,
             notes: newRefill.notes ?? null,
+            linked_ledger_ids: newRefill.linkedLedgerIds ?? null,
             machine_allocations: newRefill.machineAllocations,
           });
           if (error) throw error;
@@ -1870,6 +1936,7 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
           if (updates.purchasedBy !== undefined) dbUpdates.purchased_by = updates.purchasedBy;
           if (updates.supplier !== undefined) dbUpdates.supplier = updates.supplier;
           if (updates.notes !== undefined) dbUpdates.notes = updates.notes;
+          if (updates.linkedLedgerIds !== undefined) dbUpdates.linked_ledger_ids = updates.linkedLedgerIds;
           if (updates.machineAllocations !== undefined) dbUpdates.machine_allocations = updates.machineAllocations;
           const { error } = await supabase.from('diesel_refills').update(dbUpdates).eq('id', id);
           if (error) throw error;
@@ -1890,6 +1957,7 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
           toast.warning('Refill deleted locally — sync failed');
         }
       },
+      isLoaded
     }}>
       {children}
     </OperationsContext.Provider>

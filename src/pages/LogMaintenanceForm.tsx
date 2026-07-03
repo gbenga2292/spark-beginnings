@@ -21,7 +21,7 @@ interface LogMaintenanceFormProps {
 }
 
 export function LogMaintenanceForm({ initialAssetId, editSessionId, onSuccess, onCancel }: LogMaintenanceFormProps) {
-  const { logMaintenance, updateMaintenance, maintenanceSessions, maintenanceAssets, assets } = useOperations();
+  const { logMaintenance, updateMaintenance, maintenanceSessions, maintenanceAssets, assets, updateAssetOperationalStatus } = useOperations();
   const { isDark } = useTheme();
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [type, setType] = useState<MaintenanceLogType>('scheduled');
@@ -122,6 +122,16 @@ export function LogMaintenanceForm({ initialAssetId, editSessionId, onSuccess, o
       if (onSuccess) onSuccess();
     } else {
       logMaintenance(payload);
+      
+      // Apply any pending operational status changes
+      payload.assets.forEach(asset => {
+        const pendingStatus = sessionStorage.getItem(`pending-op-status-${asset.assetId}`);
+        if (pendingStatus) {
+          updateAssetOperationalStatus(asset.assetId, pendingStatus as any);
+          sessionStorage.removeItem(`pending-op-status-${asset.assetId}`);
+        }
+      });
+      
       toast.success(`Successfully logged maintenance for ${selectedAssetIds.length} assets.`);
       setDate(new Date().toISOString().split('T')[0]);
       setType('scheduled');

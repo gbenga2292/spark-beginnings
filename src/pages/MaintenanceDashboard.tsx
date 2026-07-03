@@ -187,7 +187,7 @@ export function MaintenanceDashboard() {
                       contentStyle={{ borderRadius: '10px', border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`, backgroundColor: isDark ? '#0f172a' : '#fff', fontSize: '12px', fontWeight: 600 }}
                       formatter={(value: number) => [`₦${value.toLocaleString()}`, 'Cost']}
                     />
-                    <Bar dataKey="cost" fill="#3b82f6" radius={[0, 4, 4, 0]} barSize={24} />
+                    <Bar dataKey="cost" fill="#3b82f6" radius={[0, 4, 4, 0]} barSize={24} isAnimationActive={false} />
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
@@ -214,7 +214,7 @@ export function MaintenanceDashboard() {
                   <div className="w-full sm:flex-1 h-[200px] sm:h-[250px]">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
-                        <Pie data={topPartsUsed} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="count">
+                        <Pie data={topPartsUsed} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="count" isAnimationActive={false}>
                           {topPartsUsed.map((entry, index) => (
                             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                           ))}

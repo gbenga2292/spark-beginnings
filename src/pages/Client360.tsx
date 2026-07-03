@@ -1180,13 +1180,18 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
     const startDate = normalizeDate(siteEditForm.startDate || '');
     const endDate   = normalizeDate(siteEditForm.endDate   || '');
 
-    // Auto-compute status from date range
+    // Auto-compute status from date range:
+    // - Has end date → Ended
+    // - Has future start date → Inactive (not started yet)
+    // - Has no start date at all → Inactive (treat as pending/not yet scheduled)
+    // - Has past/today start date and no end date → Active
     const nowStr = new Date().toISOString().split('T')[0];
-    let computedStatus: 'Active' | 'Inactive' | 'Ended' =
-      siteEditForm.status as 'Active' | 'Inactive' | 'Ended' ?? 'Active';
+    let computedStatus: 'Active' | 'Inactive' | 'Ended';
     if (endDate) {
       computedStatus = 'Ended';
-    } else if (startDate && nowStr < startDate) {
+    } else if (!startDate) {
+      computedStatus = 'Inactive'; // No start date = not yet scheduled, treat as pending
+    } else if (nowStr < startDate) {
       computedStatus = 'Inactive';
     } else {
       computedStatus = 'Active';
@@ -1210,8 +1215,14 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
           ? 'Mainland (Yes 7.5% VAT)'
           : 'Free Trade Zone (0% VAT)';
 
+      // If site is no longer Active, revert onboarding record back to Pending
+      const linkedPSStatus = computedStatus === 'Active' ? 'Active' : 'Pending';
+
       updatePendingSite(linkedPS.id, {
         siteName: (siteEditForm.name ?? linkedPS.siteName),
+        status: linkedPSStatus,
+        // Clear siteId link if reverting to Pending so it shows in pending list
+        ...(linkedPSStatus === 'Pending' ? { siteId: undefined } : {}),
         phase1: {
           ...linkedPS.phase1,
           timelineStartDate: startDate || linkedPS.phase1.timelineStartDate,

@@ -10,7 +10,7 @@ import { isInternalSite } from '../lib/siteUtils';
 import {
   Activity, Wrench, Package, Building2, MapPin, AlertCircle,
   AlertTriangle, TrendingDown, TrendingUp, ChevronDown, ChevronUp,
-  CalendarDays, Fuel, Clock, FileText, X, Filter,
+  CalendarDays, Fuel, Clock, FileText, X, Filter, Loader2
 } from 'lucide-react';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -20,10 +20,10 @@ const fmt = (iso: string) =>
 
 const statusBadge = (status: string) => {
   switch (status) {
-    case 'overdue':    return <Badge className="bg-rose-100 text-rose-700 border-rose-200 border">Overdue</Badge>;
-    case 'due_soon':   return <Badge className="bg-amber-100 text-amber-700 border-amber-200 border">Due Soon</Badge>;
+    case 'overdue': return <Badge className="bg-rose-100 text-rose-700 border-rose-200 border">Overdue</Badge>;
+    case 'due_soon': return <Badge className="bg-amber-100 text-amber-700 border-amber-200 border">Due Soon</Badge>;
     case 'in_service': return <Badge className="bg-blue-100 text-blue-700 border-blue-200 border">In Service</Badge>;
-    default:           return <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 border">OK</Badge>;
+    default: return <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 border">OK</Badge>;
   }
 };
 
@@ -36,14 +36,14 @@ function rangesOverlap(aStart: string, aEnd: string, bStart: string, bEnd: strin
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export function MachineReconciliation() {
-  const { maintenanceAssets, waybills, assets, dailyMachineLogs, sitePumpDates, dieselRefills } = useOperations();
+  const { maintenanceAssets, waybills, assets, dailyMachineLogs, sitePumpDates, dieselRefills, isLoaded } = useOperations();
   const { pendingSites, sites, invoices } = useAppStore();
 
   const [expandedMachines, setExpandedMachines] = useState<Set<string>>(new Set());
 
   // ── Date filter ─────────────────────────────────────────────────────────────
   const [filterFrom, setFilterFrom] = useState<string>('');
-  const [filterTo, setFilterTo]     = useState<string>('');
+  const [filterTo, setFilterTo] = useState<string>('');
   const hasDateFilter = !!(filterFrom && filterTo);
   const clearFilter = () => { setFilterFrom(''); setFilterTo(''); };
 
@@ -64,15 +64,15 @@ export function MachineReconciliation() {
       if (!key) return;
       if (hasDateFilter) {
         const invStart = inv.date || '';
-        const invEnd   = inv.dueDate || inv.date || '';
+        const invEnd = inv.dueDate || inv.date || '';
         if (!rangesOverlap(invStart, invEnd, filterFrom, filterTo)) return;
       }
       if (!map.has(key)) {
         map.set(key, {
-          noOfMachine:   inv.noOfMachine || 0,
+          noOfMachine: inv.noOfMachine || 0,
           invoiceNumber: inv.invoiceNumber,
-          invoiceStart:  inv.date || '',
-          invoiceEnd:    inv.dueDate || inv.date || '',
+          invoiceStart: inv.date || '',
+          invoiceEnd: inv.dueDate || inv.date || '',
         });
       }
     });
@@ -80,25 +80,36 @@ export function MachineReconciliation() {
   }, [invoices, hasDateFilter, filterFrom, filterTo]);
 
   // ── Stat card numbers ──────────────────────────────────────────────────────
-  const totalMachines    = maintenanceAssets.length;
-  const activeOnSite     = maintenanceAssets.filter(m => !isInternalSite({ name: m.site }) && m.site !== 'Warehouse' && m.isActive).length;
-  const idle             = maintenanceAssets.filter(m => (isInternalSite({ name: m.site }) || m.site === 'Warehouse') && m.isActive).length;
-  const underMaintenance = maintenanceAssets.filter(m => !m.isActive || m.status === 'overdue').length;
+  const machines = maintenanceAssets.filter(m => m.category === 'machine');
+  const totalMachines = machines.length;
+  // Respect operationalStatus for the new tri-state counts
+  const activeOnSite = machines.filter(m => {
+    const opStatus = m.operationalStatus ?? 'active';
+    return opStatus === 'active' && !isInternalSite({ name: m.site }) && m.site !== 'Warehouse' && m.isActive;
+  }).length;
+  const idle = machines.filter(m => {
+    const opStatus = m.operationalStatus ?? 'active';
+    return opStatus === 'idle' || ((isInternalSite({ name: m.site }) || m.site === 'Warehouse') && m.isActive && opStatus === 'active');
+  }).length;
+  const underMaintenance = machines.filter(m => (m.operationalStatus ?? 'active') === 'under_maintenance').length;
 
   // ── Active sites map ────────────────────────────────────────────────────────
   const activeSitesMap = useMemo(() => {
     const map = new Map<string, {
-      siteName: string; machinesOnSite: number; status: string; expectedMachines: number;
+      client: string; siteName: string; machinesOnSite: number; status: string; expectedMachines: number;
       invoiceNumber?: string; invoiceStart?: string; invoiceEnd?: string;
       activeMachinesInPeriod?: number;
     }>();
     sites.forEach(s => {
       if (s.status === 'Active' && !isInternalSite(s)) {
-        const onboarding = pendingSites.find(p => 
+        // A site with no startDate is treated as "Pending Site" — skip from Active list
+        const hasStartDate = s.startDate && s.startDate.trim() !== '';
+        if (!hasStartDate) return;
+        const onboarding = pendingSites.find(p =>
           p.siteId === s.id ||
-          p.id === s.id || 
-          (p.siteName?.trim().toLowerCase() === s.name.trim().toLowerCase() && 
-           p.clientName?.trim().toLowerCase() === s.client.trim().toLowerCase())
+          p.id === s.id ||
+          (p.siteName?.trim().toLowerCase() === s.name.trim().toLowerCase() &&
+            p.clientName?.trim().toLowerCase() === s.client.trim().toLowerCase())
         );
         if (onboarding && onboarding.phase1?.whatIsBeingBuilt && onboarding.phase1.whatIsBeingBuilt.trim().toLowerCase() !== 'dewatering') {
           return;
@@ -150,7 +161,7 @@ export function MachineReconciliation() {
         }
 
         map.set(s.name, {
-          siteName: s.name, machinesOnSite, status: s.status, expectedMachines,
+          client: s.client, siteName: s.name, machinesOnSite, status: s.status, expectedMachines,
           invoiceNumber: invData?.invoiceNumber,
           invoiceStart: invData?.invoiceStart,
           invoiceEnd: invData?.invoiceEnd,
@@ -162,16 +173,52 @@ export function MachineReconciliation() {
   }, [sites, pendingSites, waybills, assets, latestInvoiceForSite, hasDateFilter, filterFrom, filterTo, dailyMachineLogs]);
 
   // ── Pending sites ───────────────────────────────────────────────────────────
-  const pendingSitesList = useMemo(() =>
-    pendingSites
+  // Two sources:
+  //   1) SiteQuestionnaire entries with status === 'Pending'
+  //   2) Sites in the sites table that have status 'Active' but no startDate yet (e.g. Aerobell)
+  const pendingSitesList = useMemo(() => {
+    // Source 1: pending questionnaire entries
+    const fromQuestionnaire = pendingSites
       .filter(s => s.status === 'Pending' && s.phase1?.whatIsBeingBuilt?.trim().toLowerCase() === 'dewatering')
-      .map(s => ({
-        id: s.id,
-        siteName: s.siteName || 'Unknown Site',
-        client: s.clientName || 'Unknown Client',
-        pumpsRequired: parseInt(s.phase3?.totalPumpsRequired || '0', 10) || 0,
-      })),
-  [pendingSites]);
+      .map(s => {
+        const key = (s.siteName || '').toLowerCase().trim();
+        const invData = latestInvoiceForSite.get(key);
+        return {
+          id: s.id,
+          siteName: s.siteName || 'Unknown Site',
+          client: s.clientName || 'Unknown Client',
+          pumpsRequired: parseInt(s.phase3?.totalPumpsRequired || '0', 10) || 0,
+          pumpsInvoice: invData ? invData.noOfMachine : null,
+          invoiceNumber: invData ? invData.invoiceNumber : null,
+          source: 'questionnaire' as const,
+        };
+      });
+
+    // Source 2: sites table entries with Active status but no startDate
+    const fromSitesTable = sites
+      .filter(s => s.status === 'Active' && !isInternalSite(s) && (!s.startDate || s.startDate.trim() === ''))
+      .map(s => {
+        const key = s.name.toLowerCase().trim();
+        const invData = latestInvoiceForSite.get(key);
+        // avoid duplicates with questionnaire list
+        const alreadyInQuestionnaire = fromQuestionnaire.some(
+          q => q.siteName.trim().toLowerCase() === s.name.trim().toLowerCase()
+        );
+        if (alreadyInQuestionnaire) return null;
+        return {
+          id: s.id,
+          siteName: s.name,
+          client: s.client,
+          pumpsRequired: invData ? invData.noOfMachine : 0,
+          pumpsInvoice: invData ? invData.noOfMachine : null,
+          invoiceNumber: invData ? invData.invoiceNumber : null,
+          source: 'site' as const,
+        };
+      })
+      .filter((s): s is NonNullable<typeof s> => s !== null);
+
+    return [...fromQuestionnaire, ...fromSitesTable];
+  }, [pendingSites, sites, latestInvoiceForSite]);
 
   const totalRequiredPumps = pendingSitesList.reduce((acc, c) => acc + c.pumpsRequired, 0);
 
@@ -180,11 +227,13 @@ export function MachineReconciliation() {
     activeSitesMap
       .filter(s => s.expectedMachines > 0 && s.machinesOnSite !== s.expectedMachines)
       .map(s => ({ ...s, delta: s.machinesOnSite - s.expectedMachines })),
-  [activeSitesMap]);
+    [activeSitesMap]);
 
   // ── Per-machine data: active days broken down by site ──────────────────────
   const perMachineData = useMemo(() => {
-    return maintenanceAssets.map(machine => {
+    return maintenanceAssets
+      .filter(m => m.category === 'machine')
+      .map(machine => {
       const machineLogs = dailyMachineLogs.filter(l => {
         if (l.assetId !== machine.id) return false;
         if (hasDateFilter && (l.date < filterFrom || l.date > filterTo)) return false;
@@ -208,7 +257,7 @@ export function MachineReconciliation() {
           existing.activeDays += log.operationalDay === 'half' ? 0.5 : log.operationalDay === 'none' ? 0 : 1;
         }
         if (log.date < existing.firstLog) existing.firstLog = log.date;
-        if (log.date > existing.lastLog)  existing.lastLog  = log.date;
+        if (log.date > existing.lastLog) existing.lastLog = log.date;
         siteMap.set(log.siteId, existing);
       });
 
@@ -220,8 +269,8 @@ export function MachineReconciliation() {
         .map(s => ({
           ...s,
           pumpStartDate: pumpDateMap[s.siteId]?.pumpStartDate ?? s.firstLog,
-          pumpStopDate:  pumpDateMap[s.siteId]?.pumpStopDate  ?? null,
-          isCurrent:     machine.site === s.siteName,
+          pumpStopDate: pumpDateMap[s.siteId]?.pumpStopDate ?? null,
+          isCurrent: machine.site === s.siteName,
         }))
         .sort((a, b) => b.lastLog.localeCompare(a.lastLog));
 
@@ -236,7 +285,7 @@ export function MachineReconciliation() {
     maintenanceAssets
       .filter(m => m.status === 'overdue' || m.status === 'due_soon')
       .sort((a, b) => (a.status === 'overdue' ? -1 : 1)),
-  [maintenanceAssets]);
+    [maintenanceAssets]);
 
   // ── Diesel summary per site ─────────────────────────────────────────────────
   const dieselSummary = useMemo(() => {
@@ -275,10 +324,25 @@ export function MachineReconciliation() {
       siteMap.set(l.siteId, e);
     });
 
-    return Array.from(siteMap.values()).filter(s => s.refilled > 0 || s.logged > 0);
-  }, [dieselRefills, dailyMachineLogs, hasDateFilter, filterFrom, filterTo]);
+    return Array.from(siteMap.entries())
+      .filter(([siteId]) => {
+        const siteObj = sites.find(x => x.id === siteId || x.name.toLowerCase().trim() === siteId.toLowerCase().trim());
+        return siteObj ? siteObj.status === 'Active' : false;
+      })
+      .map(([_, s]) => s)
+      .filter(s => s.refilled > 0 || s.logged > 0);
+  }, [dieselRefills, dailyMachineLogs, hasDateFilter, filterFrom, filterTo, sites]);
 
   // ── Render ──────────────────────────────────────────────────────────────────
+  if (!isLoaded) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-slate-500 gap-3">
+        <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
+        <p className="text-sm font-medium">Reconciling Machine Data...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
 
@@ -395,15 +459,14 @@ export function MachineReconciliation() {
             {discrepancies.map(d => (
               <div
                 key={d.siteName}
-                className={`flex items-start gap-3 p-3 rounded-xl border ${
-                  d.delta < 0
+                className={`flex items-start gap-3 p-3 rounded-xl border ${d.delta < 0
                     ? 'bg-rose-50 border-rose-200 dark:bg-rose-950/30 dark:border-rose-800'
                     : 'bg-amber-50 border-amber-200 dark:bg-amber-950/30 dark:border-amber-800'
-                }`}
+                  }`}
               >
                 {d.delta < 0
                   ? <TrendingDown className="h-5 w-5 text-rose-500 flex-shrink-0 mt-0.5" />
-                  : <TrendingUp   className="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5" />
+                  : <TrendingUp className="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5" />
                 }
                 <div>
                   <p className={`text-sm font-semibold ${d.delta < 0 ? 'text-rose-800 dark:text-rose-300' : 'text-amber-800 dark:text-amber-300'}`}>
@@ -446,6 +509,7 @@ export function MachineReconciliation() {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead>Client</TableHead>
                       <TableHead>Site Name</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead className="text-right">
@@ -467,6 +531,7 @@ export function MachineReconciliation() {
                   <TableBody>
                     {activeSitesMap.map((site, i) => (
                       <TableRow key={i}>
+                        <TableCell className="font-medium text-slate-500">{site.client}</TableCell>
                         <TableCell className="font-medium">{site.siteName}</TableCell>
                         <TableCell>
                           <Badge variant="outline" className="text-emerald-700 bg-emerald-50 border-emerald-200">
@@ -488,8 +553,8 @@ export function MachineReconciliation() {
                                   site.activeMachinesInPeriod === site.expectedMachines
                                     ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
                                     : site.activeMachinesInPeriod < site.expectedMachines
-                                    ? 'text-rose-700 bg-rose-50 border-rose-200'
-                                    : 'text-amber-700 bg-amber-50 border-amber-200'
+                                      ? 'text-rose-700 bg-rose-50 border-rose-200'
+                                      : 'text-amber-700 bg-amber-50 border-amber-200'
                                 }
                               >
                                 {site.activeMachinesInPeriod}
@@ -533,7 +598,8 @@ export function MachineReconciliation() {
                     <TableRow>
                       <TableHead>Site Name</TableHead>
                       <TableHead>Client</TableHead>
-                      <TableHead className="text-right">Pumps Required</TableHead>
+                      <TableHead className="text-right">Pumps Required (Onboarding)</TableHead>
+                      <TableHead className="text-right">Pumps (Invoice)</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -545,6 +611,15 @@ export function MachineReconciliation() {
                           <Badge variant="outline" className="font-bold border-purple-200 text-purple-700 bg-purple-50">
                             {site.pumpsRequired}
                           </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {site.pumpsInvoice !== null ? (
+                            <Badge variant="outline" className="font-bold border-blue-200 text-blue-700 bg-blue-50" title={`Invoice ${site.invoiceNumber}`}>
+                              {site.pumpsInvoice}
+                            </Badge>
+                          ) : (
+                            <span className="text-slate-400">—</span>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -618,17 +693,16 @@ export function MachineReconciliation() {
                       <React.Fragment key={machine.id}>
                         {/* Main machine row */}
                         <TableRow
-                          className={`cursor-pointer transition-colors ${
-                            isExpanded
+                          className={`cursor-pointer transition-colors ${isExpanded
                               ? 'bg-indigo-50/60 dark:bg-indigo-950/20'
                               : 'hover:bg-slate-50 dark:hover:bg-slate-900/50'
-                          }`}
+                            }`}
                           onClick={() => hasSiteHistory && toggleExpand(machine.id)}
                         >
                           <TableCell className="text-center">
                             {hasSiteHistory ? (
                               isExpanded
-                                ? <ChevronUp   className="h-4 w-4 text-indigo-500 mx-auto" />
+                                ? <ChevronUp className="h-4 w-4 text-indigo-500 mx-auto" />
                                 : <ChevronDown className="h-4 w-4 text-slate-400 mx-auto" />
                             ) : (
                               <span className="text-slate-300 text-xs mx-auto block text-center">—</span>
@@ -639,9 +713,8 @@ export function MachineReconciliation() {
                             {machine.serialNumber || '—'}
                           </TableCell>
                           <TableCell>
-                            <span className={`text-sm font-medium ${
-                              machine.site === 'Warehouse' ? 'text-amber-600' : 'text-emerald-700'
-                            }`}>
+                            <span className={`text-sm font-medium ${machine.site === 'Warehouse' ? 'text-amber-600' : 'text-emerald-700'
+                              }`}>
                               {machine.site}
                             </span>
                           </TableCell>
@@ -678,9 +751,8 @@ export function MachineReconciliation() {
                                       return (
                                         <tr
                                           key={idx}
-                                          className={`border-t border-indigo-100 dark:border-indigo-900 ${
-                                            sh.isCurrent ? 'bg-emerald-50/60 dark:bg-emerald-950/20' : ''
-                                          }`}
+                                          className={`border-t border-indigo-100 dark:border-indigo-900 ${sh.isCurrent ? 'bg-emerald-50/60 dark:bg-emerald-950/20' : ''
+                                            }`}
                                         >
                                           <td className="px-4 py-2.5 font-medium text-slate-800 dark:text-slate-200">
                                             <div className="flex items-center gap-2">
@@ -711,11 +783,10 @@ export function MachineReconciliation() {
                                             <div className="flex items-center justify-end gap-2">
                                               <div className="w-20 h-2 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
                                                 <div
-                                                  className={`h-full rounded-full ${
-                                                    utilPct >= 80 ? 'bg-emerald-500'
-                                                    : utilPct >= 50 ? 'bg-amber-400'
-                                                    : 'bg-rose-400'
-                                                  }`}
+                                                  className={`h-full rounded-full ${utilPct >= 80 ? 'bg-emerald-500'
+                                                      : utilPct >= 50 ? 'bg-amber-400'
+                                                        : 'bg-rose-400'
+                                                    }`}
                                                   style={{ width: `${utilPct}%` }}
                                                 />
                                               </div>

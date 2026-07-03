@@ -694,12 +694,18 @@ export function Sites() {
       toast.error(`"${editForm.client} – ${editForm.name}" already exists. Client + Site must be unique.`);
       return;
     }
-    // Auto status based on end date
+    // Auto status based on date range:
+    // - Has end date → Ended
+    // - Has future start date → Inactive (not started yet)
+    // - Has no start date at all → Inactive (treat as pending/not yet scheduled)
+    // - Has past/today start date and no end date → Active
     const nowStr = new Date().toISOString().split('T')[0];
-    let submitStatus = editForm.status;
+    let submitStatus: 'Active' | 'Inactive' | 'Ended';
     if (editForm.endDate) {
       submitStatus = 'Ended';
-    } else if (editForm.startDate && nowStr < editForm.startDate) {
+    } else if (!editForm.startDate) {
+      submitStatus = 'Inactive'; // No start date = not yet scheduled, treat as pending
+    } else if (nowStr < editForm.startDate) {
       submitStatus = 'Inactive';
     } else {
       submitStatus = 'Active';
@@ -717,9 +723,15 @@ export function Sites() {
                        editForm.vat === 'Yes' ? 'Mainland (Yes 7.5% VAT)' : 
                        'Free Trade Zone (0% VAT)';
       
+      // If site is no longer Active, revert onboarding record back to Pending
+      const linkedPSStatus = submitStatus === 'Active' ? 'Active' : 'Pending';
+
       updatePendingSite(linkedPS.id, {
         siteName: editForm.name,
         clientName: editForm.client,
+        status: linkedPSStatus,
+        // Clear siteId link if reverting to Pending so it shows in pending list
+        ...(linkedPSStatus === 'Pending' ? { siteId: undefined } : {}),
         phase1: {
           ...linkedPS.phase1,
           timelineStartDate: editForm.startDate || linkedPS.phase1.timelineStartDate
@@ -730,7 +742,7 @@ export function Sites() {
         },
         phase5: {
           ...linkedPS.phase5,
-          actualEndDate: editForm.endDate // Correctly pass empty string if cleared
+          actualEndDate: editForm.endDate
         }
       });
     }

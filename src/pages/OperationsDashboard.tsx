@@ -132,11 +132,56 @@ export function Dashboard() {
     // 1. Add all configured pump dates
     sitePumpDates.forEach(pd => {
       if (pd.pumpStartDate) {
+        const quantityOnSite = siteInventoryMap.get(pd.siteId)?.get(pd.assetId)?.quantity ?? 0;
+        let pumpStopDate = pd.pumpStopDate;
+
+        // Find when the machine left this site.
+        // It could leave via:
+        // 1. A return waybill from this site (wb.type === 'return' && wb.siteId === pd.siteId)
+        // 2. A dispatch waybill to a different site (wb.type === 'waybill' && wb.siteId !== pd.siteId)
+        const removalEvents = waybills
+          .filter(wb => wb.status !== 'outstanding')
+          .filter(wb => wb.items.some(item => item.assetId === pd.assetId))
+          .map(wb => {
+            const dateStr = (wb.sentToSiteDate || wb.issueDate || '').substring(0, 10);
+            const isReturn = wb.type === 'return' && wb.siteId === pd.siteId;
+            const isTransfer = wb.type === 'waybill' && wb.siteId !== pd.siteId;
+            return { date: dateStr, isReturn, isTransfer };
+          })
+          .filter(e => e.date && e.date >= pd.pumpStartDate && (e.isReturn || e.isTransfer))
+          .sort((a, b) => a.date.localeCompare(b.date)); // earliest event first
+
+        if (removalEvents.length > 0) {
+          const earliestRemoval = removalEvents[0];
+          let stopDateStr = earliestRemoval.date;
+          
+          // If it was a transfer to a different site, it left the current site the day before the transfer.
+          if (earliestRemoval.isTransfer) {
+            const nextDispatchDate = parseISO(earliestRemoval.date);
+            const stopDate = new Date(nextDispatchDate);
+            stopDate.setDate(stopDate.getDate() - 1);
+            stopDateStr = format(stopDate, 'yyyy-MM-dd');
+          }
+          
+          if (!pumpStopDate || stopDateStr < pumpStopDate) {
+            pumpStopDate = stopDateStr;
+          }
+        } else if (quantityOnSite <= 0) {
+          // Fallback if no waybills found but quantity is 0
+          const machineLogs = dailyMachineLogs.filter(l => l.siteId === pd.siteId && l.assetId === pd.assetId);
+          if (machineLogs.length > 0) {
+            const latestLog = machineLogs.reduce((acc, log) => !acc || log.date > acc ? log.date : acc, '');
+            pumpStopDate = latestLog.substring(0, 10);
+          } else {
+            pumpStopDate = pd.pumpStartDate;
+          }
+        }
+
         pumpPeriods.push({
           siteId: pd.siteId,
           assetId: pd.assetId,
           pumpStartDate: pd.pumpStartDate,
-          pumpStopDate: pd.pumpStopDate,
+          pumpStopDate: pumpStopDate,
         });
       }
     });
@@ -172,6 +217,7 @@ export function Dashboard() {
       assetName: string;
       pumpStart: Date;
       pumpStop: Date | null;  // actual configured pumpStopDate (or null if ongoing)
+      displayEnd: Date;      // the date up to which we are checking logs (usually yesterday)
       missingDays: number;
       lastLogDate: Date | null;
       gapDays: number;       // days since last log to effective end
@@ -181,33 +227,36 @@ export function Dashboard() {
     pumpPeriods.forEach(pd => {
       const pumpStart = parseISO(pd.pumpStartDate);
       const pumpStop = pd.pumpStopDate ? parseISO(pd.pumpStopDate) : null;
-      // Effective end: use pumpStop if set, otherwise today. Cap at today to prevent future warnings.
-      const effectiveEnd = pumpStop && pumpStop < today ? pumpStop : today;
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
 
-      // Only report machines whose pump period has started
-      if (pumpStart > today) return;
+      // Only report machines whose pump period has started by yesterday
+      if (pumpStart > yesterday) return;
+
+      // For missing days, cap at pumpStop or yesterday
+      const effectiveEndForMissing = pumpStop && pumpStop < yesterday ? pumpStop : yesterday;
 
       const key = `${pd.siteId}::${pd.assetId}`;
       const loggedDates = loggedDatesMap.get(key) || new Set<string>();
 
-      // Count days in the pump range that have no log
-      const daysInRange = eachDayOfInterval({ start: pumpStart, end: effectiveEnd });
+      // Count days in the pump range (up to yesterday) that have no log
+      const daysInRange = eachDayOfInterval({ start: pumpStart, end: effectiveEndForMissing });
       const missingDays = daysInRange.filter(d => {
         const ds = format(d, 'yyyy-MM-dd');
         return !loggedDates.has(ds);
       }).length;
 
-      if (missingDays === 0) return; // fully logged — no notification
+      if (missingDays === 0) return; // fully logged up to yesterday — no notification
 
       // Find the last log within the pump range
       const logsInRange = Array.from(loggedDates)
-        .filter(ds => ds >= pd.pumpStartDate && ds <= format(effectiveEnd, 'yyyy-MM-dd'))
+        .filter(ds => ds >= pd.pumpStartDate && ds <= format(effectiveEndForMissing, 'yyyy-MM-dd'))
         .sort();
       const lastLogDate = logsInRange.length > 0 ? parseISO(logsInRange[logsInRange.length - 1]) : null;
 
-      // Gap = days from last log (or pump start if none) to effective end
+      // Gap = days from last log (or pump start if none) to effective end (yesterday)
       const gapFrom = lastLogDate || pumpStart;
-      const gapDays = Math.max(0, differenceInDays(effectiveEnd, gapFrom));
+      const gapDays = Math.max(0, differenceInDays(effectiveEndForMissing, gapFrom));
 
       const siteMeta = sites.find(s => s.id === pd.siteId);
       const siteStatus = siteMeta?.status || 'Active';
@@ -225,6 +274,7 @@ export function Dashboard() {
         assetName,
         pumpStart,
         pumpStop,
+        displayEnd: effectiveEndForMissing,
         missingDays,
         lastLogDate,
         gapDays,
@@ -563,7 +613,7 @@ export function Dashboard() {
                         <Clock className="h-3 w-3 shrink-0" />
                         Pump period: {format(notif.pumpStart, 'dd MMM yyyy')}
                         <span className="text-slate-400 font-normal mx-0.5">→</span>
-                        {notif.pumpStop ? format(notif.pumpStop, 'dd MMM yyyy') : `${format(new Date(), 'dd MMM yyyy')} (Today)`}
+                        {notif.pumpStop ? format(notif.pumpStop, 'dd MMM yyyy') : `${format(notif.displayEnd, 'dd MMM yyyy')} (Yesterday)`}
                         {notif.lastLogDate && (
                           <span className="text-slate-400 font-normal ml-1">
                             · Last log: {format(notif.lastLogDate, 'dd MMM')}

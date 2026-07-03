@@ -2,6 +2,7 @@ export type AssetCategory = 'dewatering' | 'waterproofing' | 'tiling' | 'ppe' | 
 export type AssetType = 'consumable' | 'non-consumable' | 'tools' | 'equipment' | 'reusables';
 export type AssetCondition = 'good' | 'fair' | 'poor' | 'damaged' | 'missing';
 export type AssetStatus = 'active' | 'archived';
+export type OperationalStatus = 'active' | 'idle' | 'under_maintenance';
 
 export interface RestockRecord {
   id: string;
@@ -35,6 +36,7 @@ export interface Asset {
   requiresLogging?: boolean;
   serialNumber?: string;
   serviceIntervalMonths?: number;
+  operationalStatus?: OperationalStatus;
   restockHistory?: RestockRecord[];
   created_at?: string;
 }
@@ -130,6 +132,7 @@ export interface MaintenanceRecord {
   downtimeHours?: number;
 }
 
+
 export interface MaintenanceAsset {
   id: string;
   name: string;
@@ -140,6 +143,7 @@ export interface MaintenanceAsset {
   nextServiceDate: string;
   serviceIntervalMonths: number;
   status: ServiceStatus;
+  operationalStatus?: OperationalStatus;
   pattern: string;
   totalMaintenanceRecords: number;
   isActive: boolean;
@@ -322,6 +326,7 @@ export interface DieselRefill {
   purchasedBy?: string;
   supplier?: string;
   notes?: string;
+  linkedLedgerIds?: string[];
   machineAllocations: DieselRefillAllocation[];
   created_at?: string;
   updated_at?: string;

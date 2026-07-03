@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Fuel, Plus, X, ChevronDown, ChevronUp, Pencil, Trash2, Save,
   Building2, Calendar, Droplets, Package, AlertCircle, CheckCircle2,
-  Info, ChevronRight, Gauge, BarChart3, List
+  Info, ChevronRight, Gauge, BarChart3, List, Link as LinkIcon
 } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { useTheme } from '@/src/hooks/useTheme';
@@ -74,7 +74,8 @@ interface RefillFormProps {
 function RefillForm({ editing, onClose, onSave }: RefillFormProps) {
   const { isDark } = useTheme();
   const sites = useAppStore(s => s.sites);
-  const { dailyMachineLogs, logDailyActivity } = useOperations();
+  const ledgerEntries = useAppStore(s => s.ledgerEntries);
+  const { dailyMachineLogs, logDailyActivity, dieselRefills } = useOperations();
 
   const [date, setDate] = useState(editing?.date || today());
   const [totalLitres, setTotalLitres] = useState(editing?.totalLitres?.toString() || '');
@@ -82,6 +83,7 @@ function RefillForm({ editing, onClose, onSave }: RefillFormProps) {
   const [purchasedBy, setPurchasedBy] = useState(editing?.purchasedBy || '');
   const [supplier, setSupplier] = useState(editing?.supplier || '');
   const [notes, setNotes] = useState(editing?.notes || '');
+  const [linkedLedgerIds, setLinkedLedgerIds] = useState<string[]>(editing?.linkedLedgerIds || []);
   const [isSaving, setIsSaving] = useState(false);
 
   const activeSites = useMemo(() => sites.filter(s => s.status === 'Active'), [sites]);
@@ -98,7 +100,81 @@ function RefillForm({ editing, onClose, onSave }: RefillFormProps) {
   });
 
   const [selectedMachineToAdd, setSelectedMachineToAdd] = useState('');
+  const [ledgerSearch, setLedgerSearch] = useState('');
 
+  // Calculate remaining amounts for each ledger entry
+  const ledgerRemainingAmounts = useMemo(() => {
+    const remaining = new Map<string, number>();
+    
+    // Initialize with full amounts
+    ledgerEntries.forEach(e => {
+      remaining.set(e.id, Number(e.amount) || 0);
+    });
+
+    // Subtract used amounts from other diesel refills
+    dieselRefills.forEach(refill => {
+      // Ignore the refill currently being edited so we can reallocate its cost
+      if (editing?.id && refill.id === editing.id) return;
+      
+      if (!refill.linkedLedgerIds || refill.linkedLedgerIds.length === 0) return;
+      if (!refill.totalCost) return;
+
+      let costToCover = refill.totalCost;
+      
+      // Distribute cost across linked ledgers
+      for (const lid of refill.linkedLedgerIds) {
+        if (costToCover <= 0) break;
+        const currentRemaining = remaining.get(lid) || 0;
+        if (currentRemaining > 0) {
+          const amountToUse = Math.min(costToCover, currentRemaining);
+          remaining.set(lid, currentRemaining - amountToUse);
+          costToCover -= amountToUse;
+        }
+      }
+    });
+
+    return remaining;
+  }, [ledgerEntries, dieselRefills, editing]);
+
+  // Find eligible ledger entries
+  const eligibleLedgerEntries = useMemo(() => {
+    // 1. Re-embursable Expense
+    // 2. Contains "diesel" in description
+    const filtered = ledgerEntries.filter(
+      e => e.category === 'Re-embursable Expense' && e.description.toLowerCase().includes('diesel')
+    );
+    
+    // Filter out fully consumed ledgers unless they are linked to the current edit
+    return filtered.filter(e => {
+      const remaining = ledgerRemainingAmounts.get(e.id) || 0;
+      return remaining > 0 || linkedLedgerIds.includes(e.id);
+    });
+  }, [ledgerEntries, ledgerRemainingAmounts, linkedLedgerIds]);
+
+  // Filter eligible ledger entries by search string
+  const filteredLedgerEntries = useMemo(() => {
+    if (!ledgerSearch.trim()) return eligibleLedgerEntries;
+    const query = ledgerSearch.toLowerCase();
+    return eligibleLedgerEntries.filter(entry => {
+      const matchDesc = entry.description?.toLowerCase().includes(query);
+      const matchSite = entry.site?.toLowerCase().includes(query);
+      const matchClient = entry.client?.toLowerCase().includes(query);
+      const matchVoucher = entry.voucherNo?.toLowerCase().includes(query);
+      const matchAmount = (ledgerRemainingAmounts.get(entry.id) || 0).toString().includes(query) || 
+                          entry.amount.toString().includes(query);
+      return matchDesc || matchSite || matchClient || matchVoucher || matchAmount;
+    });
+  }, [eligibleLedgerEntries, ledgerSearch, ledgerRemainingAmounts]);
+
+  const handleToggleLedger = (id: string) => {
+    setLinkedLedgerIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+
+  const totalLinkedAmount = useMemo(() => {
+    return linkedLedgerIds.reduce((sum, id) => {
+      return sum + (ledgerRemainingAmounts.get(id) || 0);
+    }, 0);
+  }, [linkedLedgerIds, ledgerRemainingAmounts]);
   const handleDateChange = (newDate: string) => {
     const prevDate = date;
     setDate(newDate);
@@ -129,11 +205,12 @@ function RefillForm({ editing, onClose, onSave }: RefillFormProps) {
     } : a));
   };
 
-  const addMachine = (machineId: string) => {
-    if (!machineId) return;
-    if (allocations.some(a => a.assetId === machineId)) return;
+  const addMachine = (machineSiteId: string) => {
+    if (!machineSiteId) return;
+    const [assetId, siteId] = machineSiteId.split('-');
+    if (allocations.some(a => a.assetId === assetId && a.siteId === siteId)) return;
     
-    const machine = allActiveMachines.find(m => m.assetId === machineId);
+    const machine = allActiveMachines.find(m => m.assetId === assetId && m.siteId === siteId);
     if (!machine) return;
 
     const existingLog = dailyMachineLogs.find(
@@ -248,7 +325,17 @@ function RefillForm({ editing, onClose, onSave }: RefillFormProps) {
         purchasedBy: purchasedBy || undefined,
         supplier: supplier || undefined,
         notes: notes || undefined,
-        machineAllocations: allocations,
+        linkedLedgerIds,
+        machineAllocations: allocations.map(a => ({
+          assetId: a.assetId,
+          assetName: a.assetName,
+          siteId: a.siteId,
+          siteName: a.siteName,
+          allocatedLitres: a.allocatedLitres,
+          actualUsed: a.actualUsed,
+          notes: a.notes,
+          refillDate: a.refillDate
+        })),
       });
       onClose();
     } catch (e: any) {
@@ -318,6 +405,101 @@ function RefillForm({ editing, onClose, onSave }: RefillFormProps) {
             <input type="text" value={notes} onChange={e => setNotes(e.target.value)} placeholder="Optional global notes" className={inp} />
           </div>
         </div>
+
+        {/* Linked Ledger Entries */}
+        <div className={cn("mt-4 p-4 rounded-xl border", isDark ? "border-slate-800 bg-slate-900/50" : "border-slate-200 bg-slate-50")}>
+          <div className="flex justify-between items-end mb-3">
+            <div>
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Link Financial Ledger (Re-embursables)</p>
+              <p className="text-[10px] text-slate-400">Select ledger entries matching 'diesel' to reconcile cost.</p>
+            </div>
+            {totalCost !== undefined && totalCost > 0 && (
+              <div className={cn(
+                "px-2 py-1 rounded-lg text-xs font-bold border",
+                totalLinkedAmount === totalCost ? (isDark ? "bg-emerald-950/40 text-emerald-400 border-emerald-800" : "bg-emerald-50 text-emerald-700 border-emerald-200") :
+                totalLinkedAmount > 0 ? (isDark ? "bg-amber-950/40 text-amber-400 border-amber-800" : "bg-amber-50 text-amber-700 border-amber-200") :
+                (isDark ? "bg-slate-800 text-slate-400 border-slate-700" : "bg-white text-slate-500 border-slate-200")
+              )}>
+                Linked: {fmtCurrency(totalLinkedAmount)} / {fmtCurrency(totalCost)}
+              </div>
+            )}
+          </div>
+          
+          {eligibleLedgerEntries.length === 0 ? (
+            <p className="text-xs text-slate-400 italic">No available diesel re-embursable expenses found in ledger.</p>
+          ) : (
+            <>
+              {/* Mini Search Bar */}
+              <div className="mb-3 relative">
+                <input
+                  type="text"
+                  value={ledgerSearch}
+                  onChange={e => setLedgerSearch(e.target.value)}
+                  placeholder="Search ledger by description, site, client, voucher, or amount..."
+                  className={cn(
+                    "w-full h-8 pl-8 pr-8 rounded-lg text-xs border focus:outline-none focus:ring-1 focus:ring-indigo-500",
+                    isDark ? "bg-slate-800 border-slate-700 text-white placeholder-slate-500" : "bg-white border-slate-200 text-slate-900 placeholder-slate-400"
+                  )}
+                />
+                <span className="absolute left-2.5 top-2 text-slate-400 dark:text-slate-500">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </span>
+                {ledgerSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setLedgerSearch('')}
+                    className="absolute right-2.5 top-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+
+              {filteredLedgerEntries.length === 0 ? (
+                <p className="text-xs text-slate-400 italic py-2">No matching ledger entries found.</p>
+              ) : (
+                <div className="max-h-48 overflow-y-auto pr-2 space-y-1">
+                  {filteredLedgerEntries.map(entry => (
+                    <label key={entry.id} className={cn(
+                      "flex items-center gap-3 p-2 rounded-lg border cursor-pointer transition-colors",
+                      linkedLedgerIds.includes(entry.id) 
+                        ? (isDark ? "bg-indigo-950/30 border-indigo-800/50" : "bg-indigo-50 border-indigo-200") 
+                        : (isDark ? "bg-slate-800 border-slate-700 hover:bg-slate-700" : "bg-white border-slate-200 hover:bg-slate-50")
+                    )}>
+                      <input
+                        type="checkbox"
+                        checked={linkedLedgerIds.includes(entry.id)}
+                        onChange={() => handleToggleLedger(entry.id)}
+                        className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex justify-between items-start">
+                          <p className={cn("text-sm font-semibold truncate", isDark ? "text-slate-200" : "text-slate-700")}>
+                            {entry.description}
+                          </p>
+                          <p className={cn("text-sm font-bold ml-2", isDark ? "text-white" : "text-slate-900")}>
+                            {fmtCurrency(ledgerRemainingAmounts.get(entry.id) || 0)}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2 mt-0.5 text-[10px] text-slate-500">
+                          <span>{entry.voucherNo}</span>
+                          <span>•</span>
+                          <span>{new Date(entry.date).toLocaleDateString('en-GB')}</span>
+                          <span>•</span>
+                          <span className="font-medium text-amber-600 dark:text-amber-500">{entry.client}</span>
+                          <span>•</span>
+                          <span className="font-medium text-indigo-600 dark:text-indigo-400">{entry.site}</span>
+                        </div>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </div>
       </div>
 
       {/* Machine Allocations */}
@@ -354,7 +536,7 @@ function RefillForm({ editing, onClose, onSave }: RefillFormProps) {
             >
               <option value="">+ Add Specific Machine...</option>
               {allActiveMachines.map(m => (
-                <option key={m.assetId} value={m.assetId}>{m.assetName} ({m.siteName})</option>
+                <option key={`${m.assetId}-${m.siteId}`} value={`${m.assetId}-${m.siteId}`}>{m.assetName} ({m.siteName})</option>
               ))}
             </select>
           </div>
@@ -554,6 +736,12 @@ function RefillCard({ refill, onEdit, onDelete, canEdit, canDelete }: RefillCard
             {refill.machineAllocations.length > 0 && (
               <span className={cn('text-xs px-2 py-0.5 rounded-full font-medium', isDark ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-600')}>
                 {refill.machineAllocations.length} machine{refill.machineAllocations.length !== 1 ? 's' : ''}
+              </span>
+            )}
+            {refill.linkedLedgerIds && refill.linkedLedgerIds.length > 0 && (
+              <span className={cn('text-xs flex items-center gap-1 px-2 py-0.5 rounded-full font-medium', isDark ? 'bg-indigo-950/40 text-indigo-400' : 'bg-indigo-50 text-indigo-600 border border-indigo-100')}>
+                <LinkIcon className="w-3 h-3" />
+                {refill.linkedLedgerIds.length} Ledger Link{refill.linkedLedgerIds.length !== 1 ? 's' : ''}
               </span>
             )}
           </div>
