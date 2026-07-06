@@ -31,6 +31,66 @@ interface SavedLayout {
   created_at: string;
 }
 
+interface BlueprintSettings {
+  visible: boolean;
+  x: number;
+  y: number;
+  scaleX: number;
+  scaleY: number;
+  rotation: number;
+  opacity: number;
+  locked: boolean;
+}
+
+function parseBlueprintUrl(urlStr: string | null | undefined): { url: string | null; settings: BlueprintSettings } {
+  const defaultSettings: BlueprintSettings = {
+    visible: true,
+    x: 0,
+    y: 0,
+    scaleX: 1,
+    scaleY: 1,
+    rotation: 0,
+    opacity: 0.5,
+    locked: true
+  };
+  
+  if (!urlStr) return { url: null, settings: defaultSettings };
+  
+  const hashIdx = urlStr.indexOf('#');
+  if (hashIdx === -1) return { url: urlStr, settings: defaultSettings };
+  
+  const url = urlStr.substring(0, hashIdx);
+  const hash = urlStr.substring(hashIdx + 1);
+  const params = new URLSearchParams(hash);
+  
+  const settings: BlueprintSettings = {
+    visible: params.get('visible') !== 'false',
+    x: parseFloat(params.get('x') || '0'),
+    y: parseFloat(params.get('y') || '0'),
+    scaleX: parseFloat(params.get('scaleX') || '1'),
+    scaleY: parseFloat(params.get('scaleY') || '1'),
+    rotation: parseFloat(params.get('rotation') || '0'),
+    opacity: parseFloat(params.get('opacity') || '0.5'),
+    locked: params.get('locked') !== 'false'
+  };
+  
+  return { url, settings };
+}
+
+function serializeBlueprintUrl(url: string | null | undefined, settings: BlueprintSettings): string | null {
+  if (!url) return null;
+  const params = new URLSearchParams();
+  params.set('visible', String(settings.visible));
+  params.set('x', String(settings.x));
+  params.set('y', String(settings.y));
+  params.set('scaleX', String(settings.scaleX));
+  params.set('scaleY', String(settings.scaleY));
+  params.set('rotation', String(settings.rotation));
+  params.set('opacity', String(settings.opacity));
+  params.set('locked', String(settings.locked));
+  return `${url}#${params.toString()}`;
+}
+
 export default function Simulator() {
   const priv = usePriv('simulator');
   const { isSimulatorDirty, setSimulatorDirty } = useAppStore();
@@ -58,7 +118,26 @@ export default function Simulator() {
       setSimulatorDirty(false);
     };
   }, [isSimulatorDirty, setSimulatorDirty]);
+  
   const [backgroundImage, setBackgroundImage] = useState<string | undefined>();
+  const [blueprintSettings, setBlueprintSettings] = useState<BlueprintSettings>({
+    visible: true,
+    x: 0,
+    y: 0,
+    scaleX: 1,
+    scaleY: 1,
+    rotation: 0,
+    opacity: 0.5,
+    locked: true
+  });
+
+  // Options bar state
+  const [offsetDistance, setOffsetDistance] = useState<number>(2.0);
+  const [mirrorCopy, setMirrorCopy] = useState<boolean>(true);
+  const [drawShapeMode, setDrawShapeMode] = useState<'rect' | 'poly'>('rect');
+  const [textColor, setTextColor] = useState<string>('#000000');
+  const [textSize, setTextSize] = useState<number>(14);
+
   const [history, setHistory] = useState<{ type: 'line' | 'component' | 'dimension' | 'area' | 'hose'; id: string }[]>([]);
   const [lineLengthMeters, setLineLengthMeters] = useState<number | ''>('');
   
@@ -84,6 +163,7 @@ export default function Simulator() {
   const [gridSnap, setGridSnap] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [show3D, setShow3D] = useState(false);
+  const [selected3DId, setSelected3DId] = useState<string | null>(null);
   const [showResults, setShowResults] = useState(window.innerWidth >= 640);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -157,7 +237,8 @@ export default function Simulator() {
 
     setIsSaving(true);
     try {
-      let finalImageUrl = backgroundImage && !backgroundImage.startsWith('blob:') ? backgroundImage : null;
+      const cleanImageBase = backgroundImage ? parseBlueprintUrl(backgroundImage).url : null;
+      let finalImageUrl = cleanImageBase && !cleanImageBase.startsWith('blob:') ? cleanImageBase : null;
 
       if (backgroundFile) {
         const fileExt = backgroundFile.name.split('.').pop();
@@ -175,6 +256,8 @@ export default function Simulator() {
         }
       }
 
+      const dbImageUrl = serializeBlueprintUrl(finalImageUrl, blueprintSettings);
+
       await db.saveDewateringLayout({
         user_id: user.id,
         name: saveName.trim(),
@@ -184,7 +267,7 @@ export default function Simulator() {
         areas,
         hoses,
         levels,
-        background_image_url: finalImageUrl
+        background_image_url: dbImageUrl
       });
       toast.success(`Layout "${saveName.trim()}" saved successfully.`);
       setCurrentLayoutName(saveName.trim());
@@ -234,7 +317,9 @@ export default function Simulator() {
       setLevels(layout.levels);
       setActiveLevelId(layout.levels[0].id);
     }
-    setBackgroundImage(layout.background_image_url || undefined);
+    const { url, settings } = parseBlueprintUrl(layout.background_image_url);
+    setBackgroundImage(url || undefined);
+    setBlueprintSettings(settings);
     setBackgroundFile(null);
     setHistory([]);
     setShowLoadPanel(false);
@@ -482,8 +567,21 @@ export default function Simulator() {
           isFullscreen={isFullscreen}
           onToggleFullscreen={() => setIsFullscreen(!isFullscreen)}
           show3D={show3D}
-          onToggle3D={() => setShow3D(!show3D)}
+          onToggle3D={() => { setShow3D(!show3D); setSelected3DId(null); }}
           onExportDrawing={handleExportDrawing}
+          offsetDistance={offsetDistance}
+          onOffsetDistanceChange={setOffsetDistance}
+          mirrorCopy={mirrorCopy}
+          onMirrorCopyChange={setMirrorCopy}
+          drawShapeMode={drawShapeMode}
+          onDrawShapeModeChange={setDrawShapeMode}
+          textColor={textColor}
+          onTextColorChange={setTextColor}
+          textSize={textSize}
+          onTextSizeChange={setTextSize}
+          blueprintSettings={blueprintSettings}
+          onUpdateBlueprintSettings={(updates) => setBlueprintSettings(prev => ({ ...prev, ...updates }))}
+          hasBlueprint={!!backgroundImage}
         />
       </div>
 
@@ -501,6 +599,12 @@ export default function Simulator() {
               screenLength={screenLength}
               levels={levels}
               wellpointSide={wellpointSide}
+              activeTool={activeTool}
+              selectedId={selected3DId}
+              onSelectId={setSelected3DId}
+              onAreasChange={handleAreasChange}
+              onLinesChange={handleLinesChange}
+              onPlacedComponentsChange={handleComponentsChange}
             />
           ) : (
             <>
@@ -519,6 +623,13 @@ export default function Simulator() {
               activeTool={activeTool}
               onToolSelect={setActiveTool}
               backgroundImageUrl={backgroundImage}
+              blueprintSettings={blueprintSettings}
+              onUpdateBlueprintSettings={(updates) => setBlueprintSettings(prev => ({ ...prev, ...updates }))}
+              offsetDistance={offsetDistance}
+              mirrorCopy={mirrorCopy}
+              drawShapeMode={drawShapeMode}
+              textColor={textColor}
+              textSize={textSize}
               fixedLineLengthMeters={lineLengthMeters === '' ? undefined : lineLengthMeters}
               showWellpoints={showWellpoints}
               wellpointSide={wellpointSide}

@@ -39,6 +39,30 @@ export interface AreaData {
   layerId?: string;
   locked?: boolean;
   zIndex?: number;
+  points?: Point[]; // Optional points for polygon shape
+}
+
+export interface TextData {
+  id: string;
+  x: number;
+  y: number;
+  text: string;
+  fontSize?: number;
+  color?: string;
+  rotation?: number;
+  layerId?: string;
+  locked?: boolean;
+}
+
+export interface BlueprintSettings {
+  visible: boolean;
+  x: number;
+  y: number;
+  scaleX: number;
+  scaleY: number;
+  rotation: number;
+  opacity: number;
+  locked: boolean;
 }
 
 export interface HoseData {

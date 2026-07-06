@@ -42,6 +42,15 @@ interface DewateringCanvasProps {
   onDeleteLayer?: (id: string) => void;
   stageRef?: React.RefObject<any>;
   onCursorPosChange?: (pos: Point | null) => void;
+  
+  // Options states
+  blueprintSettings?: any;
+  onUpdateBlueprintSettings?: (updates: any) => void;
+  offsetDistance?: number;
+  mirrorCopy?: boolean;
+  drawShapeMode?: 'rect' | 'poly';
+  textColor?: string;
+  textSize?: number;
 }
 
 function snapToAngle(prev: Point, raw: Point): Point {
@@ -57,6 +66,87 @@ function snapToGrid(pt: Point, gridSize: number): Point {
   return {
     x: Math.round(pt.x / gridSize) * gridSize,
     y: Math.round(pt.y / gridSize) * gridSize,
+  };
+}
+
+function offsetPath(points: Point[], distancePx: number): Point[] {
+  if (points.length < 2) return points.map(p => ({ ...p }));
+  
+  const newPoints: Point[] = [];
+  for (let i = 0; i < points.length; i++) {
+    let dx = 0;
+    let dy = 0;
+    
+    if (i === 0) {
+      dx = points[1].x - points[0].x;
+      dy = points[1].y - points[0].y;
+    } else if (i === points.length - 1) {
+      dx = points[i].x - points[i - 1].x;
+      dy = points[i].y - points[i - 1].y;
+    } else {
+      const dx1 = points[i].x - points[i - 1].x;
+      const dy1 = points[i].y - points[i - 1].y;
+      const len1 = Math.sqrt(dx1*dx1 + dy1*dy1);
+      
+      const dx2 = points[i + 1].x - points[i].x;
+      const dy2 = points[i + 1].y - points[i].y;
+      const len2 = Math.sqrt(dx2*dx2 + dy2*dy2);
+      
+      if (len1 > 0 && len2 > 0) {
+        dx = (dx1 / len1 + dx2 / len2) / 2;
+        dy = (dy1 / len1 + dy2 / len2) / 2;
+      } else {
+        dx = dx1 || dx2;
+        dy = dy1 || dy2;
+      }
+    }
+    
+    const len = Math.sqrt(dx * dx + dy * dy);
+    if (len === 0) {
+      newPoints.push({ ...points[i] });
+      continue;
+    }
+    
+    const px = -dy / len;
+    const py = dx / len;
+    
+    newPoints.push({
+      x: points[i].x + px * distancePx,
+      y: points[i].y + py * distancePx
+    });
+  }
+  return newPoints;
+}
+
+function reflectPoint(p: Point, a: Point, b: Point): Point {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq === 0) return { ...p };
+  
+  const t = ((p.x - a.x) * dx + (p.y - a.y) * dy) / lenSq;
+  const projX = a.x + t * dx;
+  const projY = a.y + t * dy;
+  
+  return {
+    x: 2 * projX - p.x,
+    y: 2 * projY - p.y
+  };
+}
+
+function findLineIntersection(p1: Point, p2: Point, q1: Point, q2: Point): Point | null {
+  const d1x = p2.x - p1.x;
+  const d1y = p2.y - p1.y;
+  const d2x = q2.x - q1.x;
+  const d2y = q2.y - q1.y;
+  
+  const denom = d1x * d2y - d1y * d2x;
+  if (Math.abs(denom) < 0.0001) return null;
+  
+  const t = ((q1.x - p1.x) * d2y - (q1.y - p1.y) * d2x) / denom;
+  return {
+    x: p1.x + t * d1x,
+    y: p1.y + t * d1y
   };
 }
 
@@ -207,12 +297,23 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
   onDeleteLayer,
   stageRef: externalStageRef,
   onCursorPosChange,
+  blueprintSettings = { visible: true, x: 0, y: 0, scaleX: 1, scaleY: 1, rotation: 0, opacity: 0.5, locked: true },
+  onUpdateBlueprintSettings,
+  offsetDistance = 2.0,
+  mirrorCopy = true,
+  drawShapeMode = 'rect',
+  textColor = '#000000',
+  textSize = 14
 }) => {
   const [currentLine, setCurrentLine] = useState<Point[]>([]);
   const [currentDim, setCurrentDim] = useState<Point[]>([]);
   const [currentAreaStart, setCurrentAreaStart] = useState<{ pt: Point; kind: 'excavation' | 'discharge' | 'site' } | null>(null);
   const [currentHose, setCurrentHose] = useState<Point[]>([]);
   const [currentDischarge, setCurrentDischarge] = useState<Point[]>([]);
+  const [textEditor, setTextEditor] = useState<{ x: number; y: number; val: string; editingId?: string } | null>(null);
+  const [alignRef, setAlignRef] = useState<{ x?: number; y?: number } | null>(null);
+  const [trimFirstId, setTrimFirstId] = useState<string | null>(null);
+  const [mirrorAxisPoints, setMirrorAxisPoints] = useState<Point[]>([]);
   
   // Drag cancellation tracking
   const dragInfoRef = useRef<{ node: any, startX: number, startY: number, cancelled: boolean } | null>(null);
@@ -239,6 +340,41 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
   const lastPanPosRef = useRef<{ x: number, y: number } | null>(null);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  const toggleSelectElement = (id: string, e?: any) => {
+    if (e) {
+      e.cancelBubble = true;
+      if (e.evt) {
+        e.evt.preventDefault();
+        e.evt.stopPropagation();
+      }
+    }
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      if (next.size > 0) {
+        const lastAdded = Array.from(next)[next.size - 1];
+        setSelectedId(lastAdded);
+      } else {
+        setSelectedId(null);
+      }
+      return next;
+    });
+  };
+
+  const selectSingleElement = (id: string | null) => {
+    setSelectedId(id);
+    if (id === null) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set([id]));
+    }
+  };
   const selectedArea = areas.find((a: any) => a.id === selectedId);
   const selectedLine = lines.find((l: any) => l.id === selectedId);
   const selectedHose = hoses.find((h: any) => h.id === selectedId);
@@ -263,6 +399,11 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
   const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 });
   const [scale, setScale] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
+
+  const textEditorScreenPos = textEditor ? {
+    left: textEditor.x * scale + position.x,
+    top: textEditor.y * scale + position.y,
+  } : null;
 
 
 
@@ -297,6 +438,10 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
     setCurrentAreaStart(null);
     setCurrentHose([]);
     setCurrentDischarge([]);
+    setAlignRef(null);
+    setTrimFirstId(null);
+    setMirrorAxisPoints([]);
+    setTextEditor(null);
     if (trRef.current) trRef.current.nodes([]);
   }, [activeTool]);
 
@@ -309,10 +454,18 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
       } else {
         trRef.current.nodes([]);
       }
+    } else if (activeTool === 'modify-blueprint' && !blueprintSettings.locked && trRef.current) {
+      const node = stageRef.current?.findOne('#blueprint-underlay');
+      if (node) {
+        trRef.current.nodes([node]);
+        trRef.current.getLayer().batchDraw();
+      } else {
+        trRef.current.nodes([]);
+      }
     } else if (trRef.current) {
       trRef.current.nodes([]);
     }
-  }, [selectedId, activeTool, areas]);
+  }, [selectedId, activeTool, areas, blueprintSettings.locked, bgImage]);
 
   // ---------- geometry helpers ----------
   const getSnappedPoint = useCallback((raw: Point): Point => {
@@ -493,12 +646,392 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
     if (selectedId === id) setSelectedId(null);
   };
 
+  const mirrorElementAcrossAxis = useCallback((targetId: string, a: Point, b: Point) => {
+    const area = areas.find(x => x.id === targetId);
+    const line = lines.find(x => x.id === targetId);
+    const hose = hoses.find(x => x.id === targetId);
+    const comp = placedComponents.find(x => x.id === targetId);
+    const textDim = dimensions?.find(x => x.id === targetId);
+
+    const isCopy = mirrorCopy;
+
+    if (area && onAreasChange) {
+      const nextArea = { ...area, id: isCopy ? crypto.randomUUID() : area.id };
+      if (area.points) {
+        nextArea.points = area.points.map(p => reflectPoint(p, a, b));
+        const xs = nextArea.points.map(p => p.x);
+        const ys = nextArea.points.map(p => p.y);
+        nextArea.x = Math.min(...xs);
+        nextArea.y = Math.min(...ys);
+        nextArea.width = Math.max(...xs) - nextArea.x;
+        nextArea.height = Math.max(...ys) - nextArea.y;
+      } else {
+        const pTL = reflectPoint({ x: area.x, y: area.y }, a, b);
+        const pBR = reflectPoint({ x: area.x + area.width, y: area.y + area.height }, a, b);
+        nextArea.x = Math.min(pTL.x, pBR.x);
+        nextArea.y = Math.min(pTL.y, pBR.y);
+        nextArea.width = Math.abs(pTL.x - pBR.x);
+        nextArea.height = Math.abs(pTL.y - pBR.y);
+      }
+      if (isCopy) onAreasChange([...areas, nextArea]);
+      else onAreasChange(areas.map(x => x.id === targetId ? nextArea : x));
+      toast.success("Area mirrored.");
+    } else if (line && onLinesChange) {
+      const nextLine = { ...line, id: isCopy ? crypto.randomUUID() : line.id, points: line.points.map(p => reflectPoint(p, a, b)) };
+      if (isCopy) onLinesChange([...lines, nextLine]);
+      else onLinesChange(lines.map(x => x.id === targetId ? nextLine : x));
+      toast.success("Pipeline mirrored.");
+    } else if (hose && onHosesChange) {
+      const nextHose = { ...hose, id: isCopy ? crypto.randomUUID() : hose.id, points: hose.points.map(p => reflectPoint(p, a, b)) };
+      if (isCopy) onHosesChange([...hoses, nextHose]);
+      else onHosesChange(hoses.map(x => x.id === targetId ? nextHose : x));
+      toast.success("Hose mirrored.");
+    } else if (comp && onPlacedComponentsChange) {
+      const nextCompPt = reflectPoint({ x: comp.x, y: comp.y }, a, b);
+      const axisAngleRad = Math.atan2(b.y - a.y, b.x - a.x);
+      const axisAngleDeg = axisAngleRad * (180 / Math.PI);
+      const nextRot = (2 * axisAngleDeg - (comp.rotation || 0) + 360) % 360;
+      
+      const nextComp = { ...comp, id: isCopy ? crypto.randomUUID() : comp.id, x: nextCompPt.x, y: nextCompPt.y, rotation: nextRot };
+      if (isCopy) onPlacedComponentsChange([...placedComponents, nextComp]);
+      else onPlacedComponentsChange(placedComponents.map(x => x.id === targetId ? nextComp : x));
+      toast.success("Component mirrored.");
+    } else if (textDim && onDimensionsChange && dimensions) {
+      const nextTextDimPt = reflectPoint({ x: textDim.x || textDim.start.x, y: textDim.y || textDim.start.y }, a, b);
+      const nextTextDim = {
+        ...textDim,
+        id: isCopy ? crypto.randomUUID() : textDim.id,
+        x: nextTextDimPt.x,
+        y: nextTextDimPt.y,
+        start: reflectPoint(textDim.start, a, b),
+        end: reflectPoint(textDim.end, a, b)
+      };
+      if (isCopy) onDimensionsChange([...dimensions, nextTextDim]);
+      else onDimensionsChange(dimensions.map(x => x.id === targetId ? nextTextDim : x));
+      toast.success("Text mirrored.");
+    }
+  }, [areas, lines, hoses, placedComponents, dimensions, mirrorCopy, onAreasChange, onLinesChange, onHosesChange, onPlacedComponentsChange, onDimensionsChange]);
+
+  const executeModifyCommand = useCallback((type: 'area' | 'line' | 'hose' | 'component' | 'text' | 'dimension', elementId: string, clickPt?: Point) => {
+    if (activeTool === 'pin' || activeTool === 'unpin') {
+      const lockVal = activeTool === 'pin';
+      if (type === 'area' && onAreasChange) {
+        onAreasChange(areas.map(a => a.id === elementId ? { ...a, locked: lockVal } : a));
+      } else if (type === 'line' && onLinesChange) {
+        onLinesChange(lines.map(l => l.id === elementId ? { ...l, locked: lockVal } : l));
+      } else if (type === 'hose' && onHosesChange) {
+        onHosesChange(hoses.map(h => h.id === elementId ? { ...h, locked: lockVal } : h));
+      } else if (type === 'component' && onPlacedComponentsChange) {
+        onPlacedComponentsChange(placedComponents.map(c => c.id === elementId ? { ...c, locked: lockVal } as any : c));
+      } else if (type === 'text' && onDimensionsChange && dimensions) {
+        onDimensionsChange(dimensions.map(d => d.id === elementId ? { ...d, locked: lockVal } : d));
+      }
+      toast.success(lockVal ? "Element pinned." : "Element unpinned.");
+      return true;
+    }
+
+    if (activeTool === 'delete') {
+      if (type === 'area' && onAreasChange) onAreasChange(areas.filter(a => a.id !== elementId));
+      if (type === 'line' && onLinesChange) onLinesChange(lines.filter(l => l.id !== elementId));
+      if (type === 'hose' && onHosesChange) onHosesChange(hoses.filter(h => h.id !== elementId));
+      if (type === 'component' && onPlacedComponentsChange) onPlacedComponentsChange(placedComponents.filter(c => c.id !== elementId));
+      if ((type === 'text' || type === 'dimension') && onDimensionsChange && dimensions) onDimensionsChange(dimensions.filter(d => d.id !== elementId));
+      if (selectedId === elementId) setSelectedId(null);
+      return true;
+    }
+
+    if (activeTool === 'copy') {
+      const shiftPx = 40;
+      if (type === 'area' && onAreasChange) {
+        const area = areas.find(a => a.id === elementId);
+        if (area) {
+          const newArea = { ...area, id: crypto.randomUUID(), x: area.x + shiftPx, y: area.y + shiftPx };
+          if (area.points) {
+            newArea.points = area.points.map(p => ({ x: p.x + shiftPx, y: p.y + shiftPx }));
+          }
+          onAreasChange([...areas, newArea]);
+        }
+      } else if (type === 'line' && onLinesChange) {
+        const line = lines.find(l => l.id === elementId);
+        if (line) onLinesChange([...lines, { ...line, id: crypto.randomUUID(), points: line.points.map(p => ({ x: p.x + shiftPx, y: p.y + shiftPx })) }]);
+      } else if (type === 'hose' && onHosesChange) {
+        const hose = hoses.find(h => h.id === elementId);
+        if (hose) onHosesChange([...hoses, { ...hose, id: crypto.randomUUID(), points: hose.points.map(p => ({ x: p.x + shiftPx, y: p.y + shiftPx })) }]);
+      } else if (type === 'component' && onPlacedComponentsChange) {
+        const comp = placedComponents.find(c => c.id === elementId);
+        if (comp) onPlacedComponentsChange([...placedComponents, { ...comp, id: crypto.randomUUID(), x: comp.x + shiftPx, y: comp.y + shiftPx }]);
+      } else if (type === 'text' && onDimensionsChange && dimensions) {
+        const dim = dimensions.find(d => d.id === elementId);
+        if (dim) onDimensionsChange([...dimensions, { ...dim, id: crypto.randomUUID(), x: (dim.x || 0) + shiftPx, y: (dim.y || 0) + shiftPx, start: { x: dim.start.x + shiftPx, y: dim.start.y + shiftPx }, end: { x: dim.end.x + shiftPx, y: dim.end.y + shiftPx } }]);
+      }
+      toast.success("Element duplicated.");
+      return true;
+    }
+
+    if (activeTool === 'offset') {
+      const distPx = offsetDistance * PIXELS_PER_METER;
+      if (type === 'line' && onLinesChange) {
+        const line = lines.find(l => l.id === elementId);
+        if (line) {
+          const offPts = offsetPath(line.points, distPx);
+          onLinesChange([...lines, { ...line, id: crypto.randomUUID(), points: offPts }]);
+          toast.success("Pipeline offset created.");
+        }
+      } else if (type === 'hose' && onHosesChange) {
+        const hose = hoses.find(h => h.id === elementId);
+        if (hose) {
+          const offPts = offsetPath(hose.points, distPx);
+          onHosesChange([...hoses, { ...hose, id: crypto.randomUUID(), points: offPts }]);
+          toast.success("Hose offset created.");
+        }
+      } else if (type === 'area' && onAreasChange) {
+        const area = areas.find(a => a.id === elementId);
+        if (area) {
+          const newArea = {
+            ...area,
+            id: crypto.randomUUID(),
+            x: area.x + distPx,
+            y: area.y + distPx
+          };
+          if (area.points) {
+            newArea.points = offsetPath(area.points, distPx);
+          }
+          onAreasChange([...areas, newArea]);
+          toast.success("Area offset created.");
+        }
+      }
+      return true;
+    }
+
+    if (activeTool === 'align') {
+      if (!alignRef) {
+        if (clickPt) {
+          setAlignRef({ x: clickPt.x });
+          toast.success("Alignment axis set. Click elements to align vertically.");
+        }
+      } else {
+        if (type === 'component' && onPlacedComponentsChange) {
+          onPlacedComponentsChange(placedComponents.map(c => {
+            if (c.id === elementId && !(c as any).locked) {
+              return { ...c, x: alignRef.x !== undefined ? alignRef.x : c.x, y: alignRef.y !== undefined ? alignRef.y : c.y };
+            }
+            return c;
+          }));
+          toast.success("Aligned component.");
+        } else if (type === 'area' && onAreasChange) {
+          onAreasChange(areas.map(a => {
+            if (a.id === elementId && !a.locked) {
+              const dx = alignRef.x !== undefined ? alignRef.x - a.x : 0;
+              const dy = alignRef.y !== undefined ? alignRef.y - a.y : 0;
+              const nextArea = { ...a, x: a.x + dx, y: a.y + dy };
+              if (a.points) {
+                nextArea.points = a.points.map(p => ({ x: p.x + dx, y: p.y + dy }));
+              }
+              return nextArea;
+            }
+            return a;
+          }));
+          toast.success("Aligned area.");
+        } else if (type === 'line' && onLinesChange) {
+          onLinesChange(lines.map(l => {
+            if (l.id === elementId && !l.locked) {
+              const dx = alignRef.x !== undefined ? alignRef.x - l.points[0].x : 0;
+              const dy = alignRef.y !== undefined ? alignRef.y - l.points[0].y : 0;
+              return { ...l, points: l.points.map(p => ({ x: p.x + dx, y: p.y + dy })) };
+            }
+            return l;
+          }));
+          toast.success("Aligned pipeline.");
+        } else if (type === 'hose' && onHosesChange) {
+          onHosesChange(hoses.map(h => {
+            if (h.id === elementId && !h.locked) {
+              const dx = alignRef.x !== undefined ? alignRef.x - h.points[0].x : 0;
+              const dy = alignRef.y !== undefined ? alignRef.y - h.points[0].y : 0;
+              return { ...h, points: h.points.map(p => ({ x: p.x + dx, y: p.y + dy })) };
+            }
+            return h;
+          }));
+          toast.success("Aligned hose.");
+        } else if (type === 'text' && onDimensionsChange && dimensions) {
+          onDimensionsChange(dimensions.map(d => {
+            if (d.id === elementId && !d.locked) {
+              const dx = alignRef.x !== undefined ? alignRef.x - (d.x || d.start.x) : 0;
+              const dy = alignRef.y !== undefined ? alignRef.y - (d.y || d.start.y) : 0;
+              return { ...d, x: (d.x || d.start.x) + dx, y: (d.y || d.start.y) + dy, start: { x: d.start.x + dx, y: d.start.y + dy }, end: { x: d.end.x + dx, y: d.end.y + dy } };
+            }
+            return d;
+          }));
+          toast.success("Aligned text.");
+        }
+      }
+      return true;
+    }
+
+    if (activeTool === 'trim') {
+      if (type !== 'line' && type !== 'hose') return false;
+      if (!trimFirstId) {
+        setTrimFirstId(elementId);
+        toast.info("Select second line/hose to join corner.");
+      } else {
+        if (trimFirstId === elementId) return false;
+        
+        const line1 = lines.find(l => l.id === trimFirstId) || hoses.find(h => h.id === trimFirstId);
+        const line2 = lines.find(l => l.id === elementId) || hoses.find(h => h.id === elementId);
+        
+        if (line1 && line2 && line1.points.length > 1 && line2.points.length > 1) {
+          const p1 = line1.points[line1.points.length - 2];
+          const p2 = line1.points[line1.points.length - 1];
+          const q1 = line2.points[line2.points.length - 2];
+          const q2 = line2.points[line2.points.length - 1];
+          
+          const intersect = findLineIntersection(p1, p2, q1, q2);
+          if (intersect) {
+            if (lines.some(l => l.id === trimFirstId)) {
+              onLinesChange(lines.map(l => {
+                if (l.id === trimFirstId) {
+                  return { ...l, points: [...l.points.slice(0, -1), intersect] };
+                }
+                if (l.id === elementId) {
+                  return { ...l, points: [...l.points.slice(0, -1), intersect] };
+                }
+                return l;
+              }));
+            } else {
+              onHosesChange(hoses.map(h => {
+                if (h.id === trimFirstId) {
+                  return { ...h, points: [...h.points.slice(0, -1), intersect] };
+                }
+                if (h.id === elementId) {
+                  return { ...h, points: [...h.points.slice(0, -1), intersect] };
+                }
+                return h;
+              }));
+            }
+            toast.success("Lines trimmed to corner.");
+          } else {
+            toast.error("Lines do not intersect.");
+          }
+        }
+        setTrimFirstId(null);
+      }
+      return true;
+    }
+
+    if (activeTool === 'split') {
+      if (type !== 'line' && type !== 'hose') return false;
+      if (!clickPt) return false;
+      
+      if (type === 'line') {
+        const line = lines.find(l => l.id === elementId);
+        if (line && line.points.length > 1) {
+          let minD = Infinity;
+          let segIdx = 0;
+          for (let i = 0; i < line.points.length - 1; i++) {
+            const p1 = line.points[i];
+            const p2 = line.points[i + 1];
+            const l2 = (p1.x - p2.x)**2 + (p1.y - p2.y)**2;
+            let t = ((clickPt.x - p1.x) * (p2.x - p1.x) + (clickPt.y - p1.y) * (p2.y - p1.y)) / l2;
+            t = Math.max(0, Math.min(1, t));
+            const dist = Math.sqrt((clickPt.x - (p1.x + t * (p2.x - p1.x)))**2 + (clickPt.y - (p1.y + t * (p2.y - p1.y)))**2);
+            if (dist < minD) {
+              minD = dist;
+              segIdx = i;
+            }
+          }
+          
+          if (minD < 30) {
+            const part1 = [...line.points.slice(0, segIdx + 1), clickPt];
+            const part2 = [clickPt, ...line.points.slice(segIdx + 1)];
+            const line1 = { ...line, points: part1 };
+            const line2 = { ...line, id: crypto.randomUUID(), points: part2 };
+            onLinesChange([...lines.filter(l => l.id !== elementId), line1, line2]);
+            toast.success("Pipeline split.");
+          }
+        }
+      } else if (type === 'hose') {
+        const hose = hoses.find(h => h.id === elementId);
+        if (hose && hose.points.length > 1) {
+          let minD = Infinity;
+          let segIdx = 0;
+          for (let i = 0; i < hose.points.length - 1; i++) {
+            const p1 = hose.points[i];
+            const p2 = hose.points[i + 1];
+            const l2 = (p1.x - p2.x)**2 + (p1.y - p2.y)**2;
+            let t = ((clickPt.x - p1.x) * (p2.x - p1.x) + (clickPt.y - p1.y) * (p2.y - p1.y)) / l2;
+            t = Math.max(0, Math.min(1, t));
+            const dist = Math.sqrt((clickPt.x - (p1.x + t * (p2.x - p1.x)))**2 + (clickPt.y - (p1.y + t * (p2.y - p1.y)))**2);
+            if (dist < minD) {
+              minD = dist;
+              segIdx = i;
+            }
+          }
+          
+          if (minD < 30) {
+            const part1 = [...hose.points.slice(0, segIdx + 1), clickPt];
+            const part2 = [clickPt, ...hose.points.slice(segIdx + 1)];
+            const hose1 = { ...hose, points: part1 };
+            const hose2 = { ...hose, id: crypto.randomUUID(), points: part2 };
+            onHosesChange([...hoses.filter(h => h.id !== elementId), hose1, hose2]);
+            toast.success("Hose split.");
+          }
+        }
+      }
+      return true;
+    }
+
+    if (activeTool === 'mirror-pick') {
+      if (type !== 'line' && type !== 'hose') return false;
+      if (!selectedId) {
+        toast.info("Please select an element to mirror first.");
+        return false;
+      }
+      const axisLine = lines.find(l => l.id === elementId) || hoses.find(h => h.id === elementId);
+      if (axisLine && axisLine.points.length > 1) {
+        const a = axisLine.points[0];
+        const b = axisLine.points[axisLine.points.length - 1];
+        mirrorElementAcrossAxis(selectedId, a, b);
+      }
+      return true;
+    }
+
+    return false;
+  }, [activeTool, offsetDistance, mirrorCopy, alignRef, trimFirstId, selectedId, lines, hoses, areas, placedComponents, dimensions, onLinesChange, onHosesChange, onAreasChange, onPlacedComponentsChange, onDimensionsChange, mirrorElementAcrossAxis]);
+
+  const finishPolygon = useCallback((pts: Point[], kind: string) => {
+    if (pts.length > 2 && onAreasChange) {
+      const xs = pts.map(p => p.x);
+      const ys = pts.map(p => p.y);
+      const minX = Math.min(...xs);
+      const maxX = Math.max(...xs);
+      const minY = Math.min(...ys);
+      const maxY = Math.max(...ys);
+
+      const newArea = {
+        id: crypto.randomUUID(),
+        x: minX,
+        y: minY,
+        width: maxX - minX,
+        height: maxY - minY,
+        kind,
+        levelId: activeLevelId,
+        layerId: activeLayerId,
+        points: pts
+      };
+      onAreasChange([...areas, newArea]);
+    }
+    setCurrentLine([]);
+    setCursorPos(null);
+  }, [areas, onAreasChange, activeLevelId, activeLayerId]);
+
   const finishLine = useCallback((pts: Point[]) => {
     if (pts.length > 1) {
       if (activeTool === 'hose' && onHosesChange) {
         onHosesChange([...hoses, { id: crypto.randomUUID(), points: pts, kind: 'suction', layerId: activeLayerId }]);
       } else if (activeTool === 'discharge' && onHosesChange) {
         onHosesChange([...hoses, { id: crypto.randomUUID(), points: pts, kind: 'discharge', layerId: activeLayerId }]);
+      } else if (['area', 'site-area', 'discharge-area'].includes(activeTool)) {
+        const kind = activeTool === 'area' ? 'excavation' : activeTool === 'discharge-area' ? 'discharge' : 'site';
+        finishPolygon(pts, kind);
       } else {
         const newLine: LineData = { id: crypto.randomUUID(), points: pts, levelId: activeLevelId, layerId: activeLayerId };
         onLinesChange([...lines, newLine]);
@@ -509,7 +1042,33 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
     setCurrentDischarge([]);
     setCursorPos(null);
     setDimTyped('');
-  }, [lines, hoses, activeTool, onLinesChange, onHosesChange, activeLevelId, activeLayerId]);
+  }, [lines, hoses, activeTool, onLinesChange, onHosesChange, activeLevelId, activeLayerId, finishPolygon]);
+
+  const handleFinishText = useCallback((val: string, editingId?: string) => {
+    if (val.trim() && onDimensionsChange && dimensions) {
+      if (editingId) {
+        onDimensionsChange(dimensions.map(d => d.id === editingId ? { ...d, text: val.trim() } : d));
+      } else if (textEditor) {
+        const newTextDim: DimensionData = {
+          id: crypto.randomUUID(),
+          start: { x: textEditor.x, y: textEditor.y },
+          end: { x: textEditor.x, y: textEditor.y },
+          text: val.trim(),
+          layerId: activeLayerId,
+          isTextAnnotation: true,
+          x: textEditor.x,
+          y: textEditor.y,
+          fontSize: textSize,
+          color: textColor,
+          rotation: 0
+        } as any;
+        onDimensionsChange([...dimensions, newTextDim]);
+      }
+    } else if (!val.trim() && editingId && onDimensionsChange && dimensions) {
+      onDimensionsChange(dimensions.filter(d => d.id !== editingId));
+    }
+    setTextEditor(null);
+  }, [dimensions, onDimensionsChange, textEditor, activeLayerId, textSize, textColor]);
 
   // ---------- AutoCAD keyboard capture ----------
   useEffect(() => {
@@ -518,6 +1077,29 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
 
       if (e.key === 'Shift') { setShiftHeld(true); e.preventDefault(); return; }
+      if (e.key === 'Delete') {
+        if (selectedIds.size > 0) {
+          if (onPlacedComponentsChange) {
+            onPlacedComponentsChange(placedComponents.filter(c => !selectedIds.has(c.id)));
+          }
+          if (onLinesChange) {
+            onLinesChange(lines.filter(l => !selectedIds.has(l.id)));
+          }
+          if (onHosesChange) {
+            onHosesChange(hoses.filter(h => !selectedIds.has(h.id)));
+          }
+          if (onAreasChange) {
+            onAreasChange(areas.filter(a => !selectedIds.has(a.id)));
+          }
+          if (onDimensionsChange) {
+            onDimensionsChange(dimensions.filter(d => !selectedIds.has(d.id)));
+          }
+          selectSingleElement(null);
+          if (trRef.current) trRef.current.nodes([]);
+          e.preventDefault();
+        }
+        return;
+      }
       if (e.key === 'Escape') {
         if (dragInfoRef.current) {
           cancelCurrentDrag();
@@ -532,6 +1114,9 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
         if (activeList.length > 0) { finishLine(activeList); }
         setDimTyped('');
         setCursorPos(null);
+        if (onToolSelect) {
+          onToolSelect('select');
+        }
         return;
       }
 
@@ -561,7 +1146,7 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [isDrawing, dimTyped, cursorPos, currentLine, shiftHeld, orthoLocked, finishLine, getSnappedPoint, activeTool, currentHose, currentDischarge, currentAreaStart]);
+  }, [isDrawing, dimTyped, cursorPos, currentLine, shiftHeld, orthoLocked, finishLine, getSnappedPoint, activeTool, currentHose, currentDischarge, currentAreaStart, selectedIds, placedComponents, lines, hoses, areas, dimensions, onPlacedComponentsChange, onLinesChange, onHosesChange, onAreasChange, onDimensionsChange, onToolSelect]);
 
   // ---------- useEffect: auto-dimension selected spline ----------
   useEffect(() => {
@@ -615,8 +1200,16 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
       return;
     }
 
-    // Right-click finishes drawing or cancels drag
+    // Right-click finishes drawing, cancels drag, or clears selection in select mode
     if (e.evt.button === 2) {
+      if (activeTool === 'select') {
+        if (isStage) {
+          setSelectedId(null);
+          setSelectedIds(new Set());
+          if (trRef.current) trRef.current.nodes([]);
+        }
+        return;
+      }
       if (dragInfoRef.current) {
         cancelCurrentDrag();
         return;
@@ -634,8 +1227,18 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
       // Click on empty stage → deselect
       if (isStage) {
         setSelectedId(null);
+        setSelectedIds(new Set());
         if (trRef.current) trRef.current.nodes([]);
       }
+      return;
+    }
+
+    if (activeTool === 'text') {
+      const stage = e.target.getStage();
+      const raw = getWorldPointerPos(stage);
+      if (!raw) return;
+      const pt = gridSnap ? snapToGrid(raw, PIXELS_PER_METER / 2) : raw;
+      setTextEditor({ x: pt.x, y: pt.y, val: '' });
       return;
     }
 
@@ -661,24 +1264,32 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
       const stage = e.target.getStage();
       const raw = getWorldPointerPos(stage);
       if (!raw) return;
-      const pt = gridSnap ? snapToGrid(raw, PIXELS_PER_METER / 2) : raw;
+      const pt = currentSnap ? currentSnap.pt : getSnappedPoint(gridSnap ? snapToGrid(raw, PIXELS_PER_METER / 2) : raw);
       const kind = activeTool === 'area' ? 'excavation' : activeTool === 'discharge-area' ? 'discharge' : 'site';
 
-      if (!currentAreaStart) {
-        setCurrentAreaStart({ pt, kind });
+      if (drawShapeMode === 'poly') {
+        if (currentLine.length > 2 && (currentSnap?.elementId === 'poly-start' || Math.sqrt((pt.x - currentLine[0].x)**2 + (pt.y - currentLine[0].y)**2) < 15)) {
+          finishPolygon(currentLine, kind);
+        } else {
+          setCurrentLine(prev => [...prev, pt]);
+        }
       } else {
-        const newArea = {
-          id: crypto.randomUUID(),
-          x: Math.min(currentAreaStart.pt.x, pt.x),
-          y: Math.min(currentAreaStart.pt.y, pt.y),
-          width: Math.abs(pt.x - currentAreaStart.pt.x),
-          height: Math.abs(pt.y - currentAreaStart.pt.y),
-          kind: currentAreaStart.kind,
-          levelId: activeLevelId,
-          layerId: activeLayerId
-        };
-        if (onAreasChange) onAreasChange([...areas, newArea]);
-        setCurrentAreaStart(null);
+        if (!currentAreaStart) {
+          setCurrentAreaStart({ pt, kind });
+        } else {
+          const newArea = {
+            id: crypto.randomUUID(),
+            x: Math.min(currentAreaStart.pt.x, pt.x),
+            y: Math.min(currentAreaStart.pt.y, pt.y),
+            width: Math.abs(pt.x - currentAreaStart.pt.x),
+            height: Math.abs(pt.y - currentAreaStart.pt.y),
+            kind: currentAreaStart.kind,
+            levelId: activeLevelId,
+            layerId: activeLayerId
+          };
+          if (onAreasChange) onAreasChange([...areas, newArea]);
+          setCurrentAreaStart(null);
+        }
       }
       return;
     }
@@ -773,7 +1384,23 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
             ]
           });
         });
-        setCurrentSnap(findSnapPoint(gridPt, snapLines));
+        const normalSnap = findSnapPoint(gridPt, snapLines);
+        
+        if (['area', 'site-area', 'discharge-area'].includes(activeTool) && drawShapeMode === 'poly' && currentLine.length > 0) {
+          const dStart = Math.sqrt((gridPt.x - currentLine[0].x)**2 + (gridPt.y - currentLine[0].y)**2);
+          if (dStart < 15) {
+            setCurrentSnap({
+              pt: currentLine[0],
+              type: 'endpoint',
+              elementId: 'poly-start',
+              dist: dStart
+            });
+          } else {
+            setCurrentSnap(normalSnap);
+          }
+        } else {
+          setCurrentSnap(normalSnap);
+        }
       } else {
         setCurrentSnap(null);
       }
@@ -786,17 +1413,58 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
       lastPanPosRef.current = null;
     }
   };
+  const handleBlueprintDragEnd = (e: any) => {
+    const node = e.target;
+    if (onUpdateBlueprintSettings) {
+      onUpdateBlueprintSettings({
+        x: node.x(),
+        y: node.y()
+      });
+    }
+  };
 
+  const handleBlueprintTransformEnd = (e: any) => {
+    const node = e.target;
+    if (onUpdateBlueprintSettings) {
+      onUpdateBlueprintSettings({
+        x: node.x(),
+        y: node.y(),
+        scaleX: node.scaleX(),
+        scaleY: node.scaleY(),
+        rotation: node.rotation()
+      });
+    }
+  };
   const handleAreaClick = (e: any, id: string) => {
     const area = areas.find((a: any) => a.id === id);
-    if (area?.locked) return;
+    if (!area) return;
+
+    if (activeTool === 'select' && e.evt && e.evt.button === 2) {
+      toggleSelectElement(id, e);
+      return;
+    }
+
+    const stage = e.target.getStage();
+    const clickPt = getWorldPointerPos(stage) || undefined;
+    const didExecute = executeModifyCommand('area', id, clickPt);
+    if (didExecute) {
+      e.cancelBubble = true;
+      return;
+    }
+
+    if (area.locked && activeTool !== 'select') return;
+
     if (['select', 'move', 'rotate'].includes(activeTool)) {
-      setSelectedId(id);
+      selectSingleElement(id);
       e.cancelBubble = true;
     }
-    if (activeTool === 'copy' && area) {
+    if (activeTool === 'copy') {
       if (onAreasChange) {
-        onAreasChange([...areas, { ...area, id: crypto.randomUUID(), x: area.x + 40, y: area.y + 40 }]);
+        const newArea = { ...area, id: crypto.randomUUID(), x: area.x + 40, y: area.y + 40 };
+        if (area.points) {
+          newArea.points = area.points.map(p => ({ x: p.x + 40, y: p.y + 40 }));
+        }
+        onAreasChange([...areas, newArea]);
       }
       e.cancelBubble = true;
     }
@@ -804,7 +1472,7 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
       if (onAreasChange) onAreasChange(areas.filter(a => a.id !== id));
       e.cancelBubble = true;
     }
-    if (activeTool === 'dimension' && area) {
+    if (activeTool === 'dimension') {
       const wM = (area.width / PIXELS_PER_METER).toFixed(1);
       const hM = (area.height / PIXELS_PER_METER).toFixed(1);
       const newDimW: DimensionData = {
@@ -869,12 +1537,28 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
   // ---------- line body click (select mode) ----------
   const handleLineClick = (e: any, id: string) => {
     const line = lines.find(l => l.id === id);
-    if (line?.locked) return;
+    if (!line) return;
+
+    if (activeTool === 'select' && e.evt && e.evt.button === 2) {
+      toggleSelectElement(id, e);
+      return;
+    }
+
+    const stage = e.target.getStage();
+    const clickPt = getWorldPointerPos(stage) || undefined;
+    const didExecute = executeModifyCommand('line', id, clickPt);
+    if (didExecute) {
+      e.cancelBubble = true;
+      return;
+    }
+
+    if (line.locked && activeTool !== 'select') return;
+
     if (['select', 'move', 'rotate'].includes(activeTool)) {
-      setSelectedId(id);
+      selectSingleElement(id);
       e.cancelBubble = true;
     }
-    if (activeTool === 'copy' && line) {
+    if (activeTool === 'copy') {
       onLinesChange([...lines, { ...line, id: crypto.randomUUID(), points: line.points.map(p => ({ x: p.x + 40, y: p.y + 40 })) }]);
       e.cancelBubble = true;
     }
@@ -882,7 +1566,7 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
       onLinesChange(lines.filter(l => l.id !== id));
       e.cancelBubble = true;
     }
-    if (activeTool === 'dimension' && line && line.points.length > 1) {
+    if (activeTool === 'dimension' && line.points.length > 1) {
       let totalDist = 0;
       for (let i = 0; i < line.points.length - 1; i++) {
         const dx = line.points[i+1].x - line.points[i].x;
@@ -954,12 +1638,28 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
   // ---------- hose click / drag (select mode) ----------
   const handleHoseClick = (e: any, id: string) => {
     const hose = hoses.find(h => h.id === id);
-    if (hose?.locked) return;
+    if (!hose) return;
+
+    if (activeTool === 'select' && e.evt && e.evt.button === 2) {
+      toggleSelectElement(id, e);
+      return;
+    }
+
+    const stage = e.target.getStage();
+    const clickPt = getWorldPointerPos(stage) || undefined;
+    const didExecute = executeModifyCommand('hose', id, clickPt);
+    if (didExecute) {
+      e.cancelBubble = true;
+      return;
+    }
+
+    if (hose.locked && activeTool !== 'select') return;
+
     if (['select', 'move', 'rotate'].includes(activeTool)) {
-      setSelectedId(id);
+      selectSingleElement(id);
       e.cancelBubble = true;
     }
-    if (activeTool === 'copy' && hose && onHosesChange) {
+    if (activeTool === 'copy' && onHosesChange) {
       onHosesChange([...hoses, { ...hose, id: crypto.randomUUID(), points: hose.points.map((p: any) => ({ x: p.x + 40, y: p.y + 40 })) }]);
       e.cancelBubble = true;
     }
@@ -967,7 +1667,7 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
       onHosesChange(hoses.filter(h => h.id !== id));
       e.cancelBubble = true;
     }
-    if (activeTool === 'dimension' && hose && hose.points.length > 1) {
+    if (activeTool === 'dimension' && hose.points.length > 1) {
       let totalDist = 0;
       for (let i = 0; i < hose.points.length - 1; i++) {
         totalDist += distMeters(hose.points[i], hose.points[i+1]);
@@ -1184,14 +1884,23 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
 
   // ---------- component renderer ----------
   const renderComponent = (comp: PlacedComponent) => {
-    const isSelected = ['select', 'move', 'rotate'].includes(activeTool) && selectedId === comp.id;
-    const isDraggable = ['select', 'move', 'rotate'].includes(activeTool);
+    const isSelected = ['select', 'move', 'rotate'].includes(activeTool) && (selectedId === comp.id || selectedIds.has(comp.id));
+    const isLocked = (comp as any).locked;
+    const isDraggable = ['select', 'move', 'rotate'].includes(activeTool) && !isLocked;
     const del = activeTool === 'delete';
 
     const handleCompClick = (e: any) => {
-      if (['select', 'move'].includes(activeTool)) { setSelectedId(comp.id); e.cancelBubble = true; }
-      if (activeTool === 'rotate') {
-        // Each click rotates 90°; right-click flips 180°
+      const stage = e.target.getStage();
+      const clickPt = getWorldPointerPos(stage) || { x: comp.x, y: comp.y };
+      
+      const didExecute = executeModifyCommand('component', comp.id, clickPt);
+      if (didExecute) {
+        e.cancelBubble = true;
+        return;
+      }
+      
+      if (['select', 'move'].includes(activeTool)) { selectSingleElement(comp.id); e.cancelBubble = true; }
+      if (activeTool === 'rotate' && !isLocked) {
         const delta = e.evt?.button === 2 ? 180 : 90;
         const newRot = ((comp.rotation || 0) + delta) % 360;
         onPlacedComponentsChange(placedComponents.map(c => c.id === comp.id ? { ...c, rotation: newRot } : c));
@@ -1208,6 +1917,11 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
     const base = {
       onClick: handleCompClick,
       onTap: handleCompClick,
+      onContextMenu: (e: any) => {
+        if (activeTool === 'select') {
+          toggleSelectElement(comp.id, e);
+        }
+      },
       draggable: isDraggable,
       onDragEnd: (e: any) => handleCompDragEnd(comp.id, e),
       strokeWidth: isSelected ? 3 : 2,
@@ -1216,6 +1930,7 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
     switch (comp.type) {
       case 'pump': return (
         <Group key={comp.id} {...base}>
+          {isLocked && <Text x={comp.x - 5} y={comp.y - 30} text="📌" fontSize={14} listening={false} />}
           {/* Pump body shadow */}
           <Rect x={comp.x - 22} y={comp.y - 17} width={44} height={34} fill="rgba(0,0,0,0.1)" cornerRadius={3} listening={false} />
           {/* Main pump block */}
@@ -1247,6 +1962,7 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
             rotation={comp.rotation || 0}
             {...base}
           >
+            {isLocked && <Text x={-5} y={-30} text="📌" fontSize={14} rotation={-(comp.rotation || 0)} listening={false} />}
             {/* Main horizontal flow path */}
             <Rect x={-15} y={-4} width={30} height={8} fill={del ? '#a7f3d0' : '#d1fae5'} stroke={isSelected ? '#fbbf24' : '#065f46'} strokeWidth={1.5} cornerRadius={1} />
             {/* Branch perpendicular path */}
@@ -1291,6 +2007,7 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
             rotation={comp.rotation || 0}
             {...base}
           >
+            {isLocked && <Text x={-5} y={-30} text="📌" fontSize={14} rotation={-(comp.rotation || 0)} listening={false} />}
             {/* L-shaped 90-degree curved body */}
             {/* Horizontal side */}
             <Rect x={-12} y={-4} width={12} height={8} fill={del ? '#fcd34d' : '#fef3c7'} stroke={isSelected ? '#fbbf24' : '#78350f'} strokeWidth={1.5} cornerRadius={1} />
@@ -1326,10 +2043,52 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
     }
   };
 
+  const getModifyGuidance = () => {
+    switch (activeTool) {
+      case 'align':
+        return alignRef 
+          ? "Click element to align to reference axis"
+          : "Click reference line or snap point to set alignment axis";
+      case 'offset':
+        return `Click line or area to offset by ${offsetDistance}m`;
+      case 'mirror-pick':
+        return selectedId
+          ? "Click an existing line/hose to mirror selected element"
+          : "Please SELECT an element first, then click a mirror axis line";
+      case 'mirror-draw':
+        return selectedId
+          ? "Click 2 points on the canvas to draw mirror axis"
+          : "Please SELECT an element first, then draw mirror axis";
+      case 'split':
+        return "Click a pipeline or hose to split it";
+      case 'trim':
+        return trimFirstId
+          ? "Click second pipeline or hose to trim corner"
+          : "Click first pipeline or hose to trim corner";
+      case 'pin':
+        return "Click elements to lock (pin) their position";
+      case 'unpin':
+        return "Click elements to unlock (unpin) their position";
+      case 'delete':
+        return "Click elements to delete (erase) them";
+      case 'text':
+        return "Click on canvas to add floating text annotation";
+      default:
+        return null;
+    }
+  };
+
   const getCursor = () => {
     if (isPanning) return 'grabbing';
     if (activeTool === 'select') return 'default';
-    if (['line', 'hose', 'discharge', 'delete', 'dimension', 'area', 'discharge-area', 'site-area'].includes(activeTool)) return 'crosshair';
+    if (activeTool === 'align') return 'cell';
+    if (activeTool === 'offset') return 'copy';
+    if (['mirror-pick', 'mirror-draw'].includes(activeTool)) return 'alias';
+    if (activeTool === 'pin') return 'alias';
+    if (activeTool === 'unpin') return 'pointer';
+    if (activeTool === 'delete') return 'not-allowed';
+    if (activeTool === 'text') return 'text';
+    if (['line', 'hose', 'discharge', 'dimension', 'area', 'discharge-area', 'site-area'].includes(activeTool)) return 'crosshair';
     return 'pointer';
   };
 
@@ -1434,15 +2193,27 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
             return gridLines;
           })()}
 
-          {bgImage && (
-            <KonvaImage image={bgImage} width={canvasSize.width} height={canvasSize.height} opacity={0.5} />
+          {bgImage && blueprintSettings.visible && (
+            <KonvaImage
+              id="blueprint-underlay"
+              image={bgImage}
+              x={blueprintSettings.x}
+              y={blueprintSettings.y}
+              scaleX={blueprintSettings.scaleX}
+              scaleY={blueprintSettings.scaleY}
+              rotation={blueprintSettings.rotation}
+              opacity={blueprintSettings.opacity}
+              draggable={activeTool === 'modify-blueprint' && !blueprintSettings.locked}
+              onDragEnd={handleBlueprintDragEnd}
+              onTransformEnd={handleBlueprintTransformEnd}
+            />
           )}
 
           {/* Excavation, Discharge & Site Areas */}
           {areas.filter(isItemVisible).map((area: any) => {
             const isDischarge = area.kind === 'discharge';
             const isSite = area.kind === 'site';
-            const isSelected = selectedId === area.id && activeTool === 'select';
+            const isSelected = ['select', 'move', 'rotate'].includes(activeTool) && (selectedId === area.id || selectedIds.has(area.id));
             
             const fillCol = isSite ? '#86efac' : isDischarge ? '#fed7aa' : '#fca5a5';
             const strokeCol = isSite ? '#22c55e' : isDischarge ? '#f97316' : '#ef4444';
@@ -1453,45 +2224,137 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
 
             return (
               <Group key={area.id}>
-                {/* The actual resizable Rect */}
-                <Rect
-                  id={`area-${area.id}`}
-                  x={area.x} y={area.y} width={area.width} height={area.height}
-                  fill={fillCol} opacity={area.locked ? 0.1 : 0.2}
-                  stroke={strokeCol}
-                  strokeWidth={isSelected ? 2.5 : 1.5} dash={isSite ? undefined : [10, 5]}
-                  draggable={activeTool === 'select' && !area.locked}
-                  onDragStart={(e) => !area.locked && handleAreaDragStart(e, area.id)}
-                  onDragEnd={(e) => !area.locked && handleAreaDragEnd(e, area.id)}
-                  onTransformEnd={(e) => !area.locked && handleAreaTransformEnd(e, area.id)}
-                  onClick={(e) => !area.locked && handleAreaClick(e, area.id)}
-                  onTap={(e) => !area.locked && handleAreaClick(e, area.id)}
-                  onMouseEnter={(e) => { 
-                    if (area.locked) return;
-                    if (activeTool === 'delete') document.body.style.cursor = 'pointer'; 
-                    if (activeTool === 'select') document.body.style.cursor = 'move';
-                  }}
-                  onMouseLeave={() => { document.body.style.cursor = 'default'; }}
-                />
+                {area.points ? (
+                  // Custom Polygon Shape
+                  <Line
+                    id={`area-${area.id}`}
+                    points={area.points.flatMap((p: any) => [p.x, p.y])}
+                    closed={true}
+                    fill={fillCol}
+                    opacity={area.locked ? 0.1 : 0.2}
+                    stroke={strokeCol}
+                    strokeWidth={isSelected ? 2.5 : 1.5}
+                    dash={isSite ? undefined : [10, 5]}
+                    draggable={activeTool === 'select' && !area.locked}
+                    onDragStart={(e) => !area.locked && handleAreaDragStart(e, area.id)}
+                    onDragEnd={(e) => {
+                      if (dragInfoRef.current?.cancelled) {
+                        dragInfoRef.current = null;
+                        return;
+                      }
+                      dragInfoRef.current = null;
+                      if (onAreasChange) {
+                        const dx = e.target.x();
+                        const dy = e.target.y();
+                        onAreasChange(areas.map(a => 
+                          a.id === area.id ? {
+                            ...a,
+                            x: a.x + dx,
+                            y: a.y + dy,
+                            points: a.points ? a.points.map((p: any) => ({ x: p.x + dx, y: p.y + dy })) : undefined
+                          } : a
+                        ));
+                      }
+                      e.target.position({ x: 0, y: 0 });
+                    }}
+                    onClick={(e) => handleAreaClick(e, area.id)}
+                    onTap={(e) => handleAreaClick(e, area.id)}
+                    onContextMenu={(e) => {
+                      if (activeTool === 'select') {
+                        toggleSelectElement(area.id, e);
+                      }
+                    }}
+                    onMouseEnter={(e) => { 
+                      if (area.locked) return;
+                      if (activeTool === 'delete') document.body.style.cursor = 'pointer'; 
+                      if (activeTool === 'select') document.body.style.cursor = 'move';
+                    }}
+                    onMouseLeave={() => { document.body.style.cursor = 'default'; }}
+                  />
+                ) : (
+                  // Bounding Box Rectangle
+                  <Rect
+                    id={`area-${area.id}`}
+                    x={area.x} y={area.y} width={area.width} height={area.height}
+                    fill={fillCol} opacity={area.locked ? 0.1 : 0.2}
+                    stroke={strokeCol}
+                    strokeWidth={isSelected ? 2.5 : 1.5} dash={isSite ? undefined : [10, 5]}
+                    draggable={activeTool === 'select' && !area.locked}
+                    onDragStart={(e) => !area.locked && handleAreaDragStart(e, area.id)}
+                    onDragEnd={(e) => !area.locked && handleAreaDragEnd(e, area.id)}
+                    onTransformEnd={(e) => !area.locked && handleAreaTransformEnd(e, area.id)}
+                    onClick={(e) => handleAreaClick(e, area.id)}
+                    onTap={(e) => handleAreaClick(e, area.id)}
+                    onContextMenu={(e) => {
+                      if (activeTool === 'select') {
+                        toggleSelectElement(area.id, e);
+                      }
+                    }}
+                    onMouseEnter={(e) => { 
+                      if (area.locked) return;
+                      if (activeTool === 'delete') document.body.style.cursor = 'pointer'; 
+                      if (activeTool === 'select') document.body.style.cursor = 'move';
+                    }}
+                    onMouseLeave={() => { document.body.style.cursor = 'default'; }}
+                  />
+                )}
                 
-                {/* Overlay Text inside Group to avoid scaling when transformed */}
+                {/* Overlay Text */}
                 <Text
-                  x={area.x + 5} y={area.y + 5}
+                  x={area.points ? area.points[0].x + 5 : area.x + 5}
+                  y={area.points ? area.points[0].y + 5 : area.y + 5}
                   text={area.locked ? `🔒 ${labelStr}` : labelStr}
                   fill={strokeCol}
                   opacity={0.8} fontSize={12} fontStyle="bold" listening={false}
                 />
                 
-                {/* Dimension Labels */}
-                <Text x={area.x + area.width / 2} y={area.y - 15} text={`${wMeters}m`} fill="#475569" fontSize={12} fontStyle="bold" align="center" width={area.width} offsetX={area.width / 2} listening={false} />
-                <Text x={area.x - 35} y={area.y + area.height / 2} text={`${hMeters}m`} fill="#475569" fontSize={12} fontStyle="bold" align="center" width={70} offsetX={35} offsetY={6} rotation={-90} listening={false} />
+                {/* Render Pin icon if locked */}
+                {area.locked && (
+                  <Text
+                    x={area.points ? area.points[0].x + 10 : area.x + area.width / 2}
+                    y={area.points ? area.points[0].y - 20 : area.y + area.height / 2 - 10}
+                    text="📌"
+                    fontSize={16}
+                    listening={false}
+                  />
+                )}
+
+                {/* Dimension Labels (only for rectangles since it's defined by width/height) */}
+                {!area.points && (
+                  <>
+                    <Text x={area.x + area.width / 2} y={area.y - 15} text={`${wMeters}m`} fill="#475569" fontSize={12} fontStyle="bold" align="center" width={area.width} offsetX={area.width / 2} listening={false} />
+                    <Text x={area.x - 35} y={area.y + area.height / 2} text={`${hMeters}m`} fill="#475569" fontSize={12} fontStyle="bold" align="center" width={70} offsetX={35} offsetY={6} rotation={-90} listening={false} />
+                  </>
+                )}
+
+                {/* Draggable Corner Vertices for Custom Polygon in Select Mode */}
+                {isSelected && area.points && area.points.map((pt: any, idx: number) => (
+                  <Circle
+                    key={`${area.id}-vertex-${idx}`}
+                    x={pt.x}
+                    y={pt.y}
+                    radius={6}
+                    fill="#ffffff"
+                    stroke={strokeCol}
+                    strokeWidth={2}
+                    draggable={!area.locked}
+                    onDragMove={(e) => {
+                      const node = e.target;
+                      const newPt = { x: node.x(), y: node.y() };
+                      const updatedPts = area.points.map((p: any, i: number) => i === idx ? newPt : p);
+                      if (onAreasChange) {
+                        onAreasChange(areas.map(a => a.id === area.id ? { ...a, points: updatedPts } : a));
+                      }
+                    }}
+                  />
+                ))}
               </Group>
             );
           })}
 
           {/* Finished lines (sorted by zIndex, rendered after areas so they appear on top) */}
           {[...lines].filter(isItemVisible).sort((a: any, b: any) => (a.zIndex ?? 100) - (b.zIndex ?? 100)).map((line) => {
-            const isSelected = activeTool === 'select' && selectedId === line.id;
+            const isSelected = activeTool === 'select' && (selectedId === line.id || selectedIds.has(line.id));
             return (
               <React.Fragment key={line.id}>
                 {/* Invisible wide hit area for easier clicking */}
@@ -1502,6 +2365,11 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
                   lineJoin="round" lineCap="round"
                   onClick={(e) => handleLineClick(e, line.id)}
                   onTap={(e) => handleLineClick(e, line.id)}
+                  onContextMenu={(e) => {
+                    if (activeTool === 'select') {
+                      toggleSelectElement(line.id, e);
+                    }
+                  }}
                   draggable={isSelected && !line.locked}
                   onDragStart={(e) => handleLineDragStart(line.id, e)}
                   onDragEnd={(e) => handleLineDragEnd(line.id, e)}
@@ -1823,7 +2691,7 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
 
           {/* Suction Pipes (yellow) */}
           {hoses.filter((h: any) => h.kind !== 'discharge' && isItemVisible(h)).map((hose: any) => {
-            const isSelected = activeTool === 'select' && selectedId === hose.id;
+            const isSelected = activeTool === 'select' && (selectedId === hose.id || selectedIds.has(hose.id));
             return (
               <React.Fragment key={hose.id}>
                 {/* Invisible wide hit area for easier clicking */}
@@ -1834,6 +2702,11 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
                   lineJoin="round" lineCap="round"
                   onClick={(e) => handleHoseClick(e, hose.id)}
                   onTap={(e) => handleHoseClick(e, hose.id)}
+                  onContextMenu={(e) => {
+                    if (activeTool === 'select') {
+                      toggleSelectElement(hose.id, e);
+                    }
+                  }}
                   draggable={isSelected && !hose.locked}
                   onDragStart={(e) => handleHoseDragStart(hose.id, e)}
                   onDragEnd={(e) => handleHoseDragEnd(hose.id, e)}
@@ -1891,7 +2764,7 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
 
           {/* Discharge Pipes (orange) */}
           {hoses.filter((h: any) => h.kind === 'discharge' && isItemVisible(h)).map((hose: any) => {
-            const isSelected = activeTool === 'select' && selectedId === hose.id;
+            const isSelected = activeTool === 'select' && (selectedId === hose.id || selectedIds.has(hose.id));
             return (
               <React.Fragment key={hose.id}>
                 {/* Invisible wide hit area for easier clicking */}
@@ -1902,6 +2775,11 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
                   lineJoin="round" lineCap="round"
                   onClick={(e) => handleHoseClick(e, hose.id)}
                   onTap={(e) => handleHoseClick(e, hose.id)}
+                  onContextMenu={(e) => {
+                    if (activeTool === 'select') {
+                      toggleSelectElement(hose.id, e);
+                    }
+                  }}
                   draggable={isSelected && !hose.locked}
                   onDragStart={(e) => handleHoseDragStart(hose.id, e)}
                   onDragEnd={(e) => handleHoseDragEnd(hose.id, e)}
@@ -2018,17 +2896,138 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
 
           {/* Dimensions */}
           {(dimensions || []).filter(isItemVisible).map(dim => {
+            if ((dim as any).isTextAnnotation) {
+              const isSelected = activeTool === 'select' && (selectedId === dim.id || selectedIds.has(dim.id));
+              const textX = dim.x !== undefined ? dim.x : dim.start.x;
+              const textY = dim.y !== undefined ? dim.y : dim.start.y;
+              const textFSize = (dim as any).fontSize || 14;
+              const textCol = (dim as any).color || '#000000';
+              const textRot = (dim as any).rotation || 0;
+              const isLocked = (dim as any).locked;
+              
+              return (
+                <Group 
+                  key={dim.id}
+                  x={textX}
+                  y={textY}
+                  draggable={activeTool === 'select' && !isLocked}
+                  onDragEnd={(e) => {
+                    const node = e.target;
+                    if (onDimensionsChange && dimensions) {
+                      onDimensionsChange(dimensions.map(d => d.id === dim.id ? { 
+                        ...d, 
+                        x: node.x(), 
+                        y: node.y(), 
+                        start: { x: node.x(), y: node.y() }, 
+                        end: { x: node.x(), y: node.y() } 
+                      } : d));
+                    }
+                    node.position({ x: textX, y: textY });
+                  }}
+                  onMouseEnter={() => { 
+                    if (activeTool === 'delete') document.body.style.cursor = 'pointer'; 
+                    else if (activeTool === 'select' && !isLocked) document.body.style.cursor = 'move';
+                  }}
+                  onMouseLeave={() => { document.body.style.cursor = 'default'; }}
+                  onClick={(e) => {
+                    const stage = e.target.getStage();
+                    const clickPt = getWorldPointerPos(stage) || undefined;
+                    const didExecute = executeModifyCommand('text', dim.id, clickPt);
+                    if (didExecute) {
+                      e.cancelBubble = true;
+                      return;
+                    }
+                    if (isLocked && activeTool !== 'select') return;
+                    if (activeTool === 'select') {
+                      selectSingleElement(dim.id);
+                      e.cancelBubble = true;
+                    }
+                  }}
+                  onTap={(e) => {
+                    const stage = e.target.getStage();
+                    const clickPt = getWorldPointerPos(stage) || undefined;
+                    const didExecute = executeModifyCommand('text', dim.id, clickPt);
+                    if (didExecute) {
+                      e.cancelBubble = true;
+                      return;
+                    }
+                    if (isLocked && activeTool !== 'select') return;
+                    if (activeTool === 'select') {
+                      selectSingleElement(dim.id);
+                      e.cancelBubble = true;
+                    }
+                  }}
+                  onContextMenu={(e) => {
+                    if (activeTool === 'select') {
+                      toggleSelectElement(dim.id, e);
+                    }
+                  }}
+                  onDblClick={(e) => {
+                    if (activeTool === 'select') {
+                      setTextEditor({ x: textX, y: textY, val: dim.text, editingId: dim.id });
+                      e.cancelBubble = true;
+                    }
+                  }}
+                  onDblTap={(e) => {
+                    if (activeTool === 'select') {
+                      setTextEditor({ x: textX, y: textY, val: dim.text, editingId: dim.id });
+                      e.cancelBubble = true;
+                    }
+                  }}
+                >
+                  <Text
+                    x={0}
+                    y={0}
+                    text={dim.text}
+                    fill={textCol}
+                    fontSize={textFSize}
+                    fontStyle="bold"
+                    rotation={textRot}
+                    align="center"
+                  />
+                  {isLocked && (
+                    <Text x={-5} y={-20} text="📌" fontSize={12} listening={false} />
+                  )}
+                  {isSelected && (
+                    <Rect
+                      x={-4}
+                      y={-4}
+                      width={dim.text.length * textFSize * 0.6 + 8}
+                      height={textFSize + 8}
+                      stroke="#fbbf24"
+                      strokeWidth={1.5}
+                      dash={[4, 4]}
+                      listening={false}
+                    />
+                  )}
+                </Group>
+              );
+            }
+
             const dx = dim.end.x - dim.start.x;
             const dy = dim.end.y - dim.start.y;
             const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+            const isLocked = (dim as any).locked;
             return (
               <Group key={dim.id}
                 onMouseEnter={() => { if (activeTool === 'delete') document.body.style.cursor = 'pointer'; }}
                 onMouseLeave={() => { document.body.style.cursor = 'default'; }}
                 onClick={(e) => {
+                  const stage = e.target.getStage();
+                  const clickPt = getWorldPointerPos(stage) || undefined;
+                  const didExecute = executeModifyCommand('dimension', dim.id, clickPt);
+                  if (didExecute) {
+                    e.cancelBubble = true;
+                    return;
+                  }
                   if (activeTool === 'delete' && onDimensionsChange && dimensions) {
                     onDimensionsChange(dimensions.filter(d => d.id !== dim.id));
                     e.cancelBubble = true;
+                  }
+                }}
+                onContextMenu={(e) => {
+                  if (activeTool === 'select') {
+                    toggleSelectElement(dim.id, e);
                   }
                 }}
               >
@@ -2097,6 +3096,18 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
                 fill="#3b82f6" fontSize={12} fontStyle="bold" listening={false}
               />
             </>
+          )}
+
+          {/* Polygon closing helper preview */}
+          {['area', 'site-area', 'discharge-area'].includes(activeTool) && drawShapeMode === 'poly' && currentLine.length > 1 && cursorPos && (
+            <Line
+              points={[cursorPos.x, cursorPos.y, currentLine[0].x, currentLine[0].y]}
+              stroke="#f59e0b"
+              strokeWidth={1.5}
+              dash={[4, 4]}
+              opacity={0.6}
+              listening={false}
+            />
           )}
 
           {/* OSnap Indicator */}
@@ -2346,6 +3357,20 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
         </div>
       )}
 
+      {/* Revit-style modify floating guidance tooltip */}
+      {getModifyGuidance() && cursorPos && (
+        <div
+          className="absolute z-50 pointer-events-none select-none bg-blue-900 border border-blue-500 text-white text-xs rounded shadow-2xl px-2.5 py-1.5 font-bold flex items-center gap-1.5 whitespace-nowrap animate-in fade-in zoom-in-95 duration-100"
+          style={{
+            left: Math.min((cursorPos.x * scale + position.x) + 20, canvasSize.width - 240),
+            top: Math.min((cursorPos.y * scale + position.y) + 20, canvasSize.height - 40),
+          }}
+        >
+          <span className="text-yellow-400">💡</span>
+          {getModifyGuidance()}
+        </div>
+      )}
+
       {/* Mobile Drawing Actions (Cancel / Done) */}
       {isDrawing && (
         <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-4 sm:hidden z-50">
@@ -2379,7 +3404,50 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
           </button>
         </div>
       )}
-
+      {textEditor && textEditorScreenPos && (
+        <div 
+          className="absolute z-[100] bg-white border border-blue-400 rounded shadow-md p-1 flex items-center gap-1.5"
+          style={{
+            left: `${textEditorScreenPos.left}px`,
+            top: `${textEditorScreenPos.top}px`,
+            transform: 'translate(-50%, -100%) translateY(-10px)'
+          }}
+        >
+          <input
+            type="text"
+            className="border-none outline-none px-2 py-1 text-sm bg-slate-50 rounded"
+            placeholder="Type note..."
+            style={{
+              color: textColor,
+              fontSize: `${textSize}px`,
+              fontWeight: 'bold',
+              minWidth: '150px'
+            }}
+            value={textEditor.val}
+            onChange={(e) => setTextEditor(prev => prev ? { ...prev, val: e.target.value } : null)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                handleFinishText(textEditor.val, textEditor.editingId);
+              } else if (e.key === 'Escape') {
+                setTextEditor(null);
+              }
+            }}
+            autoFocus
+          />
+          <button
+            onClick={() => handleFinishText(textEditor.val, textEditor.editingId)}
+            className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded transition-colors"
+          >
+            OK
+          </button>
+          <button
+            onClick={() => setTextEditor(null)}
+            className="px-2 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold text-xs rounded transition-colors"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
       </div>
     </div>
   );

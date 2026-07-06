@@ -14,6 +14,13 @@ interface Dewatering3DViewProps {
   screenLength: number;
   levels?: ElevationLevel[];
   wellpointSide?: 'left' | 'right' | 'both';
+  // Modify tool integration
+  activeTool?: string;
+  selectedId?: string | null;
+  onSelectId?: (id: string | null) => void;
+  onAreasChange?: (areas: any[]) => void;
+  onLinesChange?: (lines: LineData[]) => void;
+  onPlacedComponentsChange?: (comps: PlacedComponent[]) => void;
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -315,6 +322,12 @@ export const Dewatering3DView: React.FC<Dewatering3DViewProps> = ({
   screenLength,
   levels = [],
   wellpointSide = 'left',
+  activeTool,
+  selectedId,
+  onSelectId,
+  onAreasChange,
+  onLinesChange,
+  onPlacedComponentsChange,
 }) => {
   const HEADER_Y = groundElevation + 0.5;
   const BOTTOM_Y = groundElevation - targetDepth;
@@ -767,8 +780,46 @@ export const Dewatering3DView: React.FC<Dewatering3DViewProps> = ({
     return wps;
   }, [lines, groundElevation, targetDepth, levels, wellpointSide]);
 
+  const isModifyTool = activeTool && !['select','line','hose','discharge','dimension','area','site-area','discharge-area','text','pump','tee','elbow'].includes(activeTool);
+  const isSelectTool = activeTool === 'select' || !activeTool;
+
+  const guidance3D: Record<string, string> = {
+    'align': 'Click an element in 3D to align it',
+    'offset': 'Click a pipeline or area to offset it',
+    'mirror-pick': selectedId ? 'Click axis line to mirror selected' : 'Click an element to select first',
+    'mirror-draw': selectedId ? 'Orbiting disabled — modify in 2D view for mirror-draw' : 'Click an element to select first',
+    'split': 'Click a pipeline in 3D to split it',
+    'trim': 'Trim works best in 2D — switch view for precision',
+    'pin': 'Click element to pin/lock it',
+    'unpin': 'Click element to unpin/unlock it',
+    'delete': 'Click element to delete it',
+  };
+
+  const cursorStyle = (() => {
+    if (!activeTool) return 'grab';
+    if (activeTool === 'delete') return 'not-allowed';
+    if (activeTool === 'pin' || activeTool === 'unpin') return 'alias';
+    if (activeTool === 'select') return 'default';
+    return 'pointer';
+  })();
+
   return (
-    <div className="w-full h-full bg-slate-900 dewatering-3d-view">
+    <div className="w-full h-full bg-slate-900 dewatering-3d-view relative" style={{ cursor: cursorStyle }}>
+      {/* 3D Modify Guidance HUD */}
+      {activeTool && guidance3D[activeTool] && (
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 bg-blue-900/95 border border-blue-400 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-2xl flex items-center gap-2 pointer-events-none">
+          <span className="text-yellow-400">💡</span>
+          {guidance3D[activeTool]}
+        </div>
+      )}
+
+      {/* Selected indicator */}
+      {selectedId && (
+        <div className="absolute top-3 right-3 z-20 bg-emerald-800/90 border border-emerald-400 text-emerald-200 text-xs font-bold px-3 py-1.5 rounded shadow-xl pointer-events-none">
+          ✓ Selected: {selectedId.slice(0, 8)}…
+        </div>
+      )}
+
       <Canvas camera={{ position: [15, 12, 15], fov: 45 }} gl={{ preserveDrawingBuffer: true }}>
         <ambientLight intensity={0.65} />
         <directionalLight position={[10, 20, 10]} intensity={1.3} castShadow />
@@ -797,6 +848,57 @@ export const Dewatering3DView: React.FC<Dewatering3DViewProps> = ({
 
         {/* Excavation Areas */}
         {areas.map(area => {
+          const fillCol = area.kind === 'site' ? '#22c55e' : area.kind === 'discharge' ? '#f97316' : '#ef4444';
+          const isSelected3D = selectedId === area.id;
+          const highlightCol = isSelected3D ? '#facc15' : area.locked ? '#94a3b8' : fillCol;
+
+          const handle3DClick = (e: any) => {
+            e.stopPropagation();
+            if (!activeTool || activeTool === 'select') {
+              onSelectId?.(area.id);
+            } else if (activeTool === 'delete') {
+              onAreasChange?.(areas.filter((a: any) => a.id !== area.id));
+              onSelectId?.(null);
+            } else if (activeTool === 'pin') {
+              onAreasChange?.(areas.map((a: any) => a.id === area.id ? { ...a, locked: true } : a));
+            } else if (activeTool === 'unpin') {
+              onAreasChange?.(areas.map((a: any) => a.id === area.id ? { ...a, locked: false } : a));
+            } else {
+              onSelectId?.(area.id);
+            }
+          };
+
+          if (area.points && area.points.length > 2) {
+            const shape = new THREE.Shape();
+            const p0 = area.points[0];
+            shape.moveTo(p0.x / PIXELS_PER_METER, p0.y / PIXELS_PER_METER);
+            for (let i = 1; i < area.points.length; i++) {
+              const pt = area.points[i];
+              shape.lineTo(pt.x / PIXELS_PER_METER, pt.y / PIXELS_PER_METER);
+            }
+            shape.closePath();
+
+            const extrudeSettings = {
+              steps: 1,
+              depth: targetDepth,
+              bevelEnabled: false,
+            };
+
+            return (
+              <mesh 
+                key={area.id} 
+                position={[0, groundElevation, 0]} 
+                rotation={[Math.PI / 2, 0, 0]}
+                onClick={handle3DClick}
+                onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = activeTool === 'delete' ? 'not-allowed' : 'pointer'; }}
+                onPointerOut={() => { document.body.style.cursor = 'default'; }}
+              >
+                <extrudeGeometry args={[shape, extrudeSettings]} />
+                <meshStandardMaterial color={highlightCol} transparent opacity={isSelected3D ? 0.45 : 0.2} wireframe={!isSelected3D} />
+              </mesh>
+            );
+          }
+
           const width = area.width / PIXELS_PER_METER;
           const length = area.height / PIXELS_PER_METER;
           const cx = (area.x + area.width / 2) / PIXELS_PER_METER;
@@ -807,8 +909,11 @@ export const Dewatering3DView: React.FC<Dewatering3DViewProps> = ({
               key={area.id} 
               args={[width, targetDepth, length]} 
               position={[cx, groundElevation - targetDepth / 2, cz]}
+              onClick={handle3DClick}
+              onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = activeTool === 'delete' ? 'not-allowed' : 'pointer'; }}
+              onPointerOut={() => { document.body.style.cursor = 'default'; }}
             >
-              <meshStandardMaterial color="#f87171" transparent opacity={0.25} wireframe />
+              <meshStandardMaterial color={highlightCol} transparent opacity={isSelected3D ? 0.45 : 0.2} wireframe={!isSelected3D} />
             </Box>
           );
         })}
@@ -970,21 +1075,49 @@ export const Dewatering3DView: React.FC<Dewatering3DViewProps> = ({
           const componentY = groundElevation - levelDepth + 0.5;
           const pos = to3D(comp, groundElevation);
           const rotationRad = (comp.rotation || 0) * (Math.PI / 180);
-          
+          const isSelected3D = selectedId === comp.id;
+
+          const handleCompClick = (e: any) => {
+            e.stopPropagation();
+            if (!activeTool || activeTool === 'select') {
+              onSelectId?.(comp.id);
+            } else if (activeTool === 'delete') {
+              onPlacedComponentsChange?.(placedComponents.filter(c => c.id !== comp.id));
+              onSelectId?.(null);
+            } else if (activeTool === 'pin') {
+              onPlacedComponentsChange?.(placedComponents.map(c => c.id === comp.id ? { ...c, locked: true } : c));
+            } else if (activeTool === 'unpin') {
+              onPlacedComponentsChange?.(placedComponents.map(c => c.id === comp.id ? { ...c, locked: false } : c));
+            } else {
+              onSelectId?.(comp.id);
+            }
+          };
+
+          const compGroup = (child: React.ReactNode) => (
+            <group
+              key={comp.id}
+              onClick={handleCompClick}
+              onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = activeTool === 'delete' ? 'not-allowed' : 'pointer'; }}
+              onPointerOut={() => { document.body.style.cursor = 'default'; }}
+            >
+              {child}
+              {isSelected3D && (
+                <mesh position={[pos.x, groundElevation + 0.45, pos.z]}>
+                  <sphereGeometry args={[0.9, 16, 16]} />
+                  <meshStandardMaterial color="#facc15" transparent opacity={0.15} wireframe />
+                </mesh>
+              )}
+            </group>
+          );
+
           if (comp.type === 'pump') {
-            return (
-              <GehoPump3D key={comp.id} position={[pos.x, groundElevation + 0.45, pos.z]} />
-            );
+            return compGroup(<GehoPump3D key={comp.id} position={[pos.x, groundElevation + 0.45, pos.z]} />);
           }
           if (comp.type === 'elbow') {
-            return (
-              <Elbow3D key={comp.id} position={[pos.x, componentY, pos.z]} rotationY={-rotationRad} />
-            );
+            return compGroup(<Elbow3D key={comp.id} position={[pos.x, componentY, pos.z]} rotationY={-rotationRad} />);
           }
           if (comp.type === 'tee') {
-            return (
-              <Tee3D key={comp.id} position={[pos.x, componentY, pos.z]} rotationY={-rotationRad} />
-            );
+            return compGroup(<Tee3D key={comp.id} position={[pos.x, componentY, pos.z]} rotationY={-rotationRad} />);
           }
           return null;
         })}

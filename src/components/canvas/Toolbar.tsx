@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { MousePointer2, Pencil, Droplet, GitMerge, CornerDownRight, Square, Undo2, Eraser, Eye, EyeOff, Crosshair, Maximize, Minimize, Grid, Ruler, Spline, Frame, ChevronUp, ChevronDown, Printer, Move, Copy, RotateCw } from 'lucide-react';
+import { MousePointer2, Pencil, Droplet, GitMerge, CornerDownRight, Square, Undo2, Eraser, Eye, EyeOff, Crosshair, Maximize, Minimize, Grid, Ruler, Spline, Frame, ChevronUp, ChevronDown, Printer, Move, Copy, RotateCw, Type, Pin, PinOff, Scissors, AlignLeft, SlidersHorizontal, FlipHorizontal, Image } from 'lucide-react';
 import { ComponentType } from '../../utils/simulationLogic';
 
-export type ActiveTool = 'select' | 'line' | 'dimension' | 'delete' | 'area' | 'hose' | 'discharge' | 'discharge-area' | 'site-area' | 'move' | 'copy' | 'rotate' | ComponentType;
+export type ActiveTool = 'select' | 'line' | 'dimension' | 'delete' | 'area' | 'hose' | 'discharge' | 'discharge-area' | 'site-area' | 'move' | 'copy' | 'rotate' | 'align' | 'offset' | 'mirror-pick' | 'mirror-draw' | 'split' | 'trim' | 'pin' | 'unpin' | 'text' | 'modify-blueprint' | ComponentType;
 
 interface ToolbarProps {
   activeTool: ActiveTool;
@@ -21,6 +21,24 @@ interface ToolbarProps {
   show3D?: boolean;
   onToggle3D?: () => void;
   onExportDrawing?: () => void;
+  
+  // Options bar state
+  offsetDistance: number;
+  onOffsetDistanceChange: (val: number) => void;
+  mirrorCopy: boolean;
+  onMirrorCopyChange: (val: boolean) => void;
+  drawShapeMode: 'rect' | 'poly';
+  onDrawShapeModeChange: (mode: 'rect' | 'poly') => void;
+  textColor: string;
+  onTextColorChange: (color: string) => void;
+  textSize: number;
+  onTextSizeChange: (size: number) => void;
+  
+  // Blueprint settings
+  blueprintSettings: any;
+  onUpdateBlueprintSettings: (updates: any) => void;
+  hasBlueprint: boolean;
+  onUploadBlueprintClick?: () => void;
 }
 
 export const Toolbar: React.FC<ToolbarProps> = ({ 
@@ -31,7 +49,14 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   gridSnap, onToggleGridSnap,
   isFullscreen, onToggleFullscreen,
   show3D, onToggle3D,
-  onExportDrawing
+  onExportDrawing,
+  offsetDistance, onOffsetDistanceChange,
+  mirrorCopy, onMirrorCopyChange,
+  drawShapeMode, onDrawShapeModeChange,
+  textColor, onTextColorChange,
+  textSize, onTextSizeChange,
+  blueprintSettings, onUpdateBlueprintSettings,
+  hasBlueprint, onUploadBlueprintClick
 }) => {
   const [isMobileCollapsed, setIsMobileCollapsed] = useState(window.innerWidth < 640);
 
@@ -90,6 +115,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
     { id: 'hose', label: 'Suction', icon: Spline, desc: 'Suction hose connection' },
     { id: 'discharge', label: 'Discharge', icon: GitMerge, desc: 'Discharge pipeline' },
     { id: 'dimension', label: 'Dimension', icon: Ruler, desc: 'Measure distance between points' },
+    { id: 'text', label: 'Text', icon: Type, desc: 'Add text annotation' },
   ];
   
   const compToolsExtended = [
@@ -103,8 +129,19 @@ export const Toolbar: React.FC<ToolbarProps> = ({
     { id: 'move', label: 'Move', icon: Move, desc: 'Move elements around canvas' },
     { id: 'copy', label: 'Copy', icon: Copy, desc: 'Duplicate selected elements' },
     { id: 'rotate', label: 'Rotate', icon: RotateCw, desc: 'Click component to rotate 90° · Right-click to flip 180°' },
+    { id: 'align', label: 'Align (AL)', icon: AlignLeft, desc: 'Align component or line endpoint to a snap reference' },
+    { id: 'offset', label: 'Offset (OF)', icon: SlidersHorizontal, desc: 'Create parallel offsets of lines/boundaries' },
+    { id: 'mirror-pick', label: 'Mirror Pick (MM)', icon: FlipHorizontal, desc: 'Mirror elements by picking an axis' },
+    { id: 'mirror-draw', label: 'Mirror Draw (DM)', icon: Pencil, desc: 'Mirror elements by drawing a mirror line' },
+    { id: 'split', label: 'Split (SL)', icon: Scissors, desc: 'Split a header pipe, hose or boundary at a click point' },
+    { id: 'trim', label: 'Trim/Ext (TR)', icon: CornerDownRight, desc: 'Trim or extend two header lines to join at corner' },
+    { id: 'pin', label: 'Pin (PN)', icon: Pin, desc: 'Pin element to freeze position' },
+    { id: 'unpin', label: 'Unpin (UP)', icon: PinOff, desc: 'Unpin element to unlock' },
     { id: 'delete', label: 'Erase', icon: Eraser, desc: 'Remove elements from canvas' },
   ];
+
+  const showOptionsBar = 
+    ['offset', 'mirror-pick', 'mirror-draw', 'site-area', 'area', 'discharge-area', 'text', 'modify-blueprint'].includes(activeTool);
 
   return (
     <div className="relative z-20 w-full bg-white select-none">
@@ -211,6 +248,34 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                   </button>
                 )}
 
+                {/* Blueprint visibility & scale triggers */}
+                {hasBlueprint && (
+                  <>
+                    <div className="w-px h-8 bg-gray-200 mx-1"></div>
+                    <button
+                      onClick={() => onUpdateBlueprintSettings({ visible: !blueprintSettings.visible })}
+                      title={blueprintSettings.visible ? 'Hide Blueprint Underlay' : 'Show Blueprint Underlay'}
+                      className={`flex flex-col items-center justify-center p-2 rounded transition-colors ${
+                        blueprintSettings.visible ? 'bg-blue-50/70 text-blue-600 shadow-sm border border-blue-200/50' : 'text-gray-600 hover:bg-gray-100'
+                      }`}
+                    >
+                      <Image size={18} className="mb-1" />
+                      <span className="text-[10px] font-semibold">Blueprint</span>
+                    </button>
+                    
+                    <button
+                      onClick={() => onToolSelect(activeTool === 'modify-blueprint' ? 'select' : 'modify-blueprint')}
+                      title="Adjust Blueprint Scale / Position / Opacity"
+                      className={`flex flex-col items-center justify-center p-2 rounded transition-colors ${
+                        activeTool === 'modify-blueprint' ? 'bg-blue-50/70 text-blue-600 shadow-sm border border-blue-200/50' : 'text-gray-600 hover:bg-gray-100'
+                      }`}
+                    >
+                      <SlidersHorizontal size={18} className="mb-1" />
+                      <span className="text-[10px] font-semibold">Scale Underlay</span>
+                    </button>
+                  </>
+                )}
+
                 {/* Separator */}
                 <div className="w-px h-8 bg-gray-200 mx-1"></div>
 
@@ -248,6 +313,167 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Options Bar */}
+      {showOptionsBar && (
+        <div className="bg-slate-50 border-b border-gray-200 px-6 py-2 flex flex-wrap items-center gap-6 text-xs font-semibold text-gray-700 select-none animate-in slide-in-from-top duration-150 shrink-0">
+          {/* Tool Identifier */}
+          <div className="flex items-center gap-1.5 border-r border-gray-200 pr-4">
+            <span className="text-[10px] font-bold text-slate-400 tracking-widest uppercase">Options:</span>
+            <span className="text-slate-700 font-bold capitalize">
+              {activeTool.replace('-', ' ')}
+            </span>
+          </div>
+
+          {/* Area Shape Option */}
+          {['site-area', 'area', 'discharge-area'].includes(activeTool) && (
+            <div className="flex items-center gap-2">
+              <span className="text-gray-500 font-medium">Draw Shape:</span>
+              <div className="flex items-center bg-gray-200 p-0.5 rounded border border-gray-300">
+                <button
+                  onClick={() => onDrawShapeModeChange('rect')}
+                  className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all ${
+                    drawShapeMode === 'rect' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-900'
+                  }`}
+                >
+                  Rectangle
+                </button>
+                <button
+                  onClick={() => onDrawShapeModeChange('poly')}
+                  className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all ${
+                    drawShapeMode === 'poly' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-900'
+                  }`}
+                >
+                  Polygon (Line)
+                </button>
+              </div>
+              <span className="text-[10px] text-gray-400 italic">
+                {drawShapeMode === 'rect' ? '· Drag diagonal corners' : '· Click vertices, double-click/close to finish'}
+              </span>
+            </div>
+          )}
+
+          {/* Offset Option */}
+          {activeTool === 'offset' && (
+            <div className="flex items-center gap-3">
+              <span className="text-gray-500 font-medium">Offset Distance:</span>
+              <div className="flex items-center gap-1">
+                <input
+                  type="number"
+                  step="0.5"
+                  min="0.1"
+                  className="w-16 border border-gray-300 rounded px-1.5 py-0.5 font-mono text-sm bg-white text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  value={offsetDistance}
+                  onChange={(e) => onOffsetDistanceChange(Math.max(0.1, parseFloat(e.target.value) || 0.1))}
+                />
+                <span className="text-gray-500 font-mono">meters</span>
+              </div>
+            </div>
+          )}
+
+          {/* Mirror Option */}
+          {['mirror-pick', 'mirror-draw'].includes(activeTool) && (
+            <div className="flex items-center gap-3">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 h-4 w-4"
+                  checked={mirrorCopy}
+                  onChange={(e) => onMirrorCopyChange(e.target.checked)}
+                />
+                <span className="text-gray-700">Copy (Duplicate)</span>
+              </label>
+              <span className="text-[10px] text-gray-400 italic">
+                {mirrorCopy ? '· Will duplicate elements across axis' : '· Will move elements to mirrored position'}
+              </span>
+            </div>
+          )}
+
+          {/* Text Tool Option */}
+          {activeTool === 'text' && (
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <span className="text-gray-500 font-medium">Font Size:</span>
+                <input
+                  type="number"
+                  min="8"
+                  max="72"
+                  className="w-14 border border-gray-300 rounded px-1.5 py-0.5 font-mono text-sm bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  value={textSize}
+                  onChange={(e) => onTextSizeChange(Math.max(8, parseInt(e.target.value) || 12))}
+                />
+                <span className="text-gray-400">px</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-gray-500 font-medium">Color:</span>
+                <input
+                  type="color"
+                  className="w-7 h-7 border border-gray-300 rounded p-0 bg-transparent cursor-pointer"
+                  value={textColor}
+                  onChange={(e) => onTextColorChange(e.target.value)}
+                />
+              </div>
+              <span className="text-[10px] text-gray-400 italic">· Click canvas to place floating text</span>
+            </div>
+          )}
+
+          {/* Modify Blueprint Options */}
+          {activeTool === 'modify-blueprint' && (
+            <div className="flex items-center gap-6 w-full sm:w-auto">
+              <div className="flex items-center gap-2">
+                <span className="text-gray-500 font-medium">Opacity:</span>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  className="w-24 cursor-pointer"
+                  value={Math.round(blueprintSettings.opacity * 100)}
+                  onChange={(e) => onUpdateBlueprintSettings({ opacity: parseFloat(e.target.value) / 100 })}
+                />
+                <span className="font-mono w-8 text-right text-xs">{Math.round(blueprintSettings.opacity * 100)}%</span>
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <span className="text-gray-500 font-medium">Visibility:</span>
+                <button
+                  onClick={() => onUpdateBlueprintSettings({ visible: !blueprintSettings.visible })}
+                  className={`px-2 py-0.5 rounded text-[10px] font-bold border transition-colors ${
+                    blueprintSettings.visible ? 'bg-blue-50 border-blue-200 text-blue-600' : 'bg-gray-150 border-gray-300 text-gray-500'
+                  }`}
+                >
+                  {blueprintSettings.visible ? 'Visible' : 'Hidden'}
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-gray-500 font-medium">Underlay Interaction:</span>
+                <button
+                  onClick={() => {
+                    const nextLock = !blueprintSettings.locked;
+                    onUpdateBlueprintSettings({ locked: nextLock });
+                    if (nextLock) {
+                      onToolSelect('select');
+                    }
+                  }}
+                  className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold border transition-colors ${
+                    blueprintSettings.locked ? 'bg-amber-50 border-amber-200 text-amber-600' : 'bg-green-50 border-green-200 text-green-600'
+                  }`}
+                >
+                  {blueprintSettings.locked ? <Pin size={10} /> : <PinOff size={10} />}
+                  {blueprintSettings.locked ? 'Pinned (Locked)' : 'Unpinned (Transformable)'}
+                </button>
+              </div>
+
+              <button
+                onClick={() => onUpdateBlueprintSettings({ x: 0, y: 0, scaleX: 1, scaleY: 1, rotation: 0 })}
+                className="sm:ml-auto text-gray-500 hover:text-gray-800 border border-gray-300 rounded px-2 py-0.5 hover:bg-gray-100 transition-colors text-[10px] font-bold"
+              >
+                Reset Position & Scale
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Mobile Collapse Toggle Button */}
       <div className="absolute top-full left-1/2 -translate-x-1/2 sm:hidden -mt-[1px]">
