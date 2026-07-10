@@ -1,7 +1,7 @@
 import { formatDisplayDate } from '@/src/lib/dateUtils';
 import { useOperations } from '../contexts/OperationsContext';
 import { useAppStore } from '@/src/store/appStore';
-import { Package, Truck, ArrowRightLeft, AlertCircle, TrendingUp, Clock, Wrench, HardHat, Bell, CalendarRange, ChevronRight, ExternalLink, Fuel } from 'lucide-react';
+import { Package, Truck, ArrowRightLeft, AlertCircle, TrendingUp, Clock, Wrench, HardHat, Bell, CalendarRange, ChevronRight, ChevronDown, ExternalLink, Fuel } from 'lucide-react';
 import { Badge } from '@/src/components/ui/badge';
 import { useTheme } from '@/src/hooks/useTheme';
 import { cn, formatUnit } from '@/src/lib/utils';
@@ -12,6 +12,7 @@ import { useState, useMemo } from 'react';
 import { usePriv } from '@/src/hooks/usePriv';
 import { useNavigate } from 'react-router-dom';
 import { format, differenceInDays, parseISO, eachDayOfInterval } from 'date-fns';
+import { BulkMachineLogModal } from './BulkMachineLogModal';
 
 export function Dashboard() {
   const {
@@ -24,6 +25,15 @@ export function Dashboard() {
   const navigate = useNavigate();
   const sites = useAppStore(s => s.sites);
   const [logTab, setLogTab] = useState<'active' | 'pending'>('active');
+  const [showBulkLogModal, setShowBulkLogModal] = useState(false);
+  const [selectedSiteForBulk, setSelectedSiteForBulk] = useState<{
+    siteId: string;
+    siteName: string;
+    machines: { id: string; name: string }[];
+    defaultStartDate?: string;
+    defaultEndDate?: string;
+  } | null>(null);
+  const [collapsedSites, setCollapsedSites] = useState<Record<string, boolean>>({});
 
   const opsWaybills  = usePriv('opsWaybills');
   const opsCheckout  = usePriv('opsCheckout');
@@ -219,6 +229,7 @@ export function Dashboard() {
       pumpStop: Date | null;  // actual configured pumpStopDate (or null if ongoing)
       displayEnd: Date;      // the date up to which we are checking logs (usually yesterday)
       missingDays: number;
+      missingDates: string[];
       lastLogDate: Date | null;
       gapDays: number;       // days since last log to effective end
       siteStatus: 'Active' | 'Inactive' | 'Ended';
@@ -241,10 +252,14 @@ export function Dashboard() {
 
       // Count days in the pump range (up to yesterday) that have no log
       const daysInRange = eachDayOfInterval({ start: pumpStart, end: effectiveEndForMissing });
-      const missingDays = daysInRange.filter(d => {
-        const ds = format(d, 'yyyy-MM-dd');
-        return !loggedDates.has(ds);
-      }).length;
+      const missingDatesList = daysInRange
+        .filter(d => {
+          const ds = format(d, 'yyyy-MM-dd');
+          return !loggedDates.has(ds);
+        })
+        .map(d => format(d, 'yyyy-MM-dd'));
+
+      const missingDays = missingDatesList.length;
 
       if (missingDays === 0) return; // fully logged up to yesterday — no notification
 
@@ -276,6 +291,7 @@ export function Dashboard() {
         pumpStop,
         displayEnd: effectiveEndForMissing,
         missingDays,
+        missingDates: missingDatesList,
         lastLogDate,
         gapDays,
         siteStatus,
@@ -297,6 +313,21 @@ export function Dashboard() {
   const displayNotifications = useMemo(() => {
     return logTab === 'active' ? activeNotifications : pendingNotifications;
   }, [logTab, activeNotifications, pendingNotifications]);
+
+  const notificationsBySite = useMemo(() => {
+    const groups: Record<string, typeof displayNotifications> = {};
+    displayNotifications.forEach(notif => {
+      if (!groups[notif.siteId]) {
+        groups[notif.siteId] = [];
+      }
+      groups[notif.siteId].push(notif);
+    });
+    return Object.entries(groups).map(([siteId, items]) => ({
+      siteId,
+      siteName: items[0].siteName,
+      items: items.sort((a, b) => b.missingDays - a.missingDays),
+    })).sort((a, b) => a.siteName.localeCompare(b.siteName));
+  }, [displayNotifications]);
 
   return (
     <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
@@ -571,75 +602,152 @@ export function Dashboard() {
           </div>
         ) : (
           <div className="divide-y divide-slate-100 dark:divide-slate-800 overflow-y-auto max-h-80">
-            {displayNotifications.map((notif, i) => {
-              const urgency =
-                notif.missingDays >= 7
-                  ? { color: 'text-rose-600 dark:text-rose-400',  bg: 'hover:bg-rose-50/60 dark:hover:bg-rose-900/10',   pill: 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300',    icon: 'bg-rose-100 dark:bg-rose-900/30 text-rose-500',   label: 'Critical' }
-                  : notif.missingDays >= 4
-                  ? { color: 'text-amber-600 dark:text-amber-400', bg: 'hover:bg-amber-50/60 dark:hover:bg-amber-900/10', pill: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300', icon: 'bg-amber-100 dark:bg-amber-900/30 text-amber-500', label: 'Overdue'  }
-                  : { color: 'text-orange-500 dark:text-orange-400', bg: 'hover:bg-orange-50/40 dark:hover:bg-orange-900/10', pill: 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300', icon: 'bg-orange-100 dark:bg-orange-900/30 text-orange-500', label: 'Pending' };
-
-              return (
-                <button
-                  key={i}
-                  className={cn(
-                    'w-full text-left px-5 py-3.5 flex items-center justify-between transition-colors group',
-                    urgency.bg
-                  )}
-                  onClick={() =>
-                    navigate('/operations/sites', {
-                      state: { siteId: notif.siteId, assetId: notif.assetId },
-                    })
-                  }
-                  title={`Click to open ${notif.assetName} log on ${notif.siteName}`}
+            {notificationsBySite.map(group => (
+              <div key={group.siteId} className="flex flex-col">
+                {/* Site Header with Bulk Log Button */}
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => {
+                    setCollapsedSites(prev => ({
+                      ...prev,
+                      [group.siteId]: !prev[group.siteId]
+                    }));
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setCollapsedSites(prev => ({
+                        ...prev,
+                        [group.siteId]: !prev[group.siteId]
+                      }));
+                    }
+                  }}
+                  className="px-5 py-2 bg-slate-50/80 dark:bg-slate-800/40 flex items-center justify-between sticky top-0 z-10 backdrop-blur-sm border-b border-slate-100 dark:border-slate-850 cursor-pointer select-none no-drag"
                 >
-                  <div className="flex items-center gap-3 min-w-0">
-                    {/* Icon */}
-                    <div className={cn('h-9 w-9 rounded-lg flex items-center justify-center shrink-0', urgency.icon)}>
-                      <CalendarRange className="h-4 w-4" />
-                    </div>
+                  <span className="text-xs font-bold text-slate-750 dark:text-slate-300 flex items-center gap-2">
+                    {collapsedSites[group.siteId] ? (
+                      <ChevronRight className="h-3.5 w-3.5 text-slate-400" />
+                    ) : (
+                      <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+                    )}
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                    {group.siteName}
+                  </span>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const allMissingDates = group.items.flatMap(item => item.missingDates || []);
+                      let defaultStart = new Date().toISOString().split('T')[0];
+                      let defaultEnd = new Date().toISOString().split('T')[0];
+                      if (allMissingDates.length > 0) {
+                        const sortedDates = [...allMissingDates].sort();
+                        defaultStart = sortedDates[0];
+                        defaultEnd = sortedDates[sortedDates.length - 1];
+                      }
+                      setSelectedSiteForBulk({
+                        siteId: group.siteId,
+                        siteName: group.siteName,
+                        machines: group.items.map(notif => ({ id: notif.assetId, name: notif.assetName })),
+                        defaultStartDate: defaultStart,
+                        defaultEndDate: defaultEnd,
+                      });
+                      setShowBulkLogModal(true);
+                    }}
+                    className="px-2.5 py-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 rounded transition-colors flex items-center gap-1 border border-emerald-200 dark:border-emerald-800/30"
+                  >
+                    <CalendarRange className="h-3.5 w-3.5" />
+                    Bulk Log
+                  </button>
+                </div>
 
-                    <div className="min-w-0">
-                      {/* Machine name */}
-                      <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">
-                        {notif.assetName}
-                      </p>
-                      {/* Site */}
-                      <p className="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">
-                        <span className="font-semibold">Site:</span> {notif.siteName}
-                      </p>
-                      {/* Pump date range */}
-                      <p className={cn('text-[11px] font-semibold mt-0.5 flex items-center gap-1 flex-wrap', urgency.color)}>
-                        <Clock className="h-3 w-3 shrink-0" />
-                        Pump period: {format(notif.pumpStart, 'dd MMM yyyy')}
-                        <span className="text-slate-400 font-normal mx-0.5">→</span>
-                        {notif.pumpStop ? format(notif.pumpStop, 'dd MMM yyyy') : `${format(notif.displayEnd, 'dd MMM yyyy')} (Yesterday)`}
-                        {notif.lastLogDate && (
-                          <span className="text-slate-400 font-normal ml-1">
-                            · Last log: {format(notif.lastLogDate, 'dd MMM')}
-                          </span>
+                {/* Notifications for this Site */}
+                {!collapsedSites[group.siteId] && (
+                  <div className="divide-y divide-slate-100 dark:divide-slate-850">
+                  {group.items.map((notif, i) => {
+                    const urgency =
+                      notif.missingDays >= 7
+                        ? { color: 'text-rose-600 dark:text-rose-400',  bg: 'hover:bg-rose-50/60 dark:hover:bg-rose-900/10',   pill: 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300',    icon: 'bg-rose-100 dark:bg-rose-900/30 text-rose-500',   label: 'Critical' }
+                        : notif.missingDays >= 4
+                        ? { color: 'text-amber-600 dark:text-amber-400', bg: 'hover:bg-amber-50/60 dark:hover:bg-amber-900/10', pill: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300', icon: 'bg-amber-100 dark:bg-amber-900/30 text-amber-500', label: 'Overdue'  }
+                        : { color: 'text-orange-500 dark:text-orange-400', bg: 'hover:bg-orange-50/40 dark:hover:bg-orange-900/10', pill: 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300', icon: 'bg-orange-100 dark:bg-orange-900/30 text-orange-500', label: 'Pending' };
+
+                    return (
+                      <button
+                        key={i}
+                        className={cn(
+                          'w-full text-left px-5 py-3.5 flex items-center justify-between transition-colors group',
+                          urgency.bg
                         )}
-                      </p>
-                    </div>
-                  </div>
+                        onClick={() =>
+                          navigate('/operations/sites', {
+                            state: { siteId: notif.siteId, assetId: notif.assetId },
+                          })
+                        }
+                        title={`Click to open ${notif.assetName} log on ${notif.siteName}`}
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          {/* Icon */}
+                          <div className={cn('h-9 w-9 rounded-lg flex items-center justify-center shrink-0', urgency.icon)}>
+                            <CalendarRange className="h-4 w-4" />
+                          </div>
 
-                  {/* Right badges */}
-                  <div className="flex items-center gap-2 ml-4 shrink-0">
-                    <div className="text-right hidden sm:block">
-                      <span className={cn('inline-block text-[10px] font-black uppercase px-2.5 py-1 rounded-full', urgency.pill)}>
-                        {urgency.label}
-                      </span>
-                      <p className="text-[11px] text-slate-400 mt-1">{notif.missingDays} day{notif.missingDays !== 1 ? 's' : ''} missing</p>
-                    </div>
-                    <ExternalLink className="h-3.5 w-3.5 text-slate-300 group-hover:text-slate-500 transition-colors" />
-                  </div>
-                </button>
-              );
-            })}
+                          <div className="min-w-0">
+                            {/* Machine name */}
+                            <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">
+                              {notif.assetName}
+                            </p>
+                            {/* Pump date range */}
+                            <p className={cn('text-[11px] font-semibold mt-0.5 flex items-center gap-1 flex-wrap', urgency.color)}>
+                              <Clock className="h-3 w-3 shrink-0" />
+                              Pump period: {format(notif.pumpStart, 'dd MMM yyyy')}
+                              <span className="text-slate-400 font-normal mx-0.5">→</span>
+                              {notif.pumpStop ? format(notif.pumpStop, 'dd MMM yyyy') : `${format(notif.displayEnd, 'dd MMM yyyy')} (Yesterday)`}
+                              {notif.lastLogDate && (
+                                <span className="text-slate-400 font-normal ml-1">
+                                  · Last log: {format(notif.lastLogDate, 'dd MMM')}
+                                </span>
+                              )}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Right badges */}
+                        <div className="flex items-center gap-2 ml-4 shrink-0">
+                          <div className="text-right hidden sm:block">
+                            <span className={cn('inline-block text-[10px] font-black uppercase px-2.5 py-1 rounded-full', urgency.pill)}>
+                              {urgency.label}
+                            </span>
+                            <p className="text-[11px] text-slate-400 mt-1">{notif.missingDays} day{notif.missingDays !== 1 ? 's' : ''} missing</p>
+                          </div>
+                          <ExternalLink className="h-3.5 w-3.5 text-slate-300 group-hover:text-slate-500 transition-colors" />
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+            ))}
           </div>
         )}
       </div>
 
+      {selectedSiteForBulk && (
+        <BulkMachineLogModal
+          isOpen={showBulkLogModal}
+          onClose={() => {
+            setShowBulkLogModal(false);
+            setSelectedSiteForBulk(null);
+          }}
+          siteId={selectedSiteForBulk.siteId}
+          siteName={selectedSiteForBulk.siteName}
+          machines={selectedSiteForBulk.machines}
+          date={new Date().toISOString().split('T')[0]}
+          defaultStartDate={selectedSiteForBulk.defaultStartDate}
+          defaultEndDate={selectedSiteForBulk.defaultEndDate}
+        />
+      )}
     </div>
   );
 }

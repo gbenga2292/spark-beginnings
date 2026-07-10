@@ -19,9 +19,11 @@ interface BulkMachineLogModalProps {
   siteName: string;
   machines: { id: string; name: string }[];
   date: string;
+  defaultStartDate?: string;
+  defaultEndDate?: string;
 }
 
-export function BulkMachineLogModal({ isOpen, onClose, siteId, siteName, machines, date }: BulkMachineLogModalProps) {
+export function BulkMachineLogModal({ isOpen, onClose, siteId, siteName, machines, date, defaultStartDate, defaultEndDate }: BulkMachineLogModalProps) {
   const { logDailyActivity, dailyMachineLogs, sitePumpDates } = useOperations();
   const { employees, attendanceRecords } = useAppStore();
 
@@ -30,8 +32,8 @@ export function BulkMachineLogModal({ isOpen, onClose, siteId, siteName, machine
     e.staffType === 'FIELD'
   );
 
-  const [startDate, setStartDate] = useState(date);
-  const [endDate, setEndDate] = useState(date);
+  const [startDate, setStartDate] = useState(defaultStartDate || date);
+  const [endDate, setEndDate] = useState(defaultEndDate || date);
   const [machineData, setMachineData] = useState<Record<string, { operationalDay: OperationalDay; dieselUsage: string }>>({});
   const [supervisorOnSite, setSupervisorOnSite] = useState('');
   const [issuesOnSite, setIssuesOnSite] = useState('');
@@ -172,20 +174,20 @@ export function BulkMachineLogModal({ isOpen, onClose, siteId, siteName, machine
 
   useEffect(() => {
     if (isOpen) {
-      setStartDate(date);
-      setEndDate(date);
+      setStartDate(defaultStartDate || date);
+      setEndDate(defaultEndDate || date);
       const initData: Record<string, { operationalDay: OperationalDay; dieselUsage: string }> = {};
       machines.forEach(m => {
         initData[m.id] = { operationalDay: 'full', dieselUsage: '' };
       });
       setMachineData(initData);
-      const autoSelected = findAutoSupervisorForDate(date);
+      const autoSelected = findAutoSupervisorForDate(defaultStartDate || date);
       setSupervisorOnSite(autoSelected || '');
       setIssuesOnSite('');
       setMaintenanceDetails('');
       setClientFeedback('');
     }
-  }, [isOpen, machines]);
+  }, [isOpen, machines, defaultStartDate, defaultEndDate]);
 
   const handleSetOpDay = (id: string, day: OperationalDay) => {
     setMachineData(p => ({
