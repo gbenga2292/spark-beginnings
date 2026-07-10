@@ -1092,13 +1092,23 @@ export const useAppStore = create<AppState>()(
 
       // Daily Journals
       addDailyJournal: async (journal, entries) => {
-        // Persist to DB first — if it fails, we do NOT update local state
-        // so the UI catch block can show a real error instead of a false success
-        await db.insertDailyJournal(journal, entries);
+        // Optimistic update FIRST — so the realtime echo from Supabase arrives
+        // after the ID is already in local state, letting the duplicate-guard skip it.
+        // If the DB write fails, we roll back.
         set((s) => ({
           dailyJournals: [...s.dailyJournals, journal],
           siteJournalEntries: [...s.siteJournalEntries, ...entries],
         }));
+        try {
+          await db.insertDailyJournal(journal, entries);
+        } catch (err) {
+          // Roll back optimistic update on failure
+          set((s) => ({
+            dailyJournals: s.dailyJournals.filter((j) => j.id !== journal.id),
+            siteJournalEntries: s.siteJournalEntries.filter((e) => !entries.some((en) => en.id === e.id)),
+          }));
+          throw err;
+        }
       },
       updateDailyJournal: (journalId, journal, newEntries) => {
         set((s) => ({

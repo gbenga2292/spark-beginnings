@@ -4,8 +4,9 @@ import { Input } from '@/src/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
 import { useAppStore, AttendanceRecord } from '@/src/store/appStore';
 import { supabase } from '@/src/integrations/supabase/client';
-import { Search, Save, Trash2, Calendar as CalendarIcon, Database, Filter, Users, Download, Upload, ArrowUp, ArrowDown, ArrowUpDown, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, Save, Trash2, Calendar as CalendarIcon, Database, Filter, Users, Download, Upload, ArrowUp, ArrowDown, ArrowUpDown, ChevronDown, ChevronLeft, ChevronRight, Wrench, LineChart, Building2 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
+import { useOperations } from '@/src/contexts/OperationsContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/src/components/ui/card';
 import { format, parseISO, isSunday, isWithinInterval, lastDayOfMonth, subDays, isAfter, startOfDay } from 'date-fns';
 import { toast, showConfirm } from '@/src/components/ui/toast';
@@ -222,6 +223,144 @@ const statuses = [
   "On Leave"
 ];
 
+interface MachineMultiSelectProps {
+  siteId: string;
+  onSiteMachines: any[];
+  otherMachines: any[];
+  selectedIds: string[];
+  onChange: (machineId: string) => void;
+  onClear: () => void;
+}
+
+const MachineMultiSelect: React.FC<MachineMultiSelectProps> = ({
+  siteId,
+  onSiteMachines,
+  otherMachines,
+  selectedIds,
+  onChange,
+  onClear,
+}) => {
+  const [search, setSearch] = useState('');
+
+  const filteredOnSite = useMemo(() => {
+    if (!search) return onSiteMachines;
+    return onSiteMachines.filter(m => m.name.toLowerCase().includes(search.toLowerCase()) || (m.serialNumber && m.serialNumber.toLowerCase().includes(search.toLowerCase())));
+  }, [onSiteMachines, search]);
+
+  const filteredOther = useMemo(() => {
+    if (!search) return otherMachines;
+    return otherMachines.filter(m => m.name.toLowerCase().includes(search.toLowerCase()) || (m.serialNumber && m.serialNumber.toLowerCase().includes(search.toLowerCase())));
+  }, [otherMachines, search]);
+
+  const buttonLabel = useMemo(() => {
+    if (selectedIds.length === 0) return '⭕ Off / None';
+    if (selectedIds.length === 1) {
+      const matched = [...onSiteMachines, ...otherMachines].find(m => m.id === selectedIds[0]);
+      return `⚡ ${matched ? matched.name : '1 Selected'}`;
+    }
+    return `🟢 ${selectedIds.length} Selected`;
+  }, [selectedIds, onSiteMachines, otherMachines]);
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          size="sm"
+          className={`w-full justify-between font-bold text-[11px] uppercase tracking-tight h-8 ${
+            selectedIds.length > 0
+              ? 'border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
+              : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50 shadow-sm'
+          }`}
+        >
+          <span className="truncate">{buttonLabel}</span>
+          <ChevronDown className="h-3 w-3 opacity-50 shrink-0 ml-1 text-slate-400" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-64 p-2.5 z-[130] bg-white border border-slate-200 rounded-lg shadow-lg" align="start">
+        <div className="space-y-2">
+          <Input
+            placeholder="Search equipment..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="h-8 text-xs bg-slate-50 border-slate-200"
+          />
+          <div className="max-h-52 overflow-y-auto space-y-1.5 pr-1 select-none">
+            {filteredOnSite.length > 0 && (
+              <div className="space-y-1">
+                <span className="block text-[9px] font-bold text-emerald-600 uppercase tracking-wider px-1.5 py-0.5 bg-emerald-50 rounded border border-emerald-100">🟢 On This Site</span>
+                {filteredOnSite.map(m => {
+                  const checked = selectedIds.includes(m.id);
+                  return (
+                    <label
+                      key={m.id}
+                      className={`flex items-center gap-2 px-1.5 py-1.5 rounded cursor-pointer text-xs font-semibold transition-colors ${
+                        checked
+                          ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                          : 'hover:bg-emerald-50/60 text-slate-700 border border-transparent'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => onChange(m.id)}
+                        className="rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500 w-3.5 h-3.5 cursor-pointer"
+                      />
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0" />
+                      <span className="truncate">{m.name} {m.serialNumber ? `(${m.serialNumber})` : ''}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+            {filteredOther.length > 0 && (
+              <div className="space-y-1 pt-1">
+                <span className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider px-1.5 py-0.5 bg-slate-100 rounded">⚫ Other Equipment</span>
+                {filteredOther.map(m => {
+                  const checked = selectedIds.includes(m.id);
+                  return (
+                    <label
+                      key={m.id}
+                      className={`flex items-center gap-2 px-1.5 py-1.5 rounded cursor-pointer text-xs transition-colors ${
+                        checked
+                          ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                          : 'hover:bg-slate-50 text-slate-500 border border-transparent'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => onChange(m.id)}
+                        className="rounded border-slate-300 text-amber-600 focus:ring-amber-500 w-3.5 h-3.5 cursor-pointer"
+                      />
+                      <span className="truncate">{m.name} {m.serialNumber ? `(${m.serialNumber})` : ''}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+            {filteredOnSite.length === 0 && filteredOther.length === 0 && (
+              <span className="block text-[10px] text-slate-400 italic text-center py-2">No matching equipment</span>
+            )}
+          </div>
+          {selectedIds.length > 0 && (
+            <div className="border-t border-slate-100 pt-1.5 flex justify-end">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onClear}
+                className="h-6 text-[10px] text-red-500 hover:text-red-700 hover:bg-red-50 font-bold px-2 py-0"
+              >
+                Clear Selections
+              </Button>
+            </div>
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+};
+
 export function Attendance() {
   const allEmployees = useAppStore((state) => state.employees);
   // Memoized: avoids re-creating the filtered array on every parent render
@@ -244,6 +383,7 @@ export function Attendance() {
   const deleteAttendanceRecords = useAppStore((state) => state.deleteAttendanceRecords);
   const leaves = useAppStore((state) => state.leaves);
   const fetchAttendanceYearIfNeeded = useAppStore((state) => state.fetchAttendanceYearIfNeeded);
+  const consumableLogs = useAppStore((state) => state.consumableLogs ?? []);
 
   const publicHolidaysStore = useAppStore((state) => state.publicHolidays);
   const monthValues = useAppStore((state) => state.monthValues);
@@ -274,6 +414,320 @@ export function Attendance() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [mobileCalendarOpen, setMobileCalendarOpen] = useState(false);
   const [desktopCalendarOpen, setDesktopCalendarOpen] = useState(false);
+
+  // ─── Machine Register State ────────────────────────────────────────────────
+  const { assets, dailyMachineLogs, logDailyActivity, waybills, deleteDailyLog } = useOperations();
+  const [machineRegDate, setMachineRegDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [isSavingMachines, setIsSavingMachines] = useState(false);
+
+  // Machine DB filters & pagination
+  const [dbMachineDateFilterFrom, setDbMachineDateFilterFrom] = useState<string>('');
+  const [dbMachineDateFilterTo, setDbMachineDateFilterTo] = useState<string>('');
+  const [dbMachineSiteFilter, setDbMachineSiteFilter] = useState<string>('all');
+  const [dbMachineSearch, setDbMachineSearch] = useState<string>('');
+  const [dbMachinePage, setDbMachinePage] = useState(1);
+  const dbMachinePageSize = 25;
+  const [selectedMachineGroups, setSelectedMachineGroups] = useState<Set<string>>(new Set());
+
+  // Analytics filters
+  const [analyticsDateFrom, setAnalyticsDateFrom] = useState<string>('');
+  const [analyticsDateTo, setAnalyticsDateTo] = useState<string>('');
+
+  const [hideInactiveMachineSites, setHideInactiveMachineSites] = useState(false);
+  const [machineSubTab, setMachineSubTab] = useState<'register' | 'machinedb' | 'machineanalytics'>('register');
+
+  const groupedMachineLogs = useMemo(() => {
+    const groups: Record<string, {
+      date: string;
+      siteId: string;
+      siteName: string;
+      logs: typeof dailyMachineLogs;
+      totalDiesel: number;
+    }> = {};
+
+    dailyMachineLogs.forEach(log => {
+      const key = `${log.date}_${log.siteId}`;
+      if (!groups[key]) {
+        groups[key] = {
+          date: log.date,
+          siteId: log.siteId,
+          siteName: log.siteName || 'Unknown Site',
+          logs: [],
+          totalDiesel: 0,
+        };
+      }
+      groups[key].logs.push(log);
+      groups[key].totalDiesel += log.dieselUsage || 0;
+    });
+
+    let list = Object.values(groups);
+
+    if (dbMachineDateFilterFrom) {
+      list = list.filter(g => g.date >= dbMachineDateFilterFrom);
+    }
+    if (dbMachineDateFilterTo) {
+      list = list.filter(g => g.date <= dbMachineDateFilterTo);
+    }
+    if (dbMachineSiteFilter && dbMachineSiteFilter !== 'all') {
+      list = list.filter(g => g.siteId === dbMachineSiteFilter);
+    }
+    if (dbMachineSearch) {
+      const q = dbMachineSearch.toLowerCase();
+      list = list.filter(g => 
+        g.siteName.toLowerCase().includes(q) ||
+        g.logs.some(l => l.assetName.toLowerCase().includes(q))
+      );
+    }
+
+    list.sort((a, b) => {
+      if (a.date !== b.date) return b.date.localeCompare(a.date);
+      return a.siteName.localeCompare(b.siteName);
+    });
+
+    return list;
+  }, [dailyMachineLogs, dbMachineDateFilterFrom, dbMachineDateFilterTo, dbMachineSiteFilter, dbMachineSearch]);
+
+  const paginatedMachineDbRecords = useMemo(() => {
+    const start = (dbMachinePage - 1) * dbMachinePageSize;
+    return groupedMachineLogs.slice(start, start + dbMachinePageSize);
+  }, [groupedMachineLogs, dbMachinePage]);
+
+  useEffect(() => {
+    setDbMachinePage(1);
+  }, [dbMachineDateFilterFrom, dbMachineDateFilterTo, dbMachineSiteFilter, dbMachineSearch]);
+
+  const handleDeleteMachineGroup = useCallback(async (date: string, siteId: string, logs: typeof dailyMachineLogs) => {
+    const confirmed = await showConfirm(
+      `Delete machine logs for ${logs[0]?.siteName || 'this site'} on ${formatDisplayDate(date)}?`
+    );
+    if (!confirmed) return;
+
+    try {
+      for (const log of logs) {
+        await deleteDailyLog(log.id);
+      }
+      toast.success('Machine register entries deleted successfully.');
+    } catch (err: any) {
+      toast.error(`Failed to delete logs: ${err?.message ?? 'Unknown error'}`);
+    }
+  }, [deleteDailyLog]);
+
+  const activeSites = useMemo(() => sites.filter(s => s.status === 'Active'), [sites]);
+
+  // All active equipment assets that require logging
+  const allLoggableMachines = useMemo(() =>
+    assets.filter(a => a.type === 'equipment' && a.requiresLogging && a.status === 'active')
+  , [assets]);
+
+  // For each active site: Set of machine IDs currently dispatched there (via waybills)
+  const onSiteMachineIds = useMemo(() => {
+    const map: Record<string, Set<string>> = {};
+    activeSites.forEach(s => {
+      const siteWaybills = waybills.filter(w =>
+        (w.siteName?.toLowerCase() === s.name.toLowerCase() || w.siteId === s.id) &&
+        (w.status !== 'outstanding' || w.type === 'return')
+      );
+      const inventoryMap = new Map<string, number>();
+      siteWaybills
+        .filter(w => w.type === 'waybill' && w.status !== 'outstanding')
+        .forEach(wb => wb.items.forEach(item => {
+          inventoryMap.set(item.assetId, (inventoryMap.get(item.assetId) ?? 0) + item.quantity);
+        }));
+      siteWaybills
+        .filter(w => w.type === 'return')
+        .forEach(wb => wb.items.forEach(item => {
+          if (wb.status === 'return_completed')
+            inventoryMap.set(item.assetId, Math.max(0, (inventoryMap.get(item.assetId) ?? 0) - item.quantity));
+        }));
+      consumableLogs.filter(log => log.siteId === s.id).forEach(log => {
+        inventoryMap.set(log.assetId, Math.max(0, (inventoryMap.get(log.assetId) ?? 0) - log.quantityUsed));
+      });
+      map[s.id] = new Set(
+        allLoggableMachines
+          .filter(a => (inventoryMap.get(a.id) ?? 0) > 0)
+          .map(a => a.id)
+      );
+    });
+    return map;
+  }, [activeSites, allLoggableMachines, waybills, consumableLogs]);
+
+
+
+  // Only active sites with at least one on-site loggable machine, excluding Site Office DCEL
+  const sitesWithMachines = useMemo(() =>
+    activeSites.filter(s => {
+      if (s.name.toLowerCase().includes('site office dcel')) return false;
+      if (s.endDate && machineRegDate > s.endDate) return false;
+      return (onSiteMachineIds[s.id]?.size ?? 0) > 0;
+    }),
+  [activeSites, onSiteMachineIds, machineRegDate]);
+
+  const [activeMachineBySite, setActiveMachineBySite] = useState<Record<string, { activeMachineIds: string[]; machineTypes: Record<string, 'full' | 'half' | 'off'>; dieselUsage: Record<string, number>; notes: string }>>({}); 
+
+  // Pre-populate activeMachineBySite from existing daily logs when date changes
+  useEffect(() => {
+    if (!machineRegDate) return;
+    const initial: Record<string, { activeMachineIds: string[]; machineTypes: Record<string, 'full' | 'half' | 'off'>; dieselUsage: Record<string, number>; notes: string }> = {};
+
+    activeSites.forEach(s => {
+      // Logs for this site on this date (all — active AND off)
+      const siteLogs = dailyMachineLogs.filter(
+        l => l.siteId === s.id && l.date === machineRegDate
+      );
+      // Only IDs that exist in our loggable machines
+      const selectedIds = siteLogs
+        .map(l => l.assetId)
+        .filter(id => allLoggableMachines.some(m => m.id === id));
+      // Build machineTypes from operationalDay + isActive
+      const machineTypes: Record<string, 'full' | 'half' | 'off'> = {};
+      const dieselUsage: Record<string, number> = {};
+      siteLogs.forEach(l => {
+        if (!allLoggableMachines.some(m => m.id === l.assetId)) return;
+        if (!l.isActive) machineTypes[l.assetId] = 'off';
+        else if (l.operationalDay === 'half') machineTypes[l.assetId] = 'half';
+        else machineTypes[l.assetId] = 'full';
+        
+        if (l.dieselUsage) dieselUsage[l.assetId] = l.dieselUsage;
+      });
+      const anyLog = siteLogs.find(l => l.maintenanceDetails);
+      initial[s.id] = {
+        activeMachineIds: selectedIds,
+        machineTypes,
+        dieselUsage,
+        notes: anyLog?.maintenanceDetails || '',
+      };
+    });
+
+    setActiveMachineBySite(initial);
+  }, [machineRegDate, activeSites, allLoggableMachines, dailyMachineLogs]);
+
+  const handleToggleMachineSelection = useCallback((siteId: string, machineId: string) => {
+    setActiveMachineBySite(prev => {
+      const entry = prev[siteId] ?? { activeMachineIds: [], machineTypes: {}, dieselUsage: {}, notes: '' };
+      const exists = entry.activeMachineIds.includes(machineId);
+      const newIds = exists
+        ? entry.activeMachineIds.filter(id => id !== machineId)
+        : [...entry.activeMachineIds, machineId];
+      const newTypes = { ...entry.machineTypes };
+      const newDiesel = { ...entry.dieselUsage };
+      if (exists) {
+        delete newTypes[machineId];
+        delete newDiesel[machineId];
+      } else if (!newTypes[machineId]) {
+        newTypes[machineId] = 'full'; // default to full day
+      }
+      return {
+        ...prev,
+        [siteId]: {
+          ...entry,
+          activeMachineIds: newIds,
+          machineTypes: newTypes,
+          dieselUsage: newDiesel,
+        }
+      };
+    });
+  }, []);
+
+  const handleMachineTypeChange = useCallback((siteId: string, machineId: string, dayType: 'full' | 'half' | 'off') => {
+    setActiveMachineBySite(prev => {
+      const entry = prev[siteId] ?? { activeMachineIds: [], machineTypes: {}, dieselUsage: {}, notes: '' };
+      return {
+        ...prev,
+        [siteId]: {
+          ...entry,
+          machineTypes: { ...entry.machineTypes, [machineId]: dayType },
+        }
+      };
+    });
+  }, []);
+
+  const handleMachineDieselChange = useCallback((siteId: string, machineId: string, dieselStr: string) => {
+    setActiveMachineBySite(prev => {
+      const entry = prev[siteId] ?? { activeMachineIds: [], machineTypes: {}, dieselUsage: {}, notes: '' };
+      const newDiesel = { ...entry.dieselUsage };
+      const val = parseFloat(dieselStr);
+      if (isNaN(val) || val < 0 || dieselStr === '') {
+        delete newDiesel[machineId];
+      } else {
+        newDiesel[machineId] = val;
+      }
+      return {
+        ...prev,
+        [siteId]: {
+          ...entry,
+          dieselUsage: newDiesel,
+        }
+      };
+    });
+  }, []);
+
+  const handleMachineNotesChange = useCallback((siteId: string, notes: string) => {
+    setActiveMachineBySite(prev => ({
+      ...prev,
+      [siteId]: { ...(prev[siteId] ?? { activeMachineIds: [], machineTypes: {}, dieselUsage: {}, notes: '' }), notes },
+    }));
+  }, []);
+
+  const handleMachineRegSave = async () => {
+    setIsSavingMachines(true);
+    try {
+      for (const site of sitesWithMachines) {
+        const entry = activeMachineBySite[site.id] ?? { activeMachineIds: [], machineTypes: {}, dieselUsage: {}, notes: '' };
+        const selectedIds = entry.activeMachineIds.filter(id => id && id !== 'none');
+
+        for (const machineId of selectedIds) {
+          const machine = allLoggableMachines.find(m => m.id === machineId);
+          if (!machine) continue;
+          const dayType = entry.machineTypes[machineId] ?? 'full';
+          const isOff = dayType === 'off';
+          await logDailyActivity({
+            assetId: machine.id,
+            assetName: machine.name,
+            siteId: site.id,
+            siteName: site.name,
+            date: machineRegDate,
+            isActive: !isOff,
+            operationalDay: isOff ? 'none' : dayType,
+            downtimeEntries: [],
+            maintenanceDetails: entry.notes,
+            dieselUsage: entry.dieselUsage[machineId] || 0,
+          });
+        }
+
+        // Log off for on-site machines not in selectedIds at all
+        const selectedSet = new Set(selectedIds);
+        const siteOnSiteIds = onSiteMachineIds[site.id] ?? new Set();
+        for (const machine of allLoggableMachines.filter(m => siteOnSiteIds.has(m.id) && !selectedSet.has(m.id))) {
+          await logDailyActivity({
+            assetId: machine.id,
+            assetName: machine.name,
+            siteId: site.id,
+            siteName: site.name,
+            date: machineRegDate,
+            isActive: false,
+            operationalDay: 'none',
+            downtimeEntries: [],
+            maintenanceDetails: '',
+            dieselUsage: 0,
+          });
+        }
+      }
+      toast.success(`Machine registers saved for ${formatDisplayDate(machineRegDate)}.`);
+    } catch (err: any) {
+      toast.error(`Failed to save: ${err?.message ?? 'Unknown error'}`);
+    } finally {
+      setIsSavingMachines(false);
+    }
+  };
+
+  // Returns { onSite, other } machine lists for the dropdown
+  const getDropdownGroups = useCallback((siteId: string) => {
+    const siteIds = onSiteMachineIds[siteId] ?? new Set<string>();
+    return {
+      onSite: allLoggableMachines.filter(m => siteIds.has(m.id)),
+      other:  allLoggableMachines.filter(m => !siteIds.has(m.id)),
+    };
+  }, [allLoggableMachines, onSiteMachineIds]);
 
   useEffect(() => {
     if (registerDate) {
@@ -1419,11 +1873,22 @@ export function Attendance() {
           <TabsTrigger active={activeTab === 'database'} onClick={() => setActiveTab('database')} className="gap-2 text-[11px] font-bold uppercase tracking-tight h-8 px-2 sm:px-4 data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm transition-all">
             <Database className="h-3.5 w-3.5 text-emerald-500" /> <span className="hidden sm:inline">Database</span>
           </TabsTrigger>
+          <TabsTrigger active={activeTab === 'machines'} onClick={() => setActiveTab('machines')} className="gap-2 text-[11px] font-bold uppercase tracking-tight h-8 px-2 sm:px-4 data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm transition-all">
+            <Wrench className="h-3.5 w-3.5 text-amber-500" /> <span className="hidden sm:inline">Machines</span>
+          </TabsTrigger>
         </TabsList>
       </div>
     </div>,
     [activeTab, priv.canImport, priv.canDelete, priv.canExport, dbSelectedIds.size, handleImportExcel, handleExportExcel, handleBulkDelete, mobileCalendarOpen, desktopCalendarOpen, staffTypeFilter, debouncedSearchTerm, registerDate, lastAttendanceDate, maxSelectableDate, calendarModifiers]
   );
+
+  // ─── Derived summary for machine register save button label ─────────────
+  const machineActiveCount = useMemo(() => {
+    return sitesWithMachines.filter(s => {
+      const entry = activeMachineBySite[s.id];
+      return entry && entry.activeMachineIds.some(id => id && id !== 'none');
+    }).length;
+  }, [sitesWithMachines, activeMachineBySite]);
 
   return (
     <div className="flex flex-col h-full">
@@ -1961,6 +2426,902 @@ export function Attendance() {
               </div>
             )}
           </div>
+        </TabsContent>
+
+        {/* ─── Machine Register Tab ─────────────────────────────────────── */}
+        <TabsContent active={activeTab === 'machines'} className="flex-1 flex flex-col min-h-0 mt-0">
+          {/* Machine Sub-Tab Bar */}
+          <div className="flex items-center gap-1 px-2 pt-2 pb-0 border-b border-slate-200 bg-white shrink-0">
+            <button
+              onClick={() => setMachineSubTab('register')}
+              className={`flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-tight px-3 py-2 border-b-2 transition-all ${
+                machineSubTab === 'register'
+                  ? 'border-amber-500 text-amber-700 bg-amber-50/60'
+                  : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              <Wrench className="h-3.5 w-3.5" /> Register
+            </button>
+            <button
+              onClick={() => setMachineSubTab('machinedb')}
+              className={`flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-tight px-3 py-2 border-b-2 transition-all ${
+                machineSubTab === 'machinedb'
+                  ? 'border-orange-500 text-orange-700 bg-orange-50/60'
+                  : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              <Database className="h-3.5 w-3.5" /> Machine DB
+            </button>
+            <button
+              onClick={() => setMachineSubTab('machineanalytics')}
+              className={`flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-tight px-3 py-2 border-b-2 transition-all ${
+                machineSubTab === 'machineanalytics'
+                  ? 'border-blue-500 text-blue-700 bg-blue-50/60'
+                  : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              <LineChart className="h-3.5 w-3.5" /> Analytics
+            </button>
+          </div>
+
+          {/* ── Register Sub-panel ── */}
+          {machineSubTab === 'register' && (<>
+          {/* Toolbar */}
+          <div className="flex flex-wrap items-end gap-2 py-2 px-1">
+            {/* Date picker */}
+            <div className="flex flex-col gap-1 w-full sm:w-auto shrink-0">
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-0.5">Date</span>
+              <div className="flex items-center gap-1.5">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setMachineRegDate(getNextDayStr(machineRegDate, -1))}
+                  className="h-9 w-9 border-slate-200 bg-white flex-shrink-0 shadow-sm hover:bg-slate-50 transition-colors"
+                  title="Previous Day"
+                >
+                  <ChevronLeft className="h-4 w-4 text-slate-500" />
+                </Button>
+                <div className="relative flex-1 sm:w-[160px]">
+                  <Input
+                    type="date"
+                    value={machineRegDate}
+                    max={maxSelectableDate}
+                    onChange={e => setMachineRegDate(e.target.value)}
+                    className="h-9 pl-9 text-xs bg-white shadow-sm border-slate-200 uppercase font-medium text-slate-700 w-full"
+                  />
+                  <CalendarIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
+                </div>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => {
+                    const nextDate = getNextDayStr(machineRegDate, 1);
+                    if (nextDate <= maxSelectableDate) {
+                      setMachineRegDate(nextDate);
+                    }
+                  }}
+                  disabled={machineRegDate >= maxSelectableDate}
+                  className="h-9 w-9 border-slate-200 bg-white flex-shrink-0 shadow-sm hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Next Day"
+                >
+                  <ChevronRight className="h-4 w-4 text-slate-500" />
+                </Button>
+              </div>
+            </div>
+
+            {/* Hide Inactive Toggle & Clear Button */}
+            <div className="flex items-center gap-3 ml-2 self-end mb-1.5 flex-1">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="hideInactiveSites"
+                  checked={hideInactiveMachineSites}
+                  onChange={e => setHideInactiveMachineSites(e.target.checked)}
+                  className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4 cursor-pointer"
+                />
+                <label htmlFor="hideInactiveSites" className="text-xs font-semibold text-slate-600 cursor-pointer select-none">
+                  Hide inactive sites
+                </label>
+              </div>
+              
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if (confirm('Are you sure you want to clear all current machine selections for this date?')) {
+                    setActiveMachineBySite({});
+                  }
+                }}
+                className="h-7 px-2.5 text-[10px] uppercase font-bold tracking-wider text-slate-500 hover:text-red-600 hover:bg-red-50 border-slate-200"
+              >
+                Clear Selection
+              </Button>
+            </div>
+
+            {/* Summary badge */}
+            {sitesWithMachines.length > 0 && (
+              <div className="flex items-center gap-1.5 bg-amber-50 border border-amber-100 rounded-full px-3 py-1 ml-1">
+                <Wrench className="h-3 w-3 text-amber-500" />
+                <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider">
+                  {sitesWithMachines.filter(s => {
+                    const e = activeMachineBySite[s.id];
+                    return e && e.activeMachineIds.some(id => (e.machineTypes[id] ?? 'full') !== 'off');
+                  }).length} / {sitesWithMachines.length} Sites Active
+                </span>
+              </div>
+            )}
+
+            {/* Save button */}
+            {sitesWithMachines.length > 0 && (
+              <Button
+                onClick={handleMachineRegSave}
+                disabled={isSavingMachines}
+                size="sm"
+                className="h-9 ml-auto bg-amber-500 hover:bg-amber-600 text-white shadow-sm gap-2 font-bold text-[11px] uppercase tracking-tight"
+              >
+                <Save className="h-3.5 w-3.5" />
+                {isSavingMachines ? 'Saving...' : 'Save Register'}
+              </Button>
+            )}
+          </div>
+
+          {/* Content area */}
+          <div className="flex-1 overflow-auto rounded-lg border border-slate-200 shadow-sm bg-white">
+            {sitesWithMachines.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-64 gap-3 text-slate-400">
+                <Wrench className="h-10 w-10 text-slate-200" />
+                <p className="text-sm font-medium">No active sites with loggable machines found</p>
+                <p className="text-xs text-slate-400">Only active sites that have equipment assets requiring logging assigned to them appear here.</p>
+              </div>
+            ) : (
+              /* Desktop table */
+              <>
+                <div className="hidden sm:block overflow-auto">
+                  <table className="w-full text-[11px]">
+                    <thead className="bg-slate-50 sticky top-0 shadow-sm z-10 border-b border-slate-200">
+                      <tr>
+                        <th className="text-left font-bold text-slate-600 py-2.5 px-4 uppercase tracking-wide w-[22%]">Active Site</th>
+                        <th className="text-left font-bold text-slate-600 py-2.5 px-4 uppercase tracking-wide w-[16%]">Select Equipment</th>
+                        <th className="text-left font-bold text-slate-600 py-2.5 px-4 uppercase tracking-wide w-[40%]">Selected Machines &amp; Day Type</th>
+                        <th className="text-left font-bold text-slate-600 py-2.5 px-4 uppercase tracking-wide w-[22%]">Notes / Remarks</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {sitesWithMachines.filter(site => {
+                        if (!hideInactiveMachineSites) return true;
+                        const entry = activeMachineBySite[site.id];
+                        return entry && entry.activeMachineIds.some(id => (entry.machineTypes[id] ?? 'full') !== 'off');
+                      }).map((site, idx) => {
+                        const entry = activeMachineBySite[site.id] ?? { activeMachineIds: [], machineTypes: {}, dieselUsage: {}, notes: '' };
+                        const nonOffCount = entry.activeMachineIds.filter(id => (entry.machineTypes[id] ?? 'full') !== 'off').length;
+                        const isActive = nonOffCount > 0;
+                        const { onSite, other } = getDropdownGroups(site.id);
+                        
+                        return (
+                          <tr key={site.id} className={`transition-colors ${
+                            isActive ? 'bg-emerald-50/50 hover:bg-emerald-50' :
+                            idx % 2 === 0 ? 'bg-white hover:bg-slate-50' : 'bg-slate-50/50 hover:bg-slate-100/60'
+                          }`}>
+                            <td className="py-2.5 px-4">
+                              <div className="flex items-center gap-2">
+                                <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                                  isActive ? 'bg-emerald-400' : 'bg-slate-300'
+                                }`} />
+                                <span className="font-semibold text-slate-800">{site.name}</span>
+                                <span className="text-[10px] text-slate-400 bg-slate-100 rounded px-1.5 py-0.5">{site.client}</span>
+                              </div>
+                            </td>
+                            <td className="py-2 px-4">
+                              <MachineMultiSelect
+                                siteId={site.id}
+                                onSiteMachines={onSite}
+                                otherMachines={other}
+                                selectedIds={entry.activeMachineIds}
+                                onChange={(machineId) => handleToggleMachineSelection(site.id, machineId)}
+                                onClear={() => setActiveMachineBySite(prev => ({
+                                  ...prev,
+                                  [site.id]: {
+                                    ...(prev[site.id] ?? { activeMachineIds: [], machineTypes: {}, dieselUsage: {}, notes: '' }),
+                                    activeMachineIds: [],
+                                    machineTypes: {},
+                                    dieselUsage: {},
+                                  }
+                                }))}
+                              />
+                            </td>
+                            <td className="py-2 px-4">
+                              <div className="flex flex-col gap-1.5">
+                                {entry.activeMachineIds.length === 0 ? (
+                                  <span className="text-slate-300 italic text-[10px]">No equipment selected</span>
+                                ) : (
+                                  entry.activeMachineIds.map(machineId => {
+                                    const matched = [...onSite, ...other].find(m => m.id === machineId);
+                                    if (!matched) return null;
+                                    const isOnSite = onSite.some(o => o.id === machineId);
+                                    const dayType = entry.machineTypes[machineId] ?? 'full';
+                                    return (
+                                      <div key={machineId} className="flex items-center gap-1.5 w-full">
+                                        <span className={`px-1.5 py-0.5 rounded text-[9px] font-semibold border flex items-center gap-1 flex-1 min-w-0 ${
+                                          dayType === 'off'
+                                            ? 'bg-red-50 text-red-600 border-red-200'
+                                            : isOnSite
+                                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                              : 'bg-amber-50 text-amber-700 border-amber-200'
+                                        }`}>
+                                          <span className={`w-1 h-1 rounded-full flex-shrink-0 ${
+                                            dayType === 'off' ? 'bg-red-400' : isOnSite ? 'bg-emerald-500' : 'bg-amber-500'
+                                          }`} />
+                                          <span className="truncate">{matched.name}</span>
+                                        </span>
+                                        <select
+                                          value={dayType}
+                                          onChange={e => handleMachineTypeChange(site.id, machineId, e.target.value as 'full' | 'half' | 'off')}
+                                          className={`h-6 w-20 text-[9px] font-bold rounded border px-1 outline-none focus:ring-1 cursor-pointer flex-shrink-0 ${
+                                            dayType === 'full'
+                                              ? 'border-emerald-300 bg-emerald-50 text-emerald-700 focus:ring-emerald-400'
+                                              : dayType === 'half'
+                                                ? 'border-amber-300 bg-amber-50 text-amber-700 focus:ring-amber-400'
+                                                : 'border-red-300 bg-red-50 text-red-700 focus:ring-red-400'
+                                          }`}
+                                        >
+                                          <option value="full">Full Day</option>
+                                          <option value="half">Half Day</option>
+                                          <option value="off">Off</option>
+                                        </select>
+                                        <input
+                                          type="number"
+                                          placeholder="Diesel (L)"
+                                          value={entry.dieselUsage?.[machineId] || ''}
+                                          onChange={e => handleMachineDieselChange(site.id, machineId, e.target.value)}
+                                          className="h-6 w-20 text-[10px] font-medium border border-slate-200 rounded px-1.5 outline-none focus:border-slate-400 placeholder:text-slate-400 flex-shrink-0"
+                                        />
+                                      </div>
+                                    );
+                                  })
+                                )}
+                              </div>
+                            </td>
+                            <td className="py-2 px-4">
+                              <input
+                                type="text"
+                                placeholder="Optional remarks..."
+                                value={entry.notes}
+                                onChange={e => handleMachineNotesChange(site.id, e.target.value)}
+                                className="w-full h-8 text-xs border border-slate-200 rounded px-2 outline-none focus:ring-1 focus:ring-slate-400 bg-white"
+                              />
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Mobile cards */}
+                <div className="sm:hidden space-y-2 p-2">
+                  {sitesWithMachines.map(site => {
+                    const entry = activeMachineBySite[site.id] ?? { activeMachineIds: [], machineTypes: {}, dieselUsage: {}, notes: '' };
+                    const nonOffCount = entry.activeMachineIds.filter(id => (entry.machineTypes[id] ?? 'full') !== 'off').length;
+                    const isActive = nonOffCount > 0;
+                    const { onSite, other } = getDropdownGroups(site.id);
+                    return (
+                      <div
+                        key={site.id}
+                        className={`rounded-xl border p-3 transition-all ${
+                          isActive ? 'border-emerald-200 bg-emerald-50/40' : 'border-slate-200 bg-white'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                              isActive ? 'bg-emerald-400' : 'bg-slate-300'
+                            }`} />
+                            <span className="font-bold text-slate-800 text-sm">{site.name}</span>
+                          </div>
+                          <span className="text-[9px] text-slate-400 bg-slate-100 rounded px-1.5 py-0.5">{site.client}</span>
+                        </div>
+                        <div className="grid grid-cols-1 gap-2.5">
+                          <div>
+                            <label className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-1">Select Equipment</label>
+                            <MachineMultiSelect
+                              siteId={site.id}
+                              onSiteMachines={onSite}
+                              otherMachines={other}
+                              selectedIds={entry.activeMachineIds}
+                              onChange={(machineId) => handleToggleMachineSelection(site.id, machineId)}
+                              onClear={() => setActiveMachineBySite(prev => ({
+                                ...prev,
+                                [site.id]: {
+                                  ...(prev[site.id] ?? { activeMachineIds: [], machineTypes: {}, dieselUsage: {}, notes: '' }),
+                                  activeMachineIds: [],
+                                  machineTypes: {},
+                                  dieselUsage: {},
+                                }
+                              }))}
+                            />
+                          </div>
+                          {entry.activeMachineIds.length > 0 && (
+                            <div>
+                              <label className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-1">Machines &amp; Day Type</label>
+                              <div className="flex flex-col gap-1.5">
+                                {entry.activeMachineIds.map(machineId => {
+                                  const matched = [...onSite, ...other].find(m => m.id === machineId);
+                                  if (!matched) return null;
+                                  const isOnSite = onSite.some(o => o.id === machineId);
+                                  const dayType = entry.machineTypes[machineId] ?? 'full';
+                                  return (
+                                    <div key={machineId} className="flex flex-col gap-1.5">
+                                      <div className="flex items-center gap-1.5">
+                                        <span className={`px-1.5 py-0.5 rounded text-[9px] font-semibold border flex items-center gap-1 flex-1 min-w-0 ${
+                                          dayType === 'off'
+                                            ? 'bg-red-50 text-red-600 border-red-200'
+                                            : isOnSite
+                                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                              : 'bg-amber-50 text-amber-700 border-amber-200'
+                                        }`}>
+                                          <span className={`w-1 h-1 rounded-full flex-shrink-0 ${
+                                            dayType === 'off' ? 'bg-red-400' : isOnSite ? 'bg-emerald-500' : 'bg-amber-500'
+                                          }`} />
+                                          <span className="truncate">{matched.name}</span>
+                                        </span>
+                                        <select
+                                          value={dayType}
+                                          onChange={e => handleMachineTypeChange(site.id, machineId, e.target.value as 'full' | 'half' | 'off')}
+                                          className={`h-7 text-[10px] font-bold rounded border px-1.5 outline-none cursor-pointer flex-shrink-0 ${
+                                            dayType === 'full'
+                                              ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
+                                              : dayType === 'half'
+                                                ? 'border-amber-300 bg-amber-50 text-amber-700'
+                                                : 'border-red-300 bg-red-50 text-red-700'
+                                          }`}
+                                        >
+                                          <option value="full">Full Day</option>
+                                          <option value="half">Half Day</option>
+                                          <option value="off">Off</option>
+                                        </select>
+                                      </div>
+                                      <input
+                                        type="number"
+                                        placeholder="Diesel Filled (Litres)"
+                                        value={entry.dieselUsage?.[machineId] || ''}
+                                        onChange={e => handleMachineDieselChange(site.id, machineId, e.target.value)}
+                                        className="h-7 w-full text-[10px] font-medium border border-slate-200 rounded px-2 outline-none focus:border-slate-400 placeholder:text-slate-400"
+                                      />
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+                          <div>
+                            <label className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-1">Notes</label>
+                            <input
+                              type="text"
+                              placeholder="Optional remarks..."
+                              value={entry.notes}
+                              onChange={e => handleMachineNotesChange(site.id, e.target.value)}
+                              className="w-full h-8 text-xs border border-slate-200 rounded px-2 outline-none focus:ring-1 focus:ring-slate-400 bg-white"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Bottom save bar on mobile */}
+          {sitesWithMachines.length > 0 && (
+            <div className="sm:hidden flex items-center justify-between px-2 py-3 border-t border-slate-200 bg-white">
+              <span className="text-xs text-slate-500 font-medium">
+                <span className="font-bold text-amber-600">{sitesWithMachines.filter(s => {
+                  const e = activeMachineBySite[s.id];
+                  return e && e.activeMachineIds.some(id => (e.machineTypes[id] ?? 'full') !== 'off');
+                }).length}</span> / {sitesWithMachines.length} sites active
+              </span>
+              <Button
+                onClick={handleMachineRegSave}
+                disabled={isSavingMachines}
+                size="sm"
+                className="h-9 bg-amber-500 hover:bg-amber-600 text-white gap-2 font-bold text-[11px] uppercase tracking-tight"
+              >
+                <Save className="h-3.5 w-3.5" />
+                {isSavingMachines ? 'Saving...' : 'Save'}
+              </Button>
+            </div>
+          )}
+          </>)}
+
+          {/* ── Machine DB Sub-panel ── */}
+          {machineSubTab === 'machinedb' && (<div className="flex-1 flex flex-col min-h-0">
+          {/* Toolbar */}
+          <div className="flex flex-wrap items-end gap-2 py-2 px-1">
+            {/* Date Range Filter */}
+            <div className="flex flex-col gap-1 w-full lg:w-auto shrink-0">
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-0.5">Date Range</span>
+              <div className="flex flex-wrap sm:flex-nowrap items-center gap-1.5">
+                <div className="relative flex-1 sm:flex-none">
+                  <Input
+                    type="date"
+                    value={dbMachineDateFilterFrom}
+                    onChange={e => setDbMachineDateFilterFrom(e.target.value)}
+                    className="h-9 pl-7 pr-1 text-[11px] bg-white shadow-sm border-slate-200 uppercase font-medium text-slate-700 w-full sm:w-[135px]"
+                  />
+                  <CalendarIcon className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
+                </div>
+                <span className="text-xs text-slate-400 font-medium shrink-0">to</span>
+                <div className="relative flex-1 sm:flex-none">
+                  <Input
+                    type="date"
+                    value={dbMachineDateFilterTo}
+                    onChange={e => setDbMachineDateFilterTo(e.target.value)}
+                    className="h-9 pl-7 pr-1 text-[11px] bg-white shadow-sm border-slate-200 uppercase font-medium text-slate-700 w-full sm:w-[135px]"
+                  />
+                  <CalendarIcon className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
+                </div>
+                {(dbMachineDateFilterFrom || dbMachineDateFilterTo) && (
+                  <button
+                    onClick={() => { setDbMachineDateFilterFrom(''); setDbMachineDateFilterTo(''); }}
+                    className="text-[10px] font-bold text-slate-400 hover:text-slate-600 bg-slate-100 hover:bg-slate-200 rounded px-2 py-1 ml-1 shrink-0"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Site filter */}
+            <div className="flex flex-col gap-1">
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-0.5">Filter Site</span>
+              <div className="relative">
+                <select
+                  value={dbMachineSiteFilter}
+                  onChange={e => setDbMachineSiteFilter(e.target.value)}
+                  className="h-9 pl-3 pr-8 text-xs font-semibold rounded-md border border-slate-200 bg-white text-slate-700 shadow-sm appearance-none cursor-pointer hover:bg-slate-50 transition-all outline-none min-w-[150px]"
+                >
+                  <option value="all">All Active Sites</option>
+                  {activeSites.map(s => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
+              </div>
+            </div>
+
+            {/* Search */}
+            <div className="flex flex-col gap-1 flex-1 min-w-[200px]">
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-0.5">Search Logs</span>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
+                <Input
+                  placeholder="Search site or machine name..."
+                  className="h-9 pl-9 text-xs bg-white shadow-sm border-slate-200 hover:border-slate-300 transition-colors"
+                  value={dbMachineSearch}
+                  onChange={e => setDbMachineSearch(e.target.value)}
+                />
+                {dbMachineSearch && (
+                  <button
+                    onClick={() => setDbMachineSearch('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400 hover:text-slate-600 bg-slate-100 hover:bg-slate-200 rounded px-1.5 py-0.5"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Summary info */}
+            <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-full px-3 py-1.5 text-xs text-slate-600 dark:text-slate-300 font-medium">
+              <Database className="h-3.5 w-3.5 text-slate-400" />
+              <span>{groupedMachineLogs.length} Records Found</span>
+            </div>
+          </div>
+
+          {/* Bulk Action Bar */}
+          {priv.canDelete && selectedMachineGroups.size > 0 && (
+            <div className="flex items-center justify-between gap-3 bg-indigo-600 text-white px-4 py-2 rounded-lg mb-2 shadow-md animate-in slide-in-from-top-2 duration-200">
+              <div className="flex items-center gap-2 text-sm font-semibold">
+                <span className="bg-white text-indigo-600 rounded-full px-2 py-0.5 text-xs font-bold">{selectedMachineGroups.size}</span>
+                record{selectedMachineGroups.size !== 1 ? 's' : ''} selected
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setSelectedMachineGroups(new Set())}
+                  className="text-xs font-semibold text-indigo-200 hover:text-white underline"
+                >
+                  Clear
+                </button>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  className="h-7 px-3 text-xs bg-red-500 hover:bg-red-600 border-0 font-bold"
+                  onClick={async () => {
+                    const confirmed = await confirm(`Delete ${selectedMachineGroups.size} selected record group(s)? This will remove all machine logs for each selected date/site combination.`);
+                    if (!confirmed) return;
+                    try {
+                      const toDelete = groupedMachineLogs.filter(g => selectedMachineGroups.has(`${g.date}_${g.siteId}`));
+                      for (const group of toDelete) {
+                        for (const log of group.logs) {
+                          await deleteDailyLog(log.id);
+                        }
+                      }
+                      setSelectedMachineGroups(new Set());
+                      toast.success(`Deleted ${toDelete.length} record group(s) successfully.`);
+                    } catch (err: any) {
+                      toast.error(`Failed to delete: ${err?.message ?? 'Unknown error'}`);
+                    }
+                  }}
+                >
+                  <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Delete Selected
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Table / Cards Area */}
+          <div className="flex-1 overflow-auto rounded-lg border border-slate-200 shadow-sm bg-white mt-2 flex flex-col min-h-0">
+            {paginatedMachineDbRecords.length === 0 ? (
+              <div className="flex flex-col items-center justify-center flex-1 py-12 gap-3 text-slate-400">
+                <Database className="h-10 w-10 text-slate-200" />
+                <p className="text-sm font-medium">No machine log records found matching filters</p>
+              </div>
+            ) : isMobile ? (
+              /* Mobile View */
+              <div className="flex-1 overflow-auto p-2 space-y-2 bg-slate-50">
+                {paginatedMachineDbRecords.map(group => {
+                  const activeLogs = group.logs.filter(l => l.isActive);
+                  const groupKey = `${group.date}_${group.siteId}`;
+                  const isSelected = selectedMachineGroups.has(groupKey);
+                  return (
+                    <Card key={groupKey} className={`border shadow-sm ${isSelected ? 'border-indigo-300 bg-indigo-50/50' : 'border-slate-200'}`}>
+                      <CardHeader className="p-3 pb-1 flex flex-row items-start justify-between space-y-0">
+                        <div className="flex items-center gap-2">
+                          {priv.canDelete && (
+                            <input
+                              type="checkbox"
+                              className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4 cursor-pointer shrink-0"
+                              checked={isSelected}
+                              onChange={e => {
+                                setSelectedMachineGroups(prev => {
+                                  const next = new Set(prev);
+                                  if (e.target.checked) next.add(groupKey);
+                                  else next.delete(groupKey);
+                                  return next;
+                                });
+                              }}
+                            />
+                          )}
+                          <div className="flex flex-col">
+                            <CardTitle className="text-sm font-bold text-slate-800">{group.siteName}</CardTitle>
+                            <span className="text-[10px] font-mono text-slate-500 mt-0.5">{formatDisplayDate(group.date)}</span>
+                          </div>
+                        </div>
+                        {priv.canDelete && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDeleteMachineGroup(group.date, group.siteId, group.logs)}
+                            className="h-7 w-7 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg shrink-0"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                      </CardHeader>
+                      <CardContent className="p-3 pt-1 text-[11px] space-y-2">
+                        <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
+                          <span className="text-slate-400 font-bold uppercase tracking-wider text-[9px]">Machine Summary</span>
+                          <span className="font-bold text-slate-700">{activeLogs.length} / {group.logs.length} Active</span>
+                        </div>
+
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {group.logs.map(log => (
+                            <span
+                              key={log.id}
+                              className={`px-2 py-0.5 rounded-full text-[9px] font-semibold border flex items-center gap-1 ${
+                                log.isActive
+                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                  : 'bg-slate-50 text-slate-400 border-slate-200 line-through'
+                              }`}
+                            >
+                              <span className={`w-1.5 h-1.5 rounded-full ${log.isActive ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+                              {log.assetName}
+                            </span>
+                          ))}
+                        </div>
+
+                        {group.totalDiesel > 0 && (
+                          <div className="flex items-center justify-between text-slate-600 bg-amber-50/50 p-1.5 rounded border border-amber-100">
+                            <span className="font-semibold">Diesel Usage:</span>
+                            <span className="font-bold text-amber-700">{group.totalDiesel} Liters</span>
+                          </div>
+                        )}
+
+                        {group.logs.some(l => l.maintenanceDetails) && (
+                          <div className="bg-slate-50 border border-slate-150 p-2 rounded text-[10px] text-slate-600 italic">
+                            <span className="font-bold block not-italic text-slate-500 uppercase tracking-wide text-[8px] mb-0.5">Remarks / Maintenance</span>
+                            {group.logs
+                              .filter(l => l.maintenanceDetails)
+                              .map(l => `${l.assetName}: ${l.maintenanceDetails}`)
+                              .join(' | ')}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            ) : (
+              /* Desktop View Table */
+              <div className="overflow-auto flex-1 h-full">
+                <table className="w-full text-[11px] whitespace-nowrap">
+                  <thead className="bg-slate-50 sticky top-0 shadow-sm border-b border-slate-200 z-10">
+                    <tr>
+                      {priv.canDelete && (
+                        <th className="py-2.5 px-3 w-[3%]">
+                          <input
+                            type="checkbox"
+                            className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5 cursor-pointer"
+                            checked={paginatedMachineDbRecords.length > 0 && paginatedMachineDbRecords.every(g => selectedMachineGroups.has(`${g.date}_${g.siteId}`))}
+                            onChange={e => {
+                              if (e.target.checked) {
+                                setSelectedMachineGroups(prev => {
+                                  const next = new Set(prev);
+                                  paginatedMachineDbRecords.forEach(g => next.add(`${g.date}_${g.siteId}`));
+                                  return next;
+                                });
+                              } else {
+                                setSelectedMachineGroups(prev => {
+                                  const next = new Set(prev);
+                                  paginatedMachineDbRecords.forEach(g => next.delete(`${g.date}_${g.siteId}`));
+                                  return next;
+                                });
+                              }
+                            }}
+                            title="Select / deselect all on this page"
+                          />
+                        </th>
+                      )}
+                      <th className="py-2.5 px-3 text-left font-bold text-slate-600 uppercase tracking-wide w-[12%]">Date</th>
+                      <th className="py-2.5 px-3 text-left font-bold text-slate-600 uppercase tracking-wide w-[20%]">Active Site</th>
+                      <th className="py-2.5 px-3 text-center font-bold text-slate-600 uppercase tracking-wide w-[10%]">Total Machines</th>
+                      <th className="py-2.5 px-3 text-left font-bold text-slate-600 uppercase tracking-wide w-[35%]">Equipment Status</th>
+                      <th className="py-2.5 px-3 text-center font-bold text-slate-600 uppercase tracking-wide w-[10%]">Diesel (L)</th>
+                      <th className="py-2.5 px-3 text-left font-bold text-slate-600 uppercase tracking-wide w-[10%]">Remarks</th>
+                      <th className="py-2.5 px-3 text-center font-bold text-slate-600 uppercase tracking-wide w-[3%]">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {paginatedMachineDbRecords.map(group => {
+                      const activeLogs = group.logs.filter(l => l.isActive);
+                      const remarks = group.logs
+                        .filter(l => l.maintenanceDetails)
+                        .map(l => `${l.assetName}: ${l.maintenanceDetails}`)
+                        .join(' | ');
+
+                      const groupKey = `${group.date}_${group.siteId}`;
+                      const isSelected = selectedMachineGroups.has(groupKey);
+                      return (
+                        <tr key={groupKey} className={`transition-colors ${isSelected ? 'bg-indigo-50 hover:bg-indigo-100' : 'hover:bg-slate-50'}`}>
+                          {priv.canDelete && (
+                            <td className="py-2 px-3">
+                              <input
+                                type="checkbox"
+                                className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5 cursor-pointer"
+                                checked={isSelected}
+                                onChange={e => {
+                                  setSelectedMachineGroups(prev => {
+                                    const next = new Set(prev);
+                                    if (e.target.checked) next.add(groupKey);
+                                    else next.delete(groupKey);
+                                    return next;
+                                  });
+                                }}
+                              />
+                            </td>
+                          )}
+                          <td className="py-2 px-3 font-mono">{formatDisplayDate(group.date)}</td>
+                          <td className="py-2 px-3 font-semibold text-slate-800">{group.siteName}</td>
+                          <td className="py-2 px-3 text-center font-bold text-slate-600">{group.logs.length} machines</td>
+                          <td className="py-2 px-3">
+                            <div className="flex flex-wrap gap-1 max-w-[400px]">
+                              {group.logs.map(log => (
+                                <span
+                                  key={log.id}
+                                  className={`px-1.5 py-0.5 rounded text-[9px] font-semibold border flex items-center gap-1 ${
+                                    log.isActive
+                                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                      : 'bg-slate-50 text-slate-400 border-slate-200 line-through'
+                                  }`}
+                                  title={log.isActive ? `${log.assetName} - Operating` : `${log.assetName} - Off`}
+                                >
+                                  <span className={`w-1.5 h-1.5 rounded-full ${log.isActive ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+                                  {log.assetName}
+                                </span>
+                              ))}
+                            </div>
+                          </td>
+                          <td className="py-2 px-3 text-center font-mono font-bold text-slate-700">
+                            {group.totalDiesel > 0 ? `${group.totalDiesel} L` : '—'}
+                          </td>
+                          <td className="py-2 px-3 text-slate-500 truncate max-w-[200px]" title={remarks}>
+                            {remarks || '—'}
+                          </td>
+                          {priv.canDelete && (
+                            <td className="py-2 px-3 text-center">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleDeleteMachineGroup(group.date, group.siteId, group.logs)}
+                                className="h-6 w-6 text-red-500 hover:text-red-700 hover:bg-red-50 rounded"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </td>
+                          )}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Pagination Controls */}
+            {groupedMachineLogs.length > dbMachinePageSize && (
+              <div className="flex items-center justify-between px-4 py-2.5 bg-slate-50 border-t border-slate-200 shrink-0 text-[11px]">
+                <div className="text-slate-500 font-medium">
+                  Showing <span className="text-slate-900 font-bold">{(dbMachinePage - 1) * dbMachinePageSize + 1}</span> to <span className="text-slate-900 font-bold">{Math.min(dbMachinePage * dbMachinePageSize, groupedMachineLogs.length)}</span> of <span className="text-slate-900 font-bold">{groupedMachineLogs.length}</span> groups
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setDbMachinePage(p => Math.max(1, p - 1))}
+                    disabled={dbMachinePage === 1}
+                    className="h-8 px-2.5 border-slate-200 bg-white hover:bg-slate-100 text-slate-600 disabled:opacity-50"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5 mr-1" /> Previous
+                  </Button>
+                  <div className="font-bold text-slate-600 px-2">
+                    Page {dbMachinePage} of {Math.ceil(groupedMachineLogs.length / dbMachinePageSize)}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setDbMachinePage(p => Math.min(Math.ceil(groupedMachineLogs.length / dbMachinePageSize), p + 1))}
+                    disabled={dbMachinePage >= Math.ceil(groupedMachineLogs.length / dbMachinePageSize)}
+                    className="h-8 px-2.5 border-slate-200 bg-white hover:bg-slate-100 text-slate-600 disabled:opacity-50"
+                  >
+                    Next <ChevronRight className="w-3.5 h-3.5 ml-1" />
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+          </div>)}
+
+          {/* ── Analytics Sub-panel ── */}
+          {machineSubTab === 'machineanalytics' && (<div className="flex-1 flex flex-col min-h-0 overflow-auto">
+          <div className="flex flex-wrap items-end gap-2 py-2 px-3 border-b border-slate-200 bg-white">
+            <div className="flex flex-col gap-1 w-full lg:w-auto shrink-0">
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-0.5">Date Range</span>
+              <div className="flex flex-wrap sm:flex-nowrap items-center gap-1.5">
+                <div className="relative flex-1 sm:flex-none">
+                  <Input
+                    type="date"
+                    value={analyticsDateFrom}
+                    onChange={e => setAnalyticsDateFrom(e.target.value)}
+                    className="h-9 pl-7 pr-1 text-[11px] bg-white shadow-sm border-slate-200 uppercase font-medium text-slate-700 w-full sm:w-[135px]"
+                  />
+                  <CalendarIcon className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
+                </div>
+                <span className="text-xs text-slate-400 font-medium shrink-0">to</span>
+                <div className="relative flex-1 sm:flex-none">
+                  <Input
+                    type="date"
+                    value={analyticsDateTo}
+                    onChange={e => setAnalyticsDateTo(e.target.value)}
+                    className="h-9 pl-7 pr-1 text-[11px] bg-white shadow-sm border-slate-200 uppercase font-medium text-slate-700 w-full sm:w-[135px]"
+                  />
+                  <CalendarIcon className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
+                </div>
+                {(analyticsDateFrom || analyticsDateTo) && (
+                  <button
+                    onClick={() => { setAnalyticsDateFrom(''); setAnalyticsDateTo(''); }}
+                    className="text-[10px] font-bold text-slate-400 hover:text-slate-600 bg-slate-100 hover:bg-slate-200 rounded px-2 py-1 ml-1 shrink-0"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+          <div className="flex-1 overflow-auto p-4 space-y-4 bg-slate-50">
+            {activeSites.map(site => {
+              const siteLogs = dailyMachineLogs.filter(l => {
+                if (l.siteId !== site.id) return false;
+                if (analyticsDateFrom && l.date < analyticsDateFrom) return false;
+                if (analyticsDateTo && l.date > analyticsDateTo) return false;
+                return true;
+              });
+              if (siteLogs.length === 0) return null;
+              
+              const machineStats: Record<string, { name: string, active: number, off: number, offDates: string[] }> = {};
+              siteLogs.forEach(log => {
+                if (!machineStats[log.assetId]) {
+                  machineStats[log.assetId] = { name: log.assetName, active: 0, off: 0, offDates: [] };
+                }
+                const isOff = !log.isActive || log.operationalDay === 'none';
+                if (isOff) {
+                  machineStats[log.assetId].off++;
+                  machineStats[log.assetId].offDates.push(log.date);
+                } else {
+                  machineStats[log.assetId].active++;
+                }
+              });
+
+              return (
+                <div key={site.id} className="bg-white border border-slate-200 rounded-lg shadow-sm p-4 flex flex-col min-h-0">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="font-bold text-slate-800 text-lg flex items-center gap-2">
+                      <Building2 className="w-5 h-5 text-indigo-400" /> {site.name}
+                    </h3>
+                    <span className="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded-full font-medium">
+                      {site.client}
+                    </span>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                    {Object.values(machineStats).map(stat => (
+                      <div key={stat.name} className="border border-slate-200 bg-white shadow-sm rounded-lg p-3 flex flex-col">
+                        <div className="font-bold text-slate-700 text-sm mb-3 pb-2 border-b border-slate-100 truncate" title={stat.name}>
+                          {stat.name}
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-2 mb-3">
+                          <div className="bg-emerald-50 rounded-md p-2 flex flex-col items-center justify-center border border-emerald-100">
+                            <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Active</span>
+                            <span className="text-lg font-black text-emerald-700">{stat.active}</span>
+                          </div>
+                          <div className="bg-red-50 rounded-md p-2 flex flex-col items-center justify-center border border-red-100">
+                            <span className="text-[10px] font-bold text-red-600 uppercase tracking-wider">Off</span>
+                            <span className="text-lg font-black text-red-700">{stat.off}</span>
+                          </div>
+                        </div>
+
+                        <div className="flex-1 flex flex-col min-h-0">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
+                            Off Dates ({stat.offDates.length})
+                          </span>
+                          {stat.offDates.length > 0 ? (
+                            <div className="flex flex-wrap gap-1 max-h-[80px] overflow-y-auto pr-1 custom-scrollbar">
+                              {stat.offDates.sort((a, b) => b.localeCompare(a)).map(d => (
+                                <span key={d} className="px-1.5 py-0.5 bg-slate-100 text-slate-600 border border-slate-200 rounded text-[9px] font-mono whitespace-nowrap">
+                                  {formatDisplayDate(d)}
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="text-xs italic text-slate-400">Never marked off</div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+            
+            {activeSites.filter(site => dailyMachineLogs.some(l => l.siteId === site.id)).length === 0 && (
+              <div className="flex flex-col items-center justify-center py-12 text-slate-400">
+                <LineChart className="w-12 h-12 text-slate-200 mb-3" />
+                <p className="font-medium text-sm">No machine records found across any active sites.</p>
+              </div>
+            )}
+          </div>
+          </div>)}
         </TabsContent>
       </Tabs>
 
