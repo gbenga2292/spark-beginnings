@@ -6,7 +6,7 @@ import logoSrc from '../../logo/logo-2.png';
 import type { MainTask, SubTask, TaskComment, AppUser, CommentAttachment } from '@/src/types/tasks';
 import { useAppStore } from '@/src/store/appStore';
 import { useUserStore } from '@/src/store/userStore';
-import { formatDisplayDate } from '@/src/lib/dateUtils';
+import { formatDisplayDate, getISOWeekMondayString, formatWeekLabel, getISOWeekMonday } from '@/src/lib/dateUtils';
 import { useRef } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { LocalNotifications } from '@capacitor/local-notifications';
@@ -121,6 +121,8 @@ export function mapMainTaskToCamel(m: any) {
         updatedAt: m.updated_at || m.updatedAt,
         clientId: m.client_id || m.clientId,
         siteId: m.site_id || m.siteId,
+        hasBudget: m.has_budget ?? m.hasBudget,
+        budgetRequested: m.budget_requested ?? m.budgetRequested,
     };
 }
 
@@ -143,6 +145,8 @@ export function mapSubtaskToCamel(s: any) {
         updatedAt: s.updated_at || s.updatedAt,
         clientId: s.client_id || s.clientId,
         siteId: s.site_id || s.siteId,
+        hasBudget: s.has_budget ?? s.hasBudget,
+        budgetRequested: s.budget_requested ?? s.budgetRequested,
     };
 }
 
@@ -458,6 +462,8 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
             is_hr_task: task.is_hr_task || false,
             client_id: task.clientId || null,
             site_id: task.siteId || null,
+            has_budget: task.hasBudget || false,
+            budget_requested: task.budgetRequested || null,
         };
         const { data, error } = await supabase.from('main_tasks').insert(payload).select().single();
         if (error) {
@@ -486,6 +492,9 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                     approverId: task.approverId || null,
                     clientId: payload.client_id,
                     siteId: payload.site_id,
+                    hasBudget: task.hasBudget || false,
+                    budgetRequested: task.budgetRequested || null,
+                    workspaceId: payload.workspaceId,
                 }];
             }
 
@@ -502,6 +511,9 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                     main_task_id: data.id,
                     client_id: s.clientId || null,
                     site_id: s.siteId || null,
+                    has_budget: s.hasBudget || false,
+                    budget_requested: s.budgetRequested || null,
+                    workspaceId: s.workspaceId || payload.workspaceId || null,
                 }));
                 const { data: insertedSubs, error: subErr } = await supabase.from('subtasks').insert(subTasksPayload).select();
                 if (subErr) {
@@ -603,6 +615,9 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
             main_task_id: sub.mainTaskId,
             client_id: sub.clientId || null,
             site_id: sub.siteId || null,
+            has_budget: sub.hasBudget || false,
+            budget_requested: sub.budgetRequested || null,
+            workspaceId: sub.workspaceId || null,
         };
         const { data, error } = await supabase.from('subtasks').insert(payload).select().single();
         if (error) {
@@ -622,7 +637,8 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
             'title', 'description', 'status', 'assignedTo', 'assigned_to', 
             'priority', 'deadline', 'main_task_id', 'mainTaskId', 
             'requires_approval', 'approver_id', 'is_deleted', 'deleted_at', 
-            'completed_at', 'workspaceId', 'client_id', 'clientId', 'site_id', 'siteId'
+            'completed_at', 'workspaceId', 'workspace_id', 'client_id', 'clientId', 'site_id', 'siteId',
+            'has_budget', 'budget_requested'
         ];
 
         const payload: any = {};
@@ -637,6 +653,12 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                 payload.client_id = p.clientId;
             } else if (key === 'siteId') {
                 payload.site_id = p.siteId;
+            } else if (key === 'hasBudget') {
+                payload.has_budget = p.hasBudget;
+            } else if (key === 'budgetRequested') {
+                payload.budget_requested = p.budgetRequested;
+            } else if (key === 'workspaceId') {
+                payload.workspaceId = p.workspaceId;
             } else if (allowedColumns.includes(key)) {
                 payload[key] = p[key];
             }
@@ -826,7 +848,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
     const approveSubtask = useCallback(async (id: string, userId?: string, note?: string) => {
         // Update task itself
         const now = new Date().toISOString();
-        const { data, error } = await supabase.from('subtasks').update({ status: 'completed', approvedBy: userId || user?.id, completed_at: now }).eq('id', id).select().single();
+        const { data, error } = await supabase.from('subtasks').update({ status: 'completed', approved_by: userId || user?.id, completed_at: now }).eq('id', id).select().single();
         if (error) {
             console.error('approveSubtask error:', error);
             toast.error('Failed to approve task.');
@@ -1006,7 +1028,54 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         }
 
         if (data) setSubtasks(prev => prev.map(s => s.id === id ? mapSubtaskToCamel(data) : s));
-        toast.success('Approval processed successfully');
+
+        // ── Auto-create budget item if subtask has a budget request ─────────
+        const hasBudget = data?.has_budget ?? data?.hasBudget;
+        const budgetRequested = data?.budget_requested ?? data?.budgetRequested;
+        if (hasBudget && budgetRequested) {
+            const weekMonday = getISOWeekMondayString(new Date());
+            const weekLabel = formatWeekLabel(getISOWeekMonday(new Date()));
+            const mainTask = mainTasks.find(m => m.id === data.main_task_id || m.id === data.mainTaskId);
+            const workspaceId = data.workspace_id || data.workspaceId || mainTask?.workspaceId || mainTask?.workspace_id || 'dcel-team';
+            const actorId = userId || user?.id || '';
+            const { data: newBudget, error: bErr } = await supabase.from('budget_items').insert({
+                title: data.title,
+                week_start: weekMonday,
+                week_label: weekLabel,
+                requested: budgetRequested,
+                status: 'pending',
+                source: 'task',
+                subtask_id: id,
+                main_task_id: data.main_task_id || data.mainTaskId || null,
+                workspace_id: workspaceId,
+                created_by: actorId,
+            }).select().single();
+            if (bErr) {
+                console.error('budget_items auto-create error:', bErr);
+                toast.success('Approval processed successfully');
+            } else if (newBudget) {
+                useAppStore.getState().addBudgetItem({
+                    id: newBudget.id,
+                    title: newBudget.title,
+                    weekStart: newBudget.week_start,
+                    weekLabel: newBudget.week_label,
+                    requested: Number(newBudget.requested),
+                    budgeted: newBudget.budgeted != null ? Number(newBudget.budgeted) : undefined,
+                    linkedLedgerIds: newBudget.linked_ledger_ids ?? [],
+                    source: 'task',
+                    subtaskId: id,
+                    mainTaskId: newBudget.main_task_id ?? undefined,
+                    status: newBudget.status,
+                    workspaceId,
+                    createdBy: actorId,
+                    createdAt: newBudget.created_at,
+                    updatedAt: newBudget.updated_at,
+                });
+                toast.success('Task approved — budget item created.');
+            }
+        } else {
+            toast.success('Approval processed successfully');
+        }
     }, [user?.id, mainTasks, users]);
 
     const rejectSubtask = useCallback(async (id: string, _userId?: string, note?: string) => {

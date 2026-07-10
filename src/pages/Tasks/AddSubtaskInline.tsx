@@ -24,6 +24,8 @@ export function AddSubtaskInline({ mainTaskId, users, isPersonal, onAdd }: AddSu
   const [priority, setPriority] = useState<TaskPriority | undefined>(undefined);
   const [requiresApproval, setRequiresApproval] = useState(false);
   const [approverId, setApproverId] = useState("");
+  const [hasBudget, setHasBudget] = useState(false);
+  const [budgetRequested, setBudgetRequested] = useState<number | undefined>(undefined);
 
   const handleAdd = () => {
     if (!title.trim()) return;
@@ -38,9 +40,11 @@ export function AddSubtaskInline({ mainTaskId, users, isPersonal, onAdd }: AddSu
       deadline: combinedDeadline, 
       priority, 
       requiresApproval,
-      approverId: requiresApproval ? approverId : undefined
+      approverId: requiresApproval ? approverId : undefined,
+      hasBudget: requiresApproval ? hasBudget : undefined,
+      budgetRequested: (requiresApproval && hasBudget) ? budgetRequested : undefined
     });
-    setTitle(""); setDesc(""); setAssignedTo([]); setDeadline(""); setDeadlineTime(""); setPriority(undefined); setRequiresApproval(false); setApproverId(""); setOpen(false);
+    setTitle(""); setDesc(""); setAssignedTo([]); setDeadline(""); setDeadlineTime(""); setPriority(undefined); setRequiresApproval(false); setApproverId(""); setHasBudget(false); setBudgetRequested(undefined); setOpen(false);
   };
 
   const accentColor = isPersonal ? 'text-indigo-600 hover:text-indigo-700' : 'text-primary hover:text-primary/80';
@@ -131,6 +135,23 @@ export function AddSubtaskInline({ mainTaskId, users, isPersonal, onAdd }: AddSu
                 <option key={u.id} value={u.id}>{u.name}</option>
               ))}
             </select>
+          </div>
+        )}
+        
+        {requiresApproval && (
+          <label className="flex items-center gap-1.5 cursor-pointer mt-1">
+            <input type="checkbox" checked={hasBudget} onChange={e => setHasBudget(e.target.checked)}
+              className="w-4 h-4 rounded border-border text-primary focus:ring-primary/20" />
+            <span className="text-xs font-medium text-foreground">Include Budget Request</span>
+          </label>
+        )}
+        
+        {requiresApproval && hasBudget && (
+          <div className="w-full max-w-[200px]">
+            <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Requesting Amount (₦)</label>
+            <input type="number" min="0" value={budgetRequested ?? ''} onChange={e => setBudgetRequested(e.target.value ? Number(e.target.value) : undefined)}
+              placeholder="0.00"
+              className="w-full px-3 py-1.5 rounded-lg border border-border bg-card text-xs focus:outline-none focus:ring-2 focus:ring-primary/20" />
           </div>
         )}
       </div>

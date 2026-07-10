@@ -90,6 +90,8 @@ export interface SubTask {
     rejectedAt?: string;
     clientId?: string;
     siteId?: string;
+    hasBudget?: boolean;
+    budgetRequested?: number;
 }
 
 export interface MainTask {
@@ -111,6 +113,8 @@ export interface MainTask {
     deadline?: string;
     clientId?: string;
     siteId?: string;
+    hasBudget?: boolean;
+    budgetRequested?: number;
 }
 
 // ─── Notifications ────────────────────────────────────────────────────────────

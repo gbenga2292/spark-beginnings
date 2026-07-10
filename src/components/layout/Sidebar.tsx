@@ -53,7 +53,8 @@ import {
   RefreshCw,
   FolderOpen,
   TrendingUp,
-  HardHat
+  HardHat,
+  PiggyBank
 } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { NairaSign } from '@/src/components/ui/naira-sign';
@@ -195,6 +196,7 @@ const navigation: NavCategory[] = [
       { name: 'Non-Employee Directory', href: '/beneficiaries', icon: Users, privKey: 'beneficiaries', privField: 'canView' },
       { name: 'Ledger', href: '/ledger', icon: BookOpen, privKey: 'ledger', privField: 'canView' },
       { name: 'Company Expenses', href: '/company-expenses', icon: BookOpen, privKey: 'ledger', privField: 'canView' },
+      { name: 'Budget', href: '/budget', icon: PiggyBank, privKey: 'budget', privField: 'canView' },
     ],
   },
   // ── Reports ──────────────────────────────────────────────────────────────

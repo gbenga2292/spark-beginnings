@@ -192,6 +192,15 @@ const PRIV_GROUPS: PG[] = [
         fields: [{ key: 'canView', label: 'View' }, { key: 'canAdd', label: 'Record Entries' }, { key: 'canEdit', label: 'Edit Variables' }, { key: 'canDelete', label: 'Delete Entries', danger: true }, { key: 'canImport', label: 'Import' }, { key: 'canExport', label: 'Export' }] },
       { key: 'payments', label: 'Payments & VAT (Legacy)', parentKey: 'payments', masterField: 'canView',
         fields: [{ key: 'canView', label: 'View' }, { key: 'canAdd', label: 'Add' }, { key: 'canEdit', label: 'Edit' }, { key: 'canDelete', label: 'Delete', danger: true }, { key: 'canViewAmounts', label: 'View Amounts', special: true }, { key: 'canViewVat', label: 'View VAT Tab' }, { key: 'canManageVat', label: 'Manage VAT' }, { key: 'canImport', label: 'Import' }, { key: 'canExport', label: 'Export' }] },
+      { key: 'budget', label: 'Budget', parentKey: 'budget', masterField: 'canView',
+        fields: [
+          { key: 'canView', label: 'View' },
+          { key: 'canAdd', label: 'Add Manual Items' },
+          { key: 'canEdit', label: 'Edit Items' },
+          { key: 'canDelete', label: 'Delete Items', danger: true },
+          { key: 'canSetBudgeted', label: 'Set Budgeted Amount (Accounts)' },
+          { key: 'canLinkLedger', label: 'Link/Unlink Ledger Entries' }
+        ] },
     ],
   },
   {

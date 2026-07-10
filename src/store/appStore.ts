@@ -109,6 +109,26 @@ export interface LedgerEntry {
   vendor: string; bank: string; enteredBy: string;
 }
 
+// ─── Budget Item ───────────────────────────────────────────────
+export interface BudgetItem {
+  id: string;
+  workspaceId: string;
+  title: string;
+  description?: string;
+  weekLabel: string;          // e.g. "Week 27 · Jul 2026"
+  weekStart: string;          // YYYY-MM-DD — ISO Monday of the week
+  requested: number;          // amount originally requested
+  budgeted?: number;          // set by accounts dept
+  linkedLedgerIds: string[];  // array of LedgerEntry IDs
+  source: 'manual' | 'task'; // how this item was created
+  subtaskId?: string;
+  mainTaskId?: string;
+  status: 'pending' | 'budgeted' | 'settled';
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface CompanyExpense {
   id: string;
   date: string;
@@ -672,7 +692,11 @@ export interface MonthValue {
   overtimeRate: number;
 }
 
+// BudgetItem is defined at the top of this file — no duplicate needed here.
+
 interface AppState {
+
+
   commLogs: CommLog[];
   addCommLog: (log: CommLog) => void;
   updateCommLog: (id: string, log: Partial<CommLog>) => void;
@@ -832,6 +856,13 @@ interface AppState {
   setPendingLedgerEntries: (entries: CompanyExpense[]) => void;
   clearPendingLedgerEntries: () => void;
 
+  // Budget
+  budgetItems: BudgetItem[];
+  addBudgetItem: (item: BudgetItem) => void;
+  updateBudgetItem: (id: string, updates: Partial<BudgetItem>) => void;
+  deleteBudgetItem: (id: string) => void;
+  setBudgetItems: (items: BudgetItem[]) => void;
+
   addStaffMeritRecord: (record: StaffMeritRecord) => void;
   updateStaffMeritRecord: (id: string, record: Partial<StaffMeritRecord>) => void;
   deleteStaffMeritRecord: (id: string) => void;
@@ -975,6 +1006,7 @@ export const useAppStore = create<AppState>()(
       ledgerEntries: [],
       companyExpenses: [],
       pendingLedgerEntries: [],
+      budgetItems: [],
       staffMeritRecords: [],
       vehicles: [],
       vehicleTrips: [],
@@ -1255,6 +1287,12 @@ export const useAppStore = create<AppState>()(
 
       setPendingLedgerEntries: (entries) => set({ pendingLedgerEntries: entries }),
       clearPendingLedgerEntries: () => set({ pendingLedgerEntries: [] }),
+
+      // Budget Items
+      addBudgetItem: (item) => { set(s => ({ budgetItems: [...s.budgetItems, item] })); db.insertBudgetItem(item); },
+      updateBudgetItem: (id, updates) => { set(s => ({ budgetItems: s.budgetItems.map(b => b.id === id ? { ...b, ...updates, updatedAt: new Date().toISOString() } : b) })); db.updateBudgetItem(id, updates); },
+      deleteBudgetItem: (id) => { set(s => ({ budgetItems: s.budgetItems.filter(b => b.id !== id) })); db.deleteBudgetItem(id); },
+      setBudgetItems: (items) => set({ budgetItems: items }),
 
       // Payroll Variables
       updatePayrollVariables: (variables) => {
@@ -1601,6 +1639,7 @@ export const useAppStore = create<AppState>()(
           return { onboardingTemplates: updated };
         });
       },
+
     }),
     {
       name: 'dcel-hr-storage',
@@ -1608,3 +1647,4 @@ export const useAppStore = create<AppState>()(
     }
   )
 );
+

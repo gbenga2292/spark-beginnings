@@ -8,7 +8,7 @@ import type {
   SalaryAdvance, Loan, Payment, VatPayment, LeaveRecord, DepartmentTasks,
   DisciplinaryRecord, EvaluationRecord, Department, Position,
   LedgerCategory, LedgerVendor, LedgerBank, LedgerBeneficiaryBank, LedgerEntry, CommLog,
-  CompanyExpense, StaffMeritRecord, LeaveType, DailyJournal, SiteJournalEntry, ClientContact
+  CompanyExpense, StaffMeritRecord, LeaveType, DailyJournal, SiteJournalEntry, ClientContact, BudgetItem
 } from '@/src/store/appStore';
 import { useUserStore, type AppUser, type PrivilegePreset } from '@/src/store/userStore';
 import type { InterviewCandidate } from '@/src/types/interviews';
@@ -370,6 +370,46 @@ export function dbToClientContact(r: any): ClientContact {
     isPrincipal: r.is_principal ?? false,
     createdAt: r.created_at ?? new Date().toISOString(),
     updatedAt: r.updated_at ?? new Date().toISOString(),
+  };
+}
+
+export function dbToBudgetItem(r: any): BudgetItem {
+  return {
+    id: r.id,
+    workspaceId: r.workspace_id,
+    title: r.title,
+    weekLabel: r.week_label,
+    weekStart: r.week_start,
+    requested: Number(r.requested),
+    budgeted: r.budgeted != null ? Number(r.budgeted) : undefined,
+    linkedLedgerIds: r.linked_ledger_ids || [],
+    source: r.source,
+    subtaskId: r.subtask_id || undefined,
+    mainTaskId: r.main_task_id || undefined,
+    status: r.status,
+    createdBy: r.created_by,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  };
+}
+
+export function budgetItemToDb(b: BudgetItem): any {
+  return {
+    id: b.id,
+    workspace_id: b.workspaceId,
+    title: b.title,
+    week_label: b.weekLabel,
+    week_start: b.weekStart,
+    requested: b.requested,
+    budgeted: b.budgeted ?? null,
+    linked_ledger_ids: b.linkedLedgerIds,
+    source: b.source,
+    subtask_id: b.subtaskId || null,
+    main_task_id: b.mainTaskId || null,
+    status: b.status,
+    created_by: b.createdBy,
+    created_at: b.createdAt,
+    updated_at: b.updatedAt,
   };
 }
 
@@ -989,7 +1029,8 @@ export async function fetchAllAppData(privs?: any) {
     employeesRes, attendanceRes,
     invoicesRes, pendingInvoicesRes,
     ledgerCategoriesRes, ledgerVendorsRes, ledgerBanksRes, ledgerBeneficiaryBanksRes, ledgerEntriesRes, companyExpensesRes,
-    vehiclesRes, vehicleTripsRes, dailyJournalsRes, siteJournalEntriesRes
+    vehiclesRes, vehicleTripsRes, dailyJournalsRes, siteJournalEntriesRes,
+    budgetItemsRes,
   ] = await Promise.all([
     supabase.from('sites').select('*').order('created_at').limit(50000),
     supabase.from('clients').select('*').order('name').limit(50000),
@@ -1026,6 +1067,7 @@ export async function fetchAllAppData(privs?: any) {
     supabase.from('vehicle_movement_log').select('*').order('departure_time', { ascending: false }).limit(50000),
     supabase.from('daily_journals').select('*').order('date', { ascending: false }).limit(10000),
     supabase.from('site_journal_entries').select('*').order('created_at', { ascending: false }).limit(10000),
+    canView('budget') ? supabase.from('budget_items').select('*').order('week_start', { ascending: false }).limit(10000) : Promise.resolve({ data: [] }),
   ]);
 
   const settings = settingsRes.data;
@@ -1090,6 +1132,7 @@ export async function fetchAllAppData(privs?: any) {
     vehicleTrips: (vehicleTripsRes.data || []).map(dbToVehicleMovement),
     dailyJournals: (dailyJournalsRes.data || []).map(dbToDailyJournal),
     siteJournalEntries: (siteJournalEntriesRes.data || []).map(dbToSiteJournalEntry),
+    budgetItems: ((budgetItemsRes as any).data || []).map(dbToBudgetItem),
   };
 }
 
@@ -2495,6 +2538,34 @@ export const db = {
     const { error } = await supabase.from('client_contacts').delete().eq('id', id);
     if (error) { console.error('deleteClientContact:', error); throw error; }
   },
+
+  async fetchBudgetItems(): Promise<BudgetItem[]> {
+    const { data, error } = await supabase.from('budget_items').select('*').order('created_at', { ascending: false }).limit(50000);
+    if (error) { console.error('fetchBudgetItems:', error); throw error; }
+    return (data || []).map(dbToBudgetItem);
+  },
+  async insertBudgetItem(b: BudgetItem) {
+    const { error } = await supabase.from('budget_items').insert(budgetItemToDb(b));
+    if (error) { console.error('insertBudgetItem:', error); throw error; }
+  },
+  async updateBudgetItem(id: string, updates: Partial<BudgetItem>) {
+    const patch: any = {};
+    if (updates.title !== undefined) patch.title = updates.title;
+    if (updates.weekLabel !== undefined) patch.week_label = updates.weekLabel;
+    if (updates.weekStart !== undefined) patch.week_start = updates.weekStart;
+    if (updates.requested !== undefined) patch.requested = updates.requested;
+    if (updates.budgeted !== undefined) patch.budgeted = updates.budgeted;
+    if (updates.linkedLedgerIds !== undefined) patch.linked_ledger_ids = updates.linkedLedgerIds;
+    if (updates.status !== undefined) patch.status = updates.status;
+    const { error } = await supabase.from('budget_items').update(patch).eq('id', id);
+    if (error) { console.error('updateBudgetItem:', error); throw error; }
+  },
+  async deleteBudgetItem(id: string) {
+    const { error } = await supabase.from('budget_items').delete().eq('id', id);
+    if (error) { console.error('deleteBudgetItem:', error); throw error; }
+  },
 };
+
+
 
 

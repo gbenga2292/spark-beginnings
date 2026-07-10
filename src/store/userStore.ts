@@ -84,6 +84,16 @@ export interface FinancialReportsPriv {
 }
 export interface LedgerPriv { canView: boolean; canAdd: boolean; canEdit: boolean; canDelete: boolean; canImport: boolean; canExport: boolean; }
 
+// ─── Budget ──────────────────────────────────────────────────
+export interface BudgetPriv {
+  canView: boolean;
+  canAdd: boolean;           // can add manual budget items
+  canEdit: boolean;          // can edit title / week / requested amount
+  canDelete: boolean;
+  canSetBudgeted: boolean;   // accounts dept: fill in the budgeted amount
+  canLinkLedger: boolean;    // can link/unlink ledger entries to an item
+}
+
 // ─── Settings ────────────────────────────────────────────────
 export interface VariablesPriv { canView: boolean; canEdit: boolean; canImport: boolean; canExport: boolean; canBackup: boolean; canRestore: boolean; }
 export interface UsersPriv     { canView: boolean; canManage: boolean; canOverrideDiaryDelete: boolean; }
@@ -160,6 +170,7 @@ export interface UserPrivileges {
   weeklyReport:      WeeklyReportPriv;
   interviews:        InterviewsPriv;
   simulator:         SimulatorPriv;
+  budget:            BudgetPriv;
 }
 
 export interface AppUser {
@@ -230,6 +241,7 @@ export const FULL_ACCESS: UserPrivileges = {
   weeklyReport:     { canView: true, canViewHr: true, canViewOps: true, canViewComm: true, canViewFinance: true },
   interviews:       { canView: true, canAdd: true, canEdit: true, canDelete: true, canConductInterview: true, canRecordVerdict: true, canForwardToOnboarding: true },
   simulator:        { canView: true, canSave: true, canDelete: true, canExport: true },
+  budget:           { canView: true, canAdd: true, canEdit: true, canDelete: true, canSetBudgeted: true, canLinkLedger: true },
 };
 
 // ─── NO ACCESS ───────────────────────────────────────────────
@@ -278,6 +290,7 @@ export const NO_ACCESS: UserPrivileges = {
   weeklyReport:     { canView: false, canViewHr: false, canViewOps: false, canViewComm: false, canViewFinance: false },
   interviews:       { canView: false, canAdd: false, canEdit: false, canDelete: false, canConductInterview: false, canRecordVerdict: false, canForwardToOnboarding: false },
   simulator:        { canView: false, canSave: false, canDelete: false, canExport: false },
+  budget:           { canView: false, canAdd: false, canEdit: false, canDelete: false, canSetBudgeted: false, canLinkLedger: false },
 };
 
 // ─── DEFAULT PRESETS ─────────────────────────────────────────
@@ -302,6 +315,7 @@ const DEFAULT_PRESETS: PrivilegePreset[] = [
       tasks:       { canView: true, canViewMyTasks: true, canViewDashboard: true, canViewReminders: true, canViewReports: true, canCreateTasks: true, canEditTasks: true, canDeleteTasks: false, isExternalHr: false },
       beneficiaries:{ canView: true, canAdd: true, canEdit: true, canDelete: false, canImport: true, canExport: true },
       weeklyReport: { canView: true, canViewHr: true, canViewOps: true, canViewComm: true, canViewFinance: true },
+      budget:       { canView: true, canAdd: true, canEdit: true, canDelete: false, canSetBudgeted: false, canLinkLedger: false },
     },
   },
   {
@@ -317,6 +331,7 @@ const DEFAULT_PRESETS: PrivilegePreset[] = [
       ledger:           { canView: true, canAdd: true, canEdit: true, canDelete: false, canImport: true, canExport: true },
       reports:          { canView: true, canExport: true },
       tasks:            { canView: false, canViewMyTasks: false, canViewDashboard: false, canViewReminders: false, canViewReports: false, canCreateTasks: false, canEditTasks: false, canDeleteTasks: false, isExternalHr: false },
+      budget:           { canView: true, canAdd: true, canEdit: true, canDelete: true, canSetBudgeted: true, canLinkLedger: true },
     },
   },
   {
@@ -437,9 +452,11 @@ export const useUserStore = create<UserStore>()(
 );
 
 function deepMergePrivileges(defaults: UserPrivileges, stored: Partial<UserPrivileges>): UserPrivileges {
-  const result = { ...defaults };
-  for (const key of Object.keys(defaults) as (keyof UserPrivileges)[]) {
-    result[key] = { ...defaults[key], ...(stored[key] ?? {}) } as any;
+  const isAdmin = stored?.users?.canManage === true;
+  const actualDefaults = isAdmin ? FULL_ACCESS : defaults;
+  const result = { ...actualDefaults };
+  for (const key of Object.keys(actualDefaults) as (keyof UserPrivileges)[]) {
+    result[key] = { ...actualDefaults[key], ...(stored[key] ?? {}) } as any;
   }
   return result;
 }

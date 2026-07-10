@@ -56,9 +56,11 @@ export function CreateTaskDialog({
   const [priority, setPriority] = useState<TaskPriority | undefined>(undefined);
   const [requiresApproval, setRequiresApproval] = useState(false);
   const [approverId, setApproverId] = useState<string>("");
+  const [hasBudget, setHasBudget] = useState(false);
+  const [budgetRequested, setBudgetRequested] = useState<number | undefined>(undefined);
   const [isHrTask, setIsHrTask] = useState(isExternalHr ?? false);
   const [showSubs, setShowSubs] = useState(true);
-  const [subtasks, setSubs] = useState<{ title: string; assignedTo: string[]; deadline: string; deadlineTime: string; priority: TaskPriority | undefined; requiresApproval: boolean; approverId?: string }[]>([]);
+  const [subtasks, setSubs] = useState<{ title: string; assignedTo: string[]; deadline: string; deadlineTime: string; priority: TaskPriority | undefined; requiresApproval: boolean; approverId?: string; hasBudget?: boolean; budgetRequested?: number }[]>([]);
 
   // ── Tag to Site state ─────────────────────────────────────────────────────
   const [tagToSite, setTagToSite] = useState(!!(initialClientId || initialSiteId));
@@ -82,7 +84,7 @@ export function CreateTaskDialog({
   const [openMainDropdown, setOpenMainDropdown] = useState(false);
   const [openSubDropdown, setOpenSubDropdown] = useState<number | null>(null);
 
-  const addRow = () => setSubs(p => [...p, { title: "", assignedTo: [], deadline: "", deadlineTime: "", priority: undefined, requiresApproval: false, approverId: "" }]);
+  const addRow = () => setSubs(p => [...p, { title: "", assignedTo: [], deadline: "", deadlineTime: "", priority: undefined, requiresApproval: false, approverId: "", hasBudget: false, budgetRequested: undefined }]);
   const removeRow = (i: number) => setSubs(p => p.filter((_, idx) => idx !== i));
   const updateRow = (i: number, k: string, v: any) =>
     setSubs(p => p.map((r, idx) => idx === i ? { ...r, [k]: v } : r));
@@ -116,6 +118,8 @@ export function CreateTaskDialog({
         approverId: s.requiresApproval ? s.approverId : undefined,
         clientId: tagToSite && clientId ? clientId : undefined,
         siteId: tagToSite && siteId ? siteId : undefined,
+        hasBudget: s.requiresApproval ? s.hasBudget : undefined,
+        budgetRequested: (s.requiresApproval && s.hasBudget) ? s.budgetRequested : undefined,
       });
     });
 
@@ -133,6 +137,8 @@ export function CreateTaskDialog({
         priority, 
         requiresApproval, 
         approverId: requiresApproval ? approverId : undefined,
+        hasBudget: requiresApproval ? hasBudget : undefined,
+        budgetRequested: (requiresApproval && hasBudget) ? budgetRequested : undefined,
         is_hr_task: isHrTask,
         clientId: tagToSite && clientId ? clientId : undefined,
         siteId: tagToSite && siteId ? siteId : undefined,
@@ -330,28 +336,51 @@ export function CreateTaskDialog({
               <span className={`text-xs font-medium ${isDarkTheme ? "text-white/80" : "text-foreground"}`}>Approval Needed</span>
             </label>
             {requiresApproval && (
-              <div className="ml-6">
-                <label className={`block text-[10px] font-bold uppercase tracking-wider mb-1.5 ${
-                  isDarkTheme ? "text-white/40" : "text-muted-foreground"
-                }`}>Select Approver</label>
-                <select 
-                  value={approverId} 
-                  onChange={e => setApproverId(e.target.value)}
-                  required={requiresApproval}
-                  className={`w-full px-3 py-1.5 rounded-lg border text-xs focus:outline-none focus:ring-2 ${
-                    isDarkTheme 
-                      ? "border-white/10 bg-[#141622] text-white focus:ring-indigo-500/20" 
-                      : "border-border bg-background text-foreground focus:ring-primary/20"
-                  }`}
-                >
-                  <option value="">Choose an approver...</option>
-                  {activeUsers.map(u => (
-                    <option key={u.id} value={u.id} className={isDarkTheme ? "bg-[#141622]" : ""}>{u.name}</option>
-                  ))}
-                </select>
+              <div className="ml-6 flex flex-col gap-2">
+                <div>
+                  <label className={`block text-[10px] font-bold uppercase tracking-wider mb-1.5 ${
+                    isDarkTheme ? "text-white/40" : "text-muted-foreground"
+                  }`}>Select Approver</label>
+                  <select 
+                    value={approverId} 
+                    onChange={e => setApproverId(e.target.value)}
+                    required={requiresApproval}
+                    className={`w-full px-3 py-1.5 rounded-lg border text-xs focus:outline-none focus:ring-2 ${
+                      isDarkTheme 
+                        ? "border-white/10 bg-[#141622] text-white focus:ring-indigo-500/20" 
+                        : "border-border bg-background text-foreground focus:ring-primary/20"
+                    }`}
+                  >
+                    <option value="">Choose an approver...</option>
+                    {activeUsers.map(u => (
+                      <option key={u.id} value={u.id} className={isDarkTheme ? "bg-[#141622]" : ""}>{u.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <label className="flex items-center gap-1.5 cursor-pointer mt-1">
+                  <input type="checkbox" checked={hasBudget} onChange={e => setHasBudget(e.target.checked)}
+                    className="w-4 h-4 rounded border-border text-primary focus:ring-primary/20 transition-all" />
+                  <span className={`text-xs font-medium ${isDarkTheme ? "text-white/80" : "text-foreground"}`}>Include Budget Request</span>
+                </label>
+                {hasBudget && (
+                  <div className="w-full max-w-[200px]">
+                    <label className={`block text-[10px] font-bold uppercase tracking-wider mb-1.5 ${
+                      isDarkTheme ? "text-white/40" : "text-muted-foreground"
+                    }`}>Requesting Amount (₦)</label>
+                    <input type="number" min="0" value={budgetRequested ?? ''} onChange={e => setBudgetRequested(e.target.value ? Number(e.target.value) : undefined)}
+                      placeholder="0.00"
+                      className={`w-full px-3 py-1.5 rounded-lg border text-xs focus:outline-none focus:ring-2 ${
+                        isDarkTheme 
+                          ? "border-white/10 bg-[#141622] text-white focus:ring-indigo-500/20" 
+                          : "border-border bg-background text-foreground focus:ring-primary/20"
+                      }`} />
+                  </div>
+                )}
               </div>
             )}
           </div>
+
           
           <label className="flex items-center gap-2 cursor-pointer mt-1 group">
             <div className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${
@@ -567,6 +596,31 @@ export function CreateTaskDialog({
                                   <option key={u.id} value={u.id} className={isDarkTheme ? "bg-[#141622]" : ""}>{u.name}</option>
                                 ))}
                               </select>
+                            </div>
+                          )}
+                          {sub.requiresApproval && (
+                            <div className="w-full mt-1">
+                              <label className="flex items-center gap-1.5 cursor-pointer">
+                                <input type="checkbox" checked={sub.hasBudget} onChange={e => updateRow(i, "hasBudget", e.target.checked)}
+                                  className="w-3.5 h-3.5 rounded border-border text-primary focus:ring-primary/20" />
+                                <span className={`text-[11px] font-medium transition-colors ${
+                                  isDarkTheme ? "text-white/60 hover:text-white" : "text-muted-foreground hover:text-foreground"
+                                }`}>Include Budget Request</span>
+                              </label>
+                              {sub.hasBudget && (
+                                <div className="w-full max-w-[200px] mt-1.5">
+                                  <label className={`block text-[9px] font-bold uppercase tracking-wider mb-1 ${
+                                    isDarkTheme ? "text-white/40" : "text-muted-foreground"
+                                  }`}>Requesting Amount (₦)</label>
+                                  <input type="number" min="0" value={sub.budgetRequested ?? ''} onChange={e => updateRow(i, "budgetRequested", e.target.value ? Number(e.target.value) : undefined)}
+                                    placeholder="0.00"
+                                    className={`w-full px-2 py-1 rounded-lg border text-[11px] focus:outline-none focus:ring-2 ${
+                                      isDarkTheme 
+                                        ? "border-white/10 bg-[#141622] text-white focus:ring-indigo-500/20" 
+                                        : "border-border bg-background text-foreground focus:ring-primary/20"
+                                    }`} />
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>

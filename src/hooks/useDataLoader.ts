@@ -1,22 +1,24 @@
 import { useEffect, useRef } from 'react';
 import { useAppStore, DEFAULT_OFFBOARDING_TASKS, DEFAULT_LEAVE_TYPES } from '@/src/store/appStore';
-import { useUserStore, NO_ACCESS, UserPrivileges } from '@/src/store/userStore';
+import { useUserStore, NO_ACCESS, FULL_ACCESS, UserPrivileges } from '@/src/store/userStore';
 import { fetchAllAppData, fetchAllUsers, fetchPresets, db } from '@/src/lib/supabaseService';
 import { supabase } from '@/src/integrations/supabase/client';
-import { dbToSite, dbToEmployee, dbToAttendance, dbToInvoice, dbToPendingInvoice, dbToSalaryAdvance, dbToLoan, dbToPayment, dbToVatPayment, dbToLeave, dbToProfile, dbToDisciplinary, dbToEvaluation, dbToCommLog, dbToCompanyExpense, dbToPendingSite, dbToLedgerEntry, dbToClientProfile, dbToDailyJournal, dbToSiteJournalEntry, dbToVehicle, dbToVehicleMovement, dbToVehicleDocumentType, dbToInterviewCandidate, dbToLeaveType, dbToStaffMerit, dbToClientContact } from '@/src/lib/supabaseService';
+import { dbToSite, dbToEmployee, dbToAttendance, dbToInvoice, dbToPendingInvoice, dbToSalaryAdvance, dbToLoan, dbToPayment, dbToVatPayment, dbToLeave, dbToProfile, dbToDisciplinary, dbToEvaluation, dbToCommLog, dbToCompanyExpense, dbToPendingSite, dbToLedgerEntry, dbToClientProfile, dbToDailyJournal, dbToSiteJournalEntry, dbToVehicle, dbToVehicleMovement, dbToVehicleDocumentType, dbToInterviewCandidate, dbToLeaveType, dbToStaffMerit, dbToClientContact, dbToBudgetItem } from '@/src/lib/supabaseService';
 import { generateId } from '@/src/lib/utils';
 import { cacheSet, cacheGet } from '@/src/lib/offlineCache';
 import { useNetworkStore } from '@/src/store/networkStore';
 import { toast } from '@/src/components/ui/toast';
 
-/** Fills in any missing privilege sections using NO_ACCESS defaults. */
+/** Fills in any missing privilege sections using NO_ACCESS defaults (or FULL_ACCESS for admins). */
 function backfillPrivileges(
   defaults: UserPrivileges,
   stored: Partial<UserPrivileges>
 ): UserPrivileges {
-  const result = { ...defaults };
-  for (const key of Object.keys(defaults) as (keyof UserPrivileges)[]) {
-    result[key] = { ...defaults[key], ...(stored[key] ?? {}) } as any;
+  const isAdmin = stored?.users?.canManage === true;
+  const actualDefaults = isAdmin ? FULL_ACCESS : defaults;
+  const result = { ...actualDefaults };
+  for (const key of Object.keys(actualDefaults) as (keyof UserPrivileges)[]) {
+    result[key] = { ...actualDefaults[key], ...(stored[key] ?? {}) } as any;
   }
   return result;
 }
@@ -209,6 +211,7 @@ export function useDataLoader(isAuthenticated: boolean) {
           vehicleTrips: appData.vehicleTrips || [],
           dailyJournals: appData.dailyJournals || [],
           siteJournalEntries: appData.siteJournalEntries || [],
+          budgetItems: appData.budgetItems || [],
           ...(appData.payrollVariables ? { payrollVariables: appData.payrollVariables as any } : {}),
           ...(appData.payeTaxVariables ? { payeTaxVariables: appData.payeTaxVariables as any } : {}),
           ...(appData.monthValues && Object.keys(appData.monthValues as any).length > 0 ? { monthValues: appData.monthValues as any } : {}),

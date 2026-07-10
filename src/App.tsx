@@ -75,6 +75,7 @@ const NotificationsPage = lazy(() => import('./pages/Notifications').then(m => (
 const InterviewManager = lazy(() => import('./pages/InterviewManager').then(m => ({ default: m.default })));
 const Simulator = lazy(() => import('./pages/Simulator').then(m => ({ default: m.default })));
 const MachineReconciliation = lazy(() => import('./pages/MachineReconciliation').then(m => ({ default: m.MachineReconciliation })));
+const Budget = lazy(() => import('./pages/Budget').then(m => ({ default: m.Budget })));
 import { OperationsProvider } from './contexts/OperationsContext';
 
 // ── Suspense fallback ─────────────────────────────────────────────────────────
@@ -279,6 +280,7 @@ function AppContent() {
         <Route path="daily-journal" element={<Page label="Daily Journal"><ProtectedRoute requiredModule="dailyJournal"><DailyJournal /></ProtectedRoute></Page>} />
         <Route path="weekly-report" element={<Page label="Weekly Report"><ProtectedRoute requiredModule="weeklyReport"><WeeklyReport /></ProtectedRoute></Page>} />
         <Route path="notifications" element={<Page label="Notifications"><ProtectedRoute><NotificationsPage /></ProtectedRoute></Page>} />
+        <Route path="budget" element={<Page label="Budget"><ProtectedRoute requiredModule="budget"><Budget /></ProtectedRoute></Page>} />
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

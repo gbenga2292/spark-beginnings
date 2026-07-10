@@ -145,3 +145,44 @@ export function getPayrollPeriodDates(year: number, month: number, startDay: num
   
   return { start, end };
 }
+
+/**
+ * Returns the Monday (start) of the ISO week that contains the given date.
+ * Monday = day 1, Sunday = day 7 in ISO week notation.
+ */
+export function getISOWeekMonday(date: Date): Date {
+  const d = new Date(date);
+  const day = d.getDay(); // 0=Sun, 1=Mon … 6=Sat
+  const diff = day === 0 ? -6 : 1 - day; // shift to Monday
+  d.setDate(d.getDate() + diff);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+/**
+ * Returns a human-readable week label, e.g. "Week 27 · Jul 2026".
+ * Accepts a Monday date (as returned by getISOWeekMonday).
+ */
+export function formatWeekLabel(weekMonday: Date): string {
+  // ISO week number
+  const tmp = new Date(weekMonday);
+  tmp.setHours(0, 0, 0, 0);
+  tmp.setDate(tmp.getDate() + 3); // nearest Thursday
+  const yearStart = new Date(tmp.getFullYear(), 0, 1);
+  const weekNo = Math.ceil((((tmp.getTime() - yearStart.getTime()) / 86_400_000) + 1) / 7);
+
+  const monthShort = weekMonday.toLocaleString('en-GB', { month: 'short' });
+  const year = weekMonday.getFullYear();
+  return `Week ${weekNo} · ${monthShort} ${year}`;
+}
+
+/**
+ * Returns YYYY-MM-DD for the Monday of the ISO week containing the given date.
+ */
+export function getISOWeekMondayString(date: Date): string {
+  const monday = getISOWeekMonday(date);
+  const y = monday.getFullYear();
+  const m = String(monday.getMonth() + 1).padStart(2, '0');
+  const d = String(monday.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}

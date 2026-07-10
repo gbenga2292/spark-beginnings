@@ -2388,6 +2388,8 @@ function EditSubtaskDialog({ subtask, users, onClose, onSave }: {
   const [priority, setPriority] = useState<TaskPriority | undefined>(subtask.priority);
   const [requiresApproval, setRequiresApproval] = useState(subtask.requiresApproval || false);
   const [approverId, setApproverId] = useState(subtask.approverId || '');
+  const [hasBudget, setHasBudget] = useState(subtask.hasBudget || false);
+  const [budgetRequested, setBudgetRequested] = useState<number | undefined>(subtask.budgetRequested);
 
   // Tag to Site — inherit from parent task if subtask has none
   const parentTask = mainTasks.find(t => t.id === subtask.mainTaskId);
@@ -2413,6 +2415,8 @@ function EditSubtaskDialog({ subtask, users, onClose, onSave }: {
       priority,
       requiresApproval,
       approverId: requiresApproval ? approverId : undefined,
+      hasBudget: requiresApproval ? hasBudget : undefined,
+      budgetRequested: (requiresApproval && hasBudget) ? budgetRequested : undefined,
       clientId: tagToSite && clientId ? clientId : null,
       siteId: tagToSite && siteId ? siteId : null,
     });
@@ -2541,19 +2545,36 @@ function EditSubtaskDialog({ subtask, users, onClose, onSave }: {
                 <span className="text-sm font-medium text-foreground group-hover:text-primary transition-colors">Requires Approval</span>
               </label>
               {requiresApproval && (
-                <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}>
-                  <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1.5">Approving Authority</label>
-                  <select
-                    value={approverId}
-                    onChange={e => setApproverId(e.target.value)}
-                    required={requiresApproval}
-                    className="w-full px-3.5 py-2 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all shadow-sm"
-                  >
-                    <option value="">Choose an approver...</option>
-                    {users.filter(u => u.isActive !== false).map(u => (
-                      <option key={u.id} value={u.id}>{u.name}</option>
-                    ))}
-                  </select>
+                <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
+                  <div>
+                    <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1.5">Approving Authority</label>
+                    <select
+                      value={approverId}
+                      onChange={e => setApproverId(e.target.value)}
+                      required={requiresApproval}
+                      className="w-full px-3.5 py-2 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all shadow-sm"
+                    >
+                      <option value="">Choose an approver...</option>
+                      {users.filter(u => u.isActive !== false).map(u => (
+                        <option key={u.id} value={u.id}>{u.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  <label className="flex items-center gap-2 cursor-pointer group">
+                    <input type="checkbox" checked={hasBudget} onChange={e => setHasBudget(e.target.checked)}
+                      className="w-4 h-4 rounded border-border text-primary focus:ring-primary/20 transition-all" />
+                    <span className="text-sm font-medium text-foreground group-hover:text-primary transition-colors">Include Budget Request</span>
+                  </label>
+                  
+                  {hasBudget && (
+                    <div>
+                      <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1.5">Requesting Amount (₦)</label>
+                      <input type="number" min="0" value={budgetRequested ?? ''} onChange={e => setBudgetRequested(e.target.value ? Number(e.target.value) : undefined)}
+                        placeholder="0.00"
+                        className="w-full px-3.5 py-2 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all shadow-sm" />
+                    </div>
+                  )}
                 </motion.div>
               )}
             </div>
