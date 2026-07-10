@@ -269,6 +269,12 @@ export function BulkMachineLogModal({ isOpen, onClose, siteId, siteName, machine
             <Wrench className="h-5 w-5 text-indigo-500" />
             Bulk Log Machines
           </DialogTitle>
+          <div className="flex items-center gap-1.5 mt-1">
+            <span className="text-[11px] text-slate-400 dark:text-slate-500 font-medium uppercase tracking-wide">Site:</span>
+            <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 px-2 py-0.5 rounded-full border border-indigo-200 dark:border-indigo-800/40">
+              {siteName}
+            </span>
+          </div>
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mt-3">
              <div className="flex items-center gap-2">
                <Label className="text-xs font-bold text-slate-600 dark:text-slate-400">From Date:</Label>
