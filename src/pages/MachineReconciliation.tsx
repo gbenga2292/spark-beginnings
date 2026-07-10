@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useOperations } from '../contexts/OperationsContext';
 import { useAppStore } from '../store/appStore';
+import { useSetPageTitle } from '../contexts/PageContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Badge } from '../components/ui/badge';
@@ -46,6 +47,35 @@ export function MachineReconciliation() {
   const [filterTo, setFilterTo] = useState<string>('');
   const hasDateFilter = !!(filterFrom && filterTo);
   const clearFilter = () => { setFilterFrom(''); setFilterTo(''); };
+
+  useSetPageTitle(
+    'Machine Reconciliation',
+    'Overview of machine allocations, active days, requirements, and service statuses.',
+    <div className="flex flex-wrap items-end gap-2">
+      <div className="flex flex-col gap-1">
+        <label className="text-xs text-slate-500 font-medium flex items-center gap-1">
+          <Filter className="h-3 w-3" /> From
+        </label>
+        <Input
+          type="date" value={filterFrom} onChange={e => setFilterFrom(e.target.value)}
+          className="h-8 text-sm w-36"
+        />
+      </div>
+      <div className="flex flex-col gap-1">
+        <label className="text-xs text-slate-500 font-medium">To</label>
+        <Input
+          type="date" value={filterTo} onChange={e => setFilterTo(e.target.value)}
+          className="h-8 text-sm w-36"
+        />
+      </div>
+      {hasDateFilter && (
+        <Button variant="ghost" size="sm" onClick={clearFilter} className="h-8 gap-1 text-slate-500">
+          <X className="h-3 w-3" /> Clear
+        </Button>
+      )}
+    </div>,
+    [filterFrom, filterTo, hasDateFilter]
+  );
 
   const toggleExpand = (id: string) => {
     setExpandedMachines(prev => {
@@ -234,50 +264,50 @@ export function MachineReconciliation() {
     return maintenanceAssets
       .filter(m => m.category === 'machine')
       .map(machine => {
-      const machineLogs = dailyMachineLogs.filter(l => {
-        if (l.assetId !== machine.id) return false;
-        if (hasDateFilter && (l.date < filterFrom || l.date > filterTo)) return false;
-        return true;
-      });
+        const machineLogs = dailyMachineLogs.filter(l => {
+          if (l.assetId !== machine.id) return false;
+          if (hasDateFilter && (l.date < filterFrom || l.date > filterTo)) return false;
+          return true;
+        });
 
-      const siteMap = new Map<string, {
-        siteId: string; siteName: string;
-        activeDays: number; totalLoggedDays: number;
-        firstLog: string; lastLog: string;
-      }>();
+        const siteMap = new Map<string, {
+          siteId: string; siteName: string;
+          activeDays: number; totalLoggedDays: number;
+          firstLog: string; lastLog: string;
+        }>();
 
-      machineLogs.forEach(log => {
-        const existing = siteMap.get(log.siteId) ?? {
-          siteId: log.siteId, siteName: log.siteName,
-          activeDays: 0, totalLoggedDays: 0,
-          firstLog: log.date, lastLog: log.date,
-        };
-        existing.totalLoggedDays += 1;
-        if (log.isActive) {
-          existing.activeDays += log.operationalDay === 'half' ? 0.5 : log.operationalDay === 'none' ? 0 : 1;
-        }
-        if (log.date < existing.firstLog) existing.firstLog = log.date;
-        if (log.date > existing.lastLog) existing.lastLog = log.date;
-        siteMap.set(log.siteId, existing);
-      });
+        machineLogs.forEach(log => {
+          const existing = siteMap.get(log.siteId) ?? {
+            siteId: log.siteId, siteName: log.siteName,
+            activeDays: 0, totalLoggedDays: 0,
+            firstLog: log.date, lastLog: log.date,
+          };
+          existing.totalLoggedDays += 1;
+          if (log.isActive) {
+            existing.activeDays += log.operationalDay === 'half' ? 0.5 : log.operationalDay === 'none' ? 0 : 1;
+          }
+          if (log.date < existing.firstLog) existing.firstLog = log.date;
+          if (log.date > existing.lastLog) existing.lastLog = log.date;
+          siteMap.set(log.siteId, existing);
+        });
 
-      const pumpDateMap = Object.fromEntries(
-        sitePumpDates.filter(pd => pd.assetId === machine.id).map(pd => [pd.siteId, pd])
-      );
+        const pumpDateMap = Object.fromEntries(
+          sitePumpDates.filter(pd => pd.assetId === machine.id).map(pd => [pd.siteId, pd])
+        );
 
-      const siteHistory = Array.from(siteMap.values())
-        .map(s => ({
-          ...s,
-          pumpStartDate: pumpDateMap[s.siteId]?.pumpStartDate ?? s.firstLog,
-          pumpStopDate: pumpDateMap[s.siteId]?.pumpStopDate ?? null,
-          isCurrent: machine.site === s.siteName,
-        }))
-        .sort((a, b) => b.lastLog.localeCompare(a.lastLog));
+        const siteHistory = Array.from(siteMap.values())
+          .map(s => ({
+            ...s,
+            pumpStartDate: pumpDateMap[s.siteId]?.pumpStartDate ?? s.firstLog,
+            pumpStopDate: pumpDateMap[s.siteId]?.pumpStopDate ?? null,
+            isCurrent: machine.site === s.siteName,
+          }))
+          .sort((a, b) => b.lastLog.localeCompare(a.lastLog));
 
-      const totalActiveDays = siteHistory.reduce((sum, s) => sum + s.activeDays, 0);
+        const totalActiveDays = siteHistory.reduce((sum, s) => sum + s.activeDays, 0);
 
-      return { machine, siteHistory, totalActiveDays };
-    }).filter(d => !hasDateFilter || d.siteHistory.length > 0);
+        return { machine, siteHistory, totalActiveDays };
+      }).filter(d => !hasDateFilter || d.siteHistory.length > 0);
   }, [maintenanceAssets, dailyMachineLogs, sitePumpDates, hasDateFilter, filterFrom, filterTo]);
 
   // ── Overdue / due-soon list ─────────────────────────────────────────────────
@@ -345,39 +375,6 @@ export function MachineReconciliation() {
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
-
-      {/* Header + Date Filter */}
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Machine Reconciliation</h1>
-          <p className="text-slate-500 dark:text-slate-400">
-            Overview of machine allocations, active days, requirements, and service statuses.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-end gap-2">
-          <div className="flex flex-col gap-1">
-            <label className="text-xs text-slate-500 font-medium flex items-center gap-1">
-              <Filter className="h-3 w-3" /> From
-            </label>
-            <Input
-              type="date" value={filterFrom} onChange={e => setFilterFrom(e.target.value)}
-              className="h-8 text-sm w-36"
-            />
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-xs text-slate-500 font-medium">To</label>
-            <Input
-              type="date" value={filterTo} onChange={e => setFilterTo(e.target.value)}
-              className="h-8 text-sm w-36"
-            />
-          </div>
-          {hasDateFilter && (
-            <Button variant="ghost" size="sm" onClick={clearFilter} className="h-8 gap-1 text-slate-500">
-              <X className="h-3 w-3" /> Clear
-            </Button>
-          )}
-        </div>
-      </div>
 
       {/* Active filter banner */}
       {hasDateFilter && (
@@ -460,8 +457,8 @@ export function MachineReconciliation() {
               <div
                 key={d.siteName}
                 className={`flex items-start gap-3 p-3 rounded-xl border ${d.delta < 0
-                    ? 'bg-rose-50 border-rose-200 dark:bg-rose-950/30 dark:border-rose-800'
-                    : 'bg-amber-50 border-amber-200 dark:bg-amber-950/30 dark:border-amber-800'
+                  ? 'bg-rose-50 border-rose-200 dark:bg-rose-950/30 dark:border-rose-800'
+                  : 'bg-amber-50 border-amber-200 dark:bg-amber-950/30 dark:border-amber-800'
                   }`}
               >
                 {d.delta < 0
@@ -650,7 +647,7 @@ export function MachineReconciliation() {
               <p className="text-sm text-slate-500 mt-1">
                 {hasDateFilter
                   ? 'Showing machines with logs in the selected date range only.'
-                  : 'Click a row to expand per-site active day history. Machines that visited multiple sites are separated.'}
+                  : ''}
               </p>
             </div>
             <div className="flex gap-2">
@@ -694,8 +691,8 @@ export function MachineReconciliation() {
                         {/* Main machine row */}
                         <TableRow
                           className={`cursor-pointer transition-colors ${isExpanded
-                              ? 'bg-indigo-50/60 dark:bg-indigo-950/20'
-                              : 'hover:bg-slate-50 dark:hover:bg-slate-900/50'
+                            ? 'bg-indigo-50/60 dark:bg-indigo-950/20'
+                            : 'hover:bg-slate-50 dark:hover:bg-slate-900/50'
                             }`}
                           onClick={() => hasSiteHistory && toggleExpand(machine.id)}
                         >
@@ -784,8 +781,8 @@ export function MachineReconciliation() {
                                               <div className="w-20 h-2 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
                                                 <div
                                                   className={`h-full rounded-full ${utilPct >= 80 ? 'bg-emerald-500'
-                                                      : utilPct >= 50 ? 'bg-amber-400'
-                                                        : 'bg-rose-400'
+                                                    : utilPct >= 50 ? 'bg-amber-400'
+                                                      : 'bg-rose-400'
                                                     }`}
                                                   style={{ width: `${utilPct}%` }}
                                                 />
