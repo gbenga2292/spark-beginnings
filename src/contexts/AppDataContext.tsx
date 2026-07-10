@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase } from '@/src/integrations/supabase/client';
 import { useAuth } from '@/src/hooks/useAuth';
-import { toast } from '@/src/components/ui/toast';
+import { toast, showConfirm } from '@/src/components/ui/toast';
 import logoSrc from '../../logo/logo-2.png';
 import type { MainTask, SubTask, TaskComment, AppUser, CommentAttachment } from '@/src/types/tasks';
 import { useAppStore } from '@/src/store/appStore';
@@ -527,6 +527,56 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                         if (newOnes.length === 0) return prev;
                         return [...prev, ...newOnes];
                     });
+
+                    // ── Auto-create a budget_items row when task has a budget request ──
+                    if (task.hasBudget && task.budgetRequested) {
+                        const firstSub = insertedSubs[0];
+                        const weekStart = getISOWeekMondayString(new Date());
+                        const weekLabel = formatWeekLabel(getISOWeekMonday(new Date()));
+                        const budgetPayload = {
+                            workspace_id: payload.workspaceId || payload.teamId || '',
+                            title: payload.title,
+                            week_label: weekLabel,
+                            week_start: weekStart,
+                            requested: Number(task.budgetRequested) || 0,
+                            source: 'task',
+                            subtask_id: firstSub?.id || null,
+                            main_task_id: data.id,
+                            status: 'pending',
+                            created_by: task.createdBy || user?.id || '',
+                        };
+                        const { data: budgetRow, error: budgetErr } = await supabase
+                            .from('budget_items')
+                            .insert(budgetPayload)
+                            .select()
+                            .single();
+                        if (budgetErr) {
+                            console.error('Auto-create budget_items error:', budgetErr);
+                        } else if (budgetRow) {
+                            // Push into local store only — DB insert already done above
+                            const newItem = {
+                                id: budgetRow.id,
+                                workspaceId: budgetRow.workspace_id || '',
+                                title: budgetRow.title,
+                                weekLabel: budgetRow.week_label,
+                                weekStart: budgetRow.week_start,
+                                requested: Number(budgetRow.requested),
+                                budgeted: budgetRow.budgeted ?? undefined,
+                                linkedLedgerIds: budgetRow.linked_ledger_ids || [],
+                                source: 'task' as const,
+                                subtaskId: budgetRow.subtask_id ?? undefined,
+                                mainTaskId: budgetRow.main_task_id ?? undefined,
+                                status: budgetRow.status as 'pending' | 'budgeted' | 'settled',
+                                createdBy: budgetRow.created_by,
+                                createdAt: budgetRow.created_at,
+                                updatedAt: budgetRow.updated_at,
+                            };
+                            const existing = useAppStore.getState().budgetItems;
+                            if (!existing.some(b => b.id === newItem.id)) {
+                                useAppStore.getState().setBudgetItems([...existing, newItem]);
+                            }
+                        }
+                    }
                 }
             }
 
@@ -571,15 +621,84 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
     }, []);
 
     const deleteMainTask = useCallback(async (id: string) => {
+        const budgetItems = useAppStore.getState().budgetItems || [];
+        const mainTaskSubtasks = subtasks.filter(s => s.mainTaskId === id || s.main_task_id === id);
+        
+        let hasLinkedLedger = false;
+        let hasApprovedBudget = false;
+        const budgetItemsToDelete: string[] = [];
+
+        // Check main task itself
+        const mainBudget = budgetItems.find(b => b.mainTaskId === id || (b as any).main_task_id === id);
+        if (mainBudget) {
+            if ((mainBudget.linkedLedgerIds?.length ?? 0) > 0 || mainBudget.status === 'settled') {
+                hasLinkedLedger = true;
+            } else {
+                budgetItemsToDelete.push(mainBudget.id);
+                if (mainBudget.status === 'budgeted') {
+                    hasApprovedBudget = true;
+                }
+            }
+        }
+
+        // Check subtasks
+        for (const sub of mainTaskSubtasks) {
+            const subBudget = budgetItems.find(b => b.subtaskId === sub.id || (b as any).subtask_id === sub.id);
+            if (subBudget) {
+                if ((subBudget.linkedLedgerIds?.length ?? 0) > 0 || subBudget.status === 'settled') {
+                    hasLinkedLedger = true;
+                } else {
+                    budgetItemsToDelete.push(subBudget.id);
+                    if (subBudget.status === 'budgeted') {
+                        hasApprovedBudget = true;
+                    }
+                }
+            }
+        }
+
+        if (hasLinkedLedger) {
+            toast.error("This task (or one of its subtasks) is linked to a ledger. The budget has gone through. You cannot delete this task unless you unlink it first.");
+            return;
+        }
+
+        if (hasApprovedBudget) {
+            const confirmed = await showConfirm(
+                "This task has subtasks/requests linked to budgets that have been approved. Deleting this task will also delete the associated budget requests. Are you sure you want to proceed?",
+                { title: "Delete Approved Budget Task?", variant: 'danger' }
+            );
+            if (!confirmed) return;
+        }
+
         const { error } = await supabase.from('main_tasks').update({ is_deleted: true, deleted_at: new Date().toISOString() }).eq('id', id);
         if (error) {
             console.error('deleteMainTask error:', error);
             toast.error('Failed to delete task.');
             return;
         }
+
+        if (mainTaskSubtasks.length > 0) {
+            const subtaskIds = mainTaskSubtasks.map(s => s.id);
+            const { error: subtaskError } = await supabase
+                .from('subtasks')
+                .update({ is_deleted: true, deleted_at: new Date().toISOString() })
+                .in('id', subtaskIds);
+            if (subtaskError) {
+                console.error('Failed to delete subtasks:', subtaskError);
+            } else {
+                setSubtasks(prev => prev.filter(s => !subtaskIds.includes(s.id)));
+            }
+        }
+
+        if (budgetItemsToDelete.length > 0) {
+            await supabase.from('budget_items').delete().in('id', budgetItemsToDelete);
+            budgetItemsToDelete.forEach(bId => {
+                useAppStore.getState().deleteBudgetItem(bId);
+            });
+        }
+
         setMainTasks(prev => prev.filter(t => t.id !== id));
         toast.success('Task moved to archive');
-    }, []);
+    }, [subtasks]);
 
     const restoreMainTask = useCallback(async (id: string) => {
         const { data, error } = await supabase.from('main_tasks').update({ is_deleted: false, deleted_at: null }).eq('id', id).select().single();
@@ -588,9 +707,79 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
             toast.error('Failed to restore task.');
             return;
         }
+
+        // Also restore associated subtasks
+        const { data: subData, error: subError } = await supabase
+            .from('subtasks')
+            .update({ is_deleted: false, deleted_at: null })
+            .eq('main_task_id', id)
+            .select();
+
+        if (subError) {
+            console.error('Failed to restore subtasks:', subError);
+        } else if (subData) {
+            const mappedSubs = subData.map(mapSubtaskToCamel);
+            setSubtasks(prev => {
+                const filtered = prev.filter(s => s.mainTaskId !== id);
+                return [...filtered, ...mappedSubs];
+            });
+
+            // Recreate budget items if they were deleted and subtasks have budget requests
+            const existingBudgets = useAppStore.getState().budgetItems || [];
+            const weekMonday = getISOWeekMondayString(new Date());
+            const weekLabel = formatWeekLabel(getISOWeekMonday(new Date()));
+            const workspaceId = data?.workspace_id || data?.workspaceId || 'dcel-team';
+            const actorId = user?.id || '';
+
+            for (const sub of subData) {
+                const camelSub = mapSubtaskToCamel(sub);
+                if (camelSub.hasBudget && camelSub.budgetRequested) {
+                    const exists = existingBudgets.some(b => b.subtaskId === camelSub.id);
+                    if (!exists) {
+                        const { data: newBudget, error: bErr } = await supabase.from('budget_items').insert({
+                            title: camelSub.title,
+                            week_start: weekMonday,
+                            week_label: weekLabel,
+                            requested: camelSub.budgetRequested,
+                            status: 'pending',
+                            source: 'task',
+                            subtask_id: camelSub.id,
+                            main_task_id: id,
+                            workspace_id: workspaceId,
+                            created_by: actorId,
+                        }).select().single();
+
+                        if (bErr) {
+                            console.error('Failed to recreate budget item:', bErr);
+                        } else if (newBudget) {
+                            // Use setBudgetItems to append to local state WITHOUT calling db.insertBudgetItem again
+                            const budgetState = useAppStore.getState();
+                            budgetState.setBudgetItems([...budgetState.budgetItems, {
+                                id: newBudget.id,
+                                title: newBudget.title,
+                                weekStart: newBudget.week_start,
+                                weekLabel: newBudget.week_label,
+                                requested: Number(newBudget.requested),
+                                budgeted: newBudget.budgeted != null ? Number(newBudget.budgeted) : undefined,
+                                linkedLedgerIds: newBudget.linked_ledger_ids ?? [],
+                                source: 'task',
+                                subtaskId: camelSub.id,
+                                mainTaskId: id,
+                                status: newBudget.status,
+                                workspaceId: newBudget.workspace_id || 'dcel-team',
+                                createdBy: actorId,
+                                createdAt: newBudget.created_at,
+                                updatedAt: newBudget.updated_at,
+                            }]);
+                        }
+                    }
+                }
+            }
+        }
+
         if (data) setMainTasks(prev => [...prev, mapMainTaskToCamel(data)]);
         toast.success('Task restored');
-    }, []);
+    }, [user]);
 
     const deleteMainTaskPermanently = useCallback(async (id: string) => {
         const { error } = await supabase.from('main_tasks').delete().eq('id', id);
@@ -678,6 +867,30 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
 
     const deleteSubtask = useCallback(async (id: string) => {
         const existingSub = subtasks.find(s => s.id === id);
+        if (!existingSub) return;
+
+        const budgetItems = useAppStore.getState().budgetItems || [];
+        const relatedBudget = budgetItems.find(b => b.subtaskId === id || (b as any).subtask_id === id);
+
+        if (relatedBudget) {
+            const hasLedgerLink = (relatedBudget.linkedLedgerIds?.length ?? 0) > 0 || relatedBudget.status === 'settled';
+            if (hasLedgerLink) {
+                toast.error("This is an approved budget task linked to a ledger. The budget has gone through. You cannot delete this subtask unless you unlink it first.");
+                return;
+            }
+            if (relatedBudget.status === 'budgeted') {
+                const confirmed = await showConfirm(
+                    "This subtask is linked to a budget request that has been approved. Deleting this subtask will also delete the associated budget request. Are you sure you want to proceed?",
+                    { title: "Delete Approved Budget Subtask?", variant: 'danger' }
+                );
+                if (!confirmed) return;
+            }
+
+            // Delete associated budget item
+            await supabase.from('budget_items').delete().eq('id', relatedBudget.id);
+            useAppStore.getState().deleteBudgetItem(relatedBudget.id);
+        }
+
         const mainId = existingSub?.mainTaskId || existingSub?.main_task_id;
 
         const { error } = await supabase.from('subtasks').update({ is_deleted: true, deleted_at: new Date().toISOString() }).eq('id', id);

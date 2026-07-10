@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useAppStore, BudgetItem, LedgerEntry } from '@/src/store/appStore';
 import { useUserStore } from '@/src/store/userStore';
 import { useAppData } from '@/src/contexts/AppDataContext';
@@ -124,6 +124,83 @@ export function Budget() {
   const [budgetedEdit, setBudgetedEdit] = useState<{ id: string; val: string } | null>(null);
   const [reqBudgetEdit, setReqBudgetEdit] = useState<{ id: string; val: string } | null>(null);
   const [showBacklog, setShowBacklog] = useState(true);
+  // ── Multi-select (Budget tab) ─────────────────────────────────────────────
+  const [selectedBudgetIds, setSelectedBudgetIds] = useState<Set<string>>(new Set());
+  const toggleSelectBudget = useCallback((id: string) => {
+    setSelectedBudgetIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }, []);
+  const clearBudgetSelection = useCallback(() => setSelectedBudgetIds(new Set()), []);
+  const handleBulkDelete = useCallback(async () => {
+    const ids = [...selectedBudgetIds];
+    const hasLedger = ids.some(id => {
+      const item = budgetItems.find(b => b.id === id);
+      return (item?.linkedLedgerIds?.length ?? 0) > 0 || item?.status === 'settled';
+    });
+    if (hasLedger) { toast.error('One or more selected items are linked to a ledger. Unlink them first.'); return; }
+    const ok = await showConfirm(`Delete ${ids.length} budget item${ids.length > 1 ? 's' : ''}? This cannot be undone.`, { variant: 'danger' });
+    if (!ok) return;
+    ids.forEach(id => deleteBudgetItem(id));
+    clearBudgetSelection();
+    toast.success(`${ids.length} item${ids.length > 1 ? 's' : ''} deleted`);
+  }, [selectedBudgetIds, budgetItems, deleteBudgetItem, clearBudgetSelection]);
+
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkWeekStart, setBulkWeekStart] = useState('');
+  const [bulkWeekLabel, setBulkWeekLabel] = useState('');
+  const [bulkBudgeted, setBulkBudgeted] = useState('');
+
+  const handleBulkWeekChange = (val: string) => {
+    const label = val ? formatWeekLabel(getISOWeekMonday(new Date(val))) : '';
+    setBulkWeekStart(val);
+    setBulkWeekLabel(label);
+  };
+
+  const handleBulkUpdate = async () => {
+    const ids = [...selectedBudgetIds];
+    const updates: Partial<BudgetItem> = {};
+    if (bulkWeekStart) {
+      updates.weekStart = getISOWeekMondayString(new Date(bulkWeekStart));
+      updates.weekLabel = bulkWeekLabel;
+    }
+    if (bulkBudgeted) {
+      const num = parseFloat(bulkBudgeted);
+      if (!isNaN(num)) {
+        updates.budgeted = num;
+        updates.status = 'budgeted';
+      }
+    }
+    if (Object.keys(updates).length === 0) {
+      toast.error('Specify at least one change (Week or Budgeted Amount)');
+      return;
+    }
+
+    if (updates.budgeted !== undefined && !priv.canSetBudgeted) {
+      toast.error('You do not have permission to set budgeted amounts');
+      return;
+    }
+
+    const hasTaskSourced = ids.some(id => budgetItems.find(b => b.id === id)?.source === 'task');
+    if (bulkWeekStart && hasTaskSourced) {
+      toast.error('Week cannot be modified for task-linked budget items');
+      return;
+    }
+
+    for (const id of ids) {
+      await updateBudgetItem(id, updates);
+    }
+    clearBudgetSelection();
+    setBulkOpen(false);
+    toast.success(`Successfully updated ${ids.length} items`);
+  };
+
+  useEffect(() => {
+    setSelectedBudgetIds(new Set());
+  }, [tab]);
+
 
   // ── Period range ──────────────────────────────────────────────────────────
   const { start: rangeStart, end: rangeEnd } = getBudgetRange(anchor, viewMode);
@@ -166,6 +243,13 @@ export function Budget() {
         },
       }));
   }, [budgetItems, search, actualSpend, rangeStart, rangeEnd]);
+
+  const allVisibleBudgetIds = useMemo(() =>
+    grouped.flatMap(g => g.items.map(i => i.id)),
+  [grouped]);
+  const selectAllBudget = useCallback(() =>
+    setSelectedBudgetIds(new Set(allVisibleBudgetIds)),
+  [allVisibleBudgetIds]);
 
   // ── Unified "Requested" rows: pending subtask requests + pending BudgetItems ──
   interface UnifiedReqRow {
@@ -247,6 +331,10 @@ export function Budget() {
       })
       .map((b) => {
         const mt = mainTasks.find((m: any) => m.id === b.mainTaskId || m.id === (b as any).main_task_id);
+        // Look up linked subtask to get live approval status
+        const linkedSubtask = b.subtaskId
+          ? subtasks.find((s: any) => s.id === b.subtaskId || s.id === (b as any).subtask_id)
+          : null;
         return {
           id: b.id,
           rowType: 'budgetItem' as const,
@@ -258,6 +346,7 @@ export function Budget() {
             : (b.createdBy || (b as any).created_by),
           amount: Number(b.requested || 0),
           budgetStatus: 'pending',
+          taskStatus: linkedSubtask?.status,  // live subtask status for approval check
           source: b.source === 'task' ? 'task' as const : 'manual' as const,
           weekStart: b.weekStart,
           weekLabel: b.weekLabel,
@@ -369,11 +458,43 @@ export function Budget() {
   };
 
   const handleDelete = useCallback(async (item: BudgetItem) => {
+    const isLinkedToLedger = (item.linkedLedgerIds?.length ?? 0) > 0 || item.status === 'settled';
+    if (isLinkedToLedger) {
+      toast.error('This budget item is linked to a ledger entry and cannot be deleted. Unlink it first.');
+      return;
+    }
     const ok = await showConfirm(`Delete budget item "${item.title}"? This cannot be undone.`, { variant: 'danger' });
     if (!ok) return;
     deleteBudgetItem(item.id);
     toast.success('Deleted');
   }, [deleteBudgetItem]);
+
+  // Requests tab delete — warns that the linked task will also be archived
+  const { deleteMainTask } = useAppData();
+  const handleDeleteRequest = useCallback(async (item: BudgetItem) => {
+    const isLinkedToLedger = (item.linkedLedgerIds?.length ?? 0) > 0 || item.status === 'settled';
+    if (isLinkedToLedger) {
+      toast.error('This budget request is linked to a ledger entry and cannot be deleted. Unlink it first.');
+      return;
+    }
+    if (item.source === 'task' && item.mainTaskId) {
+      const ok = await showConfirm(
+        `Deleting this budget request will also archive the task "${item.title}" that created it. Are you sure?`,
+        { title: 'Delete Budget Request & Task?', variant: 'danger' }
+      );
+      if (!ok) return;
+      // Archive the linked main task (this also cleans up the budget item via deleteMainTask logic)
+      await deleteMainTask(item.mainTaskId);
+      // Also remove the budget item itself in case deleteMainTask didn't find it
+      deleteBudgetItem(item.id);
+      toast.success('Budget request and task archived');
+    } else {
+      const ok = await showConfirm(`Delete budget request "${item.title}"? This cannot be undone.`, { variant: 'danger' });
+      if (!ok) return;
+      deleteBudgetItem(item.id);
+      toast.success('Budget request deleted');
+    }
+  }, [deleteBudgetItem, deleteMainTask]);
 
   const saveBudgeted = (item: BudgetItem, val: string) => {
     const num = parseFloat(val);
@@ -668,7 +789,9 @@ export function Budget() {
                             if (row.rowType === 'subtask') subtask = subtasks.find((s: any) => s.id === row.id);
                             else if (row.rowType === 'budgetItem') { const raw = row.rawBudgetItem as any; subtask = subtasks.find((s: any) => s.id === raw?.subtaskId || s.id === raw?.subtask_id); }
                             if (subtask) {
-                              approver = users.find((u: any) => u.id === (subtask.approvedBy || subtask.approved_by));
+                              // approvedBy = who actually approved; fall back to approverId = designated approver
+                              const approverLookupId = subtask.approvedBy || subtask.approved_by || subtask.approverId || subtask.approver_id;
+                              approver = users.find((u: any) => u.id === approverLookupId);
                               if (subtask.status === 'completed') approvalColorClass = isDark ? 'bg-emerald-500/20 text-emerald-400' : 'bg-emerald-100 text-emerald-700';
                               else if (subtask.status === 'rejected') approvalColorClass = isDark ? 'bg-rose-500/20 text-rose-400' : 'bg-rose-100 text-rose-700';
                             }
@@ -713,10 +836,10 @@ export function Budget() {
                                         <MoreVertical className="w-4 h-4" />
                                       </Button>
                                     </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end" className={cn('w-44 border shadow-lg', isDark ? 'bg-[#18181b] border-white/10 text-white' : 'bg-white border-slate-200 text-slate-900')}>
-                                      {priv.canEdit && <DropdownMenuItem onClick={() => openEdit(row.rawBudgetItem!)} className="cursor-pointer flex items-center gap-2 text-xs font-semibold py-2"><Edit2 className="w-3.5 h-3.5 text-blue-500" />Edit Item</DropdownMenuItem>}
-                                      {priv.canDelete && <DropdownMenuItem onClick={() => handleDelete(row.rawBudgetItem!)} className="cursor-pointer flex items-center gap-2 text-xs font-semibold py-2 text-red-500 focus:text-red-500"><Trash2 className="w-3.5 h-3.5 text-red-500" />Delete Item</DropdownMenuItem>}
-                                    </DropdownMenuContent>
+                                    <DropdownMenuContent align="end" className={cn('w-52 border shadow-lg', isDark ? 'bg-[#18181b] border-white/10 text-white' : 'bg-white border-slate-200 text-slate-900')}>
+                                       {priv.canEdit && row.rawBudgetItem!.source !== 'task' && <DropdownMenuItem onClick={() => openEdit(row.rawBudgetItem!)} className="cursor-pointer flex items-center gap-2 text-xs font-semibold py-2"><Edit2 className="w-3.5 h-3.5 text-blue-500" />Edit Item</DropdownMenuItem>}
+                                       {priv.canDelete && (row.rawBudgetItem!.linkedLedgerIds?.length ?? 0) === 0 && row.rawBudgetItem!.status !== 'settled' && <DropdownMenuItem onClick={() => handleDeleteRequest(row.rawBudgetItem!)} className="cursor-pointer flex items-center gap-2 text-xs font-semibold py-2 text-red-500 focus:text-red-500"><Trash2 className="w-3.5 h-3.5 text-red-500" />{row.source === 'task' ? 'Delete Request & Task' : 'Delete Item'}</DropdownMenuItem>}
+                                     </DropdownMenuContent>
                                   </DropdownMenu>
                                 )}
                               </div>
@@ -825,8 +948,9 @@ export function Budget() {
                                   if (row.rowType === 'subtask') subtask = subtasks.find((s: any) => s.id === row.id);
                                   else if (row.rowType === 'budgetItem') { const raw = row.rawBudgetItem as any; subtask = subtasks.find((s: any) => s.id === raw?.subtaskId || s.id === raw?.subtask_id); }
                                   if (subtask) {
-                                    const approverId = subtask.approvedBy || subtask.approved_by;
-                                    approver = users.find((u: any) => u.id === approverId);
+                                    // approvedBy = who actually approved; fall back to approverId = designated approver
+                                    const approverLookupId = subtask.approvedBy || subtask.approved_by || subtask.approverId || subtask.approver_id;
+                                    approver = users.find((u: any) => u.id === approverLookupId);
                                     if (subtask.status === 'completed') approvalColorClass = isDark ? "bg-emerald-500/20 text-emerald-400" : "bg-emerald-100 text-emerald-700";
                                     else if (subtask.status === 'rejected') approvalColorClass = isDark ? "bg-rose-500/20 text-rose-400" : "bg-rose-100 text-rose-700";
                                   }
@@ -834,16 +958,19 @@ export function Budget() {
                                 let statusClass = 'text-slate-400 bg-slate-500/10 border-slate-500/20';
                                 let statusLabel = 'Pending Budget';
                                 let StatusIcon = Clock;
-                                if (row.rowType === 'subtask' && row.taskStatus) {
-                                  const map: Record<string, [string, string]> = {
+                                if (row.taskStatus) {
+                                  const statusMap: Record<string, [string, string]> = {
                                     not_started: ['text-slate-400 bg-slate-500/10 border-slate-500/20', 'Not Started'],
                                     in_progress: ['text-blue-400 bg-blue-500/10 border-blue-500/20', 'In Progress'],
                                     pending_approval: ['text-amber-400 bg-amber-500/10 border-amber-500/20', 'Pending Approval'],
                                     completed: ['text-emerald-400 bg-emerald-500/10 border-emerald-500/20', 'Completed'],
                                   };
-                                  [statusClass, statusLabel] = map[row.taskStatus] ?? [statusClass, row.taskStatus];
+                                  [statusClass, statusLabel] = statusMap[row.taskStatus] ?? [statusClass, row.taskStatus];
                                   if (row.taskStatus === 'completed') StatusIcon = CheckCircle2;
-                                } else { statusClass = 'text-amber-400 bg-amber-500/10 border-amber-500/20'; statusLabel = 'Awaiting Budget'; }
+                                } else if (row.rowType === 'budgetItem') {
+                                  statusClass = 'text-amber-400 bg-amber-500/10 border-amber-500/20';
+                                  statusLabel = 'Awaiting Budget';
+                                }
                                 const dateAdded = row.createdAt ? (() => { try { return format(parseISO(row.createdAt!), 'd MMM yyyy'); } catch { return '—'; } })() : '—';
                                 return (
                                   <TableRow key={row.id} className={cn(
@@ -862,7 +989,7 @@ export function Budget() {
                                     </TableCell>
                                     <TableCell className={cn("text-xs whitespace-nowrap", isDark ? "text-white/40" : "text-slate-400")}>{dateAdded}</TableCell>
                                     <TableCell className={cn("text-xs", isDark ? "text-white/60" : "text-slate-600")}>
-                                      {requester ? <div className={cn("w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold cursor-help", isDark ? "bg-amber-500/20 text-amber-400" : "bg-amber-100 text-amber-700")} title={requester.name}>{requester.name?.charAt(0).toUpperCase()}</div> : <span className={isDark ? 'text-white/20' : 'text-slate-300'}>—</span>}
+                                      {requester ? <div className={cn("w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold cursor-help", isDark ? "bg-amber-500/20 text-amber-400" : "bg-amber-100 text-slate-700")} title={requester.name}>{requester.name?.charAt(0).toUpperCase()}</div> : <span className={isDark ? 'text-white/20' : 'text-slate-300'}>—</span>}
                                     </TableCell>
                                     <TableCell className={cn("text-xs", isDark ? "text-white/60" : "text-slate-600")}>
                                       {row.source === 'task' ? (approver ? <div className={cn("w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold cursor-help", approvalColorClass)} title={approver.name}>{approver.name?.charAt(0).toUpperCase()}</div> : <div className={cn("w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold cursor-help", approvalColorClass)} title="Pending Approval">?</div>) : <span className={isDark ? 'text-white/20' : 'text-slate-300'}>—</span>}
@@ -887,9 +1014,9 @@ export function Budget() {
                                       {row.rowType === 'budgetItem' && row.rawBudgetItem && (
                                         <DropdownMenu>
                                           <DropdownMenuTrigger asChild><Button variant="ghost" size="sm" className={cn('h-8 w-8 p-0 rounded-lg', isDark ? 'text-white/40 hover:text-white hover:bg-white/5' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100')}><MoreVertical className="w-4 h-4" /></Button></DropdownMenuTrigger>
-                                          <DropdownMenuContent align="end" className={cn('w-44 border shadow-lg', isDark ? 'bg-[#18181b] border-white/10 text-white' : 'bg-white border-slate-200 text-slate-900')}>
-                                            {priv.canEdit && <DropdownMenuItem onClick={() => openEdit(row.rawBudgetItem!)} className="cursor-pointer flex items-center gap-2 text-xs font-semibold py-2"><Edit2 className="w-3.5 h-3.5 text-blue-500" />Edit Item</DropdownMenuItem>}
-                                            {priv.canDelete && <DropdownMenuItem onClick={() => handleDelete(row.rawBudgetItem!)} className="cursor-pointer flex items-center gap-2 text-xs font-semibold py-2 text-red-500 focus:text-red-500 focus:bg-red-50 dark:focus:bg-red-950/20"><Trash2 className="w-3.5 h-3.5 text-red-500" />Delete Item</DropdownMenuItem>}
+                                          <DropdownMenuContent align="end" className={cn('w-52 border shadow-lg', isDark ? 'bg-[#18181b] border-white/10 text-white' : 'bg-white border-slate-200 text-slate-900')}>
+                                            {priv.canEdit && row.rawBudgetItem!.source !== 'task' && <DropdownMenuItem onClick={() => openEdit(row.rawBudgetItem!)} className="cursor-pointer flex items-center gap-2 text-xs font-semibold py-2"><Edit2 className="w-3.5 h-3.5 text-blue-500" />Edit Item</DropdownMenuItem>}
+                                            {priv.canDelete && (row.rawBudgetItem!.linkedLedgerIds?.length ?? 0) === 0 && row.rawBudgetItem!.status !== 'settled' && <DropdownMenuItem onClick={() => handleDeleteRequest(row.rawBudgetItem!)} className="cursor-pointer flex items-center gap-2 text-xs font-semibold py-2 text-red-500 focus:text-red-500 focus:bg-red-50 dark:focus:bg-red-950/20"><Trash2 className="w-3.5 h-3.5 text-red-500" />{row.source === 'task' ? 'Delete Request & Task' : 'Delete Item'}</DropdownMenuItem>}
                                           </DropdownMenuContent>
                                         </DropdownMenu>
                                       )}
@@ -1015,19 +1142,38 @@ export function Budget() {
                     const base = item.budgeted ?? item.requested;
                     const left = base - spent;
                     const isBEditing = budgetedEdit?.id === item.id;
+                    const mainTask = item.source === 'task' ? mainTasks.find(m => m.id === item.mainTaskId || m.id === (item as any).main_task_id) : null;
                     return (
-                      <div key={item.id} className={cn('rounded-xl border p-4 space-y-3', isDark ? 'border-white/8 bg-white/[0.02]' : 'border-slate-200 bg-white')}>
+                      <div key={item.id} className={cn('rounded-xl border p-4 space-y-3 relative', isDark ? 'border-white/8 bg-white/[0.02]' : 'border-slate-200 bg-white')}>
                         <div className="flex items-start justify-between gap-2">
+                          {priv.canEdit && (
+                            <div className="pt-0.5 shrink-0">
+                              <input
+                                type="checkbox"
+                                className={cn(
+                                  "rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer h-4 w-4 mr-2",
+                                  isDark ? "bg-white/5 border-white/10" : ""
+                                )}
+                                checked={selectedBudgetIds.has(item.id)}
+                                onChange={() => toggleSelectBudget(item.id)}
+                              />
+                            </div>
+                          )}
                           <div className="flex-1 min-w-0">
                             <div className={cn('font-semibold text-sm', isDark ? 'text-white/90' : 'text-slate-700')}>{item.title}</div>
+                            {mainTask && (
+                              <div className={cn('text-[11px] mt-0.5 flex items-center gap-1', isDark ? 'text-white/35' : 'text-slate-400')}>
+                                <ClipboardList className="w-3 h-3 shrink-0" />
+                                {mainTask.title}
+                              </div>
+                            )}
                             {item.description && <div className={cn('text-[11px] mt-1 leading-relaxed', isDark ? 'text-white/50' : 'text-slate-500')}>{item.description}</div>}
                             <div className={cn('text-[11px] mt-1.5 flex items-center gap-2 flex-wrap', isDark ? 'text-white/40' : 'text-slate-400')}>
                               {(() => {
                                 if (item.source === 'task') {
-                                  const mainTask = mainTasks.find(m => m.id === item.mainTaskId || m.id === (item as any).main_task_id);
                                   const subtask = subtasks.find(s => s.id === item.subtaskId || s.id === (item as any).subtask_id);
                                   const reqUser = users.find(u => u.id === mainTask?.createdBy || u.id === (mainTask as any)?.created_by);
-                                  const appUser = users.find(u => u.id === subtask?.approvedBy || u.id === (subtask as any)?.approved_by);
+                                  const appUser = users.find(u => u.id === subtask?.approvedBy || u.id === (subtask as any)?.approved_by || u.id === subtask?.approverId || u.id === (subtask as any)?.approver_id);
                                   const appStatus = subtask?.status;
                                   let appCC = isDark ? 'bg-slate-500/20 text-slate-400' : 'bg-slate-100 text-slate-500';
                                   if (appStatus === 'completed') appCC = isDark ? 'bg-emerald-500/20 text-emerald-400' : 'bg-emerald-100 text-emerald-700';
@@ -1049,7 +1195,7 @@ export function Budget() {
                                 {priv.canLinkLedger && <DropdownMenuItem onClick={() => { setLinkTarget(item); setLinkSearch(''); }} className="cursor-pointer flex items-center gap-2 text-xs font-semibold py-2"><Link2 className="w-3.5 h-3.5 text-teal-500" />Link Ledger</DropdownMenuItem>}
                                 {((item.linkedLedgerIds?.length ?? 0) > 0 || item.status === 'settled') && <DropdownMenuItem onClick={() => toggleSettled(item)} className="cursor-pointer flex items-center gap-2 text-xs font-semibold py-2"><CheckCheck className={cn('w-3.5 h-3.5', item.status === 'settled' ? 'text-emerald-500' : 'text-slate-400')} />{item.status === 'settled' ? 'Unmark Settled' : 'Mark Settled'}</DropdownMenuItem>}
                                 {priv.canEdit && <DropdownMenuItem onClick={() => openEdit(item)} className="cursor-pointer flex items-center gap-2 text-xs font-semibold py-2"><Edit2 className="w-3.5 h-3.5 text-blue-500" />Edit Item</DropdownMenuItem>}
-                                {priv.canDelete && <DropdownMenuItem onClick={() => handleDelete(item)} className="cursor-pointer flex items-center gap-2 text-xs font-semibold py-2 text-red-500 focus:text-red-500"><Trash2 className="w-3.5 h-3.5 text-red-500" />Delete Item</DropdownMenuItem>}
+                                {priv.canDelete && (item.linkedLedgerIds?.length ?? 0) === 0 && item.status !== 'settled' && <DropdownMenuItem onClick={() => handleDelete(item)} className="cursor-pointer flex items-center gap-2 text-xs font-semibold py-2 text-red-500 focus:text-red-500"><Trash2 className="w-3.5 h-3.5 text-red-500" />Delete Item</DropdownMenuItem>}
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </div>
@@ -1078,6 +1224,33 @@ export function Budget() {
                 <Table>
                   <TableHeader>
                     <TableRow className={cn("hover:bg-transparent border-b", isDark ? "border-white/10" : "border-slate-200")}>
+                      {priv.canEdit && (
+                        <TableHead className="w-12 py-3 pl-4">
+                          <input
+                            type="checkbox"
+                            className={cn(
+                              "rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer h-4 w-4",
+                              isDark ? "bg-white/5 border-white/10" : ""
+                            )}
+                            checked={items.length > 0 && items.every((i) => selectedBudgetIds.has(i.id))}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedBudgetIds((prev) => {
+                                  const next = new Set(prev);
+                                  items.forEach((i) => next.add(i.id));
+                                  return next;
+                                });
+                              } else {
+                                setSelectedBudgetIds((prev) => {
+                                  const next = new Set(prev);
+                                  items.forEach((i) => next.delete(i.id));
+                                  return next;
+                                });
+                              }
+                            }}
+                          />
+                        </TableHead>
+                      )}
                       <TableHead className={cn("text-xs w-[30%] font-semibold", isDark ? "text-white/50" : "text-slate-500")}>Item</TableHead>
                       <TableHead className={cn("text-xs text-right font-semibold", isDark ? "text-white/50" : "text-slate-500")}>Requested (&#8358;)</TableHead>
                       <TableHead className={cn("text-xs text-right font-semibold", isDark ? "text-white/50" : "text-slate-500")}>Budgeted (&#8358;)</TableHead>
@@ -1094,19 +1267,38 @@ export function Budget() {
                       const base   = item.budgeted ?? item.requested;
                       const left   = base - spent;
                       const isBEditing = budgetedEdit?.id === item.id;
+                      const mainTask = item.source === 'task' ? mainTasks.find(m => m.id === item.mainTaskId || m.id === (item as any).main_task_id) : null;
 
                       return (
                         <TableRow key={item.id} className={cn("border-b transition-colors", isDark ? "border-white/5 hover:bg-white/[0.03]" : "border-slate-100 hover:bg-slate-50/50")}>
+                          {priv.canEdit && (
+                            <TableCell className="w-12 py-3 pl-4">
+                              <input
+                                type="checkbox"
+                                className={cn(
+                                  "rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer h-4 w-4",
+                                  isDark ? "bg-white/5 border-white/10" : ""
+                                )}
+                                checked={selectedBudgetIds.has(item.id)}
+                                onChange={() => toggleSelectBudget(item.id)}
+                              />
+                            </TableCell>
+                          )}
                           {/* Title + meta */}
                           <TableCell className={cn("font-medium text-sm py-3", isDark ? "text-white/90" : "text-slate-700")}>
                             <div className="font-semibold">{item.title}</div>
+                            {mainTask && (
+                              <div className={cn('text-[11px] mt-0.5 flex items-center gap-1', isDark ? 'text-white/35' : 'text-slate-400')}>
+                                <ClipboardList className="w-3 h-3 shrink-0" />
+                                {mainTask.title}
+                              </div>
+                            )}
                             <div className={cn("text-[11px] mt-1 font-normal flex items-center gap-2 flex-wrap", isDark ? "text-white/40" : "text-slate-400")}>
                               {(() => {
                                 if (item.source === 'task') {
-                                  const mainTask = mainTasks.find(m => m.id === item.mainTaskId || m.id === (item as any).main_task_id);
                                   const subtask = subtasks.find(s => s.id === item.subtaskId || s.id === (item as any).subtask_id);
                                   const reqUser = users.find(u => u.id === mainTask?.createdBy || u.id === (mainTask as any)?.created_by);
-                                  const appUser = users.find(u => u.id === subtask?.approvedBy || u.id === (subtask as any)?.approved_by);
+                                  const appUser = users.find(u => u.id === subtask?.approvedBy || u.id === (subtask as any)?.approved_by || u.id === subtask?.approverId || u.id === (subtask as any)?.approver_id);
                                   const reqInitial = reqUser?.name?.charAt(0).toUpperCase() || '?';
                                   
                                   const appStatus = subtask?.status;
@@ -1258,7 +1450,7 @@ export function Budget() {
                                     Edit Item
                                   </DropdownMenuItem>
                                 )}
-                                {priv.canDelete && (
+                                {priv.canDelete && (item.linkedLedgerIds?.length ?? 0) === 0 && item.status !== 'settled' && (
                                   <DropdownMenuItem
                                     onClick={() => handleDelete(item)}
                                     className="cursor-pointer flex items-center gap-2 text-xs font-semibold py-2 text-red-500 focus:text-red-500 focus:bg-red-50 dark:focus:bg-red-950/20"
@@ -1629,6 +1821,117 @@ export function Budget() {
             >
               Done
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* Floating Bulk Action Bar */}
+      {selectedBudgetIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-5 py-3 rounded-full shadow-2xl border bg-white/80 dark:bg-[#18181b]/80 backdrop-blur-xl border-slate-200 dark:border-white/10 text-slate-800 dark:text-white animate-in slide-in-from-bottom-5 duration-200">
+          <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+            {selectedBudgetIds.size} Selected
+          </span>
+          <div className="h-4 w-px bg-slate-200 dark:bg-white/10" />
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              setBulkWeekStart('');
+              setBulkWeekLabel('');
+              setBulkBudgeted('');
+              setBulkOpen(true);
+            }}
+            className="h-8 rounded-full text-xs font-medium hover:bg-slate-100 dark:hover:bg-white/5"
+          >
+            Bulk Edit
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={handleBulkDelete}
+            className="h-8 rounded-full text-xs font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20"
+          >
+            Delete Selected
+          </Button>
+          <div className="h-4 w-px bg-slate-200 dark:bg-white/10" />
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={clearBudgetSelection}
+            className="h-8 rounded-full text-xs font-medium hover:bg-slate-100 dark:hover:bg-white/5"
+          >
+            Cancel
+          </Button>
+        </div>
+      )}
+
+      {/* Bulk Edit Dialog */}
+      <Dialog open={bulkOpen} onOpenChange={setBulkOpen}>
+        <DialogContent className={cn("max-w-md border shadow-2xl rounded-2xl", isDark ? "bg-[#18181b] border-white/10 text-white" : "bg-white border-slate-200 text-slate-900")}>
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold">Bulk Edit ({selectedBudgetIds.size} Items)</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            {/* Target Week */}
+            <div className="space-y-1.5">
+              <label className={cn("text-xs font-semibold flex items-center gap-1.5", isDark ? "text-white/60" : "text-slate-500")}>
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block" />
+                Target Week (Leave blank if unchanged)
+              </label>
+              <div className="relative">
+                <Calendar className={cn("absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none", isDark ? "text-white/30" : "text-slate-400")} />
+                <input
+                  type="date"
+                  value={bulkWeekStart}
+                  onChange={(e) => handleBulkWeekChange(e.target.value)}
+                  className={cn(
+                    "w-full pl-9 pr-3 h-10 rounded-xl text-sm focus:outline-none focus:ring-2 border",
+                    isDark
+                      ? "bg-white/5 border-white/10 text-white focus:ring-emerald-500/30 [color-scheme:dark]"
+                      : "bg-slate-50 border-slate-200 text-slate-900 focus:ring-emerald-500/20 focus:bg-white"
+                  )}
+                />
+              </div>
+              {bulkWeekLabel && (
+                <div className={cn(
+                  "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border",
+                  isDark ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400" : "bg-emerald-50 border-emerald-200 text-emerald-750"
+                )}>
+                  <Calendar className="w-3 h-3" />
+                  &#8594; {bulkWeekLabel}
+                </div>
+              )}
+            </div>
+
+            {/* Budgeted Amount */}
+            {priv.canSetBudgeted && (
+              <div className="space-y-1.5">
+                <label className={cn("text-xs font-semibold flex items-center gap-1.5", isDark ? "text-white/60" : "text-slate-500")}>
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
+                  Budgeted Amount (₦) (Leave blank if unchanged)
+                </label>
+                <div className="relative">
+                  <span className={cn("absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold pointer-events-none", isDark ? "text-white/30" : "text-slate-400")}>&#8358;</span>
+                  <Input
+                    type="number"
+                    min="0"
+                    step="any"
+                    value={bulkBudgeted}
+                    onChange={(e) => setBulkBudgeted(e.target.value)}
+                    placeholder="e.g. 15000"
+                    className={cn(
+                      "pl-8 h-10 rounded-xl",
+                      isDark ? "bg-white/5 border-white/10 text-white placeholder:text-white/25" : "bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400 focus:bg-white"
+                    )}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button variant="ghost" onClick={() => setBulkOpen(false)} className="rounded-xl">Cancel</Button>
+            <Button onClick={handleBulkUpdate} className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white">Apply Changes</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
