@@ -67,17 +67,27 @@ export function WaybillManager() {
   const incomingReturns = activeWaybills.filter(w => w.type === 'return');
 
 
-  const filteredOutgoing = outgoingWaybills.filter(w => 
-    w.id.toLowerCase().includes(waybillSearch.toLowerCase()) ||
-    w.driverName?.toLowerCase().includes(waybillSearch.toLowerCase()) ||
-    w.vehicle?.toLowerCase().includes(waybillSearch.toLowerCase())
-  );
+  const filteredOutgoing = outgoingWaybills.filter(w => {
+    const term = waybillSearch.toLowerCase();
+    const siteName = sites.find(s => s.id === w.siteId)?.name?.toLowerCase() || '';
+    const dateStr = w.issueDate ? formatDisplayDate(w.issueDate).toLowerCase() : '';
+    return w.id.toLowerCase().includes(term) ||
+      w.driverName?.toLowerCase().includes(term) ||
+      w.vehicle?.toLowerCase().includes(term) ||
+      siteName.includes(term) ||
+      dateStr.includes(term);
+  });
 
-  const filteredIncoming = incomingReturns.filter(w => 
-    w.id.toLowerCase().includes(returnSearch.toLowerCase()) ||
-    w.driverName?.toLowerCase().includes(returnSearch.toLowerCase()) ||
-    w.vehicle?.toLowerCase().includes(returnSearch.toLowerCase())
-  );
+  const filteredIncoming = incomingReturns.filter(w => {
+    const term = returnSearch.toLowerCase();
+    const siteName = sites.find(s => s.id === w.siteId)?.name?.toLowerCase() || '';
+    const dateStr = w.issueDate ? formatDisplayDate(w.issueDate).toLowerCase() : '';
+    return w.id.toLowerCase().includes(term) ||
+      w.driverName?.toLowerCase().includes(term) ||
+      w.vehicle?.toLowerCase().includes(term) ||
+      siteName.includes(term) ||
+      dateStr.includes(term);
+  });
 
   const getStatusBadge = (status: WaybillStatus) => {
     switch (status) {
@@ -174,7 +184,7 @@ export function WaybillManager() {
             </div>
             <div className="relative w-full sm:w-72">
               <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-              <Input placeholder="Search by ID, driver, or vehicle..." className="pl-9 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 h-9 text-sm focus-visible:ring-blue-500/50 rounded-lg shadow-sm"
+              <Input placeholder="Search by ID, driver, vehicle, site, or date..." className="pl-9 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 h-9 text-sm focus-visible:ring-blue-500/50 rounded-lg shadow-sm"
                 value={currentSearch} onChange={e => setCurrentSearch(e.target.value)} />
             </div>
           </div>

@@ -1873,9 +1873,11 @@ export function Attendance() {
           <TabsTrigger active={activeTab === 'database'} onClick={() => setActiveTab('database')} className="gap-2 text-[11px] font-bold uppercase tracking-tight h-8 px-2 sm:px-4 data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm transition-all">
             <Database className="h-3.5 w-3.5 text-emerald-500" /> <span className="hidden sm:inline">Database</span>
           </TabsTrigger>
-          <TabsTrigger active={activeTab === 'machines'} onClick={() => setActiveTab('machines')} className="gap-2 text-[11px] font-bold uppercase tracking-tight h-8 px-2 sm:px-4 data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm transition-all">
-            <Wrench className="h-3.5 w-3.5 text-amber-500" /> <span className="hidden sm:inline">Machines</span>
-          </TabsTrigger>
+          {(priv.canViewMachineRegister || priv.canViewMachineDB || priv.canViewMachineAnalytics) && (
+            <TabsTrigger active={activeTab === 'machines'} onClick={() => setActiveTab('machines')} className="gap-2 text-[11px] font-bold uppercase tracking-tight h-8 px-2 sm:px-4 data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm transition-all">
+              <Wrench className="h-3.5 w-3.5 text-amber-500" /> <span className="hidden sm:inline">Machines</span>
+            </TabsTrigger>
+          )}
         </TabsList>
       </div>
     </div>,
@@ -2432,40 +2434,46 @@ export function Attendance() {
         <TabsContent active={activeTab === 'machines'} className="flex-1 flex flex-col min-h-0 mt-0">
           {/* Machine Sub-Tab Bar */}
           <div className="flex items-center gap-1 px-2 pt-2 pb-0 border-b border-slate-200 bg-white shrink-0">
-            <button
-              onClick={() => setMachineSubTab('register')}
-              className={`flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-tight px-3 py-2 border-b-2 transition-all ${
-                machineSubTab === 'register'
-                  ? 'border-amber-500 text-amber-700 bg-amber-50/60'
-                  : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
-              }`}
-            >
-              <Wrench className="h-3.5 w-3.5" /> Register
-            </button>
-            <button
-              onClick={() => setMachineSubTab('machinedb')}
-              className={`flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-tight px-3 py-2 border-b-2 transition-all ${
-                machineSubTab === 'machinedb'
-                  ? 'border-orange-500 text-orange-700 bg-orange-50/60'
-                  : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
-              }`}
-            >
-              <Database className="h-3.5 w-3.5" /> Machine DB
-            </button>
-            <button
-              onClick={() => setMachineSubTab('machineanalytics')}
-              className={`flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-tight px-3 py-2 border-b-2 transition-all ${
-                machineSubTab === 'machineanalytics'
-                  ? 'border-blue-500 text-blue-700 bg-blue-50/60'
-                  : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
-              }`}
-            >
-              <LineChart className="h-3.5 w-3.5" /> Analytics
-            </button>
+            {priv.canViewMachineRegister && (
+              <button
+                onClick={() => setMachineSubTab('register')}
+                className={`flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-tight px-3 py-2 border-b-2 transition-all ${
+                  machineSubTab === 'register'
+                    ? 'border-amber-500 text-amber-700 bg-amber-50/60'
+                    : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                }`}
+              >
+                <Wrench className="h-3.5 w-3.5" /> Register
+              </button>
+            )}
+            {priv.canViewMachineDB && (
+              <button
+                onClick={() => setMachineSubTab('machinedb')}
+                className={`flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-tight px-3 py-2 border-b-2 transition-all ${
+                  machineSubTab === 'machinedb'
+                    ? 'border-orange-500 text-orange-700 bg-orange-50/60'
+                    : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                }`}
+              >
+                <Database className="h-3.5 w-3.5" /> Machine DB
+              </button>
+            )}
+            {priv.canViewMachineAnalytics && (
+              <button
+                onClick={() => setMachineSubTab('machineanalytics')}
+                className={`flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-tight px-3 py-2 border-b-2 transition-all ${
+                  machineSubTab === 'machineanalytics'
+                    ? 'border-blue-500 text-blue-700 bg-blue-50/60'
+                    : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                }`}
+              >
+                <LineChart className="h-3.5 w-3.5" /> Analytics
+              </button>
+            )}
           </div>
 
           {/* ── Register Sub-panel ── */}
-          {machineSubTab === 'register' && (<>
+          {machineSubTab === 'register' && priv.canViewMachineRegister && (<>
           {/* Toolbar */}
           <div className="flex flex-wrap items-end gap-2 py-2 px-1">
             {/* Date picker */}
@@ -2835,7 +2843,7 @@ export function Attendance() {
           </>)}
 
           {/* ── Machine DB Sub-panel ── */}
-          {machineSubTab === 'machinedb' && (<div className="flex-1 flex flex-col min-h-0">
+          {machineSubTab === 'machinedb' && priv.canViewMachineDB && (<div className="flex-1 flex flex-col min-h-0">
           {/* Toolbar */}
           <div className="flex flex-wrap items-end gap-2 py-2 px-1">
             {/* Date Range Filter */}
@@ -3203,7 +3211,7 @@ export function Attendance() {
           </div>)}
 
           {/* ── Analytics Sub-panel ── */}
-          {machineSubTab === 'machineanalytics' && (<div className="flex-1 flex flex-col min-h-0 overflow-auto">
+          {machineSubTab === 'machineanalytics' && priv.canViewMachineAnalytics && (<div className="flex-1 flex flex-col min-h-0 overflow-auto">
           <div className="flex flex-wrap items-end gap-2 py-2 px-3 border-b border-slate-200 bg-white">
             <div className="flex flex-col gap-1 w-full lg:w-auto shrink-0">
               <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-0.5">Date Range</span>

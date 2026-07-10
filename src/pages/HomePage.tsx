@@ -45,6 +45,7 @@ import {
   Search,
   X,
   HardHat,
+  PiggyBank,
 } from 'lucide-react';
 import { supabase } from '../integrations/supabase/client';
 import { NairaSign } from '../components/ui/naira-sign';
@@ -125,6 +126,19 @@ const navigation: NavCategory[] = [
     standaloneHref: '/operations/machine-reconciliation',
     items: [
       { name: 'Machine Reconciliation', href: '/operations/machine-reconciliation', icon: ArrowRightLeft, privKey: 'opsMachineRecon', privField: 'canView' },
+    ],
+  },
+  {
+    name: 'Budget',
+    icon: PiggyBank,
+    color: 'from-emerald-500 to-green-600',
+    bgLight: 'bg-emerald-50 hover:bg-emerald-100',
+    bgDark: 'dark:bg-emerald-950/40 dark:hover:bg-emerald-900/60',
+    iconColor: 'text-emerald-600 dark:text-emerald-400',
+    standalone: true,
+    standaloneHref: '/budget',
+    items: [
+      { name: 'Budget', href: '/budget', icon: PiggyBank, privKey: 'budget', privField: 'canView' },
     ],
   },
   {
@@ -418,8 +432,8 @@ export function HomePage() {
       </div>
 
       {/* ── Compact Grid ─────────────────────────────────────────────────────── */}
-      <div className="w-full px-4 py-4 md:px-8 md:py-8">
-        <div className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-4">
+      <div className="w-full px-4 py-3 md:px-6 md:py-5 max-w-[1600px] mx-auto">
+        <div className="columns-1 sm:columns-2 md:columns-3 lg:columns-4 xl:columns-5 2xl:columns-6 gap-3 md:gap-4">
           {navigation.map((category) => {
             // Web build filtering
             if (IS_LIMITED_WEB_WEB) {
@@ -437,19 +451,19 @@ export function HomePage() {
             if (isStandalone) {
               const item = visibleItems[0];
               return (
-                <div key={category.name} className="w-full break-inside-avoid mb-4">
+                <div key={category.name} className="w-full break-inside-avoid mb-3 md:mb-4">
                   <Link
                     to={item.href}
                     className={cn(
-                      'group flex w-full items-center justify-between rounded-xl border p-4 transition-all duration-200',
+                      'group flex w-full items-center justify-between rounded-xl border p-3 sm:p-3.5 transition-all duration-200',
                       'hover:scale-[1.02] hover:shadow-md active:scale-[0.98]',
                       isDark
                         ? cn('border-slate-800 hover:border-slate-700', category.bgDark)
                         : cn('border-slate-200 bg-white shadow-sm hover:border-slate-300', category.bgLight)
                     )}
                   >
-                    <div className="flex items-center gap-3">
-                      <div className={cn('flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br shadow-sm', category.color)}>
+                    <div className="flex items-center gap-2.5">
+                      <div className={cn('flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br shadow-sm', category.color)}>
                         <item.icon className="h-5 w-5 text-white" />
                       </div>
                       <div>
@@ -465,13 +479,13 @@ export function HomePage() {
 
             // Render standard category as a card containing a list of modules
             return (
-              <div key={category.name} className="w-full break-inside-avoid mb-4">
+              <div key={category.name} className="w-full break-inside-avoid mb-3 md:mb-4">
                 <div className={cn(
-                   'w-full rounded-xl border p-4 shadow-sm',
+                   'w-full rounded-xl border p-3 sm:p-3.5 shadow-sm',
                    isDark ? 'border-slate-800 bg-slate-900/50' : 'border-slate-200 bg-white'
                 )}>
                   {/* Category Header */}
-                  <div className="flex items-center gap-2 mb-3 px-1">
+                  <div className="flex items-center gap-2 mb-2 px-1">
                     <CatIcon className={cn('h-4 w-4', category.iconColor)} />
                     <h2 className={cn('text-xs font-bold uppercase tracking-wider', isDark ? 'text-slate-400' : 'text-slate-500')}>
                       {category.name}
@@ -487,11 +501,11 @@ export function HomePage() {
                            key={item.href + item.name}
                            to={item.href}
                            className={cn(
-                             'group flex w-full items-center justify-between rounded-lg px-2.5 py-2 transition-colors',
+                             'group flex w-full items-center justify-between rounded-lg px-2 py-1.5 sm:py-2 transition-colors',
                              isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-50'
                            )}
                          >
-                           <div className="flex items-center gap-3">
+                           <div className="flex items-center gap-2.5">
                              <Icon className={cn('h-4 w-4 transition-colors', isDark ? 'text-slate-500 group-hover:text-slate-300' : 'text-slate-400 group-hover:text-slate-600')} />
                              <span className={cn('text-sm font-medium', isDark ? 'text-slate-300 group-hover:text-slate-100' : 'text-slate-600 group-hover:text-slate-900')}>
                                {item.name}

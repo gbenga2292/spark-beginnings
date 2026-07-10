@@ -1,7 +1,7 @@
 {
   "name": "dcel-office-app",
   "private": true,
-  "version": "1.7.5",
+  "version": "1.7.6",
   "description": "DCEL Office Suite - Comprehensive HR and Operations Management for Construction",
   "author": "Gbenga",
   "type": "module",
@@ -171,10 +171,8 @@
         "url": "file://///MYCLOUDEX2ULTRA/DCEL_Share/Updates/"
       },
       {
-        "provider": "github",
-        "owner": "gbenga2292",
-        "repo": "spark-beginnings",
-        "releaseType": "release"
+        "provider": "generic",
+        "url": "https://dewaterconstruct.com/app-updates/"
       }
     ]
   },

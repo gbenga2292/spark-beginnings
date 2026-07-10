@@ -38,9 +38,12 @@ function initAutoUpdater() {
       url: `file:///${nasPath.replace(/\\/g, '/')}`
     });
   } else {
-    // If NAS is not found (e.g. user is off-site), it will use the GitHub 
-    // provider configured in package.json automatically.
-    console.log('NAS not reachable, defaulting to GitHub for updates.');
+    // If NAS is not found (e.g. user is off-site), default to the web server
+    console.log('NAS not reachable, defaulting to web server for updates.');
+    autoUpdater.setFeedURL({
+      provider: 'generic',
+      url: 'https://dewaterconstruct.com/app-updates/'
+    });
   }
 
   autoUpdater.autoDownload = false;

@@ -86,7 +86,12 @@ const PRIV_GROUPS: PG[] = [
       { key: 'hrDashboard', label: 'HR Dashboard', parentKey: 'dashboard', masterField: 'canView',
         fields: [{ key: 'canView', label: 'View HR Dashboard' }] },
       { key: 'attendance', label: 'Daily Register', parentKey: 'attendance', masterField: 'canView',
-        fields: [{ key: 'canView', label: 'View' }, { key: 'canAdd', label: 'Submit' }, { key: 'canEdit', label: 'Edit' }, { key: 'canDelete', label: 'Delete', danger: true }, { key: 'canImport', label: 'Import DB' }, { key: 'canExport', label: 'Export DB' }] },
+        fields: [
+          { key: 'canView', label: 'View' }, { key: 'canAdd', label: 'Submit' }, { key: 'canEdit', label: 'Edit' }, { key: 'canDelete', label: 'Delete', danger: true }, { key: 'canImport', label: 'Import DB' }, { key: 'canExport', label: 'Export DB' },
+          { key: 'canViewMachineRegister', label: 'Machine Register' },
+          { key: 'canViewMachineDB', label: 'Machine DB' },
+          { key: 'canViewMachineAnalytics', label: 'Machine Analytics' }
+        ] },
       { key: 'employees', label: 'Employees', parentKey: 'employees', masterField: 'canView',
         fields: [{ key: 'canView', label: 'View' }, { key: 'canAdd', label: 'Add' }, { key: 'canEdit', label: 'Edit' }, { key: 'canDelete', label: 'Delete', danger: true }, { key: 'canViewSalary', label: 'View Salary', special: true }, { key: 'canViewAnalytics', label: 'Analytics' }, { key: 'canViewOrganogram', label: 'Organogram' }, { key: 'canImport', label: 'Import' }, { key: 'canExport', label: 'Export' }] },
       { key: 'onboarding', label: 'Onboarding', parentKey: 'onboarding', masterField: 'canView',
