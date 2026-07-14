@@ -91,6 +91,9 @@ export function Reports() {
   const [otYear, setOtYear] = useState<number>(currentYear);
   const [otChartView, setOtChartView] = useState<'table' | 'heatmap' | 'bar'>('table');
   const [fullScreenTable, setFullScreenTable] = useState<'site-work' | 'monthly-summary' | 'overtime-detail' | null>(null);
+  const [hrTab, setHrTab] = useState<'history' | 'sick'>('history');
+  const [sickLeaveMonth, setSickLeaveMonth] = useState<string>("All");
+  const [sickLeaveYear, setSickLeaveYear] = useState<number>(currentYear);
 
   // ── All staff for site-work report (with optional Office/Field filter) ──
   const siteReportBaseStaff = useMemo(() =>
@@ -1180,6 +1183,73 @@ export function Reports() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    );
+  };
+
+  // ── Sick Leave Tracker calculations ─────────────────────────────────────────
+  const sickLeaveTrackerData = useMemo(() => {
+    const records = attendanceRecords.filter(r => {
+      const status = (r.absentStatus || '').toLowerCase();
+      return status.includes('sick');
+    });
+
+    return employees.map(emp => {
+      const empRecords = records.filter(r => r.staffId === emp.id);
+
+      const yearRecords = empRecords.filter(r => {
+        const dateParts = r.date?.split('-');
+        return dateParts && Number(dateParts[0]) === sickLeaveYear;
+      });
+
+      const filteredRecords = yearRecords.filter(r => {
+        if (sickLeaveMonth === 'All') return true;
+        const dateParts = r.date?.split('-');
+        return dateParts && Number(dateParts[1]) === Number(sickLeaveMonth);
+      });
+
+      const dates = filteredRecords
+        .map(r => r.date)
+        .sort()
+        .map(d => formatDisplayDate(d));
+
+      const count = filteredRecords.length;
+      const cumulativeCount = yearRecords.length;
+
+      return {
+        id: emp.id,
+        name: `${emp.surname} ${emp.firstname}`,
+        department: emp.department || 'N/A',
+        position: emp.position || 'N/A',
+        count,
+        cumulativeCount,
+        dates
+      };
+    })
+    .filter(row => row.cumulativeCount > 0)
+    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+  }, [employees, attendanceRecords, sickLeaveYear, sickLeaveMonth]);
+
+  const exportSickLeaveCsv = () => {
+    if (!sickLeaveTrackerData.length) { toast.error('No sick leave records found.'); return; }
+    let csv = 'data:text/csv;charset=utf-8,';
+    csv += 'Employee,Department,Position,Month/Year Count,Year Cumulative Count,Dates\n';
+    sickLeaveTrackerData.forEach(row => {
+      csv += `"${row.name}","${row.department}","${row.position}",${row.count},${row.cumulativeCount},"${row.dates.join(', ')}"\n`;
+    });
+    const link = document.createElement('a');
+    link.setAttribute('href', encodeURI(csv));
+    link.setAttribute('download', `sick_leave_tracker_${sickLeaveMonth}_${sickLeaveYear}.csv`);
+    document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    showExportMessage('Sick Leave Report (CSV) exported!');
+  };
+
+  const exportSickLeavePdf = () => {
+    if (!sickLeaveTrackerData.length) { toast.error('No sick leave records found.'); return; }
+    generatePdf(
+      'Sick Leave Tracker Report',
+      [['Employee', 'Department', 'Position', 'Month Count', 'Year Cumulative', 'Dates']],
+      sickLeaveTrackerData.map(row => [row.name, row.department, row.position, String(row.count), String(row.cumulativeCount), row.dates.join(', ')]),
+      `sick_leave_tracker_${sickLeaveMonth}_${sickLeaveYear}.pdf`
     );
   };
 
@@ -2653,11 +2723,11 @@ export function Reports() {
           <div className="flex items-center justify-between flex-wrap gap-3">
             <CardTitle className="text-slate-900 flex items-center gap-2">
               <span className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest px-2.5 py-1 rounded-full border text-rose-700 bg-rose-50 border-rose-200">HR</span>
-              Leave History Report
+              Leave History & Tracker
             </CardTitle>
             <div className="flex items-center gap-2">
               <Button variant="outline" size="sm" className="gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50"
-                onClick={() => {
+                onClick={hrTab === 'sick' ? exportSickLeaveCsv : () => {
                   if (!leaves.length) { toast.error('No leave records found.'); return; }
                   let csv = 'data:text/csv;charset=utf-8,';
                   csv += 'Employee,Start Date,Duration (Days),Expected Return,Actual Return,Reason,Contactable\n';
@@ -2674,7 +2744,7 @@ export function Reports() {
                 <FileSpreadsheet className="h-4 w-4" /> CSV
               </Button>
               <Button size="sm" className="gap-2 bg-rose-600 hover:bg-rose-700 text-white"
-                onClick={() => {
+                onClick={hrTab === 'sick' ? exportSickLeavePdf : () => {
                   if (!leaves.length) { toast.error('No leave records found.'); return; }
                   generatePdf(
                     'Leave History Report',
@@ -2688,63 +2758,164 @@ export function Reports() {
               </Button>
             </div>
           </div>
+
+          <div className="flex items-center justify-between flex-wrap gap-3 mt-4">
+            <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1">
+              <button
+                onClick={() => setHrTab('history')}
+                className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                  hrTab === 'history'
+                    ? 'bg-white text-rose-700 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                Leave Applications
+              </button>
+              <button
+                onClick={() => setHrTab('sick')}
+                className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                  hrTab === 'sick'
+                    ? 'bg-white text-rose-700 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                Sick Leave Tracker
+              </button>
+            </div>
+            {hrTab === 'sick' && (
+              <div className="flex items-center gap-2">
+                <select
+                  value={sickLeaveMonth}
+                  onChange={(e) => setSickLeaveMonth(e.target.value)}
+                  className="bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-rose-500/20"
+                >
+                  <option value="All">All Months</option>
+                  {Array.from({ length: 12 }, (_, i) => {
+                    const mVal = i + 1;
+                    const mName = new Date(2000, i, 1).toLocaleString('default', { month: 'long' });
+                    return <option key={mVal} value={mVal}>{mName}</option>;
+                  })}
+                </select>
+                <select
+                  value={sickLeaveYear}
+                  onChange={(e) => setSickLeaveYear(Number(e.target.value))}
+                  className="bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-rose-500/20"
+                >
+                  {[currentYear - 2, currentYear - 1, currentYear, currentYear + 1].map(y => (
+                    <option key={y} value={y}>{y}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
         </CardHeader>
         <CardContent className="pt-6">
-          {leaves.length === 0 ? (
-            <div className="text-center py-12 text-slate-400 text-sm">No leave records found.</div>
-          ) : (
-            <div className="rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                  <Table className="max-h-[420px]">
-                    <TableHeader className="sticky top-0 z-10">
-                      <TableRow className="bg-gradient-to-r from-rose-700 to-rose-600">
-                        <TableHead className="text-white font-semibold py-2 px-3 whitespace-nowrap">Employee</TableHead>
-                        <TableHead className="text-white font-semibold py-2 px-3 whitespace-nowrap">Start Date</TableHead>
-                        <TableHead className="text-white font-semibold py-2 px-3 whitespace-nowrap text-center">Duration</TableHead>
-                        <TableHead className="text-white font-semibold py-2 px-3 whitespace-nowrap">Expected Return</TableHead>
-                        <TableHead className="text-white font-semibold py-2 px-3 whitespace-nowrap">Actual Return</TableHead>
-                        <TableHead className="text-white font-semibold py-2 px-3 whitespace-nowrap">Reason</TableHead>
-                        <TableHead className="text-white font-semibold py-2 px-3 whitespace-nowrap text-center">Contactable</TableHead>
-                        <TableHead className="text-white font-semibold py-2 px-3 whitespace-nowrap text-center">Status</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {leaves.map((leave, idx) => {
-                        const returned = !!leave.dateReturned;
-                        const overdue  = !returned && new Date(leave.expectedEndDate).setHours(0,0,0,0) <= new Date().setHours(0,0,0,0);
-                        return (
-                          <TableRow key={leave.id} className={`hover:bg-rose-50/30 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`}>
-                            <TableCell className="py-1.5 px-3 text-sm font-medium text-slate-800 whitespace-nowrap">{leave.employeeName}</TableCell>
-                            <TableCell className="py-1.5 px-3 text-sm text-slate-600 whitespace-nowrap">{formatDisplayDate(leave.startDate)}</TableCell>
-                            <TableCell className="py-1.5 px-3 text-sm text-center">
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 text-xs font-semibold">{leave.duration}d</span>
-                            </TableCell>
-                            <TableCell className="py-1.5 px-3 text-sm text-slate-600 whitespace-nowrap">{formatDisplayDate(leave.expectedEndDate)}</TableCell>
-                            <TableCell className="py-1.5 px-3 text-sm text-slate-600 whitespace-nowrap">{leave.dateReturned ? formatDisplayDate(leave.dateReturned) : <span className="text-slate-400 italic">Not yet</span>}</TableCell>
-                            <TableCell className="py-1.5 px-3 text-sm text-slate-600 max-w-[180px] truncate" title={leave.reason}>{leave.reason}</TableCell>
-                            <TableCell className="py-1.5 px-3 text-center">
-                              <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold ${
-                                leave.canBeContacted === 'Yes' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'
-                              }`}>{leave.canBeContacted}</span>
-                            </TableCell>
-                            <TableCell className="py-1.5 px-3 text-center">
-                              <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold ${
-                                returned ? 'bg-emerald-100 text-emerald-700' : overdue ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'
-                              }`}>
-                                {returned ? 'Returned' : overdue ? 'Overdue' : 'On Leave'}
-                              </span>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-              <div className="px-4 py-2 bg-slate-50 border-t border-slate-200 text-xs text-slate-500 flex items-center gap-4">
-                <span><strong>{leaves.length}</strong> total leave records</span>
-                <span className="text-amber-600"><strong>{leaves.filter(l => !l.dateReturned && new Date(l.startDate).setHours(0,0,0,0) <= new Date().setHours(0,0,0,0) && new Date(l.expectedEndDate).setHours(0,0,0,0) > new Date().setHours(0,0,0,0)).length}</strong> currently on leave</span>
-                <span className="text-red-500"><strong>{leaves.filter(l => !l.dateReturned && new Date(l.expectedEndDate).setHours(0,0,0,0) <= new Date().setHours(0,0,0,0)).length}</strong> overdue</span>
-                <span className="text-emerald-600"><strong>{leaves.filter(l => !!l.dateReturned).length}</strong> returned</span>
+          {hrTab === 'history' && (
+            leaves.length === 0 ? (
+              <div className="text-center py-12 text-slate-400 text-sm">No leave records found.</div>
+            ) : (
+              <div className="rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                <Table className="max-h-[420px]">
+                  <TableHeader className="sticky top-0 z-10">
+                    <TableRow className="bg-gradient-to-r from-rose-700 to-rose-600">
+                      <TableHead className="text-white font-semibold py-2 px-3 whitespace-nowrap">Employee</TableHead>
+                      <TableHead className="text-white font-semibold py-2 px-3 whitespace-nowrap">Start Date</TableHead>
+                      <TableHead className="text-white font-semibold py-2 px-3 whitespace-nowrap text-center">Duration</TableHead>
+                      <TableHead className="text-white font-semibold py-2 px-3 whitespace-nowrap">Expected Return</TableHead>
+                      <TableHead className="text-white font-semibold py-2 px-3 whitespace-nowrap">Actual Return</TableHead>
+                      <TableHead className="text-white font-semibold py-2 px-3 whitespace-nowrap">Reason</TableHead>
+                      <TableHead className="text-white font-semibold py-2 px-3 whitespace-nowrap text-center">Contactable</TableHead>
+                      <TableHead className="text-white font-semibold py-2 px-3 whitespace-nowrap text-center">Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {leaves.map((leave, idx) => {
+                      const returned = !!leave.dateReturned;
+                      const overdue  = !returned && new Date(leave.expectedEndDate).setHours(0,0,0,0) <= new Date().setHours(0,0,0,0);
+                      return (
+                        <TableRow key={leave.id} className={`hover:bg-rose-50/30 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`}>
+                          <TableCell className="py-1.5 px-3 text-sm font-medium text-slate-800 whitespace-nowrap">{leave.employeeName}</TableCell>
+                          <TableCell className="py-1.5 px-3 text-sm text-slate-600 whitespace-nowrap">{formatDisplayDate(leave.startDate)}</TableCell>
+                          <TableCell className="py-1.5 px-3 text-sm text-center">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 text-xs font-semibold">{leave.duration}d</span>
+                          </TableCell>
+                          <TableCell className="py-1.5 px-3 text-sm text-slate-600 whitespace-nowrap">{formatDisplayDate(leave.expectedEndDate)}</TableCell>
+                          <TableCell className="py-1.5 px-3 text-sm text-slate-600 whitespace-nowrap">{leave.dateReturned ? formatDisplayDate(leave.dateReturned) : <span className="text-slate-400 italic">Not yet</span>}</TableCell>
+                          <TableCell className="py-1.5 px-3 text-sm text-slate-600 max-w-[180px] truncate" title={leave.reason}>{leave.reason}</TableCell>
+                          <TableCell className="py-1.5 px-3 text-center">
+                            <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold ${
+                              leave.canBeContacted === 'Yes' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'
+                            }`}>{leave.canBeContacted}</span>
+                          </TableCell>
+                          <TableCell className="py-1.5 px-3 text-center">
+                            <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold ${
+                              returned ? 'bg-emerald-100 text-emerald-700' : overdue ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'
+                            }`}>
+                              {returned ? 'Returned' : overdue ? 'Overdue' : 'On Leave'}
+                            </span>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+                <div className="px-4 py-2 bg-slate-50 border-t border-slate-200 text-xs text-slate-500 flex items-center gap-4">
+                  <span><strong>{leaves.length}</strong> total leave records</span>
+                  <span className="text-amber-600"><strong>{leaves.filter(l => !l.dateReturned && new Date(l.startDate).setHours(0,0,0,0) <= new Date().setHours(0,0,0,0) && new Date(l.expectedEndDate).setHours(0,0,0,0) > new Date().setHours(0,0,0,0)).length}</strong> currently on leave</span>
+                  <span className="text-red-500"><strong>{leaves.filter(l => !l.dateReturned && new Date(l.expectedEndDate).setHours(0,0,0,0) <= new Date().setHours(0,0,0,0)).length}</strong> overdue</span>
+                  <span className="text-emerald-600"><strong>{leaves.filter(l => !!l.dateReturned).length}</strong> returned</span>
+                </div>
               </div>
-            </div>
+            )
+          )}
+
+          {hrTab === 'sick' && (
+            sickLeaveTrackerData.length === 0 ? (
+              <div className="text-center py-12 text-slate-400 text-sm">No sick leave records found.</div>
+            ) : (
+              <div className="rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                <Table className="max-h-[420px]">
+                  <TableHeader className="sticky top-0 z-10">
+                    <TableRow className="bg-gradient-to-r from-rose-700 to-rose-600">
+                      <TableHead className="text-white font-semibold py-2 px-3 whitespace-nowrap">Employee</TableHead>
+                      <TableHead className="text-white font-semibold py-2 px-3 whitespace-nowrap">Department</TableHead>
+                      <TableHead className="text-white font-semibold py-2 px-3 whitespace-nowrap">Position</TableHead>
+                      <TableHead className="text-white font-semibold py-2 px-3 whitespace-nowrap text-center">Month Count</TableHead>
+                      <TableHead className="text-white font-semibold py-2 px-3 whitespace-nowrap text-center">Year Cumulative</TableHead>
+                      <TableHead className="text-white font-semibold py-2 px-3 whitespace-nowrap">Dates Taken</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {sickLeaveTrackerData.map((row, idx) => (
+                      <TableRow key={row.id} className={`hover:bg-rose-50/30 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`}>
+                        <TableCell className="py-1.5 px-3 text-sm font-medium text-slate-800 whitespace-nowrap">{row.name}</TableCell>
+                        <TableCell className="py-1.5 px-3 text-sm text-slate-600 whitespace-nowrap">{row.department}</TableCell>
+                        <TableCell className="py-1.5 px-3 text-sm text-slate-600 whitespace-nowrap">{row.position}</TableCell>
+                        <TableCell className="py-1.5 px-3 text-sm text-center font-bold text-rose-600">{row.count}</TableCell>
+                        <TableCell className="py-1.5 px-3 text-sm text-center font-semibold text-slate-700">{row.cumulativeCount}</TableCell>
+                        <TableCell className="py-1.5 px-3 text-sm text-slate-600 max-w-md">
+                          {row.dates.length === 0 ? (
+                            <span className="text-slate-400 italic text-xs">None in selected month</span>
+                          ) : (
+                            <div className="flex flex-wrap gap-1">
+                              {row.dates.map((d, dIdx) => (
+                                <span key={dIdx} className="inline-flex items-center px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 text-xs font-semibold">
+                                  {d}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+                <div className="px-4 py-2 bg-slate-50 border-t border-slate-200 text-xs text-slate-500 flex items-center gap-4">
+                  <span><strong>{sickLeaveTrackerData.length}</strong> employees with sick leaves in {sickLeaveYear}</span>
+                  <span>Total sick leaves this year: <strong>{sickLeaveTrackerData.reduce((acc, r) => acc + r.cumulativeCount, 0)}</strong></span>
+                </div>
+              </div>
+            )
           )}
         </CardContent>
       </Card>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useOperations } from '../contexts/OperationsContext';
 import { useAppStore } from '../store/appStore';
 import { 
@@ -6,7 +6,7 @@ import {
   Edit2, Trash2, History, AlertCircle, ChevronRight,
   MoreHorizontal, PlusCircle, X, Check, ClipboardList,
   LayoutGrid, List, ChevronLeft, Download, Upload, FileSpreadsheet,
-  Fuel, TrendingUp, BarChart3, Filter
+  Fuel, TrendingUp, BarChart3, Filter, Link as LinkIcon
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import {
@@ -36,6 +36,7 @@ import {
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/src/components/ui/dropdown-menu";
 import { Label } from '@/src/components/ui/label';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/src/components/ui/dialog';
 import { useSetPageTitle, useHideLayout } from '@/src/contexts/PageContext';
 
 const VEHICLE_COLORS = [
@@ -95,9 +96,10 @@ export function VehicleManager() {
     updateVehicleTripRecord, deleteVehicleTripRecord,
     vehicleDocumentTypes, updateVehicleDocument,
     insertVehicles, setVehicles, setVehicleTripRecords,
-    vehicleFuelLogs, addVehicleFuelLog, updateVehicleFuelLog, deleteVehicleFuelLog
+    vehicleFuelLogs, addVehicleFuelLog, updateVehicleFuelLog, deleteVehicleFuelLog,
+    dieselRefills
   } = useOperations();
-  const { sites, pendingSites, employees } = useAppStore();
+  const { sites, pendingSites, employees, ledgerEntries } = useAppStore();
   const priv = usePriv('opsVehicles');
   
   const [activeTab, setActiveTab] = useState<'fleet' | 'logs' | 'documents' | 'fuel'>('logs');
@@ -205,6 +207,8 @@ export function VehicleManager() {
   }, [priv.canViewLogs, priv.canViewFuel, logsSubTab]);
 
   // ── Fuel Log State ──
+  const fmtCurrency = (n: number) => `₦${n.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
   const [showFuelForm, setShowFuelForm] = useState(false);
   const [editingFuelLog, setEditingFuelLog] = useState<VehicleFuelLog | null>(null);
   const [fuelForm, setFuelForm] = useState({
@@ -217,8 +221,99 @@ export function VehicleManager() {
     odometer: '' as string | number,
     filled_by: '',
     notes: '',
+    linkedLedgerIds: [] as string[],
     lastComputed: '' as 'litres' | 'total_cost' | 'rate_per_litre' | ''
   });
+
+  const [showLedgerDialog, setShowLedgerDialog] = useState(false);
+  const [ledgerSearch, setLedgerSearch] = useState('');
+
+  const totalLinkedAmount = useMemo(() => {
+    return (fuelForm.linkedLedgerIds || [])
+      .map(id => ledgerEntries.find(e => e.id === id))
+      .filter((e): e is NonNullable<typeof e> => !!e)
+      .reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+  }, [fuelForm.linkedLedgerIds, ledgerEntries]);
+
+  const ledgerRemainingAmounts = useMemo(() => {
+    const remaining = new Map<string, number>();
+    
+    // Initialize with full amounts
+    ledgerEntries.forEach(e => {
+      remaining.set(e.id, Number(e.amount) || 0);
+    });
+
+    // Subtract used amounts from other diesel refills
+    dieselRefills.forEach(refill => {
+      if (!refill.linkedLedgerIds || refill.linkedLedgerIds.length === 0) return;
+      if (!refill.totalCost) return;
+
+      let costToCover = refill.totalCost;
+      for (const lid of refill.linkedLedgerIds) {
+        if (costToCover <= 0) break;
+        const currentRemaining = remaining.get(lid) || 0;
+        if (currentRemaining > 0) {
+          const amountToUse = Math.min(costToCover, currentRemaining);
+          remaining.set(lid, currentRemaining - amountToUse);
+          costToCover -= amountToUse;
+        }
+      }
+    });
+
+    // Subtract used amounts from other vehicle fuel logs
+    vehicleFuelLogs.forEach(log => {
+      // Ignore the one currently being edited
+      if (editingFuelLog?.id && log.id === editingFuelLog.id) return;
+      
+      if (!log.linkedLedgerIds || log.linkedLedgerIds.length === 0) return;
+      if (!log.total_cost) return;
+
+      let costToCover = log.total_cost;
+      for (const lid of log.linkedLedgerIds) {
+        if (costToCover <= 0) break;
+        const currentRemaining = remaining.get(lid) || 0;
+        if (currentRemaining > 0) {
+          const amountToUse = Math.min(costToCover, currentRemaining);
+          remaining.set(lid, currentRemaining - amountToUse);
+          costToCover -= amountToUse;
+        }
+      }
+    });
+
+    return remaining;
+  }, [ledgerEntries, dieselRefills, vehicleFuelLogs, editingFuelLog]);
+
+  // Find eligible ledger entries for vehicles: contains "diesel", "petrol", "pms", or "fuel"
+  const eligibleLedgerEntries = useMemo(() => {
+    return ledgerEntries.filter(e => {
+      const desc = e.description?.toLowerCase() || '';
+      return desc.includes('diesel') || desc.includes('petrol') || desc.includes('pms') || desc.includes('fuel');
+    });
+  }, [ledgerEntries]);
+
+  // Filtered by mini search inside the dialog
+  const filteredLedgerEntries = useMemo(() => {
+    if (!ledgerSearch.trim()) return eligibleLedgerEntries;
+    const query = ledgerSearch.toLowerCase().trim();
+    return eligibleLedgerEntries.filter(e => {
+      const desc = e.description?.toLowerCase() || '';
+      const siteName = e.site?.toLowerCase() || '';
+      const clientName = e.client?.toLowerCase() || '';
+      const voucher = e.voucherNo?.toLowerCase() || '';
+      const amountStr = e.amount?.toString() || '';
+      return desc.includes(query) || siteName.includes(query) || clientName.includes(query) || voucher.includes(query) || amountStr.includes(query);
+    });
+  }, [eligibleLedgerEntries, ledgerSearch]);
+
+  const handleToggleLedger = (ledgerId: string) => {
+    setFuelForm(prev => {
+      const current = prev.linkedLedgerIds || [];
+      const updated = current.includes(ledgerId)
+        ? current.filter(id => id !== ledgerId)
+        : [...current, ledgerId];
+      return { ...prev, linkedLedgerIds: updated };
+    });
+  };
 
   // Fuel Analytics Filter State
   const [showFuelAnalytics, setShowFuelAnalytics] = useState(false);

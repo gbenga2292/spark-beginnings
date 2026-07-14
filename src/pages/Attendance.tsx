@@ -220,7 +220,8 @@ const AttendanceRow = memo(function AttendanceRow({
 const statuses = [
   "Absent",
   "Absent with Permit",
-  "On Leave"
+  "On Leave",
+  "Sick Leave"
 ];
 
 interface MachineMultiSelectProps {
@@ -1301,7 +1302,10 @@ export function Attendance() {
           const dSiteObj = findSite(dSite);
           const nSiteObj = findSite(nSite);
           
-          const isPermit = (val: string) => val.toUpperCase() === 'ABSENT WITH PERMIT' || val.toUpperCase() === 'ON LEAVE';
+          const isPermit = (val: string) => {
+            const u = val.toUpperCase();
+            return u === 'ABSENT WITH PERMIT' || u === 'ON LEAVE' || u === 'SICK LEAVE';
+          };
           const permitOverride = isPermit(daySiteRaw) || isPermit(absentStatusRaw);
           const nightPermitOverride = isPermit(nightSiteRaw);
 
@@ -1464,7 +1468,10 @@ export function Attendance() {
       const absentStatus = row['Absent Status'] || row.absentStatus || row.absent_status || '';
       const overtimeDetails = row['Overtime Details'] || row.overtimeDetails || row.overtime_details || row.over_time_details || '';
 
-      const isPermit = (val: string) => val.toUpperCase() === 'ABSENT WITH PERMIT' || val.toUpperCase() === 'ON LEAVE';
+      const isPermit = (val: string) => {
+        const u = val.toUpperCase();
+        return u === 'ABSENT WITH PERMIT' || u === 'ON LEAVE' || u === 'SICK LEAVE';
+      };
       const permitOverride = isPermit(ds) || isPermit(absentStatus);
       const nightPermitOverride = isPermit(ns);
 
@@ -1572,7 +1579,7 @@ export function Attendance() {
         return { site: "", shift: "No", reason: (isPaidLeave && !currentReason) ? src : (currentReason || src) };
       }
       // Paid leaves like 'On Leave' or 'Absent with Permit' count as Day shift Yes at Office
-      const site = (upperSrc === "ABSENT WITH PERMIT" || upperSrc === "ON LEAVE") ? "Office" : src;
+      const site = (upperSrc === "ABSENT WITH PERMIT" || upperSrc === "ON LEAVE" || upperSrc === "SICK LEAVE") ? "Office" : src;
       return { site, shift: "Yes", reason: src };
     }
     

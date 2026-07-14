@@ -1418,7 +1418,7 @@ export function Employees() {
                   return dayIndex === 0 || dayIndex === 6; // Sat and Sun
               };
 
-              let totalWorkdays = 0, totalAbsent = 0, totalLeave = 0, totalPermit = 0, totalOvertime = 0;
+              let totalWorkdays = 0, totalAbsent = 0, totalLeave = 0, totalPermit = 0, totalOvertime = 0, totalSickLeave = 0;
               
               const renderMonth = (monthNum: number, isMini: boolean) => {
                 const daysInMonth = new Date(currentYear, monthNum, 0).getDate();
@@ -1480,13 +1480,19 @@ export function Employees() {
 
                   if (r) {
                     recordsByDay.set(day, r);
-                    if (r.isPresent === 'Yes') totalWorkdays++;
-                    if (r.isPresent === 'No') {
-                      const status = (r.absentStatus || '').toLowerCase();
-                      if (status.includes('permit')) totalPermit++;
-                      else if (status.includes('leave')) totalLeave++;
-                      else totalAbsent++;
-                    }
+                    const status = (r.absentStatus || '').toLowerCase();
+                    const isSickLeave = status.includes('sick');
+                    const isLeave = status.includes('leave') && !isSickLeave;
+                    const isPermit = status.includes('permit');
+                    const isAbsent = r.isPresent === 'No' && !isLeave && !isPermit && !isSickLeave;
+                    const isPresent = r.isPresent === 'Yes' && !isLeave && !isPermit && !isSickLeave;
+
+                    if (isSickLeave) totalSickLeave++;
+                    else if (isLeave) totalLeave++;
+                    else if (isPermit) totalPermit++;
+                    else if (isAbsent) totalAbsent++;
+                    else if (isPresent) totalWorkdays++;
+
                     if (r.overtimeDetails || (Number(r.ot) > 0)) totalOvertime++;
                   }
 
@@ -1498,13 +1504,16 @@ export function Employees() {
 
                   if (r) {
                     const status = (r.absentStatus || '').toLowerCase();
-                    const isLeave = status.includes('leave');
+                    const isSickLeave = status.includes('sick');
+                    const isLeave = status.includes('leave') && !isSickLeave;
                     const isPermit = status.includes('permit');
-                    const isAbsent = r.isPresent === 'No' && !isLeave && !isPermit;
+                    const isAbsent = r.isPresent === 'No' && !isLeave && !isPermit && !isSickLeave;
                     const isOvertime = r.overtimeDetails || (Number(r.ot) > 0);
                     const isPresent = r.isPresent === 'Yes';
 
-                    if (isLeave) {
+                    if (isSickLeave) {
+                      bgColor = 'bg-purple-500 dark:bg-purple-600 shadow-sm'; textColor = 'text-white font-bold'; borderStyle = 'border-transparent'; hoverTitle = 'Sick Leave';
+                    } else if (isLeave) {
                       bgColor = 'bg-amber-500 dark:bg-amber-600 shadow-sm'; textColor = 'text-white font-bold'; borderStyle = 'border-transparent'; hoverTitle = 'On Leave';
                     } else if (isPermit) {
                       bgColor = 'bg-orange-500 dark:bg-orange-600 shadow-sm'; textColor = 'text-white font-bold'; borderStyle = 'border-transparent'; hoverTitle = 'Absent with Permit';
@@ -1551,10 +1560,11 @@ export function Employees() {
                         {monthName} {currentYear}
                       </h4>
                       {!isMini && (
-                        <div className="flex gap-4 text-xs font-medium">
+                        <div className="flex gap-4 text-xs font-medium flex-wrap">
                           <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-emerald-500"></div> Present</div>
                           <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-blue-500"></div> Overtime</div>
                           <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-amber-500"></div> Leave</div>
+                          <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-purple-500"></div> Sick Leave</div>
                           <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-orange-500"></div> Permit</div>
                           <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-rose-500"></div> Absent</div>
                         </div>
@@ -1581,7 +1591,7 @@ export function Employees() {
               return (
                 <div className="space-y-6">
                   {/* Executive Summary Cards */}
-                  <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                  <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
                     <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-3 border border-slate-200 dark:border-slate-700 flex flex-col">
                       <span className="text-xs text-slate-500 font-medium uppercase tracking-wider mb-1">Workdays</span>
                       <span className="text-2xl font-bold text-slate-900 dark:text-white">{totalWorkdays}</span>
@@ -1598,6 +1608,10 @@ export function Employees() {
                       <span className="text-xs text-amber-600 font-medium uppercase tracking-wider mb-1">Leave</span>
                       <span className="text-2xl font-bold text-amber-700 dark:text-amber-400">{totalLeave}</span>
                     </div>
+                    <div className="bg-purple-50 dark:bg-purple-900/10 rounded-lg p-3 border border-purple-100 dark:border-purple-900/50 flex flex-col">
+                      <span className="text-xs text-purple-600 font-medium uppercase tracking-wider mb-1">Sick Leave</span>
+                      <span className="text-2xl font-bold text-purple-700 dark:text-purple-400">{totalSickLeave}</span>
+                    </div>
                     <div className="bg-blue-50 dark:bg-blue-900/10 rounded-lg p-3 border border-blue-100 dark:border-blue-900/50 flex flex-col">
                       <span className="text-xs text-blue-600 font-medium uppercase tracking-wider mb-1">Overtime</span>
                       <span className="text-2xl font-bold text-blue-700 dark:text-blue-400">{totalOvertime}</span>
@@ -1610,6 +1624,7 @@ export function Employees() {
                       <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-emerald-500"></div> Present</div>
                       <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-blue-500"></div> Overtime</div>
                       <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-amber-500"></div> Leave</div>
+                      <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-purple-500"></div> Sick Leave</div>
                       <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-orange-500"></div> Permit</div>
                       <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-rose-500"></div> Absent</div>
                     </div>

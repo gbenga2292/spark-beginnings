@@ -26,7 +26,11 @@ export interface DimensionData {
   end: Point;
   text: string;
   layerId?: string;
+  x?: number;
+  y?: number;
+  locked?: boolean;
 }
+
 
 export interface AreaData {
   id: string;

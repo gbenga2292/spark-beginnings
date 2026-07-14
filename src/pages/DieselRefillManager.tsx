@@ -13,19 +13,23 @@ import { useUserStore } from '@/src/store/userStore';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { toast } from 'sonner';
 import { Button } from '@/src/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/src/components/ui/dialog';
 import { DieselRefill, DieselRefillAllocation } from '@/src/types/operations';
 
 const fmt = (n: number) => n.toLocaleString('en-NG', { minimumFractionDigits: 0, maximumFractionDigits: 1 });
 const fmtCurrency = (n: number) => `₦${n.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const today = () => new Date().toISOString().split('T')[0];
 
-function useAllActiveMachines() {
-  const { assets, waybills } = useOperations();
+function useAllActiveMachines(targetDate: string) {
+  const { assets, waybills, sitePumpDates } = useOperations();
   const sites = useAppStore(s => s.sites);
   return useMemo(() => {
     const locations = new Map<string, number>();
 
     waybills.forEach(wb => {
+      const dateStr = wb.sentToSiteDate ? wb.sentToSiteDate.substring(0, 10) : (wb.issueDate ? wb.issueDate.substring(0, 10) : '');
+      if (!dateStr || dateStr > targetDate) return;
+
       if (wb.type === 'waybill' && wb.status !== 'outstanding') {
         wb.items.forEach(item => {
           const key = `${item.assetId}::${wb.siteId || ''}`;
@@ -40,15 +44,30 @@ function useAllActiveMachines() {
       }
     });
 
-    const activePairs: { assetId: string, siteId: string, quantity: number }[] = [];
+    const activePairs = new Map<string, { assetId: string; siteId: string }>();
+
     locations.forEach((quantity, key) => {
       if (quantity > 0) {
         const [assetId, siteId] = key.split('::');
-        activePairs.push({ assetId, siteId, quantity });
+        activePairs.set(key, { assetId, siteId });
       }
     });
 
-    return activePairs
+    if (sitePumpDates) {
+      sitePumpDates.forEach(pd => {
+        const start = pd.pumpStartDate ? pd.pumpStartDate.substring(0, 10) : '';
+        const stop = pd.pumpStopDate ? pd.pumpStopDate.substring(0, 10) : '';
+        const hasStarted = start && start <= targetDate;
+        const hasNotStopped = !stop || stop >= targetDate;
+
+        if (hasStarted && hasNotStopped) {
+          const key = `${pd.assetId}::${pd.siteId}`;
+          activePairs.set(key, { assetId: pd.assetId, siteId: pd.siteId });
+        }
+      });
+    }
+
+    return Array.from(activePairs.values())
       .map(pair => {
          const a = assets.find(x => x.id === pair.assetId);
          if (!a || a.type !== 'equipment' || !a.requiresLogging) return null;
@@ -61,7 +80,7 @@ function useAllActiveMachines() {
          };
       })
       .filter((x): x is NonNullable<typeof x> => x !== null);
-  }, [assets, waybills, sites]);
+  }, [assets, waybills, sitePumpDates, sites, targetDate]);
 }
 
 // ── Refill Form ───────────────────────────────────────────────────────────────
@@ -75,7 +94,7 @@ function RefillForm({ editing, onClose, onSave }: RefillFormProps) {
   const { isDark } = useTheme();
   const sites = useAppStore(s => s.sites);
   const ledgerEntries = useAppStore(s => s.ledgerEntries);
-  const { dailyMachineLogs, logDailyActivity, dieselRefills } = useOperations();
+  const { dailyMachineLogs, logDailyActivity, dieselRefills, vehicleFuelLogs } = useOperations();
 
   const [date, setDate] = useState(editing?.date || today());
   const [totalLitres, setTotalLitres] = useState(editing?.totalLitres?.toString() || '');
@@ -85,9 +104,10 @@ function RefillForm({ editing, onClose, onSave }: RefillFormProps) {
   const [notes, setNotes] = useState(editing?.notes || '');
   const [linkedLedgerIds, setLinkedLedgerIds] = useState<string[]>(editing?.linkedLedgerIds || []);
   const [isSaving, setIsSaving] = useState(false);
+  const [showLedgerDialog, setShowLedgerDialog] = useState(false);
 
   const activeSites = useMemo(() => sites.filter(s => s.status === 'Active'), [sites]);
-  const allActiveMachines = useAllActiveMachines();
+  const allActiveMachines = useAllActiveMachines(date);
 
   const [allocations, setAllocations] = useState<DieselRefillAllocation[]>(() => {
     if (editing?.machineAllocations?.length) {
@@ -133,8 +153,27 @@ function RefillForm({ editing, onClose, onSave }: RefillFormProps) {
       }
     });
 
+    // Subtract used amounts from vehicle fuel logs
+    vehicleFuelLogs.forEach(log => {
+      if (!log.linkedLedgerIds || log.linkedLedgerIds.length === 0) return;
+      if (!log.total_cost) return;
+
+      let costToCover = log.total_cost;
+      
+      // Distribute cost across linked ledgers
+      for (const lid of log.linkedLedgerIds) {
+        if (costToCover <= 0) break;
+        const currentRemaining = remaining.get(lid) || 0;
+        if (currentRemaining > 0) {
+          const amountToUse = Math.min(costToCover, currentRemaining);
+          remaining.set(lid, currentRemaining - amountToUse);
+          costToCover -= amountToUse;
+        }
+      }
+    });
+
     return remaining;
-  }, [ledgerEntries, dieselRefills, editing]);
+  }, [ledgerEntries, dieselRefills, vehicleFuelLogs, editing]);
 
   // Find eligible ledger entries
   const eligibleLedgerEntries = useMemo(() => {
@@ -352,7 +391,7 @@ function RefillForm({ editing, onClose, onSave }: RefillFormProps) {
   const label = 'text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 block';
 
   return (
-    <div className={cn('flex flex-col gap-5 p-5 rounded-2xl border shadow-xl max-h-[90vh] overflow-y-auto style-scroll', isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200')}>
+    <div className={cn('flex flex-col gap-5 p-6 rounded-2xl border shadow-sm', isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200')}>
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -393,112 +432,44 @@ function RefillForm({ editing, onClose, onSave }: RefillFormProps) {
               {totalCost ? fmtCurrency(totalCost) : '—'}
             </div>
           </div>
-          <div className="col-span-2">
-            <label className={label}>Purchased By & Supplier</label>
-            <div className="flex gap-2">
-              <input type="text" value={purchasedBy} onChange={e => setPurchasedBy(e.target.value)} placeholder="Person / driver" className={inp} />
-              <input type="text" value={supplier} onChange={e => setSupplier(e.target.value)} placeholder="Fuel station" className={inp} />
-            </div>
+          <div>
+            <label className={label}>Purchased By</label>
+            <input type="text" value={purchasedBy} onChange={e => setPurchasedBy(e.target.value)} placeholder="Person / driver" className={inp} />
+          </div>
+          <div>
+            <label className={label}>Supplier / Fuel Station</label>
+            <input type="text" value={supplier} onChange={e => setSupplier(e.target.value)} placeholder="Fuel station" className={inp} />
           </div>
           <div className="col-span-2">
+            <label className={label}>Reconcile Costs</label>
+            <button
+              type="button"
+              onClick={() => setShowLedgerDialog(true)}
+              className={cn(
+                "h-10 w-full rounded-xl border px-3 flex items-center justify-between text-sm font-semibold transition-all shadow-sm",
+                linkedLedgerIds.length > 0
+                  ? (isDark ? "bg-indigo-950/20 border-indigo-800/80 text-indigo-400 hover:bg-indigo-950/30" : "bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100")
+                  : (isDark ? "bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700" : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50")
+              )}
+            >
+              <div className="flex items-center gap-2">
+                <LinkIcon className="w-4 h-4" />
+                <span>Link Financial Ledger</span>
+              </div>
+              <span className={cn(
+                "text-xs px-2.5 py-0.5 rounded-full font-bold",
+                linkedLedgerIds.length > 0 
+                  ? (isDark ? "bg-indigo-900 text-indigo-300" : "bg-indigo-100 text-indigo-800")
+                  : (isDark ? "bg-slate-900 text-slate-400" : "bg-slate-100 text-slate-500")
+              )}>
+                {linkedLedgerIds.length} Linked ({fmtCurrency(totalLinkedAmount)})
+              </span>
+            </button>
+          </div>
+          <div className="col-span-2 lg:col-span-4">
             <label className={label}>General Notes</label>
             <input type="text" value={notes} onChange={e => setNotes(e.target.value)} placeholder="Optional global notes" className={inp} />
           </div>
-        </div>
-
-        {/* Linked Ledger Entries */}
-        <div className={cn("mt-4 p-4 rounded-xl border", isDark ? "border-slate-800 bg-slate-900/50" : "border-slate-200 bg-slate-50")}>
-          <div className="flex justify-between items-end mb-3">
-            <div>
-              <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Link Financial Ledger (Re-embursables)</p>
-              <p className="text-[10px] text-slate-400">Select ledger entries matching 'diesel' to reconcile cost.</p>
-            </div>
-            {totalCost !== undefined && totalCost > 0 && (
-              <div className={cn(
-                "px-2 py-1 rounded-lg text-xs font-bold border",
-                totalLinkedAmount === totalCost ? (isDark ? "bg-emerald-950/40 text-emerald-400 border-emerald-800" : "bg-emerald-50 text-emerald-700 border-emerald-200") :
-                totalLinkedAmount > 0 ? (isDark ? "bg-amber-950/40 text-amber-400 border-amber-800" : "bg-amber-50 text-amber-700 border-amber-200") :
-                (isDark ? "bg-slate-800 text-slate-400 border-slate-700" : "bg-white text-slate-500 border-slate-200")
-              )}>
-                Linked: {fmtCurrency(totalLinkedAmount)} / {fmtCurrency(totalCost)}
-              </div>
-            )}
-          </div>
-          
-          {eligibleLedgerEntries.length === 0 ? (
-            <p className="text-xs text-slate-400 italic">No available diesel re-embursable expenses found in ledger.</p>
-          ) : (
-            <>
-              {/* Mini Search Bar */}
-              <div className="mb-3 relative">
-                <input
-                  type="text"
-                  value={ledgerSearch}
-                  onChange={e => setLedgerSearch(e.target.value)}
-                  placeholder="Search ledger by description, site, client, voucher, or amount..."
-                  className={cn(
-                    "w-full h-8 pl-8 pr-8 rounded-lg text-xs border focus:outline-none focus:ring-1 focus:ring-indigo-500",
-                    isDark ? "bg-slate-800 border-slate-700 text-white placeholder-slate-500" : "bg-white border-slate-200 text-slate-900 placeholder-slate-400"
-                  )}
-                />
-                <span className="absolute left-2.5 top-2 text-slate-400 dark:text-slate-500">
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                </span>
-                {ledgerSearch && (
-                  <button
-                    type="button"
-                    onClick={() => setLedgerSearch('')}
-                    className="absolute right-2.5 top-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                )}
-              </div>
-
-              {filteredLedgerEntries.length === 0 ? (
-                <p className="text-xs text-slate-400 italic py-2">No matching ledger entries found.</p>
-              ) : (
-                <div className="max-h-48 overflow-y-auto pr-2 space-y-1">
-                  {filteredLedgerEntries.map(entry => (
-                    <label key={entry.id} className={cn(
-                      "flex items-center gap-3 p-2 rounded-lg border cursor-pointer transition-colors",
-                      linkedLedgerIds.includes(entry.id) 
-                        ? (isDark ? "bg-indigo-950/30 border-indigo-800/50" : "bg-indigo-50 border-indigo-200") 
-                        : (isDark ? "bg-slate-800 border-slate-700 hover:bg-slate-700" : "bg-white border-slate-200 hover:bg-slate-50")
-                    )}>
-                      <input
-                        type="checkbox"
-                        checked={linkedLedgerIds.includes(entry.id)}
-                        onChange={() => handleToggleLedger(entry.id)}
-                        className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex justify-between items-start">
-                          <p className={cn("text-sm font-semibold truncate", isDark ? "text-slate-200" : "text-slate-700")}>
-                            {entry.description}
-                          </p>
-                          <p className={cn("text-sm font-bold ml-2", isDark ? "text-white" : "text-slate-900")}>
-                            {fmtCurrency(ledgerRemainingAmounts.get(entry.id) || 0)}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2 mt-0.5 text-[10px] text-slate-500">
-                          <span>{entry.voucherNo}</span>
-                          <span>•</span>
-                          <span>{new Date(entry.date).toLocaleDateString('en-GB')}</span>
-                          <span>•</span>
-                          <span className="font-medium text-amber-600 dark:text-amber-500">{entry.client}</span>
-                          <span>•</span>
-                          <span className="font-medium text-indigo-600 dark:text-indigo-400">{entry.site}</span>
-                        </div>
-                      </div>
-                    </label>
-                  ))}
-                </div>
-              )}
-            </>
-          )}
         </div>
       </div>
 
@@ -642,16 +613,134 @@ function RefillForm({ editing, onClose, onSave }: RefillFormProps) {
       </div>
 
       {/* Actions */}
-      <div className="flex gap-2 pt-1">
+      <div className="flex gap-2 pt-4">
         <Button variant="outline" onClick={onClose} className="flex-1 h-9 text-sm">Cancel</Button>
         <Button
           onClick={handleSave} disabled={isSaving}
-          className="flex-[2] h-9 text-sm bg-amber-500 hover:bg-amber-600 text-white gap-1.5"
+          className="flex-[2] h-9 text-sm bg-amber-50 hover:bg-amber-600 text-white gap-1.5"
         >
           <Save className="w-3.5 h-3.5" />
           {isSaving ? 'Saving…' : editing ? 'Update Refill' : 'Save Refill'}
         </Button>
       </div>
+
+      {/* Ledger Linking Dialog */}
+      <Dialog open={showLedgerDialog} onOpenChange={setShowLedgerDialog}>
+        <DialogContent className={cn("max-w-xl", isDark ? "bg-slate-900 border-slate-800 text-white" : "bg-white border-slate-200 text-slate-900")}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <LinkIcon className="w-5 h-5 text-indigo-500" />
+              Link Financial Ledger (Re-embursables)
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4 pt-2">
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Select ledger entries matching 'diesel' to reconcile cost.
+            </p>
+
+            {totalCost !== undefined && totalCost > 0 && (
+              <div className={cn(
+                "p-3 rounded-xl border flex items-center justify-between text-xs font-semibold",
+                totalLinkedAmount === totalCost ? (isDark ? "bg-emerald-950/40 text-emerald-400 border-emerald-800" : "bg-emerald-50 text-emerald-700 border-emerald-200") :
+                totalLinkedAmount > 0 ? (isDark ? "bg-amber-950/40 text-amber-400 border-amber-800" : "bg-amber-50 text-amber-700 border-amber-200") :
+                (isDark ? "bg-slate-850 text-slate-400 border-slate-700" : "bg-slate-50 text-slate-500 border-slate-250")
+              )}>
+                <span>Total Cost to Reconcile: {fmtCurrency(totalCost)}</span>
+                <span>Linked Amount: {fmtCurrency(totalLinkedAmount)}</span>
+              </div>
+            )}
+
+            {eligibleLedgerEntries.length === 0 ? (
+              <p className="text-sm text-slate-400 italic text-center py-6">No available diesel re-embursable expenses found in ledger.</p>
+            ) : (
+              <>
+                {/* Mini Search Bar */}
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={ledgerSearch}
+                    onChange={e => setLedgerSearch(e.target.value)}
+                    placeholder="Search ledger by description, site, client, voucher, or amount..."
+                    className={cn(
+                      "w-full h-9 pl-9 pr-9 rounded-lg text-sm border focus:outline-none focus:ring-1 focus:ring-indigo-500",
+                      isDark ? "bg-slate-800 border-slate-700 text-white placeholder-slate-500" : "bg-white border-slate-200 text-slate-900 placeholder-slate-400"
+                    )}
+                  />
+                  <span className="absolute left-3 top-2.5 text-slate-400 dark:text-slate-500">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  </span>
+                  {ledgerSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setLedgerSearch('')}
+                      className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+
+                {filteredLedgerEntries.length === 0 ? (
+                  <p className="text-sm text-slate-400 italic py-6 text-center">No matching ledger entries found.</p>
+                ) : (
+                  <div className="max-h-[300px] overflow-y-auto pr-1 space-y-2 style-scroll">
+                    {filteredLedgerEntries.map(entry => (
+                      <label key={entry.id} className={cn(
+                        "flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors",
+                        linkedLedgerIds.includes(entry.id) 
+                          ? (isDark ? "bg-indigo-950/30 border-indigo-800/50" : "bg-indigo-50 border-indigo-200") 
+                          : (isDark ? "bg-slate-800 border-slate-700 hover:bg-slate-700" : "bg-white border-slate-200 hover:bg-slate-50")
+                      )}>
+                        <input
+                          type="checkbox"
+                          checked={linkedLedgerIds.includes(entry.id)}
+                          onChange={() => handleToggleLedger(entry.id)}
+                          className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex justify-between items-start">
+                            <p className={cn("text-sm font-semibold truncate", isDark ? "text-slate-200" : "text-slate-700")}>
+                              {entry.description}
+                            </p>
+                            <p className={cn("text-sm font-bold ml-2", isDark ? "text-white" : "text-slate-900")}>
+                              {fmtCurrency(ledgerRemainingAmounts.get(entry.id) || 0)}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2 mt-1 text-[11px] text-slate-500">
+                            <span>{entry.voucherNo}</span>
+                            <span>•</span>
+                            <span>{new Date(entry.date).toLocaleDateString('en-GB')}</span>
+                            <span>•</span>
+                            <span className="font-medium text-amber-600 dark:text-amber-500">{entry.client}</span>
+                            <span>•</span>
+                            <span className="font-medium text-indigo-600 dark:text-indigo-400">{entry.site}</span>
+                          </div>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+
+          <div className="flex justify-end pt-2">
+            <button
+              type="button"
+              onClick={() => setShowLedgerDialog(false)}
+              className={cn(
+                "px-4 py-2 text-sm font-medium rounded-xl border transition-colors",
+                isDark ? "bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-200" : "bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-700"
+              )}
+            >
+              Done
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -872,16 +961,17 @@ export function DieselRefillManager() {
   const [view, setView] = useState<'logs' | 'analytics'>('logs');
 
   useSetPageTitle(
-    'Diesel Refill',
-    'Track diesel purchases and machine consumption',
-    canAdd ? (
+    showForm ? (editingRefill ? 'Edit Diesel Refill' : 'Log Diesel Refill') : 'Diesel Refill',
+    showForm ? 'Record a bulk diesel purchase and distribute to any machines' : 'Track diesel purchases and machine consumption',
+    (!showForm && canAdd) ? (
       <Button
         onClick={() => { setEditingRefill(null); setShowForm(true); }}
         className="h-8 text-xs bg-amber-500 hover:bg-amber-600 text-white gap-1.5"
       >
         <Plus className="w-3.5 h-3.5" /> Log Refill
       </Button>
-    ) : undefined
+    ) : undefined,
+    [showForm, editingRefill, canAdd]
   );
 
   const activeSites = useMemo(() => {
@@ -909,6 +999,24 @@ export function DieselRefillManager() {
   }, [dieselRefills]);
 
   const inp = cn('h-8 rounded-xl border px-3 text-xs focus:outline-none focus:ring-2 focus:ring-amber-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-200');
+
+  if (showForm) {
+    return (
+      <div className="flex flex-col h-full overflow-y-auto style-scroll p-3 sm:p-4 lg:p-6 max-w-5xl mx-auto">
+        <RefillForm
+          editing={editingRefill}
+          onClose={() => { setShowForm(false); setEditingRefill(null); }}
+          onSave={async (data) => {
+            if (editingRefill) {
+              await updateDieselRefill(editingRefill.id, data);
+            } else {
+              await addDieselRefill(data);
+            }
+          }}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-full overflow-y-auto style-scroll p-3 sm:p-4 lg:p-6 gap-4 max-w-5xl mx-auto">
@@ -973,24 +1081,7 @@ export function DieselRefillManager() {
         </button>
       </div>
 
-      {/* Refill Form (inline) */}
-      <AnimatePresence>
-        {showForm && (
-          <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.98 }}>
-            <RefillForm
-              editing={editingRefill}
-              onClose={() => { setShowForm(false); setEditingRefill(null); }}
-              onSave={async (data) => {
-                if (editingRefill) {
-                  await updateDieselRefill(editingRefill.id, data);
-                } else {
-                  await addDieselRefill(data);
-                }
-              }}
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
+
 
       {/* Content */}
       {view === 'logs' ? (

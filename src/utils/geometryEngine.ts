@@ -6,6 +6,8 @@ export const CONN_SNAP_THRESHOLD = 30; // Pixels – magnetic pull for open conn
 export type SnapPoint = {
   pt: Point;
   type: 'endpoint' | 'midpoint' | 'intersection' | 'nearest' | 'connection';
+  elementId?: string;
+  dist?: number;
 };
 
 export function distance(p1: Point, p2: Point): number {

@@ -450,6 +450,7 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
             odometer: f.odometer ? Number(f.odometer) : undefined,
             filled_by: f.filled_by,
             notes: f.notes,
+            linkedLedgerIds: f.linked_ledger_ids || [],
             created_at: f.created_at
           })));
         }
@@ -795,6 +796,7 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
                 odometer: f.odometer ? Number(f.odometer) : undefined,
                 filled_by: f.filled_by,
                 notes: f.notes,
+                linkedLedgerIds: f.linked_ledger_ids || [],
                 created_at: f.created_at
               });
               if (eventType === 'INSERT') {
@@ -1849,6 +1851,7 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
             odometer: newLog.odometer ?? null,
             filled_by: newLog.filled_by ?? null,
             notes: newLog.notes ?? null,
+            linked_ledger_ids: newLog.linkedLedgerIds ?? null,
             created_at: newLog.created_at
           });
           if (error) throw error;
@@ -1870,7 +1873,8 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
             total_cost: updates.total_cost,
             odometer: updates.odometer ?? null,
             filled_by: updates.filled_by ?? null,
-            notes: updates.notes ?? null
+            notes: updates.notes ?? null,
+            linked_ledger_ids: updates.linkedLedgerIds ?? null
           }).eq('id', id);
           if (error) throw error;
           toast.success('Fuel log updated');

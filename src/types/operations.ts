@@ -229,6 +229,7 @@ export interface VehicleFuelLog {
   odometer?: number;
   filled_by?: string;
   notes?: string;
+  linkedLedgerIds?: string[];
   created_at?: string;
 }
 export interface DowntimeEntry {

@@ -8,6 +8,7 @@ import { Check, X } from 'lucide-react';
 import { ActiveTool } from './Toolbar';
 import { DesignPanel } from './DesignPanel';
 import { DraggablePanel } from './DraggablePanel';
+import { toast } from '../ui/toast';
 
 interface DewateringCanvasProps {
   lines: LineData[];
