@@ -99,7 +99,8 @@ export function VehicleManager() {
     vehicleFuelLogs, addVehicleFuelLog, updateVehicleFuelLog, deleteVehicleFuelLog,
     dieselRefills
   } = useOperations();
-  const { sites, pendingSites, employees, ledgerEntries } = useAppStore();
+  const { sites, pendingSites, employees } = useAppStore();
+  const ledgerEntries = useAppStore(s => s.ledgerEntries);
   const priv = usePriv('opsVehicles');
   
   const [activeTab, setActiveTab] = useState<'fleet' | 'logs' | 'documents' | 'fuel'>('logs');
@@ -384,7 +385,8 @@ export function VehicleManager() {
       total_cost: Number(fuelForm.total_cost),
       odometer: fuelForm.odometer !== '' ? Number(fuelForm.odometer) : undefined,
       filled_by: fuelForm.filled_by || undefined,
-      notes: fuelForm.notes || undefined
+      notes: fuelForm.notes || undefined,
+      linkedLedgerIds: fuelForm.linkedLedgerIds
     };
     if (editingFuelLog) {
       await updateVehicleFuelLog(editingFuelLog.id, payload);
@@ -393,7 +395,7 @@ export function VehicleManager() {
     }
     setShowFuelForm(false);
     setEditingFuelLog(null);
-    setFuelForm({ vehicle_id: '', vehicle_reg: '', date: new Date().toISOString().split('T')[0], rate_per_litre: '', litres: '', total_cost: '', odometer: '', filled_by: '', notes: '', lastComputed: '' });
+    setFuelForm({ vehicle_id: '', vehicle_reg: '', date: new Date().toISOString().split('T')[0], rate_per_litre: '', litres: '', total_cost: '', odometer: '', filled_by: '', notes: '', linkedLedgerIds: [], lastComputed: '' });
   };
 
   const handleEditFuelLog = (log: VehicleFuelLog) => {
@@ -408,6 +410,7 @@ export function VehicleManager() {
       odometer: log.odometer ?? '',
       filled_by: log.filled_by ?? '',
       notes: log.notes ?? '',
+      linkedLedgerIds: log.linkedLedgerIds ?? [],
       lastComputed: ''
     });
     setShowFuelForm(true);
@@ -738,7 +741,7 @@ export function VehicleManager() {
             className="h-8 w-8 p-0 bg-amber-500 hover:bg-amber-600 text-white"
             onClick={() => {
               setEditingFuelLog(null);
-              setFuelForm({ vehicle_id: '', vehicle_reg: '', date: new Date().toISOString().split('T')[0], rate_per_litre: '', litres: '', total_cost: '', odometer: '', filled_by: '', notes: '', lastComputed: '' });
+              setFuelForm({ vehicle_id: '', vehicle_reg: '', date: new Date().toISOString().split('T')[0], rate_per_litre: '', litres: '', total_cost: '', odometer: '', filled_by: '', notes: '', linkedLedgerIds: [], lastComputed: '' });
               setShowFuelForm(true);
             }}
             title="Log Fuel"
@@ -793,7 +796,7 @@ export function VehicleManager() {
                 className="flex items-center gap-1.5 h-9 px-2 sm:px-3 text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
                 onClick={() => {
                   setEditingFuelLog(null);
-                  setFuelForm({ vehicle_id: '', vehicle_reg: '', date: new Date().toISOString().split('T')[0], rate_per_litre: '', litres: '', total_cost: '', odometer: '', filled_by: '', notes: '', lastComputed: '' });
+                  setFuelForm({ vehicle_id: '', vehicle_reg: '', date: new Date().toISOString().split('T')[0], rate_per_litre: '', litres: '', total_cost: '', odometer: '', filled_by: '', notes: '', linkedLedgerIds: [], lastComputed: '' });
                   setShowFuelForm(true);
                 }}
                 title="Log Fuel"
@@ -1450,10 +1453,68 @@ export function VehicleManager() {
                   <Label>Odometer Reading (km)</Label>
                   <Input type="number" placeholder="Optional" value={fuelForm.odometer} onChange={e => handleFuelFormChange('odometer', e.target.value)} />
                 </div>
-                <div className="space-y-2">
+              <div className="space-y-2">
                   <Label>Notes</Label>
                   <Input placeholder="Optional notes..." value={fuelForm.notes} onChange={e => handleFuelFormChange('notes', e.target.value)} />
                 </div>
+              </div>
+
+              {/* Ledger Reconciliation */}
+              <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/30 dark:bg-slate-900/20 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Reconcile with Financial Ledger</p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-7 gap-1.5 text-xs"
+                    onClick={() => { setLedgerSearch(''); setShowLedgerDialog(true); }}
+                  >
+                    <LinkIcon className="h-3 w-3" />
+                    Link Entries
+                  </Button>
+                </div>
+
+                {fuelForm.linkedLedgerIds.length === 0 ? (
+                  <p className="text-xs text-slate-400 italic">No ledger entries linked yet.</p>
+                ) : (
+                  <div className="space-y-1.5">
+                    {fuelForm.linkedLedgerIds.map(lid => {
+                      const entry = ledgerEntries.find(e => e.id === lid);
+                      if (!entry) return null;
+                      return (
+                        <div key={lid} className="flex items-center justify-between bg-white dark:bg-slate-800 rounded-lg px-3 py-2 border border-slate-200 dark:border-slate-700">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-medium text-slate-700 dark:text-slate-200 truncate">{entry.description}</p>
+                            <p className="text-[10px] text-slate-400">{entry.date} {entry.voucherNo ? `· #${entry.voucherNo}` : ''}</p>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className="text-xs font-bold text-emerald-600">{fmtCurrency(Number(entry.amount) || 0)}</span>
+                            <button
+                              type="button"
+                              onClick={() => handleToggleLedger(lid)}
+                              className="text-rose-400 hover:text-rose-600 transition-colors"
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    <div className="pt-1 flex justify-between text-xs font-bold">
+                      <span className="text-slate-500">Total Linked</span>
+                      <span className="text-emerald-600">{fmtCurrency(totalLinkedAmount)}</span>
+                    </div>
+                    {Number(fuelForm.total_cost) > 0 && (
+                      <div className="flex justify-between text-xs">
+                        <span className="text-slate-400">Fuel Cost</span>
+                        <span className={totalLinkedAmount >= Number(fuelForm.total_cost) ? 'text-emerald-600 font-semibold' : 'text-rose-500 font-semibold'}>
+                          {fmtCurrency(Number(fuelForm.total_cost))} {totalLinkedAmount >= Number(fuelForm.total_cost) ? '✓ Covered' : `(Gap: ${fmtCurrency(Number(fuelForm.total_cost) - totalLinkedAmount)})`}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </CardContent>
             <CardHeader className="bg-slate-50 dark:bg-slate-800 border-t flex flex-row gap-3 pt-4 shrink-0">
@@ -1465,6 +1526,101 @@ export function VehicleManager() {
           </Card>
         </div>
       )}
+
+      {/* Ledger Link Dialog — Vehicle Fuel */}
+      <Dialog open={showLedgerDialog} onOpenChange={setShowLedgerDialog}>
+        <DialogContent className="max-w-lg w-full max-h-[80vh] flex flex-col gap-0 p-0">
+          <DialogHeader className="px-5 pt-5 pb-3 border-b">
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <LinkIcon className="h-4 w-4 text-amber-500" />
+              Link Financial Ledger Entries
+            </DialogTitle>
+            <p className="text-xs text-slate-500 mt-1">Select petrol / diesel / fuel entries to reconcile against this vehicle refill.</p>
+          </DialogHeader>
+
+          <div className="px-4 py-3 border-b">
+            <div className="relative">
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+              <Input
+                className="pl-9 h-9 text-sm"
+                placeholder="Search by description, site, voucher…"
+                value={ledgerSearch}
+                onChange={e => setLedgerSearch(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
+            {filteredLedgerEntries.length === 0 ? (
+              <p className="text-sm text-slate-400 italic text-center py-6">
+                {eligibleLedgerEntries.length === 0
+                  ? 'No petrol / diesel / fuel / PMS entries found in the financial ledger.'
+                  : 'No entries match your search.'}
+              </p>
+            ) : (
+              filteredLedgerEntries.map(entry => {
+                const remaining = ledgerRemainingAmounts.get(entry.id) ?? Number(entry.amount);
+                const isLinked = fuelForm.linkedLedgerIds.includes(entry.id);
+                const isFullyUsed = remaining <= 0 && !isLinked;
+                return (
+                  <button
+                    key={entry.id}
+                    type="button"
+                    disabled={isFullyUsed}
+                    onClick={() => handleToggleLedger(entry.id)}
+                    className={`w-full text-left rounded-lg border px-4 py-3 transition-all ${
+                      isLinked
+                        ? 'border-amber-400 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-600'
+                        : isFullyUsed
+                        ? 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 opacity-50 cursor-not-allowed'
+                        : 'border-slate-200 dark:border-slate-700 hover:border-amber-300 hover:bg-amber-50/50 dark:hover:bg-amber-900/10'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-slate-700 dark:text-slate-200 truncate">{entry.description}</p>
+                        <p className="text-[10px] text-slate-400 mt-0.5">
+                          {entry.date}
+                          {entry.voucherNo ? ` · #${entry.voucherNo}` : ''}
+                          {entry.site ? ` · ${entry.site}` : ''}
+                        </p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-sm font-bold text-emerald-600">{fmtCurrency(Number(entry.amount) || 0)}</p>
+                        {remaining < Number(entry.amount) && (
+                          <p className="text-[10px] text-rose-500">
+                            {remaining <= 0 ? 'Fully used' : `Rem: ${fmtCurrency(remaining)}`}
+                          </p>
+                        )}
+                      </div>
+                      <div className={`h-5 w-5 rounded border-2 flex items-center justify-center shrink-0 mt-0.5 transition-colors ${
+                        isLinked ? 'border-amber-500 bg-amber-500' : 'border-slate-300 dark:border-slate-600'
+                      }`}>
+                        {isLinked && <Check className="h-3 w-3 text-white" />}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })
+            )}
+          </div>
+
+          {fuelForm.linkedLedgerIds.length > 0 && (
+            <div className="px-4 py-3 border-t bg-slate-50 dark:bg-slate-800/50">
+              <div className="flex justify-between text-xs font-medium">
+                <span className="text-slate-500">{fuelForm.linkedLedgerIds.length} entr{fuelForm.linkedLedgerIds.length === 1 ? 'y' : 'ies'} linked · Total:</span>
+                <span className="text-emerald-600 font-bold">{fmtCurrency(totalLinkedAmount)}</span>
+              </div>
+            </div>
+          )}
+
+          <div className="px-4 py-3 border-t flex justify-end">
+            <Button size="sm" onClick={() => setShowLedgerDialog(false)} className="bg-amber-500 hover:bg-amber-600 text-white">
+              Done
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Tabs — hidden when on Fuel Analytics */}
       {activeTab !== 'fuel' && (

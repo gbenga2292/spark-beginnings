@@ -2,6 +2,14 @@ const { app, BrowserWindow, Menu, dialog, shell, ipcMain, Notification, Tray } =
 const path = require('path');
 const { autoUpdater } = require('electron-updater');
 
+/* ─── Disable Hardware Acceleration (Fixes VM/RDP GPU crashes) ─── */
+app.disableHardwareAcceleration();
+app.commandLine.appendSwitch('disable-gpu');
+app.commandLine.appendSwitch('disable-software-rasterizer');
+app.commandLine.appendSwitch('disable-gpu-compositing');
+app.commandLine.appendSwitch('no-sandbox');
+app.commandLine.appendSwitch('disable-gpu-sandbox');
+
 /* ─── Single Instance Lock ─────────────────────────────────────── */
 const gotTheLock = app.requestSingleInstanceLock();
 

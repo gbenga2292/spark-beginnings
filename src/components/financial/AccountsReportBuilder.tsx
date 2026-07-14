@@ -9,6 +9,9 @@ import { toast } from '@/src/components/ui/toast';
 import logoSrc from '../../../logo/logo-2.png';
 import { usePayrollCalculator } from '@/src/hooks/usePayrollCalculator';
 import { Input } from '@/src/components/ui/input';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import { DialogDescription, DialogFooter } from '@/src/components/ui/dialog';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const YEAR_RANGE_START = 2020;
@@ -370,6 +373,11 @@ export function AccountsReportBuilder({
   const [newPresetName,   setNewPresetName]   = useState('');
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportMode, setExportMode] = useState<'csv' | 'pdf' | null>(null);
+  const [exportSeparate, setExportSeparate] = useState(true);
+  const [exportIncSummary, setExportIncSummary] = useState(true);
+  const [exportIncBreakdown, setExportIncBreakdown] = useState(false);
 
   // Tracks sections collapsed in the sidebar
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
@@ -1118,20 +1126,83 @@ export function AccountsReportBuilder({
     });
   };
 
+  const promptExport = (mode: 'csv' | 'pdf') => {
+    const rowCount = isMultiSource ? aggregatedRows.length : recordsToPrint.length;
+    if (rowCount === 0) { toast.error('No data to export.'); return; }
+    
+    if (selectedMonths.length > 1) {
+      setExportMode(mode);
+      setExportSeparate(true);
+      setExportIncSummary(true);
+      setExportIncBreakdown(false);
+      setShowExportModal(true);
+    } else {
+      if (mode === 'csv') handleExportCSV(false);
+      else handleExportPDF(false);
+    }
+  };
+
   // ── Export CSV ───────────────────────────────────────────────────────────────
-  const handleExportCSV = async () => {
+  const handleExportCSV = async (separateMonths: boolean = false) => {
     const rowCount = isMultiSource ? aggregatedRows.length : recordsToPrint.length;
     if (rowCount === 0) { toast.error('No data to export.'); return; }
 
     const headers = orderedCols.map(c => c.label);
     const esc = (v: any) => typeof v === 'number' ? String(v) : `"${String(v ?? '').replace(/"/g, '""')}"`;
+
     const dataRows = isMultiSource
       ? aggregatedRows.map((row, i) => orderedCols.map(c => getAggValue(c.id, row, i)))
       : recordsToPrint.map((rec, i) => orderedCols.map(c => getTxnValue(c.id, rec, i)));
+    
+    // Total row calculation (ignoring grouping for the overall total)
     const totalsRow = orderedCols.map(c => c.summable ? getColTotal(c.id) : (c.id === 'client' || c.id === 's_client' ? 'TOTAL' : ''));
-    dataRows.push(totalsRow);
+    
+    let csvContent = "";
 
-    const csv = [headers.join(','), ...dataRows.map(r => r.map(esc).join(','))].join('\n');
+    if (separateMonths) {
+      const rowsByMonth: Record<string, any[][]> = {};
+      
+      if (isMultiSource) {
+        aggregatedRows.forEach((row, i) => {
+          const rowData = orderedCols.map(c => getAggValue(c.id, row, i));
+          // In multi-source aggregated rows, there isn't a single month unless we look at the raw data,
+          // but we aggregate across selected months. To do month-by-month for aggregated rows, we would need 
+          // to re-aggregate per month. For simplicity, we just put everything in one sheet if it's aggregated,
+          // OR we would need a much more complex re-aggregation. 
+          // Assuming user wants month-by-month mainly for single-source lists where date is present.
+          const m = "Aggregated"; 
+          if (!rowsByMonth[m]) rowsByMonth[m] = [];
+          rowsByMonth[m].push(rowData);
+        });
+      } else {
+        recordsToPrint.forEach((rec, i) => {
+          const rowData = orderedCols.map(c => getTxnValue(c.id, rec, i));
+          // Find date field
+          const d = (rec as any).date || (rec as any).startDate;
+          let mName = "Unknown";
+          if (d) {
+            const dateObj = new Date(d);
+            mName = MONTHS[dateObj.getMonth()].label;
+          }
+          if (!rowsByMonth[mName]) rowsByMonth[mName] = [];
+          rowsByMonth[mName].push(rowData);
+        });
+      }
+
+      Object.keys(rowsByMonth).forEach(m => {
+        csvContent += `\n--- Month: ${m.toUpperCase()} ---\n`;
+        csvContent += headers.join(',') + '\n';
+        csvContent += rowsByMonth[m].map(r => r.map(esc).join(',')).join('\n') + '\n';
+      });
+      // Append grand total at the bottom
+      csvContent += `\n--- GRAND TOTAL ---\n`;
+      csvContent += headers.join(',') + '\n';
+      csvContent += totalsRow.map(esc).join(',') + '\n';
+    } else {
+      dataRows.push(totalsRow);
+      csvContent = [headers.join(','), ...dataRows.map(r => r.map(esc).join(','))].join('\n');
+    }
+
     const fileName = `${selectedSources.map(s => s.toLowerCase()).join('_')}_report_${selectedYears.join('-')}.csv`;
 
     if ((window as any).electronAPI?.savePathDialog) {
@@ -1140,14 +1211,193 @@ export function AccountsReportBuilder({
         filters: [{ name: 'CSV Files', extensions: ['csv'] }],
       });
       if (fp) {
-        const ok = await (window as any).electronAPI.writeFile(fp, csv, 'utf8');
+        const ok = await (window as any).electronAPI.writeFile(fp, csvContent, 'utf8');
         if (ok) toast.success(`Exported to ${fp}`); else toast.error('Failed to save.');
       }
     } else {
       const link = document.createElement('a');
-      link.href = encodeURI('data:text/csv;charset=utf-8,' + csv);
+      link.href = encodeURI('data:text/csv;charset=utf-8,' + csvContent);
       link.download = fileName;
       document.body.appendChild(link); link.click(); document.body.removeChild(link);
+      toast.success('Report exported!');
+    }
+  };
+
+  const handleExportPDF = async (separateMonths: boolean = false) => {
+    const rowCount = isMultiSource ? aggregatedRows.length : recordsToPrint.length;
+    if (rowCount === 0) { toast.error('No data to export.'); return; }
+
+    const doc = new jsPDF('landscape');
+    
+    const pageW = doc.internal.pageSize.getWidth();
+
+    // Helper to draw the professional header on any page
+    const drawHeader = (reportLabel: string, period?: string) => {
+      // Banner background
+      doc.setFillColor(15, 23, 42); // slate-900
+      doc.rect(0, 0, pageW, 52, 'F');
+
+      // Accent stripe
+      doc.setFillColor(79, 70, 229); // indigo-600
+      doc.rect(0, 49, pageW, 3, 'F');
+
+      // Logo — breathing room
+      try { doc.addImage(logoSrc, 'PNG', 10, 6, 38, 38); } catch (_) {}
+
+      // Vertical divider
+      doc.setDrawColor(79, 70, 229);
+      doc.setLineWidth(0.6);
+      doc.line(56, 10, 56, 44);
+
+      // Company name
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(18);
+      doc.setTextColor(255, 255, 255);
+      doc.text('DCEL Office Suite', 62, 22);
+
+      // Report label
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      doc.setTextColor(165, 180, 252); // indigo-300
+      doc.text(reportLabel, 62, 31);
+
+      // Department pill (if PAYROLL and depts selected)
+      if (selectedSources.includes('PAYROLL') && selectedDepts.length > 0) {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(7.5);
+        doc.setTextColor(196, 181, 253); // purple-300
+        doc.text(`Dept: ${selectedDepts.join(' · ')}`, 62, 40);
+      }
+
+      // Right-side meta
+      const rightX = pageW - 84;
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.setTextColor(203, 213, 225);
+      doc.text('Period:', rightX, 20);
+      doc.text('Generated:', rightX, 28);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(255, 255, 255);
+      doc.text(period ?? selectedMonths.map(m => MONTHS.find(mo => mo.value === m)?.label ?? '').filter(Boolean).join(', '), rightX + 24, 20);
+      doc.text(new Date().toLocaleDateString(), rightX + 30, 28);
+    };
+
+    const reportTitleText = selectedSources.length === 1
+      ? `${SOURCE_LABELS[selectedSources[0]]} Report`
+      : 'Combined Financial Report';
+
+    // Draw header on first page
+    drawHeader(reportTitleText);
+
+    const headers = orderedCols.map(c => c.label);
+    
+    const fm = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    
+    const dataRows = isMultiSource
+      ? aggregatedRows.map((row, i) => orderedCols.map(c => {
+          const val = getAggValue(c.id, row, i);
+          return typeof val === 'number' && c.summable ? fm(val) : String(val);
+        }))
+      : recordsToPrint.map((rec, i) => orderedCols.map(c => {
+          const val = getTxnValue(c.id, rec, i);
+          return typeof val === 'number' && c.summable ? fm(val) : String(val);
+        }));
+
+    const totalsRow = orderedCols.map(c => c.summable ? fm(getColTotal(c.id)) : (c.id === 'client' || c.id === 's_client' ? 'TOTAL' : ''));
+    dataRows.push(totalsRow);
+
+    const columnStyles: any = {};
+    orderedCols.forEach((col, idx) => {
+      if (col.summable || isNumericCol(col.id)) {
+        columnStyles[idx] = { halign: 'right' };
+      }
+    });
+
+    if (separateMonths && !isMultiSource) {
+      const rowsByMonth: Record<string, any[][]> = {};
+      recordsToPrint.forEach((rec, i) => {
+        const rowData = orderedCols.map(c => {
+          const val = getTxnValue(c.id, rec, i);
+          return typeof val === 'number' && c.summable ? fm(val) : String(val);
+        });
+        const d = (rec as any).date || (rec as any).startDate;
+        let mName = "Unknown";
+        if (d) {
+          const dateObj = new Date(d);
+          mName = MONTHS[dateObj.getMonth()].label;
+        }
+        if (!rowsByMonth[mName]) rowsByMonth[mName] = [];
+        rowsByMonth[mName].push(rowData);
+      });
+
+      let pageIdx = 0;
+      Object.keys(rowsByMonth).forEach(m => {
+        if (pageIdx > 0) doc.addPage();
+        drawHeader(`${reportTitleText} — ${m}`, m);
+
+        autoTable(doc, {
+          startY: 62,
+          head: [headers],
+          body: rowsByMonth[m],
+          theme: 'grid',
+          headStyles: { fillColor: [79, 70, 229] },
+          styles: { fontSize: 7 },
+          columnStyles: columnStyles
+        });
+        pageIdx++;
+      });
+      
+      // Grand totals page
+      doc.addPage();
+      drawHeader(`${reportTitleText} — Grand Totals`);
+      autoTable(doc, {
+        startY: 62,
+        head: [headers],
+        body: [totalsRow],
+        theme: 'grid',
+        headStyles: { fillColor: [79, 70, 229] },
+        styles: { fontSize: 7 },
+        columnStyles: columnStyles,
+        didParseCell: function(cellData) {
+          cellData.cell.styles.fontStyle = 'bold';
+          cellData.cell.styles.fillColor = [241, 245, 249];
+        }
+      });
+    } else {
+      autoTable(doc, {
+        startY: 62,
+        head: [headers],
+        body: dataRows,
+        theme: 'grid',
+        headStyles: { fillColor: [79, 70, 229] },
+        styles: { fontSize: 7 },
+        columnStyles: columnStyles,
+        didParseCell: function(cellData) {
+          if (cellData.row.index === dataRows.length - 1) {
+            cellData.cell.styles.fontStyle = 'bold';
+            cellData.cell.styles.fillColor = [241, 245, 249];
+          }
+        }
+      });
+    }
+
+    // Employee breakdown omitted for general query report.
+
+    const fileName = `${selectedSources.map(s => s.toLowerCase()).join('_')}_report_${selectedYears.join('-')}.pdf`;
+
+    if ((window as any).electronAPI?.savePathDialog) {
+      const fp = await (window as any).electronAPI.savePathDialog({
+        title: 'Export Report (PDF)', defaultPath: fileName,
+        filters: [{ name: 'PDF Files', extensions: ['pdf'] }],
+      });
+      if (fp) {
+        // Need to save as blob, convert to buffer and write via electron
+        const pdfOutput = doc.output('arraybuffer');
+        const ok = await (window as any).electronAPI.writeFile(fp, pdfOutput, 'buffer');
+        if (ok) toast.success(`Exported to ${fp}`); else toast.error('Failed to save.');
+      }
+    } else {
+      doc.save(fileName);
       toast.success('Report exported!');
     }
   };
@@ -1218,13 +1468,22 @@ export function AccountsReportBuilder({
               </button>
               {/* Primary action */}
               <button
-                onClick={handleExportCSV}
+                onClick={() => promptExport('pdf')}
+                disabled={rowCount === 0}
+                className="inline-flex items-center justify-center gap-1.5 h-7 px-2 md:px-3 text-xs font-semibold rounded bg-rose-600 hover:bg-rose-500 text-white transition-colors disabled:opacity-40 disabled:pointer-events-none"
+                title="Export PDF"
+              >
+                <Printer className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline-block">PDF</span>
+              </button>
+              <button
+                onClick={() => promptExport('csv')}
                 disabled={rowCount === 0}
                 className="inline-flex items-center justify-center gap-1.5 h-7 px-2 md:px-3 text-xs font-semibold rounded bg-indigo-600 hover:bg-indigo-500 text-white transition-colors disabled:opacity-40 disabled:pointer-events-none"
                 title="Export CSV"
               >
                 <Upload className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline-block">Export</span>
+                <span className="hidden sm:inline-block">CSV</span>
               </button>
               {/* Secondary action */}
               <button
@@ -1928,6 +2187,126 @@ export function AccountsReportBuilder({
           </div>
         </DialogContent>
       </Dialog>
+
+      {showExportModal && (
+        <Dialog open={showExportModal} onOpenChange={setShowExportModal}>
+          <DialogContent className="max-w-md !z-[60]">
+            <DialogHeader>
+              <DialogTitle>Export Options</DialogTitle>
+              <DialogDescription>
+                {selectedMonths.length} months selected — choose how to structure the {exportMode === 'csv' ? 'CSV export' : 'PDF report'}.
+                {isMultiSource && <span className="text-[10px] text-amber-600 mt-1 block">(Note: Separated months work best for single-source queries.)</span>}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="flex flex-col gap-3 my-4">
+
+              {/* ── Option 1: Combine ── */}
+              <button
+                onClick={() => setExportSeparate(false)}
+                className={`flex items-start gap-3 p-4 rounded-xl border text-left transition-all cursor-pointer ${
+                  !exportSeparate
+                    ? 'border-indigo-400 bg-indigo-50/40 ring-1 ring-indigo-300'
+                    : 'border-slate-200 hover:border-indigo-300 hover:bg-slate-50'
+                }`}
+              >
+                <span className={`mt-0.5 w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${!exportSeparate ? 'border-indigo-500' : 'border-slate-300'}`}>
+                  {!exportSeparate && <span className="w-2 h-2 rounded-full bg-indigo-500 block" />}
+                </span>
+                <div>
+                  <span className="font-bold text-slate-800 text-sm block">Combine all months</span>
+                  <span className="text-slate-500 text-xs mt-0.5 block">
+                    Aggregates all {selectedMonths.length} months into a single {exportMode === 'csv' ? 'sheet' : 'document'}.
+                  </span>
+                </div>
+              </button>
+
+              {/* ── Option 2: Separate ── */}
+              <div className={`rounded-xl border transition-all ${exportSeparate ? 'border-indigo-400 bg-indigo-50/30 ring-1 ring-indigo-300' : 'border-slate-200'}`}>
+                <button
+                  onClick={() => setExportSeparate(true)}
+                  className="flex items-start gap-3 p-4 w-full text-left cursor-pointer"
+                >
+                  <span className={`mt-0.5 w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${exportSeparate ? 'border-indigo-500' : 'border-slate-300'}`}>
+                    {exportSeparate && <span className="w-2 h-2 rounded-full bg-indigo-500 block" />}
+                  </span>
+                  <div>
+                    <span className="font-bold text-slate-800 text-sm block">Separate by month</span>
+                    <span className="text-slate-500 text-xs mt-0.5 block">
+                      Creates a separate {exportMode === 'csv' ? 'section' : 'page'} for each month — e.g. "January", "February", etc.
+                    </span>
+                  </div>
+                </button>
+
+                {/* Content checkboxes — shown when Separate is selected */}
+                {exportSeparate && (
+                  <div className="px-4 pb-4 pt-1 border-t border-indigo-100">
+                    <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-2.5">Include in each section:</p>
+                    <div className="flex flex-col gap-2.5">
+
+                      <label className="flex items-center gap-2.5 cursor-pointer group">
+                        <input
+                          type="checkbox"
+                          checked={exportIncSummary}
+                          onChange={e => setExportIncSummary(e.target.checked)}
+                          className="w-4 h-4 rounded accent-indigo-600 cursor-pointer"
+                        />
+                        <div>
+                          <span className="text-sm font-semibold text-slate-700 group-hover:text-indigo-700 block leading-tight">Transaction Table</span>
+                          <span className="text-xs text-slate-400">The main filtered data rows</span>
+                        </div>
+                      </label>
+
+                      {/* Breakdown only relevant for PAYROLL source */}
+                      {selectedSources.includes('PAYROLL') && (
+                        <label className="flex items-center gap-2.5 cursor-pointer group">
+                          <input
+                            type="checkbox"
+                            checked={exportIncBreakdown}
+                            onChange={e => setExportIncBreakdown(e.target.checked)}
+                            className="w-4 h-4 rounded accent-indigo-600 cursor-pointer"
+                          />
+                          <div>
+                            <span className="text-sm font-semibold text-slate-700 group-hover:text-indigo-700 block leading-tight">Employee Breakdown</span>
+                            <span className="text-xs text-slate-400">Per-site employee payroll detail</span>
+                          </div>
+                        </label>
+                      )}
+                    </div>
+
+                    {!exportIncSummary && (!selectedSources.includes('PAYROLL') || !exportIncBreakdown) && (
+                      <p className="text-xs text-amber-600 mt-2.5 font-medium">⚠ Select at least one option to export.</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <DialogFooter className="gap-2 flex-row justify-end">
+              <Button
+                variant="outline"
+                onClick={() => setShowExportModal(false)}
+                className="text-slate-600 hover:bg-slate-50 border-slate-200"
+              >
+                Cancel
+              </Button>
+              <Button
+                disabled={exportSeparate && !exportIncSummary && !exportIncBreakdown}
+                onClick={() => {
+                  const separate = exportSeparate;
+                  if (exportMode === 'csv') handleExportCSV(separate);
+                  else if (exportMode === 'pdf') handleExportPDF(separate);
+                  setShowExportModal(false);
+                }}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white gap-1.5"
+              >
+                Export →
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
     </Dialog>
   );
 }

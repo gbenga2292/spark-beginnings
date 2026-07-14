@@ -1866,18 +1866,52 @@ export function Payroll() {
                   {(() => {
                     // Only show columns relevant to this schedule type
                     const relevantCols = AVAILABLE_COLUMNS.filter(c => c.types.includes('all') || c.types.includes(printType));
+                    // In MATRIX mode: hide the 'month' column and summable columns — they're replaced
+                    // by per-month column headers. Only identity/metadata cols + ONE metric col are meaningful.
+                    const isMatrix = printViewMode === 'MATRIX' && printSelectedMonths.length > 1;
+                    const visibleCols = isMatrix
+                      ? relevantCols.filter(c => c.id !== 'month' && !c.summable)
+                      : relevantCols;
+                    // The metric column: the first selected summable col drives the MATRIX cell value
+                    const matrixMetricCols = isMatrix ? relevantCols.filter(c => c.summable) : [];
+                    const selectedMetricCol = isMatrix
+                      ? matrixMetricCols.find(c => printSelectedColumns.includes(c.id))
+                      : null;
                     return (
                       <div>
                         <h4 className="font-bold text-sm text-slate-900 mb-2 border-b pb-1 flex items-center justify-between">
                           Columns to Include
                           <div className="flex gap-2">
-                            <button className="text-xs text-indigo-600 font-medium hover:underline" onClick={() => setPrintSelectedColumns(relevantCols.map(c => c.id))}>All</button>
+                            <button className="text-xs text-indigo-600 font-medium hover:underline" onClick={() => setPrintSelectedColumns(visibleCols.map(c => c.id))}>All</button>
                             <span className="text-slate-300">|</span>
                             <button className="text-xs text-indigo-600 font-medium hover:underline" onClick={() => setPrintSelectedColumns([])}>None</button>
                           </div>
                         </h4>
+                        {isMatrix && (
+                          <div className="mb-3">
+                            <p className="text-[10px] text-slate-500 mb-1 font-medium uppercase tracking-wide">Month Value to Display</p>
+                            <div className="flex flex-col gap-1">
+                              {matrixMetricCols.map(col => (
+                                <label key={col.id} className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                                  <input
+                                    type="radio"
+                                    name="matrix-metric"
+                                    className="border-slate-300 text-indigo-600 shrink-0"
+                                    checked={printSelectedColumns.includes(col.id)}
+                                    onChange={() => {
+                                      // Remove all other metric cols, keep metadata cols, add this one
+                                      const nonMetric = printSelectedColumns.filter(id => !matrixMetricCols.some(m => m.id === id));
+                                      setPrintSelectedColumns([...nonMetric, col.id]);
+                                    }}
+                                  />
+                                  {col.label}
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                         <div className="flex flex-col gap-1 mt-1">
-                          {relevantCols.map((col, idx) => (
+                          {visibleCols.map((col, idx) => (
                             <div key={col.id} className="flex items-center gap-2 py-0.5">
                               <input
                                 type="checkbox"
@@ -1997,6 +2031,15 @@ export function Payroll() {
 
                     const colIsNumeric = (id: string) => !['sn','employee_name','month','bank_name','account_number','paye_id','pension_pin','tin'].includes(id);
 
+                    const isMatrix = printViewMode === 'MATRIX' && printSelectedMonths.length > 1;
+                    const summableCols = AVAILABLE_COLUMNS.filter(c => c.summable && (c.types.includes('all') || c.types.includes(printType)));
+                    const matrixSelectedMetricId = isMatrix ? (summableCols.find(c => printSelectedColumns.includes(c.id))?.id
+                      ?? (printType === 'PENSION' ? 'employee_pension'
+                        : printType === 'PAYE' ? 'paye'
+                        : printType === 'NSITF' ? 'nsitf_amount'
+                        : 'withholding')) : null;
+                    const matrixSelectedMetricLabel = matrixSelectedMetricId ? AVAILABLE_COLUMNS.find(c => c.id === matrixSelectedMetricId)?.label : null;
+
                     return (
                       <div className="bg-white dark:bg-slate-900 mx-auto shadow-lg min-w-fit rounded-sm print-break" id="print-area-content"
                         style={{ fontFamily: "'Segoe UI', system-ui, sans-serif", overflow: 'hidden' }}>
@@ -2013,7 +2056,12 @@ export function Payroll() {
                               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
                                 <div style={{ width: 4, height: 28, background: accentColor, borderRadius: 2, flexShrink: 0 }} />
                                 <h2 style={{ margin: 0, fontSize: 24, fontWeight: 800, letterSpacing: '0.04em', textTransform: 'uppercase', color: '#0f172a' }}>
-                                  {printType === 'PAYE' ? 'PAYE Tax Schedule' : printType === 'PENSION' ? 'Pension Contribution Schedule' : printType === 'WITHHOLDING' ? 'Withholding Tax Schedule' : 'NSITF Schedule'}
+                                  {isMatrix && matrixSelectedMetricLabel 
+                                    ? `${matrixSelectedMetricLabel} Schedule` 
+                                    : printType === 'PAYE' ? 'PAYE Tax Schedule' 
+                                      : printType === 'PENSION' ? 'Pension Contribution Schedule' 
+                                      : printType === 'WITHHOLDING' ? 'Withholding Tax Schedule' 
+                                      : 'NSITF Schedule'}
                                 </h2>
                               </div>
                               <p style={{ margin: 0, fontSize: 13, color: '#64748b', marginLeft: 14 }}>
@@ -2040,12 +2088,25 @@ export function Payroll() {
                           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                             {printViewMode === 'MATRIX' && printSelectedMonths.length > 1 ? (() => {
                               const empIds = [...new Set(filteredSlips.map(s => s.record.id))];
+                              // Determine which single metric column drives the MATRIX cell values.
+                              // Priority: use the first selected summable column, then fall back to a sensible default.
+                              const selectedMetricId = matrixSelectedMetricId; // Re-use the one computed above
                               const getMetric = (slip: typeof filteredSlips[0]) => {
-                                if (printType === 'PAYE') return slip.record.paye;
-                                if (printType === 'PENSION') return slip.record.pension + slip.record.employerPension;
-                                if (printType === 'NSITF') return slip.record.nsitf;
-                                if (printType === 'WITHHOLDING') return slip.record.paye;
-                                return 0;
+                                switch (selectedMetricId) {
+                                  case 'employee_pension':  return slip.record.pension;
+                                  case 'employer_pension':  return slip.record.employerPension;
+                                  case 'total_pension':     return slip.record.pension + slip.record.employerPension;
+                                  case 'pensionable':       return slip.record.basicSalary + slip.record.housing + slip.record.transport;
+                                  case 'paye':              return slip.record.paye;
+                                  case 'net_pay':           return slip.record.takeHomePay;
+                                  case 'gross':             return slip.record.grossPay;
+                                  case 'nsitf_amount':      return slip.record.nsitf;
+                                  case 'withholding':       return slip.record.paye;
+                                  case 'basic':             return slip.record.basicSalary;
+                                  case 'housing':           return slip.record.housing;
+                                  case 'transport':         return slip.record.transport;
+                                  default: return 0;
+                                }
                               };
                               const mData = empIds.map(eid => {
                                 const empSlips = filteredSlips.filter(s => s.record.id === eid);

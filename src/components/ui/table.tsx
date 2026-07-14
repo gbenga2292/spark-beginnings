@@ -18,7 +18,7 @@ const TableContainer = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTM
     if (e.ctrlKey || e.metaKey || window.matchMedia('(pointer: coarse)').matches) return;
 
     const target = e.target as HTMLElement;
-    if (target.closest('button, a, input, select, textarea, [role="button"], label')) return;
+    if (target.closest('button, a, input, select, textarea, [role="button"], label, .cursor-pointer')) return;
     
     const container = innerRef.current;
     if (!container) return;
