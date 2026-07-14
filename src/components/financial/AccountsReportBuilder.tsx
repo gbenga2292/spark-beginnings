@@ -357,6 +357,8 @@ export function AccountsReportBuilder({
   const [selectedYears,   setSelectedYears]   = useState<number[]>([currentYear]);
   const [selectedMonths,  setSelectedMonths]  = useState<string[]>(MONTHS.map(m => m.key));
   const [selectedClients, setSelectedClients] = useState<string[]>([]);
+  const [selectedSites,   setSelectedSites]   = useState<string[]>([]);
+  const [expandedClientSites, setExpandedClientSites] = useState<Record<string, boolean>>({});
   const [selectedColumns, setSelectedColumns] = useState<string[]>(BUILT_IN_PRESETS[0].columns);
   const [isGroupedView,   setIsGroupedView]   = useState(false);
   const [isPivoted,       setIsPivoted]       = useState(false);
@@ -439,6 +441,41 @@ export function AccountsReportBuilder({
     return Array.from(s).sort();
   }, [selectedSources, employees, sites, rawInvoices, rawPayments, rawVatPayments, rawLedgerEntries]);
 
+  // ── Sites grouped by client (for selected clients only) ──────────────────────
+  const availableSitesByClient = useMemo(() => {
+    const map: Record<string, string[]> = {};
+    sites.forEach(s => {
+      const client = (s.client || '').trim();
+      if (!client || !selectedClients.includes(client)) return;
+      if (!map[client]) map[client] = [];
+      if (s.name && !map[client].includes(s.name)) map[client].push(s.name);
+    });
+    // Also pull site names from invoices/payments for completeness
+    rawInvoices.forEach(r => {
+      const client = (r.client || '').trim();
+      const siteName = (r as any).site || '';
+      if (!client || !siteName || !selectedClients.includes(client)) return;
+      if (!map[client]) map[client] = [];
+      if (!map[client].includes(siteName)) map[client].push(siteName);
+    });
+    rawPayments.forEach(r => {
+      const client = ((r as any).client || '').trim();
+      const siteName = (r as any).site || '';
+      if (!client || !siteName || !selectedClients.includes(client)) return;
+      if (!map[client]) map[client] = [];
+      if (!map[client].includes(siteName)) map[client].push(siteName);
+    });
+    // Sort per client
+    Object.keys(map).forEach(k => map[k].sort());
+    return map;
+  }, [sites, rawInvoices, rawPayments, selectedClients]);
+
+  // When selected clients change, prune selectedSites to only valid ones
+  useEffect(() => {
+    const validSites = Object.values(availableSitesByClient).flat();
+    setSelectedSites(prev => prev.filter(s => validSites.includes(s)));
+  }, [availableSitesByClient]); // eslint-disable-line
+
   const availableDepts = useMemo(() => Array.from(new Set(employees.map(e => String(e.department || '')).filter(Boolean))).sort(), [employees]);
   const availablePos   = useMemo(() => Array.from(new Set(employees.map(e => String(e.position || '')).filter(Boolean))).sort((a, b) => getPositionIndex(a) - getPositionIndex(b)), [employees]);
   const availableTypes = ['OFFICE', 'FIELD', 'NON-EMPLOYEE'];
@@ -502,13 +539,19 @@ export function AccountsReportBuilder({
   const recordsToPrint = useMemo((): TaggedRecord[] => {
     const monthIndexes = selectedMonths.map(m => MONTHS.findIndex(mx => mx.key === m) + 1);
 
-    const keepByDate = (date: string, client: string) => {
+    const keepByDate = (date: string, client: string, site?: string) => {
       const norm = normalizeDate(date);
       if (!norm) return false;
       const yr = parseInt(norm.substring(0, 4), 10);
       if (!selectedYears.includes(yr)) return false;
       const mo = parseInt(norm.substring(5, 7), 10);
-      return monthIndexes.includes(mo) && selectedClients.includes((client || '').trim());
+      if (!monthIndexes.includes(mo)) return false;
+      if (!selectedClients.includes((client || '').trim())) return false;
+      // If specific sites are selected, filter by site
+      if (selectedSites.length > 0 && site !== undefined) {
+        return selectedSites.includes((site || '').trim());
+      }
+      return true;
     };
 
     // VAT: filter by VAT PERIOD month/year, not payment date
@@ -523,13 +566,13 @@ export function AccountsReportBuilder({
 
     if (selectedSources.includes('INVOICE')) {
       rawInvoices
-        .filter(r => keepByDate(r.date, r.client || ''))
+        .filter(r => keepByDate(r.date, r.client || '', (r as any).site))
         .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
         .forEach(r => rows.push({ _source: 'INVOICE', _raw: r }));
     }
     if (selectedSources.includes('PAYMENT')) {
       rawPayments
-        .filter(r => keepByDate(r.date, (r as any).client || ''))
+        .filter(r => keepByDate(r.date, (r as any).client || '', (r as any).site))
         .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
         .forEach(r => rows.push({ _source: 'PAYMENT', _raw: r }));
     }
@@ -539,7 +582,7 @@ export function AccountsReportBuilder({
       if (!selectedSources.includes('PAYMENT')) {
         rawPayments
           .filter(r => {
-            if (!keepByDate(r.date, (r as any).client || '')) return false;
+            if (!keepByDate(r.date, (r as any).client || '', (r as any).site)) return false;
             const pvVal = (r as any).payVat ||
               (sites.find(s => s.name === (r as any).site && s.client === (r as any).client)?.vat as any) || 'No';
             const { vat } = getVatDetails((r as any).amount || 0, pvVal, vatRate, (r as any).damages || 0);
@@ -608,9 +651,11 @@ export function AccountsReportBuilder({
 
     if (selectedSources.includes('SITE')) {
       sites.forEach(s => {
-        if (selectedClients.includes((s.client || '').trim())) {
-           rows.push({ _source: 'SITE', _raw: { ...s, date: s.startDate || `${selectedYears[selectedYears.length - 1]}-01-01` } });
-        }
+        const clientMatch = selectedClients.includes((s.client || '').trim());
+        if (!clientMatch) return;
+        // If specific sites selected, only include matching ones
+        if (selectedSites.length > 0 && !selectedSites.includes((s.name || '').trim())) return;
+        rows.push({ _source: 'SITE', _raw: { ...s, date: s.startDate || `${selectedYears[selectedYears.length - 1]}-01-01` } });
       });
     }
 
@@ -700,7 +745,7 @@ export function AccountsReportBuilder({
     }
 
     return rows;
-  }, [rawInvoices, rawPayments, rawVatPayments, rawLedgerEntries, sites, payrollCache, selectedSources, selectedYears, selectedMonths, selectedClients, vatRate, isGroupedView, isPivoted, getVatDetails, vatRemittanceMap, selectedDepts, selectedPos, selectedTypes]);
+  }, [rawInvoices, rawPayments, rawVatPayments, rawLedgerEntries, sites, payrollCache, selectedSources, selectedYears, selectedMonths, selectedClients, selectedSites, vatRate, isGroupedView, isPivoted, getVatDetails, vatRemittanceMap, selectedDepts, selectedPos, selectedTypes]);
 
   // ── Aggregated rows (multi-source) ───────────────────────────────────────────
   // Correctly separates period values from ALL-TIME values for accurate balance.
@@ -762,11 +807,13 @@ export function AccountsReportBuilder({
       }
     });
 
-    // Step 2: ALL-TIME totals — iterate raw records, no date filter
+    // Step 2: ALL-TIME totals — iterate raw records, no date filter (but respect site filter)
     if (selectedSources.includes('INVOICE')) {
       rawInvoices.forEach(r => {
         const client = (r.client || '').trim();
         if (!selectedClients.includes(client)) return;
+        // Apply site filter if active
+        if (selectedSites.length > 0 && !selectedSites.includes(((r as any).site || '').trim())) return;
         const row = ensure(client);
         row.allTimeCharged += r.totalCharge || 0;
         // Brought forward: invoices strictly before the earliest selected year
@@ -783,6 +830,8 @@ export function AccountsReportBuilder({
       rawPayments.forEach(r => {
         const client = ((r as any).client || '').trim();
         if (!selectedClients.includes(client)) return;
+        // Apply site filter if active
+        if (selectedSites.length > 0 && !selectedSites.includes(((r as any).site || '').trim())) return;
         const row = ensure(client);
         const cleared = ((r as any).amount || 0) + ((r as any).withholdingTax || 0) + ((r as any).discount || 0);
         row.allTimeCleared += cleared;
@@ -804,7 +853,7 @@ export function AccountsReportBuilder({
     });
 
     return Array.from(map.values()).sort((a, b) => a.client.localeCompare(b.client));
-  }, [recordsToPrint, isMultiSource, selectedClients, selectedYears, rawInvoices, rawPayments, sites, getVatDetails, vatRate]); // eslint-disable-line
+  }, [recordsToPrint, isMultiSource, selectedClients, selectedSites, selectedYears, rawInvoices, rawPayments, sites, getVatDetails, vatRate]); // eslint-disable-line
 
   // ── Column sets ──────────────────────────────────────────────────────────────
   const relevantCols = useMemo(() => {
@@ -1872,11 +1921,124 @@ export function AccountsReportBuilder({
                           <input type="checkbox" className="rounded border-slate-300 text-indigo-600 shrink-0 h-3 w-3" checked={selectedClients.includes(c)}
                             onChange={e => {
                               if (e.target.checked) setSelectedClients(prev => [...prev, c]);
-                              else setSelectedClients(prev => prev.filter(x => x !== c));
+                              else {
+                                setSelectedClients(prev => prev.filter(x => x !== c));
+                                // Also deselect sites for this client
+                                const clientSites = availableSitesByClient[c] || [];
+                                setSelectedSites(prev => prev.filter(s => !clientSites.includes(s)));
+                              }
                             }} />
                           <span className="truncate">{c}</span>
                         </label>
                       ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Sites (per-client accordion) — only for non-PAYROLL non-VAT sources */}
+              {!selectedSources.includes('PAYROLL') && !selectedSources.every(s => s === 'VAT') && selectedClients.length > 0 && Object.keys(availableSitesByClient).length > 0 && (
+                <div>
+                  <button
+                    onClick={() => toggleSection('sites')}
+                    className="w-full font-bold text-[11px] text-slate-400 uppercase tracking-wide mb-2 flex items-center justify-between hover:text-slate-600 transition-colors"
+                  >
+                    <span className="flex items-center gap-1">
+                      {collapsedSections['sites']
+                        ? <ChevronRight className="h-3 w-3" />
+                        : <ChevronDown className="h-3 w-3" />}
+                      Sites
+                      {selectedSites.length > 0 && (
+                        <span className="ml-1 text-[9px] bg-teal-100 text-teal-700 font-bold px-1.5 py-0.5 rounded-full">
+                          {selectedSites.length} filtered
+                        </span>
+                      )}
+                    </span>
+                    {!collapsedSections['sites'] && (
+                      <div className="flex gap-2" onClick={e => e.stopPropagation()}>
+                        <button
+                          className="text-[10px] text-indigo-600 font-bold hover:underline"
+                          onClick={() => setSelectedSites([])}
+                        >All</button>
+                        <span className="text-slate-300">|</span>
+                        <button
+                          className="text-[10px] text-indigo-600 font-bold hover:underline"
+                          onClick={() => setSelectedSites(Object.values(availableSitesByClient).flat())}
+                        >Select All</button>
+                      </div>
+                    )}
+                  </button>
+                  {!collapsedSections['sites'] && (
+                    <div className="flex flex-col gap-1 max-h-[200px] overflow-y-auto pr-1 custom-scrollbar">
+                      {selectedClients.filter(c => availableSitesByClient[c]?.length > 0).map(client => {
+                        const clientSites = availableSitesByClient[client] || [];
+                        const isExpanded = !!expandedClientSites[client];
+                        const allSelected = clientSites.every(s => selectedSites.includes(s));
+                        const someSelected = clientSites.some(s => selectedSites.includes(s));
+                        return (
+                          <div key={client} className="rounded-lg border border-slate-100 overflow-hidden">
+                            {/* Client group header */}
+                            <div className="flex items-center gap-1.5 px-2 py-1.5 bg-slate-50 border-b border-slate-100">
+                              <button
+                                className="flex items-center gap-1 flex-1 min-w-0"
+                                onClick={() => setExpandedClientSites(prev => ({ ...prev, [client]: !prev[client] }))}
+                              >
+                                {isExpanded
+                                  ? <ChevronDown className="h-3 w-3 text-slate-400 shrink-0" />
+                                  : <ChevronRight className="h-3 w-3 text-slate-400 shrink-0" />}
+                                <span className="text-[10px] font-bold text-slate-600 truncate">{client}</span>
+                                <span className="text-[9px] text-slate-400 shrink-0">({clientSites.length})</span>
+                              </button>
+                              {/* Select all sites for this client */}
+                              <button
+                                onClick={() => {
+                                  if (allSelected) {
+                                    setSelectedSites(prev => prev.filter(s => !clientSites.includes(s)));
+                                  } else {
+                                    setSelectedSites(prev => Array.from(new Set([...prev, ...clientSites])));
+                                  }
+                                }}
+                                className={`text-[9px] font-bold px-1.5 py-0.5 rounded border shrink-0 transition-all ${
+                                  allSelected
+                                    ? 'bg-teal-100 text-teal-700 border-teal-200'
+                                    : someSelected
+                                    ? 'bg-amber-50 text-amber-600 border-amber-200'
+                                    : 'bg-white text-slate-500 border-slate-200 hover:border-teal-300'
+                                }`}
+                              >
+                                {allSelected ? 'All ✓' : someSelected ? 'Some' : 'All'}
+                              </button>
+                            </div>
+                            {/* Sites list (expandable) */}
+                            {isExpanded && (
+                              <div className="flex flex-col gap-0">
+                                {clientSites.map(siteName => {
+                                  const siteSelected = selectedSites.includes(siteName);
+                                  return (
+                                    <label key={siteName} className={`flex items-center gap-2 text-[11px] font-medium cursor-pointer px-3 py-1 transition-colors select-none ${
+                                      siteSelected ? 'bg-teal-50 text-teal-800' : 'text-slate-600 hover:bg-slate-50'
+                                    }`}>
+                                      <input
+                                        type="checkbox"
+                                        className="rounded border-slate-300 text-teal-600 shrink-0 h-3 w-3"
+                                        checked={siteSelected}
+                                        onChange={e => {
+                                          if (e.target.checked) setSelectedSites(prev => [...prev, siteName]);
+                                          else setSelectedSites(prev => prev.filter(s => s !== siteName));
+                                        }}
+                                      />
+                                      <span className="truncate">{siteName}</span>
+                                    </label>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                      {selectedSites.length === 0 && (
+                        <p className="text-[10px] text-slate-400 italic px-1 py-1">No site filter — showing all sites for selected clients</p>
+                      )}
                     </div>
                   )}
                 </div>

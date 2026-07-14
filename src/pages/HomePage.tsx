@@ -46,6 +46,7 @@ import {
   X,
   HardHat,
   PiggyBank,
+  Calculator,
 } from 'lucide-react';
 import { supabase } from '../integrations/supabase/client';
 import { NairaSign } from '../components/ui/naira-sign';
@@ -129,16 +130,16 @@ const navigation: NavCategory[] = [
     ],
   },
   {
-    name: 'Budget',
-    icon: PiggyBank,
-    color: 'from-emerald-500 to-green-600',
-    bgLight: 'bg-emerald-50 hover:bg-emerald-100',
-    bgDark: 'dark:bg-emerald-950/40 dark:hover:bg-emerald-900/60',
-    iconColor: 'text-emerald-600 dark:text-emerald-400',
+    name: 'Logistics Estimator',
+    icon: Calculator,
+    color: 'from-amber-500 to-orange-500',
+    bgLight: 'bg-amber-50 hover:bg-amber-100',
+    bgDark: 'dark:bg-amber-950/40 dark:hover:bg-amber-900/60',
+    iconColor: 'text-amber-600 dark:text-amber-400',
     standalone: true,
-    standaloneHref: '/budget',
+    standaloneHref: '/operations/estimator',
     items: [
-      { name: 'Budget', href: '/budget', icon: PiggyBank, privKey: 'budget', privField: 'canView' },
+      { name: 'Logistics Estimator', href: '/operations/estimator', icon: Calculator, privKey: 'simulator', privField: 'canView' },
     ],
   },
   {
@@ -151,7 +152,6 @@ const navigation: NavCategory[] = [
     items: [
       { name: 'Task Register', href: '/tasks', icon: ClipboardCheck, privKey: 'tasks', privField: 'canViewMyTasks' },
       { name: 'Reminders', href: '/tasks/reminders', icon: Bell, privKey: 'tasks', privField: 'canViewReminders' },
-      { name: 'Task Reports', href: '/tasks/reports', icon: ClipboardList, privKey: 'tasks', privField: 'canViewReports' },
     ],
   },
   {
@@ -227,6 +227,7 @@ const navigation: NavCategory[] = [
       { name: 'Non-Employee Directory', href: '/beneficiaries', icon: Users, privKey: 'beneficiaries', privField: 'canView' },
       { name: 'Ledger', href: '/ledger', icon: BookOpen, privKey: 'ledger', privField: 'canView' },
       { name: 'Company Expenses', href: '/company-expenses', icon: BookOpen, privKey: 'ledger', privField: 'canView' },
+      { name: 'Budget', href: '/budget', icon: PiggyBank, privKey: 'budget', privField: 'canView' },
     ],
   },
   {

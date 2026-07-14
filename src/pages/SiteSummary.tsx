@@ -100,7 +100,7 @@ function DepartmentDropdown({
             <label key={dept} className="flex items-center gap-2.5 px-3 py-1.5 hover:bg-slate-50 cursor-pointer group">
               <input 
                 type="checkbox" 
-                checked={selectedDepts.includes(dept)} 
+                checked={selectedDepts.length === 0 || selectedDepts.includes(dept)} 
                 onChange={() => onToggleDept(dept)} 
                 className="w-3.5 h-3.5 rounded accent-indigo-600 cursor-pointer" 
               />
@@ -114,11 +114,125 @@ function DepartmentDropdown({
   );
 }
 
+function EmployeeDropdown({
+  availableEmployees,
+  selectedEmployees,
+  onToggleEmployee,
+  onSelectAll,
+  onClearAll,
+}: {
+  availableEmployees: { id: string, name: string }[];
+  selectedEmployees: string[];
+  onToggleEmployee: (empId: string) => void;
+  onSelectAll: () => void;
+  onClearAll: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState({ top: 0, left: 0 });
+  const [search, setSearch] = useState('');
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (
+        btnRef.current && !btnRef.current.contains(e.target as Node) &&
+        panelRef.current && !panelRef.current.contains(e.target as Node)
+      ) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const toggle = () => {
+    if (!open && btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect();
+      setPos({ top: r.bottom + 6, left: r.left });
+      setSearch('');
+    }
+    setOpen(o => !o);
+  };
+
+  const isFiltered = selectedEmployees.length > 0;
+  const displayLabel = !isFiltered 
+    ? 'All Employees' 
+    : selectedEmployees.length === availableEmployees.length 
+    ? 'All Employees' 
+    : `${selectedEmployees.length} selected`;
+
+  const filteredEmployees = availableEmployees.filter(e => e.name.toLowerCase().includes(search.toLowerCase()));
+
+  return (
+    <div className="relative shrink-0">
+      <button
+        ref={btnRef}
+        onClick={toggle}
+        className={`flex items-center gap-1.5 h-7 px-2.5 rounded-lg border text-[11px] font-semibold transition-all whitespace-nowrap ${
+          !isFiltered
+            ? 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-white'
+            : 'border-indigo-300 bg-indigo-50 text-indigo-700'
+        }`}
+      >
+        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-0.5">Emp</span>
+        {displayLabel}
+        <svg className={`w-3 h-3 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+      </button>
+
+      {open && createPortal(
+        <div
+          ref={panelRef}
+          style={{ position: 'fixed', top: pos.top, left: pos.left, zIndex: 9999 }}
+          className="bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 min-w-[220px] w-[260px] max-h-[350px] flex flex-col animate-in fade-in slide-in-from-top-1 duration-150"
+        >
+          <div className="px-3 pb-2 pt-1 border-b border-slate-100 shrink-0">
+            <input
+              type="text"
+              placeholder="Search employees..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="w-full h-8 px-2.5 rounded-md border border-slate-200 text-[11px] focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            />
+          </div>
+          <div className="overflow-y-auto flex-1 py-1">
+            <button 
+              type="button" 
+              onClick={onSelectAll} 
+              className="w-full text-left px-3 py-1 text-[11px] font-semibold text-indigo-600 hover:bg-indigo-50 transition-colors"
+            >
+              Select All
+            </button>
+            <button 
+              type="button" 
+              onClick={onClearAll} 
+              className="w-full text-left px-3 py-1 text-[11px] font-semibold text-rose-600 hover:bg-rose-50 border-b border-slate-100 transition-colors mb-1 pb-1.5"
+            >
+              Clear Filters (All)
+            </button>
+            {filteredEmployees.map(emp => (
+              <label key={emp.id} className="flex items-center gap-2.5 px-3 py-1.5 hover:bg-slate-50 cursor-pointer group">
+                <input 
+                  type="checkbox" 
+                  checked={selectedEmployees.length === 0 || selectedEmployees.includes(emp.id)} 
+                  onChange={() => onToggleEmployee(emp.id)} 
+                  className="w-3.5 h-3.5 rounded accent-indigo-600 cursor-pointer" 
+                />
+                <span className="text-[11px] font-semibold text-slate-700 group-hover:text-indigo-600 transition-colors truncate">{emp.name}</span>
+              </label>
+            ))}
+          </div>
+        </div>,
+        document.body
+      )}
+    </div>
+  );
+}
+
 export function SiteSummary({ filterYears = [], filterMonths = [] }: { filterYears?: string[], filterMonths?: string[] } = {}) {
   const [internalMonth, setInternalMonth] = useState(new Date().getMonth() + 1);
   const [internalYear, setInternalYear] = useState(new Date().getFullYear().toString());
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [selectedDepts, setSelectedDepts] = useState<string[]>([]);
+  const [selectedEmployees, setSelectedEmployees] = useState<string[]>([]);
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportMode, setExportMode] = useState<'excel' | 'pdf' | null>(null);
   const [exportSeparate, setExportSeparate] = useState(true);
@@ -144,6 +258,11 @@ export function SiteSummary({ filterYears = [], filterMonths = [] }: { filterYea
     }
   }, [selectedYear, fetchAttendanceYearIfNeeded]);
 
+  // Sync selectedEmployees with selectedDepts: reset employees when depts change
+  useEffect(() => {
+    setSelectedEmployees([]);
+  }, [selectedDepts]);
+
   const priv = usePriv('sites');
   const { calculatePayrollForMonth } = usePayrollCalculator();
   const staffDateWorkedMap = useMemo(() => getStaffDateWorkedMap(attendanceRecords), [attendanceRecords]);
@@ -155,6 +274,18 @@ export function SiteSummary({ filterYears = [], filterMonths = [] }: { filterYea
     });
     return Array.from(depts).sort();
   }, [employees]);
+
+  const availableEmployees = useMemo(() => {
+    // Note: User requested that when a dept is selected, the employees listed might be linked.
+    // We will show employees that belong to the selected departments (or all if none selected).
+    const filtered = selectedDepts.length > 0 
+      ? employees.filter(e => selectedDepts.includes(e.department?.trim() || ''))
+      : employees;
+      
+    return filtered
+      .map(e => ({ id: e.id, name: `${e.firstname} ${e.surname}`.trim() }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [employees, selectedDepts]);
 
   if (!priv.canViewClientSummary) {
     return (
@@ -247,6 +378,11 @@ export function SiteSummary({ filterYears = [], filterMonths = [] }: { filterYea
 
         // Department filter
         if (selectedDepts.length > 0 && !selectedDepts.includes(staffDept)) {
+          return;
+        }
+
+        // Employee filter
+        if (selectedEmployees.length > 0 && !selectedEmployees.includes(staffPayrollId)) {
           return;
         }
 
@@ -477,7 +613,7 @@ export function SiteSummary({ filterYears = [], filterMonths = [] }: { filterYea
 
   const { results, grandTotal, grandPension, grandPaye, grandWht, grandLoanRepayment, grandNetPay } = useMemo(() => {
     return getSummaryData(monthsToProcess);
-  }, [monthsToProcess, isCollapsed, selectedDepts, selectedYear, employees, sites, pendingSites, attendanceRecords, monthValues]);
+  }, [monthsToProcess, isCollapsed, selectedDepts, selectedEmployees, selectedYear, employees, sites, pendingSites, attendanceRecords, monthValues]);
 
   const executeExport = (separateSheets: boolean, incSummary = true, incBreakdown = false) => {
     if (results.length === 0) return;
@@ -590,16 +726,11 @@ export function SiteSummary({ filterYears = [], filterMonths = [] }: { filterYea
 
   const handleExportClick = (mode: 'excel' | 'pdf') => {
     if (results.length === 0) return;
-    if (monthsToProcess.length > 1) {
-      setExportMode(mode);
-      setExportSeparate(true);
-      setExportIncSummary(true);
-      setExportIncBreakdown(true);
-      setShowExportModal(true);
-    } else {
-      if (mode === 'excel') executeExport(false, true, false);
-      else exportPDF(false, true, true);
-    }
+    setExportMode(mode);
+    setExportSeparate(monthsToProcess.length > 1);
+    setExportIncSummary(true);
+    setExportIncBreakdown(true);
+    setShowExportModal(true);
   };
 
   const exportPDF = (separateSheets: boolean = false, incSummary = true, incBreakdown = true) => {
@@ -858,12 +989,30 @@ export function SiteSummary({ filterYears = [], filterMonths = [] }: { filterYea
               availableDepts={availableDepts}
               selectedDepts={selectedDepts}
               onToggleDept={(dept) => {
-                setSelectedDepts(prev => 
-                  prev.includes(dept) ? prev.filter(d => d !== dept) : [...prev, dept]
-                );
+                setSelectedDepts(prev => {
+                  if (prev.length === 0) {
+                    return availableDepts.filter(d => d !== dept);
+                  }
+                  return prev.includes(dept) ? prev.filter(d => d !== dept) : [...prev, dept];
+                });
               }}
-              onSelectAll={() => setSelectedDepts(availableDepts)}
+              onSelectAll={() => setSelectedDepts([])}
               onClearAll={() => setSelectedDepts([])}
+            />
+
+            <EmployeeDropdown
+              availableEmployees={availableEmployees}
+              selectedEmployees={selectedEmployees}
+              onToggleEmployee={(empId) => {
+                setSelectedEmployees(prev => {
+                  if (prev.length === 0) {
+                    return availableEmployees.map(e => e.id).filter(id => id !== empId);
+                  }
+                  return prev.includes(empId) ? prev.filter(id => id !== empId) : [...prev, empId];
+                });
+              }}
+              onSelectAll={() => setSelectedEmployees([])}
+              onClearAll={() => setSelectedEmployees([])}
             />
 
             <div className="hidden sm:block w-px h-4 bg-slate-200" />
@@ -955,83 +1104,87 @@ export function SiteSummary({ filterYears = [], filterMonths = [] }: { filterYea
 
             <div className="flex flex-col gap-3 my-4">
 
-              {/* ── Option 1: Combine ── */}
-              <button
-                onClick={() => setExportSeparate(false)}
-                className={`flex items-start gap-3 p-4 rounded-xl border text-left transition-all cursor-pointer ${
-                  !exportSeparate
-                    ? 'border-indigo-400 bg-indigo-50/40 ring-1 ring-indigo-300'
-                    : 'border-slate-200 hover:border-indigo-300 hover:bg-slate-50'
-                }`}
-              >
-                {/* radio dot */}
-                <span className={`mt-0.5 w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${!exportSeparate ? 'border-indigo-500' : 'border-slate-300'}`}>
-                  {!exportSeparate && <span className="w-2 h-2 rounded-full bg-indigo-500 block" />}
-                </span>
-                <div>
-                  <span className="font-bold text-slate-800 text-sm block">Combine all months</span>
-                  <span className="text-slate-500 text-xs mt-0.5 block">
-                    Aggregates all {monthsToProcess.length} months into a single {exportMode === 'excel' ? 'sheet' : 'document'} named "{isCollapsed ? 'Client Summary' : 'Site Summary'}".
-                  </span>
-                </div>
-              </button>
-
-              {/* ── Option 2: Separate ── */}
-              <div className={`rounded-xl border transition-all ${exportSeparate ? 'border-indigo-400 bg-indigo-50/30 ring-1 ring-indigo-300' : 'border-slate-200'}`}>
-                <button
-                  onClick={() => setExportSeparate(true)}
-                  className="flex items-start gap-3 p-4 w-full text-left cursor-pointer"
-                >
-                  <span className={`mt-0.5 w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${exportSeparate ? 'border-indigo-500' : 'border-slate-300'}`}>
-                    {exportSeparate && <span className="w-2 h-2 rounded-full bg-indigo-500 block" />}
-                  </span>
-                  <div>
-                    <span className="font-bold text-slate-800 text-sm block">Separate by month</span>
-                    <span className="text-slate-500 text-xs mt-0.5 block">
-                      Creates a separate {exportMode === 'excel' ? 'worksheet' : 'section'} for each month — e.g. "January", "February", etc.
+              {monthsToProcess.length > 1 && (
+                <>
+                  {/* ── Option 1: Combine ── */}
+                  <button
+                    onClick={() => setExportSeparate(false)}
+                    className={`flex items-start gap-3 p-4 rounded-xl border text-left transition-all cursor-pointer ${
+                      !exportSeparate
+                        ? 'border-indigo-400 bg-indigo-50/40 ring-1 ring-indigo-300'
+                        : 'border-slate-200 hover:border-indigo-300 hover:bg-slate-50'
+                    }`}
+                  >
+                    {/* radio dot */}
+                    <span className={`mt-0.5 w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${!exportSeparate ? 'border-indigo-500' : 'border-slate-300'}`}>
+                      {!exportSeparate && <span className="w-2 h-2 rounded-full bg-indigo-500 block" />}
                     </span>
-                  </div>
-                </button>
-
-                {/* ── Content checkboxes (only when Separate is chosen) ── */}
-                {exportSeparate && (
-                  <div className="px-4 pb-4 pt-1 border-t border-indigo-100">
-                    <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-2.5">Include in each section:</p>
-                    <div className="flex flex-col gap-2.5">
-
-                      <label className="flex items-center gap-2.5 cursor-pointer group">
-                        <input
-                          type="checkbox"
-                          checked={exportIncSummary}
-                          onChange={e => setExportIncSummary(e.target.checked)}
-                          className="w-4 h-4 rounded accent-indigo-600 cursor-pointer"
-                        />
-                        <div>
-                          <span className="text-sm font-semibold text-slate-700 group-hover:text-indigo-700 block leading-tight">Summary Table</span>
-                          <span className="text-xs text-slate-400">Site / client totals for the month</span>
-                        </div>
-                      </label>
-
-                      <label className="flex items-center gap-2.5 cursor-pointer group">
-                        <input
-                          type="checkbox"
-                          checked={exportIncBreakdown}
-                          onChange={e => setExportIncBreakdown(e.target.checked)}
-                          className="w-4 h-4 rounded accent-indigo-600 cursor-pointer"
-                        />
-                        <div>
-                          <span className="text-sm font-semibold text-slate-700 group-hover:text-indigo-700 block leading-tight">Employee Breakdown</span>
-                          <span className="text-xs text-slate-400">Per-site employee detail {exportMode === 'excel' ? '(separate sheets)' : '(extra pages)'}</span>
-                        </div>
-                      </label>
+                    <div>
+                      <span className="font-bold text-slate-800 text-sm block">Combine all months</span>
+                      <span className="text-slate-500 text-xs mt-0.5 block">
+                        Aggregates all {monthsToProcess.length} months into a single {exportMode === 'excel' ? 'sheet' : 'document'} named "{isCollapsed ? 'Client Summary' : 'Site Summary'}".
+                      </span>
                     </div>
+                  </button>
 
-                    {!exportIncSummary && !exportIncBreakdown && (
-                      <p className="text-xs text-amber-600 mt-2.5 font-medium">⚠ Select at least one option to export.</p>
-                    )}
+                  {/* ── Option 2: Separate ── */}
+                  <div className={`rounded-xl border transition-all ${exportSeparate ? 'border-indigo-400 bg-indigo-50/30 ring-1 ring-indigo-300' : 'border-slate-200'}`}>
+                    <button
+                      onClick={() => setExportSeparate(true)}
+                      className="flex items-start gap-3 p-4 w-full text-left cursor-pointer"
+                    >
+                      <span className={`mt-0.5 w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${exportSeparate ? 'border-indigo-500' : 'border-slate-300'}`}>
+                        {exportSeparate && <span className="w-2 h-2 rounded-full bg-indigo-500 block" />}
+                      </span>
+                      <div>
+                        <span className="font-bold text-slate-800 text-sm block">Separate by month</span>
+                        <span className="text-slate-500 text-xs mt-0.5 block">
+                          Creates a separate {exportMode === 'excel' ? 'worksheet' : 'section'} for each month — e.g. "January", "February", etc.
+                        </span>
+                      </div>
+                    </button>
                   </div>
-                )}
-              </div>
+                </>
+              )}
+
+              {/* ── Content checkboxes ── */}
+              {(exportSeparate || monthsToProcess.length === 1) && (
+                <div className={`px-4 pb-4 pt-1 ${monthsToProcess.length > 1 ? 'border-t border-indigo-100' : ''}`}>
+                  <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-2.5">Include in export:</p>
+                  <div className="flex flex-col gap-2.5">
+
+                    <label className="flex items-center gap-2.5 cursor-pointer group">
+                      <input
+                        type="checkbox"
+                        checked={exportIncSummary}
+                        onChange={e => setExportIncSummary(e.target.checked)}
+                        className="w-4 h-4 rounded accent-indigo-600 cursor-pointer"
+                      />
+                      <div>
+                        <span className="text-sm font-semibold text-slate-700 group-hover:text-indigo-700 block leading-tight">Summary Table</span>
+                        <span className="text-xs text-slate-400">Site / client totals</span>
+                      </div>
+                    </label>
+
+                    <label className="flex items-center gap-2.5 cursor-pointer group">
+                      <input
+                        type="checkbox"
+                        checked={exportIncBreakdown}
+                        onChange={e => setExportIncBreakdown(e.target.checked)}
+                        className="w-4 h-4 rounded accent-indigo-600 cursor-pointer"
+                      />
+                      <div>
+                        <span className="text-sm font-semibold text-slate-700 group-hover:text-indigo-700 block leading-tight">Employee Breakdown</span>
+                        <span className="text-xs text-slate-400">Per-site employee detail {exportMode === 'excel' ? '(separate sheets)' : '(extra pages)'}</span>
+                      </div>
+                    </label>
+                  </div>
+
+                  {!exportIncSummary && !exportIncBreakdown && (
+                    <p className="text-xs text-amber-600 mt-2.5 font-medium">⚠ Select at least one option to export.</p>
+                  )}
+                </div>
+              )}
             </div>
 
             <DialogFooter className="gap-2 flex-row justify-end">

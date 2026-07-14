@@ -19,7 +19,6 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 import { NumericFormat } from 'react-number-format';
 import { supabase } from '@/src/integrations/supabase/client';
 import { InvoiceDetailDialog } from './InvoiceDetailDialog';
-import { LogisticsEstimatorDialog } from './LogisticsEstimatorDialog';
 import { fetchInvoicesData } from '@/src/lib/supabaseService';
 import { useOperations } from '@/src/contexts/OperationsContext';
 
@@ -76,7 +75,6 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
   const [nextInvoiceSource, setNextInvoiceSource] = useState<Invoice | null>(null);
   const [selectedNextMachines, setSelectedNextMachines] = useState<number[]>([]);
   const [detailInvoice, setDetailInvoice] = useState<Invoice | null>(null);
-  const [showEstimator, setShowEstimator] = useState(false);
 
   React.useEffect(() => {
     if (invoices.length === 0 && pendingInvoices.length === 0) {
@@ -1298,15 +1296,6 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
            </div>
         </div>
       );
-    } else if (showEstimator && setFullPageContent) {
-      setFullPageContent(
-        <div className="flex flex-col w-full h-full mx-auto px-2 pb-4 pt-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
-          <LogisticsEstimatorDialog
-            open={true}
-            onClose={() => setShowEstimator(false)}
-          />
-        </div>
-      );
     } else if (setFullPageContent) {
       setFullPageContent(null);
     }
@@ -1314,13 +1303,13 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
     return () => {
       if (setFullPageContent) setFullPageContent(null);
     };
-  }, [printInvoiceTarget, showEstimator, setFullPageContent, ledgerBanks, ledgerBeneficiaryBanks]);
+  }, [printInvoiceTarget, setFullPageContent, ledgerBanks, ledgerBeneficiaryBanks]);
 
-  useHideLayout(!!printInvoiceTarget || showEstimator);
+  useHideLayout(!!printInvoiceTarget);
 
   useSetPageTitle(
-    (printInvoiceTarget || showEstimator) ? null : (activeTab === 'all' ? 'All Invoices' : activeTab === 'active' ? 'Active Invoices' : activeTab === 'quotations' ? 'Quotations' : activeTab === 'unpaid' ? 'Unpaid Site Records' : 'Completed Invoices'),
-    (printInvoiceTarget || showEstimator) ? '' : (activeTab === 'all'
+    (printInvoiceTarget) ? null : (activeTab === 'all' ? 'All Invoices' : activeTab === 'active' ? 'Active Invoices' : activeTab === 'quotations' ? 'Quotations' : activeTab === 'unpaid' ? 'Unpaid Site Records' : 'Completed Invoices'),
+    (printInvoiceTarget) ? '' : (activeTab === 'all'
       ? 'View every historical invoice record'
       : activeTab === 'active'
       ? 'Invoices for sites currently in progress'
@@ -1329,7 +1318,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
       : activeTab === 'quotations' 
       ? 'Review and process quotation drafts'
       : 'Review invoices for sites with consolidated payments'),
-    (printInvoiceTarget || showEstimator) ? null : (
+    (printInvoiceTarget) ? null : (
       <>
       {priv.canExport && (
         <DropdownMenu>
@@ -1371,18 +1360,8 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
           <Plus className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Create Invoice</span>
         </Button>
       )}
-      {priv.canCreate && (
-        <Button
-          size="sm"
-          className="gap-2 h-9 px-3 bg-amber-500 hover:bg-amber-600 text-white font-bold text-[11px] uppercase tracking-tight shadow-md transition-all active:scale-95"
-          onClick={() => setShowEstimator(true)}
-          title="Logistics Estimator"
-        >
-          <Calculator className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Estimator</span>
-        </Button>
-      )}
       </>),
-    [activeTab, priv, siteRegistry, pendingInvoices, completedSites, unpaidSites, currentList, printInvoiceTarget, showEstimator]
+    [activeTab, priv, siteRegistry, pendingInvoices, completedSites, unpaidSites, currentList, printInvoiceTarget]
   );
 
   return (

@@ -75,6 +75,7 @@ const NotificationsPage = lazy(() => import('./pages/Notifications').then(m => (
 const InterviewManager = lazy(() => import('./pages/InterviewManager').then(m => ({ default: m.default })));
 const Simulator = lazy(() => import('./pages/Simulator').then(m => ({ default: m.default })));
 const MachineReconciliation = lazy(() => import('./pages/MachineReconciliation').then(m => ({ default: m.MachineReconciliation })));
+const Estimator = lazy(() => import('./pages/Estimator').then(m => ({ default: m.default })));
 const Budget = lazy(() => import('./pages/Budget').then(m => ({ default: m.Budget })));
 import { OperationsProvider } from './contexts/OperationsContext';
 
@@ -255,6 +256,7 @@ function AppContent() {
                       <Route path="sites" element={<ProtectedRoute requiredModule="opsSites"><SiteManager /></ProtectedRoute>} />
                       <Route path="analytics" element={<ProtectedRoute requiredModule="opsCheckout"><EmployeeAnalytics /></ProtectedRoute>} />
                       <Route path="simulator" element={<ProtectedRoute requiredModule="simulator"><Simulator /></ProtectedRoute>} />
+                      <Route path="estimator" element={<ProtectedRoute requiredModule="simulator"><Estimator /></ProtectedRoute>} />
                       <Route path="machine-reconciliation" element={<ProtectedRoute requiredModule={['opsMachineRecon']}><MachineReconciliation /></ProtectedRoute>} />
                       <Route path="*" element={<Navigate to="/operations" replace />} />
                     </Routes>

@@ -38,9 +38,19 @@ export function attachDragScroll(el: HTMLElement): () => void {
 
   const onMouseMove = (e: MouseEvent) => {
     if (!isDown) return;
-    e.preventDefault();
+    
     const x = e.clientX;
     const y = e.clientY;
+    
+    // Only apply the CSS pointer-events:none if we've actually started dragging (moving more than a few pixels)
+    if (Math.abs(x - startX) > 5 || Math.abs(y - startY) > 5) {
+      el.dataset.dragScrolling = 'true';
+    }
+
+    if (el.dataset.dragScrolling === 'true') {
+      e.preventDefault();
+    }
+
     const walkX = (x - startX) * 1.25; // Adjusted for a completely natural feel
     const walkY = (y - startY) * 1.25;
     el.scrollLeft = scrollLeft - walkX;
@@ -58,7 +68,6 @@ export function attachDragScroll(el: HTMLElement): () => void {
     ) return;
 
     isDown = true;
-    el.dataset.dragScrolling = 'true';
     startX = e.clientX;
     startY = e.clientY;
     scrollLeft = el.scrollLeft;

@@ -37,6 +37,7 @@ import {
   BarChart2,
   Bell,
   History,
+  Calculator,
   MessageSquare,
   Package,
   Fuel,
@@ -134,6 +135,16 @@ const navigation: NavCategory[] = [
     standaloneHref: '/operations/machine-reconciliation',
     items: [
       { name: 'Machine Recon', href: '/operations/machine-reconciliation', icon: Package, privKey: 'opsMachineRecon', privField: 'canView' },
+    ],
+  },
+  // ── Logistics Estimator — standalone direct link ────────────────────────
+  {
+    name: 'Logistics Estimator',
+    icon: Calculator,
+    standalone: true,
+    standaloneHref: '/operations/estimator',
+    items: [
+      { name: 'Logistics Estimator', href: '/operations/estimator', icon: Calculator, privKey: 'simulator', privField: 'canView' },
     ],
   },
   // ── Tasks ────────────────────────────────────────────────────────
