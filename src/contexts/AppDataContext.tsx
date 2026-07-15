@@ -20,6 +20,10 @@ interface AppDataContextType {
     projects: any[];
     reminders: any[];
     workspaces: any[];
+    /** High-water mark cursors — keyed by task_id/user_id pair */
+    participantStatuses: any[];
+    /** Per-message read receipts — keyed by update_id/user_id pair */
+    updateReceipts: any[];
     addReminder: (...args: any[]) => Promise<void>;
     updateReminder: (...args: any[]) => Promise<void>;
     deleteReminder: (...args: any[]) => Promise<void>;
@@ -29,7 +33,7 @@ interface AppDataContextType {
     createMainTask: (task: any, subs?: any[]) => Promise<any>;
     updateMainTask: (id: string, p: any) => Promise<void>;
     deleteMainTask: (id: string) => Promise<void>;
-    addSubtask: (sub: any) => Promise<void>;
+    addSubtask: (sub: any) => Promise<any>;
     updateSubtask: (id: string, p: any) => Promise<void>;
     deleteSubtask: (id: string) => Promise<void>;
     restoreMainTask: (id: string) => Promise<void>;
@@ -48,6 +52,12 @@ interface AppDataContextType {
     getMainTaskWorkflow: (mainTaskId: string) => any[];
     fetchArchivedSubtasks: (workspaceId: string, retentionDays: number) => Promise<any[]>;
     fetchArchivedMainTasks: (workspaceId: string, retentionDays: number) => Promise<any[]>;
+    /** Mark a task thread as fully read — updates the high-water mark cursor */
+    markTaskAsRead: (taskId: string, userId: string) => Promise<void>;
+    /** Mark a specific message as read by the current user */
+    markMessageAsRead: (updateId: string, userId: string) => Promise<void>;
+    /** Get unread count for a task thread for a specific user */
+    getUnreadCount: (taskId: string, userId: string) => number;
 }
 
 export const TaskContext = createContext<AppDataContextType | null>(null);
@@ -175,6 +185,10 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
     const [comments, setComments] = useState<any[]>([]);
     const [projects, setProjects] = useState<any[]>([]);
     const [reminders, setReminders] = useState<any[]>([]);
+    /** High-water mark cursors: task_participant_status rows */
+    const [participantStatuses, setParticipantStatuses] = useState<any[]>([]);
+    /** Per-message receipts: task_update_receipts rows */
+    const [updateReceipts, setUpdateReceipts] = useState<any[]>([]);
 
     useEffect(() => {
         if (!user) return;
@@ -185,12 +199,14 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         // ── Initial fetch ─────────────────────────────────────────────────────
         const fetchAll = async () => {
             try {
-                const [mtRes, stRes, projRes, commRes, remRes] = await Promise.all([
+                const [mtRes, stRes, projRes, commRes, remRes, psRes, receiptRes] = await Promise.all([
                     supabase.from('main_tasks').select('*').eq('is_deleted', false),
                     supabase.from('subtasks').select('*').eq('is_deleted', false),
                     supabase.from('sites').select('*'),
                     supabase.from('task_updates').select('*').order('created_at', { ascending: true }),
                     supabase.from('reminders').select('*'),
+                    supabase.from('task_participant_status').select('*'),
+                    supabase.from('task_update_receipts').select('*'),
                 ]);
                 
                 if (!isActive) return;
@@ -200,6 +216,8 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                 if (projRes.error && !projRes.error.message?.includes('AbortError')) console.error('Failed to load sites:', projRes.error);
                 if (commRes.error && !commRes.error.message?.includes('AbortError')) console.error('Failed to load task_updates:', commRes.error);
                 if (remRes.error && !remRes.error.message?.includes('AbortError')) console.error('Failed to load reminders:', remRes.error);
+                if (psRes.error && !psRes.error.message?.includes('AbortError')) console.error('Failed to load task_participant_status:', psRes.error);
+                if (receiptRes.error && !receiptRes.error.message?.includes('AbortError')) console.error('Failed to load task_update_receipts:', receiptRes.error);
 
                 if (mtRes.data) {
                     const mapped = mtRes.data.map(mapMainTaskToCamel);
@@ -231,6 +249,19 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                     const mapped = commRes.data.map(mapTaskUpdateToCamel);
                     setComments(mapped);
                 }
+                if (psRes.data) setParticipantStatuses(psRes.data.map((r: any) => ({
+                    id: r.id,
+                    taskId: r.task_id,
+                    userId: r.user_id,
+                    lastReadTimestamp: r.last_read_timestamp,
+                })));
+                if (receiptRes.data) setUpdateReceipts(receiptRes.data.map((r: any) => ({
+                    id: r.id,
+                    updateId: r.update_id,
+                    userId: r.user_id,
+                    status: r.status,
+                    readAt: r.read_at,
+                })));
                 if (remRes.data) {
                     const mappedRems = remRes.data.map(mapReminderToCamel);
                     setReminders(mappedRems);
@@ -386,6 +417,31 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
             .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'reminders' }, (payload) => {
                 setReminders(prev => prev.filter(r => r.id !== payload.old.id));
             })
+
+            // task_participant_status (unread cursors)
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'task_participant_status' }, (payload) => {
+                const r = payload.new;
+                const mapped = { id: r.id, taskId: r.task_id, userId: r.user_id, lastReadTimestamp: r.last_read_timestamp };
+                setParticipantStatuses(prev => prev.some(p => p.id === mapped.id) ? prev : [...prev, mapped]);
+            })
+            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'task_participant_status' }, (payload) => {
+                const r = payload.new;
+                const mapped = { id: r.id, taskId: r.task_id, userId: r.user_id, lastReadTimestamp: r.last_read_timestamp };
+                setParticipantStatuses(prev => prev.map(p => p.id === mapped.id ? mapped : p));
+            })
+
+            // task_update_receipts (per-message receipts)
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'task_update_receipts' }, (payload) => {
+                const r = payload.new;
+                const mapped = { id: r.id, updateId: r.update_id, userId: r.user_id, status: r.status, readAt: r.read_at };
+                setUpdateReceipts(prev => prev.some(p => p.id === mapped.id) ? prev : [...prev, mapped]);
+            })
+            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'task_update_receipts' }, (payload) => {
+                const r = payload.new;
+                const mapped = { id: r.id, updateId: r.update_id, userId: r.user_id, status: r.status, readAt: r.read_at };
+                setUpdateReceipts(prev => prev.map(p => p.id === mapped.id ? mapped : p));
+            })
+
             .subscribe();
 
         return () => {
@@ -812,12 +868,14 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         if (error) {
             console.error('addSubtask error:', error);
             toast.error('Failed to add subtask.');
-            return;
+            return null;
         }
         if (data) {
             const camel = mapSubtaskToCamel(data);
             setSubtasks(prev => [...prev, camel]);
+            return camel;
         }
+        return null;
     }, []);
 
     const updateSubtask = useCallback(async (id: string, p: any) => {
@@ -825,7 +883,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         const allowedColumns = [
             'title', 'description', 'status', 'assignedTo', 'assigned_to', 
             'priority', 'deadline', 'main_task_id', 'mainTaskId', 
-            'requires_approval', 'approver_id', 'is_deleted', 'deleted_at', 
+            'requires_approval', 'approver_id', 'approvedBy', 'is_deleted', 'deleted_at', 
             'completed_at', 'workspaceId', 'workspace_id', 'client_id', 'clientId', 'site_id', 'siteId',
             'has_budget', 'budget_requested'
         ];
@@ -848,6 +906,8 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                 payload.budget_requested = p.budgetRequested;
             } else if (key === 'workspaceId') {
                 payload.workspaceId = p.workspaceId;
+            } else if (key === 'approved_by' || key === 'approvedBy') {
+                payload.approvedBy = p[key];
             } else if (allowedColumns.includes(key)) {
                 payload[key] = p[key];
             }
@@ -1061,7 +1121,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
     const approveSubtask = useCallback(async (id: string, userId?: string, note?: string) => {
         // Update task itself
         const now = new Date().toISOString();
-        const { data, error } = await supabase.from('subtasks').update({ status: 'completed', approved_by: userId || user?.id, completed_at: now }).eq('id', id).select().single();
+        const { data, error } = await supabase.from('subtasks').update({ status: 'completed', approvedBy: userId || user?.id, completed_at: now }).eq('id', id).select().single();
         if (error) {
             console.error('approveSubtask error:', error);
             toast.error('Failed to approve task.');
@@ -1133,10 +1193,12 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                                 title: `[Step 2/4] HoD Approval — ${meta.empName} ${meta.leaveType} Leave`,
                                 description: hodSubDesc,
                                 assignedTo: hodSystemUserId,
-                                status: 'not_started',
+                                status: 'pending_approval',
                                 priority: 'high',
                                 mainTaskId,
                                 deadline: deadline.toISOString(),
+                                requires_approval: true,
+                                approver_id: hodSystemUserId,
                             }).select().single();
                             if (hodSub) setSubtasks(prev => [...prev, mapSubtaskToCamel(hodSub)]);
 
@@ -1160,10 +1222,12 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                                 title: `[Step 3/4] Management Approval — ${meta.empName} ${meta.leaveType} Leave`,
                                 description: mgmtSubDesc,
                                 assignedTo: mgmtUserId,
-                                status: 'not_started',
+                                status: 'pending_approval',
                                 priority: 'high',
                                 mainTaskId,
                                 deadline: deadline.toISOString(),
+                                requires_approval: true,
+                                approver_id: mgmtUserId,
                             }).select().single();
                             if (mgmtSub) setSubtasks(prev => [...prev, mapSubtaskToCamel(mgmtSub)]);
 
@@ -1607,7 +1671,78 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
 
 
 
+    // ── Read-Receipt Helpers (Industry Standard) ────────────────────────────────
+
+    /**
+     * Marks a full task thread as read for a user.
+     * Uses UPSERT on the high-water mark cursor (task_participant_status).
+     * O(1) cost regardless of message count — same approach as Slack/Discord.
+     */
+    const markTaskAsRead = useCallback(async (taskId: string, userId: string) => {
+        if (!taskId || !userId) return;
+        const now = new Date().toISOString();
+        const { data, error } = await supabase
+            .from('task_participant_status')
+            .upsert({ task_id: taskId, user_id: userId, last_read_timestamp: now }, { onConflict: 'task_id,user_id' })
+            .select()
+            .single();
+        if (error) { console.error('markTaskAsRead error:', error); return; }
+        if (data) {
+            const mapped = { id: data.id, taskId: data.task_id, userId: data.user_id, lastReadTimestamp: data.last_read_timestamp };
+            setParticipantStatuses(prev => {
+                const exists = prev.find((p: any) => p.taskId === taskId && p.userId === userId);
+                if (exists) return prev.map((p: any) => p.id === exists.id ? mapped : p);
+                return [...prev, mapped];
+            });
+        }
+    }, []);
+
+    /**
+     * Marks a specific message as read by a user.
+     * Uses UPSERT on task_update_receipts.
+     * Same approach as WhatsApp/iMessage: granular per-message receipts.
+     */
+    const markMessageAsRead = useCallback(async (updateId: string, userId: string) => {
+        if (!updateId || !userId) return;
+        const { data, error } = await supabase
+            .from('task_update_receipts')
+            .upsert({ update_id: updateId, user_id: userId, status: 'read', read_at: new Date().toISOString() }, { onConflict: 'update_id,user_id' })
+            .select()
+            .single();
+        if (error) { console.error('markMessageAsRead error:', error); return; }
+        if (data) {
+            const mapped = { id: data.id, updateId: data.update_id, userId: data.user_id, status: data.status, readAt: data.read_at };
+            setUpdateReceipts(prev => {
+                const exists = prev.find((p: any) => p.updateId === updateId && p.userId === userId);
+                if (exists) return prev.map((p: any) => p.id === exists.id ? mapped : p);
+                return [...prev, mapped];
+            });
+        }
+    }, []);
+
+    /**
+     * Calculates unread message count for a task thread.
+     * Compares the user's last_read_timestamp cursor against message timestamps.
+     * O(n) on messages for that task only — scales like Slack/Discord.
+     */
+    const getUnreadCount = useCallback((taskId: string, userId: string): number => {
+        const cursor = participantStatuses.find((p: any) => p.taskId === taskId && p.userId === userId);
+        if (!cursor) {
+            return comments.filter((c: any) =>
+                (c.main_task_id === taskId || c.task_id === taskId) &&
+                (c.author_id || c.authorId) !== userId
+            ).length;
+        }
+        const lastRead = new Date(cursor.lastReadTimestamp).getTime();
+        return comments.filter((c: any) =>
+            (c.main_task_id === taskId || c.task_id === taskId) &&
+            new Date(c.created_at || c.createdAt).getTime() > lastRead &&
+            (c.author_id || c.authorId) !== userId
+        ).length;
+    }, [comments, participantStatuses]);
+
     // ── Memoize context value to prevent unnecessary re-renders ───────────────
+
     const value = useMemo<AppDataContextType>(() => ({
         mainTasks,
         subtasks,
@@ -1694,13 +1829,19 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         deleteMainTaskPermanently,
         deleteSubtaskPermanently,
         fetchArchivedSubtasks,
-        fetchArchivedMainTasks
-    }), [mainTasks, subtasks, users, comments, projects, reminders,
+        fetchArchivedMainTasks,
+        participantStatuses,
+        updateReceipts,
+        markTaskAsRead,
+        markMessageAsRead,
+        getUnreadCount,
+    }), [mainTasks, subtasks, users, comments, projects, reminders, participantStatuses, updateReceipts,
         createMainTask, updateMainTask, deleteMainTask,
         addSubtask, updateSubtask, deleteSubtask, assignSubtask,
         updateSubtaskStatus, approveSubtask, rejectSubtask,
         postComment, updateComment, deleteComment, getMainTaskComments, getSubtaskComments, getMainTaskWorkflow,
         addReminder, updateReminder, deleteReminder, toggleReminderActive, snoozeReminder,
+        markTaskAsRead, markMessageAsRead, getUnreadCount,
         restoreMainTask, restoreSubtask, deleteMainTaskPermanently, deleteSubtaskPermanently, fetchArchivedSubtasks, fetchArchivedMainTasks]);
 
     return <TaskContext.Provider value={value}>{children}</TaskContext.Provider>;
@@ -1720,6 +1861,8 @@ export function useAppData(): AppDataContextType {
             projects: [],
             reminders: [],
             workspaces: [],
+            participantStatuses: [],
+            updateReceipts: [],
             addReminder: async () => {},
             updateReminder: async () => {},
             deleteReminder: async () => {},
@@ -1748,6 +1891,9 @@ export function useAppData(): AppDataContextType {
             getMainTaskWorkflow: () => [],
             fetchArchivedSubtasks: async () => [],
             fetchArchivedMainTasks: async () => [],
+            markTaskAsRead: async () => {},
+            markMessageAsRead: async () => {},
+            getUnreadCount: () => 0,
         };
     }
     return ctx;

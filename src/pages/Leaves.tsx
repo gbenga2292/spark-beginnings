@@ -7,6 +7,7 @@ import { Input } from '@/src/components/ui/input';
 import { Badge } from '@/src/components/ui/badge';
 import { CalendarDays, CheckCircle2, Printer, Eye, X, Plus, Edit, Trash2, Ban, Search, ListFilter, CalendarClock, FileText, ShieldCheck, Clock, XCircle, MoreVertical, ChevronDown, UserPlus, ChevronRight, RefreshCw } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/src/components/ui/dropdown-menu';
+import { WorkflowControlModal } from '@/src/components/leaves/WorkflowControlModal';
 import { useAppStore, LeaveRecord } from '@/src/store/appStore';
 import { useNavigate } from 'react-router-dom';
 import { usePriv } from '@/src/hooks/usePriv';
@@ -46,6 +47,7 @@ export function Leaves() {
 
   // ─── Permissions ───────────────────────────────────────────
   const priv = usePriv('leaves');
+  const [manageWorkflowLeave, setManageWorkflowLeave] = useState<LeaveRecord | null>(null);
 
   const activeEmployees = useMemo(
     () => employees.filter(e => e.status === 'Active' || e.status === 'On Leave'),
@@ -403,7 +405,7 @@ export function Leaves() {
             description: lmDesc,
             mainTaskId: mainTask.id,
             assignedTo: lmSystemUser?.id || null,
-            status: 'not_started',
+            status: 'pending_approval',
             priority: 'high',
             deadline: today430.toISOString(),
           });
@@ -515,7 +517,7 @@ export function Leaves() {
           description: lmDesc,
           mainTaskId: mainTask.id,
           assignedTo: lmSystemUser?.id || null,
-          status: 'not_started',
+          status: 'pending_approval',
           priority: 'high',
           deadline: today430.toISOString(),
         });
@@ -639,7 +641,7 @@ export function Leaves() {
             : currentStep === 2 ? (hodSystemUser?.id || null)
             : currentStep === 3 ? (approverId || null)
             : null,
-          status: 'not_started',
+          status: 'pending_approval',
           priority: 'high',
           deadline: today430.toISOString(),
         });
@@ -922,6 +924,9 @@ export function Leaves() {
                             <DropdownMenuItem className="text-slate-600 cursor-pointer gap-2" onClick={() => openPrintPreview(leave)}>
                               <Printer className="h-4 w-4" /> Print Preview
                             </DropdownMenuItem>
+                            <DropdownMenuItem className="text-purple-600 focus:text-purple-600 cursor-pointer gap-2" onClick={() => setManageWorkflowLeave(leave)}>
+                              <CheckCircle2 className="h-4 w-4" /> Manage Workflow
+                            </DropdownMenuItem>
                             
                             {priv.canEdit && (
                               <DropdownMenuItem className="text-indigo-600 focus:text-indigo-600 cursor-pointer gap-2" onClick={() => handleEdit(leave)}>
@@ -1005,6 +1010,9 @@ export function Leaves() {
                     <DropdownMenuContent align="end" className="w-40 bg-white dark:bg-slate-900 dark:border-slate-700">
                       <DropdownMenuItem className="text-slate-600 cursor-pointer gap-2" onClick={() => openPrintPreview(leave)}>
                         <Printer className="h-4 w-4" /> Print Preview
+                      </DropdownMenuItem>
+                      <DropdownMenuItem className="text-purple-600 focus:text-purple-600 cursor-pointer gap-2" onClick={() => setManageWorkflowLeave(leave)}>
+                        <CheckCircle2 className="h-4 w-4" /> Manage Workflow
                       </DropdownMenuItem>
                       {priv.canEdit && (
                         <DropdownMenuItem className="text-indigo-600 focus:text-indigo-600 cursor-pointer gap-2" onClick={() => handleEdit(leave)}>
@@ -1551,6 +1559,15 @@ export function Leaves() {
             </div>
           </div>
         </div>
+      )}
+
+      {manageWorkflowLeave && (
+        <WorkflowControlModal
+          open={!!manageWorkflowLeave}
+          onOpenChange={(open) => !open && setManageWorkflowLeave(null)}
+          leave={manageWorkflowLeave}
+          onRecreateApprovalTask={handleRecreateApprovalTask}
+        />
       )}
     </div>
   );

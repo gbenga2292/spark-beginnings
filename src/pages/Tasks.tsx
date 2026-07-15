@@ -593,7 +593,7 @@ function AdminTasksView() {
   const { mainTasks, subtasks, users, comments, createMainTask, addSubtask, assignSubtask,
     updateSubtask, deleteSubtask, updateSubtaskStatus, deleteMainTask, updateMainTask,
     postComment, getMainTaskComments, projects, createProject, reminders,
-    fetchArchivedSubtasks, restoreSubtask, deleteSubtaskPermanently } = useAppData();
+    fetchArchivedSubtasks, restoreSubtask, deleteSubtaskPermanently, getUnreadCount } = useAppData();
   const { user: currentUser } = useAuth();
   const { readMap, markRead } = useTaskReadTracker();
   const myId = currentUser?.id;
@@ -1445,8 +1445,7 @@ function AdminTasksView() {
                 const sc = mainStatusConfig[status];
                 const pct = progress.total > 0 ? Math.round((progress.completed / progress.total) * 100) : 0;
 
-                // WhatsApp-style badges (uses component-level myFirstName / myId / readMap)
-                // Resolve mainTask ID — covers snake_case (Supabase raw) & camelCase (local inserts)
+                // WhatsApp-style badges using DB cursors
                 const mtId = mt.id;
                 const subIds = new Set(subs.map(s => s.id));
                 const taskComments = comments.filter(c => {
@@ -1457,6 +1456,7 @@ function AdminTasksView() {
                   (c.content || c.text || '').toLowerCase().includes(`@${myFirstName}`) &&
                   c.createdAt > readAt
                 );
+                
                 // Only count comments from others, after the last time the task was viewed
                 const isInvolved = myId && (
                   subs.some(s => {
@@ -1466,12 +1466,9 @@ function AdminTasksView() {
                   (mt.createdBy === myId) ||
                   String(mt.assignedTo || '').includes(myId)
                 );
-                const unseenCount = isInvolved
-                  ? taskComments.filter(c =>
-                    c.authorId !== myId &&
-                    c.createdAt > readAt
-                  ).length
-                  : 0;
+                
+                // Use the new getUnreadCount which supports DB cursors (cross-device)
+                const unseenCount = isInvolved && myId ? getUnreadCount(mtId, myId) : 0;
 
                 return (
                   <div key={mt.id} id={`task-row-${mt.id}`}
@@ -1581,10 +1578,7 @@ function AdminTasksView() {
                                   (c.content || c.text || '').toLowerCase().includes(`@${myFirstName}`) &&
                                   (c.created_at || '') > subReadAt
                                 );
-                                const subUnseenCount = subCmts.filter(c =>
-                                  (c.author_id ?? c.authorId) !== myId &&
-                                  (c.created_at || '') > subReadAt
-                                ).length;
+                                const subUnseenCount = myId ? getUnreadCount(sub.id, myId) : 0;
 
                                 return (
                                   <motion.div key={sub.id} id={`subtask-row-${sub.id}`}
@@ -2006,9 +2000,16 @@ function MainTaskChatSheet({ mainTaskId, users, currentUserId, getComments, onPo
   onClose: () => void;
   onOpenSubtask?: (subtaskId: string) => void;
 }) {
-  const { mainTasks, subtasks } = useAppData();
+  const { mainTasks, subtasks, markTaskAsRead, updateReceipts } = useAppData();
   const task = mainTasks.find(t => t.id === mainTaskId);
   const taskSubtasks = subtasks.filter(s => s.mainTaskId === mainTaskId);
+
+  // ✓✓ Mark this thread as read the moment the chat panel opens
+  useEffect(() => {
+    if (currentUserId && mainTaskId) {
+      markTaskAsRead(mainTaskId, currentUserId);
+    }
+  }, [mainTaskId, currentUserId, markTaskAsRead]);
 
   const mainComments = getComments(mainTaskId);
   const allFeedEntries = [
@@ -2293,10 +2294,22 @@ function MainTaskChatSheet({ mainTaskId, users, currentUserId, getComments, onPo
                       </div>
                     )}
                   </div>
-                  <span className="text-[10px] text-muted-foreground/50 px-1">
+                  <span className="text-[10px] text-muted-foreground/50 px-1 flex items-center gap-1">
                     {c.createdAt && !isNaN(new Date(c.createdAt).getTime())
                       ? format(new Date(c.createdAt), 'MMM d · h:mm a')
                       : ''}
+                    {/* Read Receipt indicator — WhatsApp/iMessage style */}
+                    {isMe && (() => {
+                      const msgReceipts = updateReceipts.filter((r: any) => r.updateId === c.id && r.userId !== currentUserId && r.status === 'read');
+                      const readByOthers = msgReceipts.length > 0;
+                      return (
+                        <span className={`ml-0.5 font-bold tracking-tighter ${readByOthers ? 'text-blue-400' : 'text-muted-foreground/40'}`}
+                          title={readByOthers ? `Read by ${msgReceipts.length} person${msgReceipts.length > 1 ? 's' : ''}` : 'Delivered'}
+                        >
+                          {readByOthers ? '✓✓' : '✓'}
+                        </span>
+                      );
+                    })()}
                   </span>
                 </div>
               </div>
