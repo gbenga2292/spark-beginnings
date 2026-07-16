@@ -1054,92 +1054,19 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         }
     }, []);
 
-    const updateSubtaskStatus = useCallback(async (id: string, status: string, _userId?: string, bypassApproval?: boolean) => {
-        const now = new Date().toISOString();
-        const existing = subtasks.find(s => s.id === id);
-        
-        let finalStatus = status;
-        const updatePayload: any = {};
-        
-        // Intercept 'completed' -> 'pending_approval' ONLY if requiresApproval is set AND not bypassed by an approver
-        if (status === 'completed' && !bypassApproval && (existing?.requiresApproval || (existing as any)?.requires_approval)) {
-            finalStatus = 'pending_approval';
-            updatePayload.pendingApprovalSince = now;
-        } else if (status === 'completed') {
-            updatePayload.completed_at = now;
-        }
-        
-        updatePayload.status = finalStatus;
-
-        const { data, error } = await supabase.from('subtasks').update(updatePayload).eq('id', id).select().single();
-        if (error) {
-            console.error('updateSubtaskStatus error:', error);
-            toast.error('Failed to update status.');
-            return;
-        }
-        if (data) {
-            const camel = mapSubtaskToCamel(data);
-            setSubtasks(prev => prev.map(s => s.id === id ? camel : s));
-
-            // Notify the main task creator
-            if (finalStatus === 'pending_approval') {
-                const mainTaskId = data.main_task_id || data.mainTaskId;
-                const mainTask = mainTasks.find(m => m.id === mainTaskId);
-                if (mainTask && mainTask.createdBy && mainTask.createdBy !== (user?.id ?? _userId)) {
-                    toast.info('Task submitted for review');
-                    const actorId = _userId || user?.id;
-                    if (actorId) {
-                        const { data: cData } = await supabase.from('task_updates').insert({
-                            subtask_id: id,
-                            main_task_id: mainTaskId,
-                            text: `⏳ **Review Requested**\nSubtask **"${data.title}"** needs your approval.`,
-                            author_id: actorId,
-                        }).select().single();
-                        if (cData) setComments(prev => prev.some(c => c.id === cData.id) ? prev : [...prev, cData]);
-                    }
-                }
-            } else if (finalStatus === 'completed') {
-                const mainTaskId = data.main_task_id || data.mainTaskId;
-                const mainTask = mainTasks.find(m => m.id === mainTaskId);
-                if (mainTask && mainTask.createdBy && mainTask.createdBy !== (user?.id ?? _userId)) {
-                    // Leave a comment notifying the creator
-                    const actorId = _userId || user?.id;
-                    if (actorId) {
-                        const { data: cData } = await supabase.from('task_updates').insert({
-                            subtask_id: id,
-                            main_task_id: mainTaskId,
-                            text: `✅ Subtask **"${data.title}"** marked as completed.`,
-                            author_id: actorId,
-                        }).select().single();
-                        if (cData) setComments(prev => prev.some(c => c.id === cData.id) ? prev : [...prev, cData]);
-                    }
-                }
-            }
-        }
-    }, [mainTasks, user]);
-
-    const approveSubtask = useCallback(async (id: string, userId?: string, note?: string) => {
-        // Update task itself
-        const now = new Date().toISOString();
-        const { data, error } = await supabase.from('subtasks').update({ status: 'completed', approvedBy: userId || user?.id, completed_at: now }).eq('id', id).select().single();
-        if (error) {
-            console.error('approveSubtask error:', error);
-            toast.error('Failed to approve task.');
-            return;
-        }
-
+    const processSubtaskCompletionEffects = useCallback(async (data: any, actorId: string, note?: string) => {
+        const id = data.id;
         // Check if this task is an approval workflow task
         try {
             if (data?.description) {
                 const meta = JSON.parse(data.description);
                 if (meta.refType && meta.refId) {
-                    // Find approver name
-                    const actorId = userId || user?.id;
                     const approverUser = users.find(u => u.id === actorId);
                     const approverName = approverUser?.name || '';
 
                     // Post a comment
-                    const mainTask = mainTasks.find(m => m.id === data.mainTaskId || m.id === data.main_task_id);
+                    const mainTaskId = data.mainTaskId || data.main_task_id;
+                    const mainTask = mainTasks.find(m => m.id === mainTaskId);
                     if (mainTask) {
                         const creator = users.find(u => u.id === mainTask.createdBy);
                         const mention = creator?.name ? `@${creator.name.split(' ')[0].toLowerCase()}` : '';
@@ -1195,7 +1122,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                                 assignedTo: hodSystemUserId,
                                 status: 'pending_approval',
                                 priority: 'high',
-                                mainTaskId,
+                                main_task_id: mainTaskId,
                                 deadline: deadline.toISOString(),
                                 requires_approval: true,
                                 approver_id: hodSystemUserId,
@@ -1224,7 +1151,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                                 assignedTo: mgmtUserId,
                                 status: 'pending_approval',
                                 priority: 'high',
-                                mainTaskId,
+                                main_task_id: mainTaskId,
                                 deadline: deadline.toISOString(),
                                 requires_approval: true,
                                 approver_id: mgmtUserId,
@@ -1251,7 +1178,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                                 assignedTo: hrUser?.id || null,
                                 status: 'not_started',
                                 priority: 'high',
-                                mainTaskId,
+                                main_task_id: mainTaskId,
                                 deadline: deadline.toISOString(),
                             }).select().single();
                             if (hrSub) setSubtasks(prev => [...prev, mapSubtaskToCamel(hrSub)]);
@@ -1279,9 +1206,9 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                             useAppStore.getState().updateVehicleDocument(vehicleId, docTypeName, newExpiryDate);
                             
                             // Post a comment about the update
-                            const mainTask = mainTasks.find(m => m.id === data.mainTaskId || m.id === data.main_task_id);
+                            const mainTaskId = data.mainTaskId || data.main_task_id;
+                            const mainTask = mainTasks.find(m => m.id === mainTaskId);
                             if (mainTask) {
-                                const actorId = userId || user?.id;
                                 const text = `✅ **Document Renewed**\nVehicle document **"${docTypeName}"** updated with new expiry date: **${newExpiryDate}**.`;
                                 await supabase.from('task_updates').insert({
                                     subtask_id: id,
@@ -1304,17 +1231,15 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
             // Ignore parse errors (normal task descriptions)
         }
 
-        if (data) setSubtasks(prev => prev.map(s => s.id === id ? mapSubtaskToCamel(data) : s));
-
         // ── Auto-create budget item if subtask has a budget request ─────────
         const hasBudget = data?.has_budget ?? data?.hasBudget;
         const budgetRequested = data?.budget_requested ?? data?.budgetRequested;
         if (hasBudget && budgetRequested) {
             const weekMonday = getISOWeekMondayString(new Date());
             const weekLabel = formatWeekLabel(getISOWeekMonday(new Date()));
-            const mainTask = mainTasks.find(m => m.id === data.main_task_id || m.id === data.mainTaskId);
+            const mainTaskId = data.main_task_id || data.mainTaskId;
+            const mainTask = mainTasks.find(m => m.id === mainTaskId);
             const workspaceId = data.workspace_id || data.workspaceId || mainTask?.workspaceId || mainTask?.workspace_id || 'dcel-team';
-            const actorId = userId || user?.id || '';
             const { data: newBudget, error: bErr } = await supabase.from('budget_items').insert({
                 title: data.title,
                 week_start: weekMonday,
@@ -1323,7 +1248,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                 status: 'pending',
                 source: 'task',
                 subtask_id: id,
-                main_task_id: data.main_task_id || data.mainTaskId || null,
+                main_task_id: mainTaskId || null,
                 workspace_id: workspaceId,
                 created_by: actorId,
             }).select().single();
@@ -1353,7 +1278,92 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         } else {
             toast.success('Approval processed successfully');
         }
-    }, [user?.id, mainTasks, users]);
+    }, [users, mainTasks, supabase, setComments, setSubtasks]);
+
+    const updateSubtaskStatus = useCallback(async (id: string, status: string, _userId?: string, bypassApproval?: boolean) => {
+        const now = new Date().toISOString();
+        const existing = subtasks.find(s => s.id === id);
+        
+        let finalStatus = status;
+        const updatePayload: any = {};
+        
+        // Intercept 'completed' -> 'pending_approval' ONLY if requiresApproval is set AND not bypassed by an approver
+        if (status === 'completed' && !bypassApproval && (existing?.requiresApproval || (existing as any)?.requires_approval)) {
+            finalStatus = 'pending_approval';
+            updatePayload.pendingApprovalSince = now;
+        } else if (status === 'completed') {
+            updatePayload.completed_at = now;
+        }
+        
+        updatePayload.status = finalStatus;
+
+        const { data, error } = await supabase.from('subtasks').update(updatePayload).eq('id', id).select().single();
+        if (error) {
+            console.error('updateSubtaskStatus error:', error);
+            toast.error('Failed to update status.');
+            return;
+        }
+        if (data) {
+            const camel = mapSubtaskToCamel(data);
+            setSubtasks(prev => prev.map(s => s.id === id ? camel : s));
+
+            const actorId = _userId || user?.id || '';
+
+            // Notify the main task creator
+            if (finalStatus === 'pending_approval') {
+                const mainTaskId = data.main_task_id || data.mainTaskId;
+                const mainTask = mainTasks.find(m => m.id === mainTaskId);
+                if (mainTask && mainTask.createdBy && mainTask.createdBy !== actorId) {
+                    toast.info('Task submitted for review');
+                    if (actorId) {
+                        const { data: cData } = await supabase.from('task_updates').insert({
+                            subtask_id: id,
+                            main_task_id: mainTaskId,
+                            text: `⏳ **Review Requested**\nSubtask **"${data.title}"** needs your approval.`,
+                            author_id: actorId,
+                        }).select().single();
+                        if (cData) setComments(prev => prev.some(c => c.id === cData.id) ? prev : [...prev, cData]);
+                    }
+                }
+            } else if (finalStatus === 'completed') {
+                const mainTaskId = data.main_task_id || data.mainTaskId;
+                const mainTask = mainTasks.find(m => m.id === mainTaskId);
+                if (mainTask && mainTask.createdBy && mainTask.createdBy !== actorId) {
+                    // Leave a comment notifying the creator
+                    if (actorId) {
+                        const { data: cData } = await supabase.from('task_updates').insert({
+                            subtask_id: id,
+                            main_task_id: mainTaskId,
+                            text: `✅ Subtask **"${data.title}"** marked as completed.`,
+                            author_id: actorId,
+                        }).select().single();
+                        if (cData) setComments(prev => prev.some(c => c.id === cData.id) ? prev : [...prev, cData]);
+                    }
+                }
+
+                // Process workflow progression and side-effects
+                await processSubtaskCompletionEffects(data, actorId);
+            }
+        }
+    }, [mainTasks, user, subtasks, processSubtaskCompletionEffects]);
+
+    const approveSubtask = useCallback(async (id: string, userId?: string, note?: string) => {
+        // Update task itself
+        const now = new Date().toISOString();
+        const actorId = userId || user?.id || '';
+        const { data, error } = await supabase.from('subtasks').update({ status: 'completed', approvedBy: actorId, completed_at: now }).eq('id', id).select().single();
+        if (error) {
+            console.error('approveSubtask error:', error);
+            toast.error('Failed to approve task.');
+            return;
+        }
+
+        if (data) {
+            const camel = mapSubtaskToCamel(data);
+            setSubtasks(prev => prev.map(s => s.id === id ? camel : s));
+            await processSubtaskCompletionEffects(data, actorId, note);
+        }
+    }, [user?.id, setSubtasks, processSubtaskCompletionEffects]);
 
     const rejectSubtask = useCallback(async (id: string, _userId?: string, note?: string) => {
         // Update task itself

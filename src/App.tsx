@@ -53,6 +53,7 @@ const HmoManagement = lazy(() => import('./pages/HmoManagement').then(m => ({ de
 const PerformanceConduct = lazy(() => import('./pages/PerformanceConduct').then(m => ({ default: m.PerformanceConduct })));
 const Evaluations = lazy(() => import('./pages/Evaluations').then(m => ({ default: m.Evaluations })));
 const Ledger = lazy(() => import('./pages/Ledger').then(m => ({ default: m.Ledger })));
+const BankImport = lazy(() => import('./pages/BankImport'));
 const CompanyExpenses = lazy(() => import('./pages/CompanyExpenses').then(m => ({ default: m.CompanyExpenses })));
 const TaskDashboard = lazy(() => import('./pages/TaskDashboard').then(m => ({ default: m.TaskDashboard })));
 const TaskReminders = lazy(() => import('./pages/TaskReminders').then(m => ({ default: m.TaskReminders })));
@@ -238,6 +239,7 @@ function AppContent() {
             <Route path="evaluations" element={<Page label="Evaluations"><ProtectedRoute requiredModule="evaluations"><Evaluations /></ProtectedRoute></Page>} />
             <Route path="interviews" element={<Page label="Interviews"><ProtectedRoute requiredModule="interviews"><InterviewManager /></ProtectedRoute></Page>} />
             <Route path="ledger" element={<Page label="Ledger"><ProtectedRoute requiredModule="ledger"><Ledger /></ProtectedRoute></Page>} />
+            <Route path="bank-import" element={<Page label="Bank AI Import"><ProtectedRoute requiredModule="ledger"><BankImport /></ProtectedRoute></Page>} />
             <Route path="clients" element={<Navigate to="/sites" replace />} />
             
             {/* Operations & Analytics — Restricted on Web */}

@@ -23,6 +23,7 @@ import {
 import { useTheme } from '@/src/hooks/useTheme';
 import { cn } from '@/src/lib/utils';
 import { useAppStore, Site, ClientProfile } from '@/src/store/appStore';
+import { supabase } from '@/src/integrations/supabase/client';
 import { useUserStore } from '@/src/store/userStore';
 import { useAuth } from '@/src/hooks/useAuth';
 import { useAppData, deriveMainTaskStatus } from '@/src/contexts/AppDataContext';
@@ -67,6 +68,7 @@ export function Client360() {
   const { mainTasks, subtasks, users } = useAppData();
   const { dailyMachineLogs, assets, waybills } = useOperations();
   const navigate = useNavigate();
+  const workspaceId = useAppStore(s => (s as any).workspaceId || 'default');
 
   // Dialog state
   const [selectedSite, setSelectedSite] = useState<Site | null>(null);
@@ -916,6 +918,31 @@ export function Client360() {
   const [chatInput, setChatInput] = useState('');
   const [isGeneratingBrief, setIsGeneratingBrief] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const [selectedProvider, setSelectedProvider] = useState<'gemini' | 'groq'>('groq');
+  const [selectedModel, setSelectedModel] = useState<string>('llama-3.1-8b-instant');
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data: keyRow } = await supabase
+          .from('api_keys')
+          .select('provider')
+          .eq('workspace_id', workspaceId)
+          .eq('is_default', true)
+          .maybeSingle();
+        if (keyRow) {
+          const prov = (keyRow.provider === 'gemini' || keyRow.provider === 'groq') ? keyRow.provider : 'groq';
+          setSelectedProvider(prov);
+          setSelectedModel(prov === 'gemini' ? 'gemini-2.0-flash' : 'llama-3.1-8b-instant');
+        }
+      } catch {}
+    })();
+  }, [workspaceId]);
+
+  const handleProviderChange = (p: 'gemini' | 'groq') => {
+    setSelectedProvider(p);
+    setSelectedModel(p === 'gemini' ? 'gemini-2.0-flash' : 'llama-3.1-8b-instant');
+  };
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -925,9 +952,27 @@ export function Client360() {
     if (!clientData || !selectedClient) return;
     if (!isInitialBrief && !chatInput.trim()) return;
 
-    let apiKey = import.meta.env.VITE_GROQ_API_KEY || localStorage.getItem('GROQ_API_KEY');
+    let apiKey = '';
+
+    try {
+      const { data: keys } = await supabase
+        .from('api_keys')
+        .select('key_value,provider')
+        .eq('workspace_id', workspaceId);
+      const matchKey = keys?.find(k => k.provider === selectedProvider);
+      if (matchKey) {
+        apiKey = matchKey.key_value;
+      }
+    } catch (err) {
+      console.error('Failed to load API key from DB:', err);
+    }
+
     if (!apiKey) {
-      apiKey = window.prompt('Please enter your Groq API Key for the Intelligence Assistant:');
+      apiKey = import.meta.env.VITE_GROQ_API_KEY || localStorage.getItem('GROQ_API_KEY') || '';
+    }
+
+    if (!apiKey) {
+      apiKey = window.prompt(`Please enter your ${selectedProvider === 'gemini' ? 'Gemini' : 'Groq'} API Key for the Intelligence Assistant:`) || '';
       if (!apiKey) return;
       localStorage.setItem('GROQ_API_KEY', apiKey);
     }
@@ -965,38 +1010,58 @@ Context:
 When asked to provide the initial intelligence brief, give a 3-sentence summary highlighting operational health, financial risk (VAT and Invoices), and workflow bottlenecks.
 Be extremely concise. If the user asks about invoices, machines, staff, materials, or comments, refer to the context provided.`;
 
-      const apiMessages = [
-        { role: 'system', content: systemPrompt },
-        ...messages.filter(m => m.role !== 'system'),
-        { role: 'user', content: newUserMessage }
-      ];
-
-      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'llama-3.1-8b-instant',
-          messages: apiMessages,
-          temperature: 0.3,
-          max_tokens: 300,
-        }),
-      });
-
-      if (!res.ok) throw new Error('API Error');
-      const data = await res.json();
+      let reply = '';
+      if (selectedProvider === 'gemini') {
+        const contents = messages.map(m => ({
+          role: m.role === 'assistant' ? 'model' : (m.role === 'system' ? 'user' : 'user'),
+          parts: [{ text: m.content }]
+        }));
+        contents.push({ role: 'user', parts: [{ text: newUserMessage }] });
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent?key=${apiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents,
+            systemInstruction: { parts: [{ text: systemPrompt }] },
+            generationConfig: { temperature: 0.3, maxOutputTokens: 300 }
+          })
+        });
+        if (!res.ok) throw new Error('Gemini API Error');
+        const resData = await res.json();
+        reply = resData?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      } else {
+        const apiMessages = [
+          { role: 'system', content: systemPrompt },
+          ...messages.filter(m => m.role !== 'system'),
+          { role: 'user', content: newUserMessage }
+        ];
+        const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: selectedModel,
+            messages: apiMessages,
+            temperature: 0.3,
+            max_tokens: 300,
+          }),
+        });
+        if (!res.ok) throw new Error('Groq API Error');
+        const resData = await res.json();
+        reply = resData.choices[0].message.content;
+      }
       
       if (isInitialBrief) {
-        setMessages([{ role: 'assistant', content: data.choices[0].message.content }]);
+        setMessages([{ role: 'assistant', content: reply }]);
       } else {
-        setMessages(prev => [...prev, { role: 'assistant', content: data.choices[0].message.content }]);
+        setMessages(prev => [...prev, { role: 'assistant', content: reply }]);
       }
     } catch (err) {
       console.error(err);
       if (!isInitialBrief) {
-        setMessages(prev => [...prev, { role: 'assistant', content: 'Failed to reach Groq API. Check your network or API key.' }]);
+        setMessages(prev => [...prev, { role: 'assistant', content: 'Failed to reach API. Check your network or API key.' }]);
       }
     } finally {
       setIsGeneratingBrief(false);
@@ -1271,9 +1336,40 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                 <div className="flex items-center justify-between p-4 border-b border-indigo-800/50 relative z-10 shrink-0 cursor-pointer hover:bg-indigo-800/20 transition-colors" onClick={() => setIsChatCollapsed(!isChatCollapsed)}>
                   <div className="flex items-center gap-2">
                     <div className="p-1.5 bg-indigo-500/20 rounded-lg"><Sparkles className="w-4 h-4 text-indigo-300" /></div>
-                    <span className="text-sm font-bold uppercase tracking-wider text-indigo-200">Decision Intelligence Assistant</span>
+                    <span className="text-xs sm:text-sm font-bold uppercase tracking-wider text-indigo-200">Decision Intelligence Assistant</span>
                   </div>
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
+                    {!isChatCollapsed && (
+                      <div className="flex items-center gap-1.5 mr-2">
+                        <select 
+                          value={selectedProvider} 
+                          onChange={e => handleProviderChange(e.target.value as 'gemini' | 'groq')} 
+                          className="bg-indigo-950/70 border border-indigo-750/70 text-indigo-200 text-[10px] font-bold rounded-full px-2 py-0.5 focus:outline-none cursor-pointer hover:border-indigo-500"
+                        >
+                          <option value="gemini">Gemini</option>
+                          <option value="groq">Groq</option>
+                        </select>
+                        <select 
+                          value={selectedModel} 
+                          onChange={e => setSelectedModel(e.target.value)} 
+                          className="bg-indigo-950/70 border border-indigo-750/70 text-indigo-200 text-[10px] font-bold rounded-full px-2 py-0.5 focus:outline-none cursor-pointer hover:border-indigo-500"
+                        >
+                          {selectedProvider === 'gemini' ? (
+                            <>
+                              <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+                              <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
+                              <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+                            </>
+                          ) : (
+                            <>
+                              <option value="llama-3.1-8b-instant">Llama 3.1 8B</option>
+                              <option value="llama-3.3-70b-versatile">Llama 3.3 70B</option>
+                              <option value="mixtral-8x7b-32768">Mixtral 8x7B</option>
+                            </>
+                          )}
+                        </select>
+                      </div>
+                    )}
                     {!isChatCollapsed && messages.length === 0 && (
                       <div className="flex items-center gap-1.5">
                         <Button onClick={(e) => { e.stopPropagation(); sendChatMessage(true); }} disabled={isGeneratingBrief} size="sm" className="bg-indigo-600 hover:bg-indigo-500 text-white border-0 h-8 text-xs px-2 sm:px-3">

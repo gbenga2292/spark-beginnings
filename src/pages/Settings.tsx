@@ -70,9 +70,20 @@ interface ApiKey {
   provider: string;
   keyValue: string;
   isDefault: boolean;
+  defaultModel?: string;
 }
 
 const AI_PROVIDERS = ['gemini', 'groq', 'openai', 'xai', 'anthropic', 'cohere', 'mistral'];
+
+const PROVIDER_MODELS: Record<string, string[]> = {
+  gemini: ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-2.0-pro-exp-02-05'],
+  groq: ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'mixtral-8x7b-32768', 'gemma2-9b-it'],
+  openai: ['gpt-4o', 'gpt-4o-mini', 'o1-mini', 'gpt-4-turbo'],
+  xai: ['grok-2', 'grok-beta'],
+  anthropic: ['claude-3-5-sonnet-latest', 'claude-3-5-haiku-latest', 'claude-3-opus-latest'],
+  cohere: ['command-r-plus', 'command-r'],
+  mistral: ['mistral-large-latest', 'pixtral-large-latest', 'open-mixtral-8x22b'],
+};
 
 function detectProvider(key: string): string {
   if (key.startsWith('AIza')) return 'gemini';
@@ -96,6 +107,9 @@ export function Settings() {
   const [newKeyLabel, setNewKeyLabel] = useState('');
   const [newKeyValue, setNewKeyValue] = useState('');
   const [newKeyProvider, setNewKeyProvider] = useState('');
+  const [newKeyDefaultModel, setNewKeyDefaultModel] = useState('');
+  const activeProvider = newKeyProvider || detectProvider(newKeyValue);
+  const activeProviderModels = PROVIDER_MODELS[activeProvider] || [];
   const [showNewKey, setShowNewKey] = useState(false);
   const [isSavingKey, setIsSavingKey] = useState(false);
   const [isTestingKey, setIsTestingKey] = useState(false);
@@ -103,6 +117,70 @@ export function Settings() {
   const [visibleKeyIds, setVisibleKeyIds] = useState<Set<string>>(new Set());
   const [isSavingMode, setIsSavingMode] = useState(false);
   const workspaceId = useAppStore(s => (s as any).workspaceId || 'default');
+
+  const [fetchedModels, setFetchedModels] = useState<string[]>([]);
+  const [isFetchingModels, setIsFetchingModels] = useState(false);
+
+  // Debounced live API model fetching when key is entered/edited
+  useEffect(() => {
+    if (!newKeyValue || newKeyValue.length < 10) {
+      setFetchedModels([]);
+      return;
+    }
+    
+    const provider = newKeyProvider || detectProvider(newKeyValue);
+    if (provider !== 'gemini' && provider !== 'groq' && provider !== 'openai') {
+      setFetchedModels([]);
+      return;
+    }
+
+    const delayDebounce = setTimeout(async () => {
+      setIsFetchingModels(true);
+      try {
+        let models: string[] = [];
+        if (provider === 'gemini') {
+          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${newKeyValue}`);
+          if (res.ok) {
+            const data = await res.json();
+            models = (data.models || [])
+              .filter((m: any) => m.supportedGenerationMethods?.includes('generateContent'))
+              .map((m: any) => m.name.replace('models/', ''));
+          }
+        } else if (provider === 'groq') {
+          const res = await fetch('https://api.groq.com/openai/v1/models', {
+            headers: { Authorization: `Bearer ${newKeyValue}` }
+          });
+          if (res.ok) {
+            const data = await res.json();
+            models = (data.data || []).map((m: any) => m.id);
+          }
+        } else if (provider === 'openai') {
+          const res = await fetch('https://api.openai.com/v1/models', {
+            headers: { Authorization: `Bearer ${newKeyValue}` }
+          });
+          if (res.ok) {
+            const data = await res.json();
+            models = (data.data || [])
+              .map((m: any) => m.id)
+              .filter((id: string) => id.includes('gpt') || id.includes('o1') || id.startsWith('o3'));
+          }
+        }
+        
+        if (models.length > 0) {
+          // Sort models alphabetically
+          setFetchedModels(models.sort());
+        }
+      } catch (err) {
+        console.error('Failed to fetch models:', err);
+      } finally {
+        setIsFetchingModels(false);
+      }
+    }, 1000);
+
+    return () => clearTimeout(delayDebounce);
+  }, [newKeyValue, newKeyProvider]);
+
+  const modelsList = fetchedModels.length > 0 ? fetchedModels : activeProviderModels;
 
   /* ── Company info state ─────────────────────────────────────── */
   const [isEditing, setIsEditing] = useState(false);
@@ -152,6 +230,7 @@ export function Settings() {
           provider: k.provider,
           keyValue: k.key_value,
           isDefault: k.is_default,
+          defaultModel: k.default_model || '',
         })));
       }
       const { data: settingsData } = await supabase
@@ -182,20 +261,21 @@ export function Settings() {
         key_value: newKeyValue,
         is_default: apiKeys.length === 0,
         workspace_id: workspaceId,
+        default_model: newKeyDefaultModel,
       };
       if (editKeyId) {
         await supabase.from('api_keys').update(payload).eq('id', editKeyId);
-        setApiKeys(prev => prev.map(k => k.id === editKeyId ? { ...k, label: payload.label, provider: payload.provider, keyValue: payload.key_value } : k));
+        setApiKeys(prev => prev.map(k => k.id === editKeyId ? { ...k, label: payload.label, provider: payload.provider, keyValue: payload.key_value, defaultModel: payload.default_model } : k));
         setEditKeyId(null);
         toast.success('API Key updated.');
       } else {
-        const { data } = await supabase.from('api_keys').insert(payload).select('id').single();
+        const { data } = await supabase.from('api_keys').insert(payload).select('id, default_model').single();
         if (data) {
-          setApiKeys(prev => [...prev, { id: data.id, label: payload.label, provider: payload.provider, keyValue: payload.key_value, isDefault: payload.is_default }]);
+          setApiKeys(prev => [...prev, { id: data.id, label: payload.label, provider: payload.provider, keyValue: payload.key_value, isDefault: payload.is_default, defaultModel: data.default_model || '' }]);
         }
         toast.success('API Key saved.');
       }
-      setNewKeyLabel(''); setNewKeyValue(''); setNewKeyProvider('');
+      setNewKeyLabel(''); setNewKeyValue(''); setNewKeyProvider(''); setNewKeyDefaultModel(''); setFetchedModels([]);
     } catch { toast.error('Failed to save key.'); }
     finally { setIsSavingKey(false); }
   };
@@ -1201,7 +1281,7 @@ export function Settings() {
                 {/* Add New Key Form */}
                 <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-4">
                   <h3 className="text-sm font-bold text-slate-700">Add New API Key</h3>
-                  <div className="grid md:grid-cols-2 gap-3">
+                  <div className="grid md:grid-cols-3 gap-3">
                     <div className="space-y-1.5">
                       <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Label (Optional)</label>
                       <Input
@@ -1221,6 +1301,31 @@ export function Settings() {
                         <option value="">Auto-detected</option>
                         {AI_PROVIDERS.map(p => <option key={p} value={p} className="capitalize">{p}</option>)}
                       </select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                        Default Model (Optional)
+                        {isFetchingModels && <span className="text-[10px] text-slate-400 animate-pulse ml-2 font-normal">(loading live models…)</span>}
+                      </label>
+                      {modelsList.length > 0 ? (
+                        <select
+                          value={newKeyDefaultModel}
+                          onChange={e => setNewKeyDefaultModel(e.target.value)}
+                          className="w-full h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none capitalize shadow-sm"
+                        >
+                          <option value="">Default Model...</option>
+                          {modelsList.map(m => (
+                            <option key={m} value={m}>{m}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <Input
+                          value={newKeyDefaultModel}
+                          onChange={e => setNewKeyDefaultModel(e.target.value)}
+                          placeholder="e.g. gemini-2.0-flash"
+                          className="h-10 bg-white border-slate-200"
+                        />
+                      )}
                     </div>
                   </div>
                   <div className="space-y-1.5">
@@ -1284,17 +1389,22 @@ export function Settings() {
                             <button onClick={() => toggleKeyVisibility(k.id)} className="text-slate-400 hover:text-slate-600">
                               {visibleKeyIds.has(k.id) ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
                             </button>
-                            <Badge className="text-[9px] capitalize bg-slate-100 text-slate-600 border border-slate-200">{k.provider}</Badge>
+                            <Badge className="text-[9px] capitalize bg-slate-100 text-slate-650 border border-slate-200">{k.provider}</Badge>
+                            {k.defaultModel && (
+                              <Badge variant="outline" className="text-[9px] bg-slate-50 text-indigo-650 border border-indigo-200">
+                                Model: {k.defaultModel}
+                              </Badge>
+                            )}
                           </div>
                         </div>
                         <div className="flex items-center gap-1 shrink-0">
                           {!k.isDefault && (
-                            <Button variant="ghost" size="sm" onClick={() => handleSetDefault(k.id)} className="text-xs h-8 px-2 text-slate-500 hover:text-indigo-600">
+                            <Button variant="ghost" size="sm" onClick={() => handleSetDefault(k.id)} className="text-xs h-8 px-2 text-slate-500 hover:text-indigo-650">
                               Set Default
                             </Button>
                           )}
                           <button
-                            onClick={() => { setEditKeyId(k.id); setNewKeyLabel(k.label); setNewKeyValue(k.keyValue); setNewKeyProvider(k.provider); setActiveTab('ai'); }}
+                            onClick={() => { setEditKeyId(k.id); setNewKeyLabel(k.label); setNewKeyValue(k.keyValue); setNewKeyProvider(k.provider); setNewKeyDefaultModel(k.defaultModel || ''); setActiveTab('ai'); }}
                             className="h-8 w-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
                           >
                             <Pencil className="h-3.5 w-3.5" />

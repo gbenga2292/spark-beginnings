@@ -72,6 +72,7 @@ export function Ledger() {
   // VOUCHER FORM STATE
   const [voucherDate, setVoucherDate] = useState(new Date().toISOString().split('T')[0]);
   const [activeVoucherNo, setActiveVoucherNo] = useState<string>('');
+  const [loadedVoucherNo, setLoadedVoucherNo] = useState<string>('');
   const [paidFrom, setPaidFrom] = useState('');
   const [items, setItems] = useState<EntryItem[]>(Array(8).fill(null).map(() => getEmptyItem()));
   const [originalItemsJSON, setOriginalItemsJSON] = useState<string>(() => JSON.stringify(Array(8).fill(null).map(() => getEmptyItem())));
@@ -271,6 +272,7 @@ export function Ledger() {
     if (records.length === 0) return;
     
     setActiveVoucherNo(vNo);
+    setLoadedVoucherNo(vNo);
     // Parse the date out of the voucher or use the first record's transaction date ideally
     const match = vNo.match(/^VN(\d{2})-(\d{2})-(\d{2})/);
     if (match) {
@@ -340,6 +342,7 @@ export function Ledger() {
       return;
     }
     setActiveVoucherNo('');
+    setLoadedVoucherNo('');
     const newItems = Array(8).fill(null).map(() => getEmptyItem());
     setItems(newItems);
     setOriginalItemsJSON(JSON.stringify(newItems));
@@ -358,11 +361,29 @@ export function Ledger() {
   };
 
   const handleDateChange = (newDate: string) => {
-    if (activeVoucherNo) {
-      toast.info('Form cleared for a new voucher based on the selected date.');
-      handleClear();
-    }
     setVoucherDate(newDate);
+    if (activeVoucherNo) {
+      const dateObj = new Date(newDate);
+      if (!isNaN(dateObj.getTime())) {
+        const yy = String(dateObj.getFullYear()).slice(-2);
+        const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+        const dd = String(dateObj.getDate()).padStart(2, '0');
+        const prefix = `VN${yy}-${mm}-${dd}-`;
+        
+        let maxSeq = 0;
+        ledgerEntries.forEach(e => {
+          if (e.voucherNo && e.voucherNo.startsWith(prefix) && e.voucherNo !== loadedVoucherNo) {
+            const seqStr = e.voucherNo.replace(prefix, '');
+            const seq = parseInt(seqStr, 10);
+            if (!isNaN(seq) && seq > maxSeq) {
+              maxSeq = seq;
+            }
+          }
+        });
+        const newSeq = String(maxSeq + 1).padStart(2, '0');
+        setActiveVoucherNo(`${prefix}${newSeq}`);
+      }
+    }
   };
 
   const handleSubmit = async () => {
@@ -406,7 +427,13 @@ export function Ledger() {
     const targetVoucherNo = activeVoucherNo || generatedVoucherNo;
     const existingRecords = ledgerEntries.filter(e => e.voucherNo === targetVoucherNo);
     
-    if (activeVoucherNo && existingRecords.length > 0) {
+    if (loadedVoucherNo && loadedVoucherNo !== targetVoucherNo) {
+      const confirmed = await showConfirm(
+        `You have changed the voucher date. This will update the voucher number from ${loadedVoucherNo} to ${targetVoucherNo}.\n\nAre you sure you want to proceed?`,
+        { variant: 'danger', confirmLabel: 'Yes, Change Date' }
+      );
+      if (!confirmed) return;
+    } else if (activeVoucherNo && existingRecords.length > 0) {
       const confirmed = await showConfirm(
         `A change has been made to voucher ${targetVoucherNo}.\n\nAre you sure you want to overwrite the existing record?`,
         { variant: 'danger', confirmLabel: 'Yes, Overwrite' }
@@ -456,8 +483,10 @@ export function Ledger() {
       return;
     }
 
-    // Purge rows that were cleared from an existing voucher
-    existingRecords.forEach(r => {
+    // Purge rows that were cleared from the loaded voucher (even if its name/number changed due to date change)
+    const purgeVoucherNo = loadedVoucherNo || targetVoucherNo;
+    const originalRecords = ledgerEntries.filter(e => e.voucherNo === purgeVoucherNo);
+    originalRecords.forEach(r => {
       if (!keptIds.has(r.id)) {
         deleteLedgerEntry(r.id);
       }

@@ -32,6 +32,65 @@ function isOnLeave(leave: LeaveRecord, date: Date): boolean {
   } catch { return false; }
 }
 
+function renderApprovalTooltip(leave: LeaveRecord) {
+  const steps = [
+    { label: 'Line Manager', sig: leave.supervisorSignature },
+    { label: 'Head of Dept', sig: leave.hodSignature },
+    { label: 'Management', sig: leave.managementSignature },
+    { label: 'HR', sig: leave.hrSignature },
+  ];
+
+  return (
+    <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 bg-slate-900 text-white text-xs rounded-lg p-3 shadow-xl opacity-0 group-hover/tooltip:opacity-100 transition-opacity duration-200 z-50 pointer-events-none text-left">
+      <p className="font-bold border-b border-slate-700 pb-1.5 mb-1.5 text-center text-[10px] uppercase tracking-wider text-teal-400">Approval Workflow Details</p>
+      <div className="space-y-1.5 text-[11px] text-slate-300">
+        {steps.map((s, idx) => {
+          const isSigned = s.sig?.signed === 'Signed';
+          const signerName = s.sig?.name || '';
+          
+          // Determine status text
+          let statusText = 'Awaiting';
+          let textColor = 'text-slate-400';
+          
+          if (isSigned) {
+            statusText = signerName ? `✓ ${signerName}` : '✓ Signed';
+            textColor = 'text-emerald-400 font-semibold';
+          } else if (leave.workflowStep === -1) {
+            if (leave.rejectionNote && leave.rejectionNote.toLowerCase().includes(`step ${idx + 1}`)) {
+              statusText = '✗ Rejected';
+              textColor = 'text-rose-400 font-semibold';
+            } else {
+              statusText = '—';
+              textColor = 'text-slate-500';
+            }
+          } else if (leave.workflowStep && leave.workflowStep > idx + 1) {
+            statusText = '✓ Bypassed';
+            textColor = 'text-emerald-400/80';
+          } else if (leave.workflowStep === idx + 1) {
+            statusText = 'Awaiting Approval…';
+            textColor = 'text-amber-400 font-medium italic';
+          }
+
+          return (
+            <div key={idx} className="flex justify-between items-center gap-2">
+              <span className="font-medium text-slate-400">{s.label}:</span>
+              <span className={`text-right truncate max-w-[140px] ${textColor}`} title={statusText}>
+                {statusText}
+              </span>
+            </div>
+          );
+        })}
+        {leave.rejectionNote && (
+          <div className="mt-2 pt-1.5 border-t border-slate-800 text-[10px] text-rose-300 leading-normal">
+            <span className="font-bold uppercase">Reason:</span> {leave.rejectionNote}
+          </div>
+        )}
+      </div>
+      <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-900"></div>
+    </div>
+  );
+}
+
 /* ─────────────────────────────────── component ─ */
 export function Leaves() {
   const navigate = useNavigate();
@@ -873,15 +932,18 @@ export function Leaves() {
                       ) : <span className="text-slate-300 dark:text-slate-600 text-xs">—</span>}
                     </td>
                     <td className="px-5 py-4 text-center whitespace-nowrap hidden sm:table-cell">
-                      {leave.approvalStatus === 'Approved' ? (
-                        <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-500/20 dark:text-emerald-400 dark:border-emerald-500/30" variant="outline">Approved</Badge>
-                      ) : leave.approvalStatus === 'Rejected' ? (
-                        <Badge className="bg-red-100 text-red-700 border-red-200 dark:bg-red-500/20 dark:text-red-400 dark:border-red-500/30" variant="outline">Rejected</Badge>
-                      ) : leave.approvalStatus === 'Pending' ? (
-                        <Badge className="bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-500/20 dark:text-amber-400 dark:border-amber-500/30" variant="outline">Pending</Badge>
-                      ) : (
-                        <span className="text-slate-300 text-xs">—</span>
-                      )}
+                      <div className="relative group/tooltip inline-block">
+                        {leave.approvalStatus === 'Approved' ? (
+                          <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-500/20 dark:text-emerald-400 dark:border-emerald-500/30 cursor-help" variant="outline">Approved</Badge>
+                        ) : leave.approvalStatus === 'Rejected' ? (
+                          <Badge className="bg-red-100 text-red-700 border-red-200 dark:bg-red-500/20 dark:text-red-400 dark:border-red-500/30 cursor-help" variant="outline">Rejected</Badge>
+                        ) : leave.approvalStatus === 'Pending' ? (
+                          <Badge className="bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-500/20 dark:text-amber-400 dark:border-amber-500/30 cursor-help" variant="outline">Pending</Badge>
+                        ) : (
+                          <span className="text-slate-300 text-xs">—</span>
+                        )}
+                        {leave.approvalStatus && renderApprovalTooltip(leave)}
+                      </div>
                     </td>
                     <td className="px-5 py-4 text-center whitespace-nowrap">
                       {(() => {
@@ -1046,16 +1108,17 @@ export function Leaves() {
                 </div>
                 <div className="flex flex-col">
                   <span className="text-[10px] uppercase font-bold text-slate-400">Approval</span>
-                  <div className="mt-0.5">
+                  <div className="mt-0.5 relative group/tooltip inline-block">
                     {leave.approvalStatus === 'Approved' ? (
-                      <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-500/20 dark:text-emerald-400 dark:border-emerald-500/30 text-[10px] py-0" variant="outline">Approved</Badge>
+                      <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-500/20 dark:text-emerald-400 dark:border-emerald-500/30 text-[10px] py-0 cursor-help" variant="outline">Approved</Badge>
                     ) : leave.approvalStatus === 'Rejected' ? (
-                      <Badge className="bg-red-100 text-red-700 border-red-200 dark:bg-red-500/20 dark:text-red-400 dark:border-red-500/30 text-[10px] py-0" variant="outline">Rejected</Badge>
+                      <Badge className="bg-red-100 text-red-700 border-red-200 dark:bg-red-500/20 dark:text-red-400 dark:border-red-500/30 text-[10px] py-0 cursor-help" variant="outline">Rejected</Badge>
                     ) : leave.approvalStatus === 'Pending' ? (
-                      <Badge className="bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-500/20 dark:text-amber-400 dark:border-amber-500/30 text-[10px] py-0" variant="outline">Pending</Badge>
+                      <Badge className="bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-500/20 dark:text-amber-400 dark:border-amber-500/30 text-[10px] py-0 cursor-help" variant="outline">Pending</Badge>
                     ) : (
                       <span className="text-slate-300 text-xs">—</span>
                     )}
+                    {leave.approvalStatus && renderApprovalTooltip(leave)}
                   </div>
                 </div>
                 <div className="flex flex-col">

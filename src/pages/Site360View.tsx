@@ -15,6 +15,7 @@ import { Button } from '@/src/components/ui/button';
 import { cn } from '@/src/lib/utils';
 import { useTheme } from '@/src/hooks/useTheme';
 import { useAppStore, Site } from '@/src/store/appStore';
+import { supabase } from '@/src/integrations/supabase/client';
 import { useOperations } from '@/src/contexts/OperationsContext';
 import { useAppData, deriveMainTaskStatus } from '@/src/contexts/AppDataContext';
 import { useAuth } from '@/src/hooks/useAuth';
@@ -43,6 +44,7 @@ export function Site360View({ site, clientSites, onSiteChange, onBack, onEditSit
   const { user: authUser } = useAuth();
   const currentUser = useUserStore(s => s.users.find(u => u.id === s.currentUserId));
   const allSites = useAppStore(s => s.sites);
+  const workspaceId = useAppStore(s => (s as any).workspaceId || 'default');
   const allClients = useMemo(() => {
     const names = new Set<string>();
     allSites.forEach(s => { 
@@ -100,6 +102,31 @@ export function Site360View({ site, clientSites, onSiteChange, onBack, onEditSit
   const [isChatCollapsed, setIsChatCollapsed] = useState(true);
   const [isSiteInfoCollapsed, setIsSiteInfoCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 1024);
+  const [selectedProvider, setSelectedProvider] = useState<'gemini' | 'groq'>('groq');
+  const [selectedModel, setSelectedModel] = useState<string>('llama-3.1-8b-instant');
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data: keyRow } = await supabase
+          .from('api_keys')
+          .select('provider')
+          .eq('workspace_id', workspaceId)
+          .eq('is_default', true)
+          .maybeSingle();
+        if (keyRow) {
+          const prov = (keyRow.provider === 'gemini' || keyRow.provider === 'groq') ? keyRow.provider : 'groq';
+          setSelectedProvider(prov);
+          setSelectedModel(prov === 'gemini' ? 'gemini-2.0-flash' : 'llama-3.1-8b-instant');
+        }
+      } catch {}
+    })();
+  }, [workspaceId]);
+
+  const handleProviderChange = (p: 'gemini' | 'groq') => {
+    setSelectedProvider(p);
+    setSelectedModel(p === 'gemini' ? 'gemini-2.0-flash' : 'llama-3.1-8b-instant');
+  };
 
   useEffect(() => {
     const handler = () => setIsMobile(window.innerWidth < 1024);
@@ -613,12 +640,32 @@ export function Site360View({ site, clientSites, onSiteChange, onBack, onEditSit
   // AI Chat
   const sendChatMessage = async (isInitialBrief = false) => {
     if (!isInitialBrief && !chatInput.trim()) return;
-    let apiKey = import.meta.env.VITE_GROQ_API_KEY || localStorage.getItem('GROQ_API_KEY');
+
+    let apiKey = '';
+
+    try {
+      const { data: keys } = await supabase
+        .from('api_keys')
+        .select('key_value,provider')
+        .eq('workspace_id', workspaceId);
+      const matchKey = keys?.find(k => k.provider === selectedProvider);
+      if (matchKey) {
+        apiKey = matchKey.key_value;
+      }
+    } catch (err) {
+      console.error('Failed to load API key from DB:', err);
+    }
+
     if (!apiKey) {
-      apiKey = window.prompt('Enter your Groq API Key:');
+      apiKey = import.meta.env.VITE_GROQ_API_KEY || localStorage.getItem('GROQ_API_KEY') || '';
+    }
+
+    if (!apiKey) {
+      apiKey = window.prompt(`Enter your ${selectedProvider === 'gemini' ? 'Gemini' : 'Groq'} API Key:`) || '';
       if (!apiKey) return;
       localStorage.setItem('GROQ_API_KEY', apiKey);
     }
+
     const newUserMessage = isInitialBrief ? 'Provide a 3-sentence intelligence brief for this site.' : chatInput;
     if (!isInitialBrief) { setMessages(prev => [...prev, { role: 'user', content: newUserMessage }]); setChatInput(''); }
     setIsGeneratingBrief(true);
@@ -629,14 +676,37 @@ Operations: ${data.machineLogs.length} log days, ${data.activeDays} active days,
 Maintenance: ${data.siteMaintAssets.length} assets tracked. Overdue: ${data.siteMaintAssets.filter(a => a.status === 'overdue').map(a => a.name).join(', ') || 'None'}.
 Pending Tasks: ${data.siteTasks.length}. Alerts: ${data.alerts.map(a => a.title).join('; ') || 'None'}.
 Answer site-specific questions using this context only. Be concise.`;
-      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: 'llama-3.1-8b-instant', messages: [{ role: 'system', content: systemPrompt }, ...messages, { role: 'user', content: newUserMessage }], temperature: 0.3, max_tokens: 300 }),
-      });
-      if (!res.ok) throw new Error('API Error');
-      const resData = await res.json();
-      const reply = resData.choices[0].message.content;
+
+      let reply = '';
+      if (selectedProvider === 'gemini') {
+        const contents = messages.map(m => ({
+          role: m.role === 'assistant' ? 'model' : 'user',
+          parts: [{ text: m.content }]
+        }));
+        contents.push({ role: 'user', parts: [{ text: newUserMessage }] });
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent?key=${apiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents,
+            systemInstruction: { parts: [{ text: systemPrompt }] },
+            generationConfig: { temperature: 0.3, maxOutputTokens: 300 }
+          })
+        });
+        if (!res.ok) throw new Error('Gemini API Error');
+        const resData = await res.json();
+        reply = resData?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      } else {
+        const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model: selectedModel, messages: [{ role: 'system', content: systemPrompt }, ...messages, { role: 'user', content: newUserMessage }], temperature: 0.3, max_tokens: 300 }),
+        });
+        if (!res.ok) throw new Error('Groq API Error');
+        const resData = await res.json();
+        reply = resData.choices[0].message.content;
+      }
+
       if (isInitialBrief) setMessages([{ role: 'assistant', content: reply }]);
       else setMessages(prev => [...prev, { role: 'assistant', content: reply }]);
     } catch { if (!isInitialBrief) setMessages(prev => [...prev, { role: 'assistant', content: 'Unable to connect to intelligence API.' }]); }
@@ -830,9 +900,40 @@ Answer site-specific questions using this context only. Be concise.`;
               <div className="flex items-center justify-between p-4 border-b border-indigo-800/50 relative z-10 shrink-0 cursor-pointer hover:bg-indigo-800/20 transition-colors" onClick={() => setIsChatCollapsed(!isChatCollapsed)}>
                 <div className="flex items-center gap-2">
                   <div className="p-1.5 bg-indigo-500/20 rounded-lg"><Sparkles className="w-4 h-4 text-indigo-300" /></div>
-                  <span className="text-sm font-bold uppercase tracking-wider text-indigo-200">Site Intelligence Assistant</span>
+                  <span className="text-xs sm:text-sm font-bold uppercase tracking-wider text-indigo-200">Site Intelligence Assistant</span>
                 </div>
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
+                  {!isChatCollapsed && (
+                    <div className="flex items-center gap-1.5 mr-2">
+                      <select 
+                        value={selectedProvider} 
+                        onChange={e => handleProviderChange(e.target.value as 'gemini' | 'groq')} 
+                        className="bg-indigo-950/70 border border-indigo-750/70 text-indigo-200 text-[10px] font-bold rounded-full px-2 py-0.5 focus:outline-none cursor-pointer hover:border-indigo-500"
+                      >
+                        <option value="gemini">Gemini</option>
+                        <option value="groq">Groq</option>
+                      </select>
+                      <select 
+                        value={selectedModel} 
+                        onChange={e => setSelectedModel(e.target.value)} 
+                        className="bg-indigo-950/70 border border-indigo-750/70 text-indigo-200 text-[10px] font-bold rounded-full px-2 py-0.5 focus:outline-none cursor-pointer hover:border-indigo-500"
+                      >
+                        {selectedProvider === 'gemini' ? (
+                          <>
+                            <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+                            <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
+                            <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+                          </>
+                        ) : (
+                          <>
+                            <option value="llama-3.1-8b-instant">Llama 3.1 8B</option>
+                            <option value="llama-3.3-70b-versatile">Llama 3.3 70B</option>
+                            <option value="mixtral-8x7b-32768">Mixtral 8x7B</option>
+                          </>
+                        )}
+                      </select>
+                    </div>
+                  )}
                   {!isChatCollapsed && messages.length === 0 && (
                     <div className="flex items-center gap-1.5">
                       <Button onClick={e => { e.stopPropagation(); sendChatMessage(true); }} disabled={isGeneratingBrief} size="sm" className="bg-indigo-600 hover:bg-indigo-500 text-white border-0 h-8 text-xs px-2 sm:px-3">
