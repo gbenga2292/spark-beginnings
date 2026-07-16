@@ -376,6 +376,7 @@ export function Attendance() {
   );
   const isMobile = useIsMobile();
   const sites = useAppStore((state) => state.sites);
+  const updateSite = useAppStore((state) => state.updateSite);
   const attendanceRecords = useAppStore((state) => state.attendanceRecords);
   const payrollVariables = useAppStore((state) => state.payrollVariables);
   const departments = useAppStore((state) => state.departments);
@@ -563,12 +564,12 @@ export function Attendance() {
     }),
   [activeSites, onSiteMachineIds, machineRegDate]);
 
-  const [activeMachineBySite, setActiveMachineBySite] = useState<Record<string, { activeMachineIds: string[]; machineTypes: Record<string, 'full' | 'half' | 'off'>; dieselUsage: Record<string, number>; notes: string }>>({}); 
+  const [activeMachineBySite, setActiveMachineBySite] = useState<Record<string, { activeMachineIds: string[]; machineTypes: Record<string, 'full' | 'half' | 'off'>; dieselUsage: Record<string, number>; notes: string; progressPercentage?: number }>>({}); 
 
   // Pre-populate activeMachineBySite from existing daily logs when date changes
   useEffect(() => {
     if (!machineRegDate) return;
-    const initial: Record<string, { activeMachineIds: string[]; machineTypes: Record<string, 'full' | 'half' | 'off'>; dieselUsage: Record<string, number>; notes: string }> = {};
+    const initial: Record<string, { activeMachineIds: string[]; machineTypes: Record<string, 'full' | 'half' | 'off'>; dieselUsage: Record<string, number>; notes: string; progressPercentage?: number }> = {};
 
     activeSites.forEach(s => {
       // Logs for this site on this date (all — active AND off)
@@ -596,6 +597,7 @@ export function Attendance() {
         machineTypes,
         dieselUsage,
         notes: anyLog?.maintenanceDetails || '',
+        progressPercentage: s.currentProgressPercentage ?? 0,
       };
     });
 
@@ -673,8 +675,17 @@ export function Attendance() {
     setIsSavingMachines(true);
     try {
       for (const site of sitesWithMachines) {
-        const entry = activeMachineBySite[site.id] ?? { activeMachineIds: [], machineTypes: {}, dieselUsage: {}, notes: '' };
+        const entry = activeMachineBySite[site.id] ?? { activeMachineIds: [], machineTypes: {}, dieselUsage: {}, notes: '', progressPercentage: site.currentProgressPercentage ?? 0 };
         const selectedIds = entry.activeMachineIds.filter(id => id && id !== 'none');
+        
+        // Update site progress in DB if changed
+        const newProgress = entry.progressPercentage ?? site.currentProgressPercentage ?? 0;
+        if (newProgress !== (site.currentProgressPercentage ?? 0)) {
+          if (newProgress < (site.currentProgressPercentage ?? 0)) {
+            throw new Error(`Progress percentage for "${site.name}" cannot be decreased below the previous value of ${site.currentProgressPercentage}%.`);
+          }
+          await updateSite(site.id, { currentProgressPercentage: newProgress });
+        }
 
         for (const machineId of selectedIds) {
           const machine = allLoggableMachines.find(m => m.id === machineId);
@@ -2595,10 +2606,11 @@ export function Attendance() {
                   <table className="w-full text-[11px]">
                     <thead className="bg-slate-50 sticky top-0 shadow-sm z-10 border-b border-slate-200">
                       <tr>
-                        <th className="text-left font-bold text-slate-600 py-2.5 px-4 uppercase tracking-wide w-[22%]">Active Site</th>
-                        <th className="text-left font-bold text-slate-600 py-2.5 px-4 uppercase tracking-wide w-[16%]">Select Equipment</th>
-                        <th className="text-left font-bold text-slate-600 py-2.5 px-4 uppercase tracking-wide w-[40%]">Selected Machines &amp; Day Type</th>
-                        <th className="text-left font-bold text-slate-600 py-2.5 px-4 uppercase tracking-wide w-[22%]">Notes / Remarks</th>
+                        <th className="text-left font-bold text-slate-600 py-2.5 px-4 uppercase tracking-wide w-[20%]">Active Site</th>
+                        <th className="text-left font-bold text-slate-600 py-2.5 px-4 uppercase tracking-wide w-[10%]">Site Progress</th>
+                        <th className="text-left font-bold text-slate-600 py-2.5 px-4 uppercase tracking-wide w-[15%]">Select Equipment</th>
+                        <th className="text-left font-bold text-slate-600 py-2.5 px-4 uppercase tracking-wide w-[35%]">Selected Machines &amp; Day Type</th>
+                        <th className="text-left font-bold text-slate-600 py-2.5 px-4 uppercase tracking-wide w-[20%]">Notes / Remarks</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -2624,6 +2636,36 @@ export function Attendance() {
                                 }`} />
                                 <span className="font-semibold text-slate-800">{site.name}</span>
                                 <span className="text-[10px] text-slate-400 bg-slate-100 rounded px-1.5 py-0.5">{site.client}</span>
+                              </div>
+                            </td>
+                            <td className="py-2.5 px-4">
+                              <div className="flex items-center gap-2">
+                                <div className="relative flex items-center">
+                                  <Input
+                                    type="number"
+                                    min={site.currentProgressPercentage ?? 0}
+                                    max={100}
+                                    value={entry.progressPercentage ?? site.currentProgressPercentage ?? 0}
+                                    onChange={e => {
+                                      const val = Math.min(100, Math.max(0, parseInt(e.target.value, 10) || 0));
+                                      setActiveMachineBySite(prev => ({
+                                        ...prev,
+                                        [site.id]: {
+                                          ...(prev[site.id] ?? { activeMachineIds: [], machineTypes: {}, dieselUsage: {}, notes: '' }),
+                                          progressPercentage: val
+                                        }
+                                      }));
+                                    }}
+                                    className="w-14 h-8 px-1.5 text-center font-bold text-slate-700 border-slate-200 focus-visible:ring-indigo-500 bg-white"
+                                  />
+                                  <span className="ml-1 text-[10px] font-bold text-slate-400">%</span>
+                                </div>
+                                <div className="w-10 bg-slate-100 rounded-full h-1.5 overflow-hidden hidden md:block">
+                                  <div 
+                                    className="bg-indigo-500 h-1.5 transition-all duration-300"
+                                    style={{ width: `${entry.progressPercentage ?? site.currentProgressPercentage ?? 0}%` }}
+                                  />
+                                </div>
                               </div>
                             </td>
                             <td className="py-2 px-4">
@@ -2714,18 +2756,13 @@ export function Attendance() {
 
                 {/* Mobile cards */}
                 <div className="sm:hidden space-y-2 p-2">
-                  {sitesWithMachines.map(site => {
+                  {sitesWithMachines.map((site, idx) => {
                     const entry = activeMachineBySite[site.id] ?? { activeMachineIds: [], machineTypes: {}, dieselUsage: {}, notes: '' };
                     const nonOffCount = entry.activeMachineIds.filter(id => (entry.machineTypes[id] ?? 'full') !== 'off').length;
                     const isActive = nonOffCount > 0;
                     const { onSite, other } = getDropdownGroups(site.id);
                     return (
-                      <div
-                        key={site.id}
-                        className={`rounded-xl border p-3 transition-all ${
-                          isActive ? 'border-emerald-200 bg-emerald-50/40' : 'border-slate-200 bg-white'
-                        }`}
-                      >
+                      <div key={site.id} className={`rounded-xl border p-3 space-y-3 ${isActive ? 'bg-emerald-50/60 border-emerald-200' : idx % 2 === 0 ? 'bg-white border-slate-100' : 'bg-slate-50/50 border-slate-100'}`}>
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-2">
                             <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
@@ -2736,6 +2773,41 @@ export function Attendance() {
                           <span className="text-[9px] text-slate-400 bg-slate-100 rounded px-1.5 py-0.5">{site.client}</span>
                         </div>
                         <div className="grid grid-cols-1 gap-2.5">
+                          {/* Site Progress Card Field */}
+                          <div className="bg-slate-50/50 p-2.5 rounded-xl border border-slate-100">
+                            <label className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-1">Site Progress</label>
+                            <div className="flex items-center gap-3">
+                              <div className="relative flex items-center shrink-0">
+                                <Input
+                                  type="number"
+                                  min={site.currentProgressPercentage ?? 0}
+                                  max={100}
+                                  value={entry.progressPercentage ?? site.currentProgressPercentage ?? 0}
+                                  onChange={e => {
+                                    const val = Math.min(100, Math.max(0, parseInt(e.target.value, 10) || 0));
+                                    setActiveMachineBySite(prev => ({
+                                      ...prev,
+                                      [site.id]: {
+                                        ...(prev[site.id] ?? { activeMachineIds: [], machineTypes: {}, dieselUsage: {}, notes: '' }),
+                                        progressPercentage: val
+                                      }
+                                    }));
+                                  }}
+                                  className="w-16 h-8 px-1.5 text-center font-bold text-slate-700 border-slate-200 bg-white"
+                                />
+                                <span className="ml-1 text-[10px] font-bold text-slate-400">%</span>
+                              </div>
+                              <div className="flex-1 bg-slate-200/50 rounded-full h-2 overflow-hidden">
+                                <div 
+                                  className="bg-indigo-500 h-full transition-all duration-300"
+                                  style={{ width: `${entry.progressPercentage ?? site.currentProgressPercentage ?? 0}%` }}
+                                />
+                              </div>
+                              <span className="text-[10px] font-bold text-slate-400 shrink-0">
+                                (Prev: {site.currentProgressPercentage ?? 0}%)
+                              </span>
+                            </div>
+                          </div>
                           <div>
                             <label className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-1">Select Equipment</label>
                             <MachineMultiSelect

@@ -49,7 +49,7 @@ export function SiteMachineAnalyticsModal({ isOpen, onClose, site, machines }: S
 
   const stats = useMemo(() => {
     const totalLogs = filteredLogs.length;
-    const activeDays = filteredLogs.filter(l => l.isActive).length;
+    const activeDays = filteredLogs.reduce((acc, l) => acc + (l.operationalDay === 'half' ? 0.5 : l.operationalDay === 'none' ? 0 : (l.isActive ? 1 : 0)), 0);
     const totalDiesel = filteredLogs.reduce((acc, l) => acc + (Number(l.dieselUsage) || 0), 0);
     const logsWithIssues = filteredLogs.filter(l => l.issuesOnSite?.trim()).length;
 
@@ -57,7 +57,7 @@ export function SiteMachineAnalyticsModal({ isOpen, onClose, site, machines }: S
     const machineList = selectedMachineId === 'all' ? machines : machines.filter(m => m.id === selectedMachineId);
     const machineStats = machineList.map(m => {
       const mLogs = filteredLogs.filter(l => l.assetId === m.id);
-      const active = mLogs.filter(l => l.isActive).length;
+      const active = mLogs.reduce((acc, l) => acc + (l.operationalDay === 'half' ? 0.5 : l.operationalDay === 'none' ? 0 : (l.isActive ? 1 : 0)), 0);
       const diesel = mLogs.reduce((acc, l) => acc + (Number(l.dieselUsage) || 0), 0);
       const utilisation = mLogs.length > 0 ? Math.round((active / mLogs.length) * 100) : 0;
       const halfDays = mLogs.filter(l => l.operationalDay === 'half').length;

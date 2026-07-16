@@ -32,6 +32,7 @@ function SiteLogCard({
   idx, 
   onRemove, 
   onChangeNarration, 
+  onChangeProgress,
   formDate,
   onOpenMachineLog
 }: { 
@@ -39,14 +40,28 @@ function SiteLogCard({
   idx: number; 
   onRemove: () => void; 
   onChangeNarration: (val: string) => void;
+  onChangeProgress: (val: number | undefined) => void;
   formDate: string;
   onOpenMachineLog: (machine: {id: string, name: string}, siteId: string, siteName: string) => void;
 }) {
   const { waybills, assets, dailyMachineLogs } = useOperations();
-  const { consumableLogs } = useAppStore();
+  const { consumableLogs, siteJournalEntries: allEntries } = useAppStore();
   const [activeTab, setActiveTab] = useState<'general' | 'machines' | 'consumables'>('general');
   const [isBulkConsumableOpen, setIsBulkConsumableOpen] = useState(false);
   const [isBulkMachineOpen, setIsBulkMachineOpen] = useState(false);
+
+  // Find the highest progress ever logged for this site for validation
+  const maxSavedProgress = useMemo(() => {
+    if (!entry.siteId) return 0;
+    const siteLogs = allEntries.filter(e => e.siteId === entry.siteId && e.progressPercentage != null);
+    if (siteLogs.length === 0) return 0;
+    return Math.max(...siteLogs.map(e => e.progressPercentage!));
+  }, [allEntries, entry.siteId]);
+
+  const progressVal = entry.progressPercentage;
+  const progressError = progressVal !== undefined && progressVal < maxSavedProgress
+    ? `Cannot be less than previous progress (${maxSavedProgress}%)`
+    : null;
   
   // Media State
   const [mediaFiles, setMediaFiles] = useState<File[]>([]);
@@ -320,6 +335,56 @@ function SiteLogCard({
             <textarea value={entry.narration || ''} onChange={e => onChangeNarration(e.target.value)}
               rows={4} placeholder="Type your field notes here..."
               className="w-full text-base sm:text-sm border border-slate-200 dark:border-slate-700 rounded-lg p-3 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50 dark:bg-slate-950 transition-all placeholder:text-slate-400" />
+
+            {/* Site Progress % Input */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                  <span>📊</span> Site Progress
+                </label>
+                {maxSavedProgress > 0 && (
+                  <span className="text-[10px] text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">
+                    Last recorded: <strong>{maxSavedProgress}%</strong>
+                  </span>
+                )}
+              </div>
+              <div className="relative">
+                <input
+                  type="number"
+                  min={maxSavedProgress}
+                  max={100}
+                  step={1}
+                  value={progressVal ?? ''}
+                  onChange={e => {
+                    const raw = e.target.value;
+                    onChangeProgress(raw === '' ? undefined : Math.min(100, Math.max(0, Number(raw))));
+                  }}
+                  placeholder={maxSavedProgress > 0 ? `Min ${maxSavedProgress}%` : '0–100%'}
+                  className={`w-full h-10 rounded-lg border px-3 pr-8 text-sm focus:outline-none focus:ring-2 bg-slate-50 dark:bg-slate-950 transition-all
+                    ${progressError
+                      ? 'border-red-400 focus:ring-red-400/30 text-red-600'
+                      : 'border-slate-200 dark:border-slate-700 focus:ring-indigo-500'
+                    }`}
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-slate-400 font-bold">%</span>
+              </div>
+              {progressError && (
+                <p className="text-[11px] text-red-500 flex items-center gap-1">
+                  ⚠️ {progressError}
+                </p>
+              )}
+              {progressVal !== undefined && !progressError && (
+                <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden mt-1">
+                  <div
+                    className="h-full rounded-full transition-all duration-300"
+                    style={{
+                      width: `${progressVal}%`,
+                      background: progressVal >= 80 ? '#10b981' : progressVal >= 40 ? '#f59e0b' : '#6366f1'
+                    }}
+                  />
+                </div>
+              )}
+            </div>
 
             {/* WhatsApp-style fullscreen media viewer */}
             {lightboxIndex !== null && (uploadedMedia.length > 0 || mediaPreviews.length > 0) && (
@@ -1096,6 +1161,7 @@ export function DailyJournal() {
                     idx={idx}
                     onRemove={() => setFormEntries(p => p.filter((_, i) => i !== idx))}
                     onChangeNarration={(val) => { const n = [...formEntries]; n[idx].narration = val; setFormEntries(n); }}
+                    onChangeProgress={(val) => { const n = [...formEntries]; n[idx].progressPercentage = val; setFormEntries(n); }}
                     formDate={formDate}
                     onOpenMachineLog={(machine, siteId, siteName) => {
                       setMachineLogContext({ assetId: machine.id, assetName: machine.name, siteId, siteName });

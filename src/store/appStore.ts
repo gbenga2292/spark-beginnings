@@ -78,6 +78,7 @@ export interface SiteJournalEntry {
   siteName: string;
   clientName: string;
   narration: string;
+  progressPercentage?: number;
   createdAt: string;
   loggedBy: string;
 }
@@ -165,6 +166,7 @@ export interface Site {
   mainContactPerson?: string;
   contactPhone?: string;
   position?: string;
+  currentProgressPercentage?: number;
 }
 
 export interface TaxBracket {

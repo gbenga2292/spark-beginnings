@@ -46,6 +46,7 @@ export function dbToSite(r: any): Site {
     mainContactPerson: r.contact_person || undefined,
     contactPhone: r.phone || undefined,
     position: r.position || undefined,
+    currentProgressPercentage: r.current_progress_percentage ?? undefined,
   };
 }
 
@@ -515,6 +516,7 @@ export function dbToSiteJournalEntry(r: any): SiteJournalEntry {
     siteName: r.site_name,
     clientName: r.client_name,
     narration: r.narration,
+    progressPercentage: r.progress_percentage ?? undefined,
     createdAt: r.created_at,
     loggedBy: r.logged_by,
   };
@@ -597,6 +599,7 @@ export function siteJournalEntryToDb(e: SiteJournalEntry): any {
     site_name: e.siteName,
     client_name: e.clientName,
     narration: e.narration,
+    progress_percentage: e.progressPercentage ?? null,
     created_at: e.createdAt,
     logged_by: e.loggedBy,
     workspace_id: getWS(),
@@ -630,6 +633,7 @@ function siteToDb(s: Site) {
     contact_person: s.mainContactPerson || null,
     phone: s.contactPhone || null,
     position: s.position || null,
+    current_progress_percentage: s.currentProgressPercentage ?? null,
   };
 }
 

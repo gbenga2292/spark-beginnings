@@ -1467,7 +1467,7 @@ export function Sites() {
                           </div>
                         </div>
 
-                        <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+                        <div className="flex items-center justify-between pt-3 border-t border-slate-100 mt-3">
                           <div className="flex items-center gap-2">
                             <span className="text-xs text-slate-500 font-medium">VAT:</span>
                             <Badge variant={site.vat === 'Yes' || site.vat === 'Add' ? 'success' : 'outline'} className="text-[9px] uppercase font-bold px-1.5 py-0">

@@ -7,6 +7,7 @@ import {
   Save, Building, Link as LinkIcon, CloudDownload,
   RefreshCw, Library, Pencil, X, Mail, Phone, MapPin, Hash, CheckCircle2,
   DatabaseBackup, Upload, Download, Clock, ShieldCheck, AlertTriangle, FolderOpen,
+  Bot, Key, Eye, EyeOff, Star, Trash2, ToggleLeft, ToggleRight, FlaskConical, Cpu,
 } from 'lucide-react';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Variables } from './Variables';
@@ -62,12 +63,46 @@ const DEFAULT_BACKUP_SETTINGS: BackupSettings = {
   lastBackupAt: null,
 };
 
+// ─── AI Settings Types ────────────────────────────────────────────────
+interface ApiKey {
+  id: string;
+  label: string;
+  provider: string;
+  keyValue: string;
+  isDefault: boolean;
+}
+
+const AI_PROVIDERS = ['gemini', 'groq', 'openai', 'xai', 'anthropic', 'cohere', 'mistral'];
+
+function detectProvider(key: string): string {
+  if (key.startsWith('AIza')) return 'gemini';
+  if (key.startsWith('gsk_')) return 'groq';
+  if (key.startsWith('sk-ant')) return 'anthropic';
+  if (key.startsWith('sk-')) return 'openai';
+  if (key.startsWith('xai-')) return 'xai';
+  return 'unknown';
+}
+
 export function Settings() {
   const [activeTab, setActiveTab] = useState('general');
   const [appVersion, setAppVersion] = useState(APP_VERSION);
   const [isChecking, setIsChecking] = useState(false);
   const isElectron = ((window as any).electronAPI as any)?.isElectron as boolean | undefined;
   const isAndroidNative = Capacitor.getPlatform() === 'android';
+
+  /* ── AI Settings state ───────────────────────────────────────── */
+  const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
+  const [allocationMode, setAllocationMode] = useState<'analytic' | 'hybrid'>('analytic');
+  const [newKeyLabel, setNewKeyLabel] = useState('');
+  const [newKeyValue, setNewKeyValue] = useState('');
+  const [newKeyProvider, setNewKeyProvider] = useState('');
+  const [showNewKey, setShowNewKey] = useState(false);
+  const [isSavingKey, setIsSavingKey] = useState(false);
+  const [isTestingKey, setIsTestingKey] = useState(false);
+  const [editKeyId, setEditKeyId] = useState<string | null>(null);
+  const [visibleKeyIds, setVisibleKeyIds] = useState<Set<string>>(new Set());
+  const [isSavingMode, setIsSavingMode] = useState(false);
+  const workspaceId = useAppStore(s => (s as any).workspaceId || 'default');
 
   /* ── Company info state ─────────────────────────────────────── */
   const [isEditing, setIsEditing] = useState(false);
@@ -105,6 +140,112 @@ export function Settings() {
       setAppVersion(APP_VERSION);
     }
   }, [isElectron, isAndroidNative]);
+
+  /* ── Load AI keys and mode from Supabase ─────────────────────── */
+  useEffect(() => {
+    (async () => {
+      const { data: keysData } = await supabase.from('api_keys').select('*').eq('workspace_id', workspaceId);
+      if (keysData) {
+        setApiKeys(keysData.map((k: any) => ({
+          id: k.id,
+          label: k.label || '',
+          provider: k.provider,
+          keyValue: k.key_value,
+          isDefault: k.is_default,
+        })));
+      }
+      const { data: settingsData } = await supabase
+        .from('workspace_settings')
+        .select('resource_allocation_mode')
+        .eq('workspace_id', workspaceId)
+        .maybeSingle();
+      if (settingsData?.resource_allocation_mode) {
+        setAllocationMode(settingsData.resource_allocation_mode as 'analytic' | 'hybrid');
+      }
+    })();
+  }, [workspaceId]);
+
+  /* ── AI key auto-detect provider ────────────────────────────── */
+  useEffect(() => {
+    const detected = detectProvider(newKeyValue);
+    if (detected !== 'unknown') setNewKeyProvider(detected);
+  }, [newKeyValue]);
+
+  const handleSaveApiKey = async () => {
+    if (!newKeyValue.trim()) { toast.error('API Key is required.'); return; }
+    setIsSavingKey(true);
+    try {
+      const provider = newKeyProvider || detectProvider(newKeyValue);
+      const payload = {
+        label: newKeyLabel || provider,
+        provider,
+        key_value: newKeyValue,
+        is_default: apiKeys.length === 0,
+        workspace_id: workspaceId,
+      };
+      if (editKeyId) {
+        await supabase.from('api_keys').update(payload).eq('id', editKeyId);
+        setApiKeys(prev => prev.map(k => k.id === editKeyId ? { ...k, label: payload.label, provider: payload.provider, keyValue: payload.key_value } : k));
+        setEditKeyId(null);
+        toast.success('API Key updated.');
+      } else {
+        const { data } = await supabase.from('api_keys').insert(payload).select('id').single();
+        if (data) {
+          setApiKeys(prev => [...prev, { id: data.id, label: payload.label, provider: payload.provider, keyValue: payload.key_value, isDefault: payload.is_default }]);
+        }
+        toast.success('API Key saved.');
+      }
+      setNewKeyLabel(''); setNewKeyValue(''); setNewKeyProvider('');
+    } catch { toast.error('Failed to save key.'); }
+    finally { setIsSavingKey(false); }
+  };
+
+  const handleDeleteKey = async (id: string) => {
+    await supabase.from('api_keys').delete().eq('id', id);
+    setApiKeys(prev => prev.filter(k => k.id !== id));
+    toast.success('Key deleted.');
+  };
+
+  const handleSetDefault = async (id: string) => {
+    await supabase.from('api_keys').update({ is_default: false }).eq('workspace_id', workspaceId);
+    await supabase.from('api_keys').update({ is_default: true }).eq('id', id);
+    setApiKeys(prev => prev.map(k => ({ ...k, isDefault: k.id === id })));
+    toast.success('Default key updated.');
+  };
+
+  const handleTestKey = async () => {
+    if (!newKeyValue.trim()) { toast.error('Enter a key to test.'); return; }
+    setIsTestingKey(true);
+    const provider = newKeyProvider || detectProvider(newKeyValue);
+    try {
+      if (provider === 'gemini') {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${newKeyValue}`);
+        res.ok ? toast.success('Gemini key is valid! ✓') : toast.error('Gemini key rejected.');
+      } else if (provider === 'groq') {
+        const res = await fetch('https://api.groq.com/openai/v1/models', { headers: { Authorization: `Bearer ${newKeyValue}` } });
+        res.ok ? toast.success('Groq key is valid! ✓') : toast.error('Groq key rejected.');
+      } else {
+        toast.info('Key format looks OK — live test not available for this provider yet.');
+      }
+    } catch { toast.error('Network error during test.'); }
+    finally { setIsTestingKey(false); }
+  };
+
+  const handleSaveMode = async (mode: 'analytic' | 'hybrid') => {
+    setIsSavingMode(true);
+    setAllocationMode(mode);
+    try {
+      await supabase.from('workspace_settings').upsert({ workspace_id: workspaceId, resource_allocation_mode: mode }, { onConflict: 'workspace_id' });
+      toast.success(`Mode switched to ${mode === 'hybrid' ? 'Hybrid (AI)' : 'Analytic'}.`);
+    } catch { toast.error('Failed to save mode.'); }
+    finally { setIsSavingMode(false); }
+  };
+
+  const toggleKeyVisibility = (id: string) => {
+    setVisibleKeyIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  };
+
+  const maskKey = (key: string) => key.slice(0, 6) + '•'.repeat(Math.min(key.length - 6, 12));
 
   /* ── Load company info from Supabase on mount ─────────────────── */
   useEffect(() => {
@@ -525,7 +666,8 @@ export function Settings() {
       case 'backup': return 'Backup & Restore';
       case 'integrations': return 'Integrations';
       case 'updates': return 'System Updates';
-      case 'variables': return null; // Variables handles its own title
+      case 'ai': return 'AI & Resource Settings';
+      case 'variables': return null;
       default: return 'Settings';
     }
   };
@@ -547,6 +689,9 @@ export function Settings() {
           ) : null}
           <TabsTrigger active={activeTab === 'integrations'} onClick={() => setActiveTab('integrations')} className="w-36">
             <LinkIcon       className="mr-2 h-4 w-4" /> Integrations
+          </TabsTrigger>
+          <TabsTrigger active={activeTab === 'ai'}           onClick={() => setActiveTab('ai')}           className="w-36">
+            <Bot            className="mr-2 h-4 w-4" /> AI Settings
           </TabsTrigger>
           <TabsTrigger active={activeTab === 'updates'}      onClick={() => setActiveTab('updates')}      className="w-32">
             <CloudDownload  className="mr-2 h-4 w-4" /> Updates
@@ -959,6 +1104,218 @@ export function Settings() {
                 {backupSettings.autoBackupEnabled && (
                   <div className="mt-6 text-xs text-slate-600 bg-emerald-50 border border-emerald-100 rounded-lg px-4 py-3 leading-relaxed">
                     <strong className="text-emerald-700">How it works:</strong> The app checks your schedule in the background. When the assigned time arrives, both a <strong>JSON file</strong> and an <strong>Excel file</strong> will be automatically generated and securely saved into structured folders in your selected Backup Storage Folder.
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+          </div>
+        </TabsContent>
+
+        {/* ─────────── AI SETTINGS TAB ──────────────────────────────── */}
+        <TabsContent active={activeTab === 'ai'}>
+          <div className="flex flex-col gap-6">
+
+            {/* Resource Allocation Mode */}
+            <Card className="border border-slate-200 shadow-sm rounded-2xl overflow-hidden">
+              <CardHeader className="bg-gradient-to-r from-indigo-50 to-white border-b border-slate-100 px-6 py-5">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-xl bg-indigo-100 flex items-center justify-center text-indigo-600 shadow-sm">
+                    <Cpu className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base font-bold text-slate-800">Resource Allocation Mode</CardTitle>
+                    <p className="text-xs text-slate-500 mt-0.5">Choose how the Machine Recon analysis is performed.</p>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="px-6 py-6">
+                <div className="grid md:grid-cols-2 gap-4">
+                  {/* Analytic Mode */}
+                  <button
+                    onClick={() => handleSaveMode('analytic')}
+                    className={`relative flex flex-col gap-3 p-5 rounded-2xl border-2 text-left transition-all ${
+                      allocationMode === 'analytic'
+                        ? 'border-indigo-500 bg-indigo-50/50 shadow-md'
+                        : 'border-slate-200 hover:border-indigo-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    {allocationMode === 'analytic' && (
+                      <span className="absolute top-3 right-3 h-5 w-5 rounded-full bg-indigo-500 flex items-center justify-center">
+                        <CheckCircle2 className="h-3 w-3 text-white" />
+                      </span>
+                    )}
+                    <div className="h-10 w-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-600">
+                      <FlaskConical className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <p className="font-bold text-slate-800">Analytic</p>
+                      <p className="text-xs text-slate-500 mt-1 leading-relaxed">Uses rolling 5-day average velocity to mathematically estimate completion dates and machine availability. Fast, offline-capable.</p>
+                    </div>
+                  </button>
+
+                  {/* Hybrid Mode */}
+                  <button
+                    onClick={() => handleSaveMode('hybrid')}
+                    className={`relative flex flex-col gap-3 p-5 rounded-2xl border-2 text-left transition-all ${
+                      allocationMode === 'hybrid'
+                        ? 'border-emerald-500 bg-emerald-50/50 shadow-md'
+                        : 'border-slate-200 hover:border-emerald-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    {allocationMode === 'hybrid' && (
+                      <span className="absolute top-3 right-3 h-5 w-5 rounded-full bg-emerald-500 flex items-center justify-center">
+                        <CheckCircle2 className="h-3 w-3 text-white" />
+                      </span>
+                    )}
+                    <div className="h-10 w-10 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-600">
+                      <Bot className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <p className="font-bold text-slate-800">Hybrid <Badge variant="success" className="ml-1 text-[10px]">AI</Badge></p>
+                      <p className="text-xs text-slate-500 mt-1 leading-relaxed">Combines the analytic calculation with an AI model for narrative insights, risk flagging, and smart machine re-allocation suggestions.</p>
+                    </div>
+                    {allocationMode !== 'hybrid' && apiKeys.filter(k => k.isDefault).length === 0 && (
+                      <p className="text-[10px] text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1 mt-1">⚠️ Add a default API key below to use Hybrid mode.</p>
+                    )}
+                  </button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* API Key Management */}
+            <Card className="border border-slate-200 shadow-sm rounded-2xl overflow-hidden">
+              <CardHeader className="bg-gradient-to-r from-slate-50 to-white border-b border-slate-100 px-6 py-5">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-600 shadow-sm">
+                    <Key className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base font-bold text-slate-800">API Keys</CardTitle>
+                    <p className="text-xs text-slate-500 mt-0.5">Manage AI provider keys. Keys are stored securely in your workspace.</p>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="px-6 py-6 space-y-6">
+
+                {/* Add New Key Form */}
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-4">
+                  <h3 className="text-sm font-bold text-slate-700">Add New API Key</h3>
+                  <div className="grid md:grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Label (Optional)</label>
+                      <Input
+                        value={newKeyLabel}
+                        onChange={e => setNewKeyLabel(e.target.value)}
+                        placeholder="e.g. Personal Groq"
+                        className="h-10 bg-white border-slate-200"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Provider</label>
+                      <select
+                        value={newKeyProvider}
+                        onChange={e => setNewKeyProvider(e.target.value)}
+                        className="w-full h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none capitalize"
+                      >
+                        <option value="">Auto-detected</option>
+                        {AI_PROVIDERS.map(p => <option key={p} value={p} className="capitalize">{p}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold uppercase tracking-wider text-slate-500">API Key</label>
+                    <div className="relative">
+                      <Input
+                        type={showNewKey ? 'text' : 'password'}
+                        value={newKeyValue}
+                        onChange={e => setNewKeyValue(e.target.value)}
+                        placeholder="Paste your API key here..."
+                        className="h-10 bg-white border-slate-200 pr-10 font-mono text-sm"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowNewKey(p => !p)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                      >
+                        {showNewKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                    {newKeyValue && (
+                      <p className="text-[10px] text-slate-400">
+                        Detected provider: <strong className="text-indigo-600 capitalize">{newKeyProvider || detectProvider(newKeyValue)}</strong>
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 pt-1">
+                    <Button
+                      variant="outline"
+                      onClick={handleTestKey}
+                      disabled={isTestingKey || !newKeyValue}
+                      className="flex-1 h-10 border-slate-300 text-slate-700"
+                    >
+                      {isTestingKey ? <><RefreshCw className="h-4 w-4 mr-2 animate-spin" />Testing…</> : 'Test Key'}
+                    </Button>
+                    <Button
+                      onClick={handleSaveApiKey}
+                      disabled={isSavingKey || !newKeyValue}
+                      className="flex-1 h-10 bg-indigo-600 hover:bg-indigo-700 text-white"
+                    >
+                      {isSavingKey ? <><RefreshCw className="h-4 w-4 mr-2 animate-spin" />Saving…</> : <><Save className="h-4 w-4 mr-2" />Save Key</>}
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Saved Keys List */}
+                {apiKeys.length > 0 && (
+                  <div className="space-y-3">
+                    <h3 className="text-sm font-bold text-slate-700">Saved Keys ({apiKeys.length})</h3>
+                    {apiKeys.map(k => (
+                      <div key={k.id} className="flex items-center justify-between gap-3 p-4 bg-white border border-slate-200 rounded-xl hover:border-indigo-200 transition-colors">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-0.5">
+                            <p className="font-bold text-slate-800 text-sm">{k.label || k.provider}</p>
+                            {k.isDefault && <Badge variant="success" className="text-[10px]">⭐ Default</Badge>}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-xs text-slate-500">
+                              {visibleKeyIds.has(k.id) ? k.keyValue : maskKey(k.keyValue)}
+                            </span>
+                            <button onClick={() => toggleKeyVisibility(k.id)} className="text-slate-400 hover:text-slate-600">
+                              {visibleKeyIds.has(k.id) ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                            </button>
+                            <Badge className="text-[9px] capitalize bg-slate-100 text-slate-600 border border-slate-200">{k.provider}</Badge>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          {!k.isDefault && (
+                            <Button variant="ghost" size="sm" onClick={() => handleSetDefault(k.id)} className="text-xs h-8 px-2 text-slate-500 hover:text-indigo-600">
+                              Set Default
+                            </Button>
+                          )}
+                          <button
+                            onClick={() => { setEditKeyId(k.id); setNewKeyLabel(k.label); setNewKeyValue(k.keyValue); setNewKeyProvider(k.provider); setActiveTab('ai'); }}
+                            className="h-8 w-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteKey(k.id)}
+                            className="h-8 w-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {apiKeys.length === 0 && (
+                  <div className="text-center py-8 text-slate-400">
+                    <Key className="h-8 w-8 mx-auto mb-2 opacity-30" />
+                    <p className="text-sm">No API keys saved yet.</p>
+                    <p className="text-xs mt-1">Add a key above to enable AI-powered analysis.</p>
                   </div>
                 )}
               </CardContent>

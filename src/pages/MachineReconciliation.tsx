@@ -1,7 +1,8 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react';
 import { useOperations } from '../contexts/OperationsContext';
 import { useAppStore } from '../store/appStore';
 import { useSetPageTitle } from '../contexts/PageContext';
+import { supabase } from '../integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Badge } from '../components/ui/badge';
@@ -11,7 +12,9 @@ import { isInternalSite } from '../lib/siteUtils';
 import {
   Activity, Wrench, Package, Building2, MapPin, AlertCircle,
   AlertTriangle, TrendingDown, TrendingUp, ChevronDown, ChevronUp,
-  CalendarDays, Fuel, Clock, FileText, X, Filter, Loader2
+  CalendarDays, Fuel, Clock, FileText, X, Filter, Loader2,
+  Bot, FlaskConical, Cpu, CheckCircle2, CircleDot, Circle, Zap, ArrowRight,
+  BarChart3, Settings2, Lightbulb, ShieldAlert,
 } from 'lucide-react';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -34,12 +37,695 @@ function rangesOverlap(aStart: string, aEnd: string, bStart: string, bEnd: strin
   return aStart <= bEnd && aEnd >= bStart;
 }
 
+// ─── Rolling velocity helper ──────────────────────────────────────────────────
+function computeVelocity(siteId: string, entries: any[]): { velocity: number; progress: number; daysLeft: number | null; estDate: string | null } {
+  const siteLogs = entries
+    .filter((e: any) => e.siteId === siteId && e.progressPercentage != null)
+    .sort((a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+
+  if (siteLogs.length === 0) return { velocity: 0, progress: 0, daysLeft: null, estDate: null };
+  const progress = Math.max(...siteLogs.map((e: any) => e.progressPercentage!));
+  if (progress >= 100) return { velocity: 0, progress: 100, daysLeft: 0, estDate: 'Completed' };
+  const recent = siteLogs.slice(-6);
+  let totalGain = 0; let intervals = 0;
+  for (let i = 1; i < recent.length; i++) {
+    const daysDiff = Math.max(1, (new Date(recent[i].createdAt).getTime() - new Date(recent[i-1].createdAt).getTime()) / 86400000);
+    const gain = (recent[i].progressPercentage! - recent[i-1].progressPercentage!) / daysDiff;
+    if (gain >= 0) { totalGain += gain; intervals++; }
+  }
+  const velocity = intervals > 0 ? totalGain / intervals : 0;
+  if (velocity <= 0) return { velocity: 0, progress, daysLeft: null, estDate: null };
+  const daysLeft = Math.ceil((100 - progress) / velocity);
+  const d = new Date(); d.setDate(d.getDate() + daysLeft);
+  return { velocity: Math.round(velocity * 10) / 10, progress, daysLeft, estDate: d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) };
+}
+
+// ─── Recon Dialog ─────────────────────────────────────────────────────────────
+
+interface ReconPhase {
+  id: string;
+  label: string;
+  icon: React.ElementType;
+  status: 'pending' | 'running' | 'done' | 'error';
+  findings: string[];
+  risks: string[];
+}
+
+interface ReconResult {
+  phases: ReconPhase[];
+  recommendations: string[];
+  aiInsight?: string;
+  summary: { activeSites: number; stalledSites: number; machinesAvailableSoon: number; pendingNeed: number; breachRisk: number };
+}
+
+interface ReconDialogProps {
+  open: boolean;
+  onClose: () => void;
+  sites: any[];
+  pendingSites: any[];
+  maintenanceAssets: any[];
+  dailyMachineLogs: any[];
+  siteJournalEntries: any[];
+  waybills: any[];
+  dieselRefills: any[];
+  workspaceId: string;
+}
+
+function ReconDialog({ open, onClose, sites, pendingSites, maintenanceAssets, dailyMachineLogs, siteJournalEntries, waybills, dieselRefills, workspaceId }: ReconDialogProps) {
+  const [phases, setPhases] = useState<ReconPhase[]>([]);
+  const [running, setRunning] = useState(false);
+  const [done, setDone] = useState(false);
+  const [recommendations, setRecommendations] = useState<string[]>([]);
+  const [summary, setSummary] = useState<ReconResult['summary'] | null>(null);
+  const [aiInsight, setAiInsight] = useState<string | null>(null);
+  const [mode, setMode] = useState<'analytic' | 'hybrid'>('analytic');
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Structured analysis results state
+  const [analysedSites, setAnalysedSites] = useState<any[]>([]);
+  const [fleetStats, setFleetStats] = useState<any>(null);
+  const [progressStats, setProgressStats] = useState<any>(null);
+  const [pipelineStats, setPipelineStats] = useState<any>(null);
+
+  // Load workspace mode
+  useEffect(() => {
+    if (!open) return;
+    supabase.from('workspace_settings').select('resource_allocation_mode').eq('workspace_id', workspaceId).maybeSingle()
+      .then(({ data }) => { if (data?.resource_allocation_mode) setMode(data.resource_allocation_mode as any); });
+  }, [open, workspaceId]);
+
+  const updatePhase = useCallback((id: string, update: Partial<ReconPhase>) => {
+    setPhases(prev => prev.map(p => p.id === id ? { ...p, ...update } : p));
+    setTimeout(() => scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' }), 50);
+  }, []);
+
+  const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+
+  const runRecon = useCallback(async () => {
+    setRunning(true); setDone(false); setAiInsight(null);
+    const today = new Date().toISOString().split('T')[0];
+    const activeSites = sites.filter(s => {
+      if (s.status !== 'Active' || !s.startDate || isInternalSite(s)) return false;
+      const onboarding = pendingSites.find(p =>
+        p.siteId === s.id ||
+        p.id === s.id ||
+        (p.siteName?.trim().toLowerCase() === s.name.trim().toLowerCase() &&
+          p.clientName?.trim().toLowerCase() === s.client.trim().toLowerCase())
+      );
+      if (onboarding && onboarding.phase1?.whatIsBeingBuilt && onboarding.phase1.whatIsBeingBuilt.trim().toLowerCase() !== 'dewatering') {
+        return false;
+      }
+      return true;
+    });
+
+    const pendingDewatering = [
+      ...pendingSites
+        .filter(s => s.status === 'Pending' && s.phase1?.whatIsBeingBuilt?.trim().toLowerCase() === 'dewatering')
+        .map(s => ({
+          ...s,
+          totalPumpsRequired: parseInt(s.phase3?.totalPumpsRequired || '0', 10) || 0,
+        })),
+      ...sites
+        .filter(s => {
+          if (s.status !== 'Active' || isInternalSite(s) || (s.startDate && s.startDate.trim() !== '')) return false;
+          const onboarding = pendingSites.find(p =>
+            p.siteId === s.id ||
+            p.id === s.id ||
+            (p.siteName?.trim().toLowerCase() === s.name.trim().toLowerCase() &&
+              p.clientName?.trim().toLowerCase() === s.client.trim().toLowerCase())
+          );
+          if (onboarding && onboarding.phase1?.whatIsBeingBuilt && onboarding.phase1.whatIsBeingBuilt.trim().toLowerCase() !== 'dewatering') {
+            return false;
+          }
+          return true;
+        })
+        .map(s => {
+          const onboarding = pendingSites.find(p =>
+            p.siteId === s.id ||
+            p.id === s.id ||
+            (p.siteName?.trim().toLowerCase() === s.name.trim().toLowerCase() &&
+              p.clientName?.trim().toLowerCase() === s.client.trim().toLowerCase())
+          );
+          return {
+            id: s.id,
+            siteName: s.name,
+            clientName: s.client,
+            phase3: {
+              totalPumpsRequired: onboarding?.phase3?.totalPumpsRequired || '0'
+            }
+          };
+        })
+    ];
+    const machines = maintenanceAssets.filter(m => m.category === 'machine' && m.isActive);
+
+    const initPhases: ReconPhase[] = [
+      { id: 'sites', label: 'Scanning Active Sites', icon: MapPin, status: 'pending', findings: [], risks: [] },
+      { id: 'machines', label: 'Machine Status & Maintenance', icon: Wrench, status: 'pending', findings: [], risks: [] },
+      { id: 'progress', label: 'Site Progress Velocity', icon: TrendingUp, status: 'pending', findings: [], risks: [] },
+      { id: 'pipeline', label: 'Pending Site Pipeline', icon: ArrowRight, status: 'pending', findings: [], risks: [] },
+      { id: 'risk', label: 'Risk Assessment', icon: ShieldAlert, status: 'pending', findings: [], risks: [] },
+    ];
+    setPhases(initPhases);
+
+    // ── PHASE 1: Sites Scan ──────────────────────────────────────────────────
+    updatePhase('sites', { status: 'running' });
+    await sleep(600);
+    const siteFindings: string[] = [];
+    const siteRisks: string[] = [];
+    siteFindings.push(`Sir, I have scanned our active sites. We currently have ${activeSites.length} active dewatering engagements.`);
+
+    const endedSoon = activeSites.filter(s => s.endDate && s.endDate >= today && (new Date(s.endDate).getTime() - Date.now()) < 14 * 86400000);
+    if (endedSoon.length > 0) siteRisks.push(`Notice: ${endedSoon.length} site(s) are nearing their contracted end date within 14 days: ${endedSoon.map((s:any) => s.name).join(', ')}.`);
+    const noEndDate = activeSites.filter(s => !s.endDate);
+    if (noEndDate.length > 0) siteRisks.push(`Attention Needed: ${noEndDate.length} site(s) are currently open-ended (no end date set). I recommend defining estimated completion dates to assist demob planning.`);
+
+    // Set active sites data immediately
+    const structuredSitesData = activeSites.map(s => {
+      const siteMachines = machines.filter(m => m.site === s.name);
+      const mList = siteMachines.map(m => {
+        const mLogs = dailyMachineLogs.filter(l => l.assetId === m.id && l.isActive).sort((a, b) => b.date.localeCompare(a.date));
+        const latestLog = mLogs[0];
+        const statusMap = { full: 'Full Day', half: 'Half Day', off: 'Off' };
+        return { name: m.name, lastLogStatus: latestLog ? (statusMap[latestLog.operationalDay as 'full' | 'half' | 'off'] || latestLog.operationalDay) : null, lastLogDate: latestLog?.date };
+      });
+      return { id: s.id, name: s.name, client: s.client, progress: s.currentProgressPercentage ?? 0, endDate: s.endDate || null, machines: mList };
+    });
+    setAnalysedSites(structuredSitesData);
+    updatePhase('sites', { status: 'done', findings: siteFindings, risks: siteRisks });
+
+    // ── PHASE 2: Machine Status ──────────────────────────────────────────────
+    updatePhase('machines', { status: 'running' });
+    await sleep(700);
+    const machineFindings: string[] = [];
+    const machineRisks: string[] = [];
+    const overdueM = machines.filter(m => m.status === 'overdue');
+    const dueSoonM = machines.filter(m => m.status === 'due_soon');
+    const inServiceM = machines.filter(m => m.operationalStatus === 'under_maintenance');
+    const idleM = machines.filter(m => m.operationalStatus === 'idle' || isInternalSite({ name: m.site }));
+
+    machineFindings.push(`Our total pump fleet is ${machines.length} units. Currently, ${machines.filter(m => !isInternalSite({ name: m.site }) && m.operationalStatus !== 'idle' && m.operationalStatus !== 'under_maintenance').length} are actively deployed on client sites.`);
+    if (idleM.length > 0) machineFindings.push(`We have ${idleM.length} pump(s) idle in the warehouse: ${idleM.map((m:any) => m.name).join(', ')}.`);
+    if (overdueM.length > 0) machineRisks.push(`Action Required: ${overdueM.length} pump(s) are OVERDUE for servicing. Please send them to the workshop before redeployment: ${overdueM.map((m:any) => m.name).join(', ')}.`);
+    if (dueSoonM.length > 0) machineRisks.push(`Reminder: ${dueSoonM.length} pump(s) are approaching their service intervals and should be scheduled for servicing soon.`);
+    if (inServiceM.length > 0) machineFindings.push(`Note: ${inServiceM.length} pump(s) are currently undergoing workshop maintenance.`);
+
+    const sevenDaysAgo = new Date(); sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const sevenStr = sevenDaysAgo.toISOString().split('T')[0];
+    const underutilised = new Map<string, { site: string; halfDays: number; noneDays: number }>();
+    dailyMachineLogs.filter(l => l.date >= sevenStr).forEach(log => {
+      if (!underutilised.has(log.assetId)) underutilised.set(log.assetId, { site: log.siteName, halfDays: 0, noneDays: 0 });
+      const e = underutilised.get(log.assetId)!;
+      if (log.operationalDay === 'half') e.halfDays++;
+      else if (log.operationalDay === 'none') e.noneDays++;
+    });
+    const partialMachines: { name: string; site: string; halfDays: number; noneDays: number }[] = [];
+    underutilised.forEach((v, assetId) => {
+      const m = machines.find(m => m.id === assetId);
+      if ((v.halfDays + v.noneDays) >= 3) {
+        partialMachines.push({
+          name: m?.name || assetId,
+          site: v.site,
+          halfDays: v.halfDays,
+          noneDays: v.noneDays
+        });
+      }
+    });
+    if (partialMachines.length > 0) {
+      machineRisks.push(`Alert: Underutilized pumps detected (3+ partial/idle days this week): ${partialMachines.map(pm => `${pm.name} at ${pm.site} (${pm.halfDays} half + ${pm.noneDays} idle days this week)`).join('; ')}.`);
+    }
+    
+    // Set fleet stats immediately
+    setFleetStats({ total: machines.length, active: machines.filter(m => !isInternalSite({ name: m.site }) && m.operationalStatus !== 'idle' && m.operationalStatus !== 'under_maintenance').length, idle: idleM, maintenance: inServiceM, overdue: overdueM, dueSoon: dueSoonM, underutilised: partialMachines });
+    updatePhase('machines', { status: 'done', findings: machineFindings, risks: machineRisks });
+
+    // ── PHASE 3: Progress Velocity ───────────────────────────────────────────
+    updatePhase('progress', { status: 'running' });
+    await sleep(700);
+    let stalledCount = 0; let onTrackCount = 0; let breachCount = 0;
+    const siteVelocities: { name: string; velocity: number; progress: number; daysLeft: number | null; estDate: string | null; breach: boolean }[] = [];
+    const threeDaysAgo = new Date();
+    threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+    const threeStr = threeDaysAgo.toISOString().split('T')[0];
+
+    activeSites.forEach(site => {
+      const v = computeVelocity(site.id, siteJournalEntries);
+      if (v.progress === 0 && site.currentProgressPercentage != null) v.progress = site.currentProgressPercentage;
+      const breach = site.endDate && v.daysLeft != null ? new Date(site.endDate) < new Date(Date.now() + v.daysLeft * 86400000) : false;
+      siteVelocities.push({ name: site.name, ...v, breach });
+      const activeLogsIn3Days = dailyMachineLogs.filter(l => 
+        (l.siteId === site.id || l.siteName?.toLowerCase().trim() === site.name.toLowerCase().trim()) &&
+        l.date >= threeStr && l.isActive && (l.operationalDay === 'full' || l.operationalDay === 'half')
+      );
+      if (activeLogsIn3Days.length > 0) onTrackCount++; else if (v.progress < 100) stalledCount++;
+      if (breach) breachCount++;
+    });
+    const stalledSites = activeSites.filter(s => {
+      const activeLogs = dailyMachineLogs.filter(l => 
+        (l.siteId === s.id || l.siteName?.toLowerCase().trim() === s.name.toLowerCase().trim()) &&
+        l.date >= threeStr && l.isActive && (l.operationalDay === 'full' || l.operationalDay === 'half')
+      );
+      return activeLogs.length === 0;
+    });
+    const progRisks: string[] = [];
+    if (stalledSites.length > 0) progRisks.push(`Warning: No operational pump activity logged in the last 3 days for: ${stalledSites.map(s => s.name).join(', ')}.`);
+    if (breachCount > 0) progRisks.push(`High Risk: ${breachCount} site(s) are projected to breach their target dates.`);
+
+    // Set progress stats immediately
+    setProgressStats({ runningCount: onTrackCount, stalledCount: stalledCount, stalledSites: stalledSites.map(s => ({ name: s.name })), breachCount: breachCount, breachSites: siteVelocities.filter(s => s.breach).map(s => ({ name: s.name, estDate: s.estDate })) });
+    updatePhase('progress', { status: 'done', findings: [], risks: progRisks });
+
+    // ── PHASE 4: Pending Pipeline ────────────────────────────────────────────
+    updatePhase('pipeline', { status: 'running' });
+    await sleep(600);
+    const totalPumpsNeeded = pendingDewatering.reduce((sum: number, s: any) => sum + (parseInt(s.phase3?.totalPumpsRequired || '0') || 0), 0);
+    const almostDoneForDemob = siteVelocities.filter(s => s.progress >= 80 && s.progress < 100);
+
+    // Flag sites that are 100% completed but still have pumps on site
+    const completedSitesWithPumps = activeSites.filter(s => {
+      const isCompleted = s.currentProgressPercentage === 100;
+      const hasPumps = machines.some(m => m.site === s.name);
+      return isCompleted && hasPumps;
+    });
+
+    const pipelineCompletedOpportunities = completedSitesWithPumps.map(s => {
+      const siteMachines = machines.filter(m => m.site === s.name);
+      return {
+        name: s.name,
+        machines: siteMachines.map(m => m.name)
+      };
+    });
+
+    // Set pipeline stats immediately
+    setPipelineStats({ 
+      pendingCount: pendingDewatering.length, 
+      totalPumpsNeeded: totalPumpsNeeded, 
+      idleAvailable: idleM.length, 
+      demobOpportunities: almostDoneForDemob.map(s => ({ name: s.name, daysLeft: s.daysLeft, progress: s.progress })),
+      completedOpportunities: pipelineCompletedOpportunities
+    });
+    updatePhase('pipeline', { status: 'done', findings: [], risks: [] });
+
+    // ── PHASE 5: Risk Summary ────────────────────────────────────────────────
+    updatePhase('risk', { status: 'running' });
+    await sleep(500);
+    const recs: string[] = [];
+
+    // High priority: demobilize completed sites
+    completedSitesWithPumps.forEach(s => {
+      const siteMachines = machines.filter(m => m.site === s.name);
+      recs.push(`📦 Demobilize equipment [${siteMachines.map(m => m.name).join(', ')}] from ${s.name} IMMEDIATELY (site is 100% complete) and dispatch to pending pipeline.`);
+    });
+
+    if (overdueM.length > 0) recs.push(`🔧 Send ${overdueM.map((m:any) => m.name).join(', ')} to the workshop for servicing before dispatching.`);
+    if (idleM.length > 0 && totalPumpsNeeded > 0) recs.push(`🚀 Dispatch our ${idleM.length} idle pump(s) [${idleM.map((m:any) => m.name).join(', ')}] immediately to the pending queue sites.`);
+    almostDoneForDemob.forEach(s => {
+      const daysStr = s.daysLeft != null ? `in ~${s.daysLeft} days` : `soon (progress: ${s.progress}%)`;
+      recs.push(`📦 Schedule logistics for equipment demob from ${s.name} ${daysStr}.`);
+    });
+    if (breachCount > 0) recs.push(`⚡ Escalate: ${breachCount} site(s) are at risk of date breach. I recommend increasing onsite pump capacity.`);
+    if (stalledSites.length > 0) recs.push(`📞 Contact site supervisors for stalled sites [${stalledSites.map(s => s.name).join(', ')}] to check why no pump activity was logged.`);
+    if (recs.length === 0) recs.push('Sir, all dewatering sites and equipment metrics are nominal. No urgent actions needed.');
+    updatePhase('risk', { status: 'done', findings: [], risks: [] });
+
+    setRecommendations(recs);
+    setSummary({ activeSites: activeSites.length, stalledSites: stalledCount, machinesAvailableSoon: almostDoneForDemob.length, pendingNeed: totalPumpsNeeded, breachRisk: breachCount });
+
+    // AI
+    if (mode === 'hybrid') {
+      const { data: keyRow } = await supabase.from('api_keys').select('key_value,provider').eq('workspace_id', workspaceId).eq('is_default', true).maybeSingle();
+      if (keyRow) {
+        const prompt = `You are a construction operations assistant. Summary: ${activeSites.length} active sites. ${stalledCount} stalled. ${breachCount} breach risk. ${totalPumpsNeeded} pumps needed in pipeline. Recommendations: ${recs.join(' | ')}. Give a strategic summary and one bold action today.`;
+        try {
+          let insight = '';
+          if (keyRow.provider === 'gemini') {
+            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${keyRow.key_value}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }) });
+            const d = await res.json(); insight = d?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+          } else if (keyRow.provider === 'groq') {
+            const res = await fetch('https://api.groq.com/openai/v1/chat/completions', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${keyRow.key_value}` }, body: JSON.stringify({ model: 'llama3-8b-8192', messages: [{ role: 'user', content: prompt }], max_tokens: 250 }) });
+            const d = await res.json(); insight = d?.choices?.[0]?.message?.content || '';
+          }
+          if (insight) setAiInsight(insight);
+        } catch {}
+      }
+    }
+
+    setDone(true);
+    setRunning(false);
+  }, [sites, pendingSites, maintenanceAssets, dailyMachineLogs, siteJournalEntries, waybills, dieselRefills, mode, workspaceId, updatePhase]);
+
+  useEffect(() => {
+    if (open && phases.length === 0 && !running && !done) runRecon();
+  }, [open]);
+
+  const renderSitesPhase = () => {
+    const siteRisks = phases.find(p => p.id === 'sites')?.risks || [];
+    return (
+      <div className="space-y-3 pt-1">
+        <p className="text-xs text-slate-500 font-medium">Sir, here is the current status of each active dewatering site:</p>
+        <div className="grid grid-cols-1 gap-3">
+          {analysedSites.map((s, idx) => (
+            <div key={idx} className="bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-xl p-3.5 space-y-2.5">
+              <div className="flex justify-between items-start">
+                <div>
+                  <h4 className="text-sm font-bold text-slate-800 dark:text-slate-100">{s.name}</h4>
+                  <p className="text-[10px] text-slate-500 font-semibold">{s.client}</p>
+                </div>
+                <div className="text-right">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase block">Target End Date</span>
+                  <span className={`text-xs font-semibold ${s.endDate ? 'text-slate-700 dark:text-slate-300' : 'text-amber-600 font-bold'}`}>
+                    {s.endDate ? fmt(s.endDate) : 'Open-ended'}
+                  </span>
+                </div>
+              </div>
+              <div className="space-y-1">
+                <div className="flex justify-between text-[11px] font-bold text-slate-650 dark:text-slate-400">
+                  <span>Site Progress</span>
+                  <span>{s.progress}%</span>
+                </div>
+                <div className="w-full bg-slate-200 dark:bg-slate-750 rounded-full h-1.5 overflow-hidden">
+                  <div className="bg-indigo-600 h-full rounded-full transition-all duration-500" style={{ width: `${s.progress}%` }} />
+                </div>
+              </div>
+              <div className="pt-2 border-t border-slate-200/60 dark:border-slate-700/60">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Equipment Onsite</span>
+                {s.machines.length > 0 ? (
+                  <div className="flex flex-wrap gap-1.5">
+                    {s.machines.map((m: any, mIdx: number) => (
+                      <span key={mIdx} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-white dark:bg-slate-900 border border-slate-150 dark:border-slate-800 text-[10px] font-medium text-slate-600 dark:text-slate-300">
+                        <span className={`w-1.5 h-1.5 rounded-full ${m.lastLogStatus === 'Full Day' ? 'bg-emerald-500' : m.lastLogStatus === 'Half Day' ? 'bg-amber-500' : 'bg-slate-400'}`} />
+                        {m.name} ({m.lastLogDate ? `Last log: ${fmt(m.lastLogDate)}` : 'No log history'})
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-[10px] text-slate-400 italic">No dewatering equipment assigned to this site.</p>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+        {siteRisks.length > 0 && (
+          <div className="space-y-1.5 pt-2">
+            {siteRisks.map((r, i) => (
+              <p key={i} className="text-xs text-amber-700 dark:text-amber-405 flex items-start gap-1.5 bg-amber-50 dark:bg-amber-950/20 rounded-lg px-2.5 py-2">
+                <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0 text-amber-600" />
+                {r}
+              </p>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderMachinesPhase = () => {
+    if (!fleetStats) return null;
+    return (
+      <div className="space-y-3 pt-1">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          <div className="bg-slate-50 dark:bg-slate-800 border border-slate-150 rounded-xl p-2.5 text-center">
+            <span className="text-[20px] font-black text-slate-800 dark:text-slate-100 block leading-tight">{fleetStats.total}</span>
+            <span className="text-[9px] text-slate-400 uppercase font-bold tracking-wider">Total Fleet</span>
+          </div>
+          <div className="bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100 rounded-xl p-2.5 text-center">
+            <span className="text-[20px] font-black text-emerald-700 dark:text-emerald-400 block leading-tight">{fleetStats.active}</span>
+            <span className="text-[9px] text-emerald-600 uppercase font-bold tracking-wider">Active Onsite</span>
+          </div>
+          <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-100 rounded-xl p-2.5 text-center">
+            <span className="text-[20px] font-black text-amber-700 dark:text-amber-400 block leading-tight">{fleetStats.idle.length}</span>
+            <span className="text-[9px] text-amber-600 uppercase font-bold tracking-wider">Idle/Warehouse</span>
+          </div>
+          <div className="bg-rose-50 dark:bg-rose-955/20 border border-rose-100 rounded-xl p-2.5 text-center">
+            <span className="text-[20px] font-black text-rose-750 dark:text-rose-400 block leading-tight">{fleetStats.maintenance.length}</span>
+            <span className="text-[9px] text-rose-600 dark:text-rose-400 uppercase font-bold tracking-wider">Need Maintenance</span>
+          </div>
+        </div>
+        {fleetStats.overdue.length > 0 && (
+          <div className="space-y-1.5">
+            <span className="text-[10px] font-bold text-rose-500 uppercase tracking-wider block">Service Overdue (Immediate Action Required)</span>
+            <div className="flex flex-col gap-1">
+              {fleetStats.overdue.map((m: any, i: number) => (
+                <div key={i} className="flex items-center justify-between bg-rose-50 dark:bg-rose-955/25 border border-rose-100 rounded-lg px-2.5 py-1.5 text-xs text-rose-700 dark:text-rose-400">
+                  <span className="font-semibold">{m.name}</span>
+                  <span className="text-[10px] bg-rose-200 dark:bg-rose-900 px-1.5 py-0.5 rounded font-bold uppercase text-rose-700 dark:text-rose-350">Overdue</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {fleetStats.underutilised.length > 0 && (
+          <div className="space-y-1.5">
+            <span className="text-[10px] font-bold text-amber-600 uppercase tracking-wider block font-black">Underutilized Pumps This Week</span>
+            <div className="flex flex-col gap-1">
+              {fleetStats.underutilised.map((pm: any, i: number) => (
+                <div key={i} className="bg-amber-50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900 rounded-lg p-2 text-xs text-amber-700 dark:text-amber-400">
+                  <span className="font-bold">{pm.name}</span> at <span className="font-semibold">{pm.site}</span>
+                  <p className="text-[10px] text-amber-600/85 mt-0.5">Logged: {pm.halfDays} half-days, {pm.noneDays} idle days this week.</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderProgressPhase = () => {
+    if (!progressStats) return null;
+    return (
+      <div className="space-y-3 pt-1">
+        <p className="text-xs text-slate-655 dark:text-slate-350">
+          Sir, the recent logs indicate <span className="font-bold text-emerald-650">{progressStats.runningCount} sites</span> are actively pumping water, and <span className="font-bold text-amber-650">{progressStats.stalledCount} sites</span> are idle with no logs in the last 3 days:
+        </p>
+        {progressStats.stalledSites.length > 0 && (
+          <div className="space-y-1.5">
+            <span className="text-[10px] font-bold text-amber-600 uppercase tracking-wider block">Inactive / Stalled Sites (3+ Days No Activity)</span>
+            <div className="grid grid-cols-1 gap-1.5">
+              {progressStats.stalledSites.map((s: any, i: number) => (
+                <div key={i} className="flex items-center gap-2.5 bg-amber-50 dark:bg-amber-950/20 border border-amber-100 rounded-xl p-3 text-xs text-amber-750 dark:text-amber-400">
+                  <AlertCircle className="h-4 w-4 text-amber-600 shrink-0" />
+                  <div>
+                    <span className="font-bold">{s.name}</span>
+                    <p className="text-[10px] text-amber-600 mt-0.5">No pump operational hours recorded. Please confirm if site access is restricted or diesel is missing.</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {progressStats.breachSites.length > 0 && (
+          <div className="space-y-1.5">
+            <span className="text-[10px] font-bold text-rose-500 uppercase tracking-wider block">Contract Date Breach Risks</span>
+            <div className="grid grid-cols-1 gap-1.5">
+              {progressStats.breachSites.map((s: any, i: number) => (
+                <div key={i} className="flex items-center gap-2.5 bg-rose-50 dark:bg-rose-955/20 border border-rose-100 rounded-xl p-3 text-xs text-rose-750 dark:text-rose-400">
+                  <AlertCircle className="h-4 w-4 text-rose-500 shrink-0" />
+                  <div>
+                    <span className="font-bold">{s.name}</span>
+                    <p className="text-[10px] text-rose-600 mt-0.5">Projected completion is <span className="font-bold">{s.estDate}</span>, which breaches the target contract date.</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderPipelinePhase = () => {
+    if (!pipelineStats) return null;
+    return (
+      <div className="space-y-3 pt-1">
+        <p className="text-xs text-slate-655 dark:text-slate-350">
+          We have <span className="font-bold text-indigo-650">{pipelineStats.pendingCount} sites</span> in the onboarding pipeline requiring a total of <span className="font-bold text-indigo-650">{pipelineStats.totalPumpsNeeded} pumps</span>.
+        </p>
+        <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-3.5 border border-slate-150 flex flex-col md:flex-row gap-4 justify-between items-center">
+          <div className="text-center w-full md:w-auto">
+            <span className="text-xs text-slate-400 font-bold block mb-1">PENDING DEMAND</span>
+            <span className="text-2xl font-black text-slate-800 dark:text-slate-100">{pipelineStats.totalPumpsNeeded} Pumps</span>
+            <span className="text-[10px] text-slate-500 block">Across {pipelineStats.pendingCount} sites</span>
+          </div>
+          <div className="h-0.5 w-12 bg-slate-200 dark:bg-slate-700 hidden md:block" />
+          <div className="text-center w-full md:w-auto">
+            <span className="text-xs text-emerald-500 font-bold block mb-1">IMMEDIATELY AVAILABLE</span>
+            <span className="text-2xl font-black text-emerald-600 dark:text-emerald-450">{pipelineStats.idleAvailable} Pumps</span>
+            <span className="text-[10px] text-emerald-500 block">Idle in Warehouse</span>
+          </div>
+        </div>
+        {pipelineStats.completedOpportunities && pipelineStats.completedOpportunities.length > 0 && (
+          <div className="space-y-1.5 border border-emerald-250 bg-emerald-50 dark:border-emerald-900/60 dark:bg-emerald-950/20 rounded-xl p-3.5">
+            <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider block font-black">Immediate Demobilization Required (Site 100% Complete)</span>
+            <div className="flex flex-col gap-1.5 mt-1.5">
+              {pipelineStats.completedOpportunities.map((s: any, i: number) => (
+                <div key={i} className="text-xs text-emerald-800 dark:text-emerald-350 font-medium">
+                  <strong>{s.name}</strong> is fully completed but still has <span className="underline font-bold text-emerald-700 dark:text-emerald-400">{s.machines.join(', ')}</span> onsite. These should be moved immediately to pending sites.
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {pipelineStats.demobOpportunities.length > 0 && (
+          <div className="space-y-1.5">
+            <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider block">Upcoming Demobilization Opportunities</span>
+            <div className="flex flex-col gap-1.5">
+              {pipelineStats.demobOpportunities.map((s: any, i: number) => (
+                <div key={i} className="bg-emerald-50/45 dark:bg-emerald-950/20 border border-emerald-100 rounded-lg p-2.5 text-xs text-emerald-800 dark:text-emerald-400">
+                  Equipment on <span className="font-bold">{s.name}</span> will become available soon (Current progress: {s.progress}%{s.daysLeft != null ? `, est. ${s.daysLeft} days` : ''}).
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderRiskPhase = () => {
+    return (
+      <div className="space-y-3 pt-1">
+        <span className="text-xs text-slate-500 font-medium">Sir, I suggest we take the following actions today to optimize our fleet:</span>
+        <div className="flex flex-col gap-2">
+          {recommendations.map((rec, i) => (
+            <div key={i} className="bg-slate-50 dark:bg-slate-805 border border-slate-100 dark:border-slate-750 rounded-xl p-3 flex items-start gap-3">
+              <span className="h-6 w-6 rounded bg-indigo-50 dark:bg-indigo-900/50 flex items-center justify-center text-xs font-bold text-indigo-650 shrink-0 mt-0.5">
+                {i + 1}
+              </span>
+              <p className="text-xs text-slate-700 dark:text-slate-300 font-medium leading-normal">{rec}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4">
+      <div className="bg-white dark:bg-slate-900 w-full sm:max-w-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[95dvh] sm:max-h-[90vh] overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-slate-800 bg-gradient-to-r from-indigo-600 to-indigo-500 shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-9 rounded-xl bg-white/20 flex items-center justify-center">
+              {mode === 'hybrid' ? <Bot className="h-5 w-5 text-white" /> : <FlaskConical className="h-5 w-5 text-white" />}
+            </div>
+            <div>
+              <p className="font-black text-white text-sm">Machine Recon Analysis</p>
+              <p className="text-indigo-200 text-[10px]">{mode === 'hybrid' ? 'Hybrid AI + Analytic' : 'Analytic Mode'} · All Active Sites</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="h-8 w-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* Phases scroll area */}
+        <div ref={scrollRef} className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
+          {phases.map((phase) => {
+            const Icon = phase.icon as any;
+            return (
+              <div key={phase.id} className={`rounded-xl border transition-all ${
+                phase.status === 'running' ? 'border-indigo-300 bg-indigo-50 dark:border-indigo-800 dark:bg-indigo-950/30' :
+                phase.status === 'done' ? 'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900' :
+                'border-slate-100 bg-slate-50 dark:border-slate-800 dark:bg-slate-900/50'
+              }`}>
+                <div className="flex items-center gap-3 px-4 py-3">
+                  <div className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 ${
+                    phase.status === 'running' ? 'bg-indigo-500' :
+                    phase.status === 'done' && (phase.findings.length > 0 || phase.risks.length > 0) ? 'bg-emerald-500' :
+                    phase.status === 'done' ? 'bg-slate-400' : 'bg-slate-200 dark:bg-slate-700'
+                  }`}>
+                    {phase.status === 'running' ? (
+                      <Loader2 className="h-4 w-4 text-white animate-spin" />
+                    ) : phase.status === 'done' ? (
+                      <CheckCircle2 className="h-4 w-4 text-white" />
+                    ) : (
+                      <Icon className="h-4 w-4 text-slate-400" />
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <p className={`text-sm font-bold ${
+                      phase.status === 'pending' ? 'text-slate-400' : 'text-slate-800 dark:text-slate-200'
+                    }`}>{phase.label}</p>
+                    {phase.status === 'running' && (
+                      <p className="text-[11px] text-indigo-500 animate-pulse">Analysing…</p>
+                    )}
+                  </div>
+                  {phase.status === 'done' && phase.risks.length > 0 && (
+                    <Badge className="bg-amber-100 text-amber-700 border-amber-200 border text-[10px]">{phase.risks.length} risk{phase.risks.length !== 1 ? 's' : ''}</Badge>
+                  )}
+                </div>
+
+                {phase.status === 'done' && (
+                  <div className="px-4 pb-4 border-t border-slate-100 dark:border-slate-800 pt-3">
+                    {phase.id === 'sites' && renderSitesPhase()}
+                    {phase.id === 'machines' && renderMachinesPhase()}
+                    {phase.id === 'progress' && renderProgressPhase()}
+                    {phase.id === 'pipeline' && renderPipelinePhase()}
+                    {phase.id === 'risk' && renderRiskPhase()}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+
+
+
+          {/* AI Insight */}
+          {aiInsight && (
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/20 overflow-hidden">
+              <div className="flex items-center gap-2 px-4 py-3 border-b border-emerald-200 dark:border-emerald-800">
+                <Bot className="h-4 w-4 text-emerald-600" />
+                <p className="font-black text-emerald-700 dark:text-emerald-400 text-sm">AI Strategic Insight</p>
+              </div>
+              <p className="px-4 py-3 text-sm text-emerald-800 dark:text-emerald-300 leading-relaxed whitespace-pre-wrap">{aiInsight}</p>
+            </div>
+          )}
+
+          {/* Summary stats */}
+          {done && summary && (
+            <div className="grid grid-cols-3 gap-2 pt-1">
+              <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-3 text-center border border-slate-200 dark:border-slate-700">
+                <p className="text-2xl font-black text-slate-800 dark:text-slate-100">{summary.activeSites}</p>
+                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wide">Active Sites</p>
+              </div>
+              <div className={`rounded-xl p-3 text-center border ${ summary.breachRisk > 0 ? 'bg-red-50 border-red-200' : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700' }`}>
+                <p className={`text-2xl font-black ${ summary.breachRisk > 0 ? 'text-red-600' : 'text-slate-800 dark:text-slate-100'}`}>{summary.breachRisk}</p>
+                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wide">Breach Risk</p>
+              </div>
+              <div className={`rounded-xl p-3 text-center border ${ summary.stalledSites > 0 ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700' }`}>
+                <p className={`text-2xl font-black ${ summary.stalledSites > 0 ? 'text-amber-600' : 'text-slate-800 dark:text-slate-100'}`}>{summary.stalledSites}</p>
+                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wide">Stalled</p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        {done && (
+          <div className="px-5 py-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 shrink-0 flex gap-2">
+            <Button variant="outline" onClick={() => { setPhases([]); setDone(false); setRecommendations([]); setSummary(null); setAiInsight(null); runRecon(); }} className="flex-1 h-10 text-sm font-bold">
+              <FlaskConical className="h-4 w-4 mr-2" /> Re-run Analysis
+            </Button>
+            <Button onClick={onClose} className="flex-1 h-10 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold">
+              Close
+            </Button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export function MachineReconciliation() {
   const { maintenanceAssets, waybills, assets, dailyMachineLogs, sitePumpDates, dieselRefills, isLoaded } = useOperations();
-  const { pendingSites, sites, invoices } = useAppStore();
+  const { pendingSites, sites, invoices, siteJournalEntries } = useAppStore();
+  const workspaceId = useAppStore((s: any) => s.workspaceId || 'default');
 
+  const [showRecon, setShowRecon] = useState(false);
   const [expandedMachines, setExpandedMachines] = useState<Set<string>>(new Set());
 
   // ── Date filter ─────────────────────────────────────────────────────────────
@@ -52,6 +738,14 @@ export function MachineReconciliation() {
     'Machine Reconciliation',
     'Overview of machine allocations, active days, requirements, and service statuses.',
     <div className="flex flex-wrap items-end gap-2">
+      {/* Run Recon button */}
+      <Button
+        onClick={() => setShowRecon(true)}
+        className="h-9 px-4 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold gap-2 shadow-md shadow-indigo-200"
+      >
+        <FlaskConical className="h-3.5 w-3.5" />
+        Run Analytic Recon
+      </Button>
       <div className="flex flex-col gap-1">
         <label className="text-xs text-slate-500 font-medium flex items-center gap-1">
           <Filter className="h-3 w-3" /> From
@@ -74,7 +768,7 @@ export function MachineReconciliation() {
         </Button>
       )}
     </div>,
-    [filterFrom, filterTo, hasDateFilter]
+    [filterFrom, filterTo, hasDateFilter, showRecon]
   );
 
   const toggleExpand = (id: string) => {
@@ -224,9 +918,21 @@ export function MachineReconciliation() {
         };
       });
 
-    // Source 2: sites table entries with Active status but no startDate
+    // Source 2: sites table entries with Active status but no startDate (dewatering only)
     const fromSitesTable = sites
-      .filter(s => s.status === 'Active' && !isInternalSite(s) && (!s.startDate || s.startDate.trim() === ''))
+      .filter(s => {
+        if (s.status !== 'Active' || isInternalSite(s) || (s.startDate && s.startDate.trim() !== '')) return false;
+        const onboarding = pendingSites.find(p =>
+          p.siteId === s.id ||
+          p.id === s.id ||
+          (p.siteName?.trim().toLowerCase() === s.name.trim().toLowerCase() &&
+            p.clientName?.trim().toLowerCase() === s.client.trim().toLowerCase())
+        );
+        if (onboarding && onboarding.phase1?.whatIsBeingBuilt && onboarding.phase1.whatIsBeingBuilt.trim().toLowerCase() !== 'dewatering') {
+          return false;
+        }
+        return true;
+      })
       .map(s => {
         const key = s.name.toLowerCase().trim();
         const invData = latestInvoiceForSite.get(key);
@@ -375,6 +1081,20 @@ export function MachineReconciliation() {
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
+
+      {/* ── Machine Recon Analysis Dialog ────────────────────────────────── */}
+      <ReconDialog
+        open={showRecon}
+        onClose={() => setShowRecon(false)}
+        sites={sites}
+        pendingSites={pendingSites}
+        maintenanceAssets={maintenanceAssets}
+        dailyMachineLogs={dailyMachineLogs}
+        siteJournalEntries={(siteJournalEntries as any[]) || []}
+        waybills={waybills}
+        dieselRefills={dieselRefills}
+        workspaceId={workspaceId}
+      />
 
       {/* Active filter banner */}
       {hasDateFilter && (
