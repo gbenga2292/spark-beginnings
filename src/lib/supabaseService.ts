@@ -47,6 +47,7 @@ export function dbToSite(r: any): Site {
     contactPhone: r.phone || undefined,
     position: r.position || undefined,
     currentProgressPercentage: r.current_progress_percentage ?? undefined,
+    currentDewateringStage: r.current_dewatering_stage ?? undefined,
   };
 }
 
@@ -517,6 +518,7 @@ export function dbToSiteJournalEntry(r: any): SiteJournalEntry {
     clientName: r.client_name,
     narration: r.narration,
     progressPercentage: r.progress_percentage ?? undefined,
+    dewateringStage: r.dewatering_stage ?? undefined,
     createdAt: r.created_at,
     loggedBy: r.logged_by,
   };
@@ -600,6 +602,7 @@ export function siteJournalEntryToDb(e: SiteJournalEntry): any {
     client_name: e.clientName,
     narration: e.narration,
     progress_percentage: e.progressPercentage ?? null,
+    dewatering_stage: e.dewateringStage ?? null,
     created_at: e.createdAt,
     logged_by: e.loggedBy,
     workspace_id: getWS(),
@@ -634,6 +637,7 @@ function siteToDb(s: Site) {
     phone: s.contactPhone || null,
     position: s.position || null,
     current_progress_percentage: s.currentProgressPercentage ?? null,
+    current_dewatering_stage: s.currentDewateringStage ?? null,
   };
 }
 
@@ -1443,6 +1447,7 @@ export const db = {
     if (s.contactPhone !== undefined) update.phone = s.contactPhone || null;
     if (s.position !== undefined) update.position = s.position || null;
     if (s.currentProgressPercentage !== undefined) update.current_progress_percentage = s.currentProgressPercentage;
+    if (s.currentDewateringStage !== undefined) update.current_dewatering_stage = s.currentDewateringStage ?? null;
     const { error } = await supabase.from('sites').update(update).eq('id', id);
     if (error) { console.error('updateSite:', error); throw error; }
   },

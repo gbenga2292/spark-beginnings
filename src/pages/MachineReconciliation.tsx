@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react';
 import { useOperations } from '../contexts/OperationsContext';
-import { useAppStore } from '../store/appStore';
+import { useAppStore, DewateringStage } from '../store/appStore';
 import { useSetPageTitle } from '../contexts/PageContext';
 import { supabase } from '../integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -81,17 +81,16 @@ interface ReconResult {
 interface ReconDialogProps {
   open: boolean;
   onClose: () => void;
-  sites: any[];
-  pendingSites: any[];
   maintenanceAssets: any[];
   dailyMachineLogs: any[];
-  siteJournalEntries: any[];
   waybills: any[];
   dieselRefills: any[];
   workspaceId: string;
 }
 
-function ReconDialog({ open, onClose, sites, pendingSites, maintenanceAssets, dailyMachineLogs, siteJournalEntries, waybills, dieselRefills, workspaceId }: ReconDialogProps) {
+function ReconDialog({ open, onClose, maintenanceAssets, dailyMachineLogs, waybills, dieselRefills, workspaceId }: ReconDialogProps) {
+  // Always read directly from Zustand so analysis sees live data (including freshly saved stages)
+  const { sites: storeSites, pendingSites, siteJournalEntries } = useAppStore();
   const [phases, setPhases] = useState<ReconPhase[]>([]);
   const [running, setRunning] = useState(false);
   const [done, setDone] = useState(false);
@@ -124,6 +123,43 @@ function ReconDialog({ open, onClose, sites, pendingSites, maintenanceAssets, da
   const runRecon = useCallback(async () => {
     setRunning(true); setDone(false); setAiInsight(null);
     const today = new Date().toISOString().split('T')[0];
+
+    // ── LIVE REFRESH: pull latest site stages from DB before running ──────────
+    // This ensures current_dewatering_stage is always fresh, even if it was
+    // just saved in the journal seconds ago.
+    let sites = storeSites;
+    try {
+      const { data: freshSites } = await supabase
+        .from('sites')
+        .select('id, name, client, status, start_date, end_date, current_progress_percentage, current_dewatering_stage');
+      if (freshSites && freshSites.length > 0) {
+        // Merge fresh DB data into local store snapshot
+        sites = storeSites.map(s => {
+          const fresh = freshSites.find((f: any) => f.id === s.id);
+          if (!fresh) return s;
+          return {
+            ...s,
+            currentProgressPercentage: fresh.current_progress_percentage ?? s.currentProgressPercentage,
+            currentDewateringStage: fresh.current_dewatering_stage ?? s.currentDewateringStage,
+          };
+        });
+        // Also push into the store so the rest of the app sees it too
+        useAppStore.setState((state: any) => ({
+          sites: state.sites.map((s: any) => {
+            const fresh = freshSites.find((f: any) => f.id === s.id);
+            if (!fresh) return s;
+            return {
+              ...s,
+              currentProgressPercentage: fresh.current_progress_percentage ?? s.currentProgressPercentage,
+              currentDewateringStage: fresh.current_dewatering_stage ?? s.currentDewateringStage,
+            };
+          })
+        }));
+      }
+    } catch (e) {
+      console.warn('ReconDialog: could not refresh site stages from DB, using store snapshot', e);
+    }
+
     const activeSites = sites.filter(s => {
       if (s.status !== 'Active' || !s.startDate || isInternalSite(s)) return false;
       const onboarding = pendingSites.find(p =>
@@ -208,7 +244,7 @@ function ReconDialog({ open, onClose, sites, pendingSites, maintenanceAssets, da
         const statusMap = { full: 'Full Day', half: 'Half Day', off: 'Off' };
         return { name: m.name, lastLogStatus: latestLog ? (statusMap[latestLog.operationalDay as 'full' | 'half' | 'off'] || latestLog.operationalDay) : null, lastLogDate: latestLog?.date };
       });
-      return { id: s.id, name: s.name, client: s.client, progress: s.currentProgressPercentage ?? 0, endDate: s.endDate || null, machines: mList };
+      return { id: s.id, name: s.name, client: s.client, progress: s.currentProgressPercentage ?? 0, endDate: s.endDate || null, machines: mList, stage: s.currentDewateringStage ?? null };
     });
     setAnalysedSites(structuredSitesData);
     updatePhase('sites', { status: 'done', findings: siteFindings, risks: siteRisks });
@@ -221,9 +257,12 @@ function ReconDialog({ open, onClose, sites, pendingSites, maintenanceAssets, da
     const overdueM = machines.filter(m => m.status === 'overdue');
     const dueSoonM = machines.filter(m => m.status === 'due_soon');
     const inServiceM = machines.filter(m => m.operationalStatus === 'under_maintenance');
-    const idleM = machines.filter(m => m.operationalStatus === 'idle' || isInternalSite({ name: m.site }));
+    const idleM = machines.filter(m => {
+      const opStatus = m.operationalStatus ?? 'active';
+      return opStatus !== 'under_maintenance' && (isInternalSite({ name: m.site }) || m.site === 'Warehouse');
+    });
 
-    machineFindings.push(`Our total pump fleet is ${machines.length} units. Currently, ${machines.filter(m => !isInternalSite({ name: m.site }) && m.operationalStatus !== 'idle' && m.operationalStatus !== 'under_maintenance').length} are actively deployed on client sites.`);
+    machineFindings.push(`Our total pump fleet is ${machines.length} units. Currently, ${machines.filter(m => (m.operationalStatus ?? 'active') !== 'under_maintenance' && !isInternalSite({ name: m.site }) && m.site !== 'Warehouse').length} are actively deployed on client sites.`);
     if (idleM.length > 0) machineFindings.push(`We have ${idleM.length} pump(s) idle in the warehouse: ${idleM.map((m:any) => m.name).join(', ')}.`);
     if (overdueM.length > 0) machineRisks.push(`Action Required: ${overdueM.length} pump(s) are OVERDUE for servicing. Please send them to the workshop before redeployment: ${overdueM.map((m:any) => m.name).join(', ')}.`);
     if (dueSoonM.length > 0) machineRisks.push(`Reminder: ${dueSoonM.length} pump(s) are approaching their service intervals and should be scheduled for servicing soon.`);
@@ -241,10 +280,13 @@ function ReconDialog({ open, onClose, sites, pendingSites, maintenanceAssets, da
     const partialMachines: { name: string; site: string; halfDays: number; noneDays: number }[] = [];
     underutilised.forEach((v, assetId) => {
       const m = machines.find(m => m.id === assetId);
+      if (!m) return;
+      if (m.site === 'Warehouse' || isInternalSite({ name: m.site })) return;
+
       if ((v.halfDays + v.noneDays) >= 3) {
         partialMachines.push({
-          name: m?.name || assetId,
-          site: v.site,
+          name: m.name,
+          site: m.site || v.site,
           halfDays: v.halfDays,
           noneDays: v.noneDays
         });
@@ -255,7 +297,7 @@ function ReconDialog({ open, onClose, sites, pendingSites, maintenanceAssets, da
     }
     
     // Set fleet stats immediately
-    setFleetStats({ total: machines.length, active: machines.filter(m => !isInternalSite({ name: m.site }) && m.operationalStatus !== 'idle' && m.operationalStatus !== 'under_maintenance').length, idle: idleM, maintenance: inServiceM, overdue: overdueM, dueSoon: dueSoonM, underutilised: partialMachines });
+    setFleetStats({ total: machines.length, active: machines.filter(m => (m.operationalStatus ?? 'active') !== 'under_maintenance' && !isInternalSite({ name: m.site }) && m.site !== 'Warehouse').length, idle: idleM, maintenance: inServiceM, overdue: overdueM, dueSoon: dueSoonM, underutilised: partialMachines });
     updatePhase('machines', { status: 'done', findings: machineFindings, risks: machineRisks });
 
     // ── PHASE 3: Progress Velocity ───────────────────────────────────────────
@@ -272,20 +314,36 @@ function ReconDialog({ open, onClose, sites, pendingSites, maintenanceAssets, da
       if (v.progress === 0 && site.currentProgressPercentage != null) v.progress = site.currentProgressPercentage;
       const breach = site.endDate && v.daysLeft != null ? new Date(site.endDate) < new Date(Date.now() + v.daysLeft * 86400000) : false;
       siteVelocities.push({ name: site.name, ...v, breach });
-      const activeLogsIn3Days = dailyMachineLogs.filter(l => 
-        (l.siteId === site.id || l.siteName?.toLowerCase().trim() === site.name.toLowerCase().trim()) &&
-        l.date >= threeStr && l.isActive && (l.operationalDay === 'full' || l.operationalDay === 'half')
-      );
-      if (activeLogsIn3Days.length > 0) onTrackCount++; else if (v.progress < 100) stalledCount++;
+      const siteMachinesForStall = machines.filter(m => m.site === site.name);
+      if (siteMachinesForStall.length > 0) {
+        const activeLogsIn3Days = dailyMachineLogs.filter(l => 
+          (l.siteId === site.id || l.siteName?.toLowerCase().trim() === site.name.toLowerCase().trim()) &&
+          l.date >= threeStr && l.isActive && (l.operationalDay === 'full' || l.operationalDay === 'half')
+        );
+        if (activeLogsIn3Days.length > 0) {
+          onTrackCount++;
+        } else if (v.progress < 100 && (site.currentDewateringStage == null || site.currentDewateringStage === 'operation')) {
+          stalledCount++;
+        }
+      }
       if (breach) breachCount++;
     });
     const stalledSites = activeSites.filter(s => {
+      const siteMachines = machines.filter(m => m.site === s.name);
+      if (siteMachines.length === 0) return false;
+      // Only flag as stalled if in active 'operation' stage (or stage unset)
+      if (s.currentDewateringStage && s.currentDewateringStage !== 'operation') return false;
+
       const activeLogs = dailyMachineLogs.filter(l => 
         (l.siteId === s.id || l.siteName?.toLowerCase().trim() === s.name.toLowerCase().trim()) &&
         l.date >= threeStr && l.isActive && (l.operationalDay === 'full' || l.operationalDay === 'half')
       );
       return activeLogs.length === 0;
     });
+    // Sites in demobilisation stage that still have pumps onsite
+    const demobSitesWithPumps = activeSites.filter(s =>
+      s.currentDewateringStage === 'demobilisation' && machines.some(m => m.site === s.name)
+    );
     const progRisks: string[] = [];
     if (stalledSites.length > 0) progRisks.push(`Warning: No operational pump activity logged in the last 3 days for: ${stalledSites.map(s => s.name).join(', ')}.`);
     if (breachCount > 0) progRisks.push(`High Risk: ${breachCount} site(s) are projected to breach their target dates.`);
@@ -335,6 +393,11 @@ function ReconDialog({ open, onClose, sites, pendingSites, maintenanceAssets, da
       const siteMachines = machines.filter(m => m.site === s.name);
       recs.push(`📦 Demobilize equipment [${siteMachines.map(m => m.name).join(', ')}] from ${s.name} IMMEDIATELY (site is 100% complete) and dispatch to pending pipeline.`);
     });
+    // High priority: demobilise sites in demobilisation stage with pumps still onsite
+    demobSitesWithPumps.forEach(s => {
+      const siteMachines = machines.filter(m => m.site === s.name);
+      recs.push(`🏗️ Decommissioning in progress at ${s.name} — demobilize remaining equipment [${siteMachines.map(m => m.name).join(', ')}] and return to warehouse.`);
+    });
 
     if (overdueM.length > 0) recs.push(`🔧 Send ${overdueM.map((m:any) => m.name).join(', ')} to the workshop for servicing before dispatching.`);
     if (idleM.length > 0 && totalPumpsNeeded > 0) recs.push(`🚀 Dispatch our ${idleM.length} idle pump(s) [${idleM.map((m:any) => m.name).join(', ')}] immediately to the pending queue sites.`);
@@ -371,7 +434,7 @@ function ReconDialog({ open, onClose, sites, pendingSites, maintenanceAssets, da
 
     setDone(true);
     setRunning(false);
-  }, [sites, pendingSites, maintenanceAssets, dailyMachineLogs, siteJournalEntries, waybills, dieselRefills, mode, workspaceId, updatePhase]);
+  }, [storeSites, pendingSites, maintenanceAssets, dailyMachineLogs, siteJournalEntries, waybills, dieselRefills, mode, workspaceId, updatePhase]);
 
   useEffect(() => {
     if (open && phases.length === 0 && !running && !done) runRecon();
@@ -388,7 +451,23 @@ function ReconDialog({ open, onClose, sites, pendingSites, maintenanceAssets, da
               <div className="flex justify-between items-start">
                 <div>
                   <h4 className="text-sm font-bold text-slate-800 dark:text-slate-100">{s.name}</h4>
-                  <p className="text-[10px] text-slate-500 font-semibold">{s.client}</p>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <p className="text-[10px] text-slate-500 font-semibold">{s.client}</p>
+                    {s.stage && (
+                      <span className={`inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
+                        s.stage === 'mobilization' ? 'bg-blue-100 text-blue-700' :
+                        s.stage === 'installation' ? 'bg-amber-100 text-amber-700' :
+                        s.stage === 'operation' ? 'bg-emerald-100 text-emerald-700' :
+                        'bg-rose-100 text-rose-700'
+                      }`}>
+                        {s.stage === 'mobilization' && '🚚'}
+                        {s.stage === 'installation' && '🔧'}
+                        {s.stage === 'operation' && '⚙️'}
+                        {s.stage === 'demobilisation' && '📦'}
+                        {' '}{s.stage.charAt(0).toUpperCase() + s.stage.slice(1)}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <div className="text-right">
                   <span className="text-[10px] font-bold text-slate-500 uppercase block">Target End Date</span>
@@ -746,20 +825,22 @@ export function MachineReconciliation() {
         <FlaskConical className="h-3.5 w-3.5" />
         Run Analytic Recon
       </Button>
-      <div className="flex flex-col gap-1">
-        <label className="text-xs text-slate-500 font-medium flex items-center gap-1">
-          <Filter className="h-3 w-3" /> From
-        </label>
+      <div className="relative">
+        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400 uppercase pointer-events-none">From:</span>
         <Input
-          type="date" value={filterFrom} onChange={e => setFilterFrom(e.target.value)}
-          className="h-8 text-sm w-36"
+          type="date" 
+          value={filterFrom} 
+          onChange={e => setFilterFrom(e.target.value)}
+          className="h-8 text-xs pl-11 pr-1 w-[150px] bg-white border-slate-200 dark:border-slate-800 focus-visible:ring-indigo-500"
         />
       </div>
-      <div className="flex flex-col gap-1">
-        <label className="text-xs text-slate-500 font-medium">To</label>
+      <div className="relative">
+        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400 uppercase pointer-events-none">To:</span>
         <Input
-          type="date" value={filterTo} onChange={e => setFilterTo(e.target.value)}
-          className="h-8 text-sm w-36"
+          type="date" 
+          value={filterTo} 
+          onChange={e => setFilterTo(e.target.value)}
+          className="h-8 text-xs pl-8 pr-1 w-[130px] bg-white border-slate-200 dark:border-slate-800 focus-visible:ring-indigo-500"
         />
       </div>
       {hasDateFilter && (
@@ -809,13 +890,13 @@ export function MachineReconciliation() {
   // Respect operationalStatus for the new tri-state counts
   const activeOnSite = machines.filter(m => {
     const opStatus = m.operationalStatus ?? 'active';
-    return opStatus === 'active' && !isInternalSite({ name: m.site }) && m.site !== 'Warehouse' && m.isActive;
+    return opStatus !== 'under_maintenance' && !isInternalSite({ name: m.site }) && m.site !== 'Warehouse' && m.isActive;
   }).length;
   const idle = machines.filter(m => {
     const opStatus = m.operationalStatus ?? 'active';
-    return opStatus === 'idle' || ((isInternalSite({ name: m.site }) || m.site === 'Warehouse') && m.isActive && opStatus === 'active');
+    return opStatus !== 'under_maintenance' && (isInternalSite({ name: m.site }) || m.site === 'Warehouse') && m.isActive;
   }).length;
-  const underMaintenance = machines.filter(m => (m.operationalStatus ?? 'active') === 'under_maintenance').length;
+  const underMaintenance = machines.filter(m => (m.operationalStatus ?? 'active') === 'under_maintenance' && m.isActive).length;
 
   // ── Active sites map ────────────────────────────────────────────────────────
   const activeSitesMap = useMemo(() => {
@@ -823,6 +904,8 @@ export function MachineReconciliation() {
       client: string; siteName: string; machinesOnSite: number; status: string; expectedMachines: number;
       invoiceNumber?: string; invoiceStart?: string; invoiceEnd?: string;
       activeMachinesInPeriod?: number;
+      currentProgress?: number;
+      currentStage?: DewateringStage;
     }>();
     sites.forEach(s => {
       if (s.status === 'Active' && !isInternalSite(s)) {
@@ -890,6 +973,8 @@ export function MachineReconciliation() {
           invoiceStart: invData?.invoiceStart,
           invoiceEnd: invData?.invoiceEnd,
           activeMachinesInPeriod,
+          currentProgress: s.currentProgressPercentage ?? 0,
+          currentStage: s.currentDewateringStage,
         });
       }
     });
@@ -1086,11 +1171,8 @@ export function MachineReconciliation() {
       <ReconDialog
         open={showRecon}
         onClose={() => setShowRecon(false)}
-        sites={sites}
-        pendingSites={pendingSites}
         maintenanceAssets={maintenanceAssets}
         dailyMachineLogs={dailyMachineLogs}
-        siteJournalEntries={(siteJournalEntries as any[]) || []}
         waybills={waybills}
         dieselRefills={dieselRefills}
         workspaceId={workspaceId}
@@ -1186,14 +1268,29 @@ export function MachineReconciliation() {
                   : <TrendingUp className="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5" />
                 }
                 <div>
-                  <p className={`text-sm font-semibold ${d.delta < 0 ? 'text-rose-800 dark:text-rose-300' : 'text-amber-800 dark:text-amber-300'}`}>
-                    {d.siteName}
+                  <p className={`text-sm font-semibold flex items-center gap-1.5 flex-wrap ${d.delta < 0 ? 'text-rose-800 dark:text-rose-300' : 'text-amber-800 dark:text-amber-300'}`}>
+                    <span>{d.siteName}</span>
+                    {d.currentStage && (
+                      <span className={`inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0 rounded-full ${
+                        d.currentStage === 'mobilization' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' :
+                        d.currentStage === 'installation' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' :
+                        d.currentStage === 'operation' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' :
+                        'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300'
+                      }`}>
+                        {d.currentStage === 'mobilization' && '🚚'}
+                        {d.currentStage === 'installation' && '🔧'}
+                        {d.currentStage === 'operation' && '⚙️'}
+                        {d.currentStage === 'demobilisation' && '📦'}
+                        {' '}{d.currentStage.charAt(0).toUpperCase() + d.currentStage.slice(1)}
+                      </span>
+                    )}
                   </p>
                   <p className="text-xs text-slate-600 dark:text-slate-400">
                     {d.machinesOnSite} on site · {d.expectedMachines} expected ·{' '}
                     <span className={`font-bold ${d.delta < 0 ? 'text-rose-600' : 'text-amber-600'}`}>
                       {d.delta > 0 ? '+' : ''}{d.delta}
                     </span>
+                    {d.currentProgress !== undefined && ` · ${d.currentProgress}% Progress`}
                   </p>
                   {d.invoiceNumber && (
                     <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1">
@@ -1249,7 +1346,29 @@ export function MachineReconciliation() {
                     {activeSitesMap.map((site, i) => (
                       <TableRow key={i}>
                         <TableCell className="font-medium text-slate-500">{site.client}</TableCell>
-                        <TableCell className="font-medium">{site.siteName}</TableCell>
+                        <TableCell className="font-medium">
+                          <div>{site.siteName}</div>
+                          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                            <span className="text-[10px] text-slate-400 font-bold">{site.currentProgress}% Progress</span>
+                            {site.currentStage && (
+                              <>
+                                <span className="text-slate-300 dark:text-slate-700 text-[10px]">•</span>
+                                <span className={`inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0 rounded-full ${
+                                  site.currentStage === 'mobilization' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' :
+                                  site.currentStage === 'installation' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' :
+                                  site.currentStage === 'operation' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' :
+                                  'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300'
+                                }`}>
+                                  {site.currentStage === 'mobilization' && '🚚'}
+                                  {site.currentStage === 'installation' && '🔧'}
+                                  {site.currentStage === 'operation' && '⚙️'}
+                                  {site.currentStage === 'demobilisation' && '📦'}
+                                  {' '}{site.currentStage.charAt(0).toUpperCase() + site.currentStage.slice(1)}
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        </TableCell>
                         <TableCell>
                           <Badge variant="outline" className="text-emerald-700 bg-emerald-50 border-emerald-200">
                             {site.status}

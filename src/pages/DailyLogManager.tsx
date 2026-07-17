@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   ArrowLeft, Calendar, Clock, AlertTriangle, 
   CheckCircle2, Fuel, User, MessageSquare, 
@@ -7,7 +7,7 @@ import {
   Image as ImageIcon, Video, X, UploadCloud, FileVideo, Camera
 } from 'lucide-react';
 import { useOperations } from '../contexts/OperationsContext';
-import { useAppStore, AttendanceRecord } from '../store/appStore';
+import { useAppStore, AttendanceRecord, DewateringStage } from '../store/appStore';
 import { useUserStore } from '../store/userStore';
 import { DailyMachineLog, DowntimeEntry, OperationalDay } from '../types/operations';
 import { Button } from '@/src/components/ui/button';
@@ -38,7 +38,8 @@ interface DailyLogManagerProps {
 
 export function DailyLogManager({ assetId, assetName, siteId, siteName, initialDate, isEmbedded, onBack }: DailyLogManagerProps) {
   const { dailyMachineLogs, logDailyActivity, deleteDailyLog, waybills, sitePumpDates } = useOperations();
-  const { employees, attendanceRecords } = useAppStore();
+  const { employees, attendanceRecords, sites, siteJournalEntries, dailyJournals, updateSite, addDailyJournal, updateDailyJournal } = useAppStore();
+  const currentSite = useMemo(() => sites.find(s => s.id === siteId || s.name.toLowerCase().trim() === siteName.toLowerCase().trim()), [sites, siteId, siteName]);
   const currentUser = useUserStore(s => s.users.find(u => u.id === s.currentUserId));
   
   const [view, setView] = useState<'history' | 'form' | 'analytics' | 'calendar' | 'detail'>(initialDate ? 'form' : 'history');
@@ -75,6 +76,18 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
   const isActive = operationalDay !== 'none';
   const [dieselUsage, setDieselUsage] = useState<string>(selectedLog ? selectedLog.dieselUsage.toString() : '0');
   const [supervisorOnSite, setSupervisorOnSite] = useState(selectedLog?.supervisorOnSite || '');
+  const [siteStage, setSiteStage] = useState<DewateringStage | ''>('');
+
+  // Find and update siteStage when date or currentSite changes
+  useEffect(() => {
+    if (!currentSite) return;
+    const journalForDate = dailyJournals.find(j => j.date === date);
+    const journalEntry = journalForDate 
+      ? siteJournalEntries.find(e => e.journalId === journalForDate.id && e.siteId === currentSite.id)
+      : null;
+    
+    setSiteStage(journalEntry?.dewateringStage || currentSite.currentDewateringStage || '');
+  }, [date, currentSite, siteJournalEntries, dailyJournals]);
 
   // Reusable callback to find the auto supervisor for a specific date
   const findAutoSupervisorForDate = React.useCallback((targetDate: string) => {
@@ -421,6 +434,55 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
           downtimeEntries,
           loggedBy: currentUser?.name || 'Unknown'
         });
+
+        // Sync the dewatering stage of the site for this log's date
+        if (siteStage) {
+          // 1. Update site profile stage
+          await updateSite(siteId, { currentDewateringStage: siteStage });
+          
+          // 2. Look up or create/update a daily journal entry for this date
+          const journalForDate = dailyJournals.find(j => j.date === logDate);
+          if (journalForDate) {
+            const existingEntry = siteJournalEntries.find(e => e.journalId === journalForDate.id && e.siteId === siteId);
+            if (existingEntry) {
+              await updateDailyJournal(journalForDate.id, { date: logDate }, [{
+                ...existingEntry,
+                dewateringStage: siteStage
+              }]);
+            } else {
+              await updateDailyJournal(journalForDate.id, { date: logDate }, [{
+                id: crypto.randomUUID(),
+                journalId: journalForDate.id,
+                siteId,
+                siteName,
+                clientName: currentSite?.client || 'Client',
+                narration: 'Auto-updated dewatering stage from daily machine register.',
+                dewateringStage: siteStage,
+                createdAt: new Date().toISOString(),
+                loggedBy: currentUser?.name || 'System'
+              }]);
+            }
+          } else {
+            const newJournalId = crypto.randomUUID();
+            await addDailyJournal({
+              id: newJournalId,
+              date: logDate,
+              generalNotes: '',
+              loggedBy: currentUser?.name || 'System',
+              createdAt: new Date().toISOString()
+            }, [{
+              id: crypto.randomUUID(),
+              journalId: newJournalId,
+              siteId,
+              siteName,
+              clientName: currentSite?.client || 'Client',
+              narration: 'Auto-updated dewatering stage from daily machine register.',
+              dewateringStage: siteStage,
+              createdAt: new Date().toISOString(),
+              loggedBy: currentUser?.name || 'System'
+            }]);
+          }
+        }
       }
 
       // Handle Media Upload if any (attach to start date only)
@@ -484,6 +546,7 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
     setIssuesOnSite('');
     setDowntimeEntries([]);
     setSelectedLog(null);
+    setSiteStage(currentSite?.currentDewateringStage || '');
   };
 
   const editLog = (log: DailyMachineLog) => {
@@ -498,6 +561,14 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
     setIssuesOnSite(log.issuesOnSite || '');
     setDowntimeEntries(log.downtimeEntries || []);
     fetchUploadedMedia(log.siteId, log.assetId, log.date);
+    
+    // Look up stage for this log date
+    const journalForDate = dailyJournals.find(j => j.date === log.date);
+    const journalEntry = journalForDate 
+      ? siteJournalEntries.find(e => e.journalId === journalForDate.id && e.siteId === log.siteId)
+      : null;
+    setSiteStage(journalEntry?.dewateringStage || currentSite?.currentDewateringStage || '');
+
     setView('form');
   };
 
@@ -510,7 +581,32 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
   // inside component, right before return:
   useSetPageTitle(
     assetName,
-    `Site: ${siteName}`,
+    <div className="flex items-center gap-1.5 flex-wrap text-xs text-slate-500 font-semibold mt-0.5">
+      <span>Site: <strong>{siteName}</strong></span>
+      {currentSite && (
+        <>
+          <span className="text-slate-300 dark:text-slate-700">•</span>
+          <span className="text-slate-600 dark:text-slate-400 font-bold">{currentSite.currentProgressPercentage ?? 0}% Deployed Progress</span>
+          {currentSite.currentDewateringStage && (
+            <>
+              <span className="text-slate-300 dark:text-slate-700">•</span>
+              <span className={`inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0 rounded-full ${
+                currentSite.currentDewateringStage === 'mobilization' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' :
+                currentSite.currentDewateringStage === 'installation' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' :
+                currentSite.currentDewateringStage === 'operation' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' :
+                'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300'
+              }`}>
+                {currentSite.currentDewateringStage === 'mobilization' && '🚚'}
+                {currentSite.currentDewateringStage === 'installation' && '🔧'}
+                {currentSite.currentDewateringStage === 'operation' && '⚙️'}
+                {currentSite.currentDewateringStage === 'demobilisation' && '📦'}
+                {' '}{currentSite.currentDewateringStage.charAt(0).toUpperCase() + currentSite.currentDewateringStage.slice(1)}
+              </span>
+            </>
+          )}
+        </>
+      )}
+    </div>,
     <div className="flex items-center gap-1.5 sm:gap-3">
       {!isEmbedded && (
         <div className="flex bg-slate-100 dark:bg-slate-800/50 p-1 rounded-lg">
@@ -562,7 +658,7 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
         </Button>
       )}
     </div>,
-    [view, assetName, siteName, isEmbedded],
+    [view, assetName, siteName, isEmbedded, currentSite],
     onBack
   );
 
@@ -833,6 +929,23 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
                       </div>
                     </div>
                   )}
+
+                  {/* Dewatering Stage */}
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider ml-1">Dewatering Stage</label>
+                    <select
+                      value={siteStage}
+                      onChange={e => setSiteStage(e.target.value as DewateringStage | '')}
+                      className="w-full h-10 rounded-md border border-slate-200 dark:border-slate-700 px-3 text-xs bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all font-medium text-slate-700"
+                    >
+                      <option value="">— Select Stage —</option>
+                      <option value="mobilization">🚚 Mobilization</option>
+                      <option value="installation">🔧 Installation</option>
+                      <option value="operation">⚙️ Operation</option>
+                      <option value="demobilisation">📦 Demobilisation</option>
+                    </select>
+                    <p className="text-[10px] text-slate-400 mt-1 font-medium text-center">stage as of this date</p>
+                  </div>
                 </div>
 
                 {/* Supervisor Field */}

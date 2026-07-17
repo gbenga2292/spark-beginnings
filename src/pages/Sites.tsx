@@ -1446,6 +1446,23 @@ export function Sites() {
                                 >
                                   {site.status}
                                 </Badge>
+                                {site.status === 'Active' && site.currentDewateringStage && (
+                                  <>
+                                    <span className="text-slate-300 shrink-0">•</span>
+                                    <span className={`inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0 rounded-full shrink-0 ${
+                                      site.currentDewateringStage === 'mobilization' ? 'bg-blue-100 text-blue-700' :
+                                      site.currentDewateringStage === 'installation' ? 'bg-amber-100 text-amber-700' :
+                                      site.currentDewateringStage === 'operation' ? 'bg-emerald-100 text-emerald-700' :
+                                      'bg-rose-100 text-rose-700'
+                                    }`}>
+                                      {site.currentDewateringStage === 'mobilization' && '🚚'}
+                                      {site.currentDewateringStage === 'installation' && '🔧'}
+                                      {site.currentDewateringStage === 'operation' && '⚙️'}
+                                      {site.currentDewateringStage === 'demobilisation' && '📦'}
+                                      {' '}{site.currentDewateringStage.charAt(0).toUpperCase() + site.currentDewateringStage.slice(1)}
+                                    </span>
+                                  </>
+                                )}
                                 <span className="text-slate-300 shrink-0">•</span>
                                 <div className="flex items-center gap-1 min-w-0">
                                   <Building2 className="h-3 w-3 text-slate-400 shrink-0" />

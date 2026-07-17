@@ -83,6 +83,13 @@ export interface FinancialReportsPriv {
   canViewPayrollSummary: boolean; canViewLoansAndAdvances: boolean;
 }
 export interface LedgerPriv { canView: boolean; canAdd: boolean; canEdit: boolean; canDelete: boolean; canImport: boolean; canExport: boolean; }
+export interface BankImportPriv {
+  canView: boolean;
+  canUpload: boolean;
+  canReconcile: boolean;
+  canSave: boolean;
+  canDelete: boolean;
+}
 
 // ─── Budget ──────────────────────────────────────────────────
 export interface BudgetPriv {
@@ -151,6 +158,7 @@ export interface UserPrivileges {
   payroll:           PayrollPriv;
   financialReports:  FinancialReportsPriv;
   ledger:            LedgerPriv;
+  bankImport:        BankImportPriv;
   variables:         VariablesPriv;
   users:             UsersPriv;
   tasks:             TasksPriv;
@@ -214,6 +222,7 @@ export const FULL_ACCESS: UserPrivileges = {
   payroll:          { canView: true, canGenerate: true, canViewAmounts: true, canViewPayeSchedule: true, canViewPensionSchedule: true, canViewNsitfSchedule: true, canViewWithholdingSchedule: true },
   financialReports: { canView: true, canExport: true, canViewAmounts: true, canViewPayrollSummary: true, canViewLoansAndAdvances: true },
   ledger:           { canView: true, canAdd: true, canEdit: true, canDelete: true, canImport: true, canExport: true },
+  bankImport:       { canView: true, canUpload: true, canReconcile: true, canSave: true, canDelete: true },
   variables:        { canView: true, canEdit: true, canImport: true, canExport: true, canBackup: true, canRestore: true },
   users:            { canView: true, canManage: true, canOverrideDiaryDelete: true },
   tasks:            { canView: true, canViewMyTasks: true, canViewDashboard: true, canViewReminders: true, canViewReports: true, canCreateTasks: true, canEditTasks: true, canDeleteTasks: true, isExternalHr: false },
@@ -263,6 +272,7 @@ export const NO_ACCESS: UserPrivileges = {
   payroll:          { canView: false, canGenerate: false, canViewAmounts: false, canViewPayeSchedule: false, canViewPensionSchedule: false, canViewNsitfSchedule: false, canViewWithholdingSchedule: false },
   financialReports: { canView: false, canExport: false, canViewAmounts: false, canViewPayrollSummary: false, canViewLoansAndAdvances: false },
   ledger:           { canView: false, canAdd: false, canEdit: false, canDelete: false, canImport: false, canExport: false },
+  bankImport:       { canView: false, canUpload: false, canReconcile: false, canSave: false, canDelete: false },
   variables:        { canView: false, canEdit: false, canImport: false, canExport: false, canBackup: false, canRestore: false },
   users:            { canView: false, canManage: false, canOverrideDiaryDelete: false },
   tasks:            { canView: false, canViewMyTasks: false, canViewDashboard: false, canViewReminders: false, canViewReports: false, canCreateTasks: false, canEditTasks: false, canDeleteTasks: false, isExternalHr: false },
@@ -329,6 +339,7 @@ const DEFAULT_PRESETS: PrivilegePreset[] = [
       payroll:          { canView: true, canGenerate: false, canViewAmounts: true, canViewPayeSchedule: false, canViewPensionSchedule: false, canViewNsitfSchedule: false, canViewWithholdingSchedule: false },
       financialReports: { canView: true, canExport: true, canViewAmounts: true, canViewPayrollSummary: true, canViewLoansAndAdvances: true },
       ledger:           { canView: true, canAdd: true, canEdit: true, canDelete: false, canImport: true, canExport: true },
+      bankImport:       { canView: true, canUpload: true, canReconcile: true, canSave: true, canDelete: false },
       reports:          { canView: true, canExport: true },
       tasks:            { canView: false, canViewMyTasks: false, canViewDashboard: false, canViewReminders: false, canViewReports: false, canCreateTasks: false, canEditTasks: false, canDeleteTasks: false, isExternalHr: false },
       budget:           { canView: true, canAdd: true, canEdit: true, canDelete: true, canSetBudgeted: true, canLinkLedger: true },
@@ -351,6 +362,7 @@ const DEFAULT_PRESETS: PrivilegePreset[] = [
       payroll:          { canView: true, canGenerate: false, canViewAmounts: false, canViewPayeSchedule: false, canViewPensionSchedule: false, canViewNsitfSchedule: false, canViewWithholdingSchedule: false },
       financialReports: { canView: true, canExport: false, canViewAmounts: false, canViewPayrollSummary: false, canViewLoansAndAdvances: false },
       ledger:           { canView: true, canAdd: false, canEdit: false, canDelete: false, canImport: false, canExport: false },
+      bankImport:       { canView: true, canUpload: false, canReconcile: false, canSave: false, canDelete: false },
       tasks:            { canView: true, canViewMyTasks: false, canViewDashboard: false, canViewReminders: false, canViewReports: false, canCreateTasks: false, canEditTasks: false, canDeleteTasks: false, isExternalHr: false },
       operations:       { canView: true, canViewAnalytics: false, canDeleteLogs: false },
       opsInventory:     { canView: true, canAdd: false, canEdit: false, canDelete: false, canImport: false, canExport: false },

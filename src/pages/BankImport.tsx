@@ -70,6 +70,13 @@ export default function BankImport() {
   const navigate = useNavigate();
   const workspaceId = useAppStore((s: any) => s.workspaceId || 'default');
   const currentUser = useUserStore((s) => s.getCurrentUser());
+  const priv = currentUser?.privileges?.bankImport || {
+    canView: false,
+    canUpload: false,
+    canReconcile: false,
+    canSave: false,
+    canDelete: false
+  };
   
   // Store collections
   const ledgerCategories = useAppStore((state) => state.ledgerCategories);
@@ -936,20 +943,40 @@ export default function BankImport() {
                     <div className="flex justify-between items-center text-[9px] text-slate-400 mt-4 border-t border-slate-150 dark:border-slate-800 pt-2 leading-none">
                       <span>By: {audit.created_by || 'Unknown'} · {new Date(audit.updated_at).toLocaleDateString()}</span>
                       <div className="flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
-                        <button
-                          title="Rename"
-                          onClick={() => { setRenamingAuditId(audit.id); setRenamingAuditValue(audit.name); }}
-                          className="text-slate-400 hover:text-indigo-600 transition-colors"
-                        >
-                          <Pencil className="h-3 w-3" />
-                        </button>
-                        <button
-                          title="Delete"
-                          onClick={(e) => handleDeleteAudit(e, audit.id)}
-                          className="text-slate-400 hover:text-rose-600 transition-colors"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </button>
+                        {priv.canSave ? (
+                          <button
+                            title="Rename"
+                            onClick={() => { setRenamingAuditId(audit.id); setRenamingAuditValue(audit.name); }}
+                            className="text-slate-400 hover:text-indigo-650 transition-colors"
+                          >
+                            <Pencil className="h-3 w-3" />
+                          </button>
+                        ) : (
+                          <button
+                            disabled
+                            title="You don't have permission to rename drafts"
+                            className="text-slate-200 cursor-not-allowed"
+                          >
+                            <Pencil className="h-3 w-3" />
+                          </button>
+                        )}
+                        {priv.canDelete ? (
+                          <button
+                            title="Delete"
+                            onClick={(e) => handleDeleteAudit(e, audit.id)}
+                            className="text-slate-400 hover:text-rose-600 transition-colors"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </button>
+                        ) : (
+                          <button
+                            disabled
+                            title="You don't have permission to delete drafts"
+                            className="text-slate-200 cursor-not-allowed"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -979,12 +1006,20 @@ export default function BankImport() {
             {/* File Drag & Drop Zone */}
             <div
               onDragOver={(e) => e.preventDefault()}
-              onDrop={handleFileDrop}
-              onClick={() => fileInputRef.current?.click()}
-              className="border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-indigo-500 rounded-2xl p-10 flex flex-col items-center justify-center text-center cursor-pointer transition-colors bg-white dark:bg-slate-900/40 min-h-[220px]"
+              onDrop={priv.canUpload ? handleFileDrop : undefined}
+              onClick={() => {
+                if (priv.canUpload) {
+                  fileInputRef.current?.click();
+                } else {
+                  toast.error("You don't have permission to upload bank statements.");
+                }
+              }}
+              className={`border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl p-10 flex flex-col items-center justify-center text-center transition-colors bg-white dark:bg-slate-900/40 min-h-[220px] ${
+                priv.canUpload ? 'hover:border-indigo-500 cursor-pointer' : 'opacity-50 cursor-not-allowed'
+              }`}
             >
               <div className="bg-indigo-50 dark:bg-slate-850 p-4 rounded-full mb-4">
-                <Upload className="h-7 w-7 text-indigo-650" />
+                <Upload className="h-7 w-7 text-indigo-655" />
               </div>
               <h4 className="text-sm font-bold text-slate-800 dark:text-slate-100">Drop PDF or Spreadsheet statement</h4>
               <p className="text-xs text-slate-500 mt-1 max-w-[280px]">Supports bank statement PDF files, or Excel/CSV ledger exports (.xlsx, .xls, .csv)</p>
@@ -999,8 +1034,16 @@ export default function BankImport() {
 
             {/* Photo / Camera Scan Zone */}
             <div
-              onClick={triggerCameraScan}
-              className="border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-emerald-500 rounded-2xl p-10 flex flex-col items-center justify-center text-center cursor-pointer transition-colors bg-white dark:bg-slate-900/40 min-h-[220px]"
+              onClick={() => {
+                if (priv.canUpload) {
+                  triggerCameraScan();
+                } else {
+                  toast.error("You don't have permission to scan statement photos.");
+                }
+              }}
+              className={`border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl p-10 flex flex-col items-center justify-center text-center transition-colors bg-white dark:bg-slate-900/40 min-h-[220px] ${
+                priv.canUpload ? 'hover:border-emerald-500 cursor-pointer' : 'opacity-50 cursor-not-allowed'
+              }`}
             >
               <div className="bg-emerald-50 dark:bg-slate-850 p-4 rounded-full mb-4">
                 <Camera className="h-7 w-7 text-emerald-655 animate-pulse" />
@@ -1109,18 +1152,30 @@ export default function BankImport() {
 
               <div className="h-8 w-[1px] bg-slate-200 hidden md:block" />
 
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setAuditName(auditName || selectedFile?.name.replace(/\.[^/.]+$/, "") || 'Statement Audit');
-                  setShowSaveModal(true);
-                }}
-                className="h-9 font-bold text-[11px] uppercase tracking-tight border-slate-200 bg-white hover:bg-slate-50 flex-1 md:flex-initial gap-1.5 shadow-sm"
-              >
-                <Save className="h-4 w-4 text-slate-500" /> Save Draft
-              </Button>
+              {priv.canSave && (
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={handleImportSubmit}
+                  className="h-9 font-bold text-[11px] uppercase tracking-tight bg-indigo-600 hover:bg-indigo-700 text-white flex-1 md:flex-initial gap-1.5 shadow-sm"
+                >
+                  <Check className="h-4 w-4" /> Post to Ledger
+                </Button>
+              )}
+              {priv.canSave && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setAuditName(auditName || selectedFile?.name.replace(/\.[^/.]+$/, "") || 'Statement Audit');
+                    setShowSaveModal(true);
+                  }}
+                  className="h-9 font-bold text-[11px] uppercase tracking-tight border-slate-200 bg-white hover:bg-slate-50 flex-1 md:flex-initial gap-1.5 shadow-sm"
+                >
+                  <Save className="h-4 w-4 text-slate-500" /> Save Draft
+                </Button>
+              )}
               <Button
                 variant="outline"
                 size="sm"
@@ -1365,20 +1420,22 @@ export default function BankImport() {
                           <td className="py-2 px-2">
                             <div className="space-y-1">
                               <select
-                                value={row.category}
+                                disabled={!priv.canReconcile}
+                                value={row.category || ''}
                                 onChange={(e) => {
-                                  if (e.target.value === '__new__') {
+                                  const val = e.target.value;
+                                  if (val === '__new__') {
                                     setRowIdAddingCategory(row.id);
                                     setShowNewCategoryModal(true);
                                   } else {
-                                    updateRow(row.id, 'category', e.target.value);
+                                    updateRow(row.id, 'category', val);
                                   }
                                 }}
-                                className={`w-full h-8 px-1.5 border rounded-md text-xs bg-white dark:bg-slate-800 truncate ${
-                                  hasCategoryMismatch
-                                    ? 'border-amber-400 bg-amber-50/15 text-amber-700 font-bold'
+                                className={`bg-transparent outline-none py-1 text-slate-800 dark:text-slate-200 w-full truncate border-b border-dashed ${
+                                  !row.category
+                                    ? 'border-indigo-400 font-extrabold text-indigo-700 dark:text-indigo-400'
                                     : 'border-slate-200 dark:border-slate-700'
-                                }`}
+                                } ${!priv.canReconcile ? 'opacity-60 cursor-not-allowed' : ''}`}
                               >
                                 <option value="__new__">+ Add New Category...</option>
                                 <option value="Other">Other</option>
@@ -1401,16 +1458,22 @@ export default function BankImport() {
                               {isUnlinked ? (
                                 <button
                                   type="button"
+                                  disabled={!priv.canReconcile}
                                   onClick={() => handleOpenLinker(row)}
-                                  className="inline-flex items-center gap-1.5 px-2 py-1 rounded text-[10px] font-bold border border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800 transition-colors text-slate-505 w-full justify-center"
+                                  className={`inline-flex items-center gap-1.5 px-2 py-1 rounded text-[10px] font-bold border border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800 transition-colors text-slate-555 w-full justify-center ${
+                                    !priv.canReconcile ? 'opacity-50 cursor-not-allowed' : ''
+                                  }`}
                                 >
                                   <LinkIcon className="h-3 w-3" /> Link Ledger
                                 </button>
                               ) : (
                                 <button
                                   type="button"
+                                  disabled={!priv.canReconcile}
                                   onClick={() => handleOpenLinker(row)}
                                   className={`inline-flex flex-col items-center px-2 py-1 rounded text-[10px] border transition-colors w-full ${
+                                    !priv.canReconcile ? 'opacity-65 cursor-not-allowed' : ''
+                                  } ${
                                     isBalanced
                                       ? 'bg-emerald-50 text-emerald-700 border-emerald-250 hover:bg-emerald-100/70 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900'
                                       : 'bg-amber-50 text-amber-700 border-amber-255 hover:bg-amber-100/70 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-900'
@@ -1429,8 +1492,11 @@ export default function BankImport() {
 
                           <td className="py-2 px-3 text-center">
                             <button
+                              disabled={!priv.canReconcile}
                               onClick={() => setReviewRows((prev) => prev.filter((r) => r.id !== row.id))}
-                              className="text-slate-400 hover:text-rose-600 transition-colors"
+                              className={`text-slate-400 hover:text-rose-600 transition-colors ${
+                                !priv.canReconcile ? 'opacity-30 cursor-not-allowed' : ''
+                              }`}
                             >
                               <Trash2 className="h-4 w-4" />
                             </button>

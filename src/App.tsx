@@ -239,7 +239,7 @@ function AppContent() {
             <Route path="evaluations" element={<Page label="Evaluations"><ProtectedRoute requiredModule="evaluations"><Evaluations /></ProtectedRoute></Page>} />
             <Route path="interviews" element={<Page label="Interviews"><ProtectedRoute requiredModule="interviews"><InterviewManager /></ProtectedRoute></Page>} />
             <Route path="ledger" element={<Page label="Ledger"><ProtectedRoute requiredModule="ledger"><Ledger /></ProtectedRoute></Page>} />
-            <Route path="bank-import" element={<Page label="Bank AI Import"><ProtectedRoute requiredModule="ledger"><BankImport /></ProtectedRoute></Page>} />
+            <Route path="bank-import" element={<Page label="Bank AI Import"><ProtectedRoute requiredModule="bankImport"><BankImport /></ProtectedRoute></Page>} />
             <Route path="clients" element={<Navigate to="/sites" replace />} />
             
             {/* Operations & Analytics — Restricted on Web */}

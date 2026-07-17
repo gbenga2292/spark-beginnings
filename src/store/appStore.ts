@@ -71,6 +71,8 @@ export interface DailyJournal {
   createdAt: string;
 }
 
+export type DewateringStage = 'mobilization' | 'installation' | 'operation' | 'demobilisation';
+
 export interface SiteJournalEntry {
   id: string;
   journalId: string;
@@ -79,6 +81,7 @@ export interface SiteJournalEntry {
   clientName: string;
   narration: string;
   progressPercentage?: number;
+  dewateringStage?: DewateringStage;
   createdAt: string;
   loggedBy: string;
 }
@@ -167,6 +170,7 @@ export interface Site {
   contactPhone?: string;
   position?: string;
   currentProgressPercentage?: number;
+  currentDewateringStage?: DewateringStage;
 }
 
 export interface TaxBracket {

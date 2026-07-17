@@ -96,7 +96,6 @@ const AttendanceRow = memo(function AttendanceRow({
   const isAbsent = !!(dayVal && isAbsentStatus(dayVal));
   const nightVal = (!onLeave && !isAbsent) ? (rowData?.night || '') : '';
   const hasEntry = dayVal || nightVal;
-  const disabledOt = isWorkday || onLeave;
 
   // Shared CSS helpers
   const statusDot = isAbsent ? 'bg-red-400' : hasEntry ? 'bg-emerald-400' : 'bg-slate-300';
@@ -138,23 +137,32 @@ const AttendanceRow = memo(function AttendanceRow({
       <optgroup label="Status">{statusOptionNodes}</optgroup>
     </select>
   ) : (
-    <div className="flex items-center gap-2">
-      <label className={`flex items-center gap-1.5 ${disabledOt ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
-        title={isWorkday ? 'Overtime disabled on regular workdays' : (onLeave ? 'On leave' : '')}>
-        <input type="checkbox"
-          className="rounded border-slate-300 text-slate-800 focus:ring-slate-500 disabled:opacity-50"
-          checked={!disabledOt && (rowData?.overtime || false)}
-          onChange={(e) => onOvertimeToggle(employee.id, e.target.checked)}
-          disabled={disabledOt} />
-        <span className="text-xs text-slate-600 font-medium">Overtime</span>
-      </label>
-      {rowData?.overtime && !isWorkday && (
-        <input type="text" placeholder="Remarks..."
-          className="h-7 text-xs flex-1 border border-slate-200 rounded px-2 outline-none focus:ring-1 focus:ring-slate-400"
-          value={rowData?.overtimeDetails || ''}
-          onChange={(e) => onSelectChange(employee.id, 'overtimeDetails', e.target.value)} />
-      )}
-    </div>
+    isWorkday ? (
+      <select className={nightSelectClass} value={nightVal}
+        onChange={(e) => onSelectChange(employee.id, 'night', e.target.value)} disabled={onLeave || isAbsent}>
+        <option value="">— Select —</option>
+        <optgroup label="Sites">{siteOptionNodes}{renderHistoricalOption(nightVal)}</optgroup>
+        <optgroup label="Status">{statusOptionNodes}</optgroup>
+      </select>
+    ) : (
+      <div className="flex items-center gap-2">
+        <label className={`flex items-center gap-1.5 ${onLeave ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
+          title={onLeave ? 'On leave' : ''}>
+          <input type="checkbox"
+            className="rounded border-slate-300 text-slate-800 focus:ring-slate-500 disabled:opacity-50"
+            checked={!onLeave && (rowData?.overtime || false)}
+            onChange={(e) => onOvertimeToggle(employee.id, e.target.checked)}
+            disabled={onLeave} />
+          <span className="text-xs text-slate-600 font-medium">Overtime</span>
+        </label>
+        {rowData?.overtime && (
+          <input type="text" placeholder="Remarks..."
+            className="h-7 text-xs flex-1 border border-slate-200 rounded px-2 outline-none focus:ring-1 focus:ring-slate-400"
+            value={rowData?.overtimeDetails || ''}
+            onChange={(e) => onSelectChange(employee.id, 'overtimeDetails', e.target.value)} />
+        )}
+      </div>
+    )
   );
 
   // ── Desktop table row (hidden on mobile) ────────────────────────────────
@@ -191,22 +199,19 @@ const AttendanceRow = memo(function AttendanceRow({
       </div>
 
       {/* Selects grid */}
-      <div className={`grid gap-2 ${isFieldStaff ? 'grid-cols-2' : 'grid-cols-1'}`}>
+      <div className="grid grid-cols-2 gap-2">
         <div>
           <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
             {isFieldStaff ? '☀ Day' : 'Day Site'}
           </label>
           {DaySiteSelect}
         </div>
-        {isFieldStaff && (
-          <div>
-            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">🌙 Night</label>
-            {NightSiteSelect}
-          </div>
-        )}
-        {!isFieldStaff && (
-          <div className="mt-1">{NightSiteSelect}</div>
-        )}
+        <div>
+          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+            {isFieldStaff ? '🌙 Night' : (isWorkday ? 'Overtime Site' : 'Overtime')}
+          </label>
+          {NightSiteSelect}
+        </div>
       </div>
     </div>
   );
@@ -698,9 +703,6 @@ export function Attendance() {
         // Update site progress in DB if changed
         const newProgress = entry.progressPercentage ?? site.currentProgressPercentage ?? 0;
         if (newProgress !== (site.currentProgressPercentage ?? 0)) {
-          if (newProgress < (site.currentProgressPercentage ?? 0)) {
-            throw new Error(`Progress percentage for "${site.name}" cannot be decreased below the previous value of ${site.currentProgressPercentage}%.`);
-          }
           await updateSite(site.id, { currentProgressPercentage: newProgress });
         }
 
@@ -1773,7 +1775,12 @@ export function Attendance() {
         day: dayShift,
         night: nightShift,
         absentStatus: absentReason,
-        overtimeDetails: (attendanceData[emp.id]?.overtime && !isFieldStaff) ? attendanceData[emp.id].overtimeDetails : '',
+        overtimeDetails: !isFieldStaff
+          ? (isWorkday
+              ? (finalNightSite ? `Overtime Site: ${finalNightSite}` : '')
+              : (attendanceData[emp.id]?.overtime ? attendanceData[emp.id].overtimeDetails : '')
+            )
+          : '',
       });
     });
 
@@ -1926,6 +1933,10 @@ export function Attendance() {
       return entry && entry.activeMachineIds.some(id => id && id !== 'none');
     }).length;
   }, [sitesWithMachines, activeMachineBySite]);
+
+  const registerDow = getDOW(registerDate);
+  const registerIsHoliday = isHoliday(registerDate);
+  const isWorkdayHeader = (registerDow <= 5) && !registerIsHoliday;
 
   return (
     <div className="flex flex-col h-full">
@@ -2097,7 +2108,7 @@ export function Attendance() {
                     <th className="text-left text-[11px] font-semibold uppercase tracking-wider py-2 px-3 w-[30%]">Staff Name</th>
                     <th className="text-left text-[11px] font-semibold uppercase tracking-wider py-2 px-3 border-l border-white/10 w-[35%]">Day Site / Status</th>
                     <th className="text-left text-[11px] font-semibold uppercase tracking-wider py-2 px-3 border-l border-white/10 w-[35%]">
-                      {isFieldStaff ? 'Night Site / Status' : 'Overtime'}
+                      {isFieldStaff ? 'Night Site / Status' : (isWorkdayHeader ? 'Overtime Site' : 'Overtime')}
                     </th>
                   </tr>
                 </thead>
@@ -2660,7 +2671,7 @@ export function Attendance() {
                                 <div className="relative flex items-center">
                                   <Input
                                     type="number"
-                                    min={site.currentProgressPercentage ?? 0}
+                                    min={0}
                                     max={100}
                                     value={entry.progressPercentage ?? site.currentProgressPercentage ?? 0}
                                     onChange={e => {
@@ -2797,7 +2808,7 @@ export function Attendance() {
                               <div className="relative flex items-center shrink-0">
                                 <Input
                                   type="number"
-                                  min={site.currentProgressPercentage ?? 0}
+                                  min={0}
                                   max={100}
                                   value={entry.progressPercentage ?? site.currentProgressPercentage ?? 0}
                                   onChange={e => {
@@ -3352,10 +3363,10 @@ export function Attendance() {
               });
               if (siteLogs.length === 0) return null;
               
-              const machineStats: Record<string, { name: string, active: number, off: number, offDates: string[] }> = {};
+              const machineStats: Record<string, { assetId: string, name: string, active: number, off: number, offDates: string[] }> = {};
               siteLogs.forEach(log => {
                 if (!machineStats[log.assetId]) {
-                  machineStats[log.assetId] = { name: log.assetName, active: 0, off: 0, offDates: [] };
+                  machineStats[log.assetId] = { assetId: log.assetId, name: log.assetName, active: 0, off: 0, offDates: [] };
                 }
                 const isOff = !log.isActive || log.operationalDay === 'none';
                 const isHalf = log.isActive && log.operationalDay === 'half';
@@ -3369,53 +3380,127 @@ export function Attendance() {
                 }
               });
 
+              // Dewatering Stage Details
+              const stageEmojis = {
+                mobilization: '🚚 Mobilization',
+                installation: '🔧 Installation',
+                operation: '⚙️ Operation',
+                demobilisation: '📦 Demobilisation'
+              };
+              const stageText = site.currentDewateringStage ? (stageEmojis[site.currentDewateringStage] || site.currentDewateringStage) : null;
+
+              // Timeline calculations: Earliest Pump Start & Latest Pump Stop
+              const siteDates = sitePumpDates.filter(p => p.siteId === site.id);
+              const pumpStartDates = siteDates.map(p => p.pumpStartDate).filter(Boolean);
+              const pumpStopDates = siteDates.map(p => p.pumpStopDate).filter(Boolean);
+              
+              const earliestPumpStart = pumpStartDates.length > 0 ? pumpStartDates.reduce((min, d) => d < min ? d : min) : null;
+              const latestPumpStop = pumpStopDates.length > 0 && pumpStopDates.length === siteDates.length
+                ? pumpStopDates.reduce((max, d) => d > max ? d : max)
+                : null;
+
+              const formattedStart = earliestPumpStart ? new Date(earliestPumpStart).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : null;
+              const formattedEnd = latestPumpStop ? new Date(latestPumpStop).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : (siteDates.length > 0 ? 'Ongoing' : null);
+              const timelineText = formattedStart ? `${formattedStart} – ${formattedEnd}` : null;
+
               return (
                 <div key={site.id} className="bg-white border border-slate-200 rounded-lg shadow-sm p-4 flex flex-col min-h-0">
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="font-bold text-slate-800 text-lg flex items-center gap-2">
-                      <Building2 className="w-5 h-5 text-indigo-400" /> {site.name}
-                    </h3>
-                    <span className="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded-full font-medium">
-                      {site.client}
-                    </span>
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 mb-3 pb-3 border-b border-slate-100">
+                    <div>
+                      <h3 className="font-bold text-slate-800 text-lg flex items-center gap-2 flex-wrap">
+                        <Building2 className="w-5 h-5 text-indigo-400 shrink-0" />
+                        <span>{site.name}</span>
+                        {stageText && (
+                          <span className={`inline-flex items-center gap-0.5 text-xs font-bold px-2 py-0.5 rounded-full ${
+                            site.currentDewateringStage === 'mobilization' ? 'bg-blue-100 text-blue-700' :
+                            site.currentDewateringStage === 'installation' ? 'bg-amber-100 text-amber-700' :
+                            site.currentDewateringStage === 'operation' ? 'bg-emerald-100 text-emerald-700' :
+                            'bg-rose-100 text-rose-700'
+                          }`}>
+                            {stageText}
+                          </span>
+                        )}
+                      </h3>
+                      
+                      {/* Site Start & End Date */}
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1 text-[11px] text-slate-500 font-medium">
+                        <div><strong className="text-slate-600">Start Date:</strong> {site.startDate ? new Date(site.startDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}</div>
+                        <div><strong className="text-slate-600">End Date:</strong> {site.endDate ? new Date(site.endDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Open-ended'}</div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 flex-wrap md:justify-end">
+                      <span className="text-xs text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full font-bold">
+                        {site.client}
+                      </span>
+                      {timelineText && (
+                        <span className="text-[10px] text-indigo-700 bg-indigo-50 border border-indigo-150 px-2.5 py-1 rounded-full font-bold">
+                          ⏱️ Deployed: {timelineText}
+                        </span>
+                      )}
+                    </div>
                   </div>
                   
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                    {Object.values(machineStats).map(stat => (
-                      <div key={stat.name} className="border border-slate-200 bg-white shadow-sm rounded-lg p-3 flex flex-col">
-                        <div className="font-bold text-slate-700 text-sm mb-3 pb-2 border-b border-slate-100 truncate" title={stat.name}>
-                          {stat.name}
-                        </div>
-                        
-                        <div className="grid grid-cols-2 gap-2 mb-3">
-                          <div className="bg-emerald-50 rounded-md p-2 flex flex-col items-center justify-center border border-emerald-100">
-                            <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Active</span>
-                            <span className="text-lg font-black text-emerald-700">{stat.active}</span>
-                          </div>
-                          <div className="bg-red-50 rounded-md p-2 flex flex-col items-center justify-center border border-red-100">
-                            <span className="text-[10px] font-bold text-red-600 uppercase tracking-wider">Off</span>
-                            <span className="text-lg font-black text-red-700">{stat.off}</span>
-                          </div>
-                        </div>
+                    {Object.values(machineStats).map(stat => {
+                      const machinePumpRecord = sitePumpDates.find(p => p.siteId === site.id && p.assetId === stat.assetId);
 
-                        <div className="flex-1 flex flex-col min-h-0">
-                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
-                            Off Dates ({stat.offDates.length})
-                          </span>
-                          {stat.offDates.length > 0 ? (
-                            <div className="flex flex-wrap gap-1 max-h-[80px] overflow-y-auto pr-1 custom-scrollbar">
-                              {stat.offDates.sort((a, b) => b.localeCompare(a)).map(d => (
-                                <span key={d} className="px-1.5 py-0.5 bg-slate-100 text-slate-600 border border-slate-200 rounded text-[9px] font-mono whitespace-nowrap">
-                                  {formatDisplayDate(d)}
-                                </span>
-                              ))}
+                      return (
+                        <div key={stat.name} className="border border-slate-200 bg-white shadow-sm rounded-lg p-3 flex flex-col justify-between">
+                          <div>
+                            <div className="font-bold text-slate-700 text-sm mb-3 pb-2 border-b border-slate-100 truncate" title={stat.name}>
+                              {stat.name}
                             </div>
-                          ) : (
-                            <div className="text-xs italic text-slate-400">Never marked off</div>
+                            
+                            <div className="grid grid-cols-2 gap-2 mb-3">
+                              <div className="bg-emerald-50 rounded-md p-2 flex flex-col items-center justify-center border border-emerald-100">
+                                <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Active</span>
+                                <span className="text-lg font-black text-emerald-700">{stat.active}</span>
+                              </div>
+                              <div className="bg-red-50 rounded-md p-2 flex flex-col items-center justify-center border border-red-100">
+                                <span className="text-[10px] font-bold text-red-600 uppercase tracking-wider">Off</span>
+                                <span className="text-lg font-black text-red-700">{stat.off}</span>
+                              </div>
+                            </div>
+
+                            <div className="flex flex-col min-h-0">
+                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
+                                Off Dates ({stat.offDates.length})
+                              </span>
+                              {stat.offDates.length > 0 ? (
+                                <div className="flex flex-wrap gap-1 max-h-[80px] overflow-y-auto pr-1 custom-scrollbar">
+                                  {stat.offDates.sort((a, b) => b.localeCompare(a)).map(d => (
+                                    <span key={d} className="px-1.5 py-0.5 bg-slate-100 text-slate-600 border border-slate-200 rounded text-[9px] font-mono whitespace-nowrap">
+                                      {formatDisplayDate(d)}
+                                    </span>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div className="text-xs italic text-slate-400">Never marked off</div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Machine Pump Start/Stop dates */}
+                          {machinePumpRecord && (
+                            <div className="mt-3 pt-3 border-t border-slate-100 text-[10px] text-slate-500 font-medium space-y-0.5">
+                              <div className="flex justify-between">
+                                <span className="text-slate-400">Pump Start:</span>
+                                <span className="font-bold text-slate-700">{new Date(machinePumpRecord.pumpStartDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-slate-400">Pump Stop:</span>
+                                <span className="font-bold text-slate-700">
+                                  {machinePumpRecord.pumpStopDate 
+                                    ? new Date(machinePumpRecord.pumpStopDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+                                    : 'Ongoing'}
+                                </span>
+                              </div>
+                            </div>
                           )}
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               );

@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef, ChangeEvent } from 'react';
-import { useAppStore, DailyJournal as DailyJournalType, SiteJournalEntry } from '@/src/store/appStore';
+import { useAppStore, DailyJournal as DailyJournalType, SiteJournalEntry, DewateringStage } from '@/src/store/appStore';
 import { useUserStore } from '@/src/store/userStore';
 import { generateId, cn, formatUnit } from '@/src/lib/utils';
 import { Button } from '@/src/components/ui/button';
@@ -33,6 +33,7 @@ function SiteLogCard({
   onRemove, 
   onChangeNarration, 
   onChangeProgress,
+  onChangeStage,
   formDate,
   onOpenMachineLog
 }: { 
@@ -41,11 +42,12 @@ function SiteLogCard({
   onRemove: () => void; 
   onChangeNarration: (val: string) => void;
   onChangeProgress: (val: number | undefined) => void;
+  onChangeStage: (val: DewateringStage | undefined) => void;
   formDate: string;
   onOpenMachineLog: (machine: {id: string, name: string}, siteId: string, siteName: string) => void;
 }) {
   const { waybills, assets, dailyMachineLogs } = useOperations();
-  const { consumableLogs, siteJournalEntries: allEntries } = useAppStore();
+  const { consumableLogs, siteJournalEntries: allEntries, sites } = useAppStore();
   const [activeTab, setActiveTab] = useState<'general' | 'machines' | 'consumables'>('general');
   const [isBulkConsumableOpen, setIsBulkConsumableOpen] = useState(false);
   const [isBulkMachineOpen, setIsBulkMachineOpen] = useState(false);
@@ -53,10 +55,16 @@ function SiteLogCard({
   // Find the highest progress ever logged for this site for validation
   const maxSavedProgress = useMemo(() => {
     if (!entry.siteId) return 0;
-    const siteLogs = allEntries.filter(e => e.siteId === entry.siteId && e.progressPercentage != null);
-    if (siteLogs.length === 0) return 0;
-    return Math.max(...siteLogs.map(e => e.progressPercentage!));
-  }, [allEntries, entry.siteId]);
+    const siteLogs = allEntries.filter(e => e.siteId === entry.siteId && e.progressPercentage != null && e.id !== entry.id);
+    const maxJournalProgress = siteLogs.length > 0 ? Math.max(...siteLogs.map(e => e.progressPercentage!)) : 0;
+    
+    if (!entry.id) {
+      const siteObj = sites.find(x => x.id === entry.siteId);
+      const siteProgress = siteObj?.currentProgressPercentage ?? 0;
+      return Math.max(maxJournalProgress, siteProgress);
+    }
+    return maxJournalProgress;
+  }, [allEntries, entry.siteId, entry.id, sites]);
 
   const progressVal = entry.progressPercentage;
   const progressError = progressVal !== undefined && progressVal < maxSavedProgress
@@ -373,6 +381,9 @@ function SiteLogCard({
                   ⚠️ {progressError}
                 </p>
               )}
+              <p className="text-[10px] text-slate-400 dark:text-slate-500">
+                You can only increase this value or leave it as is.
+              </p>
               {progressVal !== undefined && !progressError && (
                 <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden mt-1">
                   <div
@@ -386,6 +397,39 @@ function SiteLogCard({
               )}
             </div>
 
+            {/* Dewatering Stage Selector */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                <span>🏗️</span> Dewatering Stage
+              </label>
+              <select
+                value={entry.dewateringStage ?? ''}
+                onChange={e => onChangeStage(e.target.value === '' ? undefined : e.target.value as DewateringStage)}
+                className="w-full h-10 rounded-lg border border-slate-200 dark:border-slate-700 px-3 text-sm bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+              >
+                <option value="">— Select Stage —</option>
+                <option value="mobilization">🚚 Mobilization</option>
+                <option value="installation">🔧 Installation</option>
+                <option value="operation">⚙️ Operation</option>
+                <option value="demobilisation">📦 Demobilisation</option>
+              </select>
+              {entry.dewateringStage && (
+                <div className="flex items-center gap-2 mt-1">
+                  <span className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-0.5 rounded-full ${
+                    entry.dewateringStage === 'mobilization' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' :
+                    entry.dewateringStage === 'installation' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' :
+                    entry.dewateringStage === 'operation' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' :
+                    'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300'
+                  }`}>
+                    {entry.dewateringStage === 'mobilization' && '🚚 Mobilizing'}
+                    {entry.dewateringStage === 'installation' && '🔧 Installing'}
+                    {entry.dewateringStage === 'operation' && '⚙️ In Operation'}
+                    {entry.dewateringStage === 'demobilisation' && '📦 Demobilising'}
+                  </span>
+                  <span className="text-[10px] text-slate-400">Stage will be synced to site profile on save</span>
+                </div>
+              )}
+            </div>
             {/* WhatsApp-style fullscreen media viewer */}
             {lightboxIndex !== null && (uploadedMedia.length > 0 || mediaPreviews.length > 0) && (
               <MediaViewer
@@ -728,6 +772,7 @@ export function DailyJournal() {
       }
 
       // Step 2: Save Journal to Store (Supabase)
+      const { updateSite } = useAppStore.getState();
       if (editingId) {
         updateDailyJournal(editingId, { date: formDate }, formEntries.map(e => ({ 
           id: e.id || generateId(), 
@@ -735,10 +780,17 @@ export function DailyJournal() {
           siteId: e.siteId!, 
           siteName: e.siteName!, 
           clientName: e.clientName!, 
-          narration: e.narration!, 
+          narration: e.narration!,
+          dewateringStage: e.dewateringStage,
           createdAt: e.createdAt || new Date().toISOString(), 
           loggedBy: e.loggedBy || currentUser?.name || 'System' 
         })));
+        // Sync dewatering stage to each site that has a stage selected
+        formEntries.forEach(e => {
+          if (e.siteId && e.dewateringStage) {
+            updateSite(e.siteId, { currentDewateringStage: e.dewateringStage });
+          }
+        });
         toast.success('Log and media updated');
       } else {
         addDailyJournal({ 
@@ -753,10 +805,17 @@ export function DailyJournal() {
           siteId: e.siteId!, 
           siteName: e.siteName!, 
           clientName: e.clientName!, 
-          narration: e.narration!, 
+          narration: e.narration!,
+          dewateringStage: e.dewateringStage,
           createdAt: new Date().toISOString(), 
           loggedBy: currentUser?.name || 'System' 
         })));
+        // Sync dewatering stage to each site that has a stage selected
+        formEntries.forEach(e => {
+          if (e.siteId && e.dewateringStage) {
+            updateSite(e.siteId, { currentDewateringStage: e.dewateringStage });
+          }
+        });
         toast.success('Log published successfully');
       }
       setIsModalOpen(false);
@@ -1137,7 +1196,18 @@ export function DailyJournal() {
                 </select>
                 <Button onClick={() => {
                   const s = sites.find(x => x.id === selectedSiteId);
-                  if (s) { setFormEntries(p => [...p, { siteId: s.id, siteName: s.name, clientName: s.client, narration: '', loggedBy: currentUser?.name || 'System', createdAt: new Date().toISOString() }]); setSelectedSiteId(''); }
+                  if (s) {
+                    setFormEntries(p => [...p, {
+                      siteId: s.id,
+                      siteName: s.name,
+                      clientName: s.client,
+                      narration: '',
+                      progressPercentage: s.currentProgressPercentage ?? 0,
+                      loggedBy: currentUser?.name || 'System',
+                      createdAt: new Date().toISOString()
+                    }]);
+                    setSelectedSiteId('');
+                  }
                 }} disabled={!selectedSiteId} className="h-11 w-full sm:w-auto px-6 bg-indigo-600 hover:bg-indigo-700 text-white font-bold shrink-0 shadow-sm">
                   <Plus className="h-4 w-4 sm:mr-1" /> Add
                 </Button>
@@ -1162,6 +1232,7 @@ export function DailyJournal() {
                     onRemove={() => setFormEntries(p => p.filter((_, i) => i !== idx))}
                     onChangeNarration={(val) => { const n = [...formEntries]; n[idx].narration = val; setFormEntries(n); }}
                     onChangeProgress={(val) => { const n = [...formEntries]; n[idx].progressPercentage = val; setFormEntries(n); }}
+                    onChangeStage={(val) => { const n = [...formEntries]; n[idx].dewateringStage = val; setFormEntries(n); }}
                     formDate={formDate}
                     onOpenMachineLog={(machine, siteId, siteName) => {
                       setMachineLogContext({ assetId: machine.id, assetName: machine.name, siteId, siteName });
