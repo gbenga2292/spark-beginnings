@@ -136,6 +136,18 @@ export default function BankImport() {
   // Grid sort state: field = key of ReviewRow, dir = 'asc' | 'desc'
   const [gridSort, setGridSort] = useState<{ field: string; dir: 'asc' | 'desc' } | null>(null);
 
+  const [auditWithLedger, setAuditWithLedger] = useState(true);
+  const [autoAddUnmatched, setAutoAddUnmatched] = useState(true);
+  const [showConfigModal, setShowConfigModal] = useState(false);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [pendingScanType, setPendingScanType] = useState<'pdf' | 'image' | 'excel' | null>(null);
+
+  const startFileProcessFlow = (file: File, scanType: 'pdf' | 'image' | 'excel') => {
+    setPendingFile(file);
+    setPendingScanType(scanType);
+    setShowConfigModal(true);
+  };
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
@@ -191,6 +203,8 @@ export default function BankImport() {
     setAuditName(audit.name);
     setDefaultBank(audit.default_bank || '');
     setReviewRows(audit.review_rows || []);
+    setAuditWithLedger(audit.file_metadata?.auditWithLedger ?? true);
+    setAutoAddUnmatched(audit.file_metadata?.autoAddUnmatched ?? true);
     setStep('review');
     setViewMode('grid');
     toast.success(`Loaded audit session "${audit.name}"!`);
@@ -249,6 +263,10 @@ export default function BankImport() {
         workspace_id: workspaceId,
         default_bank: defaultBank,
         review_rows: reviewRows,
+        file_metadata: {
+          auditWithLedger,
+          autoAddUnmatched
+        },
         created_by: currentUser?.name || 'Reconciler',
         updated_at: new Date().toISOString()
       };
@@ -371,7 +389,7 @@ export default function BankImport() {
             const amount = Math.abs(Number(row['Amount'] || row.amount)) || 0;
             
             const date = normalizeDate(rawDate);
-            const matchedEntries = findAutoMatch(date, amount);
+            const matchedEntries = auditWithLedger ? findAutoMatch(date, amount) : [];
             const hasMatch = matchedEntries.length > 0;
             const primaryMatch = matchedEntries[0];
 
@@ -433,7 +451,7 @@ export default function BankImport() {
             (status, pct) => setImportProgress({ status, pct })
           );
           const rows: ReviewRow[] = extracted.map(tx => {
-            const matchedEntries = findAutoMatch(tx.date, tx.amount);
+            const matchedEntries = auditWithLedger ? findAutoMatch(tx.date, tx.amount) : [];
             const hasMatch = matchedEntries.length > 0;
             const primaryMatch = matchedEntries[0];
             return {
@@ -481,7 +499,7 @@ export default function BankImport() {
           (status, pct) => setImportProgress({ status, pct })
         );
         const rows: ReviewRow[] = extracted.map(tx => {
-          const matchedEntries = findAutoMatch(tx.date, tx.amount);
+          const matchedEntries = auditWithLedger ? findAutoMatch(tx.date, tx.amount) : [];
           const hasMatch = matchedEntries.length > 0;
           const primaryMatch = matchedEntries[0];
           return {
@@ -522,9 +540,9 @@ export default function BankImport() {
     if (!file) return;
     
     const ext = file.name.split('.').pop()?.toLowerCase();
-    if (ext === 'pdf') handleProcess(file, 'pdf');
-    else if (['xlsx', 'xls', 'csv'].includes(ext || '')) handleProcess(file, 'excel');
-    else if (['png', 'jpg', 'jpeg'].includes(ext || '')) handleProcess(file, 'image');
+    if (ext === 'pdf') startFileProcessFlow(file, 'pdf');
+    else if (['xlsx', 'xls', 'csv'].includes(ext || '')) startFileProcessFlow(file, 'excel');
+    else if (['png', 'jpg', 'jpeg'].includes(ext || '')) startFileProcessFlow(file, 'image');
     else toast.error('Unsupported file format.');
   };
 
@@ -532,9 +550,9 @@ export default function BankImport() {
     const file = e.target.files?.[0];
     if (!file) return;
     const ext = file.name.split('.').pop()?.toLowerCase();
-    if (ext === 'pdf') handleProcess(file, 'pdf');
-    else if (['xlsx', 'xls', 'csv'].includes(ext || '')) handleProcess(file, 'excel');
-    else if (['png', 'jpg', 'jpeg'].includes(ext || '')) handleProcess(file, 'image');
+    if (ext === 'pdf') startFileProcessFlow(file, 'pdf');
+    else if (['xlsx', 'xls', 'csv'].includes(ext || '')) startFileProcessFlow(file, 'excel');
+    else if (['png', 'jpg', 'jpeg'].includes(ext || '')) startFileProcessFlow(file, 'image');
     else toast.error('Unsupported file format.');
   };
 
@@ -673,7 +691,8 @@ export default function BankImport() {
     let updatedCount = 0;
 
     toImport.forEach((row, idx) => {
-      if (row.linkedEntries && row.linkedEntries.length > 0) {
+      // Reconcile/update linked entries only if auditing is enabled and linked entries exist
+      if (auditWithLedger && row.linkedEntries && row.linkedEntries.length > 0) {
         // AUDIT ACTION: Update ALL manually linked ledger entries
         row.linkedEntries.forEach(linkedEntry => {
           updateLedgerEntry(linkedEntry.id, {
@@ -686,21 +705,24 @@ export default function BankImport() {
           updatedCount++;
         });
       } else {
-        // AUDIT ACTION: Insert brand new ledger entry
-        const uniqueVoucherNo = `AI-${Date.now().toString().slice(-6)}-${idx}`;
-        newEntries.push({
-          id: Math.random().toString(36).slice(2),
-          voucherNo: uniqueVoucherNo,
-          date: row.date,
-          description: row.description,
-          category: row.category,
-          amount: row.amount,
-          client: row.client === 'none' ? '' : row.client,
-          site: row.site === 'none' ? '' : row.site,
-          vendor: row.vendor === 'none' ? '' : row.vendor,
-          bank: row.bank === 'none' ? '' : row.bank,
-          enteredBy: currentUser?.name || 'AI Import'
-        });
+        // Insert new ledger entry only if auto-create is enabled (or if we are not auditing and just importing)
+        if (!auditWithLedger || autoAddUnmatched) {
+          // AUDIT ACTION: Insert brand new ledger entry
+          const uniqueVoucherNo = `AI-${Date.now().toString().slice(-6)}-${idx}`;
+          newEntries.push({
+            id: Math.random().toString(36).slice(2),
+            voucherNo: uniqueVoucherNo,
+            date: row.date,
+            description: row.description,
+            category: row.category,
+            amount: row.amount,
+            client: row.client === 'none' ? '' : row.client,
+            site: row.site === 'none' ? '' : row.site,
+            vendor: row.vendor === 'none' ? '' : row.vendor,
+            bank: row.bank === 'none' ? '' : row.bank,
+            enteredBy: currentUser?.name || 'AI Import'
+          });
+        }
       }
     });
 
@@ -722,7 +744,12 @@ export default function BankImport() {
     setImportedCount(newEntries.length);
     setReconciledCount(updatedCount);
     setStep('done');
-    toast.success(`Audit complete! Saved ${newEntries.length} new entries and updated ${updatedCount} matched entries.`);
+    
+    if (auditWithLedger) {
+      toast.success(`Audit complete! Saved ${newEntries.length} new entries and updated ${updatedCount} matched entries.`);
+    } else {
+      toast.success(`Import complete! Saved ${newEntries.length} new entries to your ledger.`);
+    }
   };
 
   const selectedCount = reviewRows.filter((r) => r.selected).length;
@@ -1255,19 +1282,21 @@ export default function BankImport() {
                           )}
                         </div>
                       </th>
-                      <th
-                        className="py-3 px-2 text-left font-bold uppercase tracking-wider w-44 cursor-pointer select-none hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                        onClick={() => toggleSort('linkedEntries')}
-                      >
-                        <div className="flex items-center gap-1">
-                          Audit Link
-                          {gridSort?.field === 'linkedEntries' ? (
-                            gridSort.dir === 'asc' ? <ChevronUp className="h-3 w-3 text-indigo-600" /> : <ChevronDown className="h-3 w-3 text-indigo-600" />
-                          ) : (
-                            <ChevronsUpDown className="h-3 w-3 text-slate-400" />
-                          )}
-                        </div>
-                      </th>
+                      {auditWithLedger && (
+                        <th
+                          className="py-3 px-2 text-left font-bold uppercase tracking-wider w-44 cursor-pointer select-none hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                          onClick={() => toggleSort('linkedEntries')}
+                        >
+                          <div className="flex items-center gap-1">
+                            Audit Link
+                            {gridSort?.field === 'linkedEntries' ? (
+                              gridSort.dir === 'asc' ? <ChevronUp className="h-3 w-3 text-indigo-600" /> : <ChevronDown className="h-3 w-3 text-indigo-600" />
+                            ) : (
+                              <ChevronsUpDown className="h-3 w-3 text-slate-400" />
+                            )}
+                          </div>
+                        </th>
+                      )}
                       <th className="py-3 px-3 text-center w-12" />
                     </tr>
                   </thead>
@@ -1367,34 +1396,36 @@ export default function BankImport() {
                           </td>
 
                           {/* Audit Link Button — last column */}
-                          <td className="py-2 px-2">
-                            {isUnlinked ? (
-                              <button
-                                type="button"
-                                onClick={() => handleOpenLinker(row)}
-                                className="inline-flex items-center gap-1.5 px-2 py-1 rounded text-[10px] font-bold border border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800 transition-colors text-slate-505 w-full justify-center"
-                              >
-                                <LinkIcon className="h-3 w-3" /> Link Ledger
-                              </button>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => handleOpenLinker(row)}
-                                className={`inline-flex flex-col items-center px-2 py-1 rounded text-[10px] border transition-colors w-full ${
-                                  isBalanced
-                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-250 hover:bg-emerald-100/70 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900'
-                                    : 'bg-amber-50 text-amber-700 border-amber-255 hover:bg-amber-100/70 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-900'
-                                }`}
-                              >
-                                <span className="font-extrabold flex items-center gap-1">
-                                  <LinkIcon className="h-3 w-3" /> Reconciled ({row.linkedEntries.length})
-                                </span>
-                                <span className="text-[9px] opacity-80 mt-0.5 leading-none">
-                                  {isBalanced ? 'Balanced ✓' : `₦${linkedSum.toLocaleString()} / ₦${row.amount.toLocaleString()}`}
-                                </span>
-                              </button>
-                            )}
-                          </td>
+                          {auditWithLedger && (
+                            <td className="py-2 px-2">
+                              {isUnlinked ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenLinker(row)}
+                                  className="inline-flex items-center gap-1.5 px-2 py-1 rounded text-[10px] font-bold border border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800 transition-colors text-slate-505 w-full justify-center"
+                                >
+                                  <LinkIcon className="h-3 w-3" /> Link Ledger
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenLinker(row)}
+                                  className={`inline-flex flex-col items-center px-2 py-1 rounded text-[10px] border transition-colors w-full ${
+                                    isBalanced
+                                      ? 'bg-emerald-50 text-emerald-700 border-emerald-250 hover:bg-emerald-100/70 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900'
+                                      : 'bg-amber-50 text-amber-700 border-amber-255 hover:bg-amber-100/70 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-900'
+                                  }`}
+                                >
+                                  <span className="font-extrabold flex items-center gap-1">
+                                    <LinkIcon className="h-3 w-3" /> Reconciled ({row.linkedEntries.length})
+                                  </span>
+                                  <span className="text-[9px] opacity-80 mt-0.5 leading-none">
+                                    {isBalanced ? 'Balanced ✓' : `₦${linkedSum.toLocaleString()} / ₦${row.amount.toLocaleString()}`}
+                                  </span>
+                                </button>
+                              )}
+                            </td>
+                          )}
 
                           <td className="py-2 px-3 text-center">
                             <button
@@ -2053,6 +2084,116 @@ export default function BankImport() {
           </form>
         </div>
       )}
+      {/* ================================================================
+          MODAL — Statement Import Configuration
+      ================================================================ */}
+      {showConfigModal && pendingFile && (
+        <div className="fixed inset-0 bg-slate-950/65 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 border border-slate-250 dark:border-slate-800 rounded-3xl max-w-sm w-full p-5 space-y-5 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-center">
+              <h4 className="text-xs font-black text-slate-750 uppercase tracking-wider flex items-center gap-1.5">
+                <Sparkles className="h-4 w-4 text-indigo-500 animate-pulse" /> Import Configuration
+              </h4>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowConfigModal(false);
+                  setPendingFile(null);
+                  setPendingScanType(null);
+                }}
+                className="text-slate-400 hover:text-slate-655"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3.5">
+              <div className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-150 dark:border-slate-800/80">
+                <p className="text-xs text-slate-500 truncate">
+                  File: <strong className="text-slate-700 dark:text-slate-200">{pendingFile.name}</strong>
+                </p>
+                <p className="text-[10px] text-slate-400 mt-1 capitalize font-bold">
+                  Format: {pendingScanType}
+                </p>
+              </div>
+
+              {/* Option 1: Audit with Ledger */}
+              <div
+                className="flex items-start gap-3 p-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/20 rounded-xl transition-colors cursor-pointer select-none"
+                onClick={() => setAuditWithLedger(!auditWithLedger)}
+              >
+                <input
+                  type="checkbox"
+                  checked={auditWithLedger}
+                  onChange={() => {}}
+                  className="h-4 w-4 mt-0.5 rounded border-slate-350 accent-indigo-650 shrink-0 pointer-events-none"
+                />
+                <div>
+                  <label className="text-xs font-bold text-slate-800 dark:text-slate-200 cursor-pointer">
+                    Audit and link with Ledger
+                  </label>
+                  <p className="text-[10px] text-slate-500 mt-0.5 leading-snug">
+                    Reconcile statement entries with vouchers inside the system ledger.
+                  </p>
+                </div>
+              </div>
+
+              {/* Option 2: Auto add unmatched */}
+              {auditWithLedger && (
+                <div
+                  className="flex items-start gap-3 p-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/20 rounded-xl transition-colors cursor-pointer select-none ml-4 border-l-2 border-slate-100 dark:border-slate-800"
+                  onClick={() => setAutoAddUnmatched(!autoAddUnmatched)}
+                >
+                  <input
+                    type="checkbox"
+                    checked={autoAddUnmatched}
+                    onChange={() => {}}
+                    className="h-4 w-4 mt-0.5 rounded border-slate-350 accent-indigo-650 shrink-0 pointer-events-none"
+                  />
+                  <div>
+                    <label className="text-xs font-bold text-slate-800 dark:text-slate-200 cursor-pointer">
+                      Auto add unmatched to Ledger
+                    </label>
+                    <p className="text-[10px] text-slate-500 mt-0.5 leading-snug">
+                      Create new ledger records automatically for unmatched transactions.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-150 dark:border-slate-800">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setShowConfigModal(false);
+                  setPendingFile(null);
+                  setPendingScanType(null);
+                }}
+                className="h-9 text-xs font-bold px-4 border-slate-200"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => {
+                  setShowConfigModal(false);
+                  if (pendingFile && pendingScanType) {
+                    handleProcess(pendingFile, pendingScanType);
+                  }
+                }}
+                className="h-9 text-xs font-bold px-4 bg-indigo-600 hover:bg-indigo-700 text-white"
+              >
+                Start Import
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
 
     </div>
   );

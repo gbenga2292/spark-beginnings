@@ -594,6 +594,8 @@ export function Client360() {
         clientInvoices: [],
         vatDeficit: 0,
         paymentsCleared: 0,
+        totalDiscounts: 0,
+        totalWht: 0,
         totalRevenue: 0,
         totalCost: 0,
         profit: 0,
@@ -604,6 +606,8 @@ export function Client360() {
 
     const clientPayments = payments.filter(p => p.client?.trim() === selectedClient && isWithinTimeFilter(p.date));
     const paymentsCleared = clientPayments.reduce((acc, p) => acc + (p.amount || 0), 0);
+    const totalDiscounts = clientPayments.reduce((acc, p) => acc + (p.discount || 0), 0);
+    const totalWht = clientPayments.reduce((acc, p) => acc + (p.withholdingTax || 0), 0);
 
     const clientInvoicesFiltered = invoices.filter(i => i.client?.trim() === selectedClient && isWithinTimeFilter(i.date));
     const totalRevenue = clientInvoicesFiltered.reduce((acc, i) => acc + (i.totalCharge || i.amount || 0), 0);
@@ -744,6 +748,8 @@ export function Client360() {
       clientInvoices,
       vatDeficit,
       paymentsCleared,
+      totalDiscounts,
+      totalWht,
       totalRevenue,
       totalCost,
       profit: totalRevenue - totalCost,
@@ -853,15 +859,15 @@ export function Client360() {
 
     if (!selectedClient) return { healthScore, alerts };
 
-    const { vatDeficit, totalRevenue, paymentsCleared } = financialData;
+    const { vatDeficit, totalRevenue, paymentsCleared, totalDiscounts, totalWht } = financialData;
     const { pendingTasks } = tasksData;
 
     // Financial Health
     if (vatDeficit > 50000) { healthScore -= 15; alerts.push({ title: `High VAT Deficit: ₦${vatDeficit.toLocaleString()}`, type: 'danger' }); }
     else if (vatDeficit > 0) { healthScore -= 5; alerts.push({ title: `Pending VAT: ₦${vatDeficit.toLocaleString()}`, type: 'warning' }); }
 
-    const outstandingBalance = totalRevenue - paymentsCleared;
-    if (outstandingBalance > 0) {
+    const outstandingBalance = totalRevenue - paymentsCleared - totalDiscounts - totalWht;
+    if (outstandingBalance > 0.01) {
       healthScore -= 10;
       alerts.push({ title: `Unpaid Balance: ₦${outstandingBalance.toLocaleString()}`, type: 'warning' });
     }
@@ -893,6 +899,8 @@ export function Client360() {
       clientInvoices: financialData.clientInvoices,
       vatDeficit: financialData.vatDeficit,
       paymentsCleared: financialData.paymentsCleared,
+      totalDiscounts: financialData.totalDiscounts,
+      totalWht: financialData.totalWht,
       totalRevenue: financialData.totalRevenue,
       totalCost: financialData.totalCost,
       profit: financialData.profit,
@@ -920,20 +928,28 @@ export function Client360() {
   const chatEndRef = useRef<HTMLDivElement>(null);
   const [selectedProvider, setSelectedProvider] = useState<'gemini' | 'groq'>('groq');
   const [selectedModel, setSelectedModel] = useState<string>('llama-3.1-8b-instant');
+  const [apiKeys, setApiKeys] = useState<any[]>([]);
 
   useEffect(() => {
     (async () => {
       try {
-        const { data: keyRow } = await supabase
+        const { data: keysData } = await supabase
           .from('api_keys')
-          .select('provider')
-          .eq('workspace_id', workspaceId)
-          .eq('is_default', true)
-          .maybeSingle();
-        if (keyRow) {
-          const prov = (keyRow.provider === 'gemini' || keyRow.provider === 'groq') ? keyRow.provider : 'groq';
-          setSelectedProvider(prov);
-          setSelectedModel(prov === 'gemini' ? 'gemini-2.0-flash' : 'llama-3.1-8b-instant');
+          .select('*')
+          .eq('workspace_id', workspaceId);
+        if (keysData) {
+          setApiKeys(keysData);
+          const defaultKey = keysData.find(k => k.is_default);
+          if (defaultKey) {
+            const prov = (defaultKey.provider === 'gemini' || defaultKey.provider === 'groq') ? defaultKey.provider : 'groq';
+            setSelectedProvider(prov);
+            setSelectedModel(defaultKey.default_model || (prov === 'gemini' ? 'gemini-2.0-flash' : 'llama-3.1-8b-instant'));
+          } else if (keysData.length > 0) {
+            const firstKey = keysData[0];
+            const prov = (firstKey.provider === 'gemini' || firstKey.provider === 'groq') ? firstKey.provider : 'groq';
+            setSelectedProvider(prov);
+            setSelectedModel(firstKey.default_model || (prov === 'gemini' ? 'gemini-2.0-flash' : 'llama-3.1-8b-instant'));
+          }
         }
       } catch {}
     })();
@@ -941,8 +957,47 @@ export function Client360() {
 
   const handleProviderChange = (p: 'gemini' | 'groq') => {
     setSelectedProvider(p);
-    setSelectedModel(p === 'gemini' ? 'gemini-2.0-flash' : 'llama-3.1-8b-instant');
+    const matchingKey = apiKeys.find(k => k.provider === p);
+    if (matchingKey && matchingKey.default_model) {
+      setSelectedModel(matchingKey.default_model);
+    } else {
+      setSelectedModel(p === 'gemini' ? 'gemini-2.0-flash' : 'llama-3.1-8b-instant');
+    }
   };
+
+  // Dynamic model options with a star for the default model configured in settings
+  const modelOptions = useMemo(() => {
+    const geminiDefaults = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
+    const groqDefaults = ['llama-3.1-8b-instant', 'llama-3.3-70b-versatile', 'mixtral-8x7b-32768'];
+    
+    const defaults = selectedProvider === 'gemini' ? geminiDefaults : groqDefaults;
+    
+    const keyForProvider = apiKeys.find(k => k.provider === selectedProvider);
+    const defaultModel = keyForProvider?.default_model || '';
+
+    const modelsSet = new Set(defaults);
+    if (defaultModel) {
+      modelsSet.add(defaultModel);
+    }
+
+    const formatModelName = (model: string) => {
+      if (model === 'gemini-2.0-flash') return 'Gemini 2.0 Flash';
+      if (model === 'gemini-1.5-flash') return 'Gemini 1.5 Flash';
+      if (model === 'gemini-1.5-pro') return 'Gemini 1.5 Pro';
+      if (model === 'llama-3.1-8b-instant') return 'Llama 3.1 8B';
+      if (model === 'llama-3.3-70b-versatile') return 'Llama 3.3 70B';
+      if (model === 'mixtral-8x7b-32768') return 'Mixtral 8x7B';
+      return model.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+    };
+
+    return Array.from(modelsSet).map(model => {
+      const isDefault = model === defaultModel;
+      return {
+        value: model,
+        label: isDefault ? `⭐ ${formatModelName(model)} (Default)` : formatModelName(model)
+      };
+    });
+  }, [selectedProvider, apiKeys]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -1354,19 +1409,9 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                           onChange={e => setSelectedModel(e.target.value)} 
                           className="bg-indigo-950/70 border border-indigo-750/70 text-indigo-200 text-[10px] font-bold rounded-full px-2 py-0.5 focus:outline-none cursor-pointer hover:border-indigo-500"
                         >
-                          {selectedProvider === 'gemini' ? (
-                            <>
-                              <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
-                              <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
-                              <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
-                            </>
-                          ) : (
-                            <>
-                              <option value="llama-3.1-8b-instant">Llama 3.1 8B</option>
-                              <option value="llama-3.3-70b-versatile">Llama 3.3 70B</option>
-                              <option value="mixtral-8x7b-32768">Mixtral 8x7B</option>
-                            </>
-                          )}
+                          {modelOptions.map(opt => (
+                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                          ))}
                         </select>
                       </div>
                     )}
@@ -1609,11 +1654,11 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                           </div>
                           <div className="flex justify-between items-center pb-3.5 border-b border-slate-100 dark:border-slate-800">
                             <div className="flex flex-col">
-                              <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Outstanding Balance</span>
-                              <span className="text-xs text-slate-400">Invoiced amount awaiting payment</span>
+                              <span className="text-sm font-semibold text-slate-700 dark:text-slate-350">Outstanding Balance</span>
+                              <span className="text-xs text-slate-400">Invoiced amount awaiting payment (less discounts &amp; WHT)</span>
                             </div>
-                            <span className={cn("font-bold text-lg", (clientData.totalRevenue - clientData.paymentsCleared) > 0 ? "text-amber-600 dark:text-amber-400" : "text-slate-500")}>
-                              {currentUser?.privileges?.billing?.canViewAmounts ? `₦${(clientData.totalRevenue - clientData.paymentsCleared).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '***'}
+                            <span className={cn("font-bold text-lg", (clientData.totalRevenue - clientData.paymentsCleared - (clientData.totalDiscounts || 0) - (clientData.totalWht || 0)) > 0.01 ? "text-amber-600 dark:text-amber-400" : "text-slate-500")}>
+                              {currentUser?.privileges?.billing?.canViewAmounts ? `₦${Math.max(0, clientData.totalRevenue - clientData.paymentsCleared - (clientData.totalDiscounts || 0) - (clientData.totalWht || 0)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '***'}
                             </span>
                           </div>
                         </div>

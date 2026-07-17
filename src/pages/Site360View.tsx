@@ -104,20 +104,28 @@ export function Site360View({ site, clientSites, onSiteChange, onBack, onEditSit
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 1024);
   const [selectedProvider, setSelectedProvider] = useState<'gemini' | 'groq'>('groq');
   const [selectedModel, setSelectedModel] = useState<string>('llama-3.1-8b-instant');
+  const [apiKeys, setApiKeys] = useState<any[]>([]);
 
   useEffect(() => {
     (async () => {
       try {
-        const { data: keyRow } = await supabase
+        const { data: keysData } = await supabase
           .from('api_keys')
-          .select('provider')
-          .eq('workspace_id', workspaceId)
-          .eq('is_default', true)
-          .maybeSingle();
-        if (keyRow) {
-          const prov = (keyRow.provider === 'gemini' || keyRow.provider === 'groq') ? keyRow.provider : 'groq';
-          setSelectedProvider(prov);
-          setSelectedModel(prov === 'gemini' ? 'gemini-2.0-flash' : 'llama-3.1-8b-instant');
+          .select('*')
+          .eq('workspace_id', workspaceId);
+        if (keysData) {
+          setApiKeys(keysData);
+          const defaultKey = keysData.find(k => k.is_default);
+          if (defaultKey) {
+            const prov = (defaultKey.provider === 'gemini' || defaultKey.provider === 'groq') ? defaultKey.provider : 'groq';
+            setSelectedProvider(prov);
+            setSelectedModel(defaultKey.default_model || (prov === 'gemini' ? 'gemini-2.0-flash' : 'llama-3.1-8b-instant'));
+          } else if (keysData.length > 0) {
+            const firstKey = keysData[0];
+            const prov = (firstKey.provider === 'gemini' || firstKey.provider === 'groq') ? firstKey.provider : 'groq';
+            setSelectedProvider(prov);
+            setSelectedModel(firstKey.default_model || (prov === 'gemini' ? 'gemini-2.0-flash' : 'llama-3.1-8b-instant'));
+          }
         }
       } catch {}
     })();
@@ -125,8 +133,47 @@ export function Site360View({ site, clientSites, onSiteChange, onBack, onEditSit
 
   const handleProviderChange = (p: 'gemini' | 'groq') => {
     setSelectedProvider(p);
-    setSelectedModel(p === 'gemini' ? 'gemini-2.0-flash' : 'llama-3.1-8b-instant');
+    const matchingKey = apiKeys.find(k => k.provider === p);
+    if (matchingKey && matchingKey.default_model) {
+      setSelectedModel(matchingKey.default_model);
+    } else {
+      setSelectedModel(p === 'gemini' ? 'gemini-2.0-flash' : 'llama-3.1-8b-instant');
+    }
   };
+
+  // Dynamic model options with a star for the default model configured in settings
+  const modelOptions = useMemo(() => {
+    const geminiDefaults = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
+    const groqDefaults = ['llama-3.1-8b-instant', 'llama-3.3-70b-versatile', 'mixtral-8x7b-32768'];
+    
+    const defaults = selectedProvider === 'gemini' ? geminiDefaults : groqDefaults;
+    
+    const keyForProvider = apiKeys.find(k => k.provider === selectedProvider);
+    const defaultModel = keyForProvider?.default_model || '';
+
+    const modelsSet = new Set(defaults);
+    if (defaultModel) {
+      modelsSet.add(defaultModel);
+    }
+
+    const formatModelName = (model: string) => {
+      if (model === 'gemini-2.0-flash') return 'Gemini 2.0 Flash';
+      if (model === 'gemini-1.5-flash') return 'Gemini 1.5 Flash';
+      if (model === 'gemini-1.5-pro') return 'Gemini 1.5 Pro';
+      if (model === 'llama-3.1-8b-instant') return 'Llama 3.1 8B';
+      if (model === 'llama-3.3-70b-versatile') return 'Llama 3.3 70B';
+      if (model === 'mixtral-8x7b-32768') return 'Mixtral 8x7B';
+      return model.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+    };
+
+    return Array.from(modelsSet).map(model => {
+      const isDefault = model === defaultModel;
+      return {
+        value: model,
+        label: isDefault ? `⭐ ${formatModelName(model)} (Default)` : formatModelName(model)
+      };
+    });
+  }, [selectedProvider, apiKeys]);
 
   useEffect(() => {
     const handler = () => setIsMobile(window.innerWidth < 1024);
@@ -343,7 +390,9 @@ export function Site360View({ site, clientSites, onSiteChange, onBack, onEditSit
     const totalBilled = siteInvoices.reduce((a, i) => a + (i.totalCharge || i.amount || 0), 0);
     const sitePayments = payments.filter(p => (p.site?.trim() === site.name.trim() || p.client?.trim() === site.name.trim()) && isWithinFilter(p.date));
     const totalReceived = sitePayments.reduce((a, p) => a + (p.amount || 0), 0);
-    const outstanding = totalBilled - totalReceived;
+    const totalDiscounts = sitePayments.reduce((a, p) => a + (p.discount || 0), 0);
+    const totalWht = sitePayments.reduce((a, p) => a + (p.withholdingTax || 0), 0);
+    const outstanding = Math.max(0, totalBilled - totalReceived - totalDiscounts - totalWht);
 
     const vatGenerated = 0; // VAT is only on payments, not invoices
 
@@ -412,9 +461,8 @@ export function Site360View({ site, clientSites, onSiteChange, onBack, onEditSit
       else dayVal = l.isActive ? 1 : 0;
 
       stats.total += dayVal;
-      if (dayVal > 0) {
-        stats.active += 1; // Count as an active day occurrence
-      } else if (l.operationalDay === 'none' || !l.isActive) {
+      stats.active += dayVal;
+      if (l.operationalDay === 'none' || !l.isActive) {
         stats.off += 1;
       }
       return acc;
@@ -918,19 +966,9 @@ Answer site-specific questions using this context only. Be concise.`;
                         onChange={e => setSelectedModel(e.target.value)} 
                         className="bg-indigo-950/70 border border-indigo-750/70 text-indigo-200 text-[10px] font-bold rounded-full px-2 py-0.5 focus:outline-none cursor-pointer hover:border-indigo-500"
                       >
-                        {selectedProvider === 'gemini' ? (
-                          <>
-                            <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
-                            <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
-                            <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
-                          </>
-                        ) : (
-                          <>
-                            <option value="llama-3.1-8b-instant">Llama 3.1 8B</option>
-                            <option value="llama-3.3-70b-versatile">Llama 3.3 70B</option>
-                            <option value="mixtral-8x7b-32768">Mixtral 8x7B</option>
-                          </>
-                        )}
+                        {modelOptions.map(opt => (
+                          <option key={opt.value} value={opt.value}>{opt.label}</option>
+                        ))}
                       </select>
                     </div>
                   )}

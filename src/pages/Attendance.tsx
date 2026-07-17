@@ -418,7 +418,7 @@ export function Attendance() {
   const [desktopCalendarOpen, setDesktopCalendarOpen] = useState(false);
 
   // ─── Machine Register State ────────────────────────────────────────────────
-  const { assets, dailyMachineLogs, logDailyActivity, waybills, deleteDailyLog } = useOperations();
+  const { assets, dailyMachineLogs, logDailyActivity, waybills, deleteDailyLog, sitePumpDates } = useOperations();
   const [machineRegDate, setMachineRegDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [isSavingMachines, setIsSavingMachines] = useState(false);
 
@@ -516,53 +516,70 @@ export function Attendance() {
 
   const activeSites = useMemo(() => sites.filter(s => s.status === 'Active'), [sites]);
 
+  // Only sites that were active on the selected machine register date
+  const activeSitesForMachineDate = useMemo(() => {
+    return sites.filter(s => {
+      // Exclude if it hasn't started yet
+      if (s.startDate && s.startDate > machineRegDate) return false;
+      // Exclude if it has already ended before this date
+      if (s.endDate && s.endDate < machineRegDate) return false;
+      // Exclude unconditionally inactive sites without bounds
+      if (!s.startDate && !s.endDate && s.status !== 'Active') return false; 
+      
+      return true;
+    });
+  }, [sites, machineRegDate]);
+
   // All active equipment assets that require logging
   const allLoggableMachines = useMemo(() =>
     assets.filter(a => a.type === 'equipment' && a.requiresLogging && a.status === 'active')
   , [assets]);
 
-  // For each active site: Set of machine IDs currently dispatched there (via waybills)
+  // For each active site: Set of machine IDs active on that site on the selected date based on pump start/stop date ranges
   const onSiteMachineIds = useMemo(() => {
     const map: Record<string, Set<string>> = {};
-    activeSites.forEach(s => {
-      const siteWaybills = waybills.filter(w =>
-        (w.siteName?.toLowerCase() === s.name.toLowerCase() || w.siteId === s.id) &&
-        (w.status !== 'outstanding' || w.type === 'return')
-      );
-      const inventoryMap = new Map<string, number>();
-      siteWaybills
-        .filter(w => w.type === 'waybill' && w.status !== 'outstanding')
-        .forEach(wb => wb.items.forEach(item => {
-          inventoryMap.set(item.assetId, (inventoryMap.get(item.assetId) ?? 0) + item.quantity);
-        }));
-      siteWaybills
-        .filter(w => w.type === 'return')
-        .forEach(wb => wb.items.forEach(item => {
-          if (wb.status === 'return_completed')
-            inventoryMap.set(item.assetId, Math.max(0, (inventoryMap.get(item.assetId) ?? 0) - item.quantity));
-        }));
-      consumableLogs.filter(log => log.siteId === s.id).forEach(log => {
-        inventoryMap.set(log.assetId, Math.max(0, (inventoryMap.get(log.assetId) ?? 0) - log.quantityUsed));
+    activeSitesForMachineDate.forEach(s => {
+      const activeIds = new Set<string>();
+
+      // Filter sitePumpDates for this site
+      const siteDates = sitePumpDates.filter(p => p.siteId === s.id);
+
+      siteDates.forEach(p => {
+        const start = p.pumpStartDate; // YYYY-MM-DD
+        const stop = p.pumpStopDate;   // YYYY-MM-DD or null
+
+        // Only include if allLoggableMachines contains this machine
+        if (allLoggableMachines.some(m => m.id === p.assetId)) {
+          if (machineRegDate >= start && (!stop || machineRegDate <= stop)) {
+            activeIds.add(p.assetId);
+          }
+        }
       });
-      map[s.id] = new Set(
-        allLoggableMachines
-          .filter(a => (inventoryMap.get(a.id) ?? 0) > 0)
-          .map(a => a.id)
-      );
+
+      // Fallback/Safety: Also include any machines that have actual logs recorded for this site on this date
+      dailyMachineLogs
+        .filter(l => l.siteId === s.id && l.date === machineRegDate)
+        .forEach(l => {
+          if (allLoggableMachines.some(m => m.id === l.assetId)) {
+            activeIds.add(l.assetId);
+          }
+        });
+
+      map[s.id] = activeIds;
     });
     return map;
-  }, [activeSites, allLoggableMachines, waybills, consumableLogs]);
+  }, [activeSitesForMachineDate, allLoggableMachines, sitePumpDates, machineRegDate, dailyMachineLogs]);
 
 
 
   // Only active sites with at least one on-site loggable machine, excluding Site Office DCEL
   const sitesWithMachines = useMemo(() =>
-    activeSites.filter(s => {
+    activeSitesForMachineDate.filter(s => {
       if (s.name.toLowerCase().includes('site office dcel')) return false;
       if (s.endDate && machineRegDate > s.endDate) return false;
       return (onSiteMachineIds[s.id]?.size ?? 0) > 0;
     }),
-  [activeSites, onSiteMachineIds, machineRegDate]);
+  [activeSitesForMachineDate, onSiteMachineIds, machineRegDate]);
 
   const [activeMachineBySite, setActiveMachineBySite] = useState<Record<string, { activeMachineIds: string[]; machineTypes: Record<string, 'full' | 'half' | 'off'>; dieselUsage: Record<string, number>; notes: string; progressPercentage?: number }>>({}); 
 
@@ -571,7 +588,7 @@ export function Attendance() {
     if (!machineRegDate) return;
     const initial: Record<string, { activeMachineIds: string[]; machineTypes: Record<string, 'full' | 'half' | 'off'>; dieselUsage: Record<string, number>; notes: string; progressPercentage?: number }> = {};
 
-    activeSites.forEach(s => {
+    activeSitesForMachineDate.forEach(s => {
       // Logs for this site on this date (all — active AND off)
       const siteLogs = dailyMachineLogs.filter(
         l => l.siteId === s.id && l.date === machineRegDate
@@ -602,7 +619,7 @@ export function Attendance() {
     });
 
     setActiveMachineBySite(initial);
-  }, [machineRegDate, activeSites, allLoggableMachines, dailyMachineLogs]);
+  }, [machineRegDate, activeSitesForMachineDate, allLoggableMachines, dailyMachineLogs]);
 
   const handleToggleMachineSelection = useCallback((siteId: string, machineId: string) => {
     setActiveMachineBySite(prev => {
@@ -3341,11 +3358,14 @@ export function Attendance() {
                   machineStats[log.assetId] = { name: log.assetName, active: 0, off: 0, offDates: [] };
                 }
                 const isOff = !log.isActive || log.operationalDay === 'none';
+                const isHalf = log.isActive && log.operationalDay === 'half';
                 if (isOff) {
-                  machineStats[log.assetId].off++;
+                  machineStats[log.assetId].off += 1;
                   machineStats[log.assetId].offDates.push(log.date);
+                } else if (isHalf) {
+                  machineStats[log.assetId].active += 0.5;
                 } else {
-                  machineStats[log.assetId].active++;
+                  machineStats[log.assetId].active += 1;
                 }
               });
 

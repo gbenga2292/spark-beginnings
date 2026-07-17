@@ -43,4 +43,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Native notification via main process (shows correct app name & icon on Windows)
   notify: (title, body) => ipcRenderer.send('app:notify', { title, body }),
+
+  // Auto-updater new methods
+  checkNasStatus: (path) => ipcRenderer.invoke('updater:check-nas-status', path),
+  authenticateNas: (path, username, password) => ipcRenderer.invoke('updater:authenticate-nas', { path, username, password }),
+  startUpdateCheck: (source) => ipcRenderer.send('updater:start-check', source),
+  quitAndInstall: () => ipcRenderer.send('updater:quit-and-install'),
+  onUpdateStatus: (callback) => {
+    const subscription = (_event, status) => callback(status);
+    ipcRenderer.on('updater:status', subscription);
+    return () => ipcRenderer.removeListener('updater:status', subscription);
+  },
 });
+
+

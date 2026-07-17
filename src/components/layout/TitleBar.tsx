@@ -5,8 +5,10 @@ import { useUserStore } from '@/src/store/userStore';
 import { useAuth } from '@/src/hooks/useAuth';
 import { useNavigate as useRRNavigate } from 'react-router-dom';
 import { showConfirm } from '@/src/components/ui/toast';
+import { UpdateModal } from './UpdateModal';
 
 const getElectronAPI = () => (window as any).electronAPI;
+
 
 const MENU_ITEMS = [
   { id: 'file',     label: 'File' },
@@ -19,6 +21,7 @@ export function TitleBar() {
   const isMac = getElectronAPI()?.platform === 'darwin';
   const [version, setVersion] = useState('');
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
+  const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
   const { isDark, toggle } = useTheme();
   const currentUser = useUserStore((s) => s.getCurrentUser());
   const { user: authUser, signOut } = useAuth();
@@ -151,6 +154,36 @@ export function TitleBar() {
             {isDark ? 'Light' : 'Dark'}
           </span>
         </button>
+
+        {/* Check for Updates button */}
+        <button
+          onClick={() => setIsUpdateModalOpen(true)}
+          title="Check for Updates"
+          className={`
+            flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] font-medium
+            transition-all duration-150
+            ${isDark
+              ? 'text-indigo-400 hover:bg-slate-800 hover:text-indigo-300'
+              : 'text-slate-500 hover:bg-slate-100 hover:text-indigo-600'
+            }
+          `}
+        >
+          <svg 
+            className="h-3.5 w-3.5" 
+            viewBox="0 0 24 24" 
+            fill="none" 
+            stroke="currentColor" 
+            strokeWidth="2" 
+            strokeLinecap="round" 
+            strokeLinejoin="round"
+          >
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
+          </svg>
+          <span className="hidden sm:inline">Updates</span>
+        </button>
+
       </div>
 
       {/* Spacer — draggable */}
@@ -220,6 +253,7 @@ export function TitleBar() {
           )}
         </div>
       </div>
+      <UpdateModal isOpen={isUpdateModalOpen} onClose={() => setIsUpdateModalOpen(false)} />
     </div>
   );
 }

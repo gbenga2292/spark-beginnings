@@ -57,58 +57,91 @@ function initAutoUpdater() {
   autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = true;
 
+  autoUpdater.on('checking-for-update', () => {
+    if (manualCheck) {
+      mainWindow?.webContents.send('updater:status', { type: 'checking' });
+    }
+  });
+
   autoUpdater.on('update-available', (info) => {
-    dialog
-      .showMessageBox(mainWindow, {
-        type: 'info',
-        title: 'Update Available',
-        message: `A new version (${info.version}) is available. Download now?`,
-        buttons: ['Download', 'Later'],
-        defaultId: 0,
-      })
-      .then(({ response }) => {
-        if (response === 0) autoUpdater.downloadUpdate();
-      });
+    if (manualCheck) {
+      mainWindow?.webContents.send('updater:status', { type: 'available', version: info.version });
+      autoUpdater.downloadUpdate();
+    } else {
+      dialog
+        .showMessageBox(mainWindow, {
+          type: 'info',
+          title: 'Update Available',
+          message: `A new version (${info.version}) is available. Download now?`,
+          buttons: ['Download', 'Later'],
+          defaultId: 0,
+        })
+        .then(({ response }) => {
+          if (response === 0) autoUpdater.downloadUpdate();
+        });
+    }
   });
 
   autoUpdater.on('update-not-available', () => {
     if (manualCheck) {
-      dialog.showMessageBox(mainWindow, {
-        type: 'info',
-        title: 'No Updates',
-        message: 'You are already on the latest version.',
-        buttons: ['OK']
-      });
+      mainWindow?.webContents.send('updater:status', { type: 'not-available' });
       manualCheck = false;
     }
   });
 
-  autoUpdater.on('download-progress', (progress) => {
-    mainWindow?.setProgressBar(progress.percent / 100);
+  autoUpdater.on('download-progress', (progressObj) => {
+    if (manualCheck) {
+      mainWindow?.webContents.send('updater:status', { type: 'downloading', percent: Math.round(progressObj.percent) });
+    }
+    mainWindow?.setProgressBar(progressObj.percent / 100);
   });
 
   autoUpdater.on('update-downloaded', () => {
     mainWindow?.setProgressBar(-1);
-    dialog
-      .showMessageBox(mainWindow, {
-        type: 'info',
-        title: 'Update Ready',
-        message: 'Update downloaded. The app will restart to install.',
-        buttons: ['Restart Now', 'Later'],
-        defaultId: 0,
-      })
-      .then(({ response }) => {
-        if (response === 0) autoUpdater.quitAndInstall();
-      });
+    if (manualCheck) {
+      mainWindow?.webContents.send('updater:status', { type: 'downloaded' });
+      try {
+        const noti = new Notification({
+          title: 'Update Ready to Install',
+          body: 'The update was downloaded in the background. Click to restart and install.',
+        });
+        noti.on('click', () => {
+          autoUpdater.quitAndInstall();
+        });
+        noti.show();
+      } catch (notiErr) {
+        console.error('Failed to show notification:', notiErr);
+      }
+    } else {
+      dialog
+        .showMessageBox(mainWindow, {
+          type: 'info',
+          title: 'Update Ready',
+          message: 'Update downloaded. The app will restart to install.',
+          buttons: ['Restart Now', 'Later'],
+          defaultId: 0,
+        })
+        .then(({ response }) => {
+          if (response === 0) autoUpdater.quitAndInstall();
+        });
+    }
   });
 
   autoUpdater.on('error', (err) => {
     console.error('Auto-updater error:', err);
+    if (manualCheck) {
+      mainWindow?.webContents.send('updater:status', { type: 'error', message: err.message || 'Unknown error' });
+      manualCheck = false;
+    }
   });
 
-  // Check for updates 3 seconds after launch
-  setTimeout(() => autoUpdater.checkForUpdates(), 3000);
+  // Check for updates 3 seconds after launch (runs in background mode)
+  setTimeout(() => {
+    manualCheck = false;
+    autoUpdater.checkForUpdates();
+  }, 3000);
 }
+
 
 // ── Customize the OS App Identity for Notifications
 // Must be set BEFORE app is ready so Windows uses it for notification grouping
@@ -307,7 +340,115 @@ function initIPC() {
 
   ipcMain.handle('get-version', () => app.getVersion());
 
+  // NAS connectivity check
+  ipcMain.handle('updater:check-nas-status', async (_event, nasPathToCheck) => {
+    try {
+      const fs = require('fs');
+      const cleanPath = nasPathToCheck.replace(/\\+$/, '');
+
+      // 1. If path exists natively (already authenticated & folder exists), return online
+      if (fs.existsSync(cleanPath)) {
+        return { status: 'online' };
+      }
+
+      // 2. If not found, use Windows 'net view' to check SMB server status
+      // This handles NetBIOS/LLMNR name resolution and parses native Windows error codes.
+      const parts = cleanPath.split('\\').filter(Boolean);
+      if (parts.length > 0) {
+        const host = parts[0];
+        
+        const result = await new Promise((resolve) => {
+          const { exec } = require('child_process');
+          exec(`net view \\\\${host}`, (error, stdout, stderr) => {
+            const output = (stdout + stderr).toLowerCase();
+            const rawError = (stdout + stderr).trim();
+            
+            if (!error) {
+              // Server is online and we are authenticated, but the specific folder may be missing
+              resolve({ status: 'online' });
+            } else if (
+              output.includes('access is denied') ||
+              output.includes('system error 5') ||
+              output.includes('system error 86') ||
+              output.includes('password') ||
+              output.includes('credentials') ||
+              output.includes('system error 1219')
+            ) {
+              // Server is online but we need credentials
+              resolve({ status: 'auth-required', error: rawError });
+            } else {
+              // Server is completely offline or unreachable (e.g. system error 53 / 1203)
+              resolve({ status: 'offline', error: rawError });
+            }
+          });
+        });
+
+        return result;
+      }
+      
+      return { status: 'offline', error: 'Invalid path format' };
+    } catch (err) {
+      console.error('check-nas-status error:', err);
+      return { status: 'offline', error: err.message };
+    }
+  });
+
+  // NAS programmatic authentication
+  ipcMain.handle('updater:authenticate-nas', async (_event, { path: nasPathToAuth, username, password }) => {
+    return new Promise((resolve) => {
+      const parts = nasPathToAuth.split('\\').filter(Boolean);
+      if (parts.length < 2) {
+        resolve({ success: false, error: 'Invalid network share path format' });
+        return;
+      }
+      const shareRoot = `\\\\${parts[0]}\\${parts[1]}`;
+
+      const { exec } = require('child_process');
+      const safePassword = password.replace(/"/g, '\\"');
+      const cmd = `net use "${shareRoot}" "${safePassword}" /user:"${username}" /persistent:no`;
+
+      exec(cmd, (error, stdout, stderr) => {
+        if (error) {
+          console.error('net use authentication failed:', stderr || error.message);
+          resolve({ success: false, error: stderr || error.message });
+        } else {
+          resolve({ success: true });
+        }
+      });
+    });
+  });
+
+  // Start the check-for-updates sequence targeting NAS or Web
+  ipcMain.on('updater:start-check', (event, source) => {
+    if (isDev) {
+      mainWindow?.webContents.send('updater:status', { type: 'error', message: 'Updates are disabled in development mode.' });
+      return;
+    }
+
+    manualCheck = true;
+
+    if (source === 'nas') {
+      const nasPath = '\\\\MYCLOUDEX2ULTRA\\DCEL_Share\\Updates\\';
+      autoUpdater.setFeedURL({
+        provider: 'generic',
+        url: `file:///${nasPath.replace(/\\/g, '/')}`
+      });
+    } else {
+      autoUpdater.setFeedURL({
+        provider: 'generic',
+        url: 'https://dewaterconstruct.com/app-updates/'
+      });
+    }
+
+    autoUpdater.checkForUpdates();
+  });
+
+  ipcMain.on('updater:quit-and-install', () => {
+    autoUpdater.quitAndInstall();
+  });
+
   ipcMain.on('check-for-updates', () => {
+
     if (isDev) {
       dialog.showMessageBox(mainWindow, { type: 'info', message: 'Updates are disabled in development mode.' });
     } else {
