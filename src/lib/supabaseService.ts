@@ -1442,6 +1442,7 @@ export const db = {
     if (s.mainContactPerson !== undefined) update.contact_person = s.mainContactPerson || null;
     if (s.contactPhone !== undefined) update.phone = s.contactPhone || null;
     if (s.position !== undefined) update.position = s.position || null;
+    if (s.currentProgressPercentage !== undefined) update.current_progress_percentage = s.currentProgressPercentage;
     const { error } = await supabase.from('sites').update(update).eq('id', id);
     if (error) { console.error('updateSite:', error); throw error; }
   },

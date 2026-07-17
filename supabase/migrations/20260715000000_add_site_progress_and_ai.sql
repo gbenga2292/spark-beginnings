@@ -49,9 +49,9 @@ begin
     from public.site_journal_entries
     where site_id = NEW.site_id;
     
-    -- Update the site's current progress
+    -- Update the site's current progress using the GREATEST of journal progress and direct/existing progress
     update public.sites
-    set current_progress_percentage = coalesce(v_latest_progress, 0)
+    set current_progress_percentage = greatest(coalesce(v_latest_progress, 0), coalesce(current_progress_percentage, 0))
     where id = NEW.site_id;
     
     return NEW;
