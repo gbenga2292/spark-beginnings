@@ -1327,7 +1327,7 @@ export function AccountsReportBuilder({
       doc.text('Generated:', rightX, 28);
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(255, 255, 255);
-      doc.text(period ?? selectedMonths.map(m => MONTHS.find(mo => mo.value === m)?.label ?? '').filter(Boolean).join(', '), rightX + 24, 20);
+      doc.text(period ?? selectedMonths.map(m => MONTHS.find(mo => mo.key === m)?.label ?? '').filter(Boolean).join(', '), rightX + 24, 20);
       doc.text(new Date().toLocaleDateString(), rightX + 30, 28);
     };
 

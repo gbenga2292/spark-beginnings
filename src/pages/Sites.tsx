@@ -1597,11 +1597,11 @@ export function Sites() {
                     >
                       <TableCell className="font-bold text-slate-900">{site.clientName}</TableCell>
                       <TableCell className="font-medium text-slate-600">{site.siteName}</TableCell>
-                      <TableCell className="text-center">{site.phase1.completed ? <CheckCircle2 className="mx-auto h-4 w-4 text-emerald-500" /> : <Circle className="mx-auto h-4 w-4 text-slate-200" />}</TableCell>
-                      <TableCell className="text-center">{site.phase2.completed ? <CheckCircle2 className="mx-auto h-4 w-4 text-emerald-500" /> : <Circle className="mx-auto h-4 w-4 text-slate-200" />}</TableCell>
-                      <TableCell className="text-center">{site.phase3.completed ? <CheckCircle2 className="mx-auto h-4 w-4 text-emerald-500" /> : <Circle className="mx-auto h-4 w-4 text-slate-200" />}</TableCell>
-                      <TableCell className="text-center">{site.phase4.completed ? <CheckCircle2 className="mx-auto h-4 w-4 text-emerald-500" /> : <Circle className="mx-auto h-4 w-4 text-slate-200" />}</TableCell>
-                      <TableCell className="text-center">{site.phase5.completed ? <CheckCircle2 className="mx-auto h-4 w-4 text-emerald-500" /> : <Circle className="mx-auto h-4 w-4 text-slate-200" />}</TableCell>
+                      <TableCell className="text-center">{site.phase1?.completed ? <CheckCircle2 className="mx-auto h-4 w-4 text-emerald-500" /> : <Circle className="mx-auto h-4 w-4 text-slate-200" />}</TableCell>
+                      <TableCell className="text-center">{site.phase2?.completed ? <CheckCircle2 className="mx-auto h-4 w-4 text-emerald-500" /> : <Circle className="mx-auto h-4 w-4 text-slate-200" />}</TableCell>
+                      <TableCell className="text-center">{site.phase3?.completed ? <CheckCircle2 className="mx-auto h-4 w-4 text-emerald-500" /> : <Circle className="mx-auto h-4 w-4 text-slate-200" />}</TableCell>
+                      <TableCell className="text-center">{site.phase4?.completed ? <CheckCircle2 className="mx-auto h-4 w-4 text-emerald-500" /> : <Circle className="mx-auto h-4 w-4 text-slate-200" />}</TableCell>
+                      <TableCell className="text-center">{site.phase5?.completed ? <CheckCircle2 className="mx-auto h-4 w-4 text-emerald-500" /> : <Circle className="mx-auto h-4 w-4 text-slate-200" />}</TableCell>
                       <TableCell>
                         <Badge 
                           variant={site.status === 'Pending' ? 'outline' : 'success'}
@@ -1670,7 +1670,7 @@ export function Sites() {
 
                       <div className="grid grid-cols-5 gap-1 mb-3 bg-slate-50 rounded-md p-2">
                         {[1, 2, 3, 4, 5].map(phase => {
-                          const isCompleted = (site as any)[`phase${phase}`].completed;
+                          const isCompleted = (site as any)[`phase${phase}`]?.completed;
                           return (
                             <div key={phase} className="flex flex-col items-center gap-1">
                               <span className="text-[9px] font-bold text-slate-400">P{phase}</span>
