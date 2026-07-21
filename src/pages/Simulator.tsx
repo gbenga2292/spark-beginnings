@@ -1,13 +1,13 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import logoSrc from '../../logo/logo-2.png';
-import { Upload, Save, FolderOpen, Loader2, X, Trash2, Clock, ChevronRight, ChevronLeft } from 'lucide-react';
+import { Upload, Save, FolderOpen, Loader2, X, Trash2, Clock, ChevronRight, ChevronLeft, Ruler } from 'lucide-react';
 import { DewateringCanvas } from '../components/canvas/DewateringCanvas';
 import { Dewatering3DView } from '../components/canvas/Dewatering3DView';
 import { ResultsPanel } from '../components/canvas/ResultsPanel';
 import { Toolbar, ActiveTool } from '../components/canvas/Toolbar';
 import { StatusBar } from '../components/canvas/StatusBar';
 import { DrawingSheetPreview, ExportOptions } from '../components/canvas/DrawingSheetPreview';
-import { calculateBOM, LineData, PlacedComponent, DimensionData, AreaData, HoseData, ElevationLevel } from '../utils/simulationLogic';
+import { calculateBOM, LineData, PlacedComponent, DimensionData, AreaData, HoseData, ElevationLevel, PIXELS_PER_METER } from '../utils/simulationLogic';
 import { captureKonvaStage, captureThreeCanvas } from '../utils/drawingExportUtils';
 import { useSetPageTitle } from '../contexts/PageContext';
 import { db } from '../lib/supabaseService';
@@ -196,6 +196,16 @@ export default function Simulator() {
   const [savedLayouts, setSavedLayouts] = useState<SavedLayout[]>([]);
   const [isLoadingLayouts, setIsLoadingLayouts] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // Selected Canvas Item State
+  const [selectedCanvasId, setSelectedCanvasId] = useState<string | null>(null);
+
+  // Reference Scale state
+  const [scaleRefMode, setScaleRefMode] = useState<'idle' | 'selecting-start' | 'selecting-end'>('idle');
+  const [scaleRefPt1, setScaleRefPt1] = useState<{ x: number; y: number } | null>(null);
+  const [scaleRefPt2, setScaleRefPt2] = useState<{ x: number; y: number } | null>(null);
+  const [showScaleModal, setShowScaleModal] = useState(false);
+  const [scaleInputStr, setScaleInputStr] = useState('');
 
   const results = useMemo(() => calculateBOM(lines, placedComponents), [lines, placedComponents]);
 
@@ -558,8 +568,21 @@ export default function Simulator() {
           onUndo={handleUndo} 
           showWellpoints={showWellpoints}
           onToggleWellpoints={() => setShowWellpoints(!showWellpoints)}
-          wellpointSide={wellpointSide}
-          onToggleWellpointSide={() => setWellpointSide(prev => prev === 'left' ? 'right' : prev === 'right' ? 'both' : 'left')}
+          wellpointSide={
+            (selectedCanvasId && lines.find(l => l.id === selectedCanvasId)?.wellpointSide) || wellpointSide
+          }
+          onToggleWellpointSide={() => {
+            if (selectedCanvasId) {
+              const line = lines.find(l => l.id === selectedCanvasId);
+              if (line) {
+                const currentSide = line.wellpointSide || wellpointSide;
+                const nextSide = currentSide === 'left' ? 'right' : currentSide === 'right' ? 'both' : 'left';
+                handleLinesChange(lines.map(l => l.id === selectedCanvasId ? { ...l, wellpointSide: nextSide } : l));
+                return;
+              }
+            }
+            setWellpointSide(prev => prev === 'left' ? 'right' : prev === 'right' ? 'both' : 'left');
+          }}
           orthoLocked={orthoLocked}
           onToggleOrtho={() => setOrthoLocked(!orthoLocked)}
           gridSnap={gridSnap}
@@ -582,6 +605,8 @@ export default function Simulator() {
           blueprintSettings={blueprintSettings}
           onUpdateBlueprintSettings={(updates) => setBlueprintSettings(prev => ({ ...prev, ...updates }))}
           hasBlueprint={!!backgroundImage}
+          isSettingScale={scaleRefMode !== 'idle'}
+          onStartReferenceScale={() => { setScaleRefMode('selecting-start'); setScaleRefPt1(null); setScaleRefPt2(null); setShowScaleModal(false); }}
         />
       </div>
 
@@ -610,6 +635,7 @@ export default function Simulator() {
             <>
               <DewateringCanvas
               stageRef={stageRef}
+              onSelectionChange={setSelectedCanvasId}
               lines={lines}
               onLinesChange={handleLinesChange}
               placedComponents={placedComponents}
@@ -648,6 +674,11 @@ export default function Simulator() {
               onAddLayer={(layer) => setLayers(prev => [...prev, layer])}
               onDeleteLayer={(id) => setLayers(prev => prev.filter(l => l.id !== id))}
               onCursorPosChange={setCursorPos}
+              scaleRefMode={scaleRefMode}
+              scaleRefPt1={scaleRefPt1}
+              scaleRefPt2={scaleRefPt2}
+              onSetScaleRefPt1={(pt) => { setScaleRefPt1(pt); setScaleRefMode('selecting-end'); }}
+              onSetScaleRefPt2={(pt) => { setScaleRefPt2(pt); setScaleRefMode('idle'); setShowScaleModal(true); setScaleInputStr(''); }}
             />
             </>
           )}
@@ -725,6 +756,102 @@ export default function Simulator() {
         </div>
       )}
 
+      {/* ── Reference Scale Modal ── */}
+      {showScaleModal && scaleRefPt1 && scaleRefPt2 && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-lg shadow-2xl w-full max-w-sm mx-4 overflow-hidden border border-gray-200" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-4 py-2 bg-gray-100 border-b border-gray-200">
+              <div className="flex items-center gap-2">
+                <div className="bg-blue-500 p-1 rounded">
+                  <Ruler className="w-4 h-4 text-white" />
+                </div>
+                <h2 className="text-sm font-semibold text-gray-800">Set scale</h2>
+              </div>
+              <button onClick={() => { setShowScaleModal(false); setScaleRefPt1(null); setScaleRefPt2(null); }} className="text-gray-500 hover:text-gray-700">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-4 text-sm">
+              <p className="text-gray-700 mb-4">Enter the actual length to calculate the scale.</p>
+              
+              <div className="flex items-center gap-2 mb-3">
+                <label className="text-gray-600 w-28">Measured length:</label>
+                <div className="px-2 py-1 bg-gray-50 border border-gray-200 text-gray-600 rounded">
+                  {(Math.sqrt(Math.pow(scaleRefPt2.x - scaleRefPt1.x, 2) + Math.pow(scaleRefPt2.y - scaleRefPt1.y, 2)) / PIXELS_PER_METER).toFixed(3)}
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-2 mb-6">
+                <label className="text-gray-600 w-28">Actual length:</label>
+                <input
+                  type="number"
+                  autoFocus
+                  className="flex-1 px-2 py-1 border border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-500 rounded"
+                  value={scaleInputStr}
+                  onChange={e => setScaleInputStr(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      const actualLengthMeters = parseFloat(scaleInputStr);
+                      if (isNaN(actualLengthMeters) || actualLengthMeters <= 0) return;
+                      const distPx = Math.sqrt(Math.pow(scaleRefPt2.x - scaleRefPt1.x, 2) + Math.pow(scaleRefPt2.y - scaleRefPt1.y, 2));
+                      if (distPx === 0) return;
+                      const factor = (actualLengthMeters * PIXELS_PER_METER) / distPx;
+                      const newX = scaleRefPt1.x - (scaleRefPt1.x - blueprintSettings.x) * factor;
+                      const newY = scaleRefPt1.y - (scaleRefPt1.y - blueprintSettings.y) * factor;
+                      setBlueprintSettings(prev => ({
+                        ...prev,
+                        scaleX: prev.scaleX * factor,
+                        scaleY: prev.scaleY * factor,
+                        x: newX,
+                        y: newY,
+                      }));
+                      setShowScaleModal(false);
+                      setScaleInputStr('');
+                      setScaleRefPt1(null);
+                      setScaleRefPt2(null);
+                    }
+                  }}
+                />
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <button
+                  onClick={() => {
+                    const actualLengthMeters = parseFloat(scaleInputStr);
+                    if (isNaN(actualLengthMeters) || actualLengthMeters <= 0) return;
+                    const distPx = Math.sqrt(Math.pow(scaleRefPt2.x - scaleRefPt1.x, 2) + Math.pow(scaleRefPt2.y - scaleRefPt1.y, 2));
+                    if (distPx === 0) return;
+                    const factor = (actualLengthMeters * PIXELS_PER_METER) / distPx;
+                    const newX = scaleRefPt1.x - (scaleRefPt1.x - blueprintSettings.x) * factor;
+                    const newY = scaleRefPt1.y - (scaleRefPt1.y - blueprintSettings.y) * factor;
+                    setBlueprintSettings(prev => ({
+                      ...prev,
+                      scaleX: prev.scaleX * factor,
+                      scaleY: prev.scaleY * factor,
+                      x: newX,
+                      y: newY,
+                    }));
+                    setShowScaleModal(false);
+                    setScaleInputStr('');
+                    setScaleRefPt1(null);
+                    setScaleRefPt2(null);
+                  }}
+                  disabled={!scaleInputStr || parseFloat(scaleInputStr) <= 0}
+                  className="px-4 py-1.5 border border-gray-300 rounded hover:bg-gray-50 text-gray-700 bg-white shadow-sm disabled:opacity-50"
+                >
+                  Ok
+                </button>
+                <button
+                  onClick={() => { setShowScaleModal(false); setScaleRefPt1(null); setScaleRefPt2(null); }}
+                  className="px-4 py-1.5 border border-gray-300 rounded hover:bg-gray-50 text-gray-700 bg-white shadow-sm"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       {/* ── Load Panel (Slide-over) ── */}
       {showLoadPanel && (
         <div className="fixed inset-0 z-[60] flex justify-end bg-black/40 backdrop-blur-sm" onClick={() => setShowLoadPanel(false)}>

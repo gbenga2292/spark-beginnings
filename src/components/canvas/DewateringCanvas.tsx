@@ -43,6 +43,7 @@ interface DewateringCanvasProps {
   onDeleteLayer?: (id: string) => void;
   stageRef?: React.RefObject<any>;
   onCursorPosChange?: (pos: Point | null) => void;
+  onSelectionChange?: (id: string | null) => void;
   
   // Options states
   blueprintSettings?: any;
@@ -52,6 +53,13 @@ interface DewateringCanvasProps {
   drawShapeMode?: 'rect' | 'poly';
   textColor?: string;
   textSize?: number;
+  
+  // Reference Scale mode
+  scaleRefMode?: 'idle' | 'selecting-start' | 'selecting-end';
+  scaleRefPt1?: Point | null;
+  scaleRefPt2?: Point | null;
+  onSetScaleRefPt1?: (pt: Point) => void;
+  onSetScaleRefPt2?: (pt: Point) => void;
 }
 
 function snapToAngle(prev: Point, raw: Point): Point {
@@ -304,7 +312,13 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
   mirrorCopy = true,
   drawShapeMode = 'rect',
   textColor = '#000000',
-  textSize = 14
+  textSize = 14,
+  scaleRefMode = 'idle',
+  scaleRefPt1,
+  scaleRefPt2,
+  onSetScaleRefPt1,
+  onSetScaleRefPt2,
+  onSelectionChange
 }) => {
   const [currentLine, setCurrentLine] = useState<Point[]>([]);
   const [currentDim, setCurrentDim] = useState<Point[]>([]);
@@ -413,14 +427,28 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
 
   // ---------- resize canvas ----------
   useEffect(() => {
-    const check = () => {
-      if (containerRef.current) {
-        setCanvasSize({ width: containerRef.current.offsetWidth, height: containerRef.current.offsetHeight });
+    if (!containerRef.current) return;
+    
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setCanvasSize({
+          width: entry.contentRect.width,
+          height: entry.contentRect.height
+        });
       }
+    });
+    
+    observer.observe(containerRef.current);
+    
+    // Initial size
+    setCanvasSize({ 
+      width: containerRef.current.offsetWidth, 
+      height: containerRef.current.offsetHeight 
+    });
+
+    return () => {
+      observer.disconnect();
     };
-    check();
-    window.addEventListener('resize', check);
-    return () => window.removeEventListener('resize', check);
   }, []);
 
   // ---------- shift tracking ----------
@@ -467,6 +495,12 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
       trRef.current.nodes([]);
     }
   }, [selectedId, activeTool, areas, blueprintSettings.locked, bgImage]);
+
+  useEffect(() => {
+    if (onSelectionChange) {
+      onSelectionChange(selectedId);
+    }
+  }, [selectedId, onSelectionChange]);
 
   // ---------- geometry helpers ----------
   const getSnappedPoint = useCallback((raw: Point): Point => {
@@ -1223,6 +1257,18 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
     }
 
     if (e.evt && e.evt.button !== undefined && e.evt.button !== 0) return;
+
+    if (scaleRefMode && scaleRefMode !== 'idle') {
+      const stage = e.target.getStage();
+      const raw = getWorldPointerPos(stage);
+      if (!raw) return;
+      if (scaleRefMode === 'selecting-start' && onSetScaleRefPt1) {
+        onSetScaleRefPt1(raw);
+      } else if (scaleRefMode === 'selecting-end' && onSetScaleRefPt2) {
+        onSetScaleRefPt2(raw);
+      }
+      return;
+    }
 
     if (activeTool === 'select') {
       // Click on empty stage → deselect
@@ -2185,11 +2231,22 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
           {gridSnap && (() => {
             const gridLines = [];
             const step = PIXELS_PER_METER;
-            for (let i = 0; i < canvasSize.width / step; i++) {
-              gridLines.push(<Line key={`gv-${i}`} points={[Math.round(i * step), 0, Math.round(i * step), canvasSize.height]} stroke="#cbd5e1" strokeWidth={0.5} opacity={0.5} listening={false} />);
+            
+            // Calculate visible bounds in local coordinates
+            const startX = -position.x / scale;
+            const startY = -position.y / scale;
+            const endX = (canvasSize.width - position.x) / scale;
+            const endY = (canvasSize.height - position.y) / scale;
+
+            // Snap start coordinates to the nearest grid step
+            const firstGridX = Math.floor(startX / step) * step;
+            const firstGridY = Math.floor(startY / step) * step;
+
+            for (let x = firstGridX; x <= endX; x += step) {
+              gridLines.push(<Line key={`gv-${Math.round(x)}`} points={[Math.round(x), startY, Math.round(x), endY]} stroke="#cbd5e1" strokeWidth={0.5} opacity={0.5} listening={false} />);
             }
-            for (let j = 0; j < canvasSize.height / step; j++) {
-              gridLines.push(<Line key={`gh-${j}`} points={[0, Math.round(j * step), canvasSize.width, Math.round(j * step)]} stroke="#cbd5e1" strokeWidth={0.5} opacity={0.5} listening={false} />);
+            for (let y = firstGridY; y <= endY; y += step) {
+              gridLines.push(<Line key={`gh-${Math.round(y)}`} points={[startX, Math.round(y), endX, Math.round(y)]} stroke="#cbd5e1" strokeWidth={0.5} opacity={0.5} listening={false} />);
             }
             return gridLines;
           })()}
@@ -2558,8 +2615,9 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
                         const wpY = p1.y + dirY * wpOffsetPx;
                         // Physical offset: 1m from header centreline
                         const offsetLength = PIXELS_PER_METER; // = 10px = 1m
+                        const effectiveWellpointSide = line.wellpointSide || wellpointSide;
 
-                        for (const side of (wellpointSide === 'left' ? [1] : wellpointSide === 'right' ? [-1] : [1, -1])) {
+                        for (const side of (effectiveWellpointSide === 'left' ? [1] : effectiveWellpointSide === 'right' ? [-1] : [1, -1])) {
                           const perpX = -dirY * side;
                           const perpY = dirX * side;
                           // Connector starts at pipe edge (half of visual stroke = 4px)
@@ -2628,8 +2686,9 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
                         const wpX = p1.x + dirX * wpOffsetPx;
                         const wpY = p1.y + dirY * wpOffsetPx;
                         const offsetLength = PIXELS_PER_METER;
+                        const effectiveWellpointSide = line.wellpointSide || wellpointSide;
 
-                        for (const side of (wellpointSide === 'left' ? [1] : wellpointSide === 'right' ? [-1] : [1, -1])) {
+                        for (const side of (effectiveWellpointSide === 'left' ? [1] : effectiveWellpointSide === 'right' ? [-1] : [1, -1])) {
                           const perpX = -dirY * side;
                           const perpY = dirX * side;
                           const edgePx = 4 * invScale;
@@ -3068,6 +3127,13 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
             </Group>
           )}
 
+          {/* Reference Scale Preview Line */}
+          {scaleRefMode === 'selecting-end' && scaleRefPt1 && cursorPos && (
+            <Group listening={false}>
+              <Line points={[scaleRefPt1.x, scaleRefPt1.y, cursorPos.x, cursorPos.y]} stroke="#1e3a8a" strokeWidth={2} dash={[5, 5]} />
+            </Group>
+          )}
+
           {/* Current in-progress line */}
           {currentLine.length > 0 && (
             <>
@@ -3369,6 +3435,19 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
         >
           <span className="text-yellow-400">💡</span>
           {getModifyGuidance()}
+        </div>
+      )}
+
+      {/* Reference Scale Tooltips */}
+      {scaleRefMode !== 'idle' && cursorPos && (
+        <div
+          className="absolute z-50 pointer-events-none select-none bg-blue-900 border border-blue-500 text-white text-xs rounded shadow-2xl px-3 py-2 font-medium flex items-center gap-1.5 whitespace-nowrap"
+          style={{
+            left: Math.min((cursorPos.x * scale + position.x) + 20, canvasSize.width - 320),
+            top: Math.min((cursorPos.y * scale + position.y) + 20, canvasSize.height - 40),
+          }}
+        >
+          {scaleRefMode === 'selecting-start' ? 'Select the start point of a line which has a known length' : 'Select the end point of this line'}
         </div>
       )}
 

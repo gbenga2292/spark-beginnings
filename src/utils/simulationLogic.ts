@@ -18,6 +18,7 @@ export interface LineData {
   layerId?: string;
   locked?: boolean;
   zIndex?: number;
+  wellpointSide?: 'left' | 'right' | 'both';
 }
 
 export interface DimensionData {

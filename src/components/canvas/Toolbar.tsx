@@ -39,6 +39,8 @@ interface ToolbarProps {
   onUpdateBlueprintSettings: (updates: any) => void;
   hasBlueprint: boolean;
   onUploadBlueprintClick?: () => void;
+  isSettingScale?: boolean;
+  onStartReferenceScale?: () => void;
 }
 
 export const Toolbar: React.FC<ToolbarProps> = ({ 
@@ -56,7 +58,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   textColor, onTextColorChange,
   textSize, onTextSizeChange,
   blueprintSettings, onUpdateBlueprintSettings,
-  hasBlueprint, onUploadBlueprintClick
+  hasBlueprint, onUploadBlueprintClick,
+  isSettingScale, onStartReferenceScale
 }) => {
   const [isMobileCollapsed, setIsMobileCollapsed] = useState(window.innerWidth < 640);
 
@@ -464,12 +467,29 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                 </button>
               </div>
 
-              <button
-                onClick={() => onUpdateBlueprintSettings({ x: 0, y: 0, scaleX: 1, scaleY: 1, rotation: 0 })}
-                className="sm:ml-auto text-gray-500 hover:text-gray-800 border border-gray-300 rounded px-2 py-0.5 hover:bg-gray-100 transition-colors text-[10px] font-bold"
-              >
-                Reset Position & Scale
-              </button>
+              <div className="sm:ml-auto flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    if (onStartReferenceScale) onStartReferenceScale();
+                  }}
+                  disabled={isSettingScale}
+                  className={`border rounded px-2 py-0.5 transition-colors text-[10px] font-bold flex items-center gap-1 ${
+                    isSettingScale
+                      ? 'bg-indigo-50 border-indigo-200 text-indigo-600'
+                      : 'text-gray-500 hover:text-gray-800 border-gray-300 hover:bg-gray-100'
+                  }`}
+                  title="Scale by selecting two points of known length"
+                >
+                  <Ruler size={10} />
+                  Set Reference Scale
+                </button>
+                <button
+                  onClick={() => onUpdateBlueprintSettings({ x: 0, y: 0, scaleX: 1, scaleY: 1, rotation: 0 })}
+                  className="text-gray-500 hover:text-gray-800 border border-gray-300 rounded px-2 py-0.5 hover:bg-gray-100 transition-colors text-[10px] font-bold"
+                >
+                  Reset Position & Scale
+                </button>
+              </div>
             </div>
           )}
         </div>

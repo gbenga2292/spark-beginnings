@@ -740,7 +740,8 @@ export const Dewatering3DView: React.FC<Dewatering3DViewProps> = ({
             const headerAttach = to3D({ x: wpX, y: wpY }, headerY);
 
             // Filter side selection based on wellpointSide prop
-            for (const side of (wellpointSide === 'left' ? [1] : wellpointSide === 'right' ? [-1] : [1, -1])) {
+            const effectiveWellpointSide = line.wellpointSide || wellpointSide;
+            for (const side of (effectiveWellpointSide === 'left' ? [1] : effectiveWellpointSide === 'right' ? [-1] : [1, -1])) {
               const perpX = -dirY * side;
               const perpY = dirX * side;
               const outerX = wpX + perpX * offsetPx;
@@ -764,7 +765,8 @@ export const Dewatering3DView: React.FC<Dewatering3DViewProps> = ({
             const wpY = p1.y + dirY * wpOffsetPx;
             const headerAttach = to3D({ x: wpX, y: wpY }, headerY);
 
-            for (const side of (wellpointSide === 'left' ? [1] : wellpointSide === 'right' ? [-1] : [1, -1])) {
+            const effectiveWellpointSide = line.wellpointSide || wellpointSide;
+            for (const side of (effectiveWellpointSide === 'left' ? [1] : effectiveWellpointSide === 'right' ? [-1] : [1, -1])) {
               const perpX = -dirY * side;
               const perpY = dirX * side;
               const outerX = wpX + perpX * offsetPx;
