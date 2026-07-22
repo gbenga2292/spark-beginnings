@@ -58,6 +58,7 @@ interface AppDataContextType {
     markMessageAsRead: (updateId: string, userId: string) => Promise<void>;
     /** Get unread count for a task thread for a specific user */
     getUnreadCount: (taskId: string, userId: string) => number;
+    importTaskBackupData: (data: any) => void;
 }
 
 export const TaskContext = createContext<AppDataContextType | null>(null);
@@ -1751,22 +1752,8 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         ).length;
     }, [comments, participantStatuses]);
 
-    // ── Memoize context value to prevent unnecessary re-renders ───────────────
-
-    const value = useMemo<AppDataContextType>(() => ({
-        mainTasks,
-        subtasks,
-        users,
-        comments,
-        projects,
-        reminders,
-        workspaces: [{ id: 'dcel-team', name: 'DCEL Team Workspace' }],
-        addReminder,
-        updateReminder,
-        deleteReminder,
-        toggleReminderActive,
-        snoozeReminder,
-        createProject: async (projectData: any) => {
+    const createProject = useCallback(async (projectData: any) => {
+        try {
             const taskPayload = {
                 title: projectData.name,
                 description: projectData.description || `Project for ${projectData.serviceType || 'Internal Project'}`,
@@ -1817,7 +1804,37 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
             
             setMainTasks(prev => [...prev, mainTask]);
             toast.success('Project created successfully');
-        },
+        } catch (err: any) {
+            console.error('Failed to create project:', err);
+            toast.error('Failed to create project');
+        }
+    }, []);
+
+    const importTaskBackupData = useCallback((d: any) => {
+        if (d.mainTasks && Array.isArray(d.mainTasks)) setMainTasks(d.mainTasks.map(mapMainTaskToCamel));
+        if (d.subtasks && Array.isArray(d.subtasks)) setSubtasks(d.subtasks.map(mapSubtaskToCamel));
+        if (d.comments && Array.isArray(d.comments)) setComments(d.comments.map(mapTaskUpdateToCamel));
+        if (d.projects && Array.isArray(d.projects)) setProjects(d.projects);
+        if (d.reminders && Array.isArray(d.reminders)) setReminders(d.reminders);
+        if (d.budgetItems && Array.isArray(d.budgetItems)) useAppStore.setState({ budgetItems: d.budgetItems });
+    }, []);
+
+    // ── Memoize context value to prevent unnecessary re-renders ───────────────
+
+    const value = useMemo<AppDataContextType>(() => ({
+        mainTasks,
+        subtasks,
+        users,
+        comments,
+        projects,
+        reminders,
+        workspaces: [{ id: 'dcel-team', name: 'DCEL Team Workspace' }],
+        addReminder,
+        updateReminder,
+        deleteReminder,
+        toggleReminderActive,
+        snoozeReminder,
+        createProject,
         createMainTask,
         updateMainTask,
         deleteMainTask,
@@ -1845,13 +1862,14 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         markTaskAsRead,
         markMessageAsRead,
         getUnreadCount,
+        importTaskBackupData,
     }), [mainTasks, subtasks, users, comments, projects, reminders, participantStatuses, updateReceipts,
-        createMainTask, updateMainTask, deleteMainTask,
+        createProject, createMainTask, updateMainTask, deleteMainTask,
         addSubtask, updateSubtask, deleteSubtask, assignSubtask,
         updateSubtaskStatus, approveSubtask, rejectSubtask,
         postComment, updateComment, deleteComment, getMainTaskComments, getSubtaskComments, getMainTaskWorkflow,
         addReminder, updateReminder, deleteReminder, toggleReminderActive, snoozeReminder,
-        markTaskAsRead, markMessageAsRead, getUnreadCount,
+        markTaskAsRead, markMessageAsRead, getUnreadCount, importTaskBackupData,
         restoreMainTask, restoreSubtask, deleteMainTaskPermanently, deleteSubtaskPermanently, fetchArchivedSubtasks, fetchArchivedMainTasks]);
 
     return <TaskContext.Provider value={value}>{children}</TaskContext.Provider>;
@@ -1904,6 +1922,7 @@ export function useAppData(): AppDataContextType {
             markTaskAsRead: async () => {},
             markMessageAsRead: async () => {},
             getUnreadCount: () => 0,
+            importTaskBackupData: () => {},
         };
     }
     return ctx;

@@ -13,6 +13,46 @@ import { toast } from 'sonner';
 import { useAuth } from '../hooks/useAuth';
 import { isInternalSite } from '@/src/lib/siteUtils';
 
+export function parseLedgerLinks(rawIds?: string[] | null): { ids: string[]; amounts?: Record<string, number> } {
+  if (!rawIds || rawIds.length === 0) return { ids: [] };
+  const ids: string[] = [];
+  const amounts: Record<string, number> = {};
+  let hasCustomAmounts = false;
+
+  for (const raw of rawIds) {
+    if (!raw) continue;
+    if (raw.includes(':')) {
+      const idx = raw.indexOf(':');
+      const id = raw.substring(0, idx);
+      const amt = parseFloat(raw.substring(idx + 1));
+      if (id) {
+        ids.push(id);
+        if (!isNaN(amt)) {
+          amounts[id] = amt;
+          hasCustomAmounts = true;
+        }
+      }
+    } else {
+      ids.push(raw);
+    }
+  }
+
+  return {
+    ids,
+    amounts: hasCustomAmounts ? amounts : undefined
+  };
+}
+
+export function serializeLedgerLinks(ids?: string[] | null, amounts?: Record<string, number> | null): string[] {
+  if (!ids || ids.length === 0) return [];
+  return ids.map(id => {
+    if (amounts && amounts[id] !== undefined && amounts[id] > 0) {
+      return `${id}:${amounts[id]}`;
+    }
+    return id;
+  });
+}
+
 interface OperationsContextType {
   assets: Asset[];
   waybills: Waybill[];
@@ -88,6 +128,9 @@ interface OperationsContextType {
   updateDieselRefill: (id: string, updates: Partial<Omit<DieselRefill, 'id' | 'created_at'>>) => Promise<void>;
   deleteDieselRefill: (id: string) => Promise<void>;
   
+  // Backup Import
+  importOperationsBackupData: (data: any) => void;
+
   isLoaded: boolean;
 }
 
@@ -439,20 +482,24 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
         }
 
         if (dbFuelLogs) {
-          setVehicleFuelLogs(dbFuelLogs.map((f: any) => ({
-            id: f.id,
-            vehicle_id: f.vehicle_id,
-            vehicle_reg: f.vehicle_reg,
-            date: f.date,
-            rate_per_litre: Number(f.rate_per_litre || 0),
-            litres: Number(f.litres || 0),
-            total_cost: Number(f.total_cost || 0),
-            odometer: f.odometer ? Number(f.odometer) : undefined,
-            filled_by: f.filled_by,
-            notes: f.notes,
-            linkedLedgerIds: f.linked_ledger_ids || [],
-            created_at: f.created_at
-          })));
+          setVehicleFuelLogs(dbFuelLogs.map((f: any) => {
+            const { ids: parsedIds, amounts: parsedAmounts } = parseLedgerLinks(f.linked_ledger_ids);
+            return {
+              id: f.id,
+              vehicle_id: f.vehicle_id,
+              vehicle_reg: f.vehicle_reg,
+              date: f.date,
+              rate_per_litre: Number(f.rate_per_litre || 0),
+              litres: Number(f.litres || 0),
+              total_cost: Number(f.total_cost || 0),
+              odometer: f.odometer ? Number(f.odometer) : undefined,
+              filled_by: f.filled_by,
+              notes: f.notes,
+              linkedLedgerIds: parsedIds,
+              linkedLedgerAmounts: f.linked_ledger_amounts || parsedAmounts,
+              created_at: f.created_at
+            };
+          }));
         }
 
         if (dbDieselRefills) {
@@ -785,20 +832,24 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
               break;
             }
             case 'vehicle_fuel_logs': {
-              const mapFuel = (f: any): VehicleFuelLog => ({
-                id: f.id,
-                vehicle_id: f.vehicle_id,
-                vehicle_reg: f.vehicle_reg,
-                date: f.date,
-                rate_per_litre: Number(f.rate_per_litre || 0),
-                litres: Number(f.litres || 0),
-                total_cost: Number(f.total_cost || 0),
-                odometer: f.odometer ? Number(f.odometer) : undefined,
-                filled_by: f.filled_by,
-                notes: f.notes,
-                linkedLedgerIds: f.linked_ledger_ids || [],
-                created_at: f.created_at
-              });
+              const mapFuel = (f: any): VehicleFuelLog => {
+                const { ids: parsedIds, amounts: parsedAmounts } = parseLedgerLinks(f.linked_ledger_ids);
+                return {
+                  id: f.id,
+                  vehicle_id: f.vehicle_id,
+                  vehicle_reg: f.vehicle_reg,
+                  date: f.date,
+                  rate_per_litre: Number(f.rate_per_litre || 0),
+                  litres: Number(f.litres || 0),
+                  total_cost: Number(f.total_cost || 0),
+                  odometer: f.odometer ? Number(f.odometer) : undefined,
+                  filled_by: f.filled_by,
+                  notes: f.notes,
+                  linkedLedgerIds: parsedIds,
+                  linkedLedgerAmounts: f.linked_ledger_amounts || parsedAmounts,
+                  created_at: f.created_at
+                };
+              };
               if (eventType === 'INSERT') {
                 setVehicleFuelLogs(prev => {
                   if (prev.some(f => f.id === newRow.id)) return prev;
@@ -1840,6 +1891,7 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
         const newLog: VehicleFuelLog = { ...log, id: crypto.randomUUID(), created_at: new Date().toISOString() };
         setVehicleFuelLogs(prev => [newLog, ...prev]);
         try {
+          const serializedLinks = serializeLedgerLinks(newLog.linkedLedgerIds, newLog.linkedLedgerAmounts);
           const { error } = await supabase.from('vehicle_fuel_logs').insert({
             id: newLog.id,
             vehicle_id: newLog.vehicle_id,
@@ -1851,7 +1903,7 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
             odometer: newLog.odometer ?? null,
             filled_by: newLog.filled_by ?? null,
             notes: newLog.notes ?? null,
-            linked_ledger_ids: newLog.linkedLedgerIds ?? null,
+            linked_ledger_ids: serializedLinks.length > 0 ? serializedLinks : null,
             created_at: newLog.created_at
           });
           if (error) throw error;
@@ -1862,9 +1914,16 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
         }
       },
       updateVehicleFuelLog: async (id: string, updates: Partial<VehicleFuelLog>) => {
-        setVehicleFuelLogs(prev => prev.map(f => f.id === id ? { ...f, ...updates } : f));
+        let updatedLogItem: VehicleFuelLog | undefined;
+        setVehicleFuelLogs(prev => prev.map(f => {
+          if (f.id === id) {
+            updatedLogItem = { ...f, ...updates };
+            return updatedLogItem;
+          }
+          return f;
+        }));
         try {
-          const { error } = await supabase.from('vehicle_fuel_logs').update({
+          const dbUpdates: any = {
             vehicle_id: updates.vehicle_id,
             vehicle_reg: updates.vehicle_reg,
             date: updates.date,
@@ -1874,8 +1933,14 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
             odometer: updates.odometer ?? null,
             filled_by: updates.filled_by ?? null,
             notes: updates.notes ?? null,
-            linked_ledger_ids: updates.linkedLedgerIds ?? null
-          }).eq('id', id);
+          };
+          if (updates.linkedLedgerIds !== undefined || updates.linkedLedgerAmounts !== undefined) {
+            const currentItem = updatedLogItem || vehicleFuelLogs.find(f => f.id === id);
+            const targetIds = updates.linkedLedgerIds ?? currentItem?.linkedLedgerIds ?? [];
+            const targetAmounts = updates.linkedLedgerAmounts ?? currentItem?.linkedLedgerAmounts ?? {};
+            dbUpdates.linked_ledger_ids = serializeLedgerLinks(targetIds, targetAmounts);
+          }
+          const { error } = await supabase.from('vehicle_fuel_logs').update(dbUpdates).eq('id', id);
           if (error) throw error;
           toast.success('Fuel log updated');
         } catch (err: any) {
@@ -1960,6 +2025,16 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
           console.error('Failed to delete diesel refill:', err);
           toast.warning('Refill deleted locally — sync failed');
         }
+      },
+      importOperationsBackupData: (data: any) => {
+        if (data.assets && Array.isArray(data.assets)) setAssets(data.assets);
+        if (data.waybills && Array.isArray(data.waybills)) setWaybills(data.waybills);
+        if (data.checkouts && Array.isArray(data.checkouts)) setCheckouts(data.checkouts);
+        if (data.maintenanceSessions && Array.isArray(data.maintenanceSessions)) setMaintenanceSessions(data.maintenanceSessions);
+        if (data.dailyMachineLogs && Array.isArray(data.dailyMachineLogs)) setDailyMachineLogs(data.dailyMachineLogs);
+        if (data.vehicleFuelLogs && Array.isArray(data.vehicleFuelLogs)) setVehicleFuelLogs(data.vehicleFuelLogs);
+        if (data.dieselRefills && Array.isArray(data.dieselRefills)) setDieselRefills(data.dieselRefills);
+        if (data.maintenanceCertificates && Array.isArray(data.maintenanceCertificates)) setMaintenanceCertificates(data.maintenanceCertificates);
       },
       isLoaded
     }}>

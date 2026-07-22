@@ -19,16 +19,28 @@ export interface LineData {
   locked?: boolean;
   zIndex?: number;
   wellpointSide?: 'left' | 'right' | 'both';
+  hideLength?: boolean; // Whether to hide the L: ...m label
 }
 
 export interface DimensionData {
   id: string;
   start: Point;
   end: Point;
+  measuredStart?: Point;
+  measuredEnd?: Point;
   text: string;
   layerId?: string;
   x?: number;
   y?: number;
+  locked?: boolean;
+}
+
+export interface ArrowData {
+  id: string;
+  start: Point;
+  end: Point;
+  text?: string;
+  layerId?: string;
   locked?: boolean;
 }
 
@@ -77,6 +89,7 @@ export interface HoseData {
   layerId?: string;
   locked?: boolean;
   zIndex?: number;
+  hideLength?: boolean;
 }
 
 export type ComponentType = 'pump' | 'tee' | 'elbow';

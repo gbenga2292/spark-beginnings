@@ -1,51 +1,113 @@
-export const captureKonvaStage = (stageRef: React.RefObject<any>): string | null => {
+export const captureKonvaStage = (
+  stageRef: React.RefObject<any>,
+  exportArea?: { x: number; y: number; width: number; height: number },
+  options?: { includeBlueprint?: boolean }
+): string | null => {
   if (!stageRef.current) return null;
   try {
     const stage = stageRef.current;
-    const padding = 40; // px padding around content
+    
+    // Hide UI elements (Lock and Pin)
+    const hiddenNodes: any[] = [];
+    const changedTexts: any[] = [];
+    
+    stage.find((node: any) => {
+      // Hide blueprint if requested
+      if (options?.includeBlueprint === false && node.id() === 'blueprint-underlay') {
+        hiddenNodes.push(node);
+        node.hide();
+      }
+      
+      // Hide nodes with name hide-on-export
+      if (node.name && typeof node.name === 'function') {
+        const n = node.name();
+        if (typeof n === 'string' && n.includes('hide-on-export')) {
+          hiddenNodes.push(node);
+          node.hide();
+        }
+      }
 
-    // Find bounding box of all visible content across all layers
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    let hasContent = false;
-
-    stage.getLayers().forEach((layer: any) => {
-      layer.getChildren().forEach((node: any) => {
-        // Skip guides, selection handles, grid
-        const name = node.name?.() || '';
-        if (name.includes('guide') || name.includes('selection') || name.includes('grid')) return;
-        try {
-          const rect = node.getClientRect({ relativeTo: stage, skipTransform: false });
-          if (rect.width > 0 && rect.height > 0) {
-            hasContent = true;
-            minX = Math.min(minX, rect.x);
-            minY = Math.min(minY, rect.y);
-            maxX = Math.max(maxX, rect.x + rect.width);
-            maxY = Math.max(maxY, rect.y + rect.height);
+      // Check if it's a Text node
+      if (node.text && typeof node.text === 'function') {
+        const textVal = node.text();
+        if (typeof textVal === 'string') {
+          if (textVal.includes('🔒')) {
+            changedTexts.push({ node, oldText: textVal });
+            node.text(textVal.replace('🔒 ', '').replace('🔒', ''));
           }
-        } catch (_) {}
-      });
+          if (textVal === '📌') {
+            hiddenNodes.push(node);
+            node.hide();
+          }
+        }
+      }
     });
 
-    if (!hasContent) {
-      // Fall back to full stage capture
-      return stage.toDataURL({ pixelRatio: 2 });
+    let cropX, cropY, cropW, cropH;
+
+    if (exportArea) {
+      const scaleX = stage.scaleX();
+      const scaleY = stage.scaleY();
+      const stageX = stage.x();
+      const stageY = stage.y();
+      
+      cropX = exportArea.x * scaleX + stageX;
+      cropY = exportArea.y * scaleY + stageY;
+      cropW = exportArea.width * scaleX;
+      cropH = exportArea.height * scaleY;
+    } else {
+      const padding = 40; // px padding around content
+
+      // Find bounding box of all visible content across all layers
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      let hasContent = false;
+
+      stage.getLayers().forEach((layer: any) => {
+        layer.getChildren().forEach((node: any) => {
+          // Skip guides, selection handles, grid
+          const name = node.name?.() || '';
+          if (name.includes('guide') || name.includes('selection') || name.includes('grid')) return;
+          try {
+            const rect = node.getClientRect({ relativeTo: stage, skipTransform: false });
+            if (rect.width > 0 && rect.height > 0) {
+              hasContent = true;
+              minX = Math.min(minX, rect.x);
+              minY = Math.min(minY, rect.y);
+              maxX = Math.max(maxX, rect.x + rect.width);
+              maxY = Math.max(maxY, rect.y + rect.height);
+            }
+          } catch (_) {}
+        });
+      });
+
+      if (!hasContent) {
+        hiddenNodes.forEach(n => n.show());
+        changedTexts.forEach(({ node, oldText }) => node.text(oldText));
+        return stage.toDataURL({ pixelRatio: 2 });
+      }
+
+      // Apply padding, clamped to stage bounds
+      const stageWidth = stage.width();
+      const stageHeight = stage.height();
+      cropX = Math.max(0, minX - padding);
+      cropY = Math.max(0, minY - padding);
+      cropW = Math.min(stageWidth - cropX, (maxX - minX) + padding * 2);
+      cropH = Math.min(stageHeight - cropY, (maxY - minY) + padding * 2);
     }
 
-    // Apply padding, clamped to stage bounds
-    const stageWidth = stage.width();
-    const stageHeight = stage.height();
-    const cropX = Math.max(0, minX - padding);
-    const cropY = Math.max(0, minY - padding);
-    const cropW = Math.min(stageWidth - cropX, (maxX - minX) + padding * 2);
-    const cropH = Math.min(stageHeight - cropY, (maxY - minY) + padding * 2);
-
-    return stage.toDataURL({
+    const dataUrl = stage.toDataURL({
       pixelRatio: 2,
       x: cropX,
       y: cropY,
       width: cropW,
       height: cropH,
     });
+
+    // Restore UI elements
+    hiddenNodes.forEach(n => n.show());
+    changedTexts.forEach(({ node, oldText }) => node.text(oldText));
+
+    return dataUrl;
   } catch (e) {
     console.error('Failed to capture Konva stage', e);
     return null;

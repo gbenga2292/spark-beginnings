@@ -1,13 +1,16 @@
 import React, { useState } from 'react';
-import { MousePointer2, Pencil, Droplet, GitMerge, CornerDownRight, Square, Undo2, Eraser, Eye, EyeOff, Crosshair, Maximize, Minimize, Grid, Ruler, Spline, Frame, ChevronUp, ChevronDown, Printer, Move, Copy, RotateCw, Type, Pin, PinOff, Scissors, AlignLeft, SlidersHorizontal, FlipHorizontal, Image } from 'lucide-react';
+import { MousePointer2, Pencil, Droplet, GitMerge, CornerDownRight, Square, Undo2, Redo2, Eraser, Eye, EyeOff, Crosshair, Maximize, Minimize, Grid, Ruler, Spline, Frame, ChevronUp, ChevronDown, Printer, Move, Copy, RotateCw, Type, Pin, PinOff, Scissors, AlignLeft, SlidersHorizontal, FlipHorizontal, Image, ArrowRight } from 'lucide-react';
 import { ComponentType } from '../../utils/simulationLogic';
 
-export type ActiveTool = 'select' | 'line' | 'dimension' | 'delete' | 'area' | 'hose' | 'discharge' | 'discharge-area' | 'site-area' | 'move' | 'copy' | 'rotate' | 'align' | 'offset' | 'mirror-pick' | 'mirror-draw' | 'split' | 'trim' | 'pin' | 'unpin' | 'text' | 'modify-blueprint' | ComponentType;
+export type ActiveTool = 'select' | 'line' | 'dimension' | 'arrow' | 'delete' | 'area' | 'hose' | 'discharge' | 'discharge-area' | 'site-area' | 'move' | 'copy' | 'rotate' | 'align' | 'offset' | 'mirror-pick' | 'mirror-draw' | 'split' | 'trim' | 'pin' | 'unpin' | 'text' | 'modify-blueprint' | 'export-window' | ComponentType;
 
 interface ToolbarProps {
   activeTool: ActiveTool;
   onToolSelect: (tool: ActiveTool) => void;
   onUndo: () => void;
+  onRedo?: () => void;
+  canUndo?: boolean;
+  canRedo?: boolean;
   showWellpoints?: boolean;
   onToggleWellpoints?: () => void;
   wellpointSide?: 'left' | 'right' | 'both';
@@ -44,7 +47,7 @@ interface ToolbarProps {
 }
 
 export const Toolbar: React.FC<ToolbarProps> = ({ 
-  activeTool, onToolSelect, onUndo, 
+  activeTool, onToolSelect, onUndo, onRedo, canUndo = true, canRedo = true, 
   showWellpoints, onToggleWellpoints, 
   wellpointSide = 'left', onToggleWellpointSide,
   orthoLocked, onToggleOrtho, 
@@ -71,6 +74,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
     { id: 'hose', label: 'Suction Pipe', icon: Spline },
     { id: 'discharge', label: 'Discharge Pipe', icon: GitMerge },
     { id: 'dimension', label: 'Dimension', icon: Ruler },
+    { id: 'arrow', label: 'Arrow', icon: ArrowRight },
   ];
   
   const compTools = [
@@ -119,6 +123,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
     { id: 'discharge', label: 'Discharge', icon: GitMerge, desc: 'Discharge pipeline' },
     { id: 'dimension', label: 'Dimension', icon: Ruler, desc: 'Measure distance between points' },
     { id: 'text', label: 'Text', icon: Type, desc: 'Add text annotation' },
+    { id: 'arrow', label: 'Arrow', icon: ArrowRight, desc: 'Add arrow annotation' },
   ];
   
   const compToolsExtended = [
@@ -175,12 +180,24 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                 {editToolsExtended.map(renderTool)}
                 <button
                   onClick={onUndo}
-                  title="Undo Last Action"
-                  className="flex flex-col items-center justify-center p-2 rounded transition-colors text-gray-600 hover:bg-gray-100 hover:text-gray-900 border border-transparent"
+                  disabled={!canUndo}
+                  title="Undo Last Action (Ctrl+Z)"
+                  className="flex flex-col items-center justify-center p-2 rounded transition-colors text-gray-600 hover:bg-gray-100 hover:text-gray-900 border border-transparent disabled:opacity-40 disabled:hover:bg-transparent"
                 >
                   <Undo2 size={18} className="mb-1" />
                   <span className="text-[10px] font-semibold">Undo</span>
                 </button>
+                {onRedo && (
+                  <button
+                    onClick={onRedo}
+                    disabled={!canRedo}
+                    title="Redo Action (Ctrl+Y)"
+                    className="flex flex-col items-center justify-center p-2 rounded transition-colors text-gray-600 hover:bg-gray-100 hover:text-gray-900 border border-transparent disabled:opacity-40 disabled:hover:bg-transparent"
+                  >
+                    <Redo2 size={18} className="mb-1" />
+                    <span className="text-[10px] font-semibold">Redo</span>
+                  </button>
+                )}
               </div>
             </div>
 

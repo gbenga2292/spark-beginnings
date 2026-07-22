@@ -1,5 +1,5 @@
-import React from 'react';
-import { Printer, X, Layers } from 'lucide-react';
+import React, { useState } from 'react';
+import { Printer, X, Layers, Edit3, Settings, Check } from 'lucide-react';
 import { DewateringSimulationResult } from '../../utils/simulationLogic';
 
 export interface ExportOptions {
@@ -8,6 +8,22 @@ export interface ExportOptions {
   include3DView: boolean;
   includeBOM: boolean;
   includeLegend: boolean;
+  includeBlueprint: boolean;
+  includeTitleBlock: boolean;
+  colorMode: 'color' | 'bw';
+}
+
+export interface SheetDetails {
+  companyName: string;
+  companyAddress: string;
+  companyPhone: string;
+  companyEmail: string;
+  regNumber: string;
+  layoutName: string;
+  dateStr: string;
+  sheetNo: string;
+  scale: string;
+  revNo: string;
 }
 
 interface DrawingSheetPreviewProps {
@@ -26,6 +42,9 @@ interface DrawingSheetPreviewProps {
   bomResults: DewateringSimulationResult;
   dateStr: string;
   exportOptions: ExportOptions;
+  onExportOptionsChange?: (options: ExportOptions) => void;
+  activeLegendItems?: string[];
+  sheetDetails?: SheetDetails;
 }
 
 const LEGEND_ITEMS = [
@@ -69,18 +88,18 @@ const BOMTable: React.FC<{ bomResults: DewateringSimulationResult; compact?: boo
       >
         Bill of Materials
       </h3>
-      <table className="w-full border-collapse text-left leading-tight flex-1">
+      <table className="w-full text-left border-collapse">
         <thead>
-          <tr className="border-b border-black bg-gray-100">
-            <th className={`${textSizes.row} ${textSizes.py} pl-1 font-bold`}>Item</th>
-            <th className={`${textSizes.row} ${textSizes.py} pr-1 text-right font-bold`}>Qty</th>
+          <tr className={`border-b border-black font-bold ${textSizes.row}`}>
+            <th className="py-0.5">Item</th>
+            <th className="py-0.5 text-right">Qty</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody className="divide-y divide-gray-200">
           {rows.map(([label, qty]) => (
-            <tr key={label as string} className="border-b border-gray-200">
-              <td className={`${textSizes.row} ${textSizes.py} pl-1`}>{label}</td>
-              <td className={`${textSizes.row} ${textSizes.py} pr-1 text-right font-semibold`}>{qty}</td>
+            <tr key={String(label)} className={textSizes.row}>
+              <td className={textSizes.py}>{label}</td>
+              <td className={`text-right font-mono font-bold ${textSizes.py}`}>{qty}</td>
             </tr>
           ))}
         </tbody>
@@ -92,7 +111,7 @@ const BOMTable: React.FC<{ bomResults: DewateringSimulationResult; compact?: boo
   );
 };
 
-const LegendPanel: React.FC<{ compact?: boolean }> = ({ compact = false }) => {
+const LegendPanel: React.FC<{ compact?: boolean; activeLegendItems?: string[] }> = ({ compact = false, activeLegendItems }) => {
   const textSize = compact ? 'text-[8px]' : 'text-[10px]';
   const headingSize = compact ? 'text-[9px]' : 'text-[11px]';
   const swatchSize = compact ? 'w-2.5 h-2.5' : 'w-3 h-3';
@@ -105,7 +124,7 @@ const LegendPanel: React.FC<{ compact?: boolean }> = ({ compact = false }) => {
         Drawing Legend
       </h3>
       <div className={`grid grid-cols-1 gap-y-0.5 ${textSize}`}>
-        {LEGEND_ITEMS.map(item => (
+        {LEGEND_ITEMS.filter(item => !activeLegendItems || activeLegendItems.includes(item.label.toUpperCase())).map(item => (
           <div key={item.label} className="flex items-center gap-1.5">
             <span
               className={`inline-block ${swatchSize} rounded-sm border border-gray-400 flex-shrink-0`}
@@ -131,6 +150,7 @@ interface TitleBlockProps {
   drawingType: string;
   scale: string;
   revNo?: string;
+  sheetDetails?: SheetDetails;
 }
 
 const TitleBlock: React.FC<TitleBlockProps> = ({
@@ -142,67 +162,81 @@ const TitleBlock: React.FC<TitleBlockProps> = ({
   drawingType,
   scale,
   revNo = '00',
-}) => (
-  <div className="h-[90px] flex border-t-[2px] border-black divide-x-[2px] divide-black bg-white text-black">
-    {/* Logo */}
-    <div className="w-[120px] flex items-center justify-center p-1.5 flex-shrink-0">
-      {logoSrc ? (
-        <img src={logoSrc} alt="Company Logo" className="max-h-[72px] max-w-full object-contain" />
-      ) : (
-        <div className="text-[10px] font-black uppercase text-center leading-tight opacity-60">
-          <Layers size={22} className="mx-auto mb-0.5 opacity-50" />
-          {companyInfo.name.split(' ').slice(0, 2).join('\n')}
-        </div>
-      )}
-    </div>
+  sheetDetails,
+}) => {
+  const compName = sheetDetails?.companyName ?? companyInfo.name;
+  const compAddress = sheetDetails?.companyAddress ?? companyInfo.address;
+  const compPhone = sheetDetails?.companyPhone ?? companyInfo.phone;
+  const compEmail = sheetDetails?.companyEmail ?? companyInfo.email;
+  const regNum = sheetDetails?.regNumber ?? companyInfo.regNumber;
+  const title = sheetDetails?.layoutName ?? layoutName;
+  const date = sheetDetails?.dateStr ?? dateStr;
+  const sheetNum = sheetDetails?.sheetNo ?? sheetNo;
+  const scaleVal = sheetDetails?.scale ?? scale;
+  const rev = sheetDetails?.revNo ?? revNo;
 
-    {/* Company info */}
-    <div className="w-[170px] px-2 py-1 flex flex-col justify-center flex-shrink-0">
-      <div className="font-bold text-[11px] uppercase leading-tight mb-0.5">{companyInfo.name}</div>
-      <div className="text-[8.5px] text-gray-600">{companyInfo.address}</div>
-      <div className="text-[8.5px] text-gray-600">
-        {companyInfo.phone} · {companyInfo.email}
+  return (
+    <div className="h-[90px] flex border-t-[2px] border-black divide-x-[2px] divide-black bg-white text-black flex-shrink-0">
+      {/* Logo */}
+      <div className="w-[120px] flex items-center justify-center p-1.5 flex-shrink-0">
+        {logoSrc ? (
+          <img src={logoSrc} alt="Company Logo" className="max-h-[72px] max-w-full object-contain" />
+        ) : (
+          <div className="text-[10px] font-black uppercase text-center leading-tight opacity-60">
+            <Layers size={22} className="mx-auto mb-0.5 opacity-50" />
+            {compName.split(' ').slice(0, 2).join('\n')}
+          </div>
+        )}
       </div>
-      <div className="text-[8px] text-gray-400 mt-0.5">{companyInfo.regNumber}</div>
-    </div>
 
-    {/* Title & drawing type */}
-    <div className="flex-1 px-3 py-1 flex flex-col justify-center">
-      <div className="text-[9px] font-bold uppercase text-gray-500 tracking-widest">{drawingType}</div>
-      <div className="font-black text-[14px] uppercase leading-tight mt-0.5">
-        {layoutName || 'Dewatering System Layout'}
+      {/* Company info */}
+      <div className="w-[170px] px-2 py-1 flex flex-col justify-center flex-shrink-0 min-w-0">
+        <div className="font-bold text-[11px] uppercase leading-tight mb-0.5 truncate">{compName}</div>
+        <div className="text-[8.5px] text-gray-600 truncate">{compAddress}</div>
+        <div className="text-[8.5px] text-gray-600 truncate">
+          {compPhone} {compEmail ? `· ${compEmail}` : ''}
+        </div>
+        <div className="text-[8px] text-gray-400 mt-0.5">{regNum}</div>
       </div>
-      <div className="text-[9px] text-gray-500 mt-auto">Dewatering Construction Drawing</div>
-    </div>
 
-    {/* Drawing metadata cells */}
-    <div className="w-[140px] flex flex-col flex-shrink-0 divide-y-[2px] divide-black">
-      <div className="flex flex-1 divide-x-[2px] divide-black">
-        <div className="flex-1 px-1 py-0.5 flex flex-col justify-center">
-          <span className="text-[7.5px] font-bold uppercase text-gray-500">Date</span>
-          <span className="text-[10px] font-bold leading-tight">{dateStr}</span>
+      {/* Title & drawing type */}
+      <div className="flex-1 px-3 py-1 flex flex-col justify-center min-w-0">
+        <div className="text-[9px] font-bold uppercase text-gray-500 tracking-widest truncate">{drawingType}</div>
+        <div className="font-black text-[14px] uppercase leading-tight mt-0.5 truncate">
+          {title || 'Dewatering System Layout'}
         </div>
-        <div className="flex-1 px-1 py-0.5 flex flex-col justify-center">
-          <span className="text-[7.5px] font-bold uppercase text-gray-500">Scale</span>
-          <span className="text-[10px] font-bold leading-tight">{scale}</span>
-        </div>
-        <div className="flex-1 px-1 py-0.5 flex flex-col justify-center">
-          <span className="text-[7.5px] font-bold uppercase text-gray-500">Rev.</span>
-          <span className="text-[10px] font-bold leading-tight">{revNo}</span>
-        </div>
+        <div className="text-[9px] text-gray-500 mt-auto">Dewatering Construction Drawing</div>
       </div>
-      <div className="flex-1 flex flex-col items-center justify-center bg-gray-50">
-        <span className="text-[7.5px] font-bold uppercase text-gray-500">Sheet No.</span>
-        <span className="text-[18px] font-black leading-tight">{sheetNo}</span>
+
+      {/* Drawing metadata cells */}
+      <div className="w-[140px] flex flex-col flex-shrink-0 divide-y-[2px] divide-black">
+        <div className="flex flex-1 divide-x-[2px] divide-black">
+          <div className="flex-1 px-1 py-0.5 flex flex-col justify-center min-w-0">
+            <span className="text-[7.5px] font-bold uppercase text-gray-500">Date</span>
+            <span className="text-[9.5px] font-bold leading-tight truncate">{date}</span>
+          </div>
+          <div className="flex-1 px-1 py-0.5 flex flex-col justify-center min-w-0">
+            <span className="text-[7.5px] font-bold uppercase text-gray-500">Scale</span>
+            <span className="text-[9.5px] font-bold leading-tight truncate">{scaleVal}</span>
+          </div>
+          <div className="flex-1 px-1 py-0.5 flex flex-col justify-center min-w-0">
+            <span className="text-[7.5px] font-bold uppercase text-gray-500">Rev.</span>
+            <span className="text-[9.5px] font-bold leading-tight truncate">{rev}</span>
+          </div>
+        </div>
+        <div className="flex-1 flex flex-col items-center justify-center bg-gray-50">
+          <span className="text-[7.5px] font-bold uppercase text-gray-500">Sheet No.</span>
+          <span className="text-[16px] font-black leading-tight truncate">{sheetNum}</span>
+        </div>
       </div>
     </div>
-  </div>
-);
+  );
+};
 
 /* ─────────────────────────────────────────────────────────────
    SHEET A-100: Combined (Site Plan + 3D + BOM + Legend)
 ───────────────────────────────────────────────────────── */
-const CombinedSheet: React.FC<Omit<DrawingSheetPreviewProps, 'exportOptions'>> = ({
+const CombinedSheet: React.FC<DrawingSheetPreviewProps> = ({
   companyInfo,
   logoSrc,
   layoutName,
@@ -210,75 +244,95 @@ const CombinedSheet: React.FC<Omit<DrawingSheetPreviewProps, 'exportOptions'>> =
   perspectiveDataUrl,
   bomResults,
   dateStr,
-}) => (
-  <div className="flex-1 flex flex-col">
-    {/* Drawing area */}
-    <div className="flex-1 flex border-b-[2px] border-black min-h-0">
-      {/* Site Plan — takes ~75% width */}
-      {sitePlanDataUrl && (
-        <div className="flex-[3] border-r-[2px] border-black relative flex flex-col bg-slate-50">
-          <div className="absolute top-1.5 left-2 z-10 bg-white/80 backdrop-blur-sm px-1.5 py-0.5 border border-gray-300 rounded-sm">
-            <span className="text-[9px] font-bold uppercase tracking-widest text-gray-700">Site Plan — Plan View</span>
-          </div>
-          <img src={sitePlanDataUrl} alt="Site Plan" className="w-full h-full object-contain" />
-        </div>
-      )}
+  exportOptions,
+  activeLegendItems,
+  sheetDetails,
+}) => {
+  const showBOM = exportOptions.includeBOM !== false;
+  const showLegend = exportOptions.includeLegend !== false;
+  const showTitleBlock = exportOptions.includeTitleBlock !== false;
 
-      {/* Right column: 3D + BOM + Legend */}
-      <div className="flex-1 flex flex-col divide-y-[2px] divide-black min-w-0">
-        {/* 3D Perspective */}
-        {perspectiveDataUrl && (
-          <div className="flex-[3] relative bg-slate-900 flex flex-col">
-            <div className="absolute top-1.5 left-2 z-10 bg-white/20 backdrop-blur-sm px-1.5 py-0.5 rounded-sm">
-              <span className="text-[9px] font-bold uppercase tracking-widest text-white/80">3D Perspective</span>
+  return (
+    <div className="flex-1 flex flex-col min-h-0">
+      {/* Drawing area */}
+      <div className={`flex-1 flex ${showTitleBlock ? 'border-b-[2px] border-black' : 'border-b-0'} min-h-0`}>
+        {/* Site Plan — takes ~75% width */}
+        {sitePlanDataUrl && (
+          <div className="flex-[3] border-r-[2px] border-black relative flex flex-col bg-slate-50">
+            <div className="absolute top-1.5 left-2 z-10 bg-white/80 backdrop-blur-sm px-1.5 py-0.5 border border-gray-300 rounded-sm">
+              <span className="text-[9px] font-bold uppercase tracking-widest text-gray-700">Site Plan — Plan View</span>
             </div>
-            <img src={perspectiveDataUrl} alt="3D View" className="w-full h-full object-cover" />
+            <img src={sitePlanDataUrl} alt="Site Plan" className="w-full h-full object-contain" />
           </div>
         )}
 
-        {/* BOM */}
-        <div className="flex-[2] p-2">
-          <BOMTable bomResults={bomResults} compact />
-        </div>
+        {/* Right column: 3D + BOM + Legend */}
+        <div className="flex-1 flex flex-col divide-y-[2px] divide-black min-w-0">
+          {/* 3D Perspective */}
+          {perspectiveDataUrl && (
+            <div className="flex-[3] relative bg-slate-900 flex flex-col">
+              <div className="absolute top-1.5 left-2 z-10 bg-white/20 backdrop-blur-sm px-1.5 py-0.5 rounded-sm">
+                <span className="text-[9px] font-bold uppercase tracking-widest text-white/80">3D Perspective</span>
+              </div>
+              <img src={perspectiveDataUrl} alt="3D View" className="w-full h-full object-cover" />
+            </div>
+          )}
 
-        {/* Legend */}
-        <div className="flex-[2] p-2">
-          <LegendPanel compact />
+          {/* BOM */}
+          {showBOM && (
+            <div className="flex-[2] p-2 overflow-auto">
+              <BOMTable bomResults={bomResults} compact />
+            </div>
+          )}
+
+          {/* Legend */}
+          {showLegend && (
+            <div className="flex-[2] p-2 overflow-auto">
+              <LegendPanel compact activeLegendItems={activeLegendItems} />
+            </div>
+          )}
         </div>
       </div>
-    </div>
 
-    {/* Title Block */}
-    <TitleBlock
-      companyInfo={companyInfo}
-      logoSrc={logoSrc}
-      layoutName={layoutName}
-      dateStr={dateStr}
-      sheetNo="A-100"
-      drawingType="Combined Site Plan + 3D Perspective"
-      scale="NTS"
-    />
-  </div>
-);
+      {/* Title Block */}
+      {showTitleBlock && (
+        <TitleBlock
+          companyInfo={companyInfo}
+          logoSrc={logoSrc}
+          layoutName={layoutName}
+          dateStr={dateStr}
+          sheetNo="A-100"
+          drawingType="Combined Site Plan + 3D Perspective"
+          scale="NTS"
+          sheetDetails={sheetDetails}
+        />
+      )}
+    </div>
+  );
+};
 
 /* ─────────────────────────────────────────────────────────────
    SHEET A-101: Pure 2D Floor Plan (full-width CAD blueprint)
 ───────────────────────────────────────────────────────── */
-const Pure2DSheet: React.FC<Omit<DrawingSheetPreviewProps, 'exportOptions'>> = ({
+const Pure2DSheet: React.FC<DrawingSheetPreviewProps> = ({
   companyInfo,
   logoSrc,
   layoutName,
   sitePlanDataUrl,
   bomResults,
   dateStr,
+  exportOptions,
+  activeLegendItems,
+  sheetDetails,
 }) => {
-  const showBOM = true;
-  const showLegend = true;
+  const showBOM = exportOptions.includeBOM !== false;
+  const showLegend = exportOptions.includeLegend !== false;
+  const showTitleBlock = exportOptions.includeTitleBlock !== false;
 
   return (
-    <div className="flex-1 flex flex-col">
+    <div className="flex-1 flex flex-col min-h-0">
       {/* Drawing area */}
-      <div className="flex-1 flex border-b-[2px] border-black min-h-0">
+      <div className={`flex-1 flex ${showTitleBlock ? 'border-b-[2px] border-black' : 'border-b-0'} min-h-0`}>
         {/* Main 2D plan — takes most of the space */}
         {sitePlanDataUrl && (
           <div className="flex-1 relative flex flex-col bg-white">
@@ -301,7 +355,7 @@ const Pure2DSheet: React.FC<Omit<DrawingSheetPreviewProps, 'exportOptions'>> = (
               </div>
               <div className="bg-white/90 border border-gray-200 px-2 py-0.5 inline-block">
                 <span className="text-[8px] text-gray-500 font-mono">
-                  DRAWING No: {layoutName ? layoutName.substring(0, 12).toUpperCase() : 'DW-001'} · SCALE: NTS ·
+                  DRAWING No: {sheetDetails?.sheetNo || (layoutName ? layoutName.substring(0, 12).toUpperCase() : 'DW-001')} · SCALE: {sheetDetails?.scale || 'NTS'} ·
                   ALL DIM IN METRES
                 </span>
               </div>
@@ -315,27 +369,27 @@ const Pure2DSheet: React.FC<Omit<DrawingSheetPreviewProps, 'exportOptions'>> = (
             />
 
             {/* North arrow */}
-            <div className="absolute bottom-2 right-3 z-10 bg-white/90 border border-gray-300 p-1.5 flex flex-col items-center">
+            <div className="absolute bottom-2 left-3 z-10 bg-white/90 border border-gray-300 p-1.5 flex flex-col items-center shadow-sm">
               <svg width="24" height="32" viewBox="0 0 24 32">
                 <polygon points="12,0 4,24 12,20 20,24" fill="black" />
                 <polygon points="12,0 20,24 12,20" fill="white" />
                 <text x="12" y="30" textAnchor="middle" fontSize="8" fontWeight="bold">N</text>
               </svg>
             </div>
-          </div>
-        )}
-
-        {/* Right column: BOM + Legend stacked */}
-        {(showBOM || showLegend) && (
-          <div className="w-[160px] flex flex-col divide-y-[2px] divide-black border-l-[2px] border-black flex-shrink-0">
-            {showBOM && (
-              <div className="flex-1 p-2 min-h-0 overflow-hidden">
-                <BOMTable bomResults={bomResults} compact />
-              </div>
-            )}
-            {showLegend && (
-              <div className="flex-1 p-2 min-h-0 overflow-hidden">
-                <LegendPanel compact />
+            
+            {/* BOM and Legend floating container */}
+            {(showBOM || showLegend) && (
+              <div className="absolute bottom-2 right-3 z-10 flex flex-col gap-2 max-h-[90%] overflow-hidden">
+                {showBOM && (
+                  <div className="bg-white/95 backdrop-blur-sm border border-gray-400 p-2 shadow-md rounded-sm overflow-auto">
+                    <BOMTable bomResults={bomResults} compact />
+                  </div>
+                )}
+                {showLegend && (
+                  <div className="bg-white/95 backdrop-blur-sm border border-gray-400 p-2 shadow-md rounded-sm">
+                    <LegendPanel compact activeLegendItems={activeLegendItems} />
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -343,15 +397,18 @@ const Pure2DSheet: React.FC<Omit<DrawingSheetPreviewProps, 'exportOptions'>> = (
       </div>
 
       {/* Title Block */}
-      <TitleBlock
-        companyInfo={companyInfo}
-        logoSrc={logoSrc}
-        layoutName={layoutName}
-        dateStr={dateStr}
-        sheetNo="A-101"
-        drawingType="Construction Floor Plan — Dewatering System"
-        scale="NTS"
-      />
+      {showTitleBlock && (
+        <TitleBlock
+          companyInfo={companyInfo}
+          logoSrc={logoSrc}
+          layoutName={layoutName}
+          dateStr={dateStr}
+          sheetNo="A-101"
+          drawingType="Construction Floor Plan — Dewatering System"
+          scale="NTS"
+          sheetDetails={sheetDetails}
+        />
+      )}
     </div>
   );
 };
@@ -359,71 +416,98 @@ const Pure2DSheet: React.FC<Omit<DrawingSheetPreviewProps, 'exportOptions'>> = (
 /* ─────────────────────────────────────────────────────────────
    SHEET A-102: Pure 3D Perspective (full-bleed 3D rendering)
 ───────────────────────────────────────────────────────── */
-const Pure3DSheet: React.FC<Omit<DrawingSheetPreviewProps, 'exportOptions'>> = ({
+const Pure3DSheet: React.FC<DrawingSheetPreviewProps> = ({
   companyInfo,
   logoSrc,
   layoutName,
   perspectiveDataUrl,
   bomResults,
   dateStr,
-}) => (
-  <div className="flex-1 flex flex-col">
-    {/* Drawing area — full-bleed 3D */}
-    <div className="flex-1 flex border-b-[2px] border-black min-h-0 relative bg-slate-900">
-      {perspectiveDataUrl ? (
-        <>
-          <img
-            src={perspectiveDataUrl}
-            alt="3D Perspective"
-            className="w-full h-full object-cover"
-            style={{ filter: 'contrast(1.05) brightness(1.02)' }}
-          />
+  exportOptions,
+  activeLegendItems,
+  sheetDetails,
+}) => {
+  const showBOM = exportOptions.includeBOM !== false;
+  const showTitleBlock = exportOptions.includeTitleBlock !== false;
 
-          {/* Floating labels */}
-          <div className="absolute top-3 left-3 z-10 flex flex-col gap-1">
-            <div className="bg-black/60 backdrop-blur-sm px-2.5 py-1 border border-white/20 rounded-sm">
-              <span className="text-[11px] font-black uppercase tracking-widest text-white">
-                3D Perspective — Dewatering System
-              </span>
-            </div>
-            <div className="bg-black/40 backdrop-blur-sm px-2.5 py-0.5 border border-white/10 rounded-sm">
-              <span className="text-[8px] text-white/70 font-mono uppercase">
-                Isometric Projection · High-Fidelity Render
-              </span>
-            </div>
-          </div>
+  return (
+    <div className="flex-1 flex flex-col min-h-0">
+      {/* Drawing area — full-bleed 3D */}
+      <div className={`flex-1 flex ${showTitleBlock ? 'border-b-[2px] border-black' : 'border-b-0'} min-h-0 relative bg-slate-900`}>
+        {perspectiveDataUrl ? (
+          <>
+            <img
+              src={perspectiveDataUrl}
+              alt="3D Perspective"
+              className="w-full h-full object-cover"
+              style={{ filter: 'contrast(1.05) brightness(1.02)' }}
+            />
 
-          {/* Floating BOM in 3D sheet corner */}
-          <div className="absolute bottom-3 right-3 z-10 bg-white/95 backdrop-blur-sm border border-gray-300 p-2 w-[170px] shadow-xl">
-            <BOMTable bomResults={bomResults} compact />
+            {/* Floating labels */}
+            <div className="absolute top-3 left-3 z-10 flex flex-col gap-1">
+              <div className="bg-black/60 backdrop-blur-sm px-2.5 py-1 border border-white/20 rounded-sm">
+                <span className="text-[11px] font-black uppercase tracking-widest text-white">
+                  3D Perspective — Dewatering System
+                </span>
+              </div>
+              <div className="bg-black/40 backdrop-blur-sm px-2.5 py-0.5 border border-white/10 rounded-sm">
+                <span className="text-[8px] text-white/70 font-mono uppercase">
+                  Isometric Projection · High-Fidelity Render
+                </span>
+              </div>
+            </div>
+
+            {/* Floating BOM in 3D sheet corner */}
+            {showBOM && (
+              <div className="absolute bottom-3 right-3 z-10 bg-white/95 backdrop-blur-sm border border-gray-300 p-2 w-[170px] shadow-xl rounded-sm">
+                <BOMTable bomResults={bomResults} compact />
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="flex-1 flex items-center justify-center">
+            <span className="text-white/40 text-sm">No 3D capture available. Enable 3D view before exporting.</span>
           </div>
-        </>
-      ) : (
-        <div className="flex-1 flex items-center justify-center">
-          <span className="text-white/40 text-sm">No 3D capture available. Enable 3D view before exporting.</span>
-        </div>
+        )}
+      </div>
+
+      {/* Title Block */}
+      {showTitleBlock && (
+        <TitleBlock
+          companyInfo={companyInfo}
+          logoSrc={logoSrc}
+          layoutName={layoutName}
+          dateStr={dateStr}
+          sheetNo="A-102"
+          drawingType="3D Perspective Presentation — Dewatering System"
+          scale="3D / NTS"
+          sheetDetails={sheetDetails}
+        />
       )}
     </div>
-
-    {/* Title Block */}
-    <TitleBlock
-      companyInfo={companyInfo}
-      logoSrc={logoSrc}
-      layoutName={layoutName}
-      dateStr={dateStr}
-      sheetNo="A-102"
-      drawingType="3D Perspective Presentation — Dewatering System"
-      scale="3D / NTS"
-    />
-  </div>
-);
+  );
+};
 
 /* ─────────────────────────────────────────────────────────────
    Root Component
 ───────────────────────────────────────────────────────── */
 export const DrawingSheetPreview: React.FC<DrawingSheetPreviewProps> = (props) => {
-  const { onClose, exportOptions } = props;
+  const { onClose, exportOptions, onExportOptionsChange } = props;
   const { layoutFormat } = exportOptions;
+
+  const [showEditDrawer, setShowEditDrawer] = useState(false);
+  const [sheetDetails, setSheetDetails] = useState<SheetDetails>({
+    companyName: props.companyInfo?.name || 'Dewatering Construction Ltd',
+    companyAddress: props.companyInfo?.address || 'Lagos, Nigeria',
+    companyPhone: props.companyInfo?.phone || '+234 903 000 2182',
+    companyEmail: props.companyInfo?.email || 'info@dewaterconstruct.com',
+    regNumber: props.companyInfo?.regNumber || 'RC-141299',
+    layoutName: props.layoutName || 'Dewatering System Layout',
+    dateStr: props.dateStr || new Date().toLocaleDateString(),
+    sheetNo: layoutFormat === 'combined' ? 'A-100' : layoutFormat === 'pure-2d' ? 'A-101' : 'A-102',
+    scale: 'NTS',
+    revNo: '00',
+  });
 
   const sheetLabel =
     layoutFormat === 'combined' ? 'A-100 — Combined Sheet'
@@ -432,54 +516,247 @@ export const DrawingSheetPreview: React.FC<DrawingSheetPreviewProps> = (props) =
 
   const handlePrint = () => window.print();
 
+  const toggleOption = (key: keyof ExportOptions) => {
+    if (onExportOptionsChange) {
+      if (key === 'colorMode') {
+        onExportOptionsChange({
+          ...exportOptions,
+          colorMode: exportOptions.colorMode === 'bw' ? 'color' : 'bw',
+        });
+      } else {
+        onExportOptionsChange({
+          ...exportOptions,
+          [key]: !exportOptions[key],
+        });
+      }
+    }
+  };
+
+  const updatedProps = {
+    ...props,
+    sheetDetails,
+  };
+
   return (
-    <div className="fixed inset-0 z-[100] bg-gray-600 overflow-auto print:bg-white print:overflow-visible flex flex-col items-center py-6 print:py-0">
-      {/* Non-print toolbar */}
-      <div className="fixed top-4 left-1/2 -translate-x-1/2 flex items-center gap-3 bg-white rounded-xl shadow-xl px-4 py-2.5 border border-gray-200 print:hidden z-50">
-        <div className="text-xs font-bold text-gray-500 uppercase tracking-widest">{sheetLabel}</div>
-        <div className="w-px h-5 bg-gray-200" />
+    <div className="fixed inset-0 z-[100] bg-gray-600 overflow-auto print:bg-white print:overflow-visible flex flex-col items-center py-6 print:py-0 print-area">
+      {/* Non-print interactive toolbar */}
+      <div className="fixed top-4 left-1/2 -translate-x-1/2 flex items-center gap-2.5 bg-white/95 backdrop-blur-md rounded-xl shadow-2xl px-4 py-2 border border-gray-200 print:hidden z-50 max-w-[95vw] overflow-x-auto">
+        <div className="text-xs font-bold text-gray-700 uppercase tracking-widest whitespace-nowrap">{sheetLabel}</div>
+        <div className="w-px h-5 bg-gray-300" />
+        
+        {/* Toggle options */}
+        <div className="flex items-center gap-1.5 text-xs font-medium text-gray-700">
+          <label className="flex items-center gap-1.5 cursor-pointer hover:text-slate-900 select-none bg-gray-50 px-2 py-1 rounded border border-gray-200">
+            <input
+              type="checkbox"
+              checked={exportOptions.includeBOM !== false}
+              onChange={() => toggleOption('includeBOM')}
+              className="rounded text-slate-900 focus:ring-slate-500"
+            />
+            <span>BOM</span>
+          </label>
+
+          <label className="flex items-center gap-1.5 cursor-pointer hover:text-slate-900 select-none bg-gray-50 px-2 py-1 rounded border border-gray-200">
+            <input
+              type="checkbox"
+              checked={exportOptions.includeLegend !== false}
+              onChange={() => toggleOption('includeLegend')}
+              className="rounded text-slate-900 focus:ring-slate-500"
+            />
+            <span>Legend</span>
+          </label>
+
+          <label className="flex items-center gap-1.5 cursor-pointer hover:text-slate-900 select-none bg-gray-50 px-2 py-1 rounded border border-gray-200">
+            <input
+              type="checkbox"
+              checked={exportOptions.includeTitleBlock !== false}
+              onChange={() => toggleOption('includeTitleBlock')}
+              className="rounded text-slate-900 focus:ring-slate-500"
+            />
+            <span>Title Block</span>
+          </label>
+
+          <label className="flex items-center gap-1.5 cursor-pointer hover:text-slate-900 select-none bg-gray-50 px-2 py-1 rounded border border-gray-200">
+            <input
+              type="checkbox"
+              checked={exportOptions.colorMode === 'bw'}
+              onChange={() => toggleOption('colorMode')}
+              className="rounded text-slate-900 focus:ring-slate-500"
+            />
+            <span>B&W</span>
+          </label>
+        </div>
+
+        <div className="w-px h-5 bg-gray-300" />
+
+        {/* Edit details button */}
+        <button
+          onClick={() => setShowEditDrawer(!showEditDrawer)}
+          className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md border transition-colors whitespace-nowrap ${
+            showEditDrawer ? 'bg-indigo-50 border-indigo-300 text-indigo-700' : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+          }`}
+        >
+          <Edit3 size={13} /> Edit Title Block
+        </button>
+
+        <div className="w-px h-5 bg-gray-300" />
+
         <button
           onClick={handlePrint}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white text-sm rounded-md hover:bg-slate-700 transition-colors"
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white text-xs font-semibold rounded-md hover:bg-slate-800 transition-colors whitespace-nowrap shadow-sm"
         >
-          <Printer size={14} /> Print / Save PDF
+          <Printer size={13} /> Print / Save PDF
         </button>
+
         <button
           onClick={onClose}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-white text-gray-700 text-sm rounded-md border border-gray-300 hover:bg-gray-50 transition-colors"
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-white text-gray-700 text-xs font-semibold rounded-md border border-gray-300 hover:bg-gray-100 transition-colors whitespace-nowrap"
         >
-          <X size={14} /> Close
+          <X size={13} /> Close
         </button>
       </div>
 
+      {/* Edit Title Block Drawer/Modal */}
+      {showEditDrawer && (
+        <div className="fixed top-16 left-1/2 -translate-x-1/2 w-[420px] max-w-[95vw] bg-white rounded-xl shadow-2xl border border-gray-200 p-4 z-50 print:hidden space-y-3">
+          <div className="flex items-center justify-between border-b pb-2">
+            <h4 className="text-xs font-bold text-gray-800 flex items-center gap-1.5 uppercase tracking-wider">
+              <Settings size={14} className="text-indigo-600" /> Customize Sheet Details
+            </h4>
+            <button onClick={() => setShowEditDrawer(false)} className="text-gray-400 hover:text-gray-600">
+              <X size={15} />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="col-span-2">
+              <label className="block text-[10px] font-semibold text-gray-500 uppercase">Drawing Title</label>
+              <input
+                type="text"
+                value={sheetDetails.layoutName}
+                onChange={(e) => setSheetDetails({ ...sheetDetails, layoutName: e.target.value })}
+                className="w-full border rounded px-2 py-1 mt-0.5 focus:ring-1 focus:ring-indigo-500 text-xs font-medium"
+              />
+            </div>
+            <div className="col-span-2">
+              <label className="block text-[10px] font-semibold text-gray-500 uppercase">Company Name</label>
+              <input
+                type="text"
+                value={sheetDetails.companyName}
+                onChange={(e) => setSheetDetails({ ...sheetDetails, companyName: e.target.value })}
+                className="w-full border rounded px-2 py-1 mt-0.5 focus:ring-1 focus:ring-indigo-500 text-xs font-medium"
+              />
+            </div>
+            <div className="col-span-2">
+              <label className="block text-[10px] font-semibold text-gray-500 uppercase">Company Address</label>
+              <input
+                type="text"
+                value={sheetDetails.companyAddress}
+                onChange={(e) => setSheetDetails({ ...sheetDetails, companyAddress: e.target.value })}
+                className="w-full border rounded px-2 py-1 mt-0.5 focus:ring-1 focus:ring-indigo-500 text-xs"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-semibold text-gray-500 uppercase">Phone</label>
+              <input
+                type="text"
+                value={sheetDetails.companyPhone}
+                onChange={(e) => setSheetDetails({ ...sheetDetails, companyPhone: e.target.value })}
+                className="w-full border rounded px-2 py-1 mt-0.5 focus:ring-1 focus:ring-indigo-500 text-xs"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-semibold text-gray-500 uppercase">Email</label>
+              <input
+                type="text"
+                value={sheetDetails.companyEmail}
+                onChange={(e) => setSheetDetails({ ...sheetDetails, companyEmail: e.target.value })}
+                className="w-full border rounded px-2 py-1 mt-0.5 focus:ring-1 focus:ring-indigo-500 text-xs"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-semibold text-gray-500 uppercase">Sheet Number</label>
+              <input
+                type="text"
+                value={sheetDetails.sheetNo}
+                onChange={(e) => setSheetDetails({ ...sheetDetails, sheetNo: e.target.value })}
+                className="w-full border rounded px-2 py-1 mt-0.5 focus:ring-1 focus:ring-indigo-500 text-xs font-mono"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-semibold text-gray-500 uppercase">Revision</label>
+              <input
+                type="text"
+                value={sheetDetails.revNo}
+                onChange={(e) => setSheetDetails({ ...sheetDetails, revNo: e.target.value })}
+                className="w-full border rounded px-2 py-1 mt-0.5 focus:ring-1 focus:ring-indigo-500 text-xs font-mono"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-semibold text-gray-500 uppercase">Scale</label>
+              <input
+                type="text"
+                value={sheetDetails.scale}
+                onChange={(e) => setSheetDetails({ ...sheetDetails, scale: e.target.value })}
+                className="w-full border rounded px-2 py-1 mt-0.5 focus:ring-1 focus:ring-indigo-500 text-xs"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-semibold text-gray-500 uppercase">Date</label>
+              <input
+                type="text"
+                value={sheetDetails.dateStr}
+                onChange={(e) => setSheetDetails({ ...sheetDetails, dateStr: e.target.value })}
+                className="w-full border rounded px-2 py-1 mt-0.5 focus:ring-1 focus:ring-indigo-500 text-xs"
+              />
+            </div>
+          </div>
+
+          <button
+            onClick={() => setShowEditDrawer(false)}
+            className="w-full mt-2 py-1.5 bg-indigo-600 text-white rounded text-xs font-bold hover:bg-indigo-700 flex items-center justify-center gap-1 transition-colors"
+          >
+            <Check size={14} /> Apply Edits to Sheet
+          </button>
+        </div>
+      )}
+
       {/* The A3/A1 ISO Drawing Sheet */}
       <div
-        className="bg-white shadow-2xl print:shadow-none print:m-0 relative flex flex-col"
+        className={`bg-white shadow-2xl print:shadow-none print:m-0 relative flex flex-col ${exportOptions.colorMode === 'bw' ? 'grayscale' : ''}`}
         style={{
-          width: '420mm',
-          minWidth: '420mm',
+          width: '297mm',
+          minWidth: '297mm',
           aspectRatio: '1.414 / 1',
           marginTop: '52px',
           border: '1px solid #ccc',
         }}
       >
         {/* Outer ISO border */}
-        <div className="absolute inset-[8mm] border-[2px] border-black pointer-events-none z-20" />
+        <div className="absolute inset-[5mm] border-[2px] border-black pointer-events-none z-20" />
 
         {/* Inner sheet content with margin matching ISO border */}
-        <div className="absolute inset-[8mm] flex flex-col">
-          {layoutFormat === 'combined' && <CombinedSheet {...props} />}
-          {layoutFormat === 'pure-2d' && <Pure2DSheet {...props} />}
-          {layoutFormat === 'pure-3d' && <Pure3DSheet {...props} />}
+        <div className="absolute inset-[5mm] flex flex-col bg-white">
+          {layoutFormat === 'combined' && <CombinedSheet {...updatedProps} />}
+          {layoutFormat === 'pure-2d' && <Pure2DSheet {...updatedProps} />}
+          {layoutFormat === 'pure-3d' && <Pure3DSheet {...updatedProps} />}
         </div>
       </div>
 
       {/* Print styles */}
       <style>{`
         @media print {
-          @page { size: A3 landscape; margin: 0; }
-          body > * { display: none !important; }
-          body > .fixed.inset-0.z-\\[100\\] { display: flex !important; }
+          @page { size: A4 landscape; margin: 0; }
+          body * { visibility: hidden; }
+          .print-area, .print-area * { visibility: visible !important; }
+          .print-area {
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            min-height: 100vh !important;
+          }
         }
       `}</style>
     </div>

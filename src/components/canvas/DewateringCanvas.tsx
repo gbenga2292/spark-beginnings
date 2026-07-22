@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { Stage, Layer, Line, Circle, Rect, Text, Group, Image as KonvaImage, Transformer, RegularPolygon } from 'react-konva';
+import { Stage, Layer, Line, Circle, Rect, Text, Group, Image as KonvaImage, Transformer, RegularPolygon, Arrow } from 'react-konva';
 import useImage from 'use-image';
-import { Point, LineData, PlacedComponent, ComponentType, DimensionData, PIXELS_PER_METER, ElevationLevel, AreaData, HoseData } from '../../utils/simulationLogic';
+import { Point, LineData, PlacedComponent, ComponentType, DimensionData, PIXELS_PER_METER, ElevationLevel, AreaData, HoseData, ArrowData, TextData, calculateBOM } from '../../utils/simulationLogic';
 import { CADLayer } from '../../utils/cadDataModels';
 import { findSnapPoint, findConnectionSnap, SnapPoint } from '../../utils/geometryEngine';
 import { Check, X } from 'lucide-react';
@@ -29,6 +29,10 @@ interface DewateringCanvasProps {
   onAreasChange?: (areas: AreaData[]) => void;
   hoses: HoseData[];
   onHosesChange?: (hoses: HoseData[]) => void;
+  arrows?: ArrowData[];
+  onArrowsChange?: (arrows: ArrowData[]) => void;
+  texts?: TextData[];
+  onTextsChange?: (texts: TextData[]) => void;
   levels: ElevationLevel[];
   activeLevelId: string;
   onSelectLevel?: (id: string) => void;
@@ -37,6 +41,7 @@ interface DewateringCanvasProps {
   onDeleteLevel?: (id: string) => void;
   layers?: CADLayer[];
   activeLayerId?: string;
+  onExportWindowSelected?: (rect: { x: number; y: number; width: number; height: number }) => void;
   onSelectLayer?: (id: string) => void;
   onUpdateLayer?: (id: string, updates: Partial<CADLayer>) => void;
   onAddLayer?: (layer: CADLayer) => void;
@@ -273,6 +278,120 @@ function getTangentLengthBetweenVectors(v1: Point, v2: Point): number {
   return T_meters * PIXELS_PER_METER;
 }
 
+const LegendIcon = ({ label }: { label: string }) => {
+  const l = label.toUpperCase();
+  if (l.includes('WELL POINT')) {
+    return (
+      <Group>
+        <Rect width={14} height={14} stroke="black" strokeWidth={1} />
+        <Circle x={7} y={7} r={3.5} fill="black" />
+      </Group>
+    );
+  }
+  if (l.includes('HEADER')) {
+    return (
+      <Group>
+        <Rect width={14} height={14} stroke="black" strokeWidth={1} />
+        <Rect x={2} y={4.5} width={10} height={5} cornerRadius={2.5} stroke="black" strokeWidth={1} />
+        <Circle x={7} y={7} r={1.5} fill="black" />
+      </Group>
+    );
+  }
+  if (l.includes('TEE') || l.includes('FLUSH')) {
+    return (
+      <Group>
+        <Rect width={14} height={14} stroke="black" strokeWidth={1} />
+        <Line points={[4.5, 4.5, 9.5, 4.5]} stroke="black" strokeWidth={1.5} />
+        <Line points={[7, 4.5, 7, 9.5]} stroke="black" strokeWidth={1.5} />
+      </Group>
+    );
+  }
+  if (l.includes('ELBOW')) {
+    return (
+      <Group>
+        <Rect width={14} height={14} stroke="black" strokeWidth={1} />
+        <Line points={[4.5, 4.5, 4.5, 9.5, 9.5, 9.5]} stroke="black" strokeWidth={1.5} />
+      </Group>
+    );
+  }
+  if (l.includes('PUMP')) {
+    return (
+      <Group>
+        <Rect width={14} height={14} stroke="black" strokeWidth={1} />
+        <Rect x={3.5} y={3.5} width={7} height={7} fill="black" />
+      </Group>
+    );
+  }
+  if (l.includes('HOSE')) {
+    return (
+      <Group>
+        <Rect width={14} height={14} stroke="black" strokeWidth={1} />
+        <Line points={[2, 7, 12, 7]} stroke={l.includes('DISCHARGE') ? '#2563eb' : '#eab308'} strokeWidth={1.5} dash={[2, 2]} />
+      </Group>
+    );
+  }
+  if (l.includes('EXCAVATION')) {
+    return (
+      <Group>
+        <Rect width={14} height={14} stroke="black" strokeWidth={1} />
+        <Rect x={2} y={2} width={10} height={10} fill="rgba(252, 165, 165, 0.5)" />
+      </Group>
+    );
+  }
+  if (l.includes('BOUNDARY')) {
+    return (
+      <Group>
+        <Rect width={14} height={14} stroke="black" strokeWidth={1} />
+        <Line points={[2, 7, 12, 7]} stroke="#93c5fd" strokeWidth={2} />
+      </Group>
+    );
+  }
+  return <Rect width={14} height={14} stroke="black" strokeWidth={1} />;
+};
+
+const KonvaLegend = ({ lines, placedComponents, hoses, areas, pos, onDragEnd, scale }: any) => {
+  const results = calculateBOM(lines, placedComponents, PIXELS_PER_METER);
+  const activeLegendItems: string[] = [];
+  if (results.headers > 0) activeLegendItems.push('HEADER PIPES');
+  if (results.wellpoints > 0) activeLegendItems.push('WELL POINTS');
+  if (results.pumps > 0) activeLegendItems.push('DEWATERING PUMPS');
+  if (results.elbows > 0) activeLegendItems.push('ELBOW CONNECTORS');
+  if (results.tees > 0) activeLegendItems.push('FLUSH CONNECTIONS');
+  if (hoses.some((h: any) => h.kind === 'suction' || h.kind === 'hose')) activeLegendItems.push('SUCTION HOSES');
+  if (hoses.some((h: any) => h.kind === 'discharge')) activeLegendItems.push('DISCHARGE HOSES');
+  if (areas.some((a: any) => a.kind === 'excavation')) activeLegendItems.push('EXCAVATION AREA');
+  if (areas.some((a: any) => a.kind === 'boundary' || !a.kind)) activeLegendItems.push('SITE BOUNDARY');
+
+  if (activeLegendItems.length === 0) return null;
+
+  const boxWidth = 140 / scale;
+  const itemHeight = 18 / scale;
+  const padding = 10 / scale;
+  const boxHeight = padding * 2 + activeLegendItems.length * itemHeight;
+
+  return (
+    <Group 
+      x={pos.x} 
+      y={pos.y} 
+      draggable 
+      onDragEnd={(e) => onDragEnd({ x: e.target.x(), y: e.target.y() })}
+    >
+      <Rect width={boxWidth} height={boxHeight} fill="white" stroke="black" strokeWidth={1 / scale} opacity={0.95} />
+      {activeLegendItems.map((label, idx) => {
+        const y = padding + idx * itemHeight;
+        return (
+          <Group key={label} x={padding} y={y}>
+            <Group scale={{ x: 1/scale, y: 1/scale }}>
+              <LegendIcon label={label} />
+            </Group>
+            <Text x={22 / scale} y={3 / scale} text={label} fontSize={9 / scale} fontFamily="sans-serif" fontStyle="bold" fill="black" />
+          </Group>
+        );
+      })}
+    </Group>
+  );
+};
+
 export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
   lines,
   onLinesChange,
@@ -292,6 +411,10 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
   onAreasChange,
   hoses = [],
   onHosesChange,
+  arrows = [],
+  onArrowsChange,
+  texts = [],
+  onTextsChange,
   levels,
   activeLevelId,
   onSelectLevel,
@@ -304,6 +427,8 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
   onUpdateLayer,
   onAddLayer,
   onDeleteLayer,
+  onSelectionChange,
+  onExportWindowSelected,
   stageRef: externalStageRef,
   onCursorPosChange,
   blueprintSettings = { visible: true, x: 0, y: 0, scaleX: 1, scaleY: 1, rotation: 0, opacity: 0.5, locked: true },
@@ -317,18 +442,20 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
   scaleRefPt1,
   scaleRefPt2,
   onSetScaleRefPt1,
-  onSetScaleRefPt2,
-  onSelectionChange
+  onSetScaleRefPt2
 }) => {
   const [currentLine, setCurrentLine] = useState<Point[]>([]);
   const [currentDim, setCurrentDim] = useState<Point[]>([]);
   const [currentAreaStart, setCurrentAreaStart] = useState<{ pt: Point; kind: 'excavation' | 'discharge' | 'site' } | null>(null);
+  const [currentExportStart, setCurrentExportStart] = useState<Point | null>(null);
   const [currentHose, setCurrentHose] = useState<Point[]>([]);
   const [currentDischarge, setCurrentDischarge] = useState<Point[]>([]);
+  const [currentArrow, setCurrentArrow] = useState<Point[]>([]);
   const [textEditor, setTextEditor] = useState<{ x: number; y: number; val: string; editingId?: string } | null>(null);
   const [alignRef, setAlignRef] = useState<{ x?: number; y?: number } | null>(null);
   const [trimFirstId, setTrimFirstId] = useState<string | null>(null);
   const [mirrorAxisPoints, setMirrorAxisPoints] = useState<Point[]>([]);
+  const [legendPos, setLegendPos] = useState({ x: 20, y: 20 });
   
   // Drag cancellation tracking
   const dragInfoRef = useRef<{ node: any, startX: number, startY: number, cancelled: boolean } | null>(null);
@@ -343,12 +470,12 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
     }
   }, []);
 
-  const [bgImage] = useImage(backgroundImageUrl || '');
+  const [bgImage] = useImage(backgroundImageUrl || '', (backgroundImageUrl || '').startsWith('blob:') ? undefined : 'anonymous');
   const [cursorPos, setCursorPos] = useState<Point | null>(null);
   const [shiftHeld, setShiftHeld] = useState(false);
   const [dimTyped, setDimTyped] = useState('');
   
-  const isDrawing = currentLine.length > 0 || currentHose.length > 0 || currentDischarge.length > 0 || currentAreaStart !== null;
+  const isDrawing = currentLine.length > 0 || currentHose.length > 0 || currentDischarge.length > 0 || currentAreaStart !== null || currentExportStart !== null;
 
   // Panning state
   const [isPanning, setIsPanning] = useState(false);
@@ -1075,35 +1202,57 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
     setCurrentLine([]);
     setCurrentHose([]);
     setCurrentDischarge([]);
+    setCurrentAreaStart(null);
+    setCurrentExportStart(null);
     setCursorPos(null);
     setDimTyped('');
   }, [lines, hoses, activeTool, onLinesChange, onHosesChange, activeLevelId, activeLayerId, finishPolygon]);
 
   const handleFinishText = useCallback((val: string, editingId?: string) => {
-    if (val.trim() && onDimensionsChange && dimensions) {
-      if (editingId) {
-        onDimensionsChange(dimensions.map(d => d.id === editingId ? { ...d, text: val.trim() } : d));
-      } else if (textEditor) {
-        const newTextDim: DimensionData = {
-          id: crypto.randomUUID(),
-          start: { x: textEditor.x, y: textEditor.y },
-          end: { x: textEditor.x, y: textEditor.y },
-          text: val.trim(),
-          layerId: activeLayerId,
-          isTextAnnotation: true,
-          x: textEditor.x,
-          y: textEditor.y,
-          fontSize: textSize,
-          color: textColor,
-          rotation: 0
-        } as any;
-        onDimensionsChange([...dimensions, newTextDim]);
+    // Check if it's a dimension
+    if (editingId && dimensions?.some(d => d.id === editingId)) {
+        if (!val.trim()) {
+             // they cleared the text - maybe delete dimension? Or just clear text
+             if (onDimensionsChange) {
+                 onDimensionsChange(dimensions.filter(d => d.id !== editingId));
+             }
+        } else {
+             if (onDimensionsChange) {
+                 onDimensionsChange(dimensions.map(d => d.id === editingId ? { ...d, text: val } : d));
+             }
+        }
+        setTextEditor(null);
+        if (activeTool === 'text' && onToolSelect) onToolSelect('select');
+        return;
+    }
+
+    if (!val.trim()) {
+      if (editingId && onTextsChange) {
+        onTextsChange(texts.filter(t => t.id !== editingId));
       }
-    } else if (!val.trim() && editingId && onDimensionsChange && dimensions) {
-      onDimensionsChange(dimensions.filter(d => d.id !== editingId));
+      setTextEditor(null);
+      if (activeTool === 'text' && onToolSelect) onToolSelect('select');
+      return;
+    }
+
+    if (editingId && onTextsChange) {
+      onTextsChange(texts.map(t => t.id === editingId ? { ...t, text: val } : t));
+    } else if (onTextsChange && textEditor) {
+      const newText: TextData = {
+        id: crypto.randomUUID(),
+        x: textEditor.x,
+        y: textEditor.y,
+        text: val,
+        fontSize: textSize,
+        color: textColor,
+        layerId: activeLayerId,
+        rotation: 0,
+      };
+      onTextsChange([...texts, newText]);
     }
     setTextEditor(null);
-  }, [dimensions, onDimensionsChange, textEditor, activeLayerId, textSize, textColor]);
+    if (activeTool === 'text' && onToolSelect) onToolSelect('select');
+  }, [dimensions, onDimensionsChange, textEditor, activeLayerId, textSize, textColor, texts, onTextsChange, activeTool, onToolSelect]);
 
   // ---------- AutoCAD keyboard capture ----------
   useEffect(() => {
@@ -1129,6 +1278,9 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
           if (onDimensionsChange) {
             onDimensionsChange(dimensions.filter(d => !selectedIds.has(d.id)));
           }
+          if (onArrowsChange && arrows) {
+            onArrowsChange(arrows.filter(a => !selectedIds.has(a.id)));
+          }
           selectSingleElement(null);
           if (trRef.current) trRef.current.nodes([]);
           e.preventDefault();
@@ -1142,6 +1294,12 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
         }
         if (currentAreaStart) {
           setCurrentAreaStart(null);
+          e.cancelBubble = true;
+          return;
+        }
+        if (currentExportStart) {
+          setCurrentExportStart(null);
+          e.cancelBubble = true;
           return;
         }
         const activeList = activeTool === 'line' ? currentLine : activeTool === 'hose' ? currentHose : currentDischarge;
@@ -1181,7 +1339,7 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [isDrawing, dimTyped, cursorPos, currentLine, shiftHeld, orthoLocked, finishLine, getSnappedPoint, activeTool, currentHose, currentDischarge, currentAreaStart, selectedIds, placedComponents, lines, hoses, areas, dimensions, onPlacedComponentsChange, onLinesChange, onHosesChange, onAreasChange, onDimensionsChange, onToolSelect]);
+  }, [isDrawing, dimTyped, cursorPos, currentLine, shiftHeld, orthoLocked, finishLine, getSnappedPoint, activeTool, currentHose, currentDischarge, currentAreaStart, currentExportStart, selectedIds, placedComponents, lines, hoses, areas, dimensions, onPlacedComponentsChange, onLinesChange, onHosesChange, onAreasChange, onDimensionsChange, onToolSelect]);
 
   // ---------- useEffect: auto-dimension selected spline ----------
   useEffect(() => {
@@ -1223,6 +1381,8 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
     return transform.point(pos);
   }, []);
 
+
+
   // ---------- pointer events on Stage ----------
   const handleStageMouseDown = (e: any) => {
     const isStage = e.target === e.target.getStage();
@@ -1253,6 +1413,7 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
       if (activeTool === 'hose' && currentHose.length > 0) finishLine(currentHose);
       if (activeTool === 'discharge' && currentDischarge.length > 0) finishLine(currentDischarge);
       if (currentAreaStart) setCurrentAreaStart(null);
+      if (currentExportStart) setCurrentExportStart(null);
       return;
     }
 
@@ -1307,6 +1468,14 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
       return;
     }
 
+    if (activeTool === 'export-window') {
+      const stage = e.target.getStage();
+      const raw = getWorldPointerPos(stage);
+      if (!raw) return;
+      setCurrentExportStart(raw);
+      return;
+    }
+
     if (activeTool === 'area' || activeTool === 'discharge-area' || activeTool === 'site-area') {
       const stage = e.target.getStage();
       const raw = getWorldPointerPos(stage);
@@ -1351,15 +1520,37 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
 
       if (currentDim.length === 0) {
         setCurrentDim([pt]);
-      } else {
-        const start = currentDim[0];
-        const distPx = Math.sqrt(Math.pow(pt.x - start.x, 2) + Math.pow(pt.y - start.y, 2));
-        const distM = (distPx / PIXELS_PER_METER).toFixed(2);
+      } else if (currentDim.length === 1) {
+        setCurrentDim([currentDim[0], pt]);
+      } else if (currentDim.length === 2) {
+        // 3rd click: calculate final points based on offset
+        const pt1 = currentDim[0];
+        const pt2 = currentDim[1];
+        
+        const dx = pt2.x - pt1.x;
+        const dy = pt2.y - pt1.y;
+        const length = Math.sqrt(dx * dx + dy * dy);
+        
+        let startPoint = pt1;
+        let endPoint = pt2;
+        
+        if (length > 0) {
+          const nx = -dy / length;
+          const ny = dx / length;
+          const offset = (pt.x - pt1.x) * nx + (pt.y - pt1.y) * ny;
+          
+          startPoint = { x: pt1.x + nx * offset, y: pt1.y + ny * offset };
+          endPoint = { x: pt2.x + nx * offset, y: pt2.y + ny * offset };
+        }
+
+        const distM = (length / PIXELS_PER_METER).toFixed(2);
         
         const newDim: DimensionData = {
-          id: Math.random().toString(36).substring(2, 9),
-          start,
-          end: pt,
+          id: crypto.randomUUID(),
+          start: startPoint,
+          end: endPoint,
+          measuredStart: pt1,
+          measuredEnd: pt2,
           text: `${distM}m`,
           layerId: activeLayerId
         };
@@ -1367,6 +1558,32 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
           onDimensionsChange([...dimensions, newDim]);
         }
         setCurrentDim([]);
+      }
+      return;
+    }
+
+    if (activeTool === 'arrow') {
+      const stage = e.target.getStage();
+      const raw = getWorldPointerPos(stage);
+      if (!raw) return;
+      
+      const snappedRaw = gridSnap ? snapToGrid(raw, PIXELS_PER_METER / 2) : raw;
+      const pt = getSnappedPoint(snappedRaw);
+
+      if (currentArrow.length === 0) {
+        setCurrentArrow([pt]);
+      } else {
+        const start = currentArrow[0];
+        const newArrow: ArrowData = {
+          id: crypto.randomUUID(),
+          start,
+          end: pt,
+          layerId: activeLayerId
+        };
+        if (onArrowsChange && arrows) {
+          onArrowsChange([...arrows, newArrow]);
+        }
+        setCurrentArrow([]);
       }
       return;
     }
@@ -1458,6 +1675,24 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
     if (e.evt.button === 1) {
       setIsPanning(false);
       lastPanPosRef.current = null;
+    }
+    
+    if (activeTool === 'export-window' && currentExportStart) {
+      const stage = e.target.getStage();
+      const raw = getWorldPointerPos(stage);
+      if (raw) {
+        const rect = {
+          x: Math.min(currentExportStart.x, raw.x),
+          y: Math.min(currentExportStart.y, raw.y),
+          width: Math.abs(raw.x - currentExportStart.x),
+          height: Math.abs(raw.y - currentExportStart.y)
+        };
+        // Only trigger if actually dragged
+        if (rect.width > 5 && rect.height > 5 && onExportWindowSelected) {
+          onExportWindowSelected(rect);
+        }
+      }
+      setCurrentExportStart(null);
     }
   };
   const handleBlueprintDragEnd = (e: any) => {
@@ -2550,6 +2785,7 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
                     const dy = line.points[i+1].y - line.points[i].y;
                     totalDist += Math.sqrt(dx * dx + dy * dy) / PIXELS_PER_METER;
                   }
+                  if (line.hideLength) return null;
                   const label = line.depthFromGL ? `L: ${totalDist.toFixed(1)}m | D: -${line.depthFromGL}m` : `L: ${totalDist.toFixed(1)}m`;
                   return (
                     <Text 
@@ -2804,18 +3040,18 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
                     totalDist += distMeters(hose.points[i], hose.points[i+1]);
                   }
                   return (
-                    <Text 
-                      x={(p1.x + p2.x) / 2} 
-                      y={(p1.y + p2.y) / 2 - 20} 
-                      text={`L: ${totalDist.toFixed(1)}m`} 
-                      fill="#854d0e" 
-                      fontSize={12} 
-                      fontStyle="bold" 
-                      listening={false} 
-                      align="center"
-                      offsetX={50}
-                      width={100}
-                    />
+                    !hose.hideLength ? (
+                      <Text 
+                        x={(p1.x + p2.x) / 2 + 10} 
+                        y={(p1.y + p2.y) / 2 - 20} 
+                        text={`L: ${totalDist.toFixed(1)}m`} 
+                        fill="#854d0e" 
+                        fontSize={12} 
+                        fontStyle="bold" 
+                        padding={4}
+                        listening={false}
+                      />
+                    ) : null
                   );
                 })()}
               </React.Fragment>
@@ -2877,18 +3113,18 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
                     totalDist += distMeters(hose.points[i], hose.points[i+1]);
                   }
                   return (
-                    <Text 
-                      x={(p1.x + p2.x) / 2} 
-                      y={(p1.y + p2.y) / 2 - 20} 
-                      text={`L: ${totalDist.toFixed(1)}m`} 
-                      fill="#9a3412" 
-                      fontSize={12} 
-                      fontStyle="bold" 
-                      listening={false} 
-                      align="center"
-                      offsetX={50}
-                      width={100}
-                    />
+                    !hose.hideLength ? (
+                      <Text 
+                        x={(p1.x + p2.x) / 2 + 10} 
+                        y={(p1.y + p2.y) / 2 - 20} 
+                        text={`L: ${totalDist.toFixed(1)}m`} 
+                        fill="#9a3412" 
+                        fontSize={12} 
+                        fontStyle="bold" 
+                        padding={4}
+                        listening={false}
+                      />
+                    ) : null
                   );
                 })()}
               </React.Fragment>
@@ -2950,6 +3186,29 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
                 />
                 <Text x={Math.min(currentAreaStart.pt.x, cursorPos.x) + w / 2 - 15} y={Math.min(currentAreaStart.pt.y, cursorPos.y) - 15} text={`${wM}m`} fill="#475569" fontSize={12} fontStyle="bold" />
                 <Text x={Math.min(currentAreaStart.pt.x, cursorPos.x) - 15} y={Math.min(currentAreaStart.pt.y, cursorPos.y) + h / 2 - 10} text={`${hM}m`} fill="#475569" fontSize={12} fontStyle="bold" />
+              </Group>
+            );
+          })()}
+          
+          {/* Export Window Tool Preview */}
+          {activeTool === 'export-window' && currentExportStart && cursorPos && (() => {
+            const w = Math.abs(cursorPos.x - currentExportStart.x);
+            const h = Math.abs(cursorPos.y - currentExportStart.y);
+            if (w < 1 && h < 1) return null;
+            return (
+              <Group>
+                <Rect
+                  name="hide-on-export"
+                  x={Math.min(currentExportStart.x, cursorPos.x)}
+                  y={Math.min(currentExportStart.y, cursorPos.y)}
+                  width={w}
+                  height={h}
+                  stroke="#4f46e5"
+                  strokeWidth={2 / scale}
+                  dash={[8 / scale, 8 / scale]}
+                  fill="rgba(79, 70, 229, 0.1)"
+                  listening={false}
+                />
               </Group>
             );
           })()}
@@ -3091,7 +3350,13 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
                   }
                 }}
               >
-                <Line points={[dim.start.x, dim.start.y, dim.end.x, dim.end.y]} stroke={activeTool === 'delete' ? '#ef4444' : '#64748b'} strokeWidth={1} listening={false} />
+                {dim.measuredStart && (
+                  <Line points={[dim.measuredStart.x, dim.measuredStart.y, dim.start.x, dim.start.y]} stroke="#94a3b8" strokeWidth={1} dash={[4, 4]} listening={false} />
+                )}
+                {dim.measuredEnd && (
+                  <Line points={[dim.measuredEnd.x, dim.measuredEnd.y, dim.end.x, dim.end.y]} stroke="#94a3b8" strokeWidth={1} dash={[4, 4]} listening={false} />
+                )}
+                <Line points={[dim.start.x, dim.start.y, dim.end.x, dim.end.y]} stroke={activeTool === 'delete' ? '#ef4444' : '#64748b'} strokeWidth={1} hitStrokeWidth={15} />
                 <Line points={[dim.start.x - 5, dim.start.y - 5, dim.start.x + 5, dim.start.y + 5]} stroke="#64748b" strokeWidth={1.5} rotation={45} listening={false} />
                 <Line points={[dim.end.x - 5, dim.end.y - 5, dim.end.x + 5, dim.end.y + 5]} stroke="#64748b" strokeWidth={1.5} rotation={45} listening={false} />
                 <Text 
@@ -3105,24 +3370,233 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
                   rotation={angle > 90 ? angle - 180 : angle < -90 ? angle + 180 : angle}
                   offsetY={12}
                   offsetX={20}
-                  listening={false}
                 />
               </Group>
             );
           })}
 
           {/* Current Dimension Preview */}
-          {activeTool === 'dimension' && currentDim.length === 1 && cursorPos && (
+          {activeTool === 'dimension' && currentDim.length > 0 && cursorPos && (() => {
+            if (currentDim.length === 1) {
+              return (
+                <Group listening={false}>
+                  <Line points={[currentDim[0].x, currentDim[0].y, cursorPos.x, cursorPos.y]} stroke="#3b82f6" strokeWidth={1} dash={[4, 4]} />
+                  <Text 
+                    x={(currentDim[0].x + cursorPos.x) / 2} 
+                    y={(currentDim[0].y + cursorPos.y) / 2} 
+                    text={`${(Math.sqrt(Math.pow(cursorPos.x - currentDim[0].x, 2) + Math.pow(cursorPos.y - currentDim[0].y, 2)) / PIXELS_PER_METER).toFixed(2)}m`}
+                    fill="#3b82f6" 
+                    fontSize={14} 
+                    fontStyle="bold"
+                    offsetY={12}
+                  />
+                </Group>
+              );
+            } else if (currentDim.length === 2) {
+              const pt1 = currentDim[0];
+              const pt2 = currentDim[1];
+              
+              const dx = pt2.x - pt1.x;
+              const dy = pt2.y - pt1.y;
+              const length = Math.sqrt(dx * dx + dy * dy);
+              
+              let startPoint = pt1;
+              let endPoint = pt2;
+              
+              if (length > 0) {
+                const nx = -dy / length;
+                const ny = dx / length;
+                const offset = (cursorPos.x - pt1.x) * nx + (cursorPos.y - pt1.y) * ny;
+                
+                startPoint = { x: pt1.x + nx * offset, y: pt1.y + ny * offset };
+                endPoint = { x: pt2.x + nx * offset, y: pt2.y + ny * offset };
+              }
+              
+              return (
+                <Group listening={false}>
+                  <Line points={[pt1.x, pt1.y, startPoint.x, startPoint.y]} stroke="#94a3b8" strokeWidth={1} dash={[4, 4]} />
+                  <Line points={[pt2.x, pt2.y, endPoint.x, endPoint.y]} stroke="#94a3b8" strokeWidth={1} dash={[4, 4]} />
+                  <Line points={[startPoint.x, startPoint.y, endPoint.x, endPoint.y]} stroke="#3b82f6" strokeWidth={1} />
+                  <Line points={[startPoint.x - 5, startPoint.y - 5, startPoint.x + 5, startPoint.y + 5]} stroke="#3b82f6" strokeWidth={1.5} rotation={45} />
+                  <Line points={[endPoint.x - 5, endPoint.y - 5, endPoint.x + 5, endPoint.y + 5]} stroke="#3b82f6" strokeWidth={1.5} rotation={45} />
+                  <Text 
+                    x={(startPoint.x + endPoint.x) / 2} 
+                    y={(startPoint.y + endPoint.y) / 2} 
+                    text={`${(length / PIXELS_PER_METER).toFixed(2)}m`}
+                    fill="#3b82f6" 
+                    fontSize={14} 
+                    fontStyle="bold"
+                    offsetY={12}
+                  />
+                </Group>
+              );
+            }
+            return null;
+          })()}
+
+          {/* Texts */}
+          {texts.filter(isItemVisible).map(txt => {
+            const isSelected = activeTool === 'select' && (selectedId === txt.id || selectedIds.has(txt.id));
+            const isLocked = txt.locked;
+            return (
+              <Group 
+                key={txt.id}
+                x={txt.x}
+                y={txt.y}
+                draggable={activeTool === 'select' && !isLocked}
+                onDragEnd={(e) => {
+                  const node = e.target;
+                  if (onTextsChange && texts) {
+                    onTextsChange(texts.map(t => t.id === txt.id ? { 
+                      ...t, 
+                      x: node.x(), 
+                      y: node.y(), 
+                    } : t));
+                  }
+                  node.position({ x: txt.x, y: txt.y });
+                }}
+                onMouseEnter={() => { 
+                  if (activeTool === 'delete') document.body.style.cursor = 'pointer'; 
+                  else if (activeTool === 'select' && !isLocked) document.body.style.cursor = 'move';
+                }}
+                onMouseLeave={() => { document.body.style.cursor = 'default'; }}
+                onClick={(e) => {
+                  const stage = e.target.getStage();
+                  const clickPt = getWorldPointerPos(stage) || undefined;
+                  const didExecute = executeModifyCommand('text', txt.id, clickPt);
+                  if (didExecute) {
+                    e.cancelBubble = true;
+                    return;
+                  }
+                  if (isLocked && activeTool !== 'select') return;
+                  if (activeTool === 'select') {
+                    selectSingleElement(txt.id);
+                    e.cancelBubble = true;
+                  } else if (activeTool === 'delete' && onTextsChange) {
+                    onTextsChange(texts.filter(t => t.id !== txt.id));
+                    e.cancelBubble = true;
+                  }
+                }}
+                onContextMenu={(e) => {
+                  if (activeTool === 'select') {
+                    toggleSelectElement(txt.id, e);
+                  }
+                }}
+                onDblClick={(e) => {
+                  if (activeTool === 'select' || activeTool === 'text') {
+                    setTextEditor({ x: txt.x, y: txt.y, val: txt.text, editingId: txt.id });
+                    e.cancelBubble = true;
+                  }
+                }}
+                onDblTap={(e) => {
+                  if (activeTool === 'select' || activeTool === 'text') {
+                    setTextEditor({ x: txt.x, y: txt.y, val: txt.text, editingId: txt.id });
+                    e.cancelBubble = true;
+                  }
+                }}
+              >
+                <Text
+                  x={0}
+                  y={0}
+                  text={txt.text}
+                  fill={txt.color || textColor}
+                  fontSize={txt.fontSize || textSize}
+                  fontStyle="bold"
+                  rotation={txt.rotation || 0}
+                  align="center"
+                />
+                {isLocked && (
+                  <Text x={-5} y={-20} text="📌" fontSize={12} listening={false} />
+                )}
+                {isSelected && (
+                  <Rect
+                    x={-4}
+                    y={-4}
+                    width={txt.text.length * (txt.fontSize || textSize) * 0.6 + 8}
+                    height={(txt.fontSize || textSize) + 8}
+                    stroke="#fbbf24"
+                    strokeWidth={1.5}
+                    dash={[4, 4]}
+                    listening={false}
+                  />
+                )}
+              </Group>
+            );
+          })}
+
+          {/* Arrows */}
+          {arrows.filter(isItemVisible).map(arrow => {
+            const isSelected = activeTool === 'select' && (selectedId === arrow.id || selectedIds.has(arrow.id));
+            return (
+              <Group
+                key={arrow.id}
+                draggable={activeTool === 'select' && !arrow.locked}
+                onDragEnd={(e) => {
+                  const node = e.target;
+                  if (onArrowsChange && arrows) {
+                    const dx = node.x();
+                    const dy = node.y();
+                    onArrowsChange(arrows.map(a => a.id === arrow.id ? {
+                      ...a,
+                      start: { x: a.start.x + dx, y: a.start.y + dy },
+                      end: { x: a.end.x + dx, y: a.end.y + dy }
+                    } : a));
+                  }
+                  node.position({ x: 0, y: 0 });
+                }}
+                onMouseEnter={() => { 
+                  if (activeTool === 'delete') document.body.style.cursor = 'pointer'; 
+                  else if (activeTool === 'select' && !arrow.locked) document.body.style.cursor = 'move';
+                }}
+                onMouseLeave={() => { document.body.style.cursor = 'default'; }}
+                onClick={(e) => {
+                  if (activeTool === 'delete' && onArrowsChange && arrows) {
+                    onArrowsChange(arrows.filter(a => a.id !== arrow.id));
+                    e.cancelBubble = true;
+                    return;
+                  }
+                  if (activeTool === 'select') {
+                    selectSingleElement(arrow.id);
+                    e.cancelBubble = true;
+                  }
+                }}
+              >
+                <Arrow
+                  points={[arrow.start.x, arrow.start.y, arrow.end.x, arrow.end.y]}
+                  fill={activeTool === 'delete' ? '#ef4444' : isSelected ? '#3b82f6' : '#475569'}
+                  stroke={activeTool === 'delete' ? '#ef4444' : isSelected ? '#3b82f6' : '#475569'}
+                  strokeWidth={2}
+                  pointerLength={10}
+                  pointerWidth={10}
+                  hitStrokeWidth={15}
+                />
+                {isSelected && (
+                  <Rect
+                    x={Math.min(arrow.start.x, arrow.end.x) - 10}
+                    y={Math.min(arrow.start.y, arrow.end.y) - 10}
+                    width={Math.abs(arrow.end.x - arrow.start.x) + 20}
+                    height={Math.abs(arrow.end.y - arrow.start.y) + 20}
+                    stroke="#fbbf24"
+                    strokeWidth={1.5}
+                    dash={[4, 4]}
+                    listening={false}
+                  />
+                )}
+              </Group>
+            );
+          })}
+
+          {/* Current Arrow Preview */}
+          {activeTool === 'arrow' && currentArrow.length === 1 && cursorPos && (
             <Group listening={false}>
-              <Line points={[currentDim[0].x, currentDim[0].y, cursorPos.x, cursorPos.y]} stroke="#3b82f6" strokeWidth={1} dash={[4, 4]} />
-              <Text 
-                x={(currentDim[0].x + cursorPos.x) / 2} 
-                y={(currentDim[0].y + cursorPos.y) / 2} 
-                text={`${(Math.sqrt(Math.pow(cursorPos.x - currentDim[0].x, 2) + Math.pow(cursorPos.y - currentDim[0].y, 2)) / PIXELS_PER_METER).toFixed(2)}m`}
-                fill="#3b82f6" 
-                fontSize={14} 
-                fontStyle="bold"
-                offsetY={12}
+              <Arrow
+                points={[currentArrow[0].x, currentArrow[0].y, cursorPos.x, cursorPos.y]}
+                fill="#3b82f6"
+                stroke="#3b82f6"
+                strokeWidth={2}
+                pointerLength={10}
+                pointerWidth={10}
+                dash={[4, 4]}
               />
             </Group>
           )}
@@ -3265,6 +3739,16 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
               }}
             />
           )}
+          
+          <KonvaLegend 
+            lines={lines} 
+            placedComponents={placedComponents} 
+            hoses={hoses} 
+            areas={areas} 
+            pos={legendPos} 
+            onDragEnd={setLegendPos} 
+            scale={scale} 
+          />
 
         </Layer>
       </Stage>
@@ -3391,6 +3875,42 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
                 }}
               />
               <p className="text-[10px] text-slate-400 mt-1">Relative to the assigned level.</p>
+            </div>
+            
+            <div className="flex items-center gap-2 mt-4 pt-4 border-t border-slate-200">
+              <input
+                type="checkbox"
+                id="hide-length-label"
+                className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                checked={!!selectedLine.hideLength}
+                onChange={(e) => {
+                  if (onLinesChange) {
+                    onLinesChange(lines.map((l: any) => l.id === selectedId ? { ...l, hideLength: e.target.checked } : l));
+                  }
+                }}
+              />
+              <label htmlFor="hide-length-label" className="text-xs text-slate-700">Hide "L:" length label</label>
+            </div>
+          </div>
+        </DraggablePanel>
+      )}
+
+      {selectedHose && activeTool === 'select' && (
+        <DraggablePanel title="Hose Properties" onClose={() => setSelectedId(null)}>
+          <div className="space-y-2 p-1">
+            <div className="flex items-center gap-2 mt-2">
+              <input
+                type="checkbox"
+                id="hide-hose-length-label"
+                className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                checked={!!selectedHose.hideLength}
+                onChange={(e) => {
+                  if (onHosesChange) {
+                    onHosesChange(hoses.map((h: any) => h.id === selectedId ? { ...h, hideLength: e.target.checked } : h));
+                  }
+                }}
+              />
+              <label htmlFor="hide-hose-length-label" className="text-xs text-slate-700">Hide "L:" length label</label>
             </div>
           </div>
         </DraggablePanel>

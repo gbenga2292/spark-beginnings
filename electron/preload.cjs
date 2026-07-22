@@ -54,6 +54,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('updater:status', subscription);
     return () => ipcRenderer.removeListener('updater:status', subscription);
   },
+  // Supabase Database Backup CLI/Native trigger
+  backupSupabaseDatabase: (opts) => ipcRenderer.invoke('db:backup-supabase', opts),
 });
 
 

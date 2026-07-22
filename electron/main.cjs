@@ -563,6 +563,74 @@ function initIPC() {
     });
     n.show();
   });
+
+  // ── Supabase Native Database Backup via CLI ──
+  ipcMain.handle('db:backup-supabase', async (_event, opts = {}) => {
+    const fs = require('fs');
+    const p = require('path');
+    const os = require('os');
+    const { execSync } = require('child_process');
+
+    const now = new Date();
+    const dateStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`;
+    const defaultFileName = `Supabase_DB_Backup_${dateStr}.zip`;
+
+    const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
+      title: 'Save Supabase Database Backup',
+      defaultPath: defaultFileName,
+      filters: [
+        { name: 'ZIP Archive', extensions: ['zip'] },
+        { name: 'SQL File', extensions: ['sql'] },
+        { name: 'All Files', extensions: ['*'] }
+      ]
+    });
+
+    if (canceled || !filePath) {
+      return { canceled: true };
+    }
+
+    const dbUrl = opts.dbUrl || process.env.SUPABASE_DB_URL || process.env.VITE_SUPABASE_DB_URL;
+
+    // Create temporary work directory
+    const tempDir = fs.mkdtempSync(p.join(os.tmpdir(), 'supabase-backup-'));
+
+    try {
+      if (dbUrl) {
+        // Run Supabase CLI dumps
+        const rolesFile = p.join(tempDir, 'roles.sql');
+        const schemaFile = p.join(tempDir, 'schema.sql');
+        const dataFile = p.join(tempDir, 'data.sql');
+
+        execSync(`supabase db dump --db-url "${dbUrl}" -f "${rolesFile}" --role-only`, { encoding: 'utf8' });
+        execSync(`supabase db dump --db-url "${dbUrl}" -f "${schemaFile}"`, { encoding: 'utf8' });
+        execSync(`supabase db dump --db-url "${dbUrl}" -f "${dataFile}" --use-copy --data-only`, { encoding: 'utf8' });
+
+        if (filePath.endsWith('.sql')) {
+          // If saving directly as a single .sql file, combine them
+          const combined = `-- Supabase Roles DDL\n` + fs.readFileSync(rolesFile, 'utf8') +
+                           `\n\n-- Supabase Schema DDL\n` + fs.readFileSync(schemaFile, 'utf8') +
+                           `\n\n-- Supabase Data\n` + fs.readFileSync(dataFile, 'utf8');
+          fs.writeFileSync(filePath, combined, 'utf8');
+        } else {
+          // Zip using PowerShell Compress-Archive
+          if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+          execSync(`powershell -Command "Compress-Archive -Path '${tempDir}\\*.sql' -DestinationPath '${filePath}' -Force"`);
+        }
+
+        // Clean up temp dir
+        fs.rmSync(tempDir, { recursive: true, force: true });
+        return { success: true, filePath, method: 'cli', message: 'Full database dump completed successfully' };
+      } else {
+        // If DB URL is missing, return fallback signal so renderer can export via client
+        fs.rmSync(tempDir, { recursive: true, force: true });
+        return { success: false, fallbackToClient: true, filePath, message: 'No direct database connection string configured. Using table exporter...' };
+      }
+    } catch (err) {
+      console.error('Supabase CLI backup error:', err);
+      try { fs.rmSync(tempDir, { recursive: true, force: true }); } catch (e) {}
+      return { success: false, fallbackToClient: true, filePath, message: err.message || 'CLI dump error' };
+    }
+  });
 }
 
 /* ─── Tray Setup ───────────────────────────────────────────────── */

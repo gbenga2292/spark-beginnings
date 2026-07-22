@@ -3265,9 +3265,21 @@ export function InvoicePrintModal({ invoice, onClose, ledgerBanks, ledgerBenefic
   const [projectText, setProjectText] = useState(getInitialProjectText());
   const [termsText, setTermsText] = useState(invoice.printLayout?.termsText || 'For Immediate Payment');
   
-  const [invoiceDate, setInvoiceDate] = useState(invoice.printLayout?.invoiceDate || invoice.date || invoice.startDate || '');
+  const formatInitialDate = (d: string) => {
+    if (!d) return '';
+    const p = d.split('-');
+    if (p.length === 3 && p[0].length === 4) return `${p[2]}/${p[1]}/${p[0]}`;
+    return d;
+  };
+
+  const [invoiceDate, setInvoiceDate] = useState(invoice.printLayout?.invoiceDate || formatInitialDate(invoice.date || invoice.startDate || ''));
   const [invoiceNo, setInvoiceNo] = useState(invoice.printLayout?.invoiceNo || invoice.invoiceNumber || invoice.invoiceNo || '');
-  const [paymentsCredits, setPaymentsCredits] = useState<number>(getInitialPaymentsCredits());
+  const [paymentsCredits, setPaymentsCredits] = useState<string>(
+    invoice.printLayout?.paymentsCredits !== undefined 
+      ? String(invoice.printLayout.paymentsCredits) 
+      : String(getInitialPaymentsCredits())
+  );
+  const [paymentsCreditsLabel, setPaymentsCreditsLabel] = useState(invoice.printLayout?.paymentsCreditsLabel || 'Payments/Credits');
   
   const [combineDiesel, setCombineDiesel] = useState(invoice.printLayout?.combineDiesel || false);
   const [combineIdenticalPumps, setCombineIdenticalPumps] = useState(invoice.printLayout?.combineIdenticalPumps || false);
@@ -3604,32 +3616,35 @@ export function InvoicePrintModal({ invoice, onClose, ledgerBanks, ledgerBenefic
   const subtotal = items.reduce((acc, curr) => acc + (parseFloat(curr.amount) || 0), 0);
   const vatRate = parseFloat(String(useAppStore.getState().payrollVariables?.vatRate || '7.5')) || 7.5;
 
+  const discountAmount = parseFloat(String(paymentsCredits).replace(/,/g, '')) || 0;
+  const discountedSubtotal = Math.max(0, subtotal - discountAmount);
+
   const vatIncSetting = invoice.vatInc;
-  let totalCharge = subtotal;
+  let totalCharge = discountedSubtotal;
   let vat = 0;
   if (vatIncSetting === 'Yes') {
-    vat = (subtotal / (100 + vatRate)) * vatRate;
+    vat = (discountedSubtotal / (100 + vatRate)) * vatRate;
   } else if (vatIncSetting === 'Add') {
-    vat = subtotal * (vatRate / 100);
-    totalCharge = subtotal + vat;
+    vat = discountedSubtotal * (vatRate / 100);
+    totalCharge = discountedSubtotal + vat;
   }
   
-  const [customWords, setCustomWords] = useState<string | null>(invoice.printLayout?.customWords || null);
+  const calcBalanceDue = totalCharge;
+  
+  const [customWords, setCustomWords] = useState<string>('TOTAL AMOUNT IN WORD: ' + toWords(calcBalanceDue));
   
   React.useEffect(() => {
-    if (customWords === null && !invoice.printLayout?.customWords) {
-      setCustomWords('TOTAL AMOUNT IN WORD: ' + toWords(totalCharge));
-    }
-  }, [totalCharge, customWords, invoice.printLayout?.customWords]);
+    setCustomWords('TOTAL AMOUNT IN WORD: ' + toWords(calcBalanceDue));
+  }, [calcBalanceDue]);
 
-  const wordsValue = customWords !== null ? customWords : ('TOTAL AMOUNT IN WORD: ' + toWords(totalCharge));
+  const wordsValue = customWords;
+  const [extraNote, setExtraNote] = useState(invoice.printLayout?.extraNote || '');
   const [footerText, setFooterText] = useState(invoice.printLayout?.footerText || 'We look forward to your swift response.');
   
   const [footerCompany, setFooterCompany] = useState(invoice.printLayout?.footerCompany || 'DEWATERING CONSTRUCTION ETC LIMITED');
   const [footerContact, setFooterContact] = useState(invoice.printLayout?.footerContact || '09030002182, 08028280712');
   const [footerEmail, setFooterEmail] = useState(invoice.printLayout?.footerEmail || 'info@dewaterconstruct.com');
 
-  const calcBalanceDue = totalCharge - paymentsCredits;
   const [isSaving, setIsSaving] = React.useState(false);
 
   // ── Dirty tracking ─────────────────────────────────────────────────
@@ -3640,9 +3655,11 @@ export function InvoicePrintModal({ invoice, onClose, ledgerBanks, ledgerBenefic
       invoiceNo: invoice.printLayout?.invoiceNo || invoice.invoiceNumber || invoice.invoiceNo || '',
       customWords: invoice.printLayout?.customWords || null,
       paymentsCredits: getInitialPaymentsCredits(),
+      paymentsCreditsLabel: invoice.printLayout?.paymentsCreditsLabel || 'Payments/Credits',
       footerCompany: invoice.printLayout?.footerCompany || 'DEWATERING CONSTRUCTION ETC LIMITED',
       footerContact: invoice.printLayout?.footerContact || '09030002182, 08028280712',
       footerEmail: invoice.printLayout?.footerEmail || 'info@dewaterconstruct.com',
+      extraNote: invoice.printLayout?.extraNote || '',
       footerText: invoice.printLayout?.footerText || 'We look forward to your swift response.',
       billedToInput: getInitialBilledTo(),
       paidToInput: invoice.printLayout?.paidToInput || 'STANBIC IBTC BANK\n0021939731\nDewatering Construction etc Limited',
@@ -3655,7 +3672,7 @@ export function InvoicePrintModal({ invoice, onClose, ledgerBanks, ledgerBenefic
 
   const currentSnapshot = JSON.stringify({
     items, invoiceDate, invoiceNo, customWords, paymentsCredits,
-    footerCompany, footerContact, footerEmail, footerText,
+    footerCompany, footerContact, footerEmail, extraNote, footerText,
     billedToInput, paidToInput, projectText, termsText,
     combineDiesel, combineIdenticalPumps,
   });
@@ -3666,7 +3683,7 @@ export function InvoicePrintModal({ invoice, onClose, ledgerBanks, ledgerBenefic
   const updateSnapshot = () => {
     initialSnapshot.current = JSON.stringify({
       items, invoiceDate, invoiceNo, customWords, paymentsCredits,
-      footerCompany, footerContact, footerEmail, footerText,
+      footerCompany, footerContact, footerEmail, extraNote, footerText,
       billedToInput, paidToInput, projectText, termsText,
     });
   };
@@ -3699,8 +3716,8 @@ export function InvoicePrintModal({ invoice, onClose, ledgerBanks, ledgerBenefic
     const liveInputs = Array.from(
       content.querySelectorAll<HTMLInputElement>('input.hide-on-print')
     );
-    const taValues  = liveTextareas.map(el => el.value);
-    const inpValues = liveInputs.map(el => el.value);
+    const taValues  = liveTextareas.map(el => el.getAttribute('data-print-value') || el.value);
+    const inpValues = liveInputs.map(el => el.getAttribute('data-print-value') || el.value);
 
     // Clone so mutations don't affect the live UI
     const clone = content.cloneNode(true) as HTMLElement;
@@ -3786,6 +3803,9 @@ export function InvoicePrintModal({ invoice, onClose, ledgerBanks, ledgerBenefic
         /* padding-top only — no margin-top:auto so footer stays right after content */
         .footer { padding-top: 30px; font-size: 13.5px; line-height: 1.4; font-weight: bold; page-break-inside: avoid; }
 
+        .hide-on-print { display: none !important; }
+        .show-on-print { display: inline-block !important; }
+
         @media print {
           body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
           .a4-page { margin: 0 !important; padding: 10mm !important; box-shadow: none !important; }
@@ -3813,9 +3833,11 @@ export function InvoicePrintModal({ invoice, onClose, ledgerBanks, ledgerBenefic
       invoiceNo,
       customWords,
       paymentsCredits,
+      paymentsCreditsLabel,
       footerCompany,
       footerContact,
       footerEmail,
+      extraNote,
       footerText,
       billedToInput,
       paidToInput,
@@ -3889,52 +3911,59 @@ export function InvoicePrintModal({ invoice, onClose, ledgerBanks, ledgerBenefic
     setItems(items.filter((_, i) => i !== index));
   };
 
-  useSetPageTitle(
-    'PDF Preview',
-    `#${invoiceNo} · ${invoice.client}`,
-    <div className="flex items-center gap-2">
-      {hasUnsavedChanges && (
-        <span className="hidden sm:flex items-center gap-1.5 text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-3 py-1">
-          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-          Unsaved Changes
-        </span>
-      )}
-      {savedLayout && (
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => setShowHistory(!showHistory)}
-          className="h-9 gap-2 text-slate-600 border-slate-200 bg-white hover:bg-slate-50 font-semibold text-[11px] uppercase tracking-tight shadow-sm px-4 transition-all"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>
-          <span className="hidden sm:inline">History</span>
-        </Button>
-      )}
-      <div className="h-6 w-px bg-slate-200 mx-1 hidden sm:block" />
-      <Button
-        size="sm"
-        variant="outline"
-        onClick={handleSaveLayout}
-        disabled={isSaving}
-        className="h-9 gap-2 text-slate-700 border-slate-200 bg-white hover:bg-slate-50 font-semibold text-[11px] uppercase tracking-tight shadow-sm px-4 transition-all"
-      >
-        <Save className="h-4 w-4" />
-        <span className="hidden sm:inline">{isSaving ? 'Saving...' : 'Save State'}</span>
-      </Button>
-      <Button
-        size="sm"
-        onClick={handlePrint}
-        className="h-9 gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-[11px] uppercase tracking-tight px-4 shadow-sm transition-all"
-      >
-        <Printer className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Print Document</span>
-      </Button>
-    </div>,
-    [],
-    guardedClose
-  );
-
   return (
     <>
+      {/* ── Top Action Bar ── */}
+      <div className="flex flex-wrap items-center justify-between mb-4 bg-white p-3 rounded-xl shadow-sm border border-slate-200 hide-on-print gap-4">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="sm" onClick={guardedClose} className="text-slate-500 hover:bg-slate-100 h-9 px-3 flex items-center">
+            <X className="w-4 h-4 mr-1.5" /> Close
+          </Button>
+          <div className="h-6 w-px bg-slate-200 mx-1" />
+          <div className="flex flex-col">
+            <h2 className="text-sm font-bold text-slate-800 leading-tight">PDF Preview</h2>
+            <p className="text-[10px] text-slate-500 leading-tight">#{invoiceNo} · {invoice.client}</p>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {hasUnsavedChanges && (
+            <span className="hidden sm:flex items-center gap-1.5 text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-3 py-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+              Unsaved Changes
+            </span>
+          )}
+          {savedLayout && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setShowHistory(!showHistory)}
+              className="h-9 gap-2 text-slate-600 border-slate-200 bg-white hover:bg-slate-50 font-semibold text-[11px] uppercase tracking-tight shadow-sm px-4 transition-all"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>
+              <span className="hidden sm:inline">History</span>
+            </Button>
+          )}
+          <div className="h-6 w-px bg-slate-200 mx-1 hidden sm:block" />
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleSaveLayout}
+            disabled={isSaving}
+            className="h-9 gap-2 text-slate-700 border-slate-200 bg-white hover:bg-slate-50 font-semibold text-[11px] uppercase tracking-tight shadow-sm px-4 transition-all"
+          >
+            <Save className="h-4 w-4" />
+            <span className="hidden sm:inline">{isSaving ? 'Saving...' : 'Save State'}</span>
+          </Button>
+          <Button
+            size="sm"
+            onClick={handlePrint}
+            className="h-9 gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-[11px] uppercase tracking-tight px-4 shadow-sm transition-all"
+          >
+            <Printer className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Print</span>
+          </Button>
+        </div>
+      </div>
+
     {/* ── Leave Confirmation Dialog ───────────────────────────────────── */}
     <AlertDialog open={showLeaveDialog} onOpenChange={setShowLeaveDialog}>
       <AlertDialogContent className="max-w-md">
@@ -4208,22 +4237,30 @@ export function InvoicePrintModal({ invoice, onClose, ledgerBanks, ledgerBenefic
                     <td className="rate-col">
                       <input
                         className="hide-on-print"
-                        type="number"
+                        type="text"
                         value={item.unitRate ?? item.amount}
                         onChange={e => handleUpdateItem(globalIdx, 'unitRate', e.target.value)}
                         style={{ width: '100%', textAlign: 'right', border: '1px dashed #c7d2e0', padding: 3, borderRadius: 3, outline: 'none', background: '#f9fafb', fontFamily: 'inherit', fontSize: 'inherit' }}
                       />
-                      <span className="show-on-print" style={{ display: 'none' }}>{fmt(parseFloat(String(item.unitRate ?? item.amount)) || 0)}</span>
+                      <span className="show-on-print" style={{ display: 'none' }}>
+                        {isNaN(Number(item.unitRate ?? item.amount)) 
+                          ? String(item.unitRate ?? item.amount) 
+                          : fmt(parseFloat(String(item.unitRate ?? item.amount)) || 0)}
+                      </span>
                     </td>
                     <td className="amt-col">
                       <input
                         className="hide-on-print"
-                        type="number"
+                        type="text"
                         value={item.amount}
                         onChange={e => handleUpdateItem(globalIdx, 'amount', e.target.value)}
                         style={{ width: '100%', textAlign: 'right', border: '1px dashed #c7d2e0', padding: 3, borderRadius: 3, outline: 'none', background: '#f9fafb', fontFamily: 'inherit', fontSize: 'inherit' }}
                       />
-                      <span className="show-on-print" style={{ display: 'none' }}>{fmt(parseFloat(item.amount || 0))}</span>
+                      <span className="show-on-print" style={{ display: 'none' }}>
+                        {isNaN(Number(item.amount)) 
+                          ? String(item.amount) 
+                          : fmt(parseFloat(String(item.amount)) || 0)}
+                      </span>
                     </td>
                   </tr>
                 );
@@ -4309,6 +4346,33 @@ export function InvoicePrintModal({ invoice, onClose, ledgerBanks, ledgerBenefic
                         </tr>
                       )}
 
+                      <tr className="summary-row">
+                        <td className="hide-on-print" style={{ background: '#f8fafc' }}></td>
+                        <td colSpan={4} style={{ textAlign: 'right', paddingRight: 8, ...getLabelStyle(paymentsCreditsLabel) }}>
+                          <input
+                            type="text"
+                            className="hide-on-print"
+                            value={paymentsCreditsLabel}
+                            onChange={e => setPaymentsCreditsLabel(e.target.value)}
+                            style={{ width: '110px', textAlign: 'right', fontWeight: 'inherit', border: 'none', background: 'transparent', outline: 'none', fontSize: 'inherit', color: 'inherit', fontFamily: 'inherit' }}
+                          />
+                          <span className="show-on-print" style={{ display: 'none' }}>{paymentsCreditsLabel}</span>
+                        </td>
+                        <td className="amt-col">
+                          <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 4 }}>
+                            <input
+                              type="text"
+                              className="hide-on-print"
+                              data-print-value={isNaN(Number(paymentsCredits)) || paymentsCredits === '' ? paymentsCredits : Number(paymentsCredits).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                              value={paymentsCredits}
+                              onChange={e => setPaymentsCredits(e.target.value)}
+                              placeholder="Amount or text"
+                              style={{ width: '100%', textAlign: 'right', border: '1px dashed #c7d2e0', borderRadius: 3, padding: '2px 4px', outline: 'none', background: '#f9fafb', fontSize: '11.5px' }}
+                            />
+                          </div>
+                        </td>
+                      </tr>
+
                       {vat > 0 && (
                         <tr className="summary-row">
                           <td className="hide-on-print" style={{ background: '#f8fafc' }}></td>
@@ -4328,42 +4392,25 @@ export function InvoicePrintModal({ invoice, onClose, ledgerBanks, ledgerBenefic
                 );
               })()}
 
-              {/* ── Payments / Balance Due Table (Right-aligned) ── */}
-              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14 }}>
-                <table style={{ borderCollapse: 'collapse', fontSize: 12, flexShrink: 0 }}>
-                  <tbody>
-                    <tr>
-                      <td style={{ border: '1.5px solid #385296', padding: '5px 14px', fontWeight: 'bold', ...getLabelStyle('Payments/Credits') }}>Payments/Credits</td>
-                      <td style={{ border: '1.5px solid #385296', padding: '5px 10px', textAlign: 'right', minWidth: 150 }}>
-                        <span className="hide-on-print" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 4 }}>
-                          NGN
-                          <input
-                            type="number"
-                            value={paymentsCredits}
-                            onChange={e => setPaymentsCredits(Number(e.target.value))}
-                            style={{ width: '90px', textAlign: 'right', border: '1px dashed #c7d2e0', borderRadius: 3, padding: '2px 4px', outline: 'none', background: '#f9fafb', fontSize: '11.5px' }}
-                          />
-                        </span>
-                        <span className="show-on-print" style={{ display: 'none' }}>NGN {paymentsCredits.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td style={{ border: '1.5px solid #385296', padding: '5px 14px', fontWeight: 'bold', ...getLabelStyle('Balance Due') }}>Balance Due</td>
-                      <td style={{ border: '1.5px solid #385296', padding: '5px 10px', textAlign: 'right' }}>NGN {calcBalanceDue.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-
               {/* ── TOTAL AMOUNT IN WORD — standalone paragraph below table ── */}
-              <div style={{ marginTop: 14, fontSize: 12 }}>
+              <div style={{ marginTop: 14, fontSize: 12, fontWeight: 900, color: '#000' }}>
                 <textarea
                   className="hide-on-print"
                   value={wordsValue}
                   onChange={e => setCustomWords(e.target.value)}
-                  style={{ width: '100%', minHeight: '40px', border: '1px dashed #c7d2e0', padding: '5px 8px', fontWeight: 'bold', borderRadius: 3, outline: 'none', background: '#f9fafb', fontFamily: 'inherit', fontSize: 12 }}
+                  style={{ width: '100%', minHeight: '40px', border: '1px dashed #c7d2e0', padding: '5px 8px', fontWeight: 'inherit', borderRadius: 3, outline: 'none', background: '#f9fafb', fontFamily: 'inherit', fontSize: 12, color: 'inherit' }}
                 />
-                <span className="show-on-print" style={{ display: 'none', fontWeight: 'bold', fontSize: '12px' }}>{wordsValue}</span>
+              </div>
+
+              {/* ── Extra Note ── */}
+              <div style={{ marginTop: 14 }} className={extraNote ? '' : 'hide-on-print'}>
+                <textarea
+                  className="hide-on-print"
+                  value={extraNote}
+                  onChange={e => setExtraNote(e.target.value)}
+                  placeholder="Optional extra note... (Press Enter for new lines)"
+                  style={{ width: '100%', minHeight: '40px', border: '1px dashed #c7d2e0', padding: '4px 6px', borderRadius: 3, outline: 'none', background: '#f9fafb', fontSize: 12, fontFamily: 'inherit', resize: 'vertical' }}
+                />
               </div>
 
               {/* ── Footer note ── */}

@@ -230,6 +230,7 @@ export interface VehicleFuelLog {
   filled_by?: string;
   notes?: string;
   linkedLedgerIds?: string[];
+  linkedLedgerAmounts?: Record<string, number>;
   created_at?: string;
 }
 export interface DowntimeEntry {

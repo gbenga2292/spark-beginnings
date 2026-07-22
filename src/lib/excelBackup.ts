@@ -1,5 +1,26 @@
 import * as XLSX from 'xlsx';
 
+const MAX_EXCEL_CELL_LEN = 32700;
+
+function safeCellValue(value: any): any {
+  if (value === undefined || value === null) return '';
+  if (typeof value === 'object') {
+    try {
+      const str = JSON.stringify(value);
+      if (str.length > MAX_EXCEL_CELL_LEN) {
+        return str.slice(0, MAX_EXCEL_CELL_LEN);
+      }
+      return str;
+    } catch {
+      return String(value).slice(0, MAX_EXCEL_CELL_LEN);
+    }
+  }
+  if (typeof value === 'string' && value.length > MAX_EXCEL_CELL_LEN) {
+    return value.slice(0, MAX_EXCEL_CELL_LEN);
+  }
+  return value;
+}
+
 /**
  * Normalizes an array of objects to have the same keys (headers) so that
  * sheet_to_json and json_to_sheet render consistently.
@@ -17,7 +38,7 @@ function normalizeData(data: any[]) {
   return data.map((item) => {
     const normalized: any = {};
     allKeys.forEach((key) => {
-      normalized[key] = item[key] !== undefined && item[key] !== null ? item[key] : '';
+      normalized[key] = safeCellValue(item[key]);
     });
     return normalized;
   });
@@ -27,8 +48,7 @@ function objectToSheet(obj: any, sheetName: string) {
   if (!obj || typeof obj !== 'object') return XLSX.utils.aoa_to_sheet([['Key', 'Value']]);
   const rows = Object.entries(obj).map(([key, value]) => ({
     Key: key,
-    // JSON stringify nested objects or arrays for flat representation
-    Value: typeof value === 'object' ? JSON.stringify(value) : value,
+    Value: safeCellValue(value),
   }));
   return XLSX.utils.json_to_sheet(rows);
 }
@@ -106,6 +126,27 @@ export const exportFullAppToExcel = async (appStateData: any, appVersion: string
   /* ---- HR & Tasks ---- */
   appendArraySheet('disciplinaryRecords', 'Disciplinary');
   appendArraySheet('evaluations', 'Evaluations');
+
+  /* ---- Vehicles & Operations ---- */
+  appendArraySheet('vehicles', 'Vehicles');
+  appendArraySheet('vehicleTrips', 'VehicleTrips');
+  appendArraySheet('vehicleDocumentTypes', 'VehicleDocTypes');
+  appendArraySheet('vehicleFuelLogs', 'VehicleFuelLogs');
+  appendArraySheet('dieselRefills', 'DieselRefills');
+  appendArraySheet('dailyMachineLogs', 'DailyMachineLogs');
+  appendArraySheet('assets', 'Assets');
+  appendArraySheet('waybills', 'Waybills');
+  appendArraySheet('checkouts', 'Checkouts');
+  appendArraySheet('maintenanceAssets', 'MaintAssets');
+  appendArraySheet('maintenanceSessions', 'MaintSessions');
+
+  /* ---- Tasks, Projects & Budget ---- */
+  appendArraySheet('mainTasks', 'MainTasks');
+  appendArraySheet('subtasks', 'Subtasks');
+  appendArraySheet('comments', 'TaskComments');
+  appendArraySheet('projects', 'Projects');
+  appendArraySheet('reminders', 'Reminders');
+  appendArraySheet('budgetItems', 'BudgetItems');
   
   // Write the file
   const now = new Date();
@@ -239,6 +280,27 @@ export const restoreFullAppFromExcel = (file: File): Promise<any> => {
 
         getArray('disciplinaryRecords', 'Disciplinary');
         getArray('evaluations', 'Evaluations');
+
+        /* ---- Vehicles & Operations ---- */
+        getArray('vehicles', 'Vehicles');
+        getArray('vehicleTrips', 'VehicleTrips');
+        getArray('vehicleDocumentTypes', 'VehicleDocTypes');
+        getArray('vehicleFuelLogs', 'VehicleFuelLogs');
+        getArray('dieselRefills', 'DieselRefills');
+        getArray('dailyMachineLogs', 'DailyMachineLogs');
+        getArray('assets', 'Assets');
+        getArray('waybills', 'Waybills');
+        getArray('checkouts', 'Checkouts');
+        getArray('maintenanceAssets', 'MaintAssets');
+        getArray('maintenanceSessions', 'MaintSessions');
+
+        /* ---- Tasks, Projects & Budget ---- */
+        getArray('mainTasks', 'MainTasks');
+        getArray('subtasks', 'Subtasks');
+        getArray('comments', 'TaskComments');
+        getArray('projects', 'Projects');
+        getArray('reminders', 'Reminders');
+        getArray('budgetItems', 'BudgetItems');
 
         resolve(restoredData);
       } catch (err) {

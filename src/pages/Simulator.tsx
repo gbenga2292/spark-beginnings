@@ -7,7 +7,7 @@ import { ResultsPanel } from '../components/canvas/ResultsPanel';
 import { Toolbar, ActiveTool } from '../components/canvas/Toolbar';
 import { StatusBar } from '../components/canvas/StatusBar';
 import { DrawingSheetPreview, ExportOptions } from '../components/canvas/DrawingSheetPreview';
-import { calculateBOM, LineData, PlacedComponent, DimensionData, AreaData, HoseData, ElevationLevel, PIXELS_PER_METER } from '../utils/simulationLogic';
+import { calculateBOM, LineData, PlacedComponent, DimensionData, AreaData, HoseData, ArrowData, TextData, ElevationLevel, PIXELS_PER_METER } from '../utils/simulationLogic';
 import { captureKonvaStage, captureThreeCanvas } from '../utils/drawingExportUtils';
 import { useSetPageTitle } from '../contexts/PageContext';
 import { db } from '../lib/supabaseService';
@@ -26,6 +26,8 @@ interface SavedLayout {
   dimensions?: DimensionData[];
   areas?: AreaData[];
   hoses?: HoseData[];
+  arrows?: ArrowData[];
+  texts?: TextData[];
   levels?: ElevationLevel[];
   background_image_url: string | null;
   created_at: string;
@@ -99,6 +101,8 @@ export default function Simulator() {
   const [dimensions, setDimensions] = useState<DimensionData[]>([]);
   const [areas, setAreas] = useState<AreaData[]>([]);
   const [hoses, setHoses] = useState<HoseData[]>([]);
+  const [arrows, setArrows] = useState<ArrowData[]>([]);
+  const [texts, setTexts] = useState<TextData[]>([]);
   const [activeTool, setActiveTool] = useState<ActiveTool>('line');
   const [cursorPos, setCursorPos] = useState<{ x: number; y: number } | null>(null);
 
@@ -138,7 +142,8 @@ export default function Simulator() {
   const [textColor, setTextColor] = useState<string>('#000000');
   const [textSize, setTextSize] = useState<number>(14);
 
-  const [history, setHistory] = useState<{ type: 'line' | 'component' | 'dimension' | 'area' | 'hose'; id: string }[]>([]);
+  const [history, setHistory] = useState<{ type: 'line' | 'component' | 'dimension' | 'area' | 'hose' | 'arrow'; id: string }[]>([]);
+  const [redoStack, setRedoStack] = useState<{ type: string; id: string; item: any }[]>([]);
   const [lineLengthMeters, setLineLengthMeters] = useState<number | ''>('');
   
   // Elevation Levels
@@ -171,6 +176,7 @@ export default function Simulator() {
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [saveName, setSaveName] = useState('');
   const [currentLayoutName, setCurrentLayoutName] = useState('');
+  const [currentLayoutId, setCurrentLayoutId] = useState<string | null>(null);
 
   // Drawing Export State
   const stageRef = useRef<any>(null);
@@ -182,7 +188,11 @@ export default function Simulator() {
     include3DView: true,
     includeBOM: true,
     includeLegend: true,
+    includeBlueprint: true,
+    includeTitleBlock: true,
+    colorMode: 'color',
   });
+  const [exportWindowMode, setExportWindowMode] = useState<boolean>(false);
   const [drawingExportData, setDrawingExportData] = useState<{
     sitePlanDataUrl: string;
     perspectiveDataUrl: string | null;
@@ -268,7 +278,9 @@ export default function Simulator() {
 
       const dbImageUrl = serializeBlueprintUrl(finalImageUrl, blueprintSettings);
 
+      const newId = crypto.randomUUID();
       await db.saveDewateringLayout({
+        id: newId,
         user_id: user.id,
         name: saveName.trim(),
         lines,
@@ -276,16 +288,77 @@ export default function Simulator() {
         dimensions,
         areas,
         hoses,
+        arrows,
+        texts,
         levels,
         background_image_url: dbImageUrl
       });
       toast.success(`Layout "${saveName.trim()}" saved successfully.`);
       setCurrentLayoutName(saveName.trim());
+      setCurrentLayoutId(newId);
       setShowSaveDialog(false);
       setSaveName('');
       setSimulatorDirty(false);
     } catch (err: any) {
       toast.error(err.message || 'Failed to save layout.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleUpdateLayout = async () => {
+    if (!currentLayoutId || !currentLayoutName) return;
+    const user = useUserStore.getState().getCurrentUser();
+    if (!user) {
+      toast.error('You must be logged in to update.');
+      return;
+    }
+    if (!priv.canSave) {
+      toast.error('You do not have permission to save layouts.');
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const cleanImageBase = backgroundImage ? parseBlueprintUrl(backgroundImage).url : null;
+      let finalImageUrl = cleanImageBase && !cleanImageBase.startsWith('blob:') ? cleanImageBase : null;
+
+      if (backgroundFile) {
+        const fileExt = backgroundFile.name.split('.').pop();
+        const fileName = `${user.id}-${Date.now()}.${fileExt}`;
+        const { error: uploadError, data } = await supabase.storage
+          .from('simulator-blueprints')
+          .upload(fileName, backgroundFile);
+        
+        if (uploadError) throw uploadError;
+        if (data) {
+          const { data: publicUrlData } = supabase.storage
+            .from('simulator-blueprints')
+            .getPublicUrl(fileName);
+          finalImageUrl = publicUrlData.publicUrl;
+        }
+      }
+
+      const dbImageUrl = serializeBlueprintUrl(finalImageUrl, blueprintSettings);
+
+      await db.saveDewateringLayout({
+        id: currentLayoutId,
+        user_id: user.id,
+        name: currentLayoutName,
+        lines,
+        components: placedComponents,
+        dimensions,
+        areas,
+        hoses,
+        arrows,
+        texts,
+        levels,
+        background_image_url: dbImageUrl
+      });
+      toast.success(`Layout "${currentLayoutName}" updated successfully.`);
+      setSimulatorDirty(false);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update layout.');
     } finally {
       setIsSaving(false);
     }
@@ -323,6 +396,8 @@ export default function Simulator() {
     setDimensions(layout.dimensions || []);
     setAreas(layout.areas || []);
     setHoses(layout.hoses || []);
+    setArrows(layout.arrows || []);
+    setTexts(layout.texts || []);
     if (layout.levels && layout.levels.length > 0) {
       setLevels(layout.levels);
       setActiveLevelId(layout.levels[0].id);
@@ -334,6 +409,7 @@ export default function Simulator() {
     setHistory([]);
     setShowLoadPanel(false);
     setCurrentLayoutName(layout.name);
+    setCurrentLayoutId(layout.id);
     toast.success(`Loaded layout "${layout.name}".`);
     setSimulatorDirty(false);
   };
@@ -381,7 +457,15 @@ export default function Simulator() {
         );
         return;
       }
-      sitePlanUrl = captureKonvaStage(stageRef);
+      
+      if (exportWindowMode) {
+        // If window mode, we enter select mode and wait for the user to drag a box.
+        setActiveTool('export-window');
+        toast.info('Click and drag on the canvas to select the export area.');
+        return;
+      }
+      
+      sitePlanUrl = captureKonvaStage(stageRef, undefined, { includeBlueprint: exportOptions.includeBlueprint });
       if (!sitePlanUrl) {
         toast.error('Failed to capture the 2D site plan. Make sure the canvas has content.');
         return;
@@ -404,6 +488,15 @@ export default function Simulator() {
       }
     }
 
+    if (!sitePlanUrl && !perspectiveUrl) {
+      toast.error('Nothing to export.');
+      return;
+    }
+
+    await finishExport(sitePlanUrl, perspectiveUrl);
+  };
+
+  const finishExport = async (sitePlanUrl: string | null, perspectiveUrl: string | null) => {
     if (!sitePlanUrl && !perspectiveUrl) {
       toast.error('No drawings captured for export.');
       return;
@@ -431,13 +524,49 @@ export default function Simulator() {
     }
 
     setDrawingExportData({
-      sitePlanDataUrl: sitePlanUrl,
+      sitePlanDataUrl: sitePlanUrl || '',
       perspectiveDataUrl: perspectiveUrl,
       companyInfo,
       logoSrc,
       dateStr: new Date().toLocaleDateString(),
     });
     setShowDrawingPreview(true);
+  };
+
+  const handleExportWindowSelected = (rect: {x: number, y: number, width: number, height: number}) => {
+    setActiveTool('select');
+    const fmt = exportOptions.layoutFormat;
+    
+    let sitePlanUrl: string | null = captureKonvaStage(stageRef, rect, { includeBlueprint: exportOptions.includeBlueprint });
+    let perspectiveUrl: string | null = null;
+    if (fmt === 'combined') {
+      perspectiveUrl = captureThreeCanvas();
+    }
+    
+    finishExport(sitePlanUrl, perspectiveUrl);
+  };
+
+  const handleClear = () => {
+    setLines([]);
+    setPlacedComponents([]);
+    setDimensions([]);
+    setAreas([]);
+    setHoses([]);
+    setTexts([]);
+    setHistory([]);
+    setRedoStack([]);
+    setCurrentLayoutId(null);
+    setCurrentLayoutName('');
+    setSimulatorDirty(false);
+  };
+
+  const handleNewLayout = () => {
+    if (isSimulatorDirty) {
+      if (!window.confirm("You have unsaved changes. Are you sure you want to start a new drawing without saving?")) {
+        return;
+      }
+    }
+    handleClear();
   };
 
   useSetPageTitle(
@@ -456,15 +585,47 @@ export default function Simulator() {
           onChange={handleImageUpload}
         />
       </label>
+
       <button 
-        onClick={() => { setSaveName(''); setShowSaveDialog(true); }} 
-        disabled={isSaving || !priv.canSave}
-        className="flex items-center justify-center px-4 py-2 bg-green-600 text-white border border-transparent rounded-md shadow-sm text-sm font-medium hover:bg-green-700 disabled:opacity-50"
-        title={!priv.canSave ? "You don't have permission to save layouts" : ""}
+        onClick={handleNewLayout} 
+        className="flex items-center justify-center px-4 py-2 bg-gray-600 text-white border border-transparent rounded-md shadow-sm text-sm font-medium hover:bg-gray-700"
       >
-        <Save className="w-4 h-4 mr-2" />
-        <span>Save</span>
+        <span>New</span>
       </button>
+
+      {currentLayoutId ? (
+        <>
+          <button 
+            onClick={handleUpdateLayout} 
+            disabled={isSaving || !priv.canSave}
+            className="flex items-center justify-center px-4 py-2 bg-green-600 text-white border border-transparent rounded-md shadow-sm text-sm font-medium hover:bg-green-700 disabled:opacity-50"
+            title={!priv.canSave ? "You don't have permission to save layouts" : ""}
+          >
+            <Save className="w-4 h-4 mr-2" />
+            <span>Update</span>
+          </button>
+          <button 
+            onClick={() => { setSaveName(currentLayoutName); setShowSaveDialog(true); }} 
+            disabled={isSaving || !priv.canSave}
+            className="flex items-center justify-center px-4 py-2 bg-teal-600 text-white border border-transparent rounded-md shadow-sm text-sm font-medium hover:bg-teal-700 disabled:opacity-50"
+            title={!priv.canSave ? "You don't have permission to save layouts" : ""}
+          >
+            <Save className="w-4 h-4 mr-2" />
+            <span>Save As</span>
+          </button>
+        </>
+      ) : (
+        <button 
+          onClick={() => { setSaveName(''); setShowSaveDialog(true); }} 
+          disabled={isSaving || !priv.canSave}
+          className="flex items-center justify-center px-4 py-2 bg-green-600 text-white border border-transparent rounded-md shadow-sm text-sm font-medium hover:bg-green-700 disabled:opacity-50"
+          title={!priv.canSave ? "You don't have permission to save layouts" : ""}
+        >
+          <Save className="w-4 h-4 mr-2" />
+          <span>Save</span>
+        </button>
+      )}
+
       <button 
         onClick={handleOpenLoadPanel}
         className="flex items-center justify-center px-4 py-2 bg-indigo-600 text-white border border-transparent rounded-md shadow-sm text-sm font-medium hover:bg-indigo-700"
@@ -475,39 +636,95 @@ export default function Simulator() {
     </div>
   );
 
-  const handleClear = () => {
-    setLines([]);
-    setPlacedComponents([]);
-    setDimensions([]);
-    setAreas([]);
-    setHoses([]);
-    setHistory([]);
-    setSimulatorDirty(false);
-  };
-
   const handleUndo = () => {
     if (history.length === 0) return;
     const lastAction = history[history.length - 1];
+    let removedItem: any = null;
+
     if (lastAction.type === 'line') {
-      setLines(lines.filter(l => l.id !== lastAction.id));
+      removedItem = lines.find(l => l.id === lastAction.id);
+      setLines(prev => prev.filter(l => l.id !== lastAction.id));
     } else if (lastAction.type === 'dimension') {
-      setDimensions(dimensions.filter(d => d.id !== lastAction.id));
+      removedItem = dimensions.find(d => d.id === lastAction.id);
+      setDimensions(prev => prev.filter(d => d.id !== lastAction.id));
     } else if (lastAction.type === 'area') {
-      setAreas(areas.filter(a => a.id !== lastAction.id));
+      removedItem = areas.find(a => a.id === lastAction.id);
+      setAreas(prev => prev.filter(a => a.id !== lastAction.id));
     } else if (lastAction.type === 'hose') {
-      setHoses(hoses.filter(h => h.id !== lastAction.id));
+      removedItem = hoses.find(h => h.id === lastAction.id);
+      setHoses(prev => prev.filter(h => h.id !== lastAction.id));
+    } else if (lastAction.type === 'arrow') {
+      removedItem = arrows.find(a => a.id === lastAction.id);
+      setArrows(prev => prev.filter(a => a.id !== lastAction.id));
     } else {
-      setPlacedComponents(placedComponents.filter(c => c.id !== lastAction.id));
+      removedItem = placedComponents.find(c => c.id === lastAction.id);
+      setPlacedComponents(prev => prev.filter(c => c.id !== lastAction.id));
     }
-    setHistory(history.slice(0, -1));
+
+    if (removedItem) {
+      setRedoStack(prev => [...prev, { type: lastAction.type, id: lastAction.id, item: removedItem }]);
+    }
+    setHistory(prev => prev.slice(0, -1));
     setSimulatorDirty(true);
   };
+
+  const handleRedo = () => {
+    if (redoStack.length === 0) return;
+    const nextAction = redoStack[redoStack.length - 1];
+    const item = nextAction.item;
+    if (!item) {
+      setRedoStack(prev => prev.slice(0, -1));
+      return;
+    }
+
+    if (nextAction.type === 'line') {
+      setLines(prev => [...prev, item]);
+    } else if (nextAction.type === 'dimension') {
+      setDimensions(prev => [...prev, item]);
+    } else if (nextAction.type === 'area') {
+      setAreas(prev => [...prev, item]);
+    } else if (nextAction.type === 'hose') {
+      setHoses(prev => [...prev, item]);
+    } else if (nextAction.type === 'arrow') {
+      setArrows(prev => [...prev, item]);
+    } else {
+      setPlacedComponents(prev => [...prev, item]);
+    }
+
+    setHistory(prev => [...prev, { type: nextAction.type as any, id: nextAction.id }]);
+    setRedoStack(prev => prev.slice(0, -1));
+    setSimulatorDirty(true);
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+        return;
+      }
+
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        handleUndo();
+      } else if (
+        ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') ||
+        ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'z')
+      ) {
+        e.preventDefault();
+        handleRedo();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [history, redoStack, lines, placedComponents, dimensions, areas, hoses, arrows]);
 
   const handleLinesChange = (newLines: LineData[]) => {
     if (newLines.length > lines.length) {
       const newLine = newLines[newLines.length - 1];
       if (newLine.id !== 'current') {
         setHistory([...history, { type: 'line', id: newLine.id }]);
+        setRedoStack([]);
       }
     }
     setLines(newLines);
@@ -518,6 +735,7 @@ export default function Simulator() {
     if (newComps.length > placedComponents.length) {
       const newComp = newComps[newComps.length - 1];
       setHistory([...history, { type: 'component', id: newComp.id }]);
+      setRedoStack([]);
     }
     setPlacedComponents(newComps);
     setSimulatorDirty(true);
@@ -527,6 +745,7 @@ export default function Simulator() {
     if (newDims.length > dimensions.length) {
       const newDim = newDims[newDims.length - 1];
       setHistory([...history, { type: 'dimension', id: newDim.id }]);
+      setRedoStack([]);
     }
     setDimensions(newDims);
     setSimulatorDirty(true);
@@ -536,6 +755,7 @@ export default function Simulator() {
     if (newAreas.length > areas.length) {
       const newArea = newAreas[newAreas.length - 1];
       setHistory([...history, { type: 'area', id: newArea.id }]);
+      setRedoStack([]);
     }
     setAreas(newAreas);
     setSimulatorDirty(true);
@@ -546,9 +766,21 @@ export default function Simulator() {
       const newHose = newHoses[newHoses.length - 1];
       if (newHose.id !== 'current') {
         setHistory([...history, { type: 'hose', id: newHose.id }]);
+        setRedoStack([]);
       }
     }
     setHoses(newHoses);
+    setSimulatorDirty(true);
+  };
+
+  const handleArrowsChange = (newArrows: ArrowData[]) => {
+    if (newArrows.length > arrows.length) {
+      const newArrow = newArrows[newArrows.length - 1];
+      setHistory([...history, { type: 'arrow', id: newArrow.id }]);
+      setRedoStack([]);
+    }
+    setArrows(newArrows);
+    setSimulatorDirty(true);
   };
 
   const handleToolSelect = (tool: ActiveTool) => {
@@ -559,13 +791,16 @@ export default function Simulator() {
   };
 
   return (
-    <div className={isFullscreen ? "fixed inset-0 z-50 bg-gray-100 flex flex-col overflow-hidden" : "absolute inset-0 flex flex-col bg-gray-100 overflow-hidden"}>
+    <div className={isFullscreen ? "fixed inset-0 z-50 bg-gray-100 flex flex-col overflow-hidden print:overflow-visible print:static print:h-auto" : "absolute inset-0 flex flex-col bg-gray-100 overflow-hidden print:overflow-visible print:static print:h-auto"}>
       {/* Top Toolbar Ribbon */}
       <div className="flex-shrink-0 z-10 w-full">
         <Toolbar 
           activeTool={activeTool} 
           onToolSelect={handleToolSelect} 
           onUndo={handleUndo} 
+          onRedo={handleRedo}
+          canUndo={history.length > 0}
+          canRedo={redoStack.length > 0} 
           showWellpoints={showWellpoints}
           onToggleWellpoints={() => setShowWellpoints(!showWellpoints)}
           wellpointSide={
@@ -613,6 +848,17 @@ export default function Simulator() {
       <div className="flex flex-1 relative overflow-hidden flex-col">
         {/* Main Canvas Area */}
         <div className="flex-1 bg-[#e5e7eb] overflow-hidden relative">
+          {activeTool === 'export-window' && (
+            <div className="absolute top-0 inset-x-0 z-50 bg-indigo-600 text-white text-center py-1.5 text-sm font-medium shadow-md flex items-center justify-center gap-4">
+              <span>Click and drag on the canvas to select the export window area.</span>
+              <button 
+                onClick={() => setActiveTool('select')} 
+                className="px-2 py-0.5 bg-white/20 hover:bg-white/30 rounded text-xs transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
           {show3D ? (
             <Dewatering3DView 
               lines={lines}
@@ -646,6 +892,10 @@ export default function Simulator() {
               onAreasChange={handleAreasChange}
               hoses={hoses}
               onHosesChange={handleHosesChange}
+              arrows={arrows}
+              onArrowsChange={handleArrowsChange}
+              texts={texts}
+              onTextsChange={(newTexts) => { setTexts(newTexts); setSimulatorDirty(true); }}
               activeTool={activeTool}
               onToolSelect={setActiveTool}
               backgroundImageUrl={backgroundImage}
@@ -656,6 +906,7 @@ export default function Simulator() {
               drawShapeMode={drawShapeMode}
               textColor={textColor}
               textSize={textSize}
+              onExportWindowSelected={handleExportWindowSelected}
               fixedLineLengthMeters={lineLengthMeters === '' ? undefined : lineLengthMeters}
               showWellpoints={showWellpoints}
               wellpointSide={wellpointSide}
@@ -974,6 +1225,35 @@ export default function Simulator() {
                   <option value="pure-3d">Pure 3D Perspective (A-102) — Full-bleed 3D render</option>
                 </select>
               </div>
+              
+              {(exportOptions.layoutFormat === 'combined' || exportOptions.layoutFormat === 'pure-2d') && (
+                <div className="flex flex-col gap-2 mt-3">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="exportWindowMode"
+                      checked={exportWindowMode}
+                      onChange={e => setExportWindowMode(e.target.checked)}
+                      className="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500"
+                    />
+                    <label htmlFor="exportWindowMode" className="text-sm text-gray-700">
+                      Select export window area (like AutoCAD)
+                    </label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="includeBlueprint"
+                      checked={exportOptions.includeBlueprint}
+                      onChange={e => setExportOptions(prev => ({ ...prev, includeBlueprint: e.target.checked }))}
+                      className="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500"
+                    />
+                    <label htmlFor="includeBlueprint" className="text-sm text-gray-700">
+                      Include blueprint in export
+                    </label>
+                  </div>
+                </div>
+              )}
 
               {/* Contextual requirement banner */}
               {exportOptions.layoutFormat === 'pure-2d' && (
@@ -1032,19 +1312,34 @@ export default function Simulator() {
         </div>
       )}
 
-      {showDrawingPreview && drawingExportData && (
-        <DrawingSheetPreview
-          onClose={() => setShowDrawingPreview(false)}
-          layoutName={currentLayoutName || 'Untitled Dewatering Layout'}
-          companyInfo={drawingExportData.companyInfo}
-          logoSrc={drawingExportData.logoSrc}
-          sitePlanDataUrl={drawingExportData.sitePlanDataUrl}
-          perspectiveDataUrl={drawingExportData.perspectiveDataUrl}
-          bomResults={results}
-          dateStr={drawingExportData.dateStr}
-          exportOptions={exportOptions}
-        />
-      )}
+      {showDrawingPreview && drawingExportData && (() => {
+        const activeLegendItems: string[] = [];
+        if (results.headers > 0) activeLegendItems.push('HEADER PIPES');
+        if (results.wellpoints > 0) activeLegendItems.push('WELL POINTS');
+        if (results.pumps > 0) activeLegendItems.push('DEWATERING PUMPS');
+        if (results.elbows > 0) activeLegendItems.push('ELBOW CONNECTORS');
+        if (results.tees > 0) activeLegendItems.push('FLUSH CONNECTIONS');
+        if (hoses.some(h => h.kind === 'suction' || h.kind === 'hose')) activeLegendItems.push('SUCTION HOSES');
+        if (hoses.some(h => h.kind === 'discharge')) activeLegendItems.push('DISCHARGE HOSES');
+        if (areas.some(a => a.kind === 'excavation')) activeLegendItems.push('EXCAVATION AREA');
+        if (areas.some(a => a.kind === 'boundary' || !a.kind)) activeLegendItems.push('SITE BOUNDARY');
+
+        return (
+          <DrawingSheetPreview
+            onClose={() => setShowDrawingPreview(false)}
+            layoutName={currentLayoutName || 'Untitled Dewatering Layout'}
+            companyInfo={drawingExportData.companyInfo}
+            logoSrc={drawingExportData.logoSrc}
+            sitePlanDataUrl={drawingExportData.sitePlanDataUrl}
+            perspectiveDataUrl={drawingExportData.perspectiveDataUrl}
+            bomResults={results}
+            dateStr={drawingExportData.dateStr}
+            exportOptions={exportOptions}
+            onExportOptionsChange={setExportOptions}
+            activeLegendItems={activeLegendItems}
+          />
+        );
+      })()}
     </div>
   );
 };

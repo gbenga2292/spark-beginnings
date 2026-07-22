@@ -4,7 +4,7 @@ import { useAppStore } from '../store/appStore';
 import { 
   Plus, Search, Truck, MapPin, Clock, Calendar, 
   Edit2, Trash2, History, AlertCircle, ChevronRight,
-  MoreHorizontal, PlusCircle, X, Check, ClipboardList,
+  MoreHorizontal, MoreVertical, PlusCircle, X, Check, ClipboardList,
   LayoutGrid, List, ChevronLeft, Download, Upload, FileSpreadsheet,
   Fuel, TrendingUp, BarChart3, Filter, Link as LinkIcon
 } from 'lucide-react';
@@ -226,15 +226,58 @@ export function VehicleManager() {
     lastComputed: '' as 'litres' | 'total_cost' | 'rate_per_litre' | ''
   });
 
-  const [showLedgerDialog, setShowLedgerDialog] = useState(false);
-  const [ledgerSearch, setLedgerSearch] = useState('');
+  // Standalone Link Ledger Dialog State
+  const [selectedFuelLogForLedger, setSelectedFuelLogForLedger] = useState<VehicleFuelLog | null>(null);
+  const [standaloneLedgerSearch, setStandaloneLedgerSearch] = useState('');
+  const [standaloneAllocations, setStandaloneAllocations] = useState<Record<string, number>>({});
+  const [ledgerDateFilterType, setLedgerDateFilterType] = useState<'transaction' | 'voucher'>('transaction');
+  const [ledgerStartDate, setLedgerStartDate] = useState('');
+  const [ledgerEndDate, setLedgerEndDate] = useState('');
 
-  const totalLinkedAmount = useMemo(() => {
-    return (fuelForm.linkedLedgerIds || [])
-      .map(id => ledgerEntries.find(e => e.id === id))
-      .filter((e): e is NonNullable<typeof e> => !!e)
-      .reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
-  }, [fuelForm.linkedLedgerIds, ledgerEntries]);
+  const getVoucherDate = (voucherNo?: string): string | null => {
+    if (!voucherNo) return null;
+    const match = voucherNo.match(/VN(\d{2})-(\d{2})-(\d{2})/i);
+    if (match) {
+      const [, yy, mm, dd] = match;
+      return `20${yy}-${mm}-${dd}`;
+    }
+    return null;
+  };
+
+  const handleOpenStandaloneLedgerDialog = (log: VehicleFuelLog) => {
+    setSelectedFuelLogForLedger(log);
+    setStandaloneLedgerSearch('');
+    setLedgerStartDate('');
+    setLedgerEndDate('');
+    const initialAllocations: Record<string, number> = {};
+    if (log.linkedLedgerIds && log.linkedLedgerIds.length > 0) {
+      log.linkedLedgerIds.forEach(lid => {
+        if (log.linkedLedgerAmounts && log.linkedLedgerAmounts[lid] !== undefined) {
+          initialAllocations[lid] = log.linkedLedgerAmounts[lid];
+        } else {
+          const entry = ledgerEntries.find(e => e.id === lid);
+          initialAllocations[lid] = entry ? Number(entry.amount) || 0 : log.total_cost;
+        }
+      });
+    }
+    setStandaloneAllocations(initialAllocations);
+  };
+
+  const handleSaveStandaloneLedger = async () => {
+    if (!selectedFuelLogForLedger) return;
+    const linkedIds = Object.keys(standaloneAllocations).filter(id => standaloneAllocations[id] > 0);
+    const cleanedAmounts: Record<string, number> = {};
+    linkedIds.forEach(id => {
+      cleanedAmounts[id] = standaloneAllocations[id];
+    });
+
+    await updateVehicleFuelLog(selectedFuelLogForLedger.id, {
+      linkedLedgerIds: linkedIds,
+      linkedLedgerAmounts: cleanedAmounts
+    });
+
+    setSelectedFuelLogForLedger(null);
+  };
 
   const ledgerRemainingAmounts = useMemo(() => {
     const remaining = new Map<string, number>();
@@ -263,26 +306,24 @@ export function VehicleManager() {
 
     // Subtract used amounts from other vehicle fuel logs
     vehicleFuelLogs.forEach(log => {
-      // Ignore the one currently being edited
+      // Ignore log currently open in standalone dialog or being edited
+      if (selectedFuelLogForLedger?.id && log.id === selectedFuelLogForLedger.id) return;
       if (editingFuelLog?.id && log.id === editingFuelLog.id) return;
       
       if (!log.linkedLedgerIds || log.linkedLedgerIds.length === 0) return;
-      if (!log.total_cost) return;
 
-      let costToCover = log.total_cost;
       for (const lid of log.linkedLedgerIds) {
-        if (costToCover <= 0) break;
         const currentRemaining = remaining.get(lid) || 0;
         if (currentRemaining > 0) {
-          const amountToUse = Math.min(costToCover, currentRemaining);
-          remaining.set(lid, currentRemaining - amountToUse);
-          costToCover -= amountToUse;
+          const customAllocated = log.linkedLedgerAmounts?.[lid];
+          const amountToUse = customAllocated !== undefined ? Math.min(customAllocated, currentRemaining) : Math.min(log.total_cost || 0, currentRemaining);
+          remaining.set(lid, Math.max(0, currentRemaining - amountToUse));
         }
       }
     });
 
     return remaining;
-  }, [ledgerEntries, dieselRefills, vehicleFuelLogs, editingFuelLog]);
+  }, [ledgerEntries, dieselRefills, vehicleFuelLogs, editingFuelLog, selectedFuelLogForLedger]);
 
   // Find eligible ledger entries for vehicles: contains "diesel", "petrol", "pms", or "fuel"
   const eligibleLedgerEntries = useMemo(() => {
@@ -292,29 +333,46 @@ export function VehicleManager() {
     });
   }, [ledgerEntries]);
 
-  // Filtered by mini search inside the dialog
-  const filteredLedgerEntries = useMemo(() => {
-    if (!ledgerSearch.trim()) return eligibleLedgerEntries;
-    const query = ledgerSearch.toLowerCase().trim();
+  // Filtered by search and date options inside the standalone dialog
+  const filteredStandaloneLedgerEntries = useMemo(() => {
     return eligibleLedgerEntries.filter(e => {
-      const desc = e.description?.toLowerCase() || '';
-      const siteName = e.site?.toLowerCase() || '';
-      const clientName = e.client?.toLowerCase() || '';
-      const voucher = e.voucherNo?.toLowerCase() || '';
-      const amountStr = e.amount?.toString() || '';
-      return desc.includes(query) || siteName.includes(query) || clientName.includes(query) || voucher.includes(query) || amountStr.includes(query);
-    });
-  }, [eligibleLedgerEntries, ledgerSearch]);
+      // 1. Text Search Filter
+      if (standaloneLedgerSearch.trim()) {
+        const query = standaloneLedgerSearch.toLowerCase().trim();
+        const desc = e.description?.toLowerCase() || '';
+        const siteName = e.site?.toLowerCase() || '';
+        const clientName = e.client?.toLowerCase() || '';
+        const voucher = e.voucherNo?.toLowerCase() || '';
+        const amountStr = e.amount?.toString() || '';
+        const txDate = e.date || '';
+        const vDate = getVoucherDate(e.voucherNo) || '';
 
-  const handleToggleLedger = (ledgerId: string) => {
-    setFuelForm(prev => {
-      const current = prev.linkedLedgerIds || [];
-      const updated = current.includes(ledgerId)
-        ? current.filter(id => id !== ledgerId)
-        : [...current, ledgerId];
-      return { ...prev, linkedLedgerIds: updated };
+        const matchesSearch = desc.includes(query) ||
+          siteName.includes(query) ||
+          clientName.includes(query) ||
+          voucher.includes(query) ||
+          amountStr.includes(query) ||
+          txDate.includes(query) ||
+          vDate.includes(query);
+
+        if (!matchesSearch) return false;
+      }
+
+      // 2. Date Filter (Transaction Date vs Voucher Date)
+      const targetDate = ledgerDateFilterType === 'voucher'
+        ? (getVoucherDate(e.voucherNo) || e.date)
+        : e.date;
+
+      if (ledgerStartDate && targetDate < ledgerStartDate) return false;
+      if (ledgerEndDate && targetDate > ledgerEndDate) return false;
+
+      return true;
     });
-  };
+  }, [eligibleLedgerEntries, standaloneLedgerSearch, ledgerDateFilterType, ledgerStartDate, ledgerEndDate]);
+
+  const totalAllocatedInStandaloneDialog = useMemo(() => {
+    return Object.values(standaloneAllocations).reduce((sum, amt) => sum + (Number(amt) || 0), 0);
+  }, [standaloneAllocations]);
 
   // Fuel Analytics Filter State
   const [showFuelAnalytics, setShowFuelAnalytics] = useState(false);
@@ -1459,63 +1517,6 @@ export function VehicleManager() {
                 </div>
               </div>
 
-              {/* Ledger Reconciliation */}
-              <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/30 dark:bg-slate-900/20 p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Reconcile with Financial Ledger</p>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-7 gap-1.5 text-xs"
-                    onClick={() => { setLedgerSearch(''); setShowLedgerDialog(true); }}
-                  >
-                    <LinkIcon className="h-3 w-3" />
-                    Link Entries
-                  </Button>
-                </div>
-
-                {fuelForm.linkedLedgerIds.length === 0 ? (
-                  <p className="text-xs text-slate-400 italic">No ledger entries linked yet.</p>
-                ) : (
-                  <div className="space-y-1.5">
-                    {fuelForm.linkedLedgerIds.map(lid => {
-                      const entry = ledgerEntries.find(e => e.id === lid);
-                      if (!entry) return null;
-                      return (
-                        <div key={lid} className="flex items-center justify-between bg-white dark:bg-slate-800 rounded-lg px-3 py-2 border border-slate-200 dark:border-slate-700">
-                          <div className="flex-1 min-w-0">
-                            <p className="text-xs font-medium text-slate-700 dark:text-slate-200 truncate">{entry.description}</p>
-                            <p className="text-[10px] text-slate-400">{entry.date} {entry.voucherNo ? `· #${entry.voucherNo}` : ''}</p>
-                          </div>
-                          <div className="flex items-center gap-2 shrink-0">
-                            <span className="text-xs font-bold text-emerald-600">{fmtCurrency(Number(entry.amount) || 0)}</span>
-                            <button
-                              type="button"
-                              onClick={() => handleToggleLedger(lid)}
-                              className="text-rose-400 hover:text-rose-600 transition-colors"
-                            >
-                              <X className="h-3.5 w-3.5" />
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                    <div className="pt-1 flex justify-between text-xs font-bold">
-                      <span className="text-slate-500">Total Linked</span>
-                      <span className="text-emerald-600">{fmtCurrency(totalLinkedAmount)}</span>
-                    </div>
-                    {Number(fuelForm.total_cost) > 0 && (
-                      <div className="flex justify-between text-xs">
-                        <span className="text-slate-400">Fuel Cost</span>
-                        <span className={totalLinkedAmount >= Number(fuelForm.total_cost) ? 'text-emerald-600 font-semibold' : 'text-rose-500 font-semibold'}>
-                          {fmtCurrency(Number(fuelForm.total_cost))} {totalLinkedAmount >= Number(fuelForm.total_cost) ? '✓ Covered' : `(Gap: ${fmtCurrency(Number(fuelForm.total_cost) - totalLinkedAmount)})`}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
             </CardContent>
             <CardHeader className="bg-slate-50 dark:bg-slate-800 border-t flex flex-row gap-3 pt-4 shrink-0">
               <Button className="flex-1 bg-amber-500 hover:bg-amber-600 text-white" onClick={handleSaveFuelLog}>
@@ -1527,98 +1528,235 @@ export function VehicleManager() {
         </div>
       )}
 
-      {/* Ledger Link Dialog — Vehicle Fuel */}
-      <Dialog open={showLedgerDialog} onOpenChange={setShowLedgerDialog}>
-        <DialogContent className="max-w-lg w-full max-h-[80vh] flex flex-col gap-0 p-0">
-          <DialogHeader className="px-5 pt-5 pb-3 border-b">
-            <DialogTitle className="flex items-center gap-2 text-base">
+      {/* Standalone Link Ledger Dialog — Vehicle Fuel */}
+      <Dialog open={!!selectedFuelLogForLedger} onOpenChange={open => { if (!open) setSelectedFuelLogForLedger(null); }}>
+        <DialogContent className="max-w-xl w-full max-h-[85vh] flex flex-col gap-0 p-0 overflow-hidden">
+          <DialogHeader className="px-6 pt-5 pb-4 border-b bg-slate-50/50 dark:bg-slate-900">
+            <DialogTitle className="flex items-center gap-2 text-base font-bold text-slate-800 dark:text-slate-100">
               <LinkIcon className="h-4 w-4 text-amber-500" />
               Link Financial Ledger Entries
             </DialogTitle>
-            <p className="text-xs text-slate-500 mt-1">Select petrol / diesel / fuel entries to reconcile against this vehicle refill.</p>
+            {selectedFuelLogForLedger && (
+              <div className="mt-2 text-xs text-slate-600 dark:text-slate-400 bg-white dark:bg-slate-800 p-3 rounded-lg border border-slate-200 dark:border-slate-700 flex flex-wrap justify-between items-center gap-2">
+                <div>
+                  <p className="font-bold text-slate-700 dark:text-slate-200">{getVehicleName(selectedFuelLogForLedger.vehicle_reg)} ({selectedFuelLogForLedger.vehicle_reg})</p>
+                  <p className="text-[10px] text-slate-400">Date: {formatDisplayDate(selectedFuelLogForLedger.date)} {selectedFuelLogForLedger.filled_by ? `· By ${selectedFuelLogForLedger.filled_by}` : ''}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-slate-400">Fuel Log Cost</p>
+                  <p className="text-sm font-black text-amber-600 dark:text-amber-400">{fmtCurrency(selectedFuelLogForLedger.total_cost)}</p>
+                </div>
+              </div>
+            )}
           </DialogHeader>
 
-          <div className="px-4 py-3 border-b">
+          <div className="px-5 py-3 border-b bg-white dark:bg-slate-900 space-y-2.5">
             <div className="relative">
               <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
               <Input
                 className="pl-9 h-9 text-sm"
-                placeholder="Search by description, site, voucher…"
-                value={ledgerSearch}
-                onChange={e => setLedgerSearch(e.target.value)}
+                placeholder="Search ledger entries by description, site, voucher, date..."
+                value={standaloneLedgerSearch}
+                onChange={e => setStandaloneLedgerSearch(e.target.value)}
               />
+            </div>
+
+            {/* Date Filtering Bar */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-1.5 border-t border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-1.5 shrink-0">
+                <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">Date Mode:</span>
+                <div className="flex bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg border border-slate-200 dark:border-slate-700">
+                  <button
+                    type="button"
+                    onClick={() => setLedgerDateFilterType('transaction')}
+                    className={`px-2.5 py-1 text-[10px] font-bold rounded-md transition-all ${
+                      ledgerDateFilterType === 'transaction'
+                        ? 'bg-amber-500 text-white shadow-xs'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                    }`}
+                  >
+                    Transaction Date
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLedgerDateFilterType('voucher')}
+                    className={`px-2.5 py-1 text-[10px] font-bold rounded-md transition-all ${
+                      ledgerDateFilterType === 'voucher'
+                        ? 'bg-amber-500 text-white shadow-xs'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                    }`}
+                  >
+                    Voucher Date
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 flex-1 sm:flex-initial min-w-[220px]">
+                <div className="flex items-center gap-1 flex-1">
+                  <span className="text-[10px] text-slate-400 font-semibold">From:</span>
+                  <Input
+                    type="date"
+                    value={ledgerStartDate}
+                    onChange={e => setLedgerStartDate(e.target.value)}
+                    className="h-7 text-xs bg-white dark:bg-slate-900 py-0 px-1.5 border-slate-200 dark:border-slate-700"
+                  />
+                </div>
+                <div className="flex items-center gap-1 flex-1">
+                  <span className="text-[10px] text-slate-400 font-semibold">To:</span>
+                  <Input
+                    type="date"
+                    value={ledgerEndDate}
+                    onChange={e => setLedgerEndDate(e.target.value)}
+                    className="h-7 text-xs bg-white dark:bg-slate-900 py-0 px-1.5 border-slate-200 dark:border-slate-700"
+                  />
+                </div>
+                {(ledgerStartDate || ledgerEndDate) && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => { setLedgerStartDate(''); setLedgerEndDate(''); }}
+                    className="h-7 px-1.5 text-[10px] text-rose-500 hover:text-rose-700 font-bold shrink-0"
+                  >
+                    Clear
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
-            {filteredLedgerEntries.length === 0 ? (
-              <p className="text-sm text-slate-400 italic text-center py-6">
+          <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3 bg-slate-50/30 dark:bg-slate-900/30">
+            {filteredStandaloneLedgerEntries.length === 0 ? (
+              <p className="text-sm text-slate-400 italic text-center py-8">
                 {eligibleLedgerEntries.length === 0
-                  ? 'No petrol / diesel / fuel / PMS entries found in the financial ledger.'
-                  : 'No entries match your search.'}
+                  ? 'No fuel/petrol/diesel entries found in the financial ledger.'
+                  : 'No entries match your filter criteria.'}
               </p>
             ) : (
-              filteredLedgerEntries.map(entry => {
-                const remaining = ledgerRemainingAmounts.get(entry.id) ?? Number(entry.amount);
-                const isLinked = fuelForm.linkedLedgerIds.includes(entry.id);
-                const isFullyUsed = remaining <= 0 && !isLinked;
+              filteredStandaloneLedgerEntries.map(entry => {
+                const remainingAvailable = ledgerRemainingAmounts.get(entry.id) ?? Number(entry.amount);
+                const isSelected = standaloneAllocations[entry.id] !== undefined;
+                const allocatedAmount = standaloneAllocations[entry.id] ?? 0;
+                const totalEntryAmount = Number(entry.amount) || 0;
+                const isFullyUsed = remainingAvailable <= 0 && !isSelected;
+                const vDate = getVoucherDate(entry.voucherNo);
+
                 return (
-                  <button
+                  <div
                     key={entry.id}
-                    type="button"
-                    disabled={isFullyUsed}
-                    onClick={() => handleToggleLedger(entry.id)}
-                    className={`w-full text-left rounded-lg border px-4 py-3 transition-all ${
-                      isLinked
-                        ? 'border-amber-400 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-600'
+                    className={`rounded-xl border p-3.5 transition-all ${
+                      isSelected
+                        ? 'border-amber-400 bg-amber-50/40 dark:bg-amber-950/20 dark:border-amber-600 shadow-sm'
                         : isFullyUsed
-                        ? 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 opacity-50 cursor-not-allowed'
-                        : 'border-slate-200 dark:border-slate-700 hover:border-amber-300 hover:bg-amber-50/50 dark:hover:bg-amber-900/10'
+                        ? 'border-slate-200 dark:border-slate-800 bg-slate-100/50 dark:bg-slate-900/50 opacity-50'
+                        : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-amber-300'
                     }`}
                   >
                     <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-slate-700 dark:text-slate-200 truncate">{entry.description}</p>
-                        <p className="text-[10px] text-slate-400 mt-0.5">
-                          {entry.date}
-                          {entry.voucherNo ? ` · #${entry.voucherNo}` : ''}
-                          {entry.site ? ` · ${entry.site}` : ''}
-                        </p>
+                      <div className="flex items-start gap-3 flex-1 min-w-0">
+                        <input
+                          type="checkbox"
+                          disabled={isFullyUsed}
+                          checked={isSelected}
+                          onChange={() => {
+                            if (isSelected) {
+                              setStandaloneAllocations(prev => {
+                                const copy = { ...prev };
+                                delete copy[entry.id];
+                                return copy;
+                              });
+                            } else {
+                              const remainingUncovered = Math.max(0, (selectedFuelLogForLedger?.total_cost || 0) - totalAllocatedInStandaloneDialog);
+                              const defaultAmt = remainingAvailable > 0
+                                ? Math.min(remainingAvailable, remainingUncovered > 0 ? remainingUncovered : remainingAvailable)
+                                : totalEntryAmount;
+                              setStandaloneAllocations(prev => ({
+                                ...prev,
+                                [entry.id]: defaultAmt
+                              }));
+                            }
+                          }}
+                          className="mt-1 h-4 w-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500 cursor-pointer"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate">{entry.description}</p>
+                          <p className="text-[10px] text-slate-400 mt-0.5 flex flex-wrap items-center gap-x-1.5">
+                            <span><strong className="text-slate-600 dark:text-slate-300">Tx:</strong> {entry.date}</span>
+                            {vDate && (
+                              <span className="text-amber-600 dark:text-amber-400 font-semibold">
+                                · <strong>Voucher:</strong> {vDate}
+                              </span>
+                            )}
+                            {entry.voucherNo ? ` · #${entry.voucherNo}` : ''}
+                            {entry.site ? ` · ${entry.site}` : ''}
+                          </p>
+                        </div>
                       </div>
                       <div className="text-right shrink-0">
-                        <p className="text-sm font-bold text-emerald-600">{fmtCurrency(Number(entry.amount) || 0)}</p>
-                        {remaining < Number(entry.amount) && (
-                          <p className="text-[10px] text-rose-500">
-                            {remaining <= 0 ? 'Fully used' : `Rem: ${fmtCurrency(remaining)}`}
-                          </p>
-                        )}
-                      </div>
-                      <div className={`h-5 w-5 rounded border-2 flex items-center justify-center shrink-0 mt-0.5 transition-colors ${
-                        isLinked ? 'border-amber-500 bg-amber-500' : 'border-slate-300 dark:border-slate-600'
-                      }`}>
-                        {isLinked && <Check className="h-3 w-3 text-white" />}
+                        <p className="text-xs font-black text-emerald-600 dark:text-emerald-400">{fmtCurrency(totalEntryAmount)}</p>
+                        <p className="text-[10px] text-slate-400">
+                          Available: <span className={remainingAvailable <= 0 ? 'text-rose-500 font-semibold' : 'text-slate-600 dark:text-slate-300 font-semibold'}>{fmtCurrency(remainingAvailable)}</span>
+                        </p>
                       </div>
                     </div>
-                  </button>
+
+                    {/* Allocated Amount Input when selected */}
+                    {isSelected && (
+                      <div className="mt-3 pt-2.5 border-t border-amber-200/60 dark:border-amber-800/40 flex items-center justify-between gap-3">
+                        <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">Amount to Extract/Link for this vehicle log:</span>
+                        <div className="flex items-center gap-1.5 w-36">
+                          <span className="text-xs font-bold text-slate-400">₦</span>
+                          <Input
+                            type="number"
+                            min="0"
+                            max={totalEntryAmount}
+                            className="h-8 text-xs font-bold text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-900"
+                            value={allocatedAmount === 0 ? '' : allocatedAmount}
+                            onChange={e => {
+                              const val = parseFloat(e.target.value);
+                              setStandaloneAllocations(prev => ({
+                                ...prev,
+                                [entry.id]: isNaN(val) ? 0 : val
+                              }));
+                            }}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 );
               })
             )}
           </div>
 
-          {fuelForm.linkedLedgerIds.length > 0 && (
-            <div className="px-4 py-3 border-t bg-slate-50 dark:bg-slate-800/50">
-              <div className="flex justify-between text-xs font-medium">
-                <span className="text-slate-500">{fuelForm.linkedLedgerIds.length} entr{fuelForm.linkedLedgerIds.length === 1 ? 'y' : 'ies'} linked · Total:</span>
-                <span className="text-emerald-600 font-bold">{fmtCurrency(totalLinkedAmount)}</span>
+          {/* Dialog Footer Summary & Actions */}
+          {selectedFuelLogForLedger && (
+            <div className="px-6 py-4 border-t bg-white dark:bg-slate-900 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="flex flex-col text-xs">
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-500 font-medium">Log Cost: {fmtCurrency(selectedFuelLogForLedger.total_cost)}</span>
+                  <span className="text-slate-300">|</span>
+                  <span className="text-emerald-600 font-bold">Allocated: {fmtCurrency(totalAllocatedInStandaloneDialog)}</span>
+                </div>
+                {totalAllocatedInStandaloneDialog >= selectedFuelLogForLedger.total_cost ? (
+                  <span className="text-[10px] text-emerald-600 font-bold mt-0.5 flex items-center gap-1">
+                    <Check className="h-3 w-3" /> Fully Covered
+                  </span>
+                ) : (
+                  <span className="text-[10px] text-rose-500 font-semibold mt-0.5">
+                    Remaining Uncovered: {fmtCurrency(selectedFuelLogForLedger.total_cost - totalAllocatedInStandaloneDialog)}
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                <Button variant="outline" size="sm" onClick={() => setSelectedFuelLogForLedger(null)}>
+                  Cancel
+                </Button>
+                <Button size="sm" onClick={handleSaveStandaloneLedger} className="bg-amber-500 hover:bg-amber-600 text-white font-bold px-4">
+                  Save Ledger Links
+                </Button>
               </div>
             </div>
           )}
-
-          <div className="px-4 py-3 border-t flex justify-end">
-            <Button size="sm" onClick={() => setShowLedgerDialog(false)} className="bg-amber-500 hover:bg-amber-600 text-white">
-              Done
-            </Button>
-          </div>
         </DialogContent>
       </Dialog>
 
@@ -2123,17 +2261,37 @@ export function VehicleManager() {
                                 </div>
                               </td>
                               <td className="px-6 py-4 text-right">
-                                <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                  {priv.canEditLogs && (
-                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEditTrip(trip)}>
-                                      <Edit2 className="h-3.5 w-3.5" />
-                                    </Button>
-                                  )}
-                                  {priv.canDeleteLogs && (
-                                    <Button variant="ghost" size="icon" className="h-7 w-7 text-rose-500" onClick={() => deleteVehicleTripRecord(trip.id)}>
-                                      <Trash2 className="h-3.5 w-3.5" />
-                                    </Button>
-                                  )}
+                                <div className="flex items-center justify-end">
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-slate-700 dark:hover:text-slate-200">
+                                        <MoreVertical className="h-4 w-4" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end" className="w-40">
+                                      {priv.canEditLogs && (
+                                        <DropdownMenuItem
+                                          onClick={() => handleEditTrip(trip)}
+                                          className="cursor-pointer flex items-center gap-2 text-xs font-semibold"
+                                        >
+                                          <Edit2 className="h-3.5 w-3.5" />
+                                          Edit Trip
+                                        </DropdownMenuItem>
+                                      )}
+                                      {priv.canDeleteLogs && (
+                                        <>
+                                          {priv.canEditLogs && <DropdownMenuSeparator />}
+                                          <DropdownMenuItem
+                                            onClick={() => deleteVehicleTripRecord(trip.id)}
+                                            className="cursor-pointer flex items-center gap-2 text-xs text-rose-600 font-semibold focus:text-rose-600 focus:bg-rose-50 dark:focus:bg-rose-950/20"
+                                          >
+                                            <Trash2 className="h-3.5 w-3.5" />
+                                            Delete Trip
+                                          </DropdownMenuItem>
+                                        </>
+                                      )}
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
                                 </div>
                               </td>
                             </tr>
@@ -2173,20 +2331,52 @@ export function VehicleManager() {
                                   {fuelLog.odometer && (
                                     <span className="text-[8px] text-slate-400 mt-0.5">Odo: {fuelLog.odometer.toLocaleString()} km</span>
                                   )}
+                                  {fuelLog.linkedLedgerIds && fuelLog.linkedLedgerIds.length > 0 && (
+                                    <Badge variant="outline" className="text-[8px] h-4 bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400 border-emerald-200 mt-1 w-fit gap-1 font-semibold">
+                                      <LinkIcon className="h-2.5 w-2.5" /> Linked ({fuelLog.linkedLedgerIds.length})
+                                    </Badge>
+                                  )}
                                 </div>
                               </td>
                               <td className="px-6 py-4 text-right">
-                                <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                  {priv.canEditFuel && (
-                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEditFuelLog(fuelLog)}>
-                                      <Edit2 className="h-3.5 w-3.5" />
-                                    </Button>
-                                  )}
-                                  {priv.canDeleteFuel && (
-                                    <Button variant="ghost" size="icon" className="h-7 w-7 text-rose-500" onClick={() => deleteVehicleFuelLog(fuelLog.id)}>
-                                      <Trash2 className="h-3.5 w-3.5" />
-                                    </Button>
-                                  )}
+                                <div className="flex items-center justify-end">
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-slate-700 dark:hover:text-slate-200">
+                                        <MoreVertical className="h-4 w-4" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end" className="w-48">
+                                      <DropdownMenuItem
+                                        onClick={() => handleOpenStandaloneLedgerDialog(fuelLog)}
+                                        className="cursor-pointer flex items-center gap-2 text-xs text-amber-600 dark:text-amber-400 font-semibold focus:text-amber-600 focus:bg-amber-50 dark:focus:bg-amber-950/20"
+                                      >
+                                        <LinkIcon className="h-3.5 w-3.5" />
+                                        Link Ledger
+                                      </DropdownMenuItem>
+                                      {priv.canEditFuel && (
+                                        <DropdownMenuItem
+                                          onClick={() => handleEditFuelLog(fuelLog)}
+                                          className="cursor-pointer flex items-center gap-2 text-xs font-semibold"
+                                        >
+                                          <Edit2 className="h-3.5 w-3.5" />
+                                          Edit Log
+                                        </DropdownMenuItem>
+                                      )}
+                                      {priv.canDeleteFuel && (
+                                        <>
+                                          <DropdownMenuSeparator />
+                                          <DropdownMenuItem
+                                            onClick={() => deleteVehicleFuelLog(fuelLog.id)}
+                                            className="cursor-pointer flex items-center gap-2 text-xs text-rose-600 font-semibold focus:text-rose-600 focus:bg-rose-50 dark:focus:bg-rose-950/20"
+                                          >
+                                            <Trash2 className="h-3.5 w-3.5" />
+                                            Delete Log
+                                          </DropdownMenuItem>
+                                        </>
+                                      )}
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
                                 </div>
                               </td>
                             </tr>
@@ -2232,16 +2422,37 @@ export function VehicleManager() {
                           )}
                           {trip.remark && <p className="text-[10px] text-slate-400 italic mt-1">{trip.remark}</p>}
                           <div className="flex items-center justify-end gap-1 mt-2 border-t border-slate-100 dark:border-slate-800 pt-2">
-                            {priv.canEditLogs && (
-                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEditTrip(trip)}>
-                                <Edit2 className="h-3.5 w-3.5" />
-                              </Button>
-                            )}
-                            {priv.canDeleteLogs && (
-                              <Button variant="ghost" size="icon" className="h-7 w-7 text-rose-500" onClick={() => deleteVehicleTripRecord(trip.id)}>
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
-                            )}
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm" className="h-7 px-2 text-xs gap-1.5 text-slate-600 dark:text-slate-300">
+                                  <MoreVertical className="h-3.5 w-3.5" />
+                                  Actions
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-40">
+                                {priv.canEditLogs && (
+                                  <DropdownMenuItem
+                                    onClick={() => handleEditTrip(trip)}
+                                    className="cursor-pointer flex items-center gap-2 text-xs font-semibold"
+                                  >
+                                    <Edit2 className="h-3.5 w-3.5" />
+                                    Edit Trip
+                                  </DropdownMenuItem>
+                                )}
+                                {priv.canDeleteLogs && (
+                                  <>
+                                    {priv.canEditLogs && <DropdownMenuSeparator />}
+                                    <DropdownMenuItem
+                                      onClick={() => deleteVehicleTripRecord(trip.id)}
+                                      className="cursor-pointer flex items-center gap-2 text-xs text-rose-600 font-semibold focus:text-rose-600 focus:bg-rose-50 dark:focus:bg-rose-950/20"
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                      Delete Trip
+                                    </DropdownMenuItem>
+                                  </>
+                                )}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </div>
                         </div>
                       );
@@ -2267,17 +2478,50 @@ export function VehicleManager() {
                             {fuelLog.odometer && <span>Odo: {fuelLog.odometer.toLocaleString()} km</span>}
                           </div>
                           {fuelLog.notes && <p className="text-[10px] text-slate-400 italic mt-1">{fuelLog.notes}</p>}
-                          <div className="flex items-center justify-end gap-1 mt-2 border-t border-slate-100 dark:border-slate-800 pt-2">
-                            {priv.canEditFuel && (
-                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEditFuelLog(fuelLog)}>
-                                <Edit2 className="h-3.5 w-3.5" />
-                              </Button>
-                            )}
-                            {priv.canDeleteFuel && (
-                              <Button variant="ghost" size="icon" className="h-7 w-7 text-rose-500" onClick={() => deleteVehicleFuelLog(fuelLog.id)}>
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
-                            )}
+                          <div className="flex items-center justify-between mt-2 border-t border-slate-100 dark:border-slate-800 pt-2">
+                            {fuelLog.linkedLedgerIds && fuelLog.linkedLedgerIds.length > 0 ? (
+                              <Badge variant="outline" className="text-[8px] h-4 bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400 border-emerald-200 gap-1 font-semibold">
+                                <LinkIcon className="h-2.5 w-2.5" /> Linked ({fuelLog.linkedLedgerIds.length})
+                              </Badge>
+                            ) : <div />}
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm" className="h-7 px-2 text-xs gap-1.5 text-slate-600 dark:text-slate-300">
+                                  <MoreVertical className="h-3.5 w-3.5" />
+                                  Actions
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-48">
+                                <DropdownMenuItem
+                                  onClick={() => handleOpenStandaloneLedgerDialog(fuelLog)}
+                                  className="cursor-pointer flex items-center gap-2 text-xs text-amber-600 dark:text-amber-400 font-semibold focus:text-amber-600 focus:bg-amber-50 dark:focus:bg-amber-950/20"
+                                >
+                                  <LinkIcon className="h-3.5 w-3.5" />
+                                  Link Ledger
+                                </DropdownMenuItem>
+                                {priv.canEditFuel && (
+                                  <DropdownMenuItem
+                                    onClick={() => handleEditFuelLog(fuelLog)}
+                                    className="cursor-pointer flex items-center gap-2 text-xs font-semibold"
+                                  >
+                                    <Edit2 className="h-3.5 w-3.5" />
+                                    Edit Log
+                                  </DropdownMenuItem>
+                                )}
+                                {priv.canDeleteFuel && (
+                                  <>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem
+                                      onClick={() => deleteVehicleFuelLog(fuelLog.id)}
+                                      className="cursor-pointer flex items-center gap-2 text-xs text-rose-600 font-semibold focus:text-rose-600 focus:bg-rose-50 dark:focus:bg-rose-950/20"
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                      Delete Log
+                                    </DropdownMenuItem>
+                                  </>
+                                )}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </div>
                         </div>
                       );

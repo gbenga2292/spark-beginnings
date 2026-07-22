@@ -14,10 +14,12 @@ import { Variables } from './Variables';
 import { useAppStore } from '@/src/store/appStore';
 import { useUserStore } from '@/src/store/userStore';
 import { useAppData } from '@/src/contexts/AppDataContext';
+import { useOperations } from '@/src/contexts/OperationsContext';
 import { toast } from '@/src/components/ui/toast';
 import { supabase } from '@/src/integrations/supabase/client';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { exportFullAppToExcel, restoreFullAppFromExcel } from '@/src/lib/excelBackup';
+import { performSupabaseDatabaseBackup } from '@/src/lib/supabaseBackup';
 import { usePriv } from '@/src/hooks/usePriv';
 import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import packageJson from '../../../package.json';
@@ -201,6 +203,8 @@ export function Settings() {
   const [isRestoring, setIsRestoring] = useState(false);
   const [isExportingExcel, setIsExportingExcel] = useState(false);
   const [isRestoringExcel, setIsRestoringExcel] = useState(false);
+  const [isBackingUpSupabase, setIsBackingUpSupabase] = useState(false);
+  const [supabaseDbConnString, setSupabaseDbConnString] = useState(() => localStorage.getItem('dcel-supabase-db-url') || '');
   const restoreInputRef = useRef<HTMLInputElement>(null);
   const restoreExcelInputRef = useRef<HTMLInputElement>(null);
   const autoBackupTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -209,6 +213,7 @@ export function Settings() {
   const state = useAppStore();
   const userState = useUserStore();
   const taskState = useAppData();
+  const operationsState = useOperations();
   const priv = usePriv('variables');
 
   useEffect(() => {
@@ -389,26 +394,31 @@ export function Settings() {
         disciplinaryRecords: state.disciplinaryRecords,
         evaluations: state.evaluations,
         ledgerCategories: state.ledgerCategories,
-        ledgerVendors: state.ledgerVendors,
-        ledgerBanks: state.ledgerBanks,
-        ledgerEntries: state.ledgerEntries,
-        hrVariables: state.hrVariables,
-        staffMeritRecords: state.staffMeritRecords,
-        vehicles: state.vehicles,
-        vehicleTrips: state.vehicleTrips,
-        vehicleDocumentTypes: state.vehicleDocumentTypes,
+        ledgerBeneficiaryBanks: state.ledgerBeneficiaryBanks,
+        companyExpenses: state.companyExpenses,
+        // Operations Context
+        vehicleFuelLogs: operationsState.vehicleFuelLogs,
+        dieselRefills: operationsState.dieselRefills,
+        dailyMachineLogs: operationsState.dailyMachineLogs,
+        assets: operationsState.assets,
+        waybills: operationsState.waybills,
+        checkouts: operationsState.checkouts,
+        maintenanceAssets: operationsState.maintenanceAssets,
+        maintenanceSessions: operationsState.maintenanceSessions,
+        maintenanceCertificates: operationsState.maintenanceCertificates,
         // User Store
         users: userState.users,
         presets: userState.presets,
-        // Task Context
+        // Task Context & Budget
         mainTasks: taskState.mainTasks,
         subtasks: taskState.subtasks,
         comments: taskState.comments,
         projects: taskState.projects,
         reminders: taskState.reminders,
+        budgetItems: state.budgetItems,
       },
     };
-  }, [state, userState, taskState, appVersion]);
+  }, [state, userState, taskState, operationsState, appVersion]);
 
   /* ── Manual backup to file ───────────────────────────────── */
   const handleManualBackup = async (overrideBasePath?: string) => {
@@ -506,6 +516,13 @@ export function Settings() {
         if (d.vehicles)             useAppStore.setState({ vehicles: d.vehicles });
         if (d.vehicleTrips)         useAppStore.setState({ vehicleTrips: d.vehicleTrips });
         if (d.vehicleDocumentTypes) useAppStore.setState({ vehicleDocumentTypes: d.vehicleDocumentTypes });
+        if (d.ledgerBeneficiaryBanks) useAppStore.setState({ ledgerBeneficiaryBanks: d.ledgerBeneficiaryBanks });
+        if (d.companyExpenses)      useAppStore.setState({ companyExpenses: d.companyExpenses });
+        if (d.budgetItems)          useAppStore.setState({ budgetItems: d.budgetItems });
+
+        // Restore Operations & Tasks context states
+        operationsState.importOperationsBackupData(d);
+        taskState.importTaskBackupData(d);
 
         const bDate = new Date(backup.backupDate).toLocaleString();
         toast.success(`Data restored from backup dated ${bDate}`);
@@ -543,6 +560,26 @@ export function Settings() {
       toast.error('Excel Export failed. Please try again.');
     } finally {
       setIsExportingExcel(false);
+    }
+  };
+
+  /* ── Export Supabase Database Backup (SQL / CLI) ────────── */
+  const handleSupabaseBackup = async () => {
+    if (!priv.canBackup) return;
+    setIsBackingUpSupabase(true);
+    try {
+      const res = await performSupabaseDatabaseBackup(supabaseDbConnString || undefined);
+      if (res.canceled) return;
+      if (res.success) {
+        toast.success(res.message || `Supabase database backup created successfully!`);
+      } else {
+        toast.error(res.message || 'Supabase backup failed. Please check your connection string or CLI.');
+      }
+    } catch (err: any) {
+      console.error('Supabase database backup error:', err);
+      toast.error('Supabase backup failed.');
+    } finally {
+      setIsBackingUpSupabase(false);
     }
   };
 
@@ -585,6 +622,14 @@ export function Settings() {
       if (d.ledgerEntries)        useAppStore.setState({ ledgerEntries: d.ledgerEntries });
       if (d.companyExpenses)      useAppStore.setState({ companyExpenses: d.companyExpenses });
       if (d.hrVariables)          useAppStore.setState({ hrVariables: d.hrVariables });
+      if (d.vehicles)             useAppStore.setState({ vehicles: d.vehicles });
+      if (d.vehicleTrips)         useAppStore.setState({ vehicleTrips: d.vehicleTrips });
+      if (d.vehicleDocumentTypes) useAppStore.setState({ vehicleDocumentTypes: d.vehicleDocumentTypes });
+      if (d.budgetItems)          useAppStore.setState({ budgetItems: d.budgetItems });
+
+      // Restore Operations & Tasks context states
+      operationsState.importOperationsBackupData(d);
+      taskState.importTaskBackupData(d);
 
       toast.success('Data restored from Excel successfully');
     } catch (err) {
@@ -963,6 +1008,60 @@ export function Settings() {
                       }
                     </Button>
                   </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Supabase SQL Database Backup */}
+            <Card className="border border-slate-200 shadow-sm rounded-2xl overflow-hidden">
+              <CardHeader className="bg-gradient-to-r from-blue-50 to-white border-b border-slate-100 px-6 py-5">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-xl bg-blue-100 flex items-center justify-center text-blue-600 shadow-sm">
+                    <DatabaseBackup className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base font-bold text-slate-800">Supabase SQL Database Backup</CardTitle>
+                    <p className="text-xs text-slate-500 mt-0.5">Export full PostgreSQL roles, schema DDL, and data copies via Supabase CLI or SQL table dumper.</p>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="px-6 py-6">
+                <div className="flex flex-col gap-4 p-5 bg-blue-50/50 rounded-2xl border border-blue-100">
+                  <div className="flex items-center gap-2">
+                    <Download className="h-5 w-5 text-blue-600" />
+                    <h3 className="font-bold text-slate-800">Export Supabase Database (SQL / ZIP)</h3>
+                  </div>
+                  <p className="text-sm text-slate-600 leading-relaxed">
+                    Opens a native location picker to save a <strong>.zip</strong> archive containing <code>roles.sql</code>, <code>schema.sql</code>, and <code>data.sql</code> (or a single combined <code>.sql</code> file). Pick any destination folder on your system.
+                  </p>
+
+                  <div className="flex flex-col gap-1 mt-1">
+                    <label className="text-xs font-semibold text-slate-700">Supabase DB Connection String (Optional for full CLI dumps):</label>
+                    <Input
+                      type="password"
+                      placeholder="postgresql://postgres.[ref]:[password]@aws-0-[region].pooler.supabase.com:6543/postgres"
+                      value={supabaseDbConnString}
+                      onChange={(e) => {
+                        setSupabaseDbConnString(e.target.value);
+                        localStorage.setItem('dcel-supabase-db-url', e.target.value);
+                      }}
+                      className="bg-white text-xs text-slate-800 h-9"
+                    />
+                    <span className="text-[11px] text-slate-500">
+                      Copy from Supabase Dashboard → Settings → Database → Connection pooling (Session pooler). If left blank, an instant table-data export is performed.
+                    </span>
+                  </div>
+
+                  <Button
+                    onClick={handleSupabaseBackup}
+                    disabled={isBackingUpSupabase || !priv.canBackup}
+                    className="bg-blue-600 hover:bg-blue-700 text-white gap-2 h-11 rounded-xl shadow-sm mt-2"
+                  >
+                    {isBackingUpSupabase
+                      ? <><RefreshCw className="h-4 w-4 animate-spin" /> Generating Supabase Backup…</>
+                      : <><Download className="h-4 w-4" /> Backup Supabase DB (Pick Location)</>
+                    }
+                  </Button>
                 </div>
               </CardContent>
             </Card>
