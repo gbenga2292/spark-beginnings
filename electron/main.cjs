@@ -1,14 +1,12 @@
-const { app, BrowserWindow, Menu, dialog, shell, ipcMain, Notification, Tray } = require('electron');
+const { app, BrowserWindow, Menu, dialog, shell, ipcMain, Notification, Tray, nativeImage } = require('electron');
 const path = require('path');
 const { autoUpdater } = require('electron-updater');
 
-/* ─── Disable Hardware Acceleration (Fixes VM/RDP GPU crashes) ─── */
+/* ─── Disable Hardware Acceleration & DirectComposition ─── */
 app.disableHardwareAcceleration();
 app.commandLine.appendSwitch('disable-gpu');
-app.commandLine.appendSwitch('disable-software-rasterizer');
-app.commandLine.appendSwitch('disable-gpu-compositing');
+app.commandLine.appendSwitch('disable-direct-composition');
 app.commandLine.appendSwitch('no-sandbox');
-app.commandLine.appendSwitch('disable-gpu-sandbox');
 
 /* ─── Single Instance Lock ─────────────────────────────────────── */
 const gotTheLock = app.requestSingleInstanceLock();
@@ -220,8 +218,12 @@ function initAutoUpdater() {
 
 
 // ── Customize the OS App Identity for Notifications
-// Must be set BEFORE app is ready so Windows uses it for notification grouping
-app.setAppUserModelId('com.dcel.hr');
+// In production, use registered bundle ID. In dev mode, use process.execPath so Windows taskbar loads appIcon directly.
+if (!isDev) {
+  app.setAppUserModelId('com.dcel.hr');
+} else {
+  app.setAppUserModelId(process.execPath);
+}
 app.name = 'DCEL Office Suite';
 
 /* ─── Current user privileges (updated via IPC from renderer) ─── */
@@ -494,35 +496,6 @@ function initIPC() {
     });
   });
 
-  // Start the check-for-updates sequence targeting NAS or Web
-  ipcMain.on('updater:start-check', (event, source) => {
-    if (isDev) {
-      mainWindow?.webContents.send('updater:status', { type: 'error', message: 'Updates are disabled in development mode.' });
-      return;
-    }
-
-    manualCheck = true;
-
-    if (source === 'nas') {
-      const nasPath = '\\\\MYCLOUDEX2ULTRA\\DCEL_Share\\Updates\\';
-      autoUpdater.setFeedURL({
-        provider: 'generic',
-        url: `file:///${nasPath.replace(/\\/g, '/')}`
-      });
-    } else {
-      autoUpdater.setFeedURL({
-        provider: 'generic',
-        url: 'https://dewaterconstruct.com/app-updates/'
-      });
-    }
-
-    autoUpdater.checkForUpdates();
-  });
-
-  ipcMain.on('updater:quit-and-install', () => {
-    autoUpdater.quitAndInstall();
-  });
-
   ipcMain.on('check-for-updates', () => {
     if (isDev) {
       dialog.showMessageBox(mainWindow, { type: 'info', message: 'Updates are disabled in development mode.' });
@@ -534,17 +507,6 @@ function initIPC() {
       } else {
         autoUpdater.checkForUpdates();
       }
-    }
-  });
-
-  ipcMain.handle('updater:check-nas-status', async (_event, nasPath) => {
-    const fs = require('fs');
-    const p = nasPath || '\\\\MYCLOUDEX2ULTRA\\DCEL_Share\\Updates\\';
-    try {
-      if (fs.existsSync(p)) return { status: 'online' };
-      return { status: 'offline', error: 'NAS folder not reachable.' };
-    } catch (err) {
-      return { status: 'offline', error: err.message };
     }
   });
 
@@ -729,7 +691,10 @@ function initIPC() {
   // ── Native notification from main process (correct app name/icon on Windows)
   ipcMain.on('app:notify', (_event, { title, body }) => {
     if (!Notification.isSupported()) return;
-    const iconPath = path.join(__dirname, '..', 'logo', 'logo-2.png');
+    const fs = require('fs');
+    const icoPath = path.join(__dirname, '..', 'logo', 'icon.ico');
+    const pngPath = path.join(__dirname, '..', 'logo', 'logo-1.png');
+    const iconPath = (process.platform === 'win32' && fs.existsSync(icoPath)) ? icoPath : pngPath;
     const n = new Notification({
       title,
       body: body || '',
@@ -811,8 +776,17 @@ function initIPC() {
 
 /* ─── Tray Setup ───────────────────────────────────────────────── */
 function initTray() {
-  const iconPath = path.join(__dirname, '..', 'logo', 'logo-2.png');
-  tray = new Tray(iconPath);
+  const fs = require('fs');
+  const icoPath = path.join(__dirname, '..', 'logo', 'icon.ico');
+  const pngPath = path.join(__dirname, '..', 'logo', 'logo-1.png');
+  const targetPath = (process.platform === 'win32' && fs.existsSync(icoPath)) ? icoPath : pngPath;
+
+  let trayIcon = nativeImage.createFromPath(targetPath);
+  if (process.platform === 'win32') {
+    trayIcon = trayIcon.resize({ width: 16, height: 16, quality: 'best' });
+  }
+
+  tray = new Tray(trayIcon);
   const contextMenu = Menu.buildFromTemplate([
     { label: 'Open DCEL Office Suite', click: () => {
       if (mainWindow) {
@@ -842,13 +816,19 @@ function initTray() {
 
 /* ─── Main Window ──────────────────────────────────────────────── */
 function createWindow() {
+  const fs = require('fs');
+  const icoPath = path.join(__dirname, '..', 'logo', 'icon.ico');
+  const pngPath = path.join(__dirname, '..', 'logo', 'logo-1.png');
+  const targetIconPath = (process.platform === 'win32' && fs.existsSync(icoPath)) ? icoPath : pngPath;
+  const appIcon = nativeImage.createFromPath(targetIconPath);
+
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
     minWidth: 1024,
     minHeight: 700,
     title: 'DCEL Office Suite',
-    icon: path.join(__dirname, '..', 'logo', 'logo-1.png'),
+    icon: appIcon,
     // Frameless window to allow complete custom titlebar
     frame: false,
     webPreferences: {
@@ -860,12 +840,24 @@ function createWindow() {
     show: false, // wait for ready-to-show for a flash-free launch
   });
 
-  // Smooth launch — set zoom and maximize before first paint
-  mainWindow.once('ready-to-show', () => {
-    mainWindow.webContents.setZoomFactor(1.0);
-    mainWindow.maximize();
-    mainWindow.show();
-  });
+  if (process.platform === 'win32') {
+    mainWindow.setIcon(appIcon);
+  }
+
+  const showWindow = () => {
+    if (mainWindow && !mainWindow.isVisible()) {
+      mainWindow.webContents.setZoomFactor(1.0);
+      mainWindow.maximize();
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  };
+
+  // Smooth launch — set zoom and maximize on ready-to-show
+  mainWindow.once('ready-to-show', showWindow);
+
+  // Fallback timer: ensure window becomes visible even if ready-to-show is suppressed by GPU flags
+  setTimeout(showWindow, 1000);
 
   if (isDev) {
     // In dev, load from Vite dev server

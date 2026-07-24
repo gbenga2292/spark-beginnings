@@ -272,6 +272,28 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname]);
+
+  // Listen for programmatic collapse/restore events (e.g. when full-screen form modal opens)
+  useEffect(() => {
+    const handleCollapseEvent = () => {
+      autoCollapsedRef.current = true;
+      setIsCollapsed(true);
+    };
+    const handleRestoreEvent = () => {
+      if (autoCollapsedRef.current) {
+        autoCollapsedRef.current = false;
+        setIsCollapsed(false);
+      }
+    };
+
+    window.addEventListener('sidebar:collapse', handleCollapseEvent);
+    window.addEventListener('sidebar:restore', handleRestoreEvent);
+
+    return () => {
+      window.removeEventListener('sidebar:collapse', handleCollapseEvent);
+      window.removeEventListener('sidebar:restore', handleRestoreEvent);
+    };
+  }, []);
   
   // ── Platform Detection ─────────────────────────────────────────────────
   // We only want to show the APK update UI on the actual Android device.

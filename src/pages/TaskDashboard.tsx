@@ -735,10 +735,10 @@ function UserDashboard() {
 
       {/* ── Stat Cards ── */}
       <motion.div variants={item} className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label={isExternalHr ? "HR Tasks" : "Assigned to Me"} value={mySubs.length} icon={TrendingUp} color="blue" sub={isExternalHr ? "Authorized HR tasks" : "My subtasks"} />
-        <StatCard label="In Progress" value={myProgress} icon={Loader2} color="blue" sub={isExternalHr ? `${Math.round(myProgress / Math.max(mySubs.length, 1) * 100)}% active` : `${Math.round(myProgress / Math.max(mySubs.length, 1) * 100)}% of mine`} />
+        <StatCard label={isExternalHr ? "HR Tasks" : "Assigned to Me"} value={mySubs.length} icon={TrendingUp} color="blue" sub={isExternalHr ? "Authorized HR tasks" : "Total assigned tasks"} />
+        <StatCard label="In Progress" value={myProgress} icon={Loader2} color="blue" sub={isExternalHr ? `${Math.round(myProgress / Math.max(mySubs.length, 1) * 100)}% active` : `${Math.round(myProgress / Math.max(mySubs.length, 1) * 100)}% of assigned tasks`} />
         <StatCard label="Completed" value={myDone} icon={CheckCircle2} color="green" sub={`${myRate}% completion rate`} />
-        <StatCard label={isExternalHr ? "HR Support" : "Tasks I Created"} value={isExternalHr ? mySubs.length : myCreatedTasks.length} icon={Users} color="yellow" sub={isExternalHr ? "Task visibility active" : "Tasks I initiated"} />
+        <StatCard label={isExternalHr ? "HR Support" : "Tasks I Created"} value={isExternalHr ? mySubs.length : myCreatedTasks.length} icon={Users} color="yellow" sub={isExternalHr ? "Task visibility active" : "Created by me"} />
       </motion.div>
 
       {/* ── Progress ── */}

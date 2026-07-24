@@ -334,15 +334,20 @@ export function InvoiceDetailDialog({ invoice, invoiceList, open, onClose, onNav
             <div className="mt-3 space-y-2">
               {machineConfigs.length > 0 ? (
                 machineConfigs.map((cfg: any, i: number) => {
-                  const firstRate = parseFloat(machineConfigs[0]?.rate) || 0;
-                  const firstDur  = parseFloat(machineConfigs[0]?.duration) || 0;
-                  const rate = cfg.sameRateAsFirst ? firstRate : (parseFloat(cfg.rate) || 0);
-                  const dur  = cfg.sameDurationAsFirst ? firstDur : (parseFloat(cfg.duration) || 0);
+                  const firstRate  = parseFloat(String(machineConfigs[0]?.rate ?? 0)) || 0;
+                  const firstDur   = parseFloat(String(machineConfigs[0]?.duration ?? 0)) || 0;
+                  const firstUsage = parseFloat(String(machineConfigs[0]?.dailyUsage ?? invoice.dailyUsage ?? 0)) || 0;
+                  const rate  = cfg.sameRateAsFirst ? firstRate : (parseFloat(String(cfg.rate ?? 0)) || 0);
+                  const dur   = cfg.sameDurationAsFirst ? firstDur : (parseFloat(String(cfg.duration ?? 0)) || 0);
+                  const usage = cfg.sameUsageAsFirst ? firstUsage : (parseFloat(String(cfg.dailyUsage ?? invoice.dailyUsage ?? 0)) || 0);
                   return (
                     <div key={i} className="flex items-center justify-between bg-slate-50 border border-slate-100 rounded-lg px-4 py-2.5">
                       <div className="flex items-center gap-2">
                         <div className="h-7 w-7 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 text-xs font-black">M{i+1}</div>
-                        <span className="text-sm font-medium text-slate-700">Machine {i + 1}</span>
+                        <div className="flex flex-col">
+                          <span className="text-sm font-medium text-slate-700">Machine {i + 1}</span>
+                          {usage > 0 && <span className="text-[10px] text-orange-600 font-semibold">{usage} L/day fuel usage</span>}
+                        </div>
                         {cfg.name && <span className="text-xs text-slate-400">({cfg.name})</span>}
                       </div>
                       <div className="text-right">

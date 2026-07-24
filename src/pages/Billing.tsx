@@ -142,8 +142,15 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
   };
   const [form, setForm] = useState(initialForm);
 
-  // ── Per-machine rate/duration configs ──────────────────────────
-  type MachineRow = { rate: string; duration: string; sameRateAsFirst: boolean; sameDurationAsFirst: boolean };
+  // ── Per-machine rate/duration/usage configs ──────────────────────────
+  type MachineRow = {
+    rate: string;
+    duration: string;
+    dailyUsage?: string;
+    sameRateAsFirst: boolean;
+    sameDurationAsFirst: boolean;
+    sameUsageAsFirst?: boolean;
+  };
   const [machineConfigs, setMachineConfigs] = useState<MachineRow[]>([]);
 
   // Keep machineConfigs in sync with noOfMachine changes
@@ -157,14 +164,21 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
           next.push(prev[i]);
         } else {
           // Default new rows to same as first if first exists
-          next.push({ rate: prev[0]?.rate ?? '', duration: prev[0]?.duration ?? '', sameRateAsFirst: i > 0, sameDurationAsFirst: i > 0 });
+          next.push({
+            rate: prev[0]?.rate ?? '',
+            duration: prev[0]?.duration ?? '',
+            dailyUsage: prev[0]?.dailyUsage ?? form.dailyUsage ?? '',
+            sameRateAsFirst: i > 0,
+            sameDurationAsFirst: i > 0,
+            sameUsageAsFirst: i > 0,
+          });
         }
       }
       return next;
     });
   };
 
-  const handleMachineRowChange = (idx: number, field: 'rate' | 'duration', val: string) => {
+  const handleMachineRowChange = (idx: number, field: 'rate' | 'duration' | 'dailyUsage', val: string) => {
     setMachineConfigs(prev => {
       const next = prev.map((r, i) => {
         if (i === idx) return { ...r, [field]: val };
@@ -172,6 +186,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
         if (idx === 0) {
           if (field === 'rate' && r.sameRateAsFirst) return { ...r, rate: val };
           if (field === 'duration' && r.sameDurationAsFirst) return { ...r, duration: val };
+          if (field === 'dailyUsage' && r.sameUsageAsFirst) return { ...r, dailyUsage: val };
         }
         return r;
       });
@@ -179,15 +194,17 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
     });
   };
 
-  const handleMachineSameToggle = (idx: number, field: 'rate' | 'duration', checked: boolean) => {
+  const handleMachineSameToggle = (idx: number, field: 'rate' | 'duration' | 'dailyUsage', checked: boolean) => {
     setMachineConfigs(prev => {
       const first = prev[0];
       return prev.map((r, i) => {
         if (i !== idx) return r;
         if (field === 'rate') {
           return checked ? { ...r, sameRateAsFirst: true, rate: first?.rate ?? '' } : { ...r, sameRateAsFirst: false };
-        } else {
+        } else if (field === 'duration') {
           return checked ? { ...r, sameDurationAsFirst: true, duration: first?.duration ?? '' } : { ...r, sameDurationAsFirst: false };
+        } else {
+          return checked ? { ...r, sameUsageAsFirst: true, dailyUsage: first?.dailyUsage ?? '' } : { ...r, sameUsageAsFirst: false };
         }
       });
     });
@@ -253,7 +270,10 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
     const actualNightDuration = form.technicianNightDurationSameAsMachine ? maxDuration : (parseFloat(form.technicianNightDuration) || 0);
 
     const dieselCost = machineConfigs.length > 0
-      ? machineConfigs.reduce((sum, row) => sum + dailyUsage * dieselCostPerLtr * (parseFloat(row.duration) || 0), 0)
+      ? machineConfigs.reduce((sum, row) => {
+          const usage = row.dailyUsage !== undefined && row.dailyUsage !== '' ? (parseFloat(row.dailyUsage) || 0) : dailyUsage;
+          return sum + usage * dieselCostPerLtr * (parseFloat(row.duration) || 0);
+        }, 0)
       : noOfMachine * dailyUsage * dieselCostPerLtr * maxDuration;
 
     // Separate night count logic (backwards compatible: undefined = same as day)
@@ -393,7 +413,10 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
     const actualNightDuration = isNightSame ? maxDuration : (parseFloat(input.technicianNightDuration) || 0);
 
     const dieselCost = activeCfgs
-      ? activeCfgs.reduce((sum, row) => sum + dailyUsage * dieselCostPerLtr * (parseFloat(row.duration) || 0), 0)
+      ? activeCfgs.reduce((sum, row) => {
+          const usage = (row as any).dailyUsage !== undefined && (row as any).dailyUsage !== '' ? (parseFloat((row as any).dailyUsage) || 0) : dailyUsage;
+          return sum + usage * dieselCostPerLtr * (parseFloat(row.duration) || 0);
+        }, 0)
       : noOfMachine * dailyUsage * dieselCostPerLtr * maxDuration;
 
     // Separate night count logic (backwards compatible: undefined = same as day)
@@ -428,7 +451,12 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
     }
 
     const machineConfigsOut = activeCfgs
-      ? activeCfgs.map(r => ({ qt: 1, rate: parseFloat(r.rate) || 0, duration: parseFloat(r.duration) || 0 }))
+      ? activeCfgs.map(r => ({
+          qt: 1,
+          rate: parseFloat(r.rate) || 0,
+          duration: parseFloat(r.duration) || 0,
+          dailyUsage: (r as any).dailyUsage !== undefined && (r as any).dailyUsage !== '' ? (parseFloat((r as any).dailyUsage) || 0) : dailyUsage
+        }))
       : undefined;
 
     return {
@@ -643,20 +671,31 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
     });
     // Restore per-machine configs if saved, or generate defaults from flat fields
     if (inv.machineConfigs && inv.machineConfigs.length > 0) {
+      const firstUsage = 'dailyUsage' in inv.machineConfigs[0] ? (inv.machineConfigs[0] as any).dailyUsage : undefined;
       setMachineConfigs(
         inv.machineConfigs.map((c, i) => ({
           rate: String(c.rate),
           duration: String(c.duration),
+          dailyUsage: 'dailyUsage' in c && (c as any).dailyUsage !== undefined ? String((c as any).dailyUsage) : ('dailyUsage' in inv ? String(inv.dailyUsage ?? '') : ''),
           sameRateAsFirst: i > 0 && c.rate === inv.machineConfigs![0].rate,
           sameDurationAsFirst: i > 0 && c.duration === inv.machineConfigs![0].duration,
+          sameUsageAsFirst: i > 0 && (c as any).dailyUsage === firstUsage,
         }))
       );
     } else {
       const n = parseInt(noOfMachine) || 0;
       const rate = 'dailyRentalCost' in inv ? String(inv.dailyRentalCost ?? '') : '';
       const dur = 'duration' in inv ? String(inv.duration ?? '') : '';
+      const usage = 'dailyUsage' in inv ? String(inv.dailyUsage ?? '') : '';
       setMachineConfigs(
-        Array.from({ length: n }, (_, i) => ({ rate, duration: dur, sameRateAsFirst: i > 0, sameDurationAsFirst: i > 0 }))
+        Array.from({ length: n }, (_, i) => ({
+          rate,
+          duration: dur,
+          dailyUsage: usage,
+          sameRateAsFirst: i > 0,
+          sameDurationAsFirst: i > 0,
+          sameUsageAsFirst: i > 0,
+        }))
       );
     }
     setIsModalOpen(true);
@@ -1304,6 +1343,16 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
       if (setFullPageContent) setFullPageContent(null);
     };
   }, [printInvoiceTarget, setFullPageContent, ledgerBanks, ledgerBeneficiaryBanks]);
+
+  // Auto-collapse sidebar when Invoice Form modal is open
+  React.useEffect(() => {
+    if (isModalOpen) {
+      window.dispatchEvent(new CustomEvent('sidebar:collapse'));
+      return () => {
+        window.dispatchEvent(new CustomEvent('sidebar:restore'));
+      };
+    }
+  }, [isModalOpen]);
 
   useHideLayout(!!printInvoiceTarget);
 
@@ -2293,7 +2342,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                         
                         <div className="space-y-3">
                           {machineConfigs.map((row, idx) => (
-                            <div key={idx} className="grid grid-cols-1 md:grid-cols-[100px_1fr_1fr] gap-4 items-center p-3 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
+                            <div key={idx} className="grid grid-cols-1 xl:grid-cols-[100px_1fr_1fr_1fr] gap-4 items-center p-3 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
                               <span className="text-xs font-black text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
                                 <span className="w-2.5 h-2.5 rounded-full bg-blue-500 animate-pulse" />
                                 Pump #{idx + 1}
@@ -2349,6 +2398,32 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                                   onChange={e => handleMachineRowChange(idx, 'duration', e.target.value)}
                                   className={idx > 0 && row.sameDurationAsFirst ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed h-10 text-xs font-semibold' : 'bg-white dark:bg-slate-900 h-10 text-xs font-semibold text-slate-800 dark:text-white'}
                                   placeholder="0"
+                                />
+                              </div>
+
+                              <div className="space-y-1">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-[10px] text-slate-455 font-bold uppercase tracking-wider">Daily Fuel Usage (L/day)</span>
+                                  {idx > 0 && (
+                                    <label className="flex items-center gap-1 text-[10px] text-indigo-655 dark:text-indigo-455 cursor-pointer select-none font-bold">
+                                      <input
+                                        type="checkbox"
+                                        checked={!!row.sameUsageAsFirst}
+                                        onChange={e => handleMachineSameToggle(idx, 'dailyUsage', e.target.checked)}
+                                        className="accent-indigo-650 w-3 h-3 rounded border-slate-350"
+                                      />
+                                      Link to #1
+                                    </label>
+                                  )}
+                                </div>
+                                <Input
+                                  type="number" 
+                                  min="0"
+                                  value={row.dailyUsage ?? ''}
+                                  disabled={idx > 0 && !!row.sameUsageAsFirst}
+                                  onChange={e => handleMachineRowChange(idx, 'dailyUsage', e.target.value)}
+                                  className={idx > 0 && !!row.sameUsageAsFirst ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed h-10 text-xs font-semibold' : 'bg-white dark:bg-slate-900 h-10 text-xs font-semibold text-slate-800 dark:text-white'}
+                                  placeholder={form.dailyUsage || 'e.g. 150'}
                                 />
                               </div>
                             </div>
@@ -2570,19 +2645,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                   </div>
 
                   <div className="p-6 space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-slate-500 dark:text-slate-455 uppercase tracking-wider">Daily Fuel Usage (Liters / pump / day)</label>
-                        <Input 
-                          type="number" 
-                          min="0" 
-                          value={form.dailyUsage} 
-                          onChange={e => handleChange('dailyUsage', e.target.value)} 
-                          className="bg-white dark:bg-slate-900 border-slate-205 dark:border-slate-800 h-11 font-semibold text-slate-800 dark:text-white" 
-                          placeholder="e.g. 150" 
-                        />
-                      </div>
-
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                       <div className="space-y-1.5">
                         <label className="text-xs font-bold text-slate-500 dark:text-slate-455 uppercase tracking-wider">Diesel Price (₦ / Liter)</label>
                         <NumericFormat 
@@ -2595,9 +2658,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                           placeholder="0.00" 
                         />
                       </div>
-                    </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 border-t border-slate-100 dark:border-slate-850">
                       <div className="space-y-1.5">
                         <label className="text-xs font-bold text-slate-500 dark:text-slate-450 uppercase tracking-wider">Mobilization / Demob (₦)</label>
                         <NumericFormat 
@@ -2798,21 +2859,22 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                     <p className="text-[10px] font-black uppercase tracking-wider text-orange-600 dark:text-orange-400 border-b border-slate-100 dark:border-slate-800 pb-2">Diesel Calculation</p>
                     <div className="space-y-3.5 text-xs">
                       {machineConfigs.length > 0 ? (
-                        machineConfigs.map((row, idx) => (
-                          (parseFloat(row.duration) > 0) && (
+                        machineConfigs.map((row, idx) => {
+                          const rowUsage = row.dailyUsage !== undefined && row.dailyUsage !== '' ? (parseFloat(row.dailyUsage) || 0) : (parseFloat(form.dailyUsage) || 0);
+                          return (parseFloat(row.duration) > 0) && (
                             <div key={idx} className="flex justify-between items-start text-slate-655 dark:text-slate-400 gap-2">
                               <span className="flex flex-col">
                                 <span className="font-bold text-slate-705 dark:text-slate-350">Machine {idx + 1} Diesel</span>
                                 <span className="text-[10px] text-slate-400 font-medium">
-                                  {parseFloat(form.dailyUsage) || 0}L/d × ₦{(parseFloat(form.dieselCostPerLtr) || 0).toLocaleString()}/L × {parseFloat(row.duration) || 0}d
+                                  {rowUsage}L/d × ₦{(parseFloat(form.dieselCostPerLtr) || 0).toLocaleString()}/L × {parseFloat(row.duration) || 0}d
                                 </span>
                               </span>
                               <span className="font-mono font-bold text-slate-850 dark:text-slate-205 shrink-0">
-                                ₦{((parseFloat(form.dailyUsage) || 0) * (parseFloat(form.dieselCostPerLtr) || 0) * (parseFloat(row.duration) || 0)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                ₦{(rowUsage * (parseFloat(form.dieselCostPerLtr) || 0) * (parseFloat(row.duration) || 0)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                               </span>
                             </div>
-                          )
-                        ))
+                          );
+                        })
                       ) : (
                         <div className="flex justify-between items-start text-slate-655 dark:text-slate-400 gap-2">
                           <span className="flex flex-col">
