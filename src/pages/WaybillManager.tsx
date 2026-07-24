@@ -2,7 +2,8 @@ import { formatDisplayDate } from '@/src/lib/dateUtils';
 import { useState, useMemo } from 'react';
 import { useOperations } from '../contexts/OperationsContext';
 import { 
-  Plus, Search, Eye, Edit2, Trash2, Truck, ArrowRightLeft, ListFilter, Calendar, RotateCcw
+  Plus, Search, Eye, Edit2, Trash2, Truck, ArrowRightLeft, ListFilter, Calendar, RotateCcw,
+  ArrowUpDown, ArrowUp, ArrowDown
 } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { useTheme } from '@/src/hooks/useTheme';
@@ -57,6 +58,7 @@ export function WaybillManager() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [viewingWaybill, setViewingWaybill] = useState<Waybill | null>(null);
   const [editingWaybill, setEditingWaybill] = useState<Waybill | null>(null);
+  const [returnToDetailOnClose, setReturnToDetailOnClose] = useState(false);
   const [waybillToSend, setWaybillToSend] = useState<Waybill | null>(null);
   const [sentDate, setSentDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [activeTab, setActiveTab] = useState<'waybill' | 'return'>('waybill');
@@ -98,9 +100,76 @@ export function WaybillManager() {
     }
   };
 
+  type SortField = 'id' | 'driver' | 'site' | 'date' | 'status';
+  type SortOrder = 'asc' | 'desc';
+
+  const [sortField, setSortField] = useState<SortField>('date');
+  const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortOrder(prev => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortField(field);
+      setSortOrder('desc');
+    }
+  };
+
   const currentItems = activeTab === 'waybill' ? filteredOutgoing : filteredIncoming;
   const currentSearch = activeTab === 'waybill' ? waybillSearch : returnSearch;
   const setCurrentSearch = activeTab === 'waybill' ? setWaybillSearch : setReturnSearch;
+
+  const sortedItems = useMemo(() => {
+    const items = [...currentItems];
+    items.sort((a, b) => {
+      let comparison = 0;
+      switch (sortField) {
+        case 'id':
+          comparison = a.id.localeCompare(b.id, undefined, { numeric: true, sensitivity: 'base' });
+          break;
+        case 'driver':
+          comparison = (a.driverName || '').localeCompare(b.driverName || '');
+          break;
+        case 'site':
+          comparison = (a.siteName || '').localeCompare(b.siteName || '');
+          break;
+        case 'date': {
+          const dateA = new Date(a.sentToSiteDate || a.issueDate || 0).getTime();
+          const dateB = new Date(b.sentToSiteDate || b.issueDate || 0).getTime();
+          comparison = dateA - dateB;
+          break;
+        }
+        case 'status':
+          comparison = (a.status || '').localeCompare(b.status || '');
+          break;
+      }
+      return sortOrder === 'asc' ? comparison : -comparison;
+    });
+    return items;
+  }, [currentItems, sortField, sortOrder]);
+
+  const renderSortHeader = (field: SortField, label: string) => {
+    const isSorted = sortField === field;
+    return (
+      <th
+        onClick={() => handleSort(field)}
+        className="px-5 py-4 whitespace-nowrap cursor-pointer select-none hover:bg-blue-800 transition-colors group/header"
+      >
+        <div className="flex items-center gap-1.5">
+          <span>{label}</span>
+          {isSorted ? (
+            sortOrder === 'asc' ? (
+              <ArrowUp className="h-3.5 w-3.5 text-blue-200" />
+            ) : (
+              <ArrowDown className="h-3.5 w-3.5 text-blue-200" />
+            )
+          ) : (
+            <ArrowUpDown className="h-3.5 w-3.5 text-blue-200/50 group-hover/header:text-blue-200 transition-colors" />
+          )}
+        </div>
+      </th>
+    );
+  };
 
   // ── Full-page detail view (replaces list entirely) ────────────────────
   const handleOpenSendDialog = (wb: Waybill) => {
@@ -132,15 +201,33 @@ export function WaybillManager() {
     }
   };
 
-  if (viewingWaybill) {
-    return <WaybillDetailView waybill={viewingWaybill} onClose={() => setViewingWaybill(null)} />;
+  if (editingWaybill) {
+    const handleCloseForm = () => {
+      if (returnToDetailOnClose) {
+        setViewingWaybill(editingWaybill);
+        setReturnToDetailOnClose(false);
+      }
+      setEditingWaybill(null);
+    };
+
+    if (editingWaybill.type === 'return') {
+      return <CreateReturnWaybill editWaybill={editingWaybill} onBack={handleCloseForm} />;
+    }
+    return <WaybillForm onClose={handleCloseForm} editWaybill={editingWaybill} />;
   }
 
-  if (editingWaybill) {
-    if (editingWaybill.type === 'return') {
-      return <CreateReturnWaybill editWaybill={editingWaybill} onBack={() => setEditingWaybill(null)} />;
-    }
-    return <WaybillForm onClose={() => setEditingWaybill(null)} editWaybill={editingWaybill} />;
+  if (viewingWaybill) {
+    return (
+      <WaybillDetailView
+        waybill={viewingWaybill}
+        onClose={() => setViewingWaybill(null)}
+        onEdit={(wb) => {
+          setReturnToDetailOnClose(true);
+          setViewingWaybill(null);
+          setEditingWaybill(wb);
+        }}
+      />
+    );
   }
 
   if (showCreateModal) {
@@ -194,17 +281,17 @@ export function WaybillManager() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-blue-700 border-b border-blue-800 text-blue-50 uppercase text-[11px] tracking-wider font-bold">
-                <th className="px-5 py-4 whitespace-nowrap">{activeTab === 'waybill' ? 'Waybill' : 'Return'} ID</th>
-                <th className="px-5 py-4 whitespace-nowrap">Driver & Vehicle</th>
-                <th className="px-5 py-4 whitespace-nowrap">{activeTab === 'waybill' ? 'Destination' : 'Source Site'}</th>
-                <th className="px-5 py-4 whitespace-nowrap">Date</th>
-                <th className="px-5 py-4 whitespace-nowrap">Status</th>
+                {renderSortHeader('id', activeTab === 'waybill' ? 'Waybill ID' : 'Return ID')}
+                {renderSortHeader('driver', 'Driver & Vehicle')}
+                {renderSortHeader('site', activeTab === 'waybill' ? 'Destination' : 'Source Site')}
+                {renderSortHeader('date', 'Date')}
+                {renderSortHeader('status', 'Status')}
                 <th className="px-5 py-4 min-w-[150px]">Items Summary</th>
                 <th className="px-5 py-4 whitespace-nowrap text-center">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-sm">
-              {currentItems.length === 0 ? (
+              {sortedItems.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-5 py-12 text-center text-slate-500">
                     <div className="flex flex-col items-center gap-3">
@@ -216,7 +303,7 @@ export function WaybillManager() {
                   </td>
                 </tr>
               ) : (
-                currentItems.map((wb) => (
+                sortedItems.map((wb) => (
                   <tr key={wb.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors group">
                     <td className="px-5 py-4 font-bold text-slate-800 dark:text-slate-200">{wb.id}</td>
                     <td className="px-5 py-4">
@@ -335,7 +422,7 @@ export function WaybillManager() {
 
         {/* Mobile View: Cards */}
         <div className="md:hidden flex flex-col divide-y divide-slate-100 dark:divide-slate-800">
-          {currentItems.length === 0 ? (
+          {sortedItems.length === 0 ? (
             <div className="px-5 py-12 text-center text-slate-500">
               <div className="flex flex-col items-center gap-3">
                 <div className="h-12 w-12 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center border dark:border-slate-700">
@@ -345,7 +432,7 @@ export function WaybillManager() {
               </div>
             </div>
           ) : (
-            currentItems.map((wb) => (
+            sortedItems.map((wb) => (
               <div key={`mobile-${wb.id}`} className="p-4 flex flex-col gap-3 hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors">
                 <div className="flex items-start justify-between">
                   <div className="flex flex-col">

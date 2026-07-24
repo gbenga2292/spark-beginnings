@@ -39,23 +39,8 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
     }
     return !!currentUser?.signature;
   });
-
   const [purpose, setPurpose] = useState('Operational Activities');
   const [siteName, setSiteName] = useState(editWaybill?.siteName || prefillSiteName);
-  const [driverName, setDriverName] = useState(editWaybill?.driverName || '');
-  // driverIsCustom is initialised lazily so it can reference uniqueDrivers safely
-  const [driverIsCustom, setDriverIsCustom] = useState(false);
-  const [vehicleName, setVehicleName] = useState(editWaybill?.vehicle || '');
-  const [service, setService] = useState('Dewatering');
-  const [expectedReturnDate, setExpectedReturnDate] = useState('');
-  const [itemMode, setItemMode] = useState<'single' | 'bulk'>('single');
-  const [items, setItems] = useState<{ rowId: string; assetId: string; quantity: number }[]>(
-    editWaybill
-      ? editWaybill.items.map(i => ({ rowId: `row-${i.assetId}`, assetId: i.assetId, quantity: i.quantity }))
-      : []
-  );
-  const [bulkText, setBulkText] = useState('');
-  const [parsedItems, setParsedItems] = useState<{ id: string; originalText: string; quantity: number; matchedAssetId: string | null; isRematching?: boolean }[]>([]);
 
   const driverOptions = employees
     .filter(e => e.status === 'Active' || e.status === 'On Leave')
@@ -73,18 +58,54 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
   
   const uniqueDrivers = Array.from(new Set(driverOptions));
 
-  // Derived: if the saved driverName is not in the list, treat it as custom
-  const isKnownDriver = (name: string) => !name || uniqueDrivers.includes(name);
+  const [driverName, setDriverName] = useState(editWaybill?.driverName || '');
+  const [driverIsCustom, setDriverIsCustom] = useState(() => {
+    const raw = editWaybill?.driverName;
+    return !!raw && !uniqueDrivers.includes(raw);
+  });
 
-  // On mount: if editing and driver name is not in the list, show the custom input
-  useEffect(() => {
-    if (editWaybill?.driverName && !isKnownDriver(editWaybill.driverName)) {
-      setDriverIsCustom(true);
+  const [vehicleName, setVehicleName] = useState(() => {
+    const raw = editWaybill?.vehicle;
+    if (!raw) return '';
+    const match = vehicles.find(v =>
+      v.name.toLowerCase() === raw.toLowerCase() ||
+      v.registration_number?.toLowerCase() === raw.toLowerCase() ||
+      `${v.registration_number} - ${v.name}`.toLowerCase() === raw.toLowerCase()
+    );
+    if (match) {
+      return match.registration_number ? `${match.registration_number} - ${match.name}` : match.name;
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    return raw;
+  });
 
-  const vehicleOptions = vehicles.map(v => v.name);
+  const [vehicleIsCustom, setVehicleIsCustom] = useState(() => {
+    const raw = editWaybill?.vehicle;
+    if (!raw) return false;
+    const match = vehicles.find(v =>
+      v.name.toLowerCase() === raw.toLowerCase() ||
+      v.registration_number?.toLowerCase() === raw.toLowerCase() ||
+      `${v.registration_number} - ${v.name}`.toLowerCase() === raw.toLowerCase()
+    );
+    return !match;
+  });
+
+  const [service, setService] = useState('Dewatering');
+  const [waybillDate, setWaybillDate] = useState(() => {
+    if (editWaybill) {
+      const d = editWaybill.sentToSiteDate || editWaybill.issueDate;
+      if (d) return d.split('T')[0];
+    }
+    return new Date().toISOString().split('T')[0];
+  });
+  const [itemMode, setItemMode] = useState<'single' | 'bulk'>('single');
+  const [items, setItems] = useState<{ rowId: string; assetId: string; quantity: number }[]>(
+    editWaybill
+      ? editWaybill.items.map(i => ({ rowId: `row-${i.assetId}`, assetId: i.assetId, quantity: i.quantity }))
+      : []
+  );
+  const [bulkText, setBulkText] = useState('');
+  const [parsedItems, setParsedItems] = useState<{ id: string; originalText: string; quantity: number; matchedAssetId: string | null; isRematching?: boolean }[]>([]);
+
   const siteOptions = sites.map(s => s.name);
 
   const addItem = () => setItems([...items, { rowId: `row-${Date.now()}-${Math.random()}`, assetId: '', quantity: 1 }]);
@@ -153,12 +174,16 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
       return { assetId: i.assetId, assetName: asset?.name || 'Unknown', quantity: i.quantity };
     });
 
+    const selectedDateISO = waybillDate ? new Date(waybillDate).toISOString() : (editWaybill?.issueDate || new Date().toISOString());
+
     if (isEditing && editWaybill) {
       updateWaybill(editWaybill.id, {
         siteName,
         siteId: sites.find(s => s.name === siteName)?.id || editWaybill.siteId,
         driverName,
-        vehicle: vehicleName,
+        vehicle: vehicleName === 'Select Vehicle' ? '' : vehicleName,
+        issueDate: selectedDateISO,
+        sentToSiteDate: waybillDate ? selectedDateISO : editWaybill.sentToSiteDate,
         items: mappedItems,
         signature: addSignature ? (editWaybill.signature || currentUser?.signature || '') : '',
       });
@@ -168,9 +193,10 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
         siteId: sites.find(s => s.name === siteName)?.id || `site-${Date.now()}`,
         siteName,
         type: initialType,
-        issueDate: new Date().toISOString(),
+        issueDate: selectedDateISO,
+        sentToSiteDate: waybillDate ? selectedDateISO : undefined,
         driverName,
-        vehicle: vehicleName,
+        vehicle: vehicleName === 'Select Vehicle' ? '' : vehicleName,
         items: mappedItems,
         signature: addSignature ? (currentUser?.signature || '') : '',
       });
@@ -202,7 +228,7 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
         </Button>
       </div>
     ),
-    [initialType, isEditing, editWaybill, items, siteName, driverName, onClose] // Added items and other deps
+    [initialType, isEditing, editWaybill, items, siteName, driverName, vehicleName, waybillDate, onClose]
   );
 
   return (
@@ -273,15 +299,40 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
                 <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Vehicle *</Label>
                 <div className="relative">
                   <select
-                    value={vehicleName}
-                    onChange={e => setVehicleName(e.target.value)}
+                    value={vehicleIsCustom ? '__custom__' : vehicleName}
+                    onChange={e => {
+                      if (e.target.value === '__custom__') {
+                        setVehicleIsCustom(true);
+                        setVehicleName('');
+                      } else {
+                        setVehicleIsCustom(false);
+                        setVehicleName(e.target.value);
+                      }
+                    }}
                     className="w-full h-10 rounded-xl border border-border bg-background px-3 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 appearance-none"
                   >
                     <option value="">Select Vehicle</option>
-                    {vehicleOptions.map(v => <option key={v} value={v}>{v}</option>)}
+                    {vehicles.map(v => {
+                      const formatted = v.registration_number ? `${v.registration_number} - ${v.name}` : v.name;
+                      return (
+                        <option key={v.id} value={formatted}>
+                          {formatted}
+                        </option>
+                      );
+                    })}
+                    <option value="__custom__">— Type vehicle name manually —</option>
                   </select>
                   <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
                 </div>
+                {vehicleIsCustom && (
+                  <Input
+                    autoFocus
+                    placeholder="Enter vehicle name or number plate…"
+                    value={vehicleName}
+                    onChange={e => setVehicleName(e.target.value)}
+                    className="h-10 rounded-xl border-border bg-background text-sm font-medium"
+                  />
+                )}
               </div>
 
               {/* Site */}
@@ -300,14 +351,14 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
                 </div>
               </div>
 
-              {/* Expected Return Date */}
+              {/* Waybill Date */}
               <div className="space-y-1.5">
-                <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Expected Return Date</Label>
+                <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Waybill Date *</Label>
                 <Input
                   type="date"
-                  value={expectedReturnDate}
-                  onChange={e => setExpectedReturnDate(e.target.value)}
-                  className="h-10 rounded-xl border-space-200 dark:border-slate-700 bg-background text-sm"
+                  value={waybillDate}
+                  onChange={e => setWaybillDate(e.target.value)}
+                  className="h-10 rounded-xl border-border bg-background text-sm font-medium"
                 />
               </div>
 

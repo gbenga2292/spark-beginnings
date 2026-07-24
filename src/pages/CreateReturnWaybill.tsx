@@ -112,8 +112,15 @@ export function CreateReturnWaybill({ site, inventoryItems, onBack, editWaybill 
   const [driverDropdownOpen, setDriverDropdownOpen] = useState(false);
   const driverComboRef = useRef<HTMLDivElement>(null);
   const [vehicleName, setVehicleName] = useState(editWaybill?.vehicle || '');
+  const [vehicleIsCustom, setVehicleIsCustom] = useState(false);
   const [service, setService] = useState('Dewatering');
-  const [expectedReturnDate, setExpectedReturnDate] = useState('');
+  const [expectedReturnDate, setExpectedReturnDate] = useState(() => {
+    if (editWaybill) {
+      const d = editWaybill.sentToSiteDate || editWaybill.issueDate;
+      if (d) return d.split('T')[0];
+    }
+    return '';
+  });
   const [returnTo, setReturnTo] = useState('Office');
   const [destinationSiteId, setDestinationSiteId] = useState('');
   const [addSignature, setAddSignature] = useState(() => {
@@ -122,6 +129,22 @@ export function CreateReturnWaybill({ site, inventoryItems, onBack, editWaybill 
     }
     return !!currentUser?.signature;
   });
+
+  useEffect(() => {
+    if (editWaybill?.vehicle) {
+      const match = vehicles.find(v =>
+        v.name === editWaybill.vehicle ||
+        v.registration_number === editWaybill.vehicle ||
+        `${v.registration_number} - ${v.name}` === editWaybill.vehicle
+      );
+      if (match) {
+        setVehicleName(match.registration_number ? `${match.registration_number} - ${match.name}` : match.name);
+        setVehicleIsCustom(false);
+      } else {
+        setVehicleIsCustom(true);
+      }
+    }
+  }, [editWaybill, vehicles]);
 
   // Close driver dropdown on outside click
   useEffect(() => {
@@ -230,11 +253,15 @@ export function CreateReturnWaybill({ site, inventoryItems, onBack, editWaybill 
       };
     });
 
+    const returnDateISO = expectedReturnDate ? new Date(expectedReturnDate).toISOString() : new Date().toISOString();
+
     if (editWaybill) {
       updateWaybill(editWaybill.id, {
         driverName,
         vehicle: vehicleName,
         items: itemsToReturn,
+        issueDate: expectedReturnDate ? returnDateISO : editWaybill.issueDate,
+        sentToSiteDate: expectedReturnDate ? returnDateISO : editWaybill.sentToSiteDate,
         signature: addSignature ? (editWaybill.signature || currentUser?.signature || '') : '',
       });
       toast.success('Return waybill updated successfully!');
@@ -253,7 +280,8 @@ export function CreateReturnWaybill({ site, inventoryItems, onBack, editWaybill 
           type: 'return',
           status: 'outstanding',
           purpose: `Site Transfer to ${destSite.name}`,
-          issueDate: new Date().toISOString(),
+          issueDate: returnDateISO,
+          sentToSiteDate: expectedReturnDate ? returnDateISO : undefined,
           driverName,
           vehicle: vehicleName,
           items: itemsToReturn,
@@ -269,7 +297,8 @@ export function CreateReturnWaybill({ site, inventoryItems, onBack, editWaybill 
           type: 'waybill',
           status: 'outstanding',
           purpose: `Site Transfer from ${resolvedSite.name}`,
-          issueDate: new Date().toISOString(),
+          issueDate: returnDateISO,
+          sentToSiteDate: expectedReturnDate ? returnDateISO : undefined,
           driverName,
           vehicle: vehicleName,
           items: itemsToReturn,
@@ -284,7 +313,8 @@ export function CreateReturnWaybill({ site, inventoryItems, onBack, editWaybill 
           siteId: resolvedSite.id,
           siteName: resolvedSite.name,
           type: 'return',
-          issueDate: new Date().toISOString(),
+          issueDate: returnDateISO,
+          sentToSiteDate: expectedReturnDate ? returnDateISO : undefined,
           driverName,
           vehicle: vehicleName,
           items: itemsToReturn,
@@ -405,15 +435,40 @@ export function CreateReturnWaybill({ site, inventoryItems, onBack, editWaybill 
               <Label className="text-xs font-bold text-slate-700">Vehicle *</Label>
               <div className="relative">
                 <select
-                  value={vehicleName}
-                  onChange={e => setVehicleName(e.target.value)}
+                  value={vehicleIsCustom ? '__custom__' : vehicleName}
+                  onChange={e => {
+                    if (e.target.value === '__custom__') {
+                      setVehicleIsCustom(true);
+                      setVehicleName('');
+                    } else {
+                      setVehicleIsCustom(false);
+                      setVehicleName(e.target.value);
+                    }
+                  }}
                   className="w-full h-11 rounded-xl border border-slate-200 bg-slate-50/50 px-4 text-sm font-semibold text-slate-800 transition-colors focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 appearance-none"
                 >
                   <option value="">Select Vehicle</option>
-                  {vehicleOptions.map(v => <option key={v} value={v}>{v}</option>)}
+                  {vehicles.map(v => {
+                    const formatted = v.registration_number ? `${v.registration_number} - ${v.name}` : v.name;
+                    return (
+                      <option key={v.id} value={formatted}>
+                        {formatted}
+                      </option>
+                    );
+                  })}
+                  <option value="__custom__">— Type vehicle manually —</option>
                 </select>
                 <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
               </div>
+              {vehicleIsCustom && (
+                <Input
+                  autoFocus
+                  placeholder="Enter vehicle name or number plate…"
+                  value={vehicleName}
+                  onChange={e => setVehicleName(e.target.value)}
+                  className="h-11 rounded-xl border-slate-200 bg-slate-50/50 text-sm font-semibold text-slate-800"
+                />
+              )}
             </div>
           </div>
 

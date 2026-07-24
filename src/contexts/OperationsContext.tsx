@@ -1285,9 +1285,9 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
   const updateWaybill = (id: string, updates: Partial<Omit<Waybill, 'id' | 'status'>>) => {
     setWaybills(prev => {
       const waybill = prev.find(w => w.id === id);
-      if (!waybill || waybill.status !== 'outstanding') return prev;
+      if (!waybill) return prev;
 
-      if (waybill.type === 'waybill') {
+      if (waybill.type === 'waybill' && waybill.status === 'outstanding') {
         const newItems = updates.items || waybill.items;
         
         // Find all unique asset IDs from old and new items

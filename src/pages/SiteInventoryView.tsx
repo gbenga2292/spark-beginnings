@@ -16,7 +16,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { cn, formatUnit } from '@/src/lib/utils';
 import { formatDisplayDate } from '@/src/lib/dateUtils';
 import { filterOperationalSites } from '@/src/lib/siteUtils';
-import { ConsumableUsageLog } from '@/src/types/operations';
+import { ConsumableUsageLog, Waybill } from '@/src/types/operations';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { WaybillForm } from './WaybillForm';
 import { CreateReturnWaybill } from './CreateReturnWaybill';
@@ -358,11 +358,34 @@ export function SiteInventoryView({ site, questionnaire, onBack, onSiteChange, i
     );
   }
 
+  const [editingWaybill, setEditingWaybill] = useState<Waybill | null>(null);
+  const [returnToDetailOnClose, setReturnToDetailOnClose] = useState(false);
+
+  if (editingWaybill) {
+    const handleCloseForm = () => {
+      if (returnToDetailOnClose) {
+        setViewingWaybill(editingWaybill);
+        setReturnToDetailOnClose(false);
+      }
+      setEditingWaybill(null);
+    };
+
+    if (editingWaybill.type === 'return') {
+      return <CreateReturnWaybill editWaybill={editingWaybill} onBack={handleCloseForm} />;
+    }
+    return <WaybillForm onClose={handleCloseForm} editWaybill={editingWaybill} />;
+  }
+
   if (viewingWaybill) {
     return (
       <WaybillDetailView
         waybill={viewingWaybill}
         onClose={() => setViewingWaybill(null)}
+        onEdit={(wb) => {
+          setReturnToDetailOnClose(true);
+          setViewingWaybill(null);
+          setEditingWaybill(wb);
+        }}
       />
     );
   }

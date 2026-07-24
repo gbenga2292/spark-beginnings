@@ -119,6 +119,12 @@ export function useSetPageTitle(
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dispatch, title, subtitle, ...deps]);
+
+  // Keep header buttons updated if buttons JSX or click handlers change
+  useEffect(() => {
+    if (!dispatch || title === null) return;
+    dispatch.setHeaderButtons(buttons);
+  }, [dispatch, buttons, title]);
 }
 
 /**

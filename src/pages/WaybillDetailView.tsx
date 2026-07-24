@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { formatDisplayDate } from '@/src/lib/dateUtils';
 import {
-  ArrowLeft, Download, Eye, Calendar, User, Car, MapPin, Package, X, FileText, Share2, CheckCircle2, Printer
+  ArrowLeft, Download, Eye, Calendar, User, Car, MapPin, Package, X, FileText, Share2, CheckCircle2, Printer, Edit2
 } from 'lucide-react';
 import { Waybill } from '../types/operations';
 import { useOperations } from '../contexts/OperationsContext';
@@ -19,18 +19,36 @@ import { PdfViewer } from '@/src/components/PdfViewer';
 interface WaybillDetailViewProps {
   waybill: Waybill;
   onClose: () => void;
+  onEdit?: (waybill: Waybill) => void;
 }
 
-export function WaybillDetailView({ waybill: propWaybill, onClose }: WaybillDetailViewProps) {
+export function WaybillDetailView({ waybill: propWaybill, onClose, onEdit }: WaybillDetailViewProps) {
   const { waybills, updateWaybillStatus, vehicles } = useOperations();
   const { sites } = useAppStore();
   const waybill = waybills.find(w => w.id === propWaybill.id) || propWaybill;
 
-  /** Returns "REG - Name" when a registration number is on file, else just the name. */
+  // Scroll to top on mount / waybill change
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    const mainContainer = document.querySelector('main') || document.documentElement;
+    if (mainContainer) {
+      mainContainer.scrollTop = 0;
+    }
+  }, [waybill.id]);
+
+  /** Returns "REG - Name" when a registration number is on file, else just the name, or '-' if empty. */
   const formatVehicle = (name: string | undefined) => {
-    const raw = name || 'L200';
-    const match = vehicles.find(v => v.name === raw);
-    return match?.registration_number ? `${match.registration_number} - ${raw}` : raw;
+    if (!name || name === 'Select Vehicle') return '-';
+    const trimmed = name.trim();
+    const match = vehicles.find(v => 
+      v.name.toLowerCase() === trimmed.toLowerCase() ||
+      (v.registration_number && v.registration_number.toLowerCase() === trimmed.toLowerCase()) ||
+      `${v.registration_number} - ${v.name}`.toLowerCase() === trimmed.toLowerCase()
+    );
+    if (match) {
+      return match.registration_number ? `${match.registration_number} - ${match.name}` : match.name;
+    }
+    return trimmed;
   };
 
   const [showPdfPreview, setShowPdfPreview] = useState(false);
@@ -268,14 +286,6 @@ export function WaybillDetailView({ waybill: propWaybill, onClose }: WaybillDeta
         <Button
           variant="outline"
           size="sm"
-          className="h-9 px-2 sm:px-3 gap-2 text-blue-700 border-blue-200 bg-blue-50 hover:bg-blue-100 font-semibold text-[11px] uppercase tracking-tight shadow-sm transition-all"
-          onClick={handleShare}
-        >
-          <Share2 className="h-4 w-4" /> <span className="hidden sm:inline">Share</span>
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
           className="h-9 px-2 sm:px-3 gap-2 text-slate-600 border-slate-200 bg-white hover:bg-slate-50 font-semibold text-[11px] uppercase tracking-tight shadow-sm transition-all"
           onClick={handlePrint}
         >
@@ -312,7 +322,7 @@ export function WaybillDetailView({ waybill: propWaybill, onClose }: WaybillDeta
         )}
       </div>
     ),
-    [waybill.id, showPdfPreview, waybill.type, waybill.status, waybill.siteName]
+    [waybill.id, showPdfPreview, waybill.type, waybill.status, waybill.siteName, onEdit]
   );
 
   return (
@@ -342,13 +352,25 @@ export function WaybillDetailView({ waybill: propWaybill, onClose }: WaybillDeta
         {/* ── Waybill info card ─────────────────────────────────────────────── */}
         <div className="border-none shadow-sm overflow-hidden bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800">
           {/* Card header */}
-          <div className="border-b border-slate-100 dark:border-slate-800 p-4 sm:p-5 flex items-center gap-2 bg-slate-50/50 dark:bg-slate-800/30">
-            <div className="h-8 w-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600">
-              <MapPin className="h-4 w-4" />
+          <div className="border-b border-slate-100 dark:border-slate-800 p-4 sm:p-5 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/30">
+            <div className="flex items-center gap-2">
+              <div className="h-8 w-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600">
+                <MapPin className="h-4 w-4" />
+              </div>
+              <p className="font-semibold text-slate-700 dark:text-slate-200 text-sm">
+                {waybill.type === 'return' ? 'Return' : 'Waybill'} Information
+              </p>
             </div>
-            <p className="font-semibold text-slate-700 dark:text-slate-200 text-sm">
-              {waybill.type === 'return' ? 'Return' : 'Waybill'} Information
-            </p>
+            {onEdit && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 px-3 gap-1.5 text-xs font-bold text-indigo-600 border-indigo-200 bg-white hover:bg-indigo-50 shadow-sm transition-all"
+                onClick={() => onEdit(waybill)}
+              >
+                <Edit2 className="h-3.5 w-3.5" /> Edit
+              </Button>
+            )}
           </div>
 
           {/* Info cells */}
