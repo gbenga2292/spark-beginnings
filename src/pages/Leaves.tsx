@@ -41,7 +41,7 @@ function renderApprovalTooltip(leave: LeaveRecord) {
   ];
 
   return (
-    <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 bg-slate-900 text-white text-xs rounded-lg p-3 shadow-xl opacity-0 group-hover/tooltip:opacity-100 transition-opacity duration-200 z-50 pointer-events-none text-left">
+    <div className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 w-64 bg-slate-900 text-white text-xs rounded-lg p-3 shadow-xl opacity-0 group-hover/tooltip:opacity-100 transition-opacity duration-200 z-50 text-left">
       <p className="font-bold border-b border-slate-700 pb-1.5 mb-1.5 text-center text-[10px] uppercase tracking-wider text-teal-400">Approval Workflow Details</p>
       <div className="space-y-1.5 text-[11px] text-slate-300">
         {steps.map((s, idx) => {
@@ -86,7 +86,7 @@ function renderApprovalTooltip(leave: LeaveRecord) {
           </div>
         )}
       </div>
-      <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-900"></div>
+      <div className="absolute bottom-full left-1/2 -translate-x-1/2 border-4 border-transparent border-b-slate-900"></div>
     </div>
   );
 }

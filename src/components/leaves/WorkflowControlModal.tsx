@@ -154,8 +154,8 @@ export function WorkflowControlModal({ open, onOpenChange, leave, onRecreateAppr
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[600px]">
-                <DialogHeader>
+            <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col p-0 overflow-hidden">
+                <DialogHeader className="p-5 border-b border-slate-100 dark:border-slate-800 shrink-0">
                     <DialogTitle>Workflow Control Center</DialogTitle>
                     <DialogDescription>
                         Manage approval steps for <strong>{liveLeave.employeeName}</strong>'s{' '}
@@ -163,7 +163,7 @@ export function WorkflowControlModal({ open, onOpenChange, leave, onRecreateAppr
                     </DialogDescription>
                 </DialogHeader>
 
-                <div className="py-4 space-y-4">
+                <div className="p-5 space-y-4 overflow-y-auto flex-1 max-h-[calc(90vh-130px)]">
                     {/* Main task status */}
                     {!mainTaskExists && (
                         <div className="bg-red-50 border border-red-200 text-red-700 text-xs p-3 rounded-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
@@ -287,7 +287,7 @@ export function WorkflowControlModal({ open, onOpenChange, leave, onRecreateAppr
                     </div>
                 </div>
 
-                <DialogFooter>
+                <DialogFooter className="px-5 py-3 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 shrink-0 mt-0">
                     <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
                 </DialogFooter>
             </DialogContent>

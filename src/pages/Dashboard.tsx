@@ -14,6 +14,7 @@ import {
     AreaChart, Area, BarChart, Bar, CartesianGrid, ResponsiveContainer,
     Tooltip, XAxis, YAxis, Legend, PieChart, Pie, Cell, LabelList
 } from 'recharts';
+import { formatDisplayDate } from '@/src/lib/dateUtils';
 
 function computeWorkDays(year: number, monthNum: number, holidayDates: string[], workDaysPerWeek: number = 6, empStartDate?: string, empEndDate?: string): number {
     const startDate = new Date(year, monthNum - 1, 1);
@@ -48,6 +49,68 @@ function computeWorkDays(year: number, monthNum: number, holidayDates: string[],
     }
     return Math.max(0, days);
 }
+
+const CustomHeadcountTooltip = ({ active, payload }: any) => {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload;
+    const additions: Array<any> = data.newAdditions || [];
+
+    return (
+      <div className="bg-slate-900/95 text-white border border-slate-700/80 rounded-xl p-3 shadow-xl backdrop-blur-md max-w-xs text-xs z-50">
+        <div className="font-bold text-slate-200 border-b border-slate-700/60 pb-1.5 mb-2 flex items-center justify-between gap-3">
+          <span>{data.fullMonth || data.name}</span>
+          <span className="text-emerald-400 font-mono text-xs font-bold">
+            Total: {data.Headcount}
+          </span>
+        </div>
+
+        <div className="space-y-1">
+          <div className="text-[11px] font-semibold text-slate-400 flex items-center justify-between">
+            <span>New Additions:</span>
+            <span className={additions.length > 0 ? "text-emerald-400 font-bold" : "text-slate-500"}>
+              +{additions.length}
+            </span>
+          </div>
+
+          {additions.length > 0 ? (
+            <ul className="mt-1.5 space-y-1 max-h-40 overflow-y-auto custom-scrollbar pr-1">
+              {additions.map((emp) => {
+                const fullName = [emp.firstname, emp.surname].filter(Boolean).join(' ') || 'Unnamed Staff';
+                const formattedDate = emp.startDate ? formatDisplayDate(emp.startDate) : '';
+
+                return (
+                  <li key={emp.id} className="bg-slate-800/80 rounded p-1.5 flex flex-col gap-0.5 text-[11px] border border-slate-700/50">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-semibold text-slate-100 truncate" title={fullName}>
+                        {fullName}
+                      </span>
+                      {formattedDate && (
+                        <span className="text-[9px] font-mono text-emerald-400 shrink-0">
+                          {formattedDate}
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-[10px] text-slate-400 flex items-center justify-between gap-2">
+                      <span className="truncate">{emp.position || 'Staff'}</span>
+                      {emp.department && (
+                        <span className="text-[9px] bg-slate-700/60 text-slate-300 px-1.5 py-0.2 rounded shrink-0">
+                          {emp.department}
+                        </span>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <p className="text-[10px] text-slate-400 italic mt-1">No new additions this month</p>
+          )}
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
 
 const MONTHS = [
     { label: 'January', value: 1, key: 'jan' },
@@ -460,18 +523,32 @@ export function Dashboard() {
             const startOfMonthTimestamp = new Date(filterYear, m.value - 1, 1).getTime();
             const endOfMonthTimestamp = new Date(filterYear, m.value, 0).getTime();
             let count = 0;
+            const newAdditions: typeof employees = [];
+
             employees.forEach(emp => {
                 if (emp.staffType !== 'FIELD' && emp.staffType !== 'OFFICE') return;
                 
                 if (emp.endDate && new Date(emp.endDate).getTime() < startOfMonthTimestamp) return;
 
                 if (emp.startDate) {
-                    if (new Date(emp.startDate).getTime() <= endOfMonthTimestamp) count++;
+                    const startTs = new Date(emp.startDate).getTime();
+                    if (startTs <= endOfMonthTimestamp) {
+                        count++;
+                        if (startTs >= startOfMonthTimestamp) {
+                            newAdditions.push(emp);
+                        }
+                    }
                 } else {
                     count++;
                 }
             });
-            return { name: m.label.substring(0, 3), Headcount: count };
+            return {
+                name: m.label.substring(0, 3),
+                fullMonth: `${m.label} ${filterYear}`,
+                Headcount: count,
+                newAdditions,
+                newAdditionsCount: newAdditions.length
+            };
         });
     }, [employees, filterYear]);
 
@@ -699,7 +776,7 @@ export function Dashboard() {
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(148,163,184,0.15)" />
                                     <XAxis dataKey="name" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
                                     <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
-                                    <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid rgba(148,163,184,0.2)', backgroundColor: 'rgba(30,41,59,0.95)', color: '#f1f5f9', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.4)' }} />
+                                    <Tooltip content={<CustomHeadcountTooltip />} />
                                     <Area type="monotone" name="Headcount" dataKey="Headcount" stroke="#10b981" strokeWidth={2} fill="url(#colorHeadcount)">
                                         <LabelList dataKey="Headcount" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#10b981' }} />
                                     </Area>
@@ -750,7 +827,7 @@ export function Dashboard() {
                                         <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="rgba(148,163,184,0.15)" />
                                         <XAxis type="number" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
                                         <YAxis dataKey="name" type="category" stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} width={100} />
-                                        <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid rgba(148,163,184,0.2)', backgroundColor: 'rgba(30,41,59,0.95)', color: '#f1f5f9', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.4)' }} />
+                                        <Tooltip content={<CustomHeadcountTooltip />} />
                                         <Bar dataKey="count" name="Staff Count" fill="#6366f1" radius={[0, 4, 4, 0]} barSize={18}>
                                             <LabelList dataKey="count" position="right" style={{ fontSize: 11, fontWeight: 700, fill: '#818cf8' }} />
                                         </Bar>

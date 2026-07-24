@@ -1107,35 +1107,70 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                             sigUpdate.hrSignature = { signed: 'Signed', date: now, name: approverName };
                             appStore.updateLeave(meta.refId, sigUpdate);
                         } else if (step === 1) {
-                            // LM approved → create HoD subtask using pre-resolved IDs from JSON
+                            // LM approved → check if HoD is the exact same person
                             const hodSystemUserId = meta.hodSystemUserId || null;
+                            const currentUserId = user?.id;
+                            const lmAssignedTo = data.assignedTo || data.assigned_to;
+                            const isSamePersonForHod = hodSystemUserId && (hodSystemUserId === currentUserId || hodSystemUserId === lmAssignedTo);
 
-                            const hodSubDesc = JSON.stringify({
-                                refType: 'leave', refId: meta.refId, workflowStep: 2,
-                                empName: meta.empName, leaveType: meta.leaveType, duration: meta.duration,
-                                hodUserId: meta.hodUserId,
-                                hodSystemUserId: meta.hodSystemUserId,
-                                mgmtUserId: meta.mgmtUserId,  // carry forward
-                            });
-                            const { data: hodSub } = await supabase.from('subtasks').insert({
-                                title: `[Step 2/4] HoD Approval — ${meta.empName} ${meta.leaveType} Leave`,
-                                description: hodSubDesc,
-                                assignedTo: hodSystemUserId,
-                                status: 'pending_approval',
-                                priority: 'high',
-                                main_task_id: mainTaskId,
-                                deadline: deadline.toISOString(),
-                                requires_approval: true,
-                                approver_id: hodSystemUserId,
-                            }).select().single();
-                            if (hodSub) setSubtasks(prev => [...prev, mapSubtaskToCamel(hodSub)]);
+                            if (isSamePersonForHod) {
+                                // Line Manager is also the Head of Department — auto-approve Step 2 and jump directly to Step 3 (Management)
+                                const mgmtUserId = meta.mgmtUserId || null;
 
-                            appStore.updateLeave(meta.refId, {
-                                approvalStatus: 'Pending',
-                                workflowStep: 2,
-                                supervisorSignature: { signed: 'Signed', date: now, name: approverName },
-                                hodTaskId: hodSub?.id,
-                            });
+                                const mgmtSubDesc = JSON.stringify({
+                                    refType: 'leave', refId: meta.refId, workflowStep: 3,
+                                    empName: meta.empName, leaveType: meta.leaveType, duration: meta.duration,
+                                    mgmtUserId,  // carry forward
+                                });
+                                const { data: mgmtSub } = await supabase.from('subtasks').insert({
+                                    title: `[Step 3/4] Management Approval — ${meta.empName} ${meta.leaveType} Leave`,
+                                    description: mgmtSubDesc,
+                                    assignedTo: mgmtUserId,
+                                    status: 'pending_approval',
+                                    priority: 'high',
+                                    main_task_id: mainTaskId,
+                                    deadline: deadline.toISOString(),
+                                    requires_approval: true,
+                                    approver_id: mgmtUserId,
+                                }).select().single();
+                                if (mgmtSub) setSubtasks(prev => [...prev, mapSubtaskToCamel(mgmtSub)]);
+
+                                appStore.updateLeave(meta.refId, {
+                                    approvalStatus: 'Pending',
+                                    workflowStep: 3,
+                                    supervisorSignature: { signed: 'Signed', date: now, name: approverName },
+                                    hodSignature: { signed: 'Signed', date: now, name: `${approverName} (Line Manager & HoD)` },
+                                    managementTaskId: mgmtSub?.id,
+                                });
+                            } else {
+                                // LM approved → create HoD subtask as normal
+                                const hodSubDesc = JSON.stringify({
+                                    refType: 'leave', refId: meta.refId, workflowStep: 2,
+                                    empName: meta.empName, leaveType: meta.leaveType, duration: meta.duration,
+                                    hodUserId: meta.hodUserId,
+                                    hodSystemUserId: meta.hodSystemUserId,
+                                    mgmtUserId: meta.mgmtUserId,  // carry forward
+                                });
+                                const { data: hodSub } = await supabase.from('subtasks').insert({
+                                    title: `[Step 2/4] HoD Approval — ${meta.empName} ${meta.leaveType} Leave`,
+                                    description: hodSubDesc,
+                                    assignedTo: hodSystemUserId,
+                                    status: 'pending_approval',
+                                    priority: 'high',
+                                    main_task_id: mainTaskId,
+                                    deadline: deadline.toISOString(),
+                                    requires_approval: true,
+                                    approver_id: hodSystemUserId,
+                                }).select().single();
+                                if (hodSub) setSubtasks(prev => [...prev, mapSubtaskToCamel(hodSub)]);
+
+                                appStore.updateLeave(meta.refId, {
+                                    approvalStatus: 'Pending',
+                                    workflowStep: 2,
+                                    supervisorSignature: { signed: 'Signed', date: now, name: approverName },
+                                    hodTaskId: hodSub?.id,
+                                });
+                            }
 
                         } else if (step === 2) {
                             // HoD approved → create Management subtask using pre-resolved mgmtUserId from JSON

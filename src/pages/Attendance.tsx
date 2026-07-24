@@ -4,7 +4,7 @@ import { Input } from '@/src/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
 import { useAppStore, AttendanceRecord } from '@/src/store/appStore';
 import { supabase } from '@/src/integrations/supabase/client';
-import { Search, Save, Trash2, Calendar as CalendarIcon, Database, Filter, Users, Download, Upload, ArrowUp, ArrowDown, ArrowUpDown, ChevronDown, ChevronLeft, ChevronRight, Wrench, LineChart, Building2 } from 'lucide-react';
+import { Search, Save, Trash2, Calendar as CalendarIcon, Database, Filter, Users, Download, Upload, ArrowUp, ArrowDown, ArrowUpDown, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Wrench, LineChart, Building2 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
 import { useOperations } from '@/src/contexts/OperationsContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/src/components/ui/card';
@@ -425,6 +425,7 @@ export function Attendance() {
   // ─── Machine Register State ────────────────────────────────────────────────
   const { assets, dailyMachineLogs, logDailyActivity, waybills, deleteDailyLog, sitePumpDates } = useOperations();
   const [machineRegDate, setMachineRegDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [machineCalendarOpen, setMachineCalendarOpen] = useState(false);
   const [isSavingMachines, setIsSavingMachines] = useState(false);
 
   // Machine DB filters & pagination
@@ -436,9 +437,19 @@ export function Attendance() {
   const dbMachinePageSize = 25;
   const [selectedMachineGroups, setSelectedMachineGroups] = useState<Set<string>>(new Set());
 
-  // Analytics filters
+  // Analytics filters & collapse state (collapsed by default)
   const [analyticsDateFrom, setAnalyticsDateFrom] = useState<string>('');
   const [analyticsDateTo, setAnalyticsDateTo] = useState<string>('');
+  const [expandedSiteIds, setExpandedSiteIds] = useState<Set<string>>(new Set());
+
+  const toggleSiteCollapse = (siteId: string) => {
+    setExpandedSiteIds(prev => {
+      const next = new Set(prev);
+      if (next.has(siteId)) next.delete(siteId);
+      else next.add(siteId);
+      return next;
+    });
+  };
 
   const [hideInactiveMachineSites, setHideInactiveMachineSites] = useState(false);
   const [machineSubTab, setMachineSubTab] = useState<'register' | 'machinedb' | 'machineanalytics'>('register');
@@ -968,6 +979,64 @@ export function Attendance() {
 
     return { fullyDates, specialDates, missingDates };
   }, [attendanceStatusMap, publicHolidaysStore, maxSelectableDate]);
+
+  // ─── Machine Attendance Status & Calendar Modifiers ──────────
+  const machineAttendanceStatusMap = useMemo(() => {
+    const map: Record<string, 'fully' | 'special' | 'none'> = {};
+    if (!dailyMachineLogs || dailyMachineLogs.length === 0) return map;
+
+    const holidaySet = new Set(publicHolidaysStore.map(h => h.date));
+    const datesWithLogs = new Set<string>();
+
+    dailyMachineLogs.forEach(log => {
+      if (log.date) datesWithLogs.add(log.date);
+    });
+
+    datesWithLogs.forEach((dateStr) => {
+      const isPublicHoliday = holidaySet.has(dateStr);
+      const isSun = isSunday(parseISO(dateStr));
+      map[dateStr] = (isPublicHoliday || isSun) ? 'special' : 'fully';
+    });
+
+    return map;
+  }, [dailyMachineLogs, publicHolidaysStore]);
+
+  const machineCalendarModifiers = useMemo(() => {
+    const fullyDates: Date[] = [];
+    const specialDates: Date[] = [];
+    const missingDates: Date[] = [];
+    const now = new Date(); now.setHours(0, 0, 0, 0);
+    const maxDate = parseISO(maxSelectableDate);
+
+    const allDateStrs = new Set([
+      ...Object.keys(machineAttendanceStatusMap),
+    ]);
+
+    const startCheck = new Date(now); startCheck.setDate(startCheck.getDate() - 60);
+    let cursor = new Date(startCheck);
+    while (cursor <= now && cursor <= maxDate) {
+      const dStr = format(cursor, 'yyyy-MM-dd');
+      if (!allDateStrs.has(dStr)) allDateStrs.add(dStr);
+      cursor = new Date(cursor); cursor.setDate(cursor.getDate() + 1);
+    }
+
+    allDateStrs.forEach(dStr => {
+      const status = machineAttendanceStatusMap[dStr];
+      const d = parseISO(dStr);
+      const dMid = new Date(d); dMid.setHours(0, 0, 0, 0);
+
+      if (status === 'fully') { fullyDates.push(d); return; }
+      if (status === 'special') { specialDates.push(d); return; }
+
+      // missing: past date, no status, not holiday, not Sunday
+      if (dMid <= now && (!status || status === 'none')) {
+        const isHol = publicHolidaysStore.some(h => h.date === dStr);
+        if (!isHol && !isSunday(d)) missingDates.push(d);
+      }
+    });
+
+    return { fullyDates, specialDates, missingDates };
+  }, [machineAttendanceStatusMap, publicHolidaysStore, maxSelectableDate]);
 
 
   const lastAttendanceDate = useMemo(() => {
@@ -2560,6 +2629,47 @@ export function Attendance() {
                 >
                   <ChevronRight className="h-4 w-4 text-slate-500" />
                 </Button>
+                <Popover open={machineCalendarOpen} onOpenChange={setMachineCalendarOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-9 w-9 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex-shrink-0 shadow-sm hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                      title="Machine Attendance Calendar Overview"
+                    >
+                      <CalendarIcon className="h-4 w-4 text-amber-500" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent align="start" className="w-auto p-3 z-50 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-xl rounded-xl">
+                    <div className="mb-2 text-xs font-semibold text-slate-700 dark:text-slate-300">Machine Attendance Overview</div>
+                    <DayPicker
+                      defaultMonth={parseISO(machineRegDate)}
+                      onDayClick={(date) => { setMachineRegDate(format(date, 'yyyy-MM-dd')); setMachineCalendarOpen(false); }}
+                      disabled={{ after: parseISO(maxSelectableDate) }}
+                      modifiers={{
+                        fully: machineCalendarModifiers.fullyDates,
+                        special: machineCalendarModifiers.specialDates,
+                        viewing: [parseISO(machineRegDate)],
+                        missing: machineCalendarModifiers.missingDates,
+                      }}
+                      modifiersStyles={{
+                        today: { color: 'inherit', fontWeight: 'bold' },
+                        viewing: { backgroundColor: '#f8fafc', border: '2px solid #cbd5e1', borderRadius: '4px' },
+                        fully: { backgroundColor: '#d1fae5', color: '#065f46', fontWeight: 'bold', borderRadius: '4px' },
+                        special: { backgroundColor: '#e0e7ff', color: '#3730a3', fontWeight: 'bold', borderRadius: '4px' },
+                        missing: { border: '2px solid #ef4444', borderRadius: '50%' },
+                      }}
+                      className="bg-white dark:bg-slate-900"
+                    />
+                    <div className="mt-3 text-[10px] flex flex-col gap-1.5">
+                      <div className="flex items-center gap-2"><div className="w-3 h-3 rounded bg-[#d1fae5]"></div> Machine Register Entered</div>
+                      <div className="flex items-center gap-2"><div className="w-3 h-3 rounded bg-[#e0e7ff]"></div> Machine Register Entered (Holiday/Sun)</div>
+                      <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full border-2 border-red-500"></div> Missing/Due Machine Register</div>
+                      <div className="flex items-center gap-2"><div className="w-3 h-3 rounded bg-[#f8fafc] border-2 border-[#cbd5e1]"></div> Date Currently Viewing</div>
+                      <div className="flex items-center gap-2"><div className="w-3 h-3 rounded bg-transparent border border-slate-200"></div> No Entry</div>
+                    </div>
+                  </PopoverContent>
+                </Popover>
               </div>
             </div>
 
@@ -3352,6 +3462,25 @@ export function Attendance() {
                 )}
               </div>
             </div>
+            <div className="flex items-center gap-1.5 ml-auto self-end mb-0.5">
+              <button
+                onClick={() => {
+                  const allSiteIds = new Set(activeSites.map(s => s.id));
+                  setExpandedSiteIds(allSiteIds);
+                }}
+                className="text-[10px] font-bold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded px-2.5 py-1.5 transition-all flex items-center gap-1 cursor-pointer"
+                title="Expand all site cards"
+              >
+                <ChevronDown className="w-3 h-3 text-slate-500" /> Expand All
+              </button>
+              <button
+                onClick={() => setExpandedSiteIds(new Set())}
+                className="text-[10px] font-bold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded px-2.5 py-1.5 transition-all flex items-center gap-1 cursor-pointer"
+                title="Collapse all site cards"
+              >
+                <ChevronUp className="w-3 h-3 text-slate-500" /> Collapse All
+              </button>
+            </div>
           </div>
           <div className="flex-1 overflow-auto p-4 space-y-4 bg-slate-50">
             {activeSites.map(site => {
@@ -3403,9 +3532,18 @@ export function Attendance() {
               const formattedEnd = latestPumpStop ? new Date(latestPumpStop).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : (siteDates.length > 0 ? 'Ongoing' : null);
               const timelineText = formattedStart ? `${formattedStart} – ${formattedEnd}` : null;
 
+              const isExpanded = expandedSiteIds.has(site.id);
+              const isCollapsed = !isExpanded;
+              const machineList = Object.values(machineStats);
+
               return (
-                <div key={site.id} className="bg-white border border-slate-200 rounded-lg shadow-sm p-4 flex flex-col min-h-0">
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 mb-3 pb-3 border-b border-slate-100">
+                <div key={site.id} className="bg-white border border-slate-200 rounded-lg shadow-sm p-4 flex flex-col min-h-0 transition-all">
+                  <div 
+                    onClick={() => toggleSiteCollapse(site.id)}
+                    className={`flex flex-col md:flex-row md:items-center justify-between gap-2 cursor-pointer select-none ${
+                      !isCollapsed ? 'mb-3 pb-3 border-b border-slate-100' : ''
+                    }`}
+                  >
                     <div>
                       <h3 className="font-bold text-slate-800 text-lg flex items-center gap-2 flex-wrap">
                         <Building2 className="w-5 h-5 text-indigo-400 shrink-0" />
@@ -3438,70 +3576,82 @@ export function Attendance() {
                           ⏱️ Deployed: {timelineText}
                         </span>
                       )}
+                      <span className="text-[10px] text-slate-600 bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-full font-bold">
+                        {machineList.length} Machine{machineList.length !== 1 ? 's' : ''}
+                      </span>
+                      <button 
+                        type="button"
+                        className="p-1 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors ml-1"
+                        aria-label={isCollapsed ? 'Expand site' : 'Collapse site'}
+                      >
+                        {isCollapsed ? <ChevronDown className="w-5 h-5 text-slate-500" /> : <ChevronUp className="w-5 h-5 text-slate-500" />}
+                      </button>
                     </div>
                   </div>
                   
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                    {Object.values(machineStats).map(stat => {
-                      const machinePumpRecord = sitePumpDates.find(p => p.siteId === site.id && p.assetId === stat.assetId);
+                  {!isCollapsed && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                      {machineList.map(stat => {
+                        const machinePumpRecord = sitePumpDates.find(p => p.siteId === site.id && p.assetId === stat.assetId);
 
-                      return (
-                        <div key={stat.name} className="border border-slate-200 bg-white shadow-sm rounded-lg p-3 flex flex-col justify-between">
-                          <div>
-                            <div className="font-bold text-slate-700 text-sm mb-3 pb-2 border-b border-slate-100 truncate" title={stat.name}>
-                              {stat.name}
-                            </div>
-                            
-                            <div className="grid grid-cols-2 gap-2 mb-3">
-                              <div className="bg-emerald-50 rounded-md p-2 flex flex-col items-center justify-center border border-emerald-100">
-                                <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Active</span>
-                                <span className="text-lg font-black text-emerald-700">{stat.active}</span>
+                        return (
+                          <div key={stat.name} className="border border-slate-200 bg-white shadow-sm rounded-lg p-3 flex flex-col justify-between">
+                            <div>
+                              <div className="font-bold text-slate-700 text-sm mb-3 pb-2 border-b border-slate-100 truncate" title={stat.name}>
+                                {stat.name}
                               </div>
-                              <div className="bg-red-50 rounded-md p-2 flex flex-col items-center justify-center border border-red-100">
-                                <span className="text-[10px] font-bold text-red-600 uppercase tracking-wider">Off</span>
-                                <span className="text-lg font-black text-red-700">{stat.off}</span>
-                              </div>
-                            </div>
-
-                            <div className="flex flex-col min-h-0">
-                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
-                                Off Dates ({stat.offDates.length})
-                              </span>
-                              {stat.offDates.length > 0 ? (
-                                <div className="flex flex-wrap gap-1 max-h-[80px] overflow-y-auto pr-1 custom-scrollbar">
-                                  {stat.offDates.sort((a, b) => b.localeCompare(a)).map(d => (
-                                    <span key={d} className="px-1.5 py-0.5 bg-slate-100 text-slate-600 border border-slate-200 rounded text-[9px] font-mono whitespace-nowrap">
-                                      {formatDisplayDate(d)}
-                                    </span>
-                                  ))}
+                              
+                              <div className="grid grid-cols-2 gap-2 mb-3">
+                                <div className="bg-emerald-50 rounded-md p-2 flex flex-col items-center justify-center border border-emerald-100">
+                                  <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Active</span>
+                                  <span className="text-lg font-black text-emerald-700">{stat.active}</span>
                                 </div>
-                              ) : (
-                                <div className="text-xs italic text-slate-400">Never marked off</div>
-                              )}
-                            </div>
-                          </div>
+                                <div className="bg-red-50 rounded-md p-2 flex flex-col items-center justify-center border border-red-100">
+                                  <span className="text-[10px] font-bold text-red-600 uppercase tracking-wider">Off</span>
+                                  <span className="text-lg font-black text-red-700">{stat.off}</span>
+                                </div>
+                              </div>
 
-                          {/* Machine Pump Start/Stop dates */}
-                          {machinePumpRecord && (
-                            <div className="mt-3 pt-3 border-t border-slate-100 text-[10px] text-slate-500 font-medium space-y-0.5">
-                              <div className="flex justify-between">
-                                <span className="text-slate-400">Pump Start:</span>
-                                <span className="font-bold text-slate-700">{new Date(machinePumpRecord.pumpStartDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span className="text-slate-400">Pump Stop:</span>
-                                <span className="font-bold text-slate-700">
-                                  {machinePumpRecord.pumpStopDate 
-                                    ? new Date(machinePumpRecord.pumpStopDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
-                                    : 'Ongoing'}
+                              <div className="flex flex-col min-h-0">
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
+                                  Off Dates ({stat.offDates.length})
                                 </span>
+                                {stat.offDates.length > 0 ? (
+                                  <div className="flex flex-wrap gap-1 max-h-[80px] overflow-y-auto pr-1 custom-scrollbar">
+                                    {stat.offDates.sort((a, b) => b.localeCompare(a)).map(d => (
+                                      <span key={d} className="px-1.5 py-0.5 bg-slate-100 text-slate-600 border border-slate-200 rounded text-[9px] font-mono whitespace-nowrap">
+                                        {formatDisplayDate(d)}
+                                      </span>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <div className="text-xs italic text-slate-400">Never marked off</div>
+                                )}
                               </div>
                             </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
+
+                            {/* Machine Pump Start/Stop dates */}
+                            {machinePumpRecord && (
+                              <div className="mt-3 pt-3 border-t border-slate-100 text-[10px] text-slate-500 font-medium space-y-0.5">
+                                <div className="flex justify-between">
+                                  <span className="text-slate-400">Pump Start:</span>
+                                  <span className="font-bold text-slate-700">{new Date(machinePumpRecord.pumpStartDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-slate-400">Pump Stop:</span>
+                                  <span className="font-bold text-slate-700">
+                                    {machinePumpRecord.pumpStopDate 
+                                      ? new Date(machinePumpRecord.pumpStopDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+                                      : 'Ongoing'}
+                                  </span>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               );
             })}
