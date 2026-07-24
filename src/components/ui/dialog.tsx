@@ -1,4 +1,5 @@
 import React, { createContext, useContext } from 'react';
+import { createPortal } from 'react-dom';
 import { cn } from '@/src/lib/utils';
 import { X } from 'lucide-react';
 
@@ -17,9 +18,9 @@ export function Dialog({ open, onOpenChange, onClose, title, children, className
 
   // Legacy title-based API
   if (title) {
-    return (
+    return createPortal(
       <DialogCloseContext.Provider value={handleClose}>
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
           <div
             className="absolute inset-0 bg-black/50 backdrop-blur-sm"
             onClick={handleClose}
@@ -39,18 +40,20 @@ export function Dialog({ open, onOpenChange, onClose, title, children, className
             </div>
           </div>
         </div>
-      </DialogCloseContext.Provider>
+      </DialogCloseContext.Provider>,
+      document.body
     );
   }
 
   // Modern component-based API
-  return (
+  return createPortal(
     <DialogCloseContext.Provider value={handleClose}>
-      <div className={cn("fixed inset-0 z-50 flex items-center justify-center", fullScreenMobile ? "p-0 sm:p-4" : "p-4", className)}>
+      <div className={cn("fixed inset-0 z-[9999] flex items-center justify-center", fullScreenMobile ? "p-0 sm:p-4" : "p-4", className)}>
         <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={handleClose} />
         {children}
       </div>
-    </DialogCloseContext.Provider>
+    </DialogCloseContext.Provider>,
+    document.body
   );
 }
 

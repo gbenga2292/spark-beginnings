@@ -82,6 +82,8 @@ export function dbToEmployee(r: any): Employee {
     lashmaExpiryDate: r.lashma_expiry_date || undefined,
     onboardingMainTaskId: r.onboarding_main_task_id || undefined,
     onboardingSuspended: r.onboarding_suspended ?? false,
+    onboardingSuspendedAt: r.onboarding_suspended_at || undefined,
+    onboardingArchived: r.onboarding_archived ?? false,
     secondaryDepartments: r.secondary_departments || [],
     onboardingNotes: r.onboarding_notes || undefined,
     offboardingRemarks: r.offboarding_remarks || undefined,
@@ -672,6 +674,8 @@ function employeeToDb(e: Employee) {
     lashma_expiry_date: e.lashmaExpiryDate || null,
     onboarding_main_task_id: e.onboardingMainTaskId || null,
     onboarding_suspended: e.onboardingSuspended ?? false,
+    onboarding_suspended_at: e.onboardingSuspendedAt || null,
+    onboarding_archived: e.onboardingArchived ?? false,
     phone: e.phone || null,
     email: e.email || null,
     onboarding_notes: e.onboardingNotes || null,
@@ -1620,6 +1624,8 @@ export const db = {
     if (e.onboardingChecklist !== undefined) update.onboarding_checklist = e.onboardingChecklist;
     if (e.onboardingMainTaskId !== undefined) update.onboarding_main_task_id = e.onboardingMainTaskId;
     if (e.onboardingSuspended !== undefined) update.onboarding_suspended = e.onboardingSuspended;
+    if (e.onboardingSuspendedAt !== undefined) update.onboarding_suspended_at = e.onboardingSuspendedAt;
+    if (e.onboardingArchived !== undefined) update.onboarding_archived = e.onboardingArchived;
     if (e.lineManager !== undefined) update.line_manager = e.lineManager;
     if (e.phone !== undefined) update.phone = e.phone;
     if (e.email !== undefined) update.email = e.email;

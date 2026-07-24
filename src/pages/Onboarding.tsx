@@ -8,7 +8,7 @@ import {
   Clock, FileText, UserPlus, UserMinus, Users, Building, Activity,
   CalendarDays, Check, Search, AlertCircle, Mail, RotateCcw,
   ShieldCheck, CalendarCheck2, FileSignature, GraduationCap, Package,
-  ChevronDown, ChevronUp, Lock, Unlock, Siren, UserCheck, Pencil, PauseCircle, PlayCircle, X, CheckCircle2, Star, Trash2
+  ChevronDown, ChevronUp, Lock, Unlock, Siren, UserCheck, Pencil, PauseCircle, PlayCircle, X, CheckCircle2, Star, Trash2, Archive
 } from 'lucide-react';
 import { useAppStore, Employee, OnboardingTask, OnboardingChecklist, GuarantorInfo } from '@/src/store/appStore';
 import { toast, showConfirm } from '@/src/components/ui/toast';
@@ -361,15 +361,58 @@ export function Onboarding() {
     toast.success('Employee details updated.');
     closeEdit();
   };
+  const [viewingPendingArchive, setViewingPendingArchive] = useState(false);
+
+  // Helper to test if a pending employee is suspended > 30 days or manually archived
+  const isSuspendedOver30Days = (emp: Employee) => {
+    if (!emp.onboardingSuspended) return false;
+    const dateStr = emp.onboardingSuspendedAt || emp.tentativeStartDate || emp.startDate || emp.created_at || emp.updatedAt;
+    if (!dateStr) return false;
+    const suspendedTime = new Date(dateStr).getTime();
+    if (isNaN(suspendedTime)) return false;
+    const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+    return (Date.now() - suspendedTime) > thirtyDaysMs;
+  };
+
+  const isArchivedPending = (emp: Employee) => {
+    return !!emp.onboardingArchived || isSuspendedOver30Days(emp);
+  };
+
   // ── Suspend / Resume toggle for Onboarding employees ─────────────
   const handleSuspendToggle = (emp: Employee, e: React.MouseEvent) => {
     e.stopPropagation();
     const suspending = !emp.onboardingSuspended;
-    updateEmployee(emp.id, { onboardingSuspended: suspending });
+    updateEmployee(emp.id, {
+      onboardingSuspended: suspending,
+      onboardingSuspendedAt: suspending ? new Date().toISOString() : undefined,
+      ...(suspending ? {} : { onboardingArchived: false }),
+    });
     toast.info(suspending
       ? `${emp.firstname} ${emp.surname}’s onboarding has been suspended.`
       : `${emp.firstname} ${emp.surname}’s onboarding has been resumed.`
     );
+  };
+
+  // ── Manual Archive for suspended onboarding employees ──────────────
+  const handleArchiveEmployee = (emp: Employee, e: React.MouseEvent) => {
+    e.stopPropagation();
+    updateEmployee(emp.id, {
+      onboardingArchived: true,
+      onboardingSuspended: true,
+      onboardingSuspendedAt: emp.onboardingSuspendedAt || new Date().toISOString(),
+    });
+    toast.info(`${emp.firstname} ${emp.surname}’s onboarding has been moved to archive.`);
+  };
+
+  // ── Restore archived onboarding employee back to pending ──────────
+  const handleRestoreEmployee = (emp: Employee, e: React.MouseEvent) => {
+    e.stopPropagation();
+    updateEmployee(emp.id, {
+      onboardingArchived: false,
+      onboardingSuspended: false,
+      onboardingSuspendedAt: undefined,
+    });
+    toast.success(`Restored ${emp.firstname} ${emp.surname} to Pending Directory.`);
   };
 
   const selectedEmployee = useMemo(
@@ -380,8 +423,14 @@ export function Onboarding() {
   const [activeTaskType, setActiveTaskType] = useState<'Onboarding' | 'History' | 'Offboarding' | null>(null);
 
   const activeEmployees = useMemo(() => filterAndSortEmployeesExcludingCEO(employees.filter(e => e.status === 'Active' && e.staffType !== 'NON-EMPLOYEE' && !e.excludeFromOnboarding)), [employees]);
-  const pendingEmployees = useMemo(() => filterAndSortEmployeesExcludingCEO(employees.filter(e => e.status === 'Onboarding' && e.staffType !== 'NON-EMPLOYEE' && !e.excludeFromOnboarding)), [employees]);
+  const allPendingEmployees = useMemo(() => filterAndSortEmployeesExcludingCEO(employees.filter(e => e.status === 'Onboarding' && e.staffType !== 'NON-EMPLOYEE' && !e.excludeFromOnboarding)), [employees]);
   const terminatedEmployees = useMemo(() => filterAndSortEmployeesExcludingCEO(employees.filter(e => e.status === 'Terminated' && e.staffType !== 'NON-EMPLOYEE' && !e.excludeFromOnboarding)), [employees]);
+
+  const activePendingEmployees = useMemo(() => allPendingEmployees.filter(e => !isArchivedPending(e)), [allPendingEmployees]);
+  const archivedPendingEmployees = useMemo(() => allPendingEmployees.filter(e => isArchivedPending(e)), [allPendingEmployees]);
+
+  // Backward compatibility alias for pending count and actions
+  const pendingEmployees = activePendingEmployees;
 
   const filterEmps = (list: Employee[]) => {
     if (!employeeSearchQuery) return list;
@@ -393,7 +442,8 @@ export function Onboarding() {
     );
   };
   const filteredActive = useMemo(() => filterEmps(activeEmployees), [activeEmployees, employeeSearchQuery]);
-  const filteredPending = useMemo(() => filterEmps(pendingEmployees), [pendingEmployees, employeeSearchQuery]);
+  const filteredPending = useMemo(() => filterEmps(activePendingEmployees), [activePendingEmployees, employeeSearchQuery]);
+  const filteredArchivedPending = useMemo(() => filterEmps(archivedPendingEmployees), [archivedPendingEmployees, employeeSearchQuery]);
   const filteredTerminated = useMemo(() => filterEmps(terminatedEmployees), [terminatedEmployees, employeeSearchQuery]);
 
   const hasIncompleteTasks = (tasks?: OnboardingTask[]) => tasks?.some(t => t.status !== 'Completed') ?? false;
@@ -929,7 +979,10 @@ export function Onboarding() {
               {(['Active', 'Pending', 'Terminated'] as const).map(tab => (
                 <button key={tab}
                   className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-colors relative ${leftTab === tab ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-700 dark:text-indigo-300' : 'text-slate-500 hover:text-slate-700'}`}
-                  onClick={() => setLeftTab(tab)}
+                  onClick={() => {
+                    setLeftTab(tab);
+                    setViewingPendingArchive(false);
+                  }}
                 >
                   {tab === 'Terminated' ? 'Offboarding' : tab}
                   {tab === 'Pending' && pendingEmployees.length > 0 && <span className="absolute top-1.5 right-1 h-2 w-2 rounded-full bg-rose-500 animate-pulse" />}
@@ -937,9 +990,42 @@ export function Onboarding() {
                 </button>
               ))}
             </div>
-            <div className="relative">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-              <Input placeholder={`Search ${leftTab.toLowerCase()}...`} className="pl-9 bg-slate-50/50 border-slate-200/60 h-9 text-sm rounded-lg" value={employeeSearchQuery} onChange={e => setEmployeeSearchQuery(e.target.value)} />
+            <div className="flex items-center gap-2">
+              {leftTab === 'Pending' && (
+                <Button
+                  type="button"
+                  variant={viewingPendingArchive ? "default" : "outline"}
+                  size="sm"
+                  className={`h-9 px-2.5 text-xs font-bold shrink-0 gap-1.5 transition-all shadow-sm ${
+                    viewingPendingArchive
+                      ? 'bg-amber-600 hover:bg-amber-700 text-white border-amber-600'
+                      : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:bg-amber-50 hover:text-amber-700 hover:border-amber-200'
+                  }`}
+                  title={viewingPendingArchive ? "View Active Pending List" : "View Archived Pending Onboardings"}
+                  onClick={() => setViewingPendingArchive(!viewingPendingArchive)}
+                >
+                  <Archive className="h-4 w-4 text-amber-600 dark:text-amber-400 group-hover:text-amber-700" />
+                  {archivedPendingEmployees.length > 0 && (
+                    <Badge
+                      variant="secondary"
+                      className={`ml-0.5 px-1.5 py-0 text-[10px] font-bold rounded-full ${
+                        viewingPendingArchive ? 'bg-amber-800 text-amber-100' : 'bg-amber-100 text-amber-800'
+                      }`}
+                    >
+                      {archivedPendingEmployees.length}
+                    </Badge>
+                  )}
+                </Button>
+              )}
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                <Input
+                  placeholder={leftTab === 'Pending' && viewingPendingArchive ? "Search archived pending..." : `Search ${leftTab.toLowerCase()}...`}
+                  className="pl-9 bg-slate-50/50 border-slate-200/60 h-9 text-sm rounded-lg"
+                  value={employeeSearchQuery}
+                  onChange={e => setEmployeeSearchQuery(e.target.value)}
+                />
+              </div>
             </div>
           </CardHeader>
           <CardContent className="p-0 overflow-y-auto flex-1 custom-scrollbar">
@@ -966,102 +1052,205 @@ export function Onboarding() {
             )}
 
             {/* Pending */}
-            {leftTab === 'Pending' && (filteredPending.length === 0
-              ? <div className="flex flex-col items-center justify-center h-full text-slate-400 p-8 text-center"><UserPlus className="h-10 w-10 text-slate-200 mb-2" /><p className="text-sm">No pending hires.</p></div>
-              : <div className="divide-y divide-slate-100">{filteredPending.map(emp => {
-                const empCl = emp.onboardingChecklist ?? makeDefaultChecklist(emp.noOfGuarantors ?? 2);
-                const ready = allCriticalDone(empCl);
-                const suspended = !!emp.onboardingSuspended;
-                const hasPendingTasks = !ready; // still has incomplete required tasks
-                return (
-                  <div key={emp.id} className={`p-4 hover:bg-slate-50 cursor-pointer transition-colors ${
-                    suspended ? 'bg-slate-50 opacity-60' :
-                    selectedEmployeeId === emp.id ? 'bg-amber-50/50 outline outline-1 outline-amber-200' : ''
-                  }`} onClick={() => !suspended && handleSelectEmployee(emp)}>
-                    <div className="flex items-start gap-3">
-                      <div className="relative shrink-0">
-                        <div className={`h-10 w-10 rounded-full flex items-center justify-center font-bold text-sm border shadow-sm mt-0.5 ${
-                          suspended
-                            ? 'bg-slate-200 text-slate-500 border-slate-300 grayscale'
-                            : 'bg-gradient-to-tr from-amber-100 to-yellow-50 text-amber-700 border-amber-100/50'
-                        }`}>{emp.firstname.charAt(0)}{emp.surname.charAt(0)}</div>
-                        {/* Pending tasks dot */}
-                        {!suspended && hasPendingTasks && (
-                          <span className="absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full bg-rose-500 border-2 border-white animate-pulse" title="Onboarding tasks pending" />
-                        )}
-                      </div>
-                      <div className="flex-1 overflow-hidden">
-                        <div className="flex items-center gap-1.5">
-                          <p className="font-semibold text-slate-800 text-sm truncate">{emp.surname} {emp.firstname}</p>
-                          {suspended && <span className="text-[9px] font-bold bg-slate-300 text-slate-600 rounded px-1.5 py-0.5 uppercase tracking-wider shrink-0">Suspended</span>}
+            {leftTab === 'Pending' && (
+              viewingPendingArchive ? (
+                filteredArchivedPending.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full text-slate-400 p-8 text-center">
+                    <Archive className="h-10 w-10 text-slate-200 mb-2" />
+                    <p className="text-sm font-semibold text-slate-600">No archived pending hires.</p>
+                    <p className="text-xs text-slate-400 mt-1 max-w-[220px]">
+                      Pending onboardings suspended for over 30 days or manually archived will appear here.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-slate-100">
+                    <div className="bg-amber-50/80 px-4 py-2 text-[11px] font-bold text-amber-800 flex items-center justify-between border-b border-amber-100">
+                      <span>ARCHIVED PENDING HIRES ({filteredArchivedPending.length})</span>
+                      <span className="text-[10px] font-normal text-amber-600">Suspended &gt;30d or Manually Archived</span>
+                    </div>
+                    {filteredArchivedPending.map(emp => {
+                      const isManuallyArchived = !!emp.onboardingArchived;
+                      const daysSuspended = emp.onboardingSuspendedAt
+                        ? Math.floor((Date.now() - new Date(emp.onboardingSuspendedAt).getTime()) / (1000 * 60 * 60 * 24))
+                        : null;
+
+                      return (
+                        <div
+                          key={emp.id}
+                          className={`p-4 hover:bg-slate-50 cursor-pointer transition-colors ${
+                            selectedEmployeeId === emp.id ? 'bg-amber-50/40 outline outline-1 outline-amber-200' : ''
+                          }`}
+                          onClick={() => handleSelectEmployee(emp)}
+                        >
+                          <div className="flex items-start gap-3">
+                            <div className="relative shrink-0">
+                              <div className="h-10 w-10 rounded-full flex items-center justify-center font-bold text-sm border shadow-sm mt-0.5 bg-slate-200 text-slate-500 border-slate-300 grayscale">
+                                {emp.firstname.charAt(0)}{emp.surname.charAt(0)}
+                              </div>
+                            </div>
+                            <div className="flex-1 overflow-hidden">
+                              <div className="flex items-center gap-1.5">
+                                <p className="font-semibold text-slate-800 text-sm truncate">{emp.surname} {emp.firstname}</p>
+                                <span className="text-[9px] font-bold bg-amber-100 text-amber-800 rounded px-1.5 py-0.5 uppercase tracking-wider shrink-0">
+                                  Archived
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-slate-500 uppercase tracking-widest mt-0.5 truncate">{emp.position}</p>
+                              <p className="text-[10px] font-medium text-slate-400 mt-1">
+                                {isManuallyArchived
+                                  ? 'Manually Archived'
+                                  : daysSuspended !== null
+                                    ? `Suspended ${daysSuspended} days ago`
+                                    : 'Suspended > 30 days'}
+                              </p>
+                            </div>
+                            {priv.canEdit && (
+                              <div className="flex gap-1 shrink-0 items-center" onClick={e => e.stopPropagation()}>
+                                <button
+                                  className="h-7 px-2 rounded-md flex items-center gap-1 text-xs font-bold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-colors"
+                                  title="Restore back to Pending Directory"
+                                  onClick={e => handleRestoreEmployee(emp, e)}
+                                >
+                                  <RotateCcw className="h-3.5 w-3.5" />
+                                  <span>Restore</span>
+                                </button>
+                                {isAdmin && (
+                                  <button
+                                    className="h-7 w-7 rounded-md flex items-center justify-center text-rose-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                                    title="Delete pending hire"
+                                    onClick={e => handleDeleteEmployee(emp, e)}
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         </div>
-                        <p className="text-[11px] text-slate-500 uppercase tracking-widest mt-0.5 truncate">{emp.position}</p>
-                      </div>
-                      {priv.canEdit && (
-                        <div className="flex gap-1 shrink-0" onClick={e => e.stopPropagation()}>
-                          <button
-                            className="h-7 w-7 rounded-md flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
-                            title="Edit new hire details"
-                            onClick={e => openEdit(emp, e)}
-                          >
-                            <Pencil className="h-3.5 w-3.5" />
-                          </button>
-                          <button
-                            className={`h-7 w-7 rounded-md flex items-center justify-center transition-colors ${
+                      );
+                    })}
+                  </div>
+                )
+              ) : (
+                filteredPending.length === 0
+                  ? <div className="flex flex-col items-center justify-center h-full text-slate-400 p-8 text-center"><UserPlus className="h-10 w-10 text-slate-200 mb-2" /><p className="text-sm">No pending hires.</p></div>
+                  : <div className="divide-y divide-slate-100">{filteredPending.map(emp => {
+                    const empCl = emp.onboardingChecklist ?? makeDefaultChecklist(emp.noOfGuarantors ?? 2);
+                    const ready = allCriticalDone(empCl);
+                    const suspended = !!emp.onboardingSuspended;
+                    const hasPendingTasks = !ready; // still has incomplete required tasks
+                    return (
+                      <div key={emp.id} className={`p-4 hover:bg-slate-50 cursor-pointer transition-colors ${
+                        suspended ? 'bg-slate-50 opacity-75' :
+                        selectedEmployeeId === emp.id ? 'bg-amber-50/50 outline outline-1 outline-amber-200' : ''
+                      }`} onClick={() => !suspended && handleSelectEmployee(emp)}>
+                        <div className="flex items-start gap-3">
+                          <div className="relative shrink-0">
+                            <div className={`h-10 w-10 rounded-full flex items-center justify-center font-bold text-sm border shadow-sm mt-0.5 ${
                               suspended
-                                ? 'text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50'
-                                : 'text-amber-400 hover:text-amber-600 hover:bg-amber-50'
-                            }`}
-                            title={suspended ? 'Resume onboarding' : 'Suspend onboarding'}
-                            onClick={e => handleSuspendToggle(emp, e)}
-                          >
-                            {suspended
-                              ? <PlayCircle className="h-3.5 w-3.5" />
-                              : <PauseCircle className="h-3.5 w-3.5" />
-                            }
-                          </button>
-                          {isAdmin && (
-                            <button
-                              className="h-7 w-7 rounded-md flex items-center justify-center text-rose-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
-                              title="Delete pending hire"
-                              onClick={e => handleDeleteEmployee(emp, e)}
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
+                                ? 'bg-slate-200 text-slate-500 border-slate-300 grayscale'
+                                : 'bg-gradient-to-tr from-amber-100 to-yellow-50 text-amber-700 border-amber-100/50'
+                            }`}>{emp.firstname.charAt(0)}{emp.surname.charAt(0)}</div>
+                            {/* Pending tasks dot */}
+                            {!suspended && hasPendingTasks && (
+                              <span className="absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full bg-rose-500 border-2 border-white animate-pulse" title="Onboarding tasks pending" />
+                            )}
+                          </div>
+                          <div className="flex-1 overflow-hidden">
+                            <div className="flex items-center gap-1.5">
+                              <p className="font-semibold text-slate-800 text-sm truncate">{emp.surname} {emp.firstname}</p>
+                              {suspended && <span className="text-[9px] font-bold bg-slate-300 text-slate-600 rounded px-1.5 py-0.5 uppercase tracking-wider shrink-0">Suspended</span>}
+                            </div>
+                            <p className="text-[11px] text-slate-500 uppercase tracking-widest mt-0.5 truncate">{emp.position}</p>
+                          </div>
+                          {priv.canEdit && (
+                            <div className="flex gap-1 shrink-0" onClick={e => e.stopPropagation()}>
+                              <button
+                                className="h-7 w-7 rounded-md flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                                title="Edit new hire details"
+                                onClick={e => openEdit(emp, e)}
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                              </button>
+                              <button
+                                className={`h-7 w-7 rounded-md flex items-center justify-center transition-colors ${
+                                  suspended
+                                    ? 'text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50'
+                                    : 'text-amber-400 hover:text-amber-600 hover:bg-amber-50'
+                                }`}
+                                title={suspended ? 'Resume onboarding' : 'Suspend onboarding'}
+                                onClick={e => handleSuspendToggle(emp, e)}
+                              >
+                                {suspended
+                                  ? <PlayCircle className="h-3.5 w-3.5" />
+                                  : <PauseCircle className="h-3.5 w-3.5" />
+                                }
+                              </button>
+                              {suspended && (
+                                <button
+                                  className="h-7 w-7 rounded-md flex items-center justify-center text-amber-600 hover:text-amber-800 hover:bg-amber-100 transition-colors"
+                                  title="Archive onboarding prematurely"
+                                  onClick={e => handleArchiveEmployee(emp, e)}
+                                >
+                                  <Archive className="h-3.5 w-3.5" />
+                                </button>
+                              )}
+                              {isAdmin && (
+                                <button
+                                  className="h-7 w-7 rounded-md flex items-center justify-center text-rose-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                                  title="Delete pending hire"
+                                  onClick={e => handleDeleteEmployee(emp, e)}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              )}
+                            </div>
                           )}
                         </div>
-                      )}
-                    </div>
-                    <div className="mt-2 text-center space-y-1.5">
-                      {suspended
-                        ? <div className="w-full flex justify-center h-7 items-center text-xs font-semibold text-slate-400 border border-slate-200 rounded-full bg-slate-50">&#9646;&#9646; Suspended</div>
-                        : <Badge variant="outline" className={`w-full flex justify-center h-7 text-xs font-semibold ${ready ? 'text-emerald-700 border-emerald-200 bg-emerald-50' : 'text-amber-600 border-amber-200 bg-amber-50'}`}>
-                            {ready ? <><Unlock className="h-3 w-3 mr-1.5" />Ready to Activate</> : <><Clock className="h-3 w-3 mr-1.5" />Tasks Pending</>}
-                          </Badge>
-                      }
-                      {/* Subtask progress quick view */}
-                      {!suspended && emp.onboardingMainTaskId && (
-                        <div className="text-[10px] font-medium text-slate-500 flex justify-between items-center px-1">
-                          {(() => {
-                            const empSubs = subtasks.filter(s => s.main_task_id === emp.onboardingMainTaskId || s.mainTaskId === emp.onboardingMainTaskId);
-                            if (!empSubs.length) return null;
-                            const completed = empSubs.filter(s => s.status === 'completed').length;
-                            const pct = Math.round((completed / empSubs.length) * 100);
-                            return (
-                              <>
-                                <span>Tasks: {completed}/{empSubs.length}</span>
-                                <div className="w-16 h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                                  <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${pct}%` }}></div>
-                                </div>
-                              </>
-                            );
-                          })()}
+                        <div className="mt-2 text-center space-y-1.5">
+                          {suspended
+                            ? (
+                              <div className="w-full flex justify-between px-3 h-7 items-center text-xs font-semibold text-slate-500 border border-slate-200 rounded-full bg-slate-50">
+                                <span>&#9646;&#9646; Suspended</span>
+                                {priv.canEdit && (
+                                  <button
+                                    className="text-[10px] text-amber-600 hover:text-amber-800 font-bold uppercase tracking-wider underline flex items-center gap-1"
+                                    onClick={e => handleArchiveEmployee(emp, e)}
+                                    title="Move to archive prematurely"
+                                  >
+                                    <Archive className="h-3 w-3" /> Archive Now
+                                  </button>
+                                )}
+                              </div>
+                            )
+                            : <Badge variant="outline" className={`w-full flex justify-center h-7 text-xs font-semibold ${ready ? 'text-emerald-700 border-emerald-200 bg-emerald-50' : 'text-amber-600 border-amber-200 bg-amber-50'}`}>
+                                {ready ? <><Unlock className="h-3 w-3 mr-1.5" />Ready to Activate</> : <><Clock className="h-3 w-3 mr-1.5" />Tasks Pending</>}
+                              </Badge>
+                          }
+                          {/* Subtask progress quick view */}
+                          {!suspended && emp.onboardingMainTaskId && (
+                            <div className="text-[10px] font-medium text-slate-500 flex justify-between items-center px-1">
+                              {(() => {
+                                const empSubs = subtasks.filter(s => s.main_task_id === emp.onboardingMainTaskId || s.mainTaskId === emp.onboardingMainTaskId);
+                                if (!empSubs.length) return null;
+                                const completed = empSubs.filter(s => s.status === 'completed').length;
+                                const pct = Math.round((completed / empSubs.length) * 100);
+                                return (
+                                  <>
+                                    <span>Tasks: {completed}/{empSubs.length}</span>
+                                    <div className="w-16 h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                                      <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${pct}%` }}></div>
+                                    </div>
+                                  </>
+                                );
+                              })()}
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}</div>
+                      </div>
+                    );
+                  })}</div>
+              )
             )}
 
             {/* Terminated */}

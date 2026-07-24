@@ -260,6 +260,8 @@ export interface DailyMachineLog {
   dieselUsage: number;
   supervisorOnSite?: string;
   loggedBy?: string;
+  /** Site construction progress % as recorded on this specific date */
+  siteProgressPercentage?: number;
   created_at?: string;
 }
 

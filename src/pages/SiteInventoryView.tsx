@@ -66,6 +66,8 @@ export function SiteInventoryView({ site, questionnaire, onBack, onSiteChange, i
   const [showMachineBulkLog, setShowMachineBulkLog] = useState(false);
   const [showMachineAnalytics, setShowMachineAnalytics] = useState(false);
   const [viewingWaybill, setViewingWaybill] = useState<any | null>(null);
+  const [editingWaybill, setEditingWaybill] = useState<Waybill | null>(null);
+  const [returnToDetailOnClose, setReturnToDetailOnClose] = useState(false);
 
   // Auto-open machine log if navigated from dashboard
   useEffect(() => {
@@ -357,9 +359,6 @@ export function SiteInventoryView({ site, questionnaire, onBack, onSiteChange, i
       />
     );
   }
-
-  const [editingWaybill, setEditingWaybill] = useState<Waybill | null>(null);
-  const [returnToDetailOnClose, setReturnToDetailOnClose] = useState(false);
 
   if (editingWaybill) {
     const handleCloseForm = () => {

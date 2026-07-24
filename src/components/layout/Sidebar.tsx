@@ -257,8 +257,12 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
       (href !== '/' && location.pathname.startsWith(href + '/'))
     );
 
-    if (!isOnSidebarPage) {
-      // Auto-collapse when on a non-sidebar page
+    // Simulator gets the full canvas — collapse the sidebar automatically
+    const isSimulatorPage = location.pathname === '/operations/simulator' ||
+      location.pathname.startsWith('/operations/simulator/');
+
+    if (!isOnSidebarPage || isSimulatorPage) {
+      // Auto-collapse when on a non-sidebar page or the Simulator
       if (!isCollapsed) {
         autoCollapsedRef.current = true;
         setIsCollapsed(true);

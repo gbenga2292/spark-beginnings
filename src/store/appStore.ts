@@ -433,6 +433,8 @@ export interface Employee {
   onboardingChecklist?: OnboardingChecklist;
   onboardingMainTaskId?: string;
   onboardingSuspended?: boolean;   // suspend/resume onboarding without deleting
+  onboardingSuspendedAt?: string;  // ISO timestamp when onboarding was suspended
+  onboardingArchived?: boolean;    // manually or auto archived after 30d suspension
   lineManager?: string;            // ID of the line manager (typically CEO or Head of Dept)
   phone?: string;
   email?: string;
@@ -449,6 +451,8 @@ export interface Employee {
   workExperience?: { date: string; organisation: string; jobTitle: string }[];
   onboardingNotes?: string;
   offboardingRemarks?: string;
+  created_at?: string;
+  updatedAt?: string;
 }
 
 export interface DisciplinaryRecord {

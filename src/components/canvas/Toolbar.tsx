@@ -65,6 +65,23 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   isSettingScale, onStartReferenceScale
 }) => {
   const [isMobileCollapsed, setIsMobileCollapsed] = useState(window.innerWidth < 640);
+  const [isCompactIcons, setIsCompactIcons] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('spark_toolbar_compact') === 'true';
+    } catch (_) {
+      return false;
+    }
+  });
+
+  const toggleCompactIcons = () => {
+    setIsCompactIcons((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('spark_toolbar_compact', String(next));
+      } catch (_) {}
+      return next;
+    });
+  };
 
   const drawTools = [
     { id: 'site-area', label: 'Site Area', icon: Grid },
@@ -98,17 +115,19 @@ export const Toolbar: React.FC<ToolbarProps> = ({
       <button
         key={tool.id}
         onClick={() => onToolSelect(tool.id as ActiveTool)}
-        title={tool.desc ? `${tool.label} - ${tool.desc}` : tool.label}
-        className={`relative flex flex-col items-center justify-center p-2 rounded transition-all duration-200 ${
+        title={tool.desc ? `${tool.label} (${tool.desc})` : tool.label}
+        className={`relative flex flex-col items-center justify-center rounded transition-all duration-150 ${
+          isCompactIcons ? 'p-1.5 min-w-[34px] h-[34px]' : 'p-2'
+        } ${
           isActive 
-            ? 'bg-blue-50/70 text-blue-600 shadow-sm border border-blue-200/50' 
+            ? 'bg-blue-50/70 text-blue-600 shadow-sm border border-blue-200/50 font-bold' 
             : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 border border-transparent'
         }`}
       >
-        <Icon size={18} className="mb-1" />
-        <span className="text-[10px] font-semibold">{tool.label}</span>
+        <Icon size={18} className={isCompactIcons ? 'm-0' : 'mb-1'} />
+        {!isCompactIcons && <span className="text-[10px] font-semibold">{tool.label}</span>}
         {isActive && (
-          <span className="absolute bottom-0 left-2 right-2 h-0.5 bg-blue-600 rounded-full" />
+          <span className="absolute bottom-0 left-1 right-1 h-0.5 bg-blue-600 rounded-full" />
         )}
       </button>
     );
@@ -182,20 +201,24 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                   onClick={onUndo}
                   disabled={!canUndo}
                   title="Undo Last Action (Ctrl+Z)"
-                  className="flex flex-col items-center justify-center p-2 rounded transition-colors text-gray-600 hover:bg-gray-100 hover:text-gray-900 border border-transparent disabled:opacity-40 disabled:hover:bg-transparent"
+                  className={`flex flex-col items-center justify-center rounded transition-colors text-gray-600 hover:bg-gray-100 hover:text-gray-900 border border-transparent disabled:opacity-40 disabled:hover:bg-transparent ${
+                    isCompactIcons ? 'p-1.5 min-w-[34px] h-[34px]' : 'p-2'
+                  }`}
                 >
-                  <Undo2 size={18} className="mb-1" />
-                  <span className="text-[10px] font-semibold">Undo</span>
+                  <Undo2 size={18} className={isCompactIcons ? 'm-0' : 'mb-1'} />
+                  {!isCompactIcons && <span className="text-[10px] font-semibold">Undo</span>}
                 </button>
                 {onRedo && (
                   <button
                     onClick={onRedo}
                     disabled={!canRedo}
                     title="Redo Action (Ctrl+Y)"
-                    className="flex flex-col items-center justify-center p-2 rounded transition-colors text-gray-600 hover:bg-gray-100 hover:text-gray-900 border border-transparent disabled:opacity-40 disabled:hover:bg-transparent"
+                    className={`flex flex-col items-center justify-center rounded transition-colors text-gray-600 hover:bg-gray-100 hover:text-gray-900 border border-transparent disabled:opacity-40 disabled:hover:bg-transparent ${
+                      isCompactIcons ? 'p-1.5 min-w-[34px] h-[34px]' : 'p-2'
+                    }`}
                   >
-                    <Redo2 size={18} className="mb-1" />
-                    <span className="text-[10px] font-semibold">Redo</span>
+                    <Redo2 size={18} className={isCompactIcons ? 'm-0' : 'mb-1'} />
+                    {!isCompactIcons && <span className="text-[10px] font-semibold">Redo</span>}
                   </button>
                 )}
               </div>
@@ -209,12 +232,14 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                   <button
                     onClick={onToggleWellpoints}
                     title={showWellpoints ? 'Hide Wellpoints' : 'Show Wellpoints'}
-                    className={`flex flex-col items-center justify-center p-2 rounded transition-colors ${
-                      showWellpoints ? 'bg-blue-50/70 text-blue-600 shadow-sm border border-blue-200/50' : 'text-gray-600 hover:bg-gray-100'
+                    className={`flex flex-col items-center justify-center rounded transition-colors ${
+                      isCompactIcons ? 'p-1.5 min-w-[34px] h-[34px]' : 'p-2'
+                    } ${
+                      showWellpoints ? 'bg-blue-50/70 text-blue-600 shadow-sm border border-blue-200/50 font-bold' : 'text-gray-600 hover:bg-gray-100'
                     }`}
                   >
-                    {showWellpoints ? <Eye size={18} className="mb-1" /> : <EyeOff size={18} className="mb-1" />}
-                    <span className="text-[10px] font-semibold">Wellpoints</span>
+                    {showWellpoints ? <Eye size={18} className={isCompactIcons ? 'm-0' : 'mb-1'} /> : <EyeOff size={18} className={isCompactIcons ? 'm-0' : 'mb-1'} />}
+                    {!isCompactIcons && <span className="text-[10px] font-semibold">Wellpoints</span>}
                   </button>
                 )}
 
@@ -222,10 +247,12 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                   <button
                     onClick={onToggleWellpointSide}
                     title={`Wellpoint Side: ${wellpointSide === 'left' ? 'Left' : wellpointSide === 'right' ? 'Right' : 'Both'}`}
-                    className="flex flex-col items-center justify-center p-2 rounded transition-colors bg-blue-50/70 text-blue-600 shadow-sm border border-blue-200/50"
+                    className={`flex flex-col items-center justify-center rounded transition-colors bg-blue-50/70 text-blue-600 shadow-sm border border-blue-200/50 ${
+                      isCompactIcons ? 'p-1.5 min-w-[34px] h-[34px]' : 'p-2'
+                    }`}
                   >
-                    <span className="text-[14px] mb-0.5">{wellpointSide === 'left' ? '◀' : wellpointSide === 'right' ? '▶' : '◀▶'}</span>
-                    <span className="text-[10px] font-semibold">{wellpointSide === 'left' ? 'Left' : wellpointSide === 'right' ? 'Right' : 'Both'}</span>
+                    <span className={`text-[14px] ${isCompactIcons ? 'mb-0' : 'mb-0.5'}`}>{wellpointSide === 'left' ? '◀' : wellpointSide === 'right' ? '▶' : '◀▶'}</span>
+                    {!isCompactIcons && <span className="text-[10px] font-semibold">{wellpointSide === 'left' ? 'Left' : wellpointSide === 'right' ? 'Right' : 'Both'}</span>}
                   </button>
                 )}
 
@@ -233,12 +260,14 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                   <button
                     onClick={onToggleOrtho}
                     title="Lock Ortho Snapping"
-                    className={`flex flex-col items-center justify-center p-2 rounded transition-colors ${
-                      orthoLocked ? 'bg-blue-50/70 text-blue-600 shadow-sm border border-blue-200/50' : 'text-gray-600 hover:bg-gray-100'
+                    className={`flex flex-col items-center justify-center rounded transition-colors ${
+                      isCompactIcons ? 'p-1.5 min-w-[34px] h-[34px]' : 'p-2'
+                    } ${
+                      orthoLocked ? 'bg-blue-50/70 text-blue-600 shadow-sm border border-blue-200/50 font-bold' : 'text-gray-600 hover:bg-gray-100'
                     }`}
                   >
-                    <Crosshair size={18} className="mb-1" />
-                    <span className="text-[10px] font-semibold">Ortho</span>
+                    <Crosshair size={18} className={isCompactIcons ? 'm-0' : 'mb-1'} />
+                    {!isCompactIcons && <span className="text-[10px] font-semibold">Ortho</span>}
                   </button>
                 )}
 
@@ -246,12 +275,14 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                   <button
                     onClick={onToggleGridSnap}
                     title="Toggle Grid Snap"
-                    className={`flex flex-col items-center justify-center p-2 rounded transition-colors ${
-                      gridSnap ? 'bg-blue-50/70 text-blue-600 shadow-sm border border-blue-200/50' : 'text-gray-600 hover:bg-gray-100'
+                    className={`flex flex-col items-center justify-center rounded transition-colors ${
+                      isCompactIcons ? 'p-1.5 min-w-[34px] h-[34px]' : 'p-2'
+                    } ${
+                      gridSnap ? 'bg-blue-50/70 text-blue-600 shadow-sm border border-blue-200/50 font-bold' : 'text-gray-600 hover:bg-gray-100'
                     }`}
                   >
-                    <Grid size={18} className="mb-1" />
-                    <span className="text-[10px] font-semibold">Grid Snap</span>
+                    <Grid size={18} className={isCompactIcons ? 'm-0' : 'mb-1'} />
+                    {!isCompactIcons && <span className="text-[10px] font-semibold">Grid Snap</span>}
                   </button>
                 )}
 
@@ -259,12 +290,14 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                   <button
                     onClick={onToggleFullscreen}
                     title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
-                    className={`flex flex-col items-center justify-center p-2 rounded transition-colors ${
-                      isFullscreen ? 'bg-blue-50/70 text-blue-600 shadow-sm border border-blue-200/50' : 'text-gray-600 hover:bg-gray-100'
+                    className={`flex flex-col items-center justify-center rounded transition-colors ${
+                      isCompactIcons ? 'p-1.5 min-w-[34px] h-[34px]' : 'p-2'
+                    } ${
+                      isFullscreen ? 'bg-blue-50/70 text-blue-600 shadow-sm border border-blue-200/50 font-bold' : 'text-gray-600 hover:bg-gray-100'
                     }`}
                   >
-                    {isFullscreen ? <Minimize size={18} className="mb-1" /> : <Maximize size={18} className="mb-1" />}
-                    <span className="text-[10px] font-semibold">Fullscreen</span>
+                    {isFullscreen ? <Minimize size={18} className={isCompactIcons ? 'm-0' : 'mb-1'} /> : <Maximize size={18} className={isCompactIcons ? 'm-0' : 'mb-1'} />}
+                    {!isCompactIcons && <span className="text-[10px] font-semibold">Fullscreen</span>}
                   </button>
                 )}
 
@@ -275,23 +308,27 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                     <button
                       onClick={() => onUpdateBlueprintSettings({ visible: !blueprintSettings.visible })}
                       title={blueprintSettings.visible ? 'Hide Blueprint Underlay' : 'Show Blueprint Underlay'}
-                      className={`flex flex-col items-center justify-center p-2 rounded transition-colors ${
-                        blueprintSettings.visible ? 'bg-blue-50/70 text-blue-600 shadow-sm border border-blue-200/50' : 'text-gray-600 hover:bg-gray-100'
+                      className={`flex flex-col items-center justify-center rounded transition-colors ${
+                        isCompactIcons ? 'p-1.5 min-w-[34px] h-[34px]' : 'p-2'
+                      } ${
+                        blueprintSettings.visible ? 'bg-blue-50/70 text-blue-600 shadow-sm border border-blue-200/50 font-bold' : 'text-gray-600 hover:bg-gray-100'
                       }`}
                     >
-                      <Image size={18} className="mb-1" />
-                      <span className="text-[10px] font-semibold">Blueprint</span>
+                      <Image size={18} className={isCompactIcons ? 'm-0' : 'mb-1'} />
+                      {!isCompactIcons && <span className="text-[10px] font-semibold">Blueprint</span>}
                     </button>
                     
                     <button
                       onClick={() => onToolSelect(activeTool === 'modify-blueprint' ? 'select' : 'modify-blueprint')}
                       title="Adjust Blueprint Scale / Position / Opacity"
-                      className={`flex flex-col items-center justify-center p-2 rounded transition-colors ${
-                        activeTool === 'modify-blueprint' ? 'bg-blue-50/70 text-blue-600 shadow-sm border border-blue-200/50' : 'text-gray-600 hover:bg-gray-100'
+                      className={`flex flex-col items-center justify-center rounded transition-colors ${
+                        isCompactIcons ? 'p-1.5 min-w-[34px] h-[34px]' : 'p-2'
+                      } ${
+                        activeTool === 'modify-blueprint' ? 'bg-blue-50/70 text-blue-600 shadow-sm border border-blue-200/50 font-bold' : 'text-gray-600 hover:bg-gray-100'
                       }`}
                     >
-                      <SlidersHorizontal size={18} className="mb-1" />
-                      <span className="text-[10px] font-semibold">Scale Underlay</span>
+                      <SlidersHorizontal size={18} className={isCompactIcons ? 'm-0' : 'mb-1'} />
+                      {!isCompactIcons && <span className="text-[10px] font-semibold">Scale Underlay</span>}
                     </button>
                   </>
                 )}
@@ -312,22 +349,39 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                   <button
                     onClick={onExportDrawing}
                     title="Export Drawing Sheet"
-                    className="flex flex-col items-center justify-center p-2 rounded transition-colors text-gray-600 hover:bg-gray-100 hover:text-gray-900 ml-1 border border-transparent"
+                    className={`flex flex-col items-center justify-center rounded transition-colors text-gray-600 hover:bg-gray-100 hover:text-gray-900 ml-1 border border-transparent ${
+                      isCompactIcons ? 'p-1.5 min-w-[34px] h-[34px]' : 'p-2'
+                    }`}
                   >
-                    <Printer size={18} className="mb-1" />
-                    <span className="text-[10px] font-semibold">Export</span>
+                    <Printer size={18} className={isCompactIcons ? 'm-0' : 'mb-1'} />
+                    {!isCompactIcons && <span className="text-[10px] font-semibold">Export</span>}
                   </button>
                 )}
               </div>
             </div>
 
-            {/* Active Tool Chip */}
-            <div className="flex-1" />
-            <div className="hidden lg:flex items-center space-x-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 shrink-0 select-none">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Active Tool</span>
-              <span className="text-xs font-bold text-indigo-600 px-2.5 py-0.5 bg-indigo-50 border border-indigo-100 rounded-md">
-                {activeTool.toUpperCase().replace('-', ' ')}
-              </span>
+            {/* Active Tool Chip + Collapse Button */}
+            <div className="flex-1 min-w-[12px]" />
+            <div className="flex items-center space-x-2 shrink-0 select-none">
+              <button
+                onClick={toggleCompactIcons}
+                title={isCompactIcons ? 'Expand Toolbar (Show Text Labels)' : 'Collapse Toolbar (Icons Only)'}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-bold transition-all shadow-sm ${
+                  isCompactIcons
+                    ? 'bg-indigo-600 text-white border-indigo-700 hover:bg-indigo-700'
+                    : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                <SlidersHorizontal size={13} />
+                <span>{isCompactIcons ? 'Show Labels' : 'Icons Only'}</span>
+              </button>
+
+              <div className="hidden lg:flex items-center space-x-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 shrink-0">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Active Tool</span>
+                <span className="text-xs font-bold text-indigo-600 px-2.5 py-0.5 bg-indigo-50 border border-indigo-100 rounded-md">
+                  {activeTool.toUpperCase().replace('-', ' ')}
+                </span>
+              </div>
             </div>
 
           </div>

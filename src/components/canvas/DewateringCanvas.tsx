@@ -2775,33 +2775,7 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
                   return pipeSegments;
                 })()}
                 
-                {/* Length and Depth Label */}
-                {line.points.length > 1 && (() => {
-                  const p1 = line.points[0];
-                  const p2 = line.points[line.points.length - 1];
-                  let totalDist = 0;
-                  for (let i = 0; i < line.points.length - 1; i++) {
-                    const dx = line.points[i+1].x - line.points[i].x;
-                    const dy = line.points[i+1].y - line.points[i].y;
-                    totalDist += Math.sqrt(dx * dx + dy * dy) / PIXELS_PER_METER;
-                  }
-                  if (line.hideLength) return null;
-                  const label = line.depthFromGL ? `L: ${totalDist.toFixed(1)}m | D: -${line.depthFromGL}m` : `L: ${totalDist.toFixed(1)}m`;
-                  return (
-                    <Text 
-                      x={(p1.x + p2.x) / 2} 
-                      y={(p1.y + p2.y) / 2 - 20} 
-                      text={label} 
-                      fill="#0369a1" 
-                      fontSize={12} 
-                      fontStyle="bold" 
-                      listening={false} 
-                      align="center"
-                      offsetX={50}
-                      width={100}
-                    />
-                  );
-                })()}
+
 
                 {/* Vertex handles when selected and NOT locked */}
                 {isSelected && !line.locked && line.points.map((p, i) => (
@@ -3631,11 +3605,7 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
                 stroke={(shiftHeld || orthoLocked) ? '#22c55e' : '#ef4444'}
                 strokeWidth={2} dash={[6, 4]} opacity={0.75} listening={false}
               />
-              <Text 
-                x={(lastPoint.x + previewPoint.x) / 2} y={(lastPoint.y + previewPoint.y) / 2 - 15}
-                text={`${(Math.sqrt(Math.pow(previewPoint.x - lastPoint.x, 2) + Math.pow(previewPoint.y - lastPoint.y, 2)) / PIXELS_PER_METER).toFixed(2)}m`}
-                fill="#3b82f6" fontSize={12} fontStyle="bold" listening={false}
-              />
+
             </>
           )}
 

@@ -64,9 +64,17 @@ export const captureKonvaStage = (
 
       stage.getLayers().forEach((layer: any) => {
         layer.getChildren().forEach((node: any) => {
-          // Skip guides, selection handles, grid
-          const name = node.name?.() || '';
-          if (name.includes('guide') || name.includes('selection') || name.includes('grid')) return;
+          // Skip guides, selection handles, grid, blueprint underlay, or layer background shapes
+          const name = (typeof node.name === 'function' ? node.name() : node.name) || '';
+          const id = (typeof node.id === 'function' ? node.id() : node.id) || '';
+          if (
+            id === 'blueprint-underlay' ||
+            id === 'grid-layer' ||
+            name.includes('guide') ||
+            name.includes('selection') ||
+            name.includes('grid') ||
+            name.includes('background')
+          ) return;
           try {
             const rect = node.getClientRect({ relativeTo: stage, skipTransform: false });
             if (rect.width > 0 && rect.height > 0) {
@@ -86,13 +94,11 @@ export const captureKonvaStage = (
         return stage.toDataURL({ pixelRatio: 2 });
       }
 
-      // Apply padding, clamped to stage bounds
-      const stageWidth = stage.width();
-      const stageHeight = stage.height();
-      cropX = Math.max(0, minX - padding);
-      cropY = Math.max(0, minY - padding);
-      cropW = Math.min(stageWidth - cropX, (maxX - minX) + padding * 2);
-      cropH = Math.min(stageHeight - cropY, (maxY - minY) + padding * 2);
+      // Apply padding around content
+      cropX = minX - padding;
+      cropY = minY - padding;
+      cropW = (maxX - minX) + padding * 2;
+      cropH = (maxY - minY) + padding * 2;
     }
 
     const dataUrl = stage.toDataURL({

@@ -1824,7 +1824,8 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
             issues_on_site: logData.issuesOnSite,
             diesel_usage: logData.dieselUsage,
             supervisor_on_site: logData.supervisorOnSite,
-            logged_by: logData.loggedBy
+            logged_by: logData.loggedBy,
+            site_progress_percentage: logData.siteProgressPercentage ?? null,
           };
 
           const { data, error } = await supabase
@@ -1851,6 +1852,7 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
             dieselUsage: Number(data.diesel_usage || 0),
             supervisorOnSite: data.supervisor_on_site,
             loggedBy: data.logged_by,
+            siteProgressPercentage: data.site_progress_percentage ?? undefined,
             created_at: data.created_at
           };
 

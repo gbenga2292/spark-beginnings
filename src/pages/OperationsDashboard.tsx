@@ -718,7 +718,12 @@ export function Dashboard() {
                             <span className={cn('inline-block text-[10px] font-black uppercase px-2.5 py-1 rounded-full', urgency.pill)}>
                               {urgency.label}
                             </span>
-                            <p className="text-[11px] text-slate-400 mt-1">{notif.missingDays} day{notif.missingDays !== 1 ? 's' : ''} missing</p>
+                            <p
+                              className="text-[11px] text-slate-400 mt-1 cursor-help underline decoration-dotted underline-offset-2 decoration-slate-300"
+                              title={`Missing dates:\n${notif.missingDates.map(d => format(parseISO(d), 'EEE, dd MMM yyyy')).join('\n')}`}
+                            >
+                              {notif.missingDays} day{notif.missingDays !== 1 ? 's' : ''} missing
+                            </p>
                           </div>
                           <ExternalLink className="h-3.5 w-3.5 text-slate-300 group-hover:text-slate-500 transition-colors" />
                         </div>
