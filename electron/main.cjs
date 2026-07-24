@@ -33,27 +33,99 @@ let manualCheck = false;
 const isDev = !app.isPackaged;
 
 /* ─── Auto‑Updater Setup ──────────────────────────────────────── */
+let downloadedInstallerPath = null;
+
+function isNewerVersion(latest, current) {
+  try {
+    const parse = (v) => v.replace(/^v/i, '').split('.').map(n => parseInt(n, 10) || 0);
+    const l = parse(latest);
+    const c = parse(current);
+    for (let i = 0; i < Math.max(l.length, c.length); i++) {
+      const numL = l[i] || 0;
+      const numC = c[i] || 0;
+      if (numL > numC) return true;
+      if (numL < numC) return false;
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+function checkNasUpdatesDirectly(nasPath) {
+  const fs = require('fs');
+  const path = require('path');
+  const targetDir = nasPath || '\\\\MYCLOUDEX2ULTRA\\DCEL_Share\\Updates\\';
+
+  if (!fs.existsSync(targetDir)) {
+    return { available: false, error: 'NAS path unreachable' };
+  }
+
+  // 1. Check for latest.yml
+  const ymlPath = path.join(targetDir, 'latest.yml');
+  let latestVersion = null;
+  let exeFileName = null;
+
+  if (fs.existsSync(ymlPath)) {
+    try {
+      const ymlContent = fs.readFileSync(ymlPath, 'utf8');
+      const versionMatch = ymlContent.match(/version:\s*([^\s\r\n]+)/i);
+      const pathMatch = ymlContent.match(/path:\s*([^\s\r\n]+)/i);
+      if (versionMatch) latestVersion = versionMatch[1].trim();
+      if (pathMatch) exeFileName = pathMatch[1].trim();
+    } catch (err) {
+      console.error('Error reading latest.yml from NAS:', err);
+    }
+  }
+
+  // 2. Fallback: find highest version .exe in folder if latest.yml is missing
+  if (!exeFileName || !latestVersion) {
+    try {
+      const files = fs.readdirSync(targetDir);
+      const exeFiles = files.filter(f => f.toLowerCase().endsWith('.exe'));
+      if (exeFiles.length > 0) {
+        for (const file of exeFiles) {
+          const match = file.match(/(\d+\.\d+\.\d+)/);
+          if (match) {
+            const v = match[1];
+            if (!latestVersion || isNewerVersion(v, latestVersion)) {
+              latestVersion = v;
+              exeFileName = file;
+            }
+          }
+        }
+        if (!exeFileName && exeFiles.length > 0) {
+          exeFileName = exeFiles[0];
+        }
+      }
+    } catch (e) {
+      console.error('Error listing NAS files:', e);
+    }
+  }
+
+  const currentVersion = app.getVersion();
+  if (latestVersion && isNewerVersion(latestVersion, currentVersion)) {
+    const fullExePath = exeFileName ? path.join(targetDir, exeFileName) : null;
+    return {
+      available: true,
+      version: latestVersion,
+      currentVersion,
+      exePath: fullExePath,
+      nasPath: targetDir,
+    };
+  }
+
+  return { available: false, version: currentVersion };
+}
+
 function initAutoUpdater() {
   if (isDev) return; // skip in dev mode
 
-  const fs = require('fs');
-  const nasPath = '\\\\MYCLOUDEX2ULTRA\\DCEL_Share\\Updates\\';
-  
-  // If the NAS is reachable, use it as the primary update source
-  if (fs.existsSync(nasPath)) {
-    autoUpdater.setFeedURL({
-      provider: 'generic',
-      url: `file:///${nasPath.replace(/\\/g, '/')}`
-    });
-  } else {
-    // If NAS is not found (e.g. user is off-site), default to the web server
-    console.log('NAS not reachable, defaulting to web server for updates.');
-    autoUpdater.setFeedURL({
-      provider: 'generic',
-      url: 'https://dewaterconstruct.com/app-updates/'
-    });
-  }
-
+  // Configure autoUpdater ONLY for HTTPS web releases (prevents file:// ClientRequest crash)
+  autoUpdater.setFeedURL({
+    provider: 'generic',
+    url: 'https://dewaterconstruct.com/app-updates/'
+  });
   autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = true;
 
@@ -98,20 +170,9 @@ function initAutoUpdater() {
 
   autoUpdater.on('update-downloaded', () => {
     mainWindow?.setProgressBar(-1);
+    downloadedInstallerPath = null;
     if (manualCheck) {
       mainWindow?.webContents.send('updater:status', { type: 'downloaded' });
-      try {
-        const noti = new Notification({
-          title: 'Update Ready to Install',
-          body: 'The update was downloaded in the background. Click to restart and install.',
-        });
-        noti.on('click', () => {
-          autoUpdater.quitAndInstall();
-        });
-        noti.show();
-      } catch (notiErr) {
-        console.error('Failed to show notification:', notiErr);
-      }
     } else {
       dialog
         .showMessageBox(mainWindow, {
@@ -135,10 +196,25 @@ function initAutoUpdater() {
     }
   });
 
-  // Check for updates 3 seconds after launch (runs in background mode)
+  // Check for updates 3 seconds after launch (background NAS check)
   setTimeout(() => {
     manualCheck = false;
-    autoUpdater.checkForUpdates();
+    const nasRes = checkNasUpdatesDirectly();
+    if (nasRes.available && nasRes.version) {
+      dialog
+        .showMessageBox(mainWindow, {
+          type: 'info',
+          title: 'Update Available on NAS',
+          message: `A new version (${nasRes.version}) is available on the local company NAS. Open Update Manager to install?`,
+          buttons: ['Open Update Manager', 'Later'],
+          defaultId: 0,
+        })
+        .then(({ response }) => {
+          if (response === 0) {
+            mainWindow?.webContents.send('updater:open-modal');
+          }
+        });
+    }
   }, 3000);
 }
 
@@ -448,12 +524,112 @@ function initIPC() {
   });
 
   ipcMain.on('check-for-updates', () => {
-
     if (isDev) {
       dialog.showMessageBox(mainWindow, { type: 'info', message: 'Updates are disabled in development mode.' });
     } else {
       manualCheck = true;
+      const nasRes = checkNasUpdatesDirectly();
+      if (nasRes.available) {
+        mainWindow?.webContents.send('updater:open-modal');
+      } else {
+        autoUpdater.checkForUpdates();
+      }
+    }
+  });
+
+  ipcMain.handle('updater:check-nas-status', async (_event, nasPath) => {
+    const fs = require('fs');
+    const p = nasPath || '\\\\MYCLOUDEX2ULTRA\\DCEL_Share\\Updates\\';
+    try {
+      if (fs.existsSync(p)) return { status: 'online' };
+      return { status: 'offline', error: 'NAS folder not reachable.' };
+    } catch (err) {
+      return { status: 'offline', error: err.message };
+    }
+  });
+
+  ipcMain.on('updater:start-check', async (_event, source) => {
+    const fs = require('fs');
+    const path = require('path');
+    const os = require('os');
+
+    manualCheck = true;
+    mainWindow?.webContents.send('updater:status', { type: 'checking' });
+
+    if (source === 'nas') {
+      const nasPath = '\\\\MYCLOUDEX2ULTRA\\DCEL_Share\\Updates\\';
+      const nasRes = checkNasUpdatesDirectly(nasPath);
+
+      if (nasRes.error) {
+        mainWindow?.webContents.send('updater:status', { type: 'error', message: nasRes.error });
+        return;
+      }
+
+      if (!nasRes.available) {
+        mainWindow?.webContents.send('updater:status', { type: 'not-available' });
+        return;
+      }
+
+      // NAS update available! Notify renderer
+      mainWindow?.webContents.send('updater:status', { type: 'available', version: nasRes.version });
+
+      if (nasRes.exePath && fs.existsSync(nasRes.exePath)) {
+        try {
+          const tempDir = path.join(os.tmpdir(), 'dcel-updates');
+          fs.mkdirSync(tempDir, { recursive: true });
+          const targetFile = path.join(tempDir, path.basename(nasRes.exePath));
+
+          const stat = fs.statSync(nasRes.exePath);
+          const totalSize = stat.size;
+          let copiedSize = 0;
+
+          const readStream = fs.createReadStream(nasRes.exePath);
+          const writeStream = fs.createWriteStream(targetFile);
+
+          readStream.on('data', (chunk) => {
+            copiedSize += chunk.length;
+            const percent = totalSize > 0 ? Math.round((copiedSize / totalSize) * 100) : 50;
+            mainWindow?.webContents.send('updater:status', { type: 'downloading', percent });
+            mainWindow?.setProgressBar(percent / 100);
+          });
+
+          readStream.on('end', () => {
+            writeStream.end();
+            downloadedInstallerPath = targetFile;
+            mainWindow?.setProgressBar(-1);
+            mainWindow?.webContents.send('updater:status', { type: 'downloaded' });
+          });
+
+          readStream.on('error', (err) => {
+            console.error('NAS file copy error:', err);
+            mainWindow?.setProgressBar(-1);
+            mainWindow?.webContents.send('updater:status', { type: 'error', message: `File copy error: ${err.message}` });
+          });
+
+          readStream.pipe(writeStream);
+        } catch (copyErr) {
+          console.error('NAS download error:', copyErr);
+          mainWindow?.webContents.send('updater:status', { type: 'error', message: copyErr.message });
+        }
+      } else {
+        mainWindow?.webContents.send('updater:status', { type: 'error', message: 'Installer executable not found in NAS update folder.' });
+      }
+    } else {
       autoUpdater.checkForUpdates();
+    }
+  });
+
+  ipcMain.on('updater:quit-and-install', () => {
+    if (downloadedInstallerPath && require('fs').existsSync(downloadedInstallerPath)) {
+      const { execFile } = require('child_process');
+      const exe = downloadedInstallerPath;
+      downloadedInstallerPath = null;
+      execFile(exe, [], (err) => {
+        if (err) console.error('Failed to launch installer:', err);
+      });
+      app.quit();
+    } else {
+      autoUpdater.quitAndInstall();
     }
   });
 
