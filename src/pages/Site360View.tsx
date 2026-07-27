@@ -195,6 +195,8 @@ export function Site360View({ site, clientSites, onSiteChange, onBack, onEditSit
     }
   }, [site.id]);
 
+
+
   const handleCreateTaskSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!taskTitle.trim() || isSubmittingTask) return;
@@ -820,6 +822,8 @@ Answer site-specific questions using this context only. Be concise.`;
   );
 
   useSetPageTitle('Site 360', `Operational command center for ${site.name}`, headerActions, [filterMonth, filterYear, site.name, isDark, showFilters, clientSites], onBack);
+
+
 
   const renderTaskRow = (task: any, statusType: 'pending' | 'approval' | 'completed') => {
     const taskSubs = subtasks.filter(s => s.mainTaskId === task.id);

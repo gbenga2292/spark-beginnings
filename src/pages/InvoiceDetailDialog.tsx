@@ -571,6 +571,7 @@ export function InvoiceDetailDialog({ invoice, invoiceList, open, onClose, onNav
               {(invoice.mobDemob ?? 0) > 0 && <CostRow label="Mob / Demob" value={invoice.mobDemob ?? 0} />}
               {(invoice.installation ?? 0) > 0 && <CostRow label="Installation" value={invoice.installation ?? 0} />}
               {(invoice.damages ?? 0) > 0 && <CostRow label="Damages" value={invoice.damages ?? 0} />}
+              {(invoice.discount ?? 0) > 0 && <CostRow label="Discount / Concession" value={-(invoice.discount ?? 0)} />}
               <div className="my-1 border-t border-slate-100" />
               <CostRow label="Gross Total" value={invoice.totalCost ?? 0} muted />
               <CostRow label={`VAT (${invoice.vatInc === 'Yes' ? 'Inclusive' : invoice.vatInc === 'Add' ? 'Added' : 'Excluded'})`} value={invoice.vat ?? 0} muted />

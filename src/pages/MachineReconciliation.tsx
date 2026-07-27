@@ -22,11 +22,13 @@ import {
 const fmt = (iso: string) =>
   iso ? new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
 
-const statusBadge = (status: string) => {
+const statusBadge = (status: string, operationalStatus?: string) => {
+  if (operationalStatus === 'under_maintenance' || status === 'under_maintenance' || status === 'in_service' || status === 'maintenance') {
+    return <Badge className="bg-rose-100 text-rose-700 border-rose-200 border font-semibold">Under Maintenance</Badge>;
+  }
   switch (status) {
     case 'overdue': return <Badge className="bg-rose-100 text-rose-700 border-rose-200 border">Overdue</Badge>;
     case 'due_soon': return <Badge className="bg-amber-100 text-amber-700 border-amber-200 border">Due Soon</Badge>;
-    case 'in_service': return <Badge className="bg-blue-100 text-blue-700 border-blue-200 border">In Service</Badge>;
     default: return <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 border">OK</Badge>;
   }
 };
@@ -1554,7 +1556,7 @@ export function MachineReconciliation() {
                               {machine.site}
                             </span>
                           </TableCell>
-                          <TableCell>{statusBadge(machine.status)}</TableCell>
+                          <TableCell>{statusBadge(machine.status, machine.operationalStatus)}</TableCell>
                           <TableCell className="text-right font-bold text-slate-800 dark:text-slate-100">
                             {totalActiveDays > 0 ? totalActiveDays.toFixed(1) : '—'}
                           </TableCell>
@@ -1682,7 +1684,7 @@ export function MachineReconciliation() {
                       <TableCell className="font-semibold">{m.name}</TableCell>
                       <TableCell className="text-slate-500 font-mono text-sm">{m.serialNumber || '—'}</TableCell>
                       <TableCell className="text-sm">{m.site}</TableCell>
-                      <TableCell>{statusBadge(m.status)}</TableCell>
+                      <TableCell>{statusBadge(m.status, m.operationalStatus)}</TableCell>
                       <TableCell className="text-sm text-slate-600">{m.lastServiceDate ? fmt(m.lastServiceDate) : '—'}</TableCell>
                       <TableCell className="text-sm font-medium text-rose-600">{fmt(m.nextServiceDate)}</TableCell>
                     </TableRow>

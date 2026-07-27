@@ -135,6 +135,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
     mobDemob: '',
     installation: '',
     damages: '',
+    discount: '',
     createReminder: true,
     sendEmailNotification: true,
     vatInc: 'No' as 'Yes' | 'No' | 'Add',
@@ -255,6 +256,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
     const mobDemob = parseFloat(form.mobDemob) || 0;
     const installation = parseFloat(form.installation) || 0;
     const damages = parseFloat(form.damages) || 0;
+    const discount = parseFloat(form.discount) || 0;
 
     // Max duration across all machine rows — used for technicians, diesel, end-date
     const maxDuration = machineConfigs.length > 0
@@ -289,7 +291,8 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
 
     const instMobDemob = mobDemob + installation;
     const otherCosts = damages;
-    const totalCost = rentalCost + dieselCost + techniciansCost + instMobDemob + otherCosts;
+    const subtotalCost = rentalCost + dieselCost + techniciansCost + instMobDemob + otherCosts;
+    const totalCost = Math.max(0, subtotalCost - discount);
 
     let siteRecord = siteRegistry.find(s => s.name === form.site && s.client === form.client);
     if (!siteRecord) {
@@ -309,7 +312,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
       totalCharge = totalCost + vat;
     }
 
-    return { totalCost, vat, totalCharge, vatInc, maxDuration, actualTechDuration, actualNightDuration, techniciansCost, effectiveTechDailyRate, noOfTechnicianNight, accomCrewCount, dieselCost, rentalCost, mobDemob, installation, damages };
+    return { totalCost, subtotalCost, discount, vat, totalCharge, vatInc, maxDuration, actualTechDuration, actualNightDuration, techniciansCost, effectiveTechDailyRate, noOfTechnicianNight, accomCrewCount, dieselCost, rentalCost, mobDemob, installation, damages };
   }, [form, machineConfigs, siteRegistry, vatRate]);
 
   const calculateFullInvoiceData = (input: any, configs?: { rate: string; duration: string }[]) => {
@@ -434,7 +437,9 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
 
     const instMobDemob = mobDemob + installation;
     const otherCosts = damages;
-    const totalCost = rentalCost + dieselCost + techniciansCost + instMobDemob + otherCosts;
+    const discount = parseFloat(input.discount) || 0;
+    const subtotalCost = rentalCost + dieselCost + techniciansCost + instMobDemob + otherCosts;
+    const totalCost = Math.max(0, subtotalCost - discount);
 
     const vatInc = siteObj ? siteObj.vat : (input.vatInc || 'No');
 
@@ -463,9 +468,9 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
       duration: maxDuration, noOfMachine,
       dailyRentalCost: parseFloat(input.dailyRentalCost) || 0,
       noOfTechnician, techniciansDailyRate,
-      dieselCostPerLtr, dailyUsage, mobDemob, installation, damages,
+      dieselCostPerLtr, dailyUsage, mobDemob, installation, damages, discount,
       startDate, endDate, rentalCost, dieselCost, techniciansCost,
-      totalCost, vat, totalCharge, vatInc,
+      subtotalCost, totalCost, vat, totalCharge, vatInc,
       totalExclusiveOfVat: totalCharge - vat,
       invoiceNo: input.invoiceNo || input.invoiceNumber || '',
       client: clientName, site: siteName,
@@ -533,6 +538,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
         mobDemob: data.mobDemob,
         installation: data.installation,
         damages: data.damages,
+        discount: data.discount,
         duration: data.duration,
         rentalCost: data.rentalCost,
         dieselCost: data.dieselCost,
@@ -665,6 +671,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
       mobDemob: 'mobDemob' in inv ? String(inv.mobDemob ?? 0) : '0',
       installation: 'installation' in inv ? String(inv.installation ?? 0) : '0',
       damages: 'damages' in inv ? String(inv.damages ?? 0) : '0',
+      discount: 'discount' in inv ? String(inv.discount ?? 0) : '0',
       countOffDays: 'countOffDays' in inv ? (inv.countOffDays ?? true) : true,
       createReminder: false,
       sendEmailNotification: true,
@@ -742,6 +749,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
         mobDemob: inv.mobDemob,
         installation: inv.installation,
         damages: inv.damages,
+        discount: inv.discount,
         duration: inv.duration,
         rentalCost: inv.rentalCost,
         dieselCost: inv.dieselCost,
@@ -2645,7 +2653,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                   </div>
 
                   <div className="p-6 space-y-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                       <div className="space-y-1.5">
                         <label className="text-xs font-bold text-slate-500 dark:text-slate-455 uppercase tracking-wider">Diesel Price (₦ / Liter)</label>
                         <NumericFormat 
@@ -2694,6 +2702,19 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                           value={form.damages} 
                           onValueChange={(v) => handleChange('damages', v.value || '')} 
                           className="bg-white dark:bg-slate-900 border-slate-205 dark:border-slate-800 h-11 font-mono font-semibold text-slate-800 dark:text-white" 
+                          placeholder="0.00" 
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Discount (₦)</label>
+                        <NumericFormat 
+                          customInput={Input} 
+                          thousandSeparator 
+                          decimalScale={2} 
+                          value={form.discount} 
+                          onValueChange={(v) => handleChange('discount', v.value || '')} 
+                          className="bg-white dark:bg-slate-900 border-emerald-300 dark:border-emerald-800 focus:border-emerald-500 h-11 font-mono font-semibold text-emerald-600 dark:text-emerald-400" 
                           placeholder="0.00" 
                         />
                       </div>
@@ -2771,11 +2792,33 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                   </div>
                   <div className="space-y-4">
                     <div className="flex flex-col">
-                      <span className="text-slate-500 text-[10px] uppercase font-black tracking-wider mb-1">Gross Total</span>
+                      <span className="text-slate-500 text-[10px] uppercase font-black tracking-wider mb-1">
+                        {livePreview.discount > 0 ? 'Gross Subtotal' : 'Gross Total'}
+                      </span>
                       <span className="font-mono text-slate-200 font-bold text-xl">
-                        ₦{priv?.canViewAmounts === false ? '***' : livePreview.totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        ₦{priv?.canViewAmounts === false ? '***' : livePreview.subtotalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </span>
                     </div>
+
+                    {livePreview.discount > 0 && (
+                      <>
+                        <div className="h-px bg-slate-800" />
+                        <div className="flex flex-col">
+                          <span className="text-emerald-400 text-[10px] uppercase font-black tracking-wider mb-1">Discount Subtraction</span>
+                          <span className="font-mono text-emerald-400 font-bold text-lg">
+                            -₦{priv?.canViewAmounts === false ? '***' : livePreview.discount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                        <div className="h-px bg-slate-800" />
+                        <div className="flex flex-col">
+                          <span className="text-slate-400 text-[10px] uppercase font-black tracking-wider mb-1">Net Subtotal (Vatable)</span>
+                          <span className="font-mono text-slate-100 font-bold text-lg">
+                            ₦{priv?.canViewAmounts === false ? '***' : livePreview.totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      </>
+                    )}
+
                     <div className="h-px bg-slate-800" />
                     <div className="flex flex-col">
                       <span className="text-slate-500 text-[10px] uppercase font-black tracking-wider mb-1">Tax (VAT {livePreview.vatInc})</span>

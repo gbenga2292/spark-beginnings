@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Plus, Calendar, MapPin, Camera, Play, Video, Eye, Trash2, Check } from 'lucide-react';
-import { useAppStore, DailyJournal as DailyJournalType, SiteJournalEntry } from "@/src/store/appStore";
+import { useAppStore, DailyJournal as DailyJournalType, SiteJournalEntry, DewateringStage } from "@/src/store/appStore";
 import { useUserStore } from "@/src/store/userStore";
 import { useOperations } from "@/src/contexts/OperationsContext";
 import { Button } from "@/src/components/ui/button";
@@ -21,6 +21,8 @@ function SiteLogCard({
   idx,
   onRemove,
   onChangeNarration,
+  onChangeProgress,
+  onChangeStage,
   formDate,
   onOpenMachineLog,
 }: {
@@ -28,14 +30,36 @@ function SiteLogCard({
   idx: number;
   onRemove: () => void;
   onChangeNarration: (val: string) => void;
+  onChangeProgress: (val?: number) => void;
+  onChangeStage: (val?: DewateringStage) => void;
   formDate: string;
   onOpenMachineLog: (machine: { id: string; name: string }, siteId: string, siteName: string) => void;
 }) {
   const { waybills, assets } = useOperations();
+  const { siteJournalEntries: allEntries, sites } = useAppStore();
   const [activeTab, setActiveTab] = useState<'general' | 'machines'>('general');
   const [mediaPreviews, setMediaPreviews] = useState<{ url: string; type: 'image' | 'video'; name: string }[]>([]);
   const [showCustomCamera, setShowCustomCamera] = useState(false);
   const currentUser = useUserStore(s => s.getCurrentUser());
+
+  // Find the highest progress ever logged for this site for validation
+  const maxSavedProgress = useMemo(() => {
+    if (!entry.siteId) return 0;
+    const siteLogs = allEntries.filter(e => e.siteId === entry.siteId && e.progressPercentage != null && e.id !== entry.id);
+    const maxJournalProgress = siteLogs.length > 0 ? Math.max(...siteLogs.map(e => e.progressPercentage!)) : 0;
+    
+    if (!entry.id) {
+      const siteObj = sites.find(x => x.id === entry.siteId);
+      const siteProgress = siteObj?.currentProgressPercentage ?? 0;
+      return Math.max(maxJournalProgress, siteProgress);
+    }
+    return maxJournalProgress;
+  }, [allEntries, entry.siteId, entry.id, sites]);
+
+  const progressVal = entry.progressPercentage;
+  const progressError = progressVal !== undefined && progressVal < maxSavedProgress
+    ? `Cannot be less than previous progress (${maxSavedProgress}%)`
+    : null;
 
   const handleCapturedFile = (file: File) => {
     // @ts-ignore
@@ -116,16 +140,103 @@ function SiteLogCard({
       )}
 
       {activeTab === 'general' ? (
-        <div className="space-y-3">
+        <div className="space-y-4">
           <div>
             <label className="block text-[10px] font-bold text-white/40 uppercase mb-1">Site Activity Notes</label>
             <textarea
               value={entry.narration || ''}
               onChange={e => onChangeNarration(e.target.value)}
-              placeholder="Enter activity description, progress, delays, etc…"
+              placeholder="Type your field notes here…"
               rows={3}
               className="w-full px-3 py-2 rounded-xl border border-white/10 bg-[#0f111a] text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-sm resize-none"
             />
+          </div>
+
+          {/* Site Progress */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <label className="text-[10px] font-bold text-white/40 uppercase flex items-center gap-1.5">
+                <span>📊</span> Site Progress
+              </label>
+              {maxSavedProgress > 0 && (
+                <span className="text-[10px] text-white/50 bg-white/5 px-2 py-0.5 rounded-full">
+                  Last recorded: <strong className="text-white">{maxSavedProgress}%</strong>
+                </span>
+              )}
+            </div>
+            <div className="relative">
+              <input
+                type="number"
+                min={maxSavedProgress}
+                max={100}
+                step={1}
+                value={progressVal ?? ''}
+                onChange={e => {
+                  const raw = e.target.value;
+                  onChangeProgress(raw === '' ? undefined : Math.min(100, Math.max(0, Number(raw))));
+                }}
+                placeholder={maxSavedProgress > 0 ? `Min ${maxSavedProgress}%` : '0–100%'}
+                className={`w-full h-10 rounded-xl border px-3 pr-8 text-sm bg-[#0f111a] text-white focus:outline-none focus:ring-2 transition-all
+                  ${progressError
+                    ? 'border-red-500/50 focus:ring-red-500/20 text-red-400'
+                    : 'border-white/10 focus:ring-indigo-500/20 focus:border-indigo-500'
+                  }`}
+              />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-white/40 font-bold">%</span>
+            </div>
+            {progressError && (
+              <p className="text-[11px] text-red-400 flex items-center gap-1">
+                ⚠️ {progressError}
+              </p>
+            )}
+            <p className="text-[10px] text-white/40">
+              You can only increase this value or leave it as is.
+            </p>
+            {progressVal !== undefined && !progressError && (
+              <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden mt-1">
+                <div
+                  className="h-full rounded-full transition-all duration-300"
+                  style={{
+                    width: `${progressVal}%`,
+                    background: progressVal >= 80 ? '#10b981' : progressVal >= 40 ? '#f59e0b' : '#6366f1'
+                  }}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Dewatering Stage */}
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-bold text-white/40 uppercase flex items-center gap-1.5">
+              <span>🏗️</span> Dewatering Stage
+            </label>
+            <select
+              value={entry.dewateringStage ?? ''}
+              onChange={e => onChangeStage(e.target.value === '' ? undefined : e.target.value as DewateringStage)}
+              className="w-full h-10 rounded-xl border border-white/10 px-3 text-sm bg-[#0f111a] text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+            >
+              <option value="">— Select Stage —</option>
+              <option value="mobilization">🚚 Mobilization</option>
+              <option value="installation">🔧 Installation</option>
+              <option value="operation">⚙️ Operation</option>
+              <option value="demobilisation">📦 Demobilisation</option>
+            </select>
+            {entry.dewateringStage && (
+              <div className="flex items-center gap-2 mt-1">
+                <span className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-0.5 rounded-full ${
+                  entry.dewateringStage === 'mobilization' ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30' :
+                  entry.dewateringStage === 'installation' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' :
+                  entry.dewateringStage === 'operation' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' :
+                  'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                }`}>
+                  {entry.dewateringStage === 'mobilization' && '🚚 Mobilizing'}
+                  {entry.dewateringStage === 'installation' && '🔧 Installing'}
+                  {entry.dewateringStage === 'operation' && '⚙️ In Operation'}
+                  {entry.dewateringStage === 'demobilisation' && '📦 Demobilising'}
+                </span>
+                <span className="text-[10px] text-white/40">Stage will be synced to site profile on save</span>
+              </div>
+            )}
           </div>
 
           {/* Media Capture Section */}
@@ -224,11 +335,13 @@ export function CreateDailyJournalDialog({ onClose, initialDate = "" }: CreateDa
       const hasMachines = entry.siteId && dailyMachineLogs.some(l => l.siteId === entry.siteId && l.date === formDate);
       // @ts-ignore
       const hasFiles = entry.pendingFiles && entry.pendingFiles.length > 0;
-      return hasNarration || hasMachines || hasFiles;
+      const hasProgress = entry.progressPercentage !== undefined;
+      const hasStage = entry.dewateringStage !== undefined;
+      return hasNarration || hasMachines || hasFiles || hasProgress || hasStage;
     });
 
     if (!hasAnyContent) {
-      return toast.error('Please fill in notes, attach media, or log machine activity before publishing.');
+      return toast.error('Please fill in notes, progress, stage, attach media, or log machine activity before publishing.');
     }
 
     setIsSubmitting(true);
@@ -283,9 +396,24 @@ export function CreateDailyJournalDialog({ onClose, initialDate = "" }: CreateDa
         siteName: e.siteName!,
         clientName: e.clientName!,
         narration: e.narration || '',
+        progressPercentage: e.progressPercentage,
+        dewateringStage: e.dewateringStage,
         createdAt: new Date().toISOString(),
         loggedBy: currentUser?.name || 'System'
       })));
+
+      // Sync dewatering stage & progress percentage to each site
+      const { updateSite } = useAppStore.getState();
+      formEntries.forEach(e => {
+        if (e.siteId) {
+          const siteUpdate: any = {};
+          if (e.dewateringStage !== undefined) siteUpdate.currentDewateringStage = e.dewateringStage;
+          if (e.progressPercentage !== undefined) siteUpdate.currentProgressPercentage = e.progressPercentage;
+          if (Object.keys(siteUpdate).length > 0) {
+            updateSite(e.siteId, siteUpdate);
+          }
+        }
+      });
 
       toast.success('Log published successfully');
       onClose();
@@ -366,6 +494,8 @@ export function CreateDailyJournalDialog({ onClose, initialDate = "" }: CreateDa
                         siteName: s.name,
                         clientName: s.client,
                         narration: '',
+                        progressPercentage: s.currentProgressPercentage ?? 0,
+                        dewateringStage: s.currentDewateringStage,
                         loggedBy: currentUser?.name || 'System',
                         createdAt: new Date().toISOString(),
                         pendingFiles: []
@@ -405,6 +535,16 @@ export function CreateDailyJournalDialog({ onClose, initialDate = "" }: CreateDa
                   onChangeNarration={(val) => {
                     const n = [...formEntries];
                     n[idx].narration = val;
+                    setFormEntries(n);
+                  }}
+                  onChangeProgress={(val) => {
+                    const n = [...formEntries];
+                    n[idx].progressPercentage = val;
+                    setFormEntries(n);
+                  }}
+                  onChangeStage={(val) => {
+                    const n = [...formEntries];
+                    n[idx].dewateringStage = val;
                     setFormEntries(n);
                   }}
                   formDate={formDate}

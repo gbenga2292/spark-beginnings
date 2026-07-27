@@ -63,19 +63,7 @@ export function WeeklyReport() {
     canView: false, canViewHr: false, canViewOps: false, canViewComm: false, canViewFinance: false 
   };
 
-  if (!privs.canView && currentUser?.role !== 'admin') {
-    return (
-      <div className="flex flex-col items-center justify-center h-[60vh] text-slate-400 gap-4">
-        <div className="h-16 w-16 rounded-full bg-slate-100 flex items-center justify-center">
-          <Lock className="h-8 w-8 text-slate-300" />
-        </div>
-        <div className="text-center">
-          <h3 className="text-lg font-bold text-slate-600">Access Restricted</h3>
-          <p className="text-sm">You do not have permission to view the Weekly Operations Report.</p>
-        </div>
-      </div>
-    );
-  }
+
 
   // ── Context data ──────────────────────────────────────
   const { mainTasks, subtasks, comments, users } = useAppData();
@@ -683,6 +671,20 @@ export function WeeklyReport() {
     ...weekJournalEntries.filter(e => weekJournals.some(j => j.id === e.journalId)).map(e => e.siteName),
     ...weekLedger.map(e => e.site),
   ].filter(Boolean))), [weekMachineLogs, weekJournalEntries, weekJournals, weekLedger]);
+
+  if (!privs.canView && currentUser?.role !== 'admin') {
+    return (
+      <div className="flex flex-col items-center justify-center h-[60vh] text-slate-400 gap-4">
+        <div className="h-16 w-16 rounded-full bg-slate-100 flex items-center justify-center">
+          <Lock className="h-8 w-8 text-slate-300" />
+        </div>
+        <div className="text-center">
+          <h3 className="text-lg font-bold text-slate-600">Access Restricted</h3>
+          <p className="text-sm">You do not have permission to view the Weekly Operations Report.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={cn("flex flex-col bg-slate-50 dark:bg-slate-950/50 overflow-hidden font-sans", showPreview ? "h-full" : "h-full pb-10")}>

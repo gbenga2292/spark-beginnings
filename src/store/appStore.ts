@@ -568,6 +568,7 @@ export interface PendingInvoice {
   mobDemob: number;
   installation: number;
   damages: number;
+  discount?: number;
   startDate: string;
   duration: number;
   endDate: string;
@@ -616,6 +617,7 @@ export interface Invoice {
   mobDemob?: number;
   installation?: number;
   damages?: number;
+  discount?: number;
   duration?: number;
   rentalCost?: number;
   dieselCost?: number;

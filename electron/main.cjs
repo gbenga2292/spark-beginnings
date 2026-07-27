@@ -67,8 +67,8 @@ function checkNasUpdatesDirectly(nasPath) {
   if (fs.existsSync(ymlPath)) {
     try {
       const ymlContent = fs.readFileSync(ymlPath, 'utf8');
-      const versionMatch = ymlContent.match(/version:\s*([^\s\r\n]+)/i);
-      const pathMatch = ymlContent.match(/path:\s*([^\s\r\n]+)/i);
+      const versionMatch = ymlContent.match(/version:\s*['"]?([^\r\n"']+)['"]?/i);
+      const pathMatch = ymlContent.match(/path:\s*['"]?([^\r\n"']+)['"]?/i);
       if (versionMatch) latestVersion = versionMatch[1].trim();
       if (pathMatch) exeFileName = pathMatch[1].trim();
     } catch (err) {
@@ -583,12 +583,18 @@ function initIPC() {
 
   ipcMain.on('updater:quit-and-install', () => {
     if (downloadedInstallerPath && require('fs').existsSync(downloadedInstallerPath)) {
-      const { execFile } = require('child_process');
+      const { spawn } = require('child_process');
       const exe = downloadedInstallerPath;
       downloadedInstallerPath = null;
-      execFile(exe, [], (err) => {
-        if (err) console.error('Failed to launch installer:', err);
-      });
+      try {
+        const child = spawn(exe, [], {
+          detached: true,
+          stdio: 'ignore'
+        });
+        child.unref();
+      } catch (err) {
+        console.error('Failed to launch detached installer:', err);
+      }
       app.quit();
     } else {
       autoUpdater.quitAndInstall();
