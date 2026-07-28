@@ -1,7 +1,10 @@
 import { useCallback } from 'react';
 import { useAppStore } from '@/src/store/appStore';
-import { computeWorkDays } from '@/src/lib/workdays';
+import { computeWorkDays, computeWorkDaysInRange } from '@/src/lib/workdays';
 import { calculateAttendanceMetrics, getStaffDateWorkedMap } from '@/src/lib/attendanceLogic';
+import { getPayrollPeriodDates } from '@/src/lib/dateUtils';
+import { getPositionIndex } from '@/src/lib/hierarchy';
+
 const MONTHS = [
   { key: 'jan', label: 'January' },
   { key: 'feb', label: 'February' },
@@ -34,6 +37,9 @@ export function usePayrollCalculator() {
     const mKey = monthKey as keyof typeof employees[0]['monthlySalaries'];
     const selectedMonthIndex = MONTHS.findIndex(m => m.key === monthKey) + 1;
 
+    // Get custom payroll period dates
+    const { start: periodStart, end: periodEnd } = getPayrollPeriodDates(year, selectedMonthIndex, payrollVariables.periodStartDay);
+
     const holidayDates = publicHolidays.map(h => h.date);
     const fallbackWorkdays = computeWorkDays(year, selectedMonthIndex, holidayDates, 6);
 
@@ -45,21 +51,18 @@ export function usePayrollCalculator() {
 
     return employees
       .filter(e => {
-        // Date-based eligibility — match Payroll.tsx
-        const startOfViewingMonth = new Date(year, selectedMonthIndex - 1, 1);
-        const endOfViewingMonth = new Date(year, selectedMonthIndex, 0);
-
+        // Date-based eligibility using the CUSTOM payroll period boundaries
         if (e.startDate) {
           const empStart = new Date(e.startDate);
-          if (empStart > endOfViewingMonth) return false;
+          if (empStart > periodEnd) return false;
         }
         if (e.endDate) {
           const empEnd = new Date(e.endDate);
-          if (empEnd < startOfViewingMonth) return false;
+          if (empEnd < periodStart) return false;
         }
 
-        // Non-Active employees: only include if they have an endDate
-        if (e.status !== 'Active') {
+        // If current status is not Active or On Leave, only show if they were active in the viewed month
+        if (e.status !== 'Active' && e.status !== 'On Leave') {
           if (!e.endDate) return false;
         }
 
@@ -81,55 +84,50 @@ export function usePayrollCalculator() {
         }
         return true;
       })
+      .sort((a, b) => {
+        const idxA = getPositionIndex(a.position);
+        const idxB = getPositionIndex(b.position);
+        if (idxA !== idxB) return idxA - idxB;
+        return (a.position || '').localeCompare(b.position || '');
+      })
       .map((emp) => {
+        let whtRateToStore = 0;
         const standardSalary = emp.monthlySalaries[mKey] || 0;
 
-        // Use workDaysPerWeek from the departments table (set in Variables page) as the authoritative source
         const defaultDays = emp.staffType === 'FIELD' ? 6 : 5;
         const deptRecord = departments.find(d => d.name === emp.department);
         const empWorkDaysPerWeek = deptRecord?.workDaysPerWeek ?? defaultDays;
         const empOfficialWorkdays = computeWorkDays(year, selectedMonthIndex, holidayDates, empWorkDaysPerWeek);
 
-        // Attendance tallies — filter by BOTH year and month to match Payroll.tsx
         let daysWorked = 0;
         let daysAbsent = 0;
         let totalOTInstances = 0;
 
         for (const r of attendanceRecords) {
-          if (!r.date) continue;
-          const [yStr, mStr] = r.date.split('-');
-          const recordYear = parseInt(yStr, 10);
-          const recordMonth = parseInt(mStr, 10);
+          if (!r.date || r.staffId !== emp.id) continue;
 
-          if (r.staffId === emp.id && recordMonth === selectedMonthIndex && recordYear === year) {
-            // Use calculateAttendanceMetrics for accurate OT detection
+          const recordDate = new Date(r.date + 'T12:00:00');
+          if (recordDate >= periodStart && recordDate <= periodEnd) {
             const metrics = calculateAttendanceMetrics(r, holidayDates, payrollVariables, monthValues as any, staffDateWorkedMap);
+
+            if (r.day?.toLowerCase() === 'yes') {
+              daysWorked += 1;
+            } else if (r.day?.toLowerCase() === 'no') {
+              const st = (r as any).absentStatus?.toUpperCase() || '';
+              const isRealAbsence = ["ABSENT", "NO WORK", "ABSENT WITHOUT PERMIT", "SUSPENSION", "OFF DUTY"].includes(st);
+              if (isRealAbsence) {
+                daysAbsent += 1;
+              }
+            }
 
             if (metrics.ot > 0) {
               totalOTInstances += 1;
-            } else {
-              if (r.day?.toLowerCase() === 'yes') {
-                daysWorked += 1;
-              }
-              if (r.night?.toLowerCase() === 'yes') {
-                daysWorked += 1;
-              }
-              
-              if (r.day?.toLowerCase() === 'no' && r.night?.toLowerCase() === 'no') {
-                // Only count real absences if NEITHER shift was worked
-                const st = (r as any).absentStatus?.toUpperCase() || '';
-                const isRealAbsence = ['ABSENT', 'NO WORK', 'ABSENT WITHOUT PERMIT', 'SUSPENSION', 'OFF DUTY'].includes(st);
-                if (isRealAbsence) {
-                  daysAbsent += 1;
-                }
-              }
             }
           }
         }
 
         if (daysWorked > empOfficialWorkdays) daysWorked = empOfficialWorkdays;
 
-        // Salary calculation — uses staffType (not department) to match Payroll.tsx
         let salary = 0;
         let overtime = 0;
 
@@ -137,26 +135,35 @@ export function usePayrollCalculator() {
           const dailyRate = standardSalary / empOfficialWorkdays;
           const isFieldStaff = emp.staffType === 'FIELD';
 
+          let salaryBase = standardSalary;
+          if (emp.startDate) {
+            const empJoin = new Date(emp.startDate);
+            const isJoinWithinPeriod = empJoin > periodStart && empJoin <= periodEnd;
+            if (isJoinWithinPeriod) {
+              const workdaysFromJoin = computeWorkDaysInRange(
+                empJoin > periodStart ? empJoin : periodStart,
+                periodEnd,
+                holidayDates,
+                empWorkDaysPerWeek
+              );
+              salaryBase = standardSalary * (workdaysFromJoin / empOfficialWorkdays);
+            }
+          }
+
           if (isFieldStaff) {
             salary = dailyRate * daysWorked;
           } else {
-            salary = standardSalary - (dailyRate * daysAbsent);
+            salary = salaryBase - (dailyRate * daysAbsent);
             if (salary < 0) salary = 0;
           }
 
           overtime = totalOTInstances * (dailyRate * (1 + otRate));
         }
 
-        // hasPension: mirrors Payroll.tsx exactly (line 367-369)
-        // Uses subjectToPension if explicitly set, else falls back to payeTax
-        // NON-EMPLOYEE staff are always excluded from pension
         const hasPension = (emp.subjectToPension !== undefined && emp.subjectToPension !== null)
           ? (emp.subjectToPension && emp.staffType !== 'NON-EMPLOYEE')
           : (emp.payeTax && emp.staffType !== 'NON-EMPLOYEE');
 
-        // Allowance breakdown: ONLY for payeTax employees — matches Payroll.tsx exactly
-        // Pension-eligible but non-payeTax employees have pensionSum = 0, so pension = 0
-        // This is intentional to match the Pension Schedule (source of truth)
         const basicSalary = emp.payeTax ? salary * (payrollVariables.basic / 100) : 0;
         const housing = emp.payeTax ? salary * (payrollVariables.housing / 100) : 0;
         const transport = emp.payeTax ? salary * (payrollVariables.transport / 100) : 0;
@@ -164,7 +171,6 @@ export function usePayrollCalculator() {
 
         const totalAllowances = basicSalary + housing + transport + otherAllowances;
         const pensionSum = basicSalary + housing + transport;
-
         const grossPay = salary + overtime;
 
         const pension = hasPension ? pensionSum * (payrollVariables.employeePensionRate / 100) : 0;
@@ -181,33 +187,46 @@ export function usePayrollCalculator() {
           const annualTaxable = Math.max(annualGross - cra, 0);
 
           let annualTax = 0;
-          if (annualTaxable <= 0) {
-            annualTax = 0;
-          } else if (annualTaxable <= 2200000) {
-            annualTax = annualTaxable * 0.15;
-          } else if (annualTaxable <= 11200000) {
-            annualTax = (annualTaxable - 2200000) * 0.18 + 330000;
-          } else if (annualTaxable <= 24200000) {
-            annualTax = (annualTaxable - 11200000) * 0.21 + (330000 + 1620000);
-          } else if (annualTaxable <= 49200000) {
-            annualTax = (annualTaxable - 24200000) * 0.23 + (330000 + 1620000 + 2730000);
-          } else {
-            annualTax = (annualTaxable - 49200000) * 0.25 + (330000 + 1620000 + 2730000 + 5750000);
+          let remainingTaxable = annualTaxable;
+          let previousLimit = 0;
+
+          if (annualTaxable > 0) {
+            const sortedBrackets = [...tv.taxBrackets].sort((a, b) => {
+              if (a.upTo === null) return 1;
+              if (b.upTo === null) return -1;
+              return a.upTo - b.upTo;
+            });
+
+            for (const bracket of sortedBrackets) {
+              if (remainingTaxable <= 0) break;
+
+              let taxableInBucket = 0;
+              if (bracket.upTo === null) {
+                taxableInBucket = remainingTaxable;
+              } else {
+                const bracketSize = bracket.upTo - previousLimit;
+                taxableInBucket = Math.min(remainingTaxable, bracketSize);
+                previousLimit = bracket.upTo;
+              }
+
+              annualTax += taxableInBucket * bracket.rate;
+              remainingTaxable -= taxableInBucket;
+            }
           }
 
           paye = annualTax / 12;
         } else if (emp.withholdingTax) {
-          withholdingTax = salary * ((payrollVariables as any).withholdingTaxRate ?? 0);
+          const whtRate = (emp as any).withholdingTaxRate ?? 0.05;
+          withholdingTax = salary * whtRate;
+          whtRateToStore = whtRate;
         }
 
         const empAdvances = salaryAdvances.filter(a => {
           if (a.employeeId !== emp.id) return false;
           if (a.status !== 'Approved' && a.status !== 'Deducted') return false;
           if (!a.requestDate) return false;
-          const dateParts = a.requestDate.split('-');
-          const advanceYear = parseInt(dateParts[0], 10);
-          const advanceMonth = parseInt(dateParts[1], 10);
-          return advanceYear === year && advanceMonth === selectedMonthIndex;
+          const advanceDate = new Date(a.requestDate + 'T12:00:00');
+          return advanceDate >= periodStart && advanceDate <= periodEnd;
         });
         const advanceDeduction = empAdvances.reduce((sum, a) => sum + a.amount, 0);
 
@@ -215,11 +234,12 @@ export function usePayrollCalculator() {
           if (l.employeeId !== emp.id) return false;
           if (l.status !== 'Active' && l.status !== 'Completed' && l.status !== 'Approved') return false;
           if (!l.paymentStartDate) return false;
-          const dateParts = l.paymentStartDate.split('-');
-          const startYear = parseInt(dateParts[0], 10);
-          const startMonth = parseInt(dateParts[1], 10);
 
-          const monthsElapsed = (year - startYear) * 12 + (selectedMonthIndex - startMonth);
+          const loanStart = new Date(l.paymentStartDate + 'T12:00:00');
+          const periodStartMonth = year * 12 + selectedMonthIndex - 1;
+          const loanStartMonth = loanStart.getFullYear() * 12 + loanStart.getMonth();
+          const monthsElapsed = periodStartMonth - loanStartMonth;
+
           return monthsElapsed >= 0 && monthsElapsed < l.duration;
         });
         const loanDeduction = empLoans.reduce((sum, l) => sum + l.monthlyDeduction, 0);
@@ -233,11 +253,13 @@ export function usePayrollCalculator() {
 
         return {
           id: emp.id,
+          employeeCode: emp.employeeCode,
           sn: snCounter++,
           surname: emp.surname,
           firstname: emp.firstname,
           position: emp.position,
           department: emp.department,
+          staffType: emp.staffType,
           bankName: emp.bankName,
           accountNo: emp.accountNo,
           salary,
@@ -250,12 +272,14 @@ export function usePayrollCalculator() {
           grossPay,
           paye,
           withholdingTax,
+          withholdingTaxRate: whtRateToStore,
           loanRepayment,
           pension,
           employerPension,
           nsitf,
           takeHomePay,
-          staffType: emp.staffType,
+          hasPension,
+          taxId: (emp as any).taxId || '',
           status: 'Pending' as const,
         };
       });

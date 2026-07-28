@@ -133,9 +133,17 @@ const TXN_COLUMNS: ColumnDef[] = [
   { id: 'p_department', label: 'Department',       summable: false, sources: ['PAYROLL'] },
   { id: 'p_position',   label: 'Position',         summable: false, sources: ['PAYROLL'] },
   { id: 'p_staffType',  label: 'Staff Type',       summable: false, sources: ['PAYROLL'] },
-  { id: 'p_basic',      label: 'Gross Pay',        summable: true,  sources: ['PAYROLL'] },
+  { id: 'p_salary',     label: 'Main Salary',      summable: true,  sources: ['PAYROLL'] },
+  { id: 'p_basic',      label: 'Basic Salary',     summable: true,  sources: ['PAYROLL'] },
+  { id: 'p_housing',    label: 'Housing',          summable: true,  sources: ['PAYROLL'] },
+  { id: 'p_transport',  label: 'Transport',        summable: true,  sources: ['PAYROLL'] },
+  { id: 'p_other',      label: 'Other Allowances', summable: true,  sources: ['PAYROLL'] },
+  { id: 'p_overtime',   label: 'Overtime Pay',     summable: true,  sources: ['PAYROLL'] },
+  { id: 'p_gross',      label: 'Gross Pay',        summable: true,  sources: ['PAYROLL'] },
   { id: 'p_pension',    label: 'Pension',          summable: true,  sources: ['PAYROLL'] },
+  { id: 'p_employerPension', label: 'Employer Pension', summable: true, sources: ['PAYROLL'] },
   { id: 'p_paye',       label: 'PAYE Tax',         summable: true,  sources: ['PAYROLL'] },
+  { id: 'p_loan',       label: 'Loan Repayment',   summable: true,  sources: ['PAYROLL'] },
   { id: 'p_wht',        label: 'WHT',              summable: true,  sources: ['PAYROLL'] },
   { id: 'p_nsitf',      label: 'NSITF',            summable: true,  sources: ['PAYROLL'] },
   { id: 'p_net',        label: 'Net Pay',          summable: true,  sources: ['PAYROLL'] },
@@ -227,7 +235,7 @@ const BUILT_IN_PRESETS: ReportPreset[] = [
   {
     id: '__payroll', name: 'Payroll Report', builtIn: true,
     sources: ['PAYROLL'],
-    columns: ['sn','p_employee','p_department','p_position','p_staffType','p_basic','p_pension','p_paye','p_wht','p_nsitf','p_net','p_month','p_year', 'p_bank', 'p_account'],
+    columns: ['sn','p_employee','p_department','p_position','p_staffType','p_salary','p_basic','p_housing','p_transport','p_other','p_overtime','p_gross','p_pension','p_employerPension','p_paye','p_loan','p_wht','p_nsitf','p_net','p_month','p_year', 'p_bank', 'p_account'],
   },
   {
     id: '__led', name: 'Ledger Report', builtIn: true,
@@ -712,16 +720,27 @@ export function AccountsReportBuilder({
               _raw: {
                 ...rec._raw,
                 p_month: '—', p_year: '—', // Temporal fields disabled
-                grossPay: 0, pension: 0, paye: 0, nsitf: 0, takeHomePay: 0
+                salary: 0, basicSalary: 0, housing: 0, transport: 0, otherAllowances: 0,
+                overtime: 0, grossPay: 0, pension: 0, employerPension: 0, paye: 0,
+                loanRepayment: 0, withholdingTax: 0, nsitf: 0, takeHomePay: 0
               }
             });
           }
           const g = groupedMap.get(empId)!;
-          g._raw.grossPay    += rec._raw.grossPay || 0;
-          g._raw.pension     += rec._raw.pension || 0;
-          g._raw.paye        += rec._raw.paye || 0;
-          g._raw.nsitf       += rec._raw.nsitf || 0;
-          g._raw.takeHomePay += rec._raw.takeHomePay || 0;
+          g._raw.salary          += rec._raw.salary || 0;
+          g._raw.basicSalary     += rec._raw.basicSalary || 0;
+          g._raw.housing         += rec._raw.housing || 0;
+          g._raw.transport       += rec._raw.transport || 0;
+          g._raw.otherAllowances += rec._raw.otherAllowances || 0;
+          g._raw.overtime        += rec._raw.overtime || 0;
+          g._raw.grossPay        += rec._raw.grossPay || 0;
+          g._raw.pension         += rec._raw.pension || 0;
+          g._raw.employerPension += rec._raw.employerPension || 0;
+          g._raw.paye            += rec._raw.paye || 0;
+          g._raw.loanRepayment   += rec._raw.loanRepayment || 0;
+          g._raw.withholdingTax  += rec._raw.withholdingTax || 0;
+          g._raw.nsitf           += rec._raw.nsitf || 0;
+          g._raw.takeHomePay     += rec._raw.takeHomePay || 0;
 
           // Pivot data: store per-month values
           if (isPivoted) {
@@ -1038,9 +1057,17 @@ export function AccountsReportBuilder({
         case 'p_department': return r.department || '—';
         case 'p_position':   return r.position || '—';
         case 'p_staffType':  return r.staffType || '—';
-        case 'p_basic':      return r.grossPay || 0;
+        case 'p_salary':     return r.salary || 0;
+        case 'p_basic':      return r.basicSalary || 0;
+        case 'p_housing':    return r.housing || 0;
+        case 'p_transport':  return r.transport || 0;
+        case 'p_other':      return r.otherAllowances || 0;
+        case 'p_overtime':   return r.overtime || 0;
+        case 'p_gross':      return r.grossPay || 0;
         case 'p_pension':    return r.pension || 0;
+        case 'p_employerPension': return r.employerPension || 0;
         case 'p_paye':       return r.paye || 0;
+        case 'p_loan':       return r.loanRepayment || 0;
         case 'p_wht':        return r.withholdingTax || 0;
         case 'p_nsitf':      return r.nsitf || 0;
         case 'p_net':        return r.takeHomePay || 0;
