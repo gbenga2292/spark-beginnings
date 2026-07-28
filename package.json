@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.7.10",
   "description": "DCEL Office Suite - Comprehensive HR and Operations Management for Construction",
-  "author": "Gbenga",
+  "author": "Alconsult",
   "type": "module",
   "main": "electron/main.cjs",
   "repository": {

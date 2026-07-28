@@ -75,6 +75,36 @@ export function Tasks() {
 /* ═══════════════════════════════════════════════════════════════════════════════
    HELPER UTILITIES
 ═══════════════════════════════════════════════════════════════════════════════ */
+function isSystemTask(mt?: MainTask | null, sub?: SubTask | null): boolean {
+  const mtAny = mt as any;
+  const subAny = sub as any;
+  if (mt?.createdBy === 'system' || mt?.is_system || mtAny?.isSystem || mtAny?.is_system_task || mt?.is_hr_task || mtAny?.isHrTask) return true;
+  if (sub?.createdBy === 'system' || sub?.is_system || subAny?.isSystem || subAny?.is_system_task) return true;
+
+  const desc = sub?.description || mt?.description || '';
+  if (desc && desc.trim().startsWith('{')) {
+    try {
+      const parsed = JSON.parse(desc);
+      if (parsed.refType || parsed.workflowStep || parsed.leaveType || parsed.narration || parsed.step) {
+        return true;
+      }
+    } catch {}
+  }
+  return false;
+}
+
+function canUserEditMainTask(mt?: MainTask | null, currentUserId?: string): boolean {
+  if (!mt || !currentUserId) return false;
+  if (isSystemTask(mt)) return false;
+  return mt.createdBy === currentUserId;
+}
+
+function canUserEditSubtask(sub?: SubTask | null, mt?: MainTask | null, currentUserId?: string): boolean {
+  if (!sub || !currentUserId) return false;
+  if (isSystemTask(mt, sub)) return false;
+  return sub.createdBy === currentUserId || (mt ? mt.createdBy === currentUserId : false);
+}
+
 function applySortToMainTasks(tasks: MainTask[], sortBy: SortOption, allSubtasks: SubTask[]) {
   return [...tasks].sort((a, b) => {
     const statusRank: Record<string, number> = { "pending_approval": 1, "not_started": 2, "in_progress": 3, "completed": 4 };
@@ -117,6 +147,7 @@ function PersonalTasksView() {
   const [search, setSearch] = useState("");
   const [showCreate, setShowCreate] = useState(false);
   const [editingTask, setEditingTask] = useState<MainTask | null>(null);
+  const [editingSubtask, setEditingSubtask] = useState<SubTask | null>(null);
   const [openSubtaskId, setOpenSubtaskId] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [sortBy, setSortBy] = useState<SortOption>(loadDefaultSort());
@@ -500,6 +531,14 @@ function PersonalTasksView() {
                                             {sc2.label}
                                           </span>
                                           <div onClick={e => e.stopPropagation()} className="flex items-center gap-1 flex-shrink-0">
+                                            {canUserEditSubtask(sub, mt, currentUser?.id) && (
+                                              <button
+                                                onClick={() => setEditingSubtask(sub)}
+                                                className="p-1 rounded-lg text-muted-foreground/40 hover:text-primary hover:bg-primary/10 transition-all"
+                                                title="Edit subtask">
+                                                <Pencil className="w-3.5 h-3.5" />
+                                              </button>
+                                            )}
                                             <DeleteSubtaskButton
                                               hasActivity={comments.some(c => c.subtaskId === sub.id) || sub.status !== 'not_started'}
                                               onConfirm={() => deleteSubtask(sub.id ?? '')}
@@ -516,11 +555,20 @@ function PersonalTasksView() {
 
                               <div className="px-5 py-3 border-t border-indigo-100 dark:border-indigo-900/30 flex items-center justify-between gap-2">
                                 <AddSubtaskInline mainTaskId={mt.id} users={users} onAdd={sub => addSubtask(sub)} isPersonal />
-                                <DeleteTaskButton
-                                  onConfirm={() => deleteMainTask(mt.id)}
-                                  isCompleted={status === 'completed'}
-                                  canManageUsers={me?.privileges?.users?.canManage}
-                                />
+                                <div className="flex items-center gap-2">
+                                  {canUserEditMainTask(mt, currentUser?.id) && (
+                                    <button onClick={(e) => { e.stopPropagation(); setEditingTask(mt); }}
+                                      className="p-1.5 rounded-lg text-muted-foreground/40 hover:text-primary hover:bg-primary/10 transition-all flex items-center justify-center"
+                                      title="Edit task">
+                                      <Pencil className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
+                                  <DeleteTaskButton
+                                    onConfirm={() => deleteMainTask(mt.id)}
+                                    isCompleted={status === 'completed'}
+                                    canManageUsers={me?.privileges?.users?.canManage}
+                                  />
+                                </div>
                               </div>
                             </div>
                           </motion.div>
@@ -580,6 +628,15 @@ function PersonalTasksView() {
           currentUserId={currentUser?.id ?? ""}
           teamId={workspace?.id ?? ""}
           workspaceId={workspace?.id ?? ""}
+        />
+      )}
+
+      {editingSubtask && (
+        <EditSubtaskDialog
+          subtask={editingSubtask}
+          users={users}
+          onClose={() => setEditingSubtask(null)}
+          onSave={(patch) => { updateSubtask(editingSubtask.id ?? '', patch); setEditingSubtask(null); }}
         />
       )}
     </motion.div>
@@ -1091,7 +1148,7 @@ function AdminTasksView() {
                         }}
                         className="p-4 hover:bg-muted/30 cursor-pointer transition-colors relative group">
 
-                        {mt && currentUser?.id === mt.createdBy && (
+                        {mt && canUserEditMainTask(mt, currentUser?.id) && (
                           <button
                             onClick={(e) => { e.stopPropagation(); setEditingTask(mt); }}
                             className="absolute top-4 right-4 p-1.5 opacity-0 group-hover:opacity-100 rounded-md hover:bg-muted text-muted-foreground hover:text-primary transition-all z-10"
@@ -1185,7 +1242,7 @@ function AdminTasksView() {
                                         </span>
                                       )}
                                       <div onClick={e => e.stopPropagation()} className="flex items-center gap-1 flex-shrink-0">
-                                        {currentUser?.id === mt.createdBy && (
+                                        {canUserEditSubtask(sub, mt, currentUser?.id) && (
                                           <>
                                             <button
                                               onClick={() => setEditingSubtask(sub)}
@@ -1210,6 +1267,13 @@ function AdminTasksView() {
                                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs text-muted-foreground hover:text-primary hover:border-primary/30 transition-all">
                                     <MessageSquare className="w-3 h-3" /> Chat
                                   </button>
+                                  {canUserEditMainTask(mt, currentUser?.id) && (
+                                    <button onClick={(e) => { e.stopPropagation(); setEditingTask(mt); }}
+                                      className="p-1.5 rounded-lg text-muted-foreground/40 hover:text-primary hover:bg-primary/10 transition-all flex items-center justify-center"
+                                      title="Edit task">
+                                      <Pencil className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
                                   <DeleteTaskButton
                                     onConfirm={() => deleteMainTask(mt.id)}
                                     isCompleted={pct === 100}
@@ -1320,9 +1384,27 @@ function AdminTasksView() {
                             <Clock className="w-3 h-3" />{formatDueDate(sub.deadline)}
                           </span>
                         )}
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap shadow-sm ${sc.pillClass} ml-auto sm:ml-0`}>
-                          {sc.label}
-                        </span>
+                        <div className="flex items-center gap-2 ml-auto sm:ml-0">
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap shadow-sm ${sc.pillClass}`}>
+                            {sc.label}
+                          </span>
+                          <div onClick={e => e.stopPropagation()} className="flex items-center gap-1 flex-shrink-0">
+                            {canUserEditSubtask(sub, mt, currentUser?.id) && (
+                              <button
+                                onClick={() => setEditingSubtask(sub)}
+                                className="p-1 rounded-lg text-muted-foreground/40 hover:text-primary hover:bg-primary/10 transition-all flex items-center justify-center"
+                                title="Edit subtask">
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                            <DeleteSubtaskButton
+                              hasActivity={comments.some(c => c.subtaskId === sub.id) || sub.status !== 'not_started'}
+                              onConfirm={() => deleteSubtask(sub.id ?? '')}
+                              isCompleted={sub.status === 'completed'}
+                              canManageUsers={me?.privileges?.users?.canManage}
+                            />
+                          </div>
+                        </div>
                       </div>
                     </motion.div>
                   );
@@ -1665,7 +1747,7 @@ function AdminTasksView() {
                                       </span>
                                     )}
                                     <div onClick={e => e.stopPropagation()} className="flex items-center gap-1 flex-shrink-0">
-                                      {currentUser?.id === mt.createdBy && (
+                                      {canUserEditSubtask(sub, mt, currentUser?.id) && (
                                         <>
                                           <button
                                             onClick={() => setEditingSubtask(sub)}
@@ -1697,6 +1779,13 @@ function AdminTasksView() {
                                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs text-muted-foreground hover:text-primary hover:border-primary/30 transition-all">
                                   <MessageSquare className="w-3 h-3" /> Chat
                                 </button>
+                                {canUserEditMainTask(mt, currentUser?.id) && (
+                                  <button onClick={(e) => { e.stopPropagation(); setEditingTask(mt); }}
+                                    className="p-1.5 rounded-lg text-muted-foreground/40 hover:text-primary hover:bg-primary/10 transition-all flex items-center justify-center"
+                                    title="Edit task">
+                                    <Pencil className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
                                 <DeleteTaskButton
                                   onConfirm={() => deleteMainTask(mt.id)}
                                   isCompleted={status === 'completed'}

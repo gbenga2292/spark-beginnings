@@ -92,6 +92,8 @@ export interface SubTask {
     siteId?: string;
     hasBudget?: boolean;
     budgetRequested?: number;
+    createdBy?: string;
+    is_system?: boolean;
 }
 
 export interface MainTask {
@@ -105,6 +107,7 @@ export interface MainTask {
     priority?: TaskPriority;
     isDeleted?: boolean;
     is_project?: boolean;
+    is_system?: boolean;
     requiresApproval?: boolean;
     approverId?: string;
     is_hr_task?: boolean;         // Manual flag for external HR visibility

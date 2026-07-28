@@ -300,18 +300,18 @@ export function Payroll() {
             if (recordDate >= periodStart && recordDate <= periodEnd) {
               const metrics = calculateAttendanceMetrics(r, holidayDates, payrollVariables, monthValues as any, staffDateWorkedMap);
               
+              if (r.day?.toLowerCase() === 'yes') {
+                daysWorked += 1;
+              } else if (r.day?.toLowerCase() === 'no') {
+                const st = r.absentStatus?.toUpperCase() || '';
+                const isRealAbsence = ["ABSENT", "NO WORK", "ABSENT WITHOUT PERMIT", "SUSPENSION", "OFF DUTY"].includes(st);
+                if (isRealAbsence) {
+                  daysAbsent += 1;
+                }
+              }
+
               if (metrics.ot > 0) {
                 totalOTInstances += 1;
-              } else {
-                if (r.day?.toLowerCase() === 'yes') {
-                  daysWorked += 1;
-                } else if (r.day?.toLowerCase() === 'no') {
-                  const st = r.absentStatus?.toUpperCase() || '';
-                  const isRealAbsence = ["ABSENT", "NO WORK", "ABSENT WITHOUT PERMIT", "SUSPENSION", "OFF DUTY"].includes(st);
-                  if (isRealAbsence) {
-                    daysAbsent += 1;
-                  }
-                }
               }
             }
           }

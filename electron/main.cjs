@@ -555,18 +555,25 @@ function initIPC() {
             mainWindow?.setProgressBar(percent / 100);
           });
 
-          readStream.on('end', () => {
-            writeStream.end();
-            downloadedInstallerPath = targetFile;
-            mainWindow?.setProgressBar(-1);
-            mainWindow?.webContents.send('updater:status', { type: 'downloaded' });
+          writeStream.on('finish', () => {
+            if (fs.existsSync(targetFile) && fs.statSync(targetFile).size === totalSize) {
+              downloadedInstallerPath = targetFile;
+              mainWindow?.setProgressBar(-1);
+              mainWindow?.webContents.send('updater:status', { type: 'downloaded' });
+            } else {
+              mainWindow?.setProgressBar(-1);
+              mainWindow?.webContents.send('updater:status', { type: 'error', message: 'Downloaded installer file is incomplete or truncated.' });
+            }
           });
 
-          readStream.on('error', (err) => {
+          const handleStreamErr = (err) => {
             console.error('NAS file copy error:', err);
             mainWindow?.setProgressBar(-1);
             mainWindow?.webContents.send('updater:status', { type: 'error', message: `File copy error: ${err.message}` });
-          });
+          };
+
+          readStream.on('error', handleStreamErr);
+          writeStream.on('error', handleStreamErr);
 
           readStream.pipe(writeStream);
         } catch (copyErr) {
