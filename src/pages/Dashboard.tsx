@@ -53,58 +53,127 @@ function computeWorkDays(year: number, monthNum: number, holidayDates: string[],
 const CustomHeadcountTooltip = ({ active, payload }: any) => {
   if (active && payload && payload.length) {
     const data = payload[0].payload;
+
+    if (data.count !== undefined && data.Headcount === undefined) {
+      return (
+        <div className="bg-slate-900/95 text-white border border-slate-700/80 rounded-xl p-3 shadow-xl backdrop-blur-md max-w-xs text-xs z-50">
+          <div className="font-bold text-slate-200 flex items-center justify-between gap-3">
+            <span>{data.name}</span>
+            <span className="text-indigo-400 font-mono text-xs font-bold">
+              Count: {data.count}
+            </span>
+          </div>
+        </div>
+      );
+    }
+
     const additions: Array<any> = data.newAdditions || [];
+    const subtractions: Array<any> = data.subtractions || [];
 
     return (
-      <div className="bg-slate-900/95 text-white border border-slate-700/80 rounded-xl p-3 shadow-xl backdrop-blur-md max-w-xs text-xs z-50">
-        <div className="font-bold text-slate-200 border-b border-slate-700/60 pb-1.5 mb-2 flex items-center justify-between gap-3">
+      <div className="bg-slate-900/95 text-white border border-slate-700/80 rounded-xl p-3 shadow-xl backdrop-blur-md min-w-[240px] max-w-xs text-xs z-50">
+        <div className="font-bold text-slate-200 border-b border-slate-700/60 pb-1.5 mb-2.5 flex items-center justify-between gap-3">
           <span>{data.fullMonth || data.name}</span>
           <span className="text-emerald-400 font-mono text-xs font-bold">
             Total: {data.Headcount}
           </span>
         </div>
 
-        <div className="space-y-1">
-          <div className="text-[11px] font-semibold text-slate-400 flex items-center justify-between">
-            <span>New Additions:</span>
-            <span className={additions.length > 0 ? "text-emerald-400 font-bold" : "text-slate-500"}>
-              +{additions.length}
-            </span>
+        <div className="space-y-3">
+          {/* New Additions */}
+          <div>
+            <div className="text-[11px] font-semibold text-slate-300 flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-emerald-400"></span>
+                New Additions:
+              </span>
+              <span className={additions.length > 0 ? "text-emerald-400 font-bold font-mono" : "text-slate-500 font-mono"}>
+                +{additions.length}
+              </span>
+            </div>
+
+            {additions.length > 0 ? (
+              <ul className="mt-1.5 space-y-1 max-h-36 overflow-y-auto custom-scrollbar pr-1">
+                {additions.map((emp) => {
+                  const fullName = [emp.firstname, emp.surname].filter(Boolean).join(' ') || 'Unnamed Staff';
+                  const formattedDate = emp.startDate ? formatDisplayDate(emp.startDate) : '';
+
+                  return (
+                    <li key={emp.id} className="bg-slate-800/80 rounded p-1.5 flex flex-col gap-0.5 text-[11px] border border-slate-700/50">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-semibold text-slate-100 truncate" title={fullName}>
+                          {fullName}
+                        </span>
+                        {formattedDate && (
+                          <span className="text-[9px] font-mono text-emerald-400 shrink-0">
+                            {formattedDate}
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[10px] text-slate-400 flex items-center justify-between gap-2">
+                        <span className="truncate">{emp.position || 'Staff'}</span>
+                        {emp.department && (
+                          <span className="text-[9px] bg-slate-700/60 text-slate-300 px-1.5 py-0.2 rounded shrink-0">
+                            {emp.department}
+                          </span>
+                        )}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <p className="text-[10px] text-slate-500 italic mt-0.5 pl-3.5">No new additions</p>
+            )}
           </div>
 
-          {additions.length > 0 ? (
-            <ul className="mt-1.5 space-y-1 max-h-40 overflow-y-auto custom-scrollbar pr-1">
-              {additions.map((emp) => {
-                const fullName = [emp.firstname, emp.surname].filter(Boolean).join(' ') || 'Unnamed Staff';
-                const formattedDate = emp.startDate ? formatDisplayDate(emp.startDate) : '';
+          {/* Subtractions */}
+          <div className="border-t border-slate-800/80 pt-2.5">
+            <div className="text-[11px] font-semibold text-slate-300 flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-rose-400"></span>
+                Subtractions:
+              </span>
+              <span className={subtractions.length > 0 ? "text-rose-400 font-bold font-mono" : "text-slate-500 font-mono"}>
+                -{subtractions.length}
+              </span>
+            </div>
 
-                return (
-                  <li key={emp.id} className="bg-slate-800/80 rounded p-1.5 flex flex-col gap-0.5 text-[11px] border border-slate-700/50">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-semibold text-slate-100 truncate" title={fullName}>
-                        {fullName}
-                      </span>
-                      {formattedDate && (
-                        <span className="text-[9px] font-mono text-emerald-400 shrink-0">
-                          {formattedDate}
+            {subtractions.length > 0 ? (
+              <ul className="mt-1.5 space-y-1 max-h-36 overflow-y-auto custom-scrollbar pr-1">
+                {subtractions.map((emp) => {
+                  const fullName = [emp.firstname, emp.surname].filter(Boolean).join(' ') || 'Unnamed Staff';
+                  const exitDate = emp.endDate || emp.offboardingDate || emp.terminationDate;
+                  const formattedDate = exitDate ? formatDisplayDate(exitDate) : '';
+
+                  return (
+                    <li key={emp.id} className="bg-slate-800/80 rounded p-1.5 flex flex-col gap-0.5 text-[11px] border border-rose-900/40">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-semibold text-slate-100 truncate" title={fullName}>
+                          {fullName}
                         </span>
-                      )}
-                    </div>
-                    <div className="text-[10px] text-slate-400 flex items-center justify-between gap-2">
-                      <span className="truncate">{emp.position || 'Staff'}</span>
-                      {emp.department && (
-                        <span className="text-[9px] bg-slate-700/60 text-slate-300 px-1.5 py-0.2 rounded shrink-0">
-                          {emp.department}
-                        </span>
-                      )}
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          ) : (
-            <p className="text-[10px] text-slate-400 italic mt-1">No new additions this month</p>
-          )}
+                        {formattedDate && (
+                          <span className="text-[9px] font-mono text-rose-400 shrink-0">
+                            {formattedDate}
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[10px] text-slate-400 flex items-center justify-between gap-2">
+                        <span className="truncate">{emp.position || 'Staff'}</span>
+                        {emp.department && (
+                          <span className="text-[9px] bg-slate-700/60 text-slate-300 px-1.5 py-0.2 rounded shrink-0">
+                            {emp.department}
+                          </span>
+                        )}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <p className="text-[10px] text-slate-500 italic mt-0.5 pl-3.5">No subtractions</p>
+            )}
+          </div>
         </div>
       </div>
     );
@@ -133,11 +202,12 @@ export function Dashboard() {
     const departments = useAppStore((state) => state.departments);
     const nonEmployeeDeptNames = useMemo(() => new Set(departments.filter(d => d.staffType === 'NON-EMPLOYEE').map(d => d.name)), [departments]);
 
-    const employees = useAppStore((state) => state.employees).filter(e => 
+    const allStoreEmployees = useAppStore((state) => state.employees);
+    const employees = useMemo(() => allStoreEmployees.filter(e => 
         (e.status === 'Active' || e.status === 'On Leave') && 
         e.staffType?.toUpperCase() !== 'NON-EMPLOYEE' && e.staffType?.toUpperCase() !== 'NON EMPLOYEE' &&
         (!e.department || !nonEmployeeDeptNames.has(e.department))
-    );
+    ), [allStoreEmployees, nonEmployeeDeptNames]);
     const attendanceRecords = useAppStore((state) => state.attendanceRecords);
     const leaves = useAppStore((state) => state.leaves);
     const holidays = useAppStore((state) => state.publicHolidays);
@@ -249,9 +319,19 @@ export function Dashboard() {
             return start <= todayMidnight && todayMidnight < resumptionDate;
         }).length;
 
-        // "Pending Leaves": not yet started (future) AND no dateReturned — excludes anyone currently mid-leave
+        // "Pending Leaves": leave requests actually awaiting approval (approvalStatus === 'Pending' or workflowStep 1-4)
         const pendingLeaves = leaves.filter(l => {
             if (l.status === 'Cancelled') return false;
+            if (l.approvalStatus === 'Approved' || l.workflowStep === 5) return false;
+            if (l.approvalStatus === 'Rejected' || l.workflowStep === -1) return false;
+            return l.approvalStatus === 'Pending' || (l.workflowStep !== undefined && l.workflowStep >= 1 && l.workflowStep < 5);
+        }).length;
+
+        // "Upcoming Approved Leaves": approved leaves starting in the future
+        const upcomingLeaves = leaves.filter(l => {
+            if (l.status === 'Cancelled') return false;
+            const isApproved = l.approvalStatus === 'Approved' || l.workflowStep === 5;
+            if (!isApproved) return false;
             if (l.dateReturned && l.dateReturned !== '') return false;
             const start = new Date(l.startDate);
             start.setHours(0, 0, 0, 0);
@@ -276,6 +356,7 @@ export function Dashboard() {
             totalPossibleDays,
             attendanceRate,
             pendingLeaves,
+            upcomingLeaves,
             pendingAdvances,
             activeLoans,
             activeSites,
@@ -519,38 +600,71 @@ export function Dashboard() {
 
     // ── HEADCOUNT GROWTH ──
     const headcountChartData = useMemo(() => {
+        const parseYM = (dateStr?: string) => {
+            if (!dateStr) return null;
+            const clean = dateStr.trim().split('T')[0];
+            const parts = clean.split('-');
+            if (parts.length === 3) {
+                const y = parseInt(parts[0], 10);
+                const m = parseInt(parts[1], 10);
+                const d = parseInt(parts[2], 10);
+                if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
+                    return { year: y, month: m, day: d };
+                }
+            }
+            const d = new Date(dateStr);
+            if (isNaN(d.getTime())) return null;
+            return { year: d.getFullYear(), month: d.getMonth() + 1, day: d.getDate() };
+        };
+
+        const relevantStaff = allStoreEmployees.filter(emp =>
+            emp.staffType?.toUpperCase() !== 'NON-EMPLOYEE' && emp.staffType?.toUpperCase() !== 'NON EMPLOYEE' &&
+            (!emp.department || !nonEmployeeDeptNames.has(emp.department)) &&
+            (emp.staffType === 'FIELD' || emp.staffType === 'OFFICE' || !emp.staffType)
+        );
+
         return MONTHS.map((m) => {
-            const startOfMonthTimestamp = new Date(filterYear, m.value - 1, 1).getTime();
-            const endOfMonthTimestamp = new Date(filterYear, m.value, 0).getTime();
             let count = 0;
-            const newAdditions: typeof employees = [];
+            const newAdditions: typeof relevantStaff = [];
+            const subtractions: typeof relevantStaff = [];
 
-            employees.forEach(emp => {
-                if (emp.staffType !== 'FIELD' && emp.staffType !== 'OFFICE') return;
-                
-                if (emp.endDate && new Date(emp.endDate).getTime() < startOfMonthTimestamp) return;
+            relevantStaff.forEach(emp => {
+                const startYM = parseYM(emp.startDate);
+                const exitDate = emp.endDate || (emp as any).offboardingDate || (emp as any).terminationDate;
+                const endYM = parseYM(exitDate);
 
-                if (emp.startDate) {
-                    const startTs = new Date(emp.startDate).getTime();
-                    if (startTs <= endOfMonthTimestamp) {
-                        count++;
-                        if (startTs >= startOfMonthTimestamp) {
-                            newAdditions.push(emp);
-                        }
-                    }
-                } else {
+                // Joined on or before month m of filterYear
+                const joinedBeforeOrInMonth = !startYM || startYM.year < filterYear || (startYM.year === filterYear && startYM.month <= m.value);
+                // Exited on or before month m of filterYear
+                const exitedBeforeOrInMonth = endYM ? (endYM.year < filterYear || (endYM.year === filterYear && endYM.month <= m.value)) : false;
+
+                // Headcount at the end of month m
+                if (joinedBeforeOrInMonth && !exitedBeforeOrInMonth) {
                     count++;
                 }
+
+                // New Addition in month m of filterYear
+                if (startYM && startYM.year === filterYear && startYM.month === m.value) {
+                    newAdditions.push(emp);
+                }
+
+                // Subtraction in month m of filterYear
+                if (endYM && endYM.year === filterYear && endYM.month === m.value) {
+                    subtractions.push(emp);
+                }
             });
+
             return {
                 name: m.label.substring(0, 3),
                 fullMonth: `${m.label} ${filterYear}`,
                 Headcount: count,
                 newAdditions,
-                newAdditionsCount: newAdditions.length
+                newAdditionsCount: newAdditions.length,
+                subtractions,
+                subtractionsCount: subtractions.length
             };
         });
-    }, [employees, filterYear]);
+    }, [allStoreEmployees, filterYear, nonEmployeeDeptNames]);
 
     // ── POSITION STAFFING ──
     const positionStaffing = useMemo(() => {
@@ -570,6 +684,9 @@ export function Dashboard() {
 
         if (kpiStats.pendingLeaves > 0) {
             ALERTS.push({ type: 'warning', msg: `${kpiStats.pendingLeaves} leave request(s) awaiting approval.` });
+        }
+        if (kpiStats.upcomingLeaves > 0) {
+            ALERTS.push({ type: 'info', msg: `${kpiStats.upcomingLeaves} approved leave(s) scheduled.` });
         }
         if (kpiStats.pendingAdvances > 0) {
             ALERTS.push({ type: 'warning', msg: `${kpiStats.pendingAdvances} salary advance request(s) pending.` });
