@@ -1,12 +1,14 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useAppStore } from '../store/appStore';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Users, Building2, Calendar, FileText, Search, MapPin, LayoutGrid, List, ChevronRight, UserCheck } from 'lucide-react';
+import { Users, Building2, Calendar, FileText, Search, MapPin, LayoutGrid, List, ChevronRight, UserCheck, Trash2 } from 'lucide-react';
 import { Input } from '../components/ui/input';
 import { Button } from '../components/ui/button';
 import { cn } from '../lib/utils';
 import { format, parseISO } from 'date-fns';
 import { ClientContactsPanel } from './ClientContactsPanel';
+import { toast, showConfirm } from '../components/ui/toast';
+import { useUserStore } from '../store/userStore';
 
 export function ClientSummaryGrid() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -14,6 +16,9 @@ export function ClientSummaryGrid() {
   const [contactsFor, setContactsFor] = useState<string | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
+
+  const currentUser = useUserStore((s) => s.getCurrentUser());
+  const canDeleteClient = !currentUser || currentUser.role === 'Admin' || currentUser.role === 'SuperAdmin' || currentUser.privileges?.clients?.canDelete !== false || currentUser.privileges?.sites?.canDeleteClient !== false;
   
   const clientProfiles = useAppStore(s => s.clientProfiles);
   const sites = useAppStore(s => s.sites);
@@ -21,6 +26,53 @@ export function ClientSummaryGrid() {
   const commLogs = useAppStore(s => s.commLogs);
   const pendingSites = useAppStore(s => s.pendingSites);
   const clientContacts = useAppStore(s => s.clientContacts);
+  const removeClient = useAppStore(s => s.removeClient);
+  const deleteClientProfile = useAppStore(s => s.deleteClientProfile);
+  const deleteClientContact = useAppStore(s => s.deleteClientContact);
+  const deletePendingSite = useAppStore(s => s.deletePendingSite);
+
+  const handleDeleteClient = async (clientName: string) => {
+    const nameTrim = clientName.trim();
+    const nameLow = nameTrim.toLowerCase();
+    
+    const clientSites = sites.filter(s => s.client.trim().toLowerCase() === nameLow);
+    
+    let confirmPrompt = `Are you sure you want to delete client "${nameTrim}"? This will remove the client record.`;
+    if (clientSites.length > 0) {
+      confirmPrompt = `Client "${nameTrim}" currently has ${clientSites.length} site(s) associated with it. Are you sure you want to permanently delete this client?`;
+    }
+
+    const ok = await showConfirm(confirmPrompt, {
+      title: `Delete Client — ${nameTrim}`,
+      confirmLabel: 'Delete Client',
+      cancelLabel: 'Cancel',
+      variant: 'danger'
+    });
+
+    if (!ok) return;
+
+    removeClient(nameTrim);
+
+    clientProfiles.forEach(p => {
+      if (p.name.trim().toLowerCase() === nameLow) {
+        deleteClientProfile(p.id);
+      }
+    });
+
+    clientContacts.forEach(c => {
+      if (c.clientName.trim().toLowerCase() === nameLow) {
+        deleteClientContact(c.id);
+      }
+    });
+
+    pendingSites.forEach(ps => {
+      if (ps.clientName.trim().toLowerCase() === nameLow && !ps.siteId) {
+        deletePendingSite(ps.id);
+      }
+    });
+
+    toast.success(`Client "${nameTrim}" deleted successfully.`);
+  };
 
   // Deduplicate profiles by normalized name (trim + lowercase).
   // Prefer the profile with the most complete data (has TIN or startDate).
@@ -180,8 +232,24 @@ export function ClientSummaryGrid() {
                     Since: <span className="font-medium text-slate-700">{client.startDate}</span>
                   </div>
                 </div>
-                <div className="p-2 -mr-2 -mt-2 text-slate-300 group-hover:text-indigo-500 transition-colors opacity-0 group-hover:opacity-100">
-                   <ChevronRight className="w-5 h-5" />
+                <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                  {canDeleteClient && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                      title="Delete Client"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteClient(client.name);
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                  <div className="p-2 -mr-2 -mt-2 text-slate-300 group-hover:text-indigo-500 transition-colors">
+                     <ChevronRight className="w-5 h-5" />
+                  </div>
                 </div>
               </div>
               
@@ -238,6 +306,11 @@ export function ClientSummaryGrid() {
                         <Button size="sm" variant="outline" className="text-indigo-600 border-indigo-200 hover:bg-indigo-50" onClick={() => navigate(`/sites?client=${encodeURIComponent(client.name)}`)}>
                           View Details
                         </Button>
+                        {canDeleteClient && (
+                          <Button size="sm" variant="ghost" className="text-slate-400 hover:text-rose-600 hover:bg-rose-50" title="Delete Client" onClick={() => handleDeleteClient(client.name)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
                       </div>
                     </td>
                   </tr>

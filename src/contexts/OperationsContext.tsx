@@ -334,6 +334,7 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
           nextServiceDate: nextDate.toISOString(),
           serviceIntervalMonths: 3,
           status,
+          operationalStatus: (v.operationalStatus as OperationalStatus) || 'active',
           pattern: 'Routine',
           totalMaintenanceRecords: sessions.length,
           isActive: v.status === 'active'
@@ -1682,7 +1683,14 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const updateAssetOperationalStatus = async (id: string, opStatus: OperationalStatus): Promise<void> => {
-    // Optimistic update
+    const isVehicle = vehicles.some(v => v.id === id);
+
+    if (isVehicle) {
+      storeUpdateVehicle(id, { operationalStatus: opStatus });
+      return;
+    }
+
+    // Optimistic update for equipment/machines
     setAssets(prev => prev.map(a => a.id === id ? { ...a, operationalStatus: opStatus } : a));
     try {
       const { error } = await supabase

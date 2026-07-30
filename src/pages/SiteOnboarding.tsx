@@ -383,7 +383,16 @@ export function SiteOnboarding() {
     if (!isNew && id && id !== hasLoadedInitial) {
       const existing = pendingSites.find(s => s.id === id);
       if (existing) {
-        let loadedForm = { ...existing };
+        const defaultBlank = blankForm();
+        let loadedForm: SiteQuestionnaire = {
+          ...defaultBlank,
+          ...existing,
+          phase1: { ...defaultBlank.phase1, ...(existing.phase1 || {}) },
+          phase2: { ...defaultBlank.phase2, ...(existing.phase2 || {}) },
+          phase3: { ...defaultBlank.phase3, ...(existing.phase3 || {}) },
+          phase4: { ...defaultBlank.phase4, ...(existing.phase4 || {}) },
+          phase5: { ...defaultBlank.phase5, ...(existing.phase5 || {}) },
+        };
         
         // Auto-populate TIN if it's currently empty but we have it on record
         if (!loadedForm.phase4?.clientTinNumber && loadedForm.clientName) {
@@ -403,7 +412,7 @@ export function SiteOnboarding() {
         setHasLoadedInitial(id); // Mark this specific ID as loaded
 
         if (loadedForm.status === 'Pending') {
-          const next = [1, 2, 3, 4, 5].find(p => !(loadedForm as any)[`phase${p}`].completed) as any ?? 5;
+          const next = [1, 2, 3, 4, 5].find(p => !(loadedForm as any)[`phase${p}`]?.completed) as any ?? 5;
           setActivePhase(next);
         }
       } else {
@@ -660,12 +669,12 @@ export function SiteOnboarding() {
   // ─── Activation ──────────────────────────────────────────────────────────
   const canActivate =
     form.status === 'Pending' &&
-    form.phase1.completed &&
-    form.phase2.completed &&
-    form.phase3.completed &&
-    form.phase4.quotationSent &&
-    form.phase4.proposalAccepted &&
-    form.phase5.stage1AdvanceReceived;
+    Boolean(form.phase1?.completed) &&
+    Boolean(form.phase2?.completed) &&
+    Boolean(form.phase3?.completed) &&
+    Boolean(form.phase4?.quotationSent) &&
+    Boolean(form.phase4?.proposalAccepted) &&
+    Boolean(form.phase5?.stage1AdvanceReceived);
 
   const handleActivate = async () => {
     if (!canActivate) return;
@@ -784,7 +793,7 @@ export function SiteOnboarding() {
     handleBack
   );
 
-  const completedCount = [1, 2, 3, 4, 5].filter(p => (form as any)[`phase${p}`].completed).length;
+  const completedCount = [1, 2, 3, 4, 5].filter(p => (form as any)[`phase${p}`]?.completed).length;
 
   // ─── Render ───────────────────────────────────────────────────────────────
   return (
@@ -980,7 +989,7 @@ export function SiteOnboarding() {
             </div>
             <div className="flex gap-1.5">
               {[1, 2, 3, 4, 5].map(p => {
-                const done = (form as any)[`phase${p}`].completed;
+                const done = Boolean((form as any)[`phase${p}`]?.completed);
                 return (
                   <div
                     key={p}
@@ -1134,7 +1143,7 @@ export function SiteOnboarding() {
           {/* Tabs */}
           <div className="flex border-b border-slate-200 overflow-x-auto style-scroll flex-shrink-0">
             {[1, 2, 3, 4, 5].map(phase => {
-              const done = (form as any)[`phase${phase}`].completed;
+              const done = Boolean((form as any)[`phase${phase}`]?.completed);
               return (
                 <button
                   key={phase}
@@ -1453,7 +1462,7 @@ export function SiteOnboarding() {
                     <h2 className="text-base font-semibold text-slate-800">Phase 1: Initial Inquiry</h2>
                     <p className="text-xs text-slate-400 mt-0.5">Head of Operations — collect first project details</p>
                   </div>
-                  {form.phase1.completed && <Badge variant="success">Complete</Badge>}
+                  {form.phase1?.completed && <Badge variant="success">Complete</Badge>}
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
@@ -1461,7 +1470,7 @@ export function SiteOnboarding() {
                     <label className="text-sm font-medium text-slate-700">Project Service</label>
                     <select
                       className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
-                      value={form.phase1.whatIsBeingBuilt || ''}
+                      value={form.phase1?.whatIsBeingBuilt || ''}
                       onChange={e => updPhase('phase1', { whatIsBeingBuilt: e.target.value })}
                     >
                       <option value="" disabled>-- Select Service --</option>
@@ -1472,26 +1481,26 @@ export function SiteOnboarding() {
                   </div>
                   <PhaseTextField
                     label="Depth of excavation (m)"
-                    value={form.phase1.excavationDepthMeters}
+                    value={form.phase1?.excavationDepthMeters}
                     onChange={v => updPhase('phase1', { excavationDepthMeters: v })}
                     type="number" placeholder="e.g. 8"
                   />
                   <PhaseTextField
                     label="Length (m)"
-                    value={form.phase1.siteLength}
+                    value={form.phase1?.siteLength}
                     onChange={v => updPhase('phase1', { siteLength: v })}
                     type="number" placeholder="e.g. 40"
                   />
                   <PhaseTextField
                     label="Width (m)"
-                    value={form.phase1.siteWidth}
+                    value={form.phase1?.siteWidth}
                     onChange={v => updPhase('phase1', { siteWidth: v })}
                     type="number" placeholder="e.g. 30"
                   />
                   <PhaseTextField
                     label="Perimeter (m) (Auto-calculated)"
                     value={
-                      form.phase1.siteLength && form.phase1.siteWidth
+                      form.phase1?.siteLength && form.phase1?.siteWidth
                         ? String(2 * (Number(form.phase1.siteLength) + Number(form.phase1.siteWidth)))
                         : ''
                     }
@@ -1501,7 +1510,7 @@ export function SiteOnboarding() {
                   />
                   <PhaseTextField
                     label="Timeline start date"
-                    value={form.phase1.timelineStartDate}
+                    value={form.phase1?.timelineStartDate}
                     onChange={v => updPhase('phase1', { timelineStartDate: v })}
                     type="date"
                   />
@@ -1509,21 +1518,21 @@ export function SiteOnboarding() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
                   <PhaseCheck
                     label="Geotechnical Report Available"
-                    checked={form.phase1.geotechnicalReportAvailable}
+                    checked={Boolean(form.phase1?.geotechnicalReportAvailable)}
                     onChange={v => updPhase('phase1', { geotechnicalReportAvailable: v })}
                   />
                   <PhaseCheck
                     label="Hydrogeological Data Available"
-                    checked={form.phase1.hydrogeologicalDataAvailable}
+                    checked={Boolean(form.phase1?.hydrogeologicalDataAvailable)}
                     onChange={v => updPhase('phase1', { hydrogeologicalDataAvailable: v })}
                   />
                 </div>
                 <Button
                   onClick={() => markDone(1)}
-                  variant={form.phase1.completed ? 'outline' : 'default'}
-                  className={form.phase1.completed ? 'text-emerald-700 border-emerald-300 hover:bg-emerald-50' : ''}
+                  variant={form.phase1?.completed ? 'outline' : 'default'}
+                  className={form.phase1?.completed ? 'text-emerald-700 border-emerald-300 hover:bg-emerald-50' : ''}
                 >
-                  {form.phase1.completed ? '✓ Phase 1 Complete' : 'Mark Phase 1 Complete'}
+                  {form.phase1?.completed ? '✓ Phase 1 Complete' : 'Mark Phase 1 Complete'}
                 </Button>
               </div>
             )}

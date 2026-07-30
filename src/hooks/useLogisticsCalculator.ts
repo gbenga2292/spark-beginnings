@@ -52,7 +52,8 @@ export interface LogisticsInputs {
 
   // Trip Configuration
   numberOfVehicles: number;
-  tripType: 'one_way' | 'mobilisation_only' | 'full_lifecycle';
+  tripType: 'one_way' | 'mobilisation_only' | 'full_lifecycle' | 'custom';
+  numberOfTrips: number;
 }
 
 export interface LogisticsEstimate {
@@ -117,6 +118,7 @@ const DEFAULTS: LogisticsInputs = {
   contingencyPercent: 10,
   numberOfVehicles: 1,
   tripType: 'mobilisation_only',
+  numberOfTrips: 2,
 };
 
 export function getDefaults(): LogisticsInputs {
@@ -125,8 +127,13 @@ export function getDefaults(): LogisticsInputs {
 
 export function calculateLogistics(input: LogisticsInputs): LogisticsEstimate {
   let tripMultiplier = 2; // mobilisation_only
-  if (input.tripType === 'one_way') tripMultiplier = 1;
-  else if (input.tripType === 'full_lifecycle') tripMultiplier = 4;
+  if (input.numberOfTrips !== undefined && input.numberOfTrips > 0) {
+    tripMultiplier = input.numberOfTrips;
+  } else if (input.tripType === 'one_way') {
+    tripMultiplier = 1;
+  } else if (input.tripType === 'full_lifecycle') {
+    tripMultiplier = 4;
+  }
 
   const d = Math.max(0, input.distance);
   const tf = Math.min(0.5, Math.max(0, input.trafficFactor));
@@ -153,15 +160,16 @@ export function calculateLogistics(input: LogisticsInputs): LogisticsEstimate {
   const handlingPerEvent = Math.max(0, input.equipmentHandlingCost);
 
   // ── Mobilisation vs Demobilisation Subtotals ──────────────
-  const legsMob = input.tripType === 'one_way' ? 1 : 2;
-  const legsDemob = input.tripType === 'full_lifecycle' ? 2 : 0;
-  const numEvents = input.tripType === 'full_lifecycle' ? 2 : 1;
+  const isFullLifecycle = input.tripType === 'full_lifecycle' && tripMultiplier === 4;
+  const legsMob = isFullLifecycle ? 2 : tripMultiplier;
+  const legsDemob = isFullLifecycle ? 2 : 0;
+  const numEvents = isFullLifecycle ? 2 : Math.max(1, Math.ceil(tripMultiplier / 2));
 
   const mobTransport = (fuelPerLeg + driverPerLeg + maintPerLeg) * legsMob;
   const mobilisationSubtotal = mobTransport + adminPerEvent + handlingPerEvent;
 
   let demobilisationSubtotal = 0;
-  if (input.tripType === 'full_lifecycle') {
+  if (isFullLifecycle) {
      const demobTransport = (fuelPerLeg + driverPerLeg + maintPerLeg) * legsDemob;
      demobilisationSubtotal = demobTransport + adminPerEvent + handlingPerEvent;
   }

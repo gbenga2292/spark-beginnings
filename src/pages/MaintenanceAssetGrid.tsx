@@ -42,19 +42,19 @@ const OP_STATUS_CONFIG: Record<
 > = {
   active: {
     label: 'Active',
-    icon: <Zap className="h-3 w-3" />,
+    icon: <Zap className="h-2.5 w-2.5" />,
     className: 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100',
     dotClass: 'bg-emerald-500',
   },
   idle: {
     label: 'Idle',
-    icon: <Warehouse className="h-3 w-3" />,
+    icon: <Warehouse className="h-2.5 w-2.5" />,
     className: 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100',
     dotClass: 'bg-amber-500',
   },
   under_maintenance: {
-    label: 'Under Maintenance',
-    icon: <Wrench className="h-3 w-3" />,
+    label: 'Maintenance',
+    icon: <Wrench className="h-2.5 w-2.5" />,
     className: 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100',
     dotClass: 'bg-rose-500',
   },
@@ -104,7 +104,7 @@ function OpStatusBadge({
       <DropdownMenuTrigger asChild>
         <button
           className={cn(
-            'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border font-semibold text-[10px] uppercase tracking-wider transition-all cursor-pointer',
+            'inline-flex items-center gap-1 px-2 py-0.5 rounded-full border font-semibold text-[9px] uppercase tracking-wider transition-all cursor-pointer shrink-0 whitespace-nowrap',
             cfg.className,
           )}
           title="Click to change operational status"
@@ -115,13 +115,14 @@ function OpStatusBadge({
           <ChevronDown className="h-2.5 w-2.5 opacity-60 ml-0.5" />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-52">
+      <DropdownMenuContent align="end" className="w-52 z-50">
         {ALL_OP_STATUSES.filter(s => s !== current).map(s => {
           const c = OP_STATUS_CONFIG[s];
           return (
             <DropdownMenuItem
               key={s}
               className="gap-2 cursor-pointer"
+              onSelect={() => onChangeRequest(asset.id, s)}
               onClick={() => onChangeRequest(asset.id, s)}
             >
               <span className={cn('w-2 h-2 rounded-full shrink-0', c.dotClass)} />
@@ -156,7 +157,7 @@ function ServiceLogPromptModal({ assetName, targetStatus, onLogFirst, onSkip, on
           </DialogTitle>
           <DialogDescription className="pt-1">
             <strong>{assetName}</strong> is being taken out of{' '}
-            <span className="text-rose-600 font-semibold">Under Maintenance</span>. Before it
+            <span className="text-rose-600 font-semibold">Maintenance</span>. Before it
             goes back into service, do you want to log the completed maintenance work?
           </DialogDescription>
         </DialogHeader>
@@ -321,9 +322,11 @@ export function MaintenanceAssetGrid({
                 <div className={cn('h-0.5 w-full', opCfg.dotClass)} />
 
                 <CardContent className="p-5">
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-sm font-bold text-foreground uppercase truncate">{asset.name}</h3>
+                  <div className="flex items-start justify-between gap-2 mb-4">
+                    <div className="flex-1 min-w-0 pr-1">
+                      <h3 className="text-sm font-bold text-foreground uppercase leading-snug break-words" title={asset.name}>
+                        {asset.name}
+                      </h3>
                       <p className="text-xs text-muted-foreground font-medium mt-0.5">
                         {asset.serialNumber ? `S/N: ${asset.serialNumber}` : asset.category}
                       </p>

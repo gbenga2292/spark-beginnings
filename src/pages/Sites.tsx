@@ -367,13 +367,16 @@ export function Sites() {
   const clientProfiles = useAppStore((s) => s.clientProfiles);
   const addClientProfile = useAppStore((s) => s.addClientProfile);
   const updateClientProfile = useAppStore((s) => s.updateClientProfile);
+  const deleteClientProfile = useAppStore((s) => s.deleteClientProfile);
   const clientContacts = useAppStore((s) => s.clientContacts);
+  const deleteClientContact = useAppStore((s) => s.deleteClientContact);
   const invoices = useAppStore((s) => s.invoices);
   const commLogs = useAppStore((s) => s.commLogs);
   
   const clients = useMemo(() => Array.from(new Set(sites.map(s => s.client))).sort(), [sites]);
   const addSite = useAppStore((s) => s.addSite);
   const addClient = useAppStore((s) => s.addClient);
+  const removeClient = useAppStore((s) => s.removeClient);
   const setSites = useAppStore((s) => s.setSites);
   const updateSite = useAppStore((s) => s.updateSite);
   const deleteSite = useAppStore((s) => s.deleteSite);
@@ -382,6 +385,52 @@ export function Sites() {
   const updatePendingSite = useAppStore((s) => s.updatePendingSite);
   const deletePendingSite = useAppStore((s) => s.deletePendingSite);
   const { mainTasks, createMainTask } = useAppData();
+
+  const handleDeleteClient = async (clientName: string) => {
+    const nameTrim = clientName.trim();
+    const nameLow = nameTrim.toLowerCase();
+    
+    const clientSites = sites.filter(s => s.client.trim().toLowerCase() === nameLow);
+    
+    let confirmPrompt = `Are you sure you want to delete client "${nameTrim}"? This will remove the client record.`;
+    if (clientSites.length > 0) {
+      confirmPrompt = `Client "${nameTrim}" currently has ${clientSites.length} site(s) associated with it. Are you sure you want to permanently delete this client?`;
+    }
+
+    const ok = await showConfirm(confirmPrompt, {
+      title: `Delete Client — ${nameTrim}`,
+      confirmLabel: 'Delete Client',
+      cancelLabel: 'Cancel',
+      variant: 'danger'
+    });
+
+    if (!ok) return;
+
+    removeClient(nameTrim);
+
+    clientProfiles.forEach(p => {
+      if (p.name.trim().toLowerCase() === nameLow) {
+        deleteClientProfile(p.id);
+      }
+    });
+
+    clientContacts.forEach(c => {
+      if (c.clientName.trim().toLowerCase() === nameLow) {
+        deleteClientContact(c.id);
+      }
+    });
+
+    pendingSites.forEach(ps => {
+      if (ps.clientName.trim().toLowerCase() === nameLow && !ps.siteId) {
+        deletePendingSite(ps.id);
+      }
+    });
+
+    toast.success(`Client "${nameTrim}" deleted successfully.`);
+    if (selectedClientName?.trim().toLowerCase() === nameLow) {
+      navigate('/sites');
+    }
+  };
 
   // ── Auto-activate sites whose start date has arrived ──────────────────────
   // Runs on mount and whenever sites change. Silently promotes any site that
@@ -1114,9 +1163,14 @@ export function Sites() {
                         ) : null;
                       })()}
                     </Button>
-                    {currentUser?.privileges?.clients?.canEdit && (
+                    {currentUser?.privileges?.clients?.canEdit !== false && (
                       <Button onClick={openClientEdit} variant="outline" className="h-9 border-slate-200 text-slate-700 bg-white hover:bg-slate-50 font-semibold flex items-center gap-2 shadow-sm" title="Edit Client">
                         <Edit2 className="w-4 h-4 text-indigo-500" /><span className="text-xs sm:text-sm">Edit Client</span>
+                      </Button>
+                    )}
+                    {(!currentUser || currentUser?.privileges?.clients?.canDelete !== false) && (
+                      <Button onClick={() => handleDeleteClient(selectedClient.name)} variant="outline" className="h-9 border-rose-200 text-rose-700 bg-rose-50/50 hover:bg-rose-100 hover:text-rose-800 font-semibold flex items-center gap-2 shadow-sm" title="Delete Client">
+                        <Trash2 className="w-4 h-4 text-rose-600" /><span className="text-xs sm:text-sm">Delete Client</span>
                       </Button>
                     )}
                   </>

@@ -460,28 +460,36 @@ export function LogisticsEstimatorDialog({ open, onClose, siteName, clientName }
     <div className="flex flex-col h-full w-full bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden animate-in fade-in duration-300">
 
         {/* ── Header ──────────────────────────────────── */}
-        <div className="bg-gradient-to-r from-slate-800 via-slate-700 to-indigo-800 px-5 py-4 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-white/15 flex items-center justify-center">
-              <Calculator className="h-5 w-5 text-white" />
+        <div className="bg-gradient-to-r from-slate-800 via-slate-700 to-indigo-800 px-3 sm:px-5 py-3 sm:py-4 flex items-center justify-between shrink-0 gap-2">
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
+              <Calculator className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
             </div>
-            <div>
-              <h2 className="text-lg font-black text-white tracking-tight">Logistics Cost Estimator</h2>
-              <p className="text-xs text-white/60 font-medium">
+            <div className="min-w-0">
+              <h2 className="text-base sm:text-lg font-black text-white tracking-tight truncate">
+                <span className="hidden sm:inline">Logistics Cost Estimator</span>
+                <span className="sm:hidden">Logistics</span>
+              </h2>
+              <p className="text-xs text-white/60 font-medium hidden sm:block">
                 Mobilisation + Installation cost calculator
                 {clientName && <span className="text-indigo-300 ml-1">· {clientName}</span>}
               </p>
+              {clientName && (
+                <p className="text-[10px] text-indigo-300 font-medium sm:hidden truncate">
+                  {clientName}
+                </p>
+              )}
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             {/* Grand total badge */}
-            <div className={cn("px-4 py-2 rounded-xl bg-gradient-to-r text-white", costTierBg)}>
-              <p className="text-[9px] font-bold uppercase tracking-wider opacity-80">Total Estimate</p>
-              <p className="text-lg font-black tabular-nums leading-tight">₦{fmt(estimate.grandTotal)}</p>
+            <div className={cn("px-2.5 py-1 sm:px-4 sm:py-2 rounded-xl bg-gradient-to-r text-white", costTierBg)}>
+              <p className="text-[8px] sm:text-[9px] font-bold uppercase tracking-wider opacity-80">Total Estimate</p>
+              <p className="text-sm sm:text-lg font-black tabular-nums leading-tight">₦{fmt(estimate.grandTotal)}</p>
             </div>
             <button
               onClick={onClose}
-              className="h-9 w-9 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
+              className="h-8 w-8 sm:h-9 sm:w-9 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors shrink-0"
             >
               <X className="h-4 w-4 text-white" />
             </button>
@@ -688,8 +696,7 @@ export function LogisticsEstimatorDialog({ open, onClose, siteName, clientName }
                 {/* Contingency & Total */}
                 <div className="bg-white border border-slate-100 rounded-lg p-3 space-y-0.5">
                   <CostLine label={`Contingency (${inputs.contingencyPercent}%)`} value={estimate.contingencyAmount} muted />
-                  {inputs.tripType === 'mobilisation_only' && <CostLine label="Mobilisation only (2 trips)" value={0} muted />}
-                  {inputs.tripType === 'full_lifecycle' && <CostLine label="Full Lifecycle (4 trips)" value={0} muted />}
+                  <CostLine label={`Trip setup (${estimate.tripMultiplier} trip${estimate.tripMultiplier !== 1 ? 's' : ''})`} value={0} muted />
                   <div className="border-t border-indigo-100 mt-1 pt-1">
                     <div className="flex items-center justify-between py-1 bg-indigo-50 rounded-lg px-3 -mx-1">
                       <span className="text-sm font-black text-indigo-700">GRAND TOTAL</span>
@@ -714,19 +721,44 @@ export function LogisticsEstimatorDialog({ open, onClose, siteName, clientName }
                   min={0} max={50} step={5} suffix="%"
                   icon={<Gauge className="h-3 w-3 text-amber-400" />}
                 />
-                <div className="mt-2 space-y-1.5">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
-                    <ArrowLeftRight className="h-3 w-3" /> Trip Type
-                  </label>
+                <div className="mt-2 space-y-2 pt-1 border-t border-slate-100">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                      <ArrowLeftRight className="h-3 w-3" /> Trip Type Preset
+                    </label>
+                  </div>
                   <select 
                     value={inputs.tripType}
-                    onChange={e => set('tripType', e.target.value as any)}
+                    onChange={e => {
+                      const tType = e.target.value as any;
+                      let nTrips = inputs.numberOfTrips || 2;
+                      if (tType === 'one_way') nTrips = 1;
+                      else if (tType === 'mobilisation_only') nTrips = 2;
+                      else if (tType === 'full_lifecycle') nTrips = 4;
+                      setInputs(prev => ({ ...prev, tripType: tType, numberOfTrips: nTrips }));
+                    }}
                     className="w-full h-8 text-xs rounded-md border border-slate-200 bg-white px-2 focus:ring-1 focus:ring-indigo-500 outline-none"
                   >
                     <option value="one_way">One Way (1 trip)</option>
                     <option value="mobilisation_only">Mobilisation Only (Drop-off & Return - 2 trips)</option>
                     <option value="full_lifecycle">Full Lifecycle (Mob + Demob - 4 trips)</option>
+                    <option value="custom">Custom Trip Count</option>
                   </select>
+
+                  <Field
+                    label="Number of Trips"
+                    value={inputs.numberOfTrips ?? 2}
+                    onChange={v => {
+                      const num = Math.max(1, parseInt(v, 10) || 1);
+                      let tType: any = 'custom';
+                      if (num === 1) tType = 'one_way';
+                      else if (num === 2) tType = 'mobilisation_only';
+                      else if (num === 4) tType = 'full_lifecycle';
+                      setInputs(prev => ({ ...prev, numberOfTrips: num, tripType: tType }));
+                    }}
+                    min={1}
+                    suffix="trips"
+                  />
                 </div>
               </Section>
 
@@ -736,7 +768,7 @@ export function LogisticsEstimatorDialog({ open, onClose, siteName, clientName }
                 <Field label="Fuel Efficiency" value={inputs.fuelEfficiency} onChange={v => setNum('fuelEfficiency', v)} suffix="km/l" />
                 <div className="text-[10px] text-slate-400 font-medium mt-1">
                   Est. fuel needed: <span className="font-bold text-slate-600">{(inputs.distance / Math.max(0.1, inputs.fuelEfficiency * (1 - inputs.trafficFactor)) * Math.max(1, inputs.numberOfVehicles)).toFixed(1)}L</span>
-                  {inputs.tripType !== 'one_way' && <span> × {inputs.tripType === 'full_lifecycle' ? '4' : '2'} trips</span>}
+                  <span> × {estimate.tripMultiplier} trip{estimate.tripMultiplier !== 1 ? 's' : ''}</span>
                 </div>
               </Section>
 

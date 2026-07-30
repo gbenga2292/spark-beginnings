@@ -16,7 +16,7 @@ import type { InterviewCandidate } from '@/src/types/interviews';
 // Workspace identifier — update this if this app is ever redeployed for another organisation.
 const getWS = () => useUserStore.getState().getCurrentUser()?.workspaceId || 'dcel-team';
 import type { SiteQuestionnaire } from '@/src/types/SiteQuestionnaire';
-import type { Vehicle, VehicleTripLeg, DailyMachineLog } from '@/src/types/operations';
+import type { Vehicle, VehicleTripLeg, DailyMachineLog, OperationalStatus } from '@/src/types/operations';
 
 // ─── Mappers: DB → App ──────────────────────────────────────
 
@@ -470,6 +470,7 @@ export function dbToVehicle(r: any): Vehicle {
     type: r.type || undefined,
     registration_number: r.registration_number,
     status: r.status as 'active' | 'inactive',
+    operationalStatus: (r.operational_status as OperationalStatus) || 'active',
     documents: r.documents || {},
     created_at: r.created_at,
     updated_at: r.updated_at,
@@ -2396,6 +2397,7 @@ export const db = {
     if (v.type !== undefined) update.type = v.type;
     if (v.registration_number !== undefined) update.registration_number = v.registration_number;
     if (v.status !== undefined) update.status = v.status;
+    if (v.operationalStatus !== undefined) update.operational_status = v.operationalStatus;
     const { error } = await supabase.from('vehicles').update(update).eq('id', id);
     if (error) { console.error('Database error:', error); throw error; }
   },

@@ -582,7 +582,7 @@ export function MaintenanceManager() {
                       {asset.category === 'vehicle' ? <Truck className="h-4 w-4 text-slate-500 group-hover:text-blue-600" /> : <Activity className="h-4 w-4 text-slate-500 group-hover:text-blue-600" />}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-slate-800 dark:text-white truncate group-hover:text-blue-700 dark:group-hover:text-blue-400">{asset.name}</p>
+                      <p className="text-sm font-semibold text-slate-800 dark:text-white truncate group-hover:text-blue-700 dark:group-hover:text-blue-400" title={asset.name}>{asset.name}</p>
                       <p className="text-[11px] text-slate-400 capitalize">{asset.category} · {asset.site}</p>
                     </div>
                     <Award className="h-4 w-4 text-slate-300 group-hover:text-blue-500 shrink-0" />

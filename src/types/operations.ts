@@ -189,6 +189,7 @@ export interface Vehicle {
   type?: string;
   registration_number: string;
   status: 'active' | 'inactive';
+  operationalStatus?: OperationalStatus;
   documents?: Record<string, string>; // Mapping of document type name (or ID) to expiry date
   created_at?: string;
   updated_at?: string;

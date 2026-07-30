@@ -818,38 +818,40 @@ export function MachineReconciliation() {
   useSetPageTitle(
     'Machine Reconciliation',
     'Overview of machine allocations, active days, requirements, and service statuses.',
-    <div className="flex flex-wrap items-end gap-2">
+    <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-end gap-2 w-full sm:w-auto">
       {/* Run Recon button */}
       <Button
         onClick={() => setShowRecon(true)}
-        className="h-9 px-4 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold gap-2 shadow-md shadow-indigo-200"
+        className="h-9 px-4 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold gap-2 shadow-md shadow-indigo-200 w-full sm:w-auto"
       >
         <FlaskConical className="h-3.5 w-3.5" />
         Run Analytic Recon
       </Button>
-      <div className="relative">
-        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400 uppercase pointer-events-none">From:</span>
-        <Input
-          type="date" 
-          value={filterFrom} 
-          onChange={e => setFilterFrom(e.target.value)}
-          className="h-8 text-xs pl-11 pr-1 w-[150px] bg-white border-slate-200 dark:border-slate-800 focus-visible:ring-indigo-500"
-        />
+      <div className="flex items-center gap-1.5 w-full sm:w-auto">
+        <div className="relative flex-1 sm:flex-initial">
+          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400 uppercase pointer-events-none">From:</span>
+          <Input
+            type="date" 
+            value={filterFrom} 
+            onChange={e => setFilterFrom(e.target.value)}
+            className="h-8 text-xs pl-11 pr-1 w-full sm:w-[150px] bg-white border-slate-200 dark:border-slate-800 focus-visible:ring-indigo-500"
+          />
+        </div>
+        <div className="relative flex-1 sm:flex-initial">
+          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400 uppercase pointer-events-none">To:</span>
+          <Input
+            type="date" 
+            value={filterTo} 
+            onChange={e => setFilterTo(e.target.value)}
+            className="h-8 text-xs pl-8 pr-1 w-full sm:w-[130px] bg-white border-slate-200 dark:border-slate-800 focus-visible:ring-indigo-500"
+          />
+        </div>
+        {hasDateFilter && (
+          <Button variant="ghost" size="sm" onClick={clearFilter} className="h-8 gap-1 text-slate-500 shrink-0">
+            <X className="h-3 w-3" /> Clear
+          </Button>
+        )}
       </div>
-      <div className="relative">
-        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400 uppercase pointer-events-none">To:</span>
-        <Input
-          type="date" 
-          value={filterTo} 
-          onChange={e => setFilterTo(e.target.value)}
-          className="h-8 text-xs pl-8 pr-1 w-[130px] bg-white border-slate-200 dark:border-slate-800 focus-visible:ring-indigo-500"
-        />
-      </div>
-      {hasDateFilter && (
-        <Button variant="ghost" size="sm" onClick={clearFilter} className="h-8 gap-1 text-slate-500">
-          <X className="h-3 w-3" /> Clear
-        </Button>
-      )}
     </div>,
     [filterFrom, filterTo, hasDateFilter, showRecon]
   );
@@ -1190,61 +1192,71 @@ export function MachineReconciliation() {
       )}
 
       {/* ── Stat Cards ─────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Machines</CardTitle>
-            <Package className="h-4 w-4 text-slate-500" />
+      {/* ── Stat Cards ─────────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-6 gap-2.5 sm:gap-4">
+        <Card className="p-0 overflow-hidden">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:p-4 pb-1 sm:pb-2">
+            <CardTitle className="text-xs sm:text-sm font-semibold truncate pr-1">Total Machines</CardTitle>
+            <Package className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-slate-500 shrink-0" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalMachines}</div>
-            <p className="text-xs text-slate-500">Dewatering / logged assets</p>
+          <CardContent className="p-3 pt-0 sm:p-4 sm:pt-0">
+            <div className="text-lg sm:text-2xl font-bold text-foreground">{totalMachines}</div>
+            <p className="text-[10px] sm:text-xs text-muted-foreground truncate mt-0.5">Dewatering / logged</p>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active (On Site)</CardTitle>
-            <Activity className="h-4 w-4 text-emerald-500" />
+
+        <Card className="p-0 overflow-hidden">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:p-4 pb-1 sm:pb-2">
+            <CardTitle className="text-xs sm:text-sm font-semibold truncate pr-1">Active (On Site)</CardTitle>
+            <Activity className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-emerald-500 shrink-0" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-emerald-600">{activeOnSite}</div>
+          <CardContent className="p-3 pt-0 sm:p-4 sm:pt-0">
+            <div className="text-lg sm:text-2xl font-bold text-emerald-600 dark:text-emerald-400">{activeOnSite}</div>
+            <p className="text-[10px] sm:text-xs text-emerald-600/70 dark:text-emerald-400/70 truncate mt-0.5">Deployed assets</p>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Idle (Warehouse)</CardTitle>
-            <MapPin className="h-4 w-4 text-amber-500" />
+
+        <Card className="p-0 overflow-hidden">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:p-4 pb-1 sm:pb-2">
+            <CardTitle className="text-xs sm:text-sm font-semibold truncate pr-1">Idle (Warehouse)</CardTitle>
+            <MapPin className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-amber-500 shrink-0" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-amber-600">{idle}</div>
+          <CardContent className="p-3 pt-0 sm:p-4 sm:pt-0">
+            <div className="text-lg sm:text-2xl font-bold text-amber-600 dark:text-amber-400">{idle}</div>
+            <p className="text-[10px] sm:text-xs text-amber-600/70 dark:text-amber-400/70 truncate mt-0.5">In storage</p>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Maintenance / Inactive</CardTitle>
-            <Wrench className="h-4 w-4 text-rose-500" />
+
+        <Card className="p-0 overflow-hidden">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:p-4 pb-1 sm:pb-2">
+            <CardTitle className="text-xs sm:text-sm font-semibold truncate pr-1">Maintenance / Inactive</CardTitle>
+            <Wrench className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-rose-500 shrink-0" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-rose-600">{underMaintenance}</div>
+          <CardContent className="p-3 pt-0 sm:p-4 sm:pt-0">
+            <div className="text-lg sm:text-2xl font-bold text-rose-600 dark:text-rose-400">{underMaintenance}</div>
+            <p className="text-[10px] sm:text-xs text-rose-600/70 dark:text-rose-400/70 truncate mt-0.5">Service required</p>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pending Sites</CardTitle>
-            <Building2 className="h-4 w-4 text-blue-500" />
+
+        <Card className="p-0 overflow-hidden">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:p-4 pb-1 sm:pb-2">
+            <CardTitle className="text-xs sm:text-sm font-semibold truncate pr-1">Pending Sites</CardTitle>
+            <Building2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-500 shrink-0" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-600">{pendingSitesList.length}</div>
+          <CardContent className="p-3 pt-0 sm:p-4 sm:pt-0">
+            <div className="text-lg sm:text-2xl font-bold text-blue-600 dark:text-blue-400">{pendingSitesList.length}</div>
+            <p className="text-[10px] sm:text-xs text-blue-600/70 dark:text-blue-400/70 truncate mt-0.5">Awaiting setup</p>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Machines Required</CardTitle>
-            <AlertCircle className="h-4 w-4 text-purple-500" />
+
+        <Card className="p-0 overflow-hidden">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:p-4 pb-1 sm:pb-2">
+            <CardTitle className="text-xs sm:text-sm font-semibold truncate pr-1">Machines Required</CardTitle>
+            <AlertCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-indigo-500 shrink-0" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-purple-600">{totalRequiredPumps}</div>
-            <p className="text-xs text-slate-500">For pending sites</p>
+          <CardContent className="p-3 pt-0 sm:p-4 sm:pt-0">
+            <div className="text-lg sm:text-2xl font-bold text-indigo-600 dark:text-indigo-400">{totalRequiredPumps}</div>
+            <p className="text-[10px] sm:text-xs text-muted-foreground truncate mt-0.5">For pending sites</p>
           </CardContent>
         </Card>
       </div>
@@ -1319,71 +1331,55 @@ export function MachineReconciliation() {
               </p>
             )}
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-3 sm:p-6">
             {activeSitesMap.length > 0 ? (
-              <div className="rounded-md border dark:border-slate-800">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Client</TableHead>
-                      <TableHead>Site Name</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">
-                        Expected
-                        {hasDateFilter && <span className="block text-[10px] font-normal text-indigo-500">(Invoice)</span>}
-                      </TableHead>
-                      <TableHead className="text-right">On Site</TableHead>
-                      {hasDateFilter && (
-                        <TableHead className="text-right">
-                          In Period
-                          <span className="block text-[10px] font-normal text-indigo-500">(Active)</span>
-                        </TableHead>
-                      )}
-                      {hasDateFilter && (
-                        <TableHead className="text-left text-[11px] text-slate-400">Invoice</TableHead>
-                      )}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {activeSitesMap.map((site, i) => (
-                      <TableRow key={i}>
-                        <TableCell className="font-medium text-slate-500">{site.client}</TableCell>
-                        <TableCell className="font-medium">
-                          <div>{site.siteName}</div>
-                          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                            <span className="text-[10px] text-slate-400 font-bold">{site.currentProgress}% Progress</span>
-                            {site.currentStage && (
-                              <>
-                                <span className="text-slate-300 dark:text-slate-700 text-[10px]">•</span>
-                                <span className={`inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0 rounded-full ${
-                                  site.currentStage === 'mobilization' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' :
-                                  site.currentStage === 'installation' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' :
-                                  site.currentStage === 'operation' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' :
-                                  'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300'
-                                }`}>
-                                  {site.currentStage === 'mobilization' && '🚚'}
-                                  {site.currentStage === 'installation' && '🔧'}
-                                  {site.currentStage === 'operation' && '⚙️'}
-                                  {site.currentStage === 'demobilisation' && '📦'}
-                                  {' '}{site.currentStage.charAt(0).toUpperCase() + site.currentStage.slice(1)}
-                                </span>
-                              </>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="text-emerald-700 bg-emerald-50 border-emerald-200">
-                            {site.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right text-slate-600 font-medium">{site.expectedMachines}</TableCell>
-                        <TableCell className="text-right">
-                          <Badge variant={site.machinesOnSite > 0 ? 'default' : 'secondary'}>
+              <>
+                {/* Mobile Card View */}
+                <div className="space-y-3 block md:hidden">
+                  {activeSitesMap.map((site, i) => (
+                    <div key={i} className="p-3.5 rounded-xl border border-border/80 bg-card shadow-2xs space-y-2.5">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 pr-1">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block">{site.client}</span>
+                          <h4 className="text-sm font-bold text-foreground leading-snug">{site.siteName}</h4>
+                        </div>
+                        <Badge variant="outline" className="text-emerald-700 bg-emerald-50 border-emerald-200 shrink-0 text-[10px] uppercase font-bold">
+                          {site.status}
+                        </Badge>
+                      </div>
+
+                      <div className="flex items-center gap-2 flex-wrap text-xs">
+                        <span className="font-bold text-foreground">{site.currentProgress}% Progress</span>
+                        {site.currentStage && (
+                          <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            site.currentStage === 'mobilization' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' :
+                            site.currentStage === 'installation' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' :
+                            site.currentStage === 'operation' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' :
+                            'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300'
+                          }`}>
+                            {site.currentStage === 'mobilization' && '🚚'}
+                            {site.currentStage === 'installation' && '🔧'}
+                            {site.currentStage === 'operation' && '⚙️'}
+                            {site.currentStage === 'demobilisation' && '📦'}
+                            {' '}{site.currentStage.charAt(0).toUpperCase() + site.currentStage.slice(1)}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 bg-slate-50 dark:bg-slate-800/40 p-2.5 rounded-lg text-xs">
+                        <div>
+                          <span className="text-[10px] text-muted-foreground uppercase font-bold block">Expected</span>
+                          <span className="font-bold text-foreground">{site.expectedMachines}</span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-muted-foreground uppercase font-bold block">On Site</span>
+                          <Badge variant={site.machinesOnSite > 0 ? 'default' : 'secondary'} className="text-[10px] font-bold">
                             {site.machinesOnSite}
                           </Badge>
-                        </TableCell>
+                        </div>
                         {hasDateFilter && (
-                          <TableCell className="text-right">
+                          <div className="col-span-2 border-t border-border/40 pt-1.5 mt-0.5 flex justify-between items-center">
+                            <span className="text-[10px] text-indigo-600 font-bold uppercase">In Period Active</span>
                             {site.activeMachinesInPeriod !== undefined ? (
                               <Badge
                                 variant="outline"
@@ -1397,29 +1393,124 @@ export function MachineReconciliation() {
                               >
                                 {site.activeMachinesInPeriod}
                               </Badge>
-                            ) : '—'}
-                          </TableCell>
+                            ) : (
+                              '—'
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {site.invoiceNumber && (
+                        <div className="text-[11px] text-indigo-600 dark:text-indigo-400 flex items-center gap-1 font-medium pt-0.5">
+                          <FileText className="h-3 w-3 shrink-0" />
+                          Inv {site.invoiceNumber} ({fmt(site.invoiceStart || '')} – {fmt(site.invoiceEnd || '')})
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Desktop Table View */}
+                <div className="rounded-md border dark:border-slate-800 hidden md:block">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Client</TableHead>
+                        <TableHead>Site Name</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">
+                          Expected
+                          {hasDateFilter && <span className="block text-[10px] font-normal text-indigo-500">(Invoice)</span>}
+                        </TableHead>
+                        <TableHead className="text-right">On Site</TableHead>
+                        {hasDateFilter && (
+                          <TableHead className="text-right">
+                            In Period
+                            <span className="block text-[10px] font-normal text-indigo-500">(Active)</span>
+                          </TableHead>
                         )}
                         {hasDateFilter && (
-                          <TableCell className="text-left">
-                            {site.invoiceNumber ? (
-                              <div className="text-xs text-slate-500 flex items-center gap-1">
-                                <FileText className="h-3 w-3 text-indigo-400 flex-shrink-0" />
-                                <span className="font-medium text-indigo-600">{site.invoiceNumber}</span>
-                                <span className="text-slate-400 hidden sm:inline">
-                                  {fmt(site.invoiceStart || '')}–{fmt(site.invoiceEnd || '')}
-                                </span>
-                              </div>
-                            ) : (
-                              <span className="text-xs text-slate-300">No invoice</span>
-                            )}
-                          </TableCell>
+                          <TableHead className="text-left text-[11px] text-slate-400">Invoice</TableHead>
                         )}
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+                    </TableHeader>
+                    <TableBody>
+                      {activeSitesMap.map((site, i) => (
+                        <TableRow key={i}>
+                          <TableCell className="font-medium text-slate-500">{site.client}</TableCell>
+                          <TableCell className="font-medium">
+                            <div>{site.siteName}</div>
+                            <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                              <span className="text-[10px] text-slate-400 font-bold">{site.currentProgress}% Progress</span>
+                              {site.currentStage && (
+                                <>
+                                  <span className="text-slate-300 dark:text-slate-700 text-[10px]">•</span>
+                                  <span className={`inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0 rounded-full ${
+                                    site.currentStage === 'mobilization' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' :
+                                    site.currentStage === 'installation' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' :
+                                    site.currentStage === 'operation' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' :
+                                    'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300'
+                                  }`}>
+                                    {site.currentStage === 'mobilization' && '🚚'}
+                                    {site.currentStage === 'installation' && '🔧'}
+                                    {site.currentStage === 'operation' && '⚙️'}
+                                    {site.currentStage === 'demobilisation' && '📦'}
+                                    {' '}{site.currentStage.charAt(0).toUpperCase() + site.currentStage.slice(1)}
+                                  </span>
+                                </>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="text-emerald-700 bg-emerald-50 border-emerald-200">
+                              {site.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right text-slate-600 font-medium">{site.expectedMachines}</TableCell>
+                          <TableCell className="text-right">
+                            <Badge variant={site.machinesOnSite > 0 ? 'default' : 'secondary'}>
+                              {site.machinesOnSite}
+                            </Badge>
+                          </TableCell>
+                          {hasDateFilter && (
+                            <TableCell className="text-right">
+                              {site.activeMachinesInPeriod !== undefined ? (
+                                <Badge
+                                  variant="outline"
+                                  className={
+                                    site.activeMachinesInPeriod === site.expectedMachines
+                                      ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
+                                      : site.activeMachinesInPeriod < site.expectedMachines
+                                        ? 'text-rose-700 bg-rose-50 border-rose-200'
+                                        : 'text-amber-700 bg-amber-50 border-amber-200'
+                                  }
+                                >
+                                  {site.activeMachinesInPeriod}
+                                </Badge>
+                              ) : '—'}
+                            </TableCell>
+                          )}
+                          {hasDateFilter && (
+                            <TableCell className="text-left">
+                              {site.invoiceNumber ? (
+                                <div className="text-xs text-slate-500 flex items-center gap-1">
+                                  <FileText className="h-3 w-3 text-indigo-400 flex-shrink-0" />
+                                  <span className="font-medium text-indigo-600">{site.invoiceNumber}</span>
+                                  <span className="text-slate-400 hidden sm:inline">
+                                    {fmt(site.invoiceStart || '')}–{fmt(site.invoiceEnd || '')}
+                                  </span>
+                                </div>
+                              ) : (
+                                <span className="text-xs text-slate-300">No invoice</span>
+                              )}
+                            </TableCell>
+                          )}
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </>
             ) : (
               <div className="text-center py-8 text-slate-500">No active sites found.</div>
             )}
@@ -1428,42 +1519,67 @@ export function MachineReconciliation() {
 
         <Card>
           <CardHeader><CardTitle>Pending Sites & Required Machines</CardTitle></CardHeader>
-          <CardContent>
+          <CardContent className="p-3 sm:p-6">
             {pendingSitesList.length > 0 ? (
-              <div className="rounded-md border dark:border-slate-800">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Site Name</TableHead>
-                      <TableHead>Client</TableHead>
-                      <TableHead className="text-right">Pumps Required (Onboarding)</TableHead>
-                      <TableHead className="text-right">Pumps (Invoice)</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {pendingSitesList.map(site => (
-                      <TableRow key={site.id}>
-                        <TableCell className="font-medium">{site.siteName}</TableCell>
-                        <TableCell>{site.client}</TableCell>
-                        <TableCell className="text-right">
-                          <Badge variant="outline" className="font-bold border-purple-200 text-purple-700 bg-purple-50">
-                            {site.pumpsRequired}
+              <>
+                {/* Mobile List View */}
+                <div className="space-y-2.5 block md:hidden">
+                  {pendingSitesList.map(site => (
+                    <div key={site.id} className="p-3 rounded-xl border border-border/80 bg-card shadow-2xs flex items-center justify-between gap-3">
+                      <div>
+                        <h4 className="text-sm font-bold text-foreground">{site.siteName}</h4>
+                        <p className="text-xs text-muted-foreground">{site.client}</p>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <Badge variant="outline" className="font-bold border-indigo-200 text-indigo-700 bg-indigo-50 text-[10px]" title="Onboarding Pumps Required">
+                          {site.pumpsRequired} Req
+                        </Badge>
+                        {site.pumpsInvoice !== null && (
+                          <Badge variant="outline" className="font-bold border-blue-200 text-blue-700 bg-blue-50 text-[10px]" title={`Invoice ${site.invoiceNumber}`}>
+                            {site.pumpsInvoice} Inv
                           </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {site.pumpsInvoice !== null ? (
-                            <Badge variant="outline" className="font-bold border-blue-200 text-blue-700 bg-blue-50" title={`Invoice ${site.invoiceNumber}`}>
-                              {site.pumpsInvoice}
-                            </Badge>
-                          ) : (
-                            <span className="text-slate-400">—</span>
-                          )}
-                        </TableCell>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Desktop Table */}
+                <div className="rounded-md border dark:border-slate-800 hidden md:block">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Site Name</TableHead>
+                        <TableHead>Client</TableHead>
+                        <TableHead className="text-right">Pumps Required (Onboarding)</TableHead>
+                        <TableHead className="text-right">Pumps (Invoice)</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+                    </TableHeader>
+                    <TableBody>
+                      {pendingSitesList.map(site => (
+                        <TableRow key={site.id}>
+                          <TableCell className="font-medium">{site.siteName}</TableCell>
+                          <TableCell>{site.client}</TableCell>
+                          <TableCell className="text-right">
+                            <Badge variant="outline" className="font-bold border-indigo-200 text-indigo-700 bg-indigo-50">
+                              {site.pumpsRequired}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {site.pumpsInvoice !== null ? (
+                              <Badge variant="outline" className="font-bold border-blue-200 text-blue-700 bg-blue-50" title={`Invoice ${site.invoiceNumber}`}>
+                                {site.pumpsInvoice}
+                              </Badge>
+                            ) : (
+                              <span className="text-slate-400">—</span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </>
             ) : (
               <div className="text-center py-8 text-slate-500">No pending sites.</div>
             )}
@@ -1474,10 +1590,10 @@ export function MachineReconciliation() {
       {/* ── Per-Machine Active Days by Site ───────────────────────────────── */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
             <div>
-              <CardTitle className="flex items-center gap-2">
-                <CalendarDays className="h-5 w-5 text-indigo-500" />
+              <CardTitle className="flex items-center gap-2 text-base">
+                <CalendarDays className="h-5 w-5 text-indigo-500 shrink-0" />
                 Machine Active Days by Site
                 {hasDateFilter && (
                   <Badge className="bg-indigo-100 text-indigo-700 border border-indigo-200 ml-2 text-xs">
@@ -1485,21 +1601,21 @@ export function MachineReconciliation() {
                   </Badge>
                 )}
               </CardTitle>
-              <p className="text-sm text-slate-500 mt-1">
+              <p className="text-xs text-slate-500 mt-0.5">
                 {hasDateFilter
                   ? 'Showing machines with logs in the selected date range only.'
                   : ''}
               </p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 shrink-0">
               <Button
-                variant="ghost" size="sm" className="text-xs"
+                variant="ghost" size="sm" className="text-xs h-7 px-2.5"
                 onClick={() => setExpandedMachines(new Set(maintenanceAssets.map(m => m.id)))}
               >
                 Expand All
               </Button>
               <Button
-                variant="ghost" size="sm" className="text-xs"
+                variant="ghost" size="sm" className="text-xs h-7 px-2.5"
                 onClick={() => setExpandedMachines(new Set())}
               >
                 Collapse All
@@ -1507,145 +1623,235 @@ export function MachineReconciliation() {
             </div>
           </div>
         </CardHeader>
-        <CardContent className="p-0">
+        <CardContent className="p-3 sm:p-6 pt-0">
           {perMachineData.length > 0 ? (
-            <div className="rounded-md border dark:border-slate-800 overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-slate-50 dark:bg-slate-900">
-                    <TableHead className="w-8" />
-                    <TableHead>Machine</TableHead>
-                    <TableHead>Serial No.</TableHead>
-                    <TableHead>Current Site</TableHead>
-                    <TableHead>Service Status</TableHead>
-                    <TableHead className="text-right">{hasDateFilter ? 'Active Days (Period)' : 'Total Active Days'}</TableHead>
-                    <TableHead className="text-right">Sites Visited</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {perMachineData.map(({ machine, siteHistory, totalActiveDays }) => {
-                    const isExpanded = expandedMachines.has(machine.id);
-                    const hasSiteHistory = siteHistory.length > 0;
+            <>
+              {/* Mobile Accordion Cards View */}
+              <div className="space-y-3 block md:hidden">
+                {perMachineData.map(({ machine, siteHistory, totalActiveDays }) => {
+                  const isExpanded = expandedMachines.has(machine.id);
+                  const hasSiteHistory = siteHistory.length > 0;
 
-                    return (
-                      <React.Fragment key={machine.id}>
-                        {/* Main machine row */}
-                        <TableRow
-                          className={`cursor-pointer transition-colors ${isExpanded
-                            ? 'bg-indigo-50/60 dark:bg-indigo-950/20'
-                            : 'hover:bg-slate-50 dark:hover:bg-slate-900/50'
-                            }`}
-                          onClick={() => hasSiteHistory && toggleExpand(machine.id)}
-                        >
-                          <TableCell className="text-center">
-                            {hasSiteHistory ? (
-                              isExpanded
-                                ? <ChevronUp className="h-4 w-4 text-indigo-500 mx-auto" />
-                                : <ChevronDown className="h-4 w-4 text-slate-400 mx-auto" />
-                            ) : (
-                              <span className="text-slate-300 text-xs mx-auto block text-center">—</span>
-                            )}
-                          </TableCell>
-                          <TableCell className="font-semibold">{machine.name}</TableCell>
-                          <TableCell className="text-slate-500 text-sm font-mono">
-                            {machine.serialNumber || '—'}
-                          </TableCell>
-                          <TableCell>
-                            <span className={`text-sm font-medium ${machine.site === 'Warehouse' ? 'text-amber-600' : 'text-emerald-700'
-                              }`}>
-                              {machine.site}
-                            </span>
-                          </TableCell>
-                          <TableCell>{statusBadge(machine.status, machine.operationalStatus)}</TableCell>
-                          <TableCell className="text-right font-bold text-slate-800 dark:text-slate-100">
-                            {totalActiveDays > 0 ? totalActiveDays.toFixed(1) : '—'}
-                          </TableCell>
-                          <TableCell className="text-right text-slate-500 text-sm">
-                            {siteHistory.length}
-                          </TableCell>
-                        </TableRow>
+                  return (
+                    <div
+                      key={machine.id}
+                      className={`rounded-xl border transition-all overflow-hidden bg-card ${
+                        isExpanded ? 'border-indigo-300 dark:border-indigo-800 shadow-xs' : 'border-border/80'
+                      }`}
+                    >
+                      <div
+                        className="p-3.5 flex items-start justify-between gap-3 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900/50"
+                        onClick={() => hasSiteHistory && toggleExpand(machine.id)}
+                      >
+                        <div className="space-y-1 flex-1 min-w-0 pr-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h4 className="text-sm font-bold text-foreground leading-snug break-words">{machine.name}</h4>
+                            {statusBadge(machine.status, machine.operationalStatus)}
+                          </div>
+                          <p className="text-xs text-muted-foreground font-mono">S/N: {machine.serialNumber || '—'}</p>
+                          <div className="flex items-center gap-3 text-xs pt-1">
+                            <span className="text-muted-foreground">Site: <strong className={machine.site === 'Warehouse' ? 'text-amber-600' : 'text-emerald-700'}>{machine.site}</strong></span>
+                            <span className="text-muted-foreground">Active Days: <strong className="text-foreground">{totalActiveDays > 0 ? totalActiveDays.toFixed(1) : '—'}</strong></span>
+                          </div>
+                        </div>
 
-                        {/* Expanded: per-site breakdown */}
-                        {isExpanded && siteHistory.length > 0 && (
-                          <TableRow className="bg-indigo-50/40 dark:bg-indigo-950/10">
-                            <TableCell colSpan={7} className="p-0">
-                              <div className="mx-6 my-3 rounded-lg border border-indigo-200 dark:border-indigo-800 overflow-hidden">
-                                <table className="w-full text-sm">
-                                  <thead>
-                                    <tr className="bg-indigo-100/70 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-300">
-                                      <th className="text-left px-4 py-2 font-medium">Site</th>
-                                      <th className="text-left px-4 py-2 font-medium">Period</th>
-                                      <th className="text-right px-4 py-2 font-medium">Days Logged</th>
-                                      <th className="text-right px-4 py-2 font-medium">Active Days</th>
-                                      <th className="text-right px-4 py-2 font-medium">Utilisation</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {siteHistory.map((sh, idx) => {
-                                      const utilPct = sh.totalLoggedDays > 0
-                                        ? Math.round((sh.activeDays / sh.totalLoggedDays) * 100)
-                                        : 0;
+                        {hasSiteHistory && (
+                          <button className="p-1 rounded-md text-slate-400 hover:text-indigo-600 shrink-0 mt-0.5">
+                            {isExpanded ? <ChevronUp className="h-4 w-4 text-indigo-500" /> : <ChevronDown className="h-4 w-4" />}
+                          </button>
+                        )}
+                      </div>
 
-                                      return (
-                                        <tr
-                                          key={idx}
-                                          className={`border-t border-indigo-100 dark:border-indigo-900 ${sh.isCurrent ? 'bg-emerald-50/60 dark:bg-emerald-950/20' : ''
-                                            }`}
-                                        >
-                                          <td className="px-4 py-2.5 font-medium text-slate-800 dark:text-slate-200">
-                                            <div className="flex items-center gap-2">
-                                              {sh.siteName}
-                                              {sh.isCurrent && (
-                                                <Badge className="text-[10px] bg-emerald-100 text-emerald-700 border-emerald-200 border py-0 px-1.5">
-                                                  Current
-                                                </Badge>
-                                              )}
-                                            </div>
-                                          </td>
-                                          <td className="px-4 py-2.5 text-slate-500">
-                                            <div className="flex items-center gap-1 text-xs">
-                                              <Clock className="h-3 w-3 flex-shrink-0" />
-                                              {fmt(sh.pumpStartDate)}
-                                              {' → '}
-                                              {sh.pumpStopDate
-                                                ? fmt(sh.pumpStopDate)
-                                                : <span className="text-emerald-600 font-semibold">Present</span>
-                                              }
-                                            </div>
-                                          </td>
-                                          <td className="px-4 py-2.5 text-right text-slate-600">{sh.totalLoggedDays}</td>
-                                          <td className="px-4 py-2.5 text-right font-semibold text-slate-800 dark:text-slate-100">
-                                            {sh.activeDays.toFixed(1)}
-                                          </td>
-                                          <td className="px-4 py-2.5 text-right">
-                                            <div className="flex items-center justify-end gap-2">
-                                              <div className="w-20 h-2 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
-                                                <div
-                                                  className={`h-full rounded-full ${utilPct >= 80 ? 'bg-emerald-500'
-                                                    : utilPct >= 50 ? 'bg-amber-400'
-                                                      : 'bg-rose-400'
-                                                    }`}
-                                                  style={{ width: `${utilPct}%` }}
-                                                />
-                                              </div>
-                                              <span className="text-xs text-slate-600 w-8 text-right">{utilPct}%</span>
-                                            </div>
-                                          </td>
-                                        </tr>
-                                      );
-                                    })}
-                                  </tbody>
-                                </table>
-                              </div>
+                      {/* Mobile Expanded Site Breakdown */}
+                      {isExpanded && siteHistory.length > 0 && (
+                        <div className="border-t border-indigo-100 dark:border-indigo-900/60 bg-indigo-50/40 dark:bg-indigo-950/20 p-3 space-y-2.5">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-800 dark:text-indigo-300 block">
+                            Site Deployment History ({siteHistory.length} Visited)
+                          </span>
+                          <div className="space-y-2">
+                            {siteHistory.map((sh, idx) => {
+                              const utilPct = sh.totalLoggedDays > 0
+                                ? Math.round((sh.activeDays / sh.totalLoggedDays) * 100)
+                                : 0;
+
+                              return (
+                                <div key={idx} className={`p-2.5 rounded-lg border bg-background text-xs space-y-1.5 ${sh.isCurrent ? 'border-emerald-300 bg-emerald-50/40 dark:bg-emerald-950/20' : 'border-border/60'}`}>
+                                  <div className="flex items-center justify-between gap-2">
+                                    <div className="font-semibold text-foreground flex items-center gap-1.5">
+                                      <span>{sh.siteName}</span>
+                                      {sh.isCurrent && (
+                                        <Badge className="text-[9px] bg-emerald-100 text-emerald-700 border-emerald-200 border py-0 px-1.5">
+                                          Current
+                                        </Badge>
+                                      )}
+                                    </div>
+                                    <span className="text-[11px] font-bold text-foreground">{sh.activeDays.toFixed(1)} Active Days</span>
+                                  </div>
+
+                                  <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                                    <Clock className="h-3 w-3 shrink-0" />
+                                    {fmt(sh.pumpStartDate)} → {sh.pumpStopDate ? fmt(sh.pumpStopDate) : <span className="text-emerald-600 font-semibold">Present</span>}
+                                  </div>
+
+                                  <div className="flex items-center gap-2 pt-1">
+                                    <div className="flex-1 h-1.5 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
+                                      <div
+                                        className={`h-full rounded-full ${utilPct >= 80 ? 'bg-emerald-500' : utilPct >= 50 ? 'bg-amber-400' : 'bg-rose-400'}`}
+                                        style={{ width: `${utilPct}%` }}
+                                      />
+                                    </div>
+                                    <span className="text-[10px] font-bold text-muted-foreground shrink-0">{utilPct}% Util.</span>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Desktop Table View */}
+              <div className="rounded-md border dark:border-slate-800 overflow-hidden hidden md:block">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-slate-50 dark:bg-slate-900">
+                      <TableHead className="w-8" />
+                      <TableHead>Machine</TableHead>
+                      <TableHead>Serial No.</TableHead>
+                      <TableHead>Current Site</TableHead>
+                      <TableHead>Service Status</TableHead>
+                      <TableHead className="text-right">{hasDateFilter ? 'Active Days (Period)' : 'Total Active Days'}</TableHead>
+                      <TableHead className="text-right">Sites Visited</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {perMachineData.map(({ machine, siteHistory, totalActiveDays }) => {
+                      const isExpanded = expandedMachines.has(machine.id);
+                      const hasSiteHistory = siteHistory.length > 0;
+
+                      return (
+                        <React.Fragment key={machine.id}>
+                          {/* Main machine row */}
+                          <TableRow
+                            className={`cursor-pointer transition-colors ${isExpanded
+                              ? 'bg-indigo-50/60 dark:bg-indigo-950/20'
+                              : 'hover:bg-slate-50 dark:hover:bg-slate-900/50'
+                              }`}
+                            onClick={() => hasSiteHistory && toggleExpand(machine.id)}
+                          >
+                            <TableCell className="text-center">
+                              {hasSiteHistory ? (
+                                isExpanded
+                                  ? <ChevronUp className="h-4 w-4 text-indigo-500 mx-auto" />
+                                  : <ChevronDown className="h-4 w-4 text-slate-400 mx-auto" />
+                              ) : (
+                                <span className="text-slate-300 text-xs mx-auto block text-center">—</span>
+                              )}
+                            </TableCell>
+                            <TableCell className="font-semibold">{machine.name}</TableCell>
+                            <TableCell className="text-slate-500 text-sm font-mono">
+                              {machine.serialNumber || '—'}
+                            </TableCell>
+                            <TableCell>
+                              <span className={`text-sm font-medium ${machine.site === 'Warehouse' ? 'text-amber-600' : 'text-emerald-700'
+                                }`}>
+                                {machine.site}
+                              </span>
+                            </TableCell>
+                            <TableCell>{statusBadge(machine.status, machine.operationalStatus)}</TableCell>
+                            <TableCell className="text-right font-bold text-slate-800 dark:text-slate-100">
+                              {totalActiveDays > 0 ? totalActiveDays.toFixed(1) : '—'}
+                            </TableCell>
+                            <TableCell className="text-right text-slate-500 text-sm">
+                              {siteHistory.length}
                             </TableCell>
                           </TableRow>
-                        )}
-                      </React.Fragment>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
+
+                          {/* Expanded: per-site breakdown */}
+                          {isExpanded && siteHistory.length > 0 && (
+                            <TableRow className="bg-indigo-50/40 dark:bg-indigo-950/10">
+                              <TableCell colSpan={7} className="p-0">
+                                <div className="mx-6 my-3 rounded-lg border border-indigo-200 dark:border-indigo-800 overflow-hidden">
+                                  <table className="w-full text-sm">
+                                    <thead>
+                                      <tr className="bg-indigo-100/70 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-300">
+                                        <th className="text-left px-4 py-2 font-medium">Site</th>
+                                        <th className="text-left px-4 py-2 font-medium">Period</th>
+                                        <th className="text-right px-4 py-2 font-medium">Days Logged</th>
+                                        <th className="text-right px-4 py-2 font-medium">Active Days</th>
+                                        <th className="text-right px-4 py-2 font-medium">Utilisation</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {siteHistory.map((sh, idx) => {
+                                        const utilPct = sh.totalLoggedDays > 0
+                                          ? Math.round((sh.activeDays / sh.totalLoggedDays) * 100)
+                                          : 0;
+
+                                        return (
+                                          <tr
+                                            key={idx}
+                                            className={`border-t border-indigo-100 dark:border-indigo-900 ${sh.isCurrent ? 'bg-emerald-50/60 dark:bg-emerald-950/20' : ''
+                                              }`}
+                                          >
+                                            <td className="px-4 py-2.5 font-medium text-slate-800 dark:text-slate-200">
+                                              <div className="flex items-center gap-2">
+                                                {sh.siteName}
+                                                {sh.isCurrent && (
+                                                  <Badge className="text-[10px] bg-emerald-100 text-emerald-700 border-emerald-200 border py-0 px-1.5">
+                                                    Current
+                                                  </Badge>
+                                                )}
+                                              </div>
+                                            </td>
+                                            <td className="px-4 py-2.5 text-slate-500">
+                                              <div className="flex items-center gap-1 text-xs">
+                                                <Clock className="h-3 w-3 flex-shrink-0" />
+                                                {fmt(sh.pumpStartDate)}
+                                                {' → '}
+                                                {sh.pumpStopDate
+                                                  ? fmt(sh.pumpStopDate)
+                                                  : <span className="text-emerald-600 font-semibold">Present</span>
+                                                }
+                                              </div>
+                                            </td>
+                                            <td className="px-4 py-2.5 text-right text-slate-600">{sh.totalLoggedDays}</td>
+                                            <td className="px-4 py-2.5 text-right font-semibold text-slate-800 dark:text-slate-100">
+                                              {sh.activeDays.toFixed(1)}
+                                            </td>
+                                            <td className="px-4 py-2.5 text-right">
+                                              <div className="flex items-center justify-end gap-2">
+                                                <div className="w-20 h-2 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
+                                                  <div
+                                                    className={`h-full rounded-full ${utilPct >= 80 ? 'bg-emerald-500'
+                                                      : utilPct >= 50 ? 'bg-amber-400'
+                                                        : 'bg-rose-400'
+                                                      }`}
+                                                    style={{ width: `${utilPct}%` }}
+                                                  />
+                                                </div>
+                                                <span className="text-xs text-slate-600 w-8 text-right">{utilPct}%</span>
+                                              </div>
+                                            </td>
+                                          </tr>
+                                        );
+                                      })}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </React.Fragment>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
           ) : (
             <div className="text-center py-10 text-slate-500">
               {hasDateFilter
@@ -1665,8 +1871,28 @@ export function MachineReconciliation() {
               Maintenance Alerts ({overdueList.length})
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="rounded-md border dark:border-slate-800">
+          <CardContent className="p-3 sm:p-6 pt-0">
+            {/* Mobile Cards */}
+            <div className="space-y-2.5 block md:hidden">
+              {overdueList.map(m => (
+                <div key={m.id} className="p-3 rounded-xl border border-rose-200/80 bg-rose-50/40 dark:bg-rose-950/20 text-xs space-y-1.5">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <h4 className="font-bold text-foreground text-sm">{m.name}</h4>
+                      <p className="text-[11px] font-mono text-muted-foreground">S/N: {m.serialNumber || '—'}</p>
+                    </div>
+                    {statusBadge(m.status, m.operationalStatus)}
+                  </div>
+                  <div className="flex justify-between items-center text-muted-foreground pt-1 border-t border-rose-200/40">
+                    <span>Site: <strong className="text-foreground">{m.site}</strong></span>
+                    <span>Next Due: <strong className="text-rose-600">{fmt(m.nextServiceDate)}</strong></span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop Table */}
+            <div className="rounded-md border dark:border-slate-800 hidden md:block">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -1705,8 +1931,30 @@ export function MachineReconciliation() {
               Diesel Usage vs. Refills {hasDateFilter ? `(${fmt(filterFrom)} – ${fmt(filterTo)})` : '(All Time)'}
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="rounded-md border dark:border-slate-800">
+          <CardContent className="p-3 sm:p-6 pt-0">
+            {/* Mobile Cards */}
+            <div className="space-y-2.5 block md:hidden">
+              {dieselSummary.map((row, i) => {
+                const delta = row.refilled - row.logged;
+                return (
+                  <div key={i} className="p-3 rounded-xl border border-border/80 bg-card text-xs space-y-1.5">
+                    <div className="flex justify-between items-center">
+                      <h4 className="font-bold text-foreground text-sm">{row.siteName}</h4>
+                      <span className={`font-bold text-sm ${delta >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                        {delta >= 0 ? '+' : ''}{delta.toFixed(0)} L Delta
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-muted-foreground pt-1 border-t border-border/40">
+                      <div>Purchased: <strong className="text-foreground">{row.refilled.toFixed(0)} L</strong></div>
+                      <div>Refilled: <strong className="text-foreground">{row.logged.toFixed(0)} L</strong></div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Desktop Table */}
+            <div className="rounded-md border dark:border-slate-800 hidden md:block">
               <Table>
                 <TableHeader>
                   <TableRow>
