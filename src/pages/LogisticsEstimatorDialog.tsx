@@ -407,11 +407,11 @@ export function LogisticsEstimatorDialog({ open, onClose, siteName, clientName }
       <MapContainer
         center={[warehouse.lat, warehouse.lng]}
         zoom={10}
+        attributionControl={false}
         style={{ width: '100%', height: '100%' }}
         ref={mapRef}
       >
         <TileLayer
-          attribution='&copy; Google Maps'
           url="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}"
           maxZoom={20}
         />
@@ -521,27 +521,32 @@ export function LogisticsEstimatorDialog({ open, onClose, siteName, clientName }
                 </div>
                 <button 
                   onClick={() => setIsMapOpen(!isMapOpen)} 
-                  className="lg:hidden h-9 px-3 flex items-center gap-1 text-xs font-bold text-slate-500 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors shrink-0"
+                  className="h-9 px-3 flex items-center gap-1.5 text-xs font-bold text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors shrink-0 shadow-sm"
+                  title={isMapOpen ? "Hide Map View" : "Show Map View"}
                 >
-                  Map {isMapOpen ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                  <MapPin className="h-3.5 w-3.5 text-indigo-600" />
+                  <span>{isMapOpen ? 'Hide Map' : 'Show Map'}</span>
+                  {isMapOpen ? <ChevronUp className="h-3.5 w-3.5 text-slate-400" /> : <ChevronDown className="h-3.5 w-3.5 text-slate-400" />}
                 </button>
               </div>
 
               {/* Map */}
-              <div className={cn("min-h-[350px] shrink-0 relative border-b border-slate-200", !isMapOpen && "hidden lg:block")}>
-                {leafletLoaded && MapContainer ? (
-                  <>
-                    <MapContainer
-                      center={[warehouse.lat, warehouse.lng]}
-                      zoom={10}
-                      style={{ width: '100%', height: '100%' }}
-                      ref={mapRef}
-                    >
-                      <TileLayer
-                        attribution='&copy; Google Maps'
-                        url="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}"
-                        maxZoom={20}
-                      />
+              {isMapOpen && (
+                <div className="min-h-[350px] h-[350px] shrink-0 relative border-b border-slate-200">
+                  <style>{`.leaflet-control-attribution { display: none !important; }`}</style>
+                  {leafletLoaded && MapContainer ? (
+                    <>
+                      <MapContainer
+                        center={[warehouse.lat, warehouse.lng]}
+                        zoom={10}
+                        attributionControl={false}
+                        style={{ width: '100%', height: '100%' }}
+                        ref={mapRef}
+                      >
+                        <TileLayer
+                          url="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}"
+                          maxZoom={20}
+                        />
                       {/* Warehouse marker */}
                       <Marker position={[warehouse.lat, warehouse.lng]} icon={warehouseIcon}>
                         <Popup>
@@ -630,6 +635,7 @@ export function LogisticsEstimatorDialog({ open, onClose, siteName, clientName }
                   </div>
                 )}
               </div>
+              )}
 
               {/* ── Cost breakdown (below map on large screens) ─── */}
               <div className="bg-slate-50/50 p-4 space-y-1 shrink-0">

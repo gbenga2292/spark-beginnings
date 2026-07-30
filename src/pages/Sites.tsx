@@ -373,7 +373,12 @@ export function Sites() {
   const invoices = useAppStore((s) => s.invoices);
   const commLogs = useAppStore((s) => s.commLogs);
   
-  const clients = useMemo(() => Array.from(new Set(sites.map(s => s.client))).sort(), [sites]);
+  const clients = useMemo(() => {
+    if (clientProfiles && clientProfiles.length > 0) {
+      return clientProfiles.map(cp => cp.name?.trim()).filter(Boolean).sort() as string[];
+    }
+    return Array.from(new Set(sites.map(s => s.client?.trim()))).filter(Boolean).sort() as string[];
+  }, [clientProfiles, sites]);
   const addSite = useAppStore((s) => s.addSite);
   const addClient = useAppStore((s) => s.addClient);
   const removeClient = useAppStore((s) => s.removeClient);

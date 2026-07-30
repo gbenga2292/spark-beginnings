@@ -39,6 +39,24 @@ function rangesOverlap(aStart: string, aEnd: string, bStart: string, bEnd: strin
   return aStart <= bEnd && aEnd >= bStart;
 }
 
+function isDewateringMachine(m: any): boolean {
+  if (!m) return false;
+  const nameLow = (m.name || '').toLowerCase();
+  const descLow = (m.description || '').toLowerCase();
+  const categoryLow = (m.category || '').toLowerCase();
+  const typeLow = (m.type || '').toLowerCase();
+
+  // Exclude non-machine items like hoses, pipes, fittings, clamps, consumables, etc.
+  if (typeLow === 'consumable' || typeLow === 'tools' || typeLow === 'reusables') return false;
+  if (nameLow.includes('hose') || nameLow.includes('pipe') || nameLow.includes('fitting') || nameLow.includes('clamp') || nameLow.includes('coupling')) return false;
+
+  // Must match dewatering and machine equipment
+  const hasDewateringWord = nameLow.includes('dewatering') || descLow.includes('dewatering') || categoryLow === 'dewatering';
+  const isEquipmentOrMachine = categoryLow === 'machine' || typeLow === 'equipment' || !!m.requiresLogging;
+
+  return isEquipmentOrMachine && hasDewateringWord;
+}
+
 // ─── Rolling velocity helper ──────────────────────────────────────────────────
 function computeVelocity(siteId: string, entries: any[]): { velocity: number; progress: number; daysLeft: number | null; estDate: string | null } {
   const siteLogs = entries
@@ -214,7 +232,7 @@ function ReconDialog({ open, onClose, maintenanceAssets, dailyMachineLogs, waybi
           };
         })
     ];
-    const machines = maintenanceAssets.filter(m => m.category === 'machine' && m.isActive);
+    const machines = maintenanceAssets.filter(m => isDewateringMachine(m) && m.isActive);
 
     const initPhases: ReconPhase[] = [
       { id: 'sites', label: 'Scanning Active Sites', icon: MapPin, status: 'pending', findings: [], risks: [] },
@@ -825,7 +843,7 @@ export function MachineReconciliation() {
         className="h-9 px-4 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold gap-2 shadow-md shadow-indigo-200 w-full sm:w-auto"
       >
         <FlaskConical className="h-3.5 w-3.5" />
-        Run Analytic Recon
+        Run Analytics
       </Button>
       <div className="flex items-center gap-1.5 w-full sm:w-auto">
         <div className="relative flex-1 sm:flex-initial">
@@ -889,7 +907,7 @@ export function MachineReconciliation() {
   }, [invoices, hasDateFilter, filterFrom, filterTo]);
 
   // ── Stat card numbers ──────────────────────────────────────────────────────
-  const machines = maintenanceAssets.filter(m => m.category === 'machine');
+  const machines = useMemo(() => maintenanceAssets.filter(m => isDewateringMachine(m)), [maintenanceAssets]);
   const totalMachines = machines.length;
   // Respect operationalStatus for the new tri-state counts
   const activeOnSite = machines.filter(m => {
@@ -948,13 +966,23 @@ export function MachineReconciliation() {
               inventoryMap.set(item.assetId, Math.max(0, (inventoryMap.get(item.assetId) || 0) - item.quantity));
             }
           }));
-        let machinesOnSite = 0;
+        // Primary count: Dewatering pump machines assigned to this site in machine fleet
+        const fleetPumpsOnSite = maintenanceAssets.filter(m => 
+          isDewateringMachine(m) &&
+          m.site && 
+          m.site.toLowerCase().trim() === s.name.toLowerCase().trim() &&
+          (m.operationalStatus ?? 'active') !== 'under_maintenance'
+        ).length;
+
+        let waybillPumpsOnSite = 0;
         inventoryMap.forEach((qty, assetId) => {
           if (qty > 0) {
-            const a = assets.find(a => a.id === assetId);
-            if (a && a.type === 'equipment' && a.requiresLogging) machinesOnSite += 1;
+            const a = assets.find(a => a.id === assetId) || maintenanceAssets.find(m => m.id === assetId);
+            if (a && isDewateringMachine(a)) waybillPumpsOnSite += 1;
           }
         });
+
+        const machinesOnSite = fleetPumpsOnSite > 0 ? fleetPumpsOnSite : waybillPumpsOnSite;
 
         // Count unique machines with active logs in the date filter period
         let activeMachinesInPeriod: number | undefined;
@@ -966,7 +994,12 @@ export function MachineReconciliation() {
               log.isActive &&
               log.date >= filterFrom &&
               log.date <= filterTo
-            ) activeAssetIds.add(log.assetId);
+            ) {
+              const a = assets.find(a => a.id === log.assetId) || maintenanceAssets.find(m => m.id === log.assetId);
+              if (!a || isDewateringMachine(a)) {
+                activeAssetIds.add(log.assetId);
+              }
+            }
           });
           activeMachinesInPeriod = activeAssetIds.size;
         }
@@ -1056,8 +1089,7 @@ export function MachineReconciliation() {
 
   // ── Per-machine data: active days broken down by site ──────────────────────
   const perMachineData = useMemo(() => {
-    return maintenanceAssets
-      .filter(m => m.category === 'machine')
+    return machines
       .map(machine => {
         const machineLogs = dailyMachineLogs.filter(l => {
           if (l.assetId !== machine.id) return false;
@@ -1103,14 +1135,14 @@ export function MachineReconciliation() {
 
         return { machine, siteHistory, totalActiveDays };
       }).filter(d => !hasDateFilter || d.siteHistory.length > 0);
-  }, [maintenanceAssets, dailyMachineLogs, sitePumpDates, hasDateFilter, filterFrom, filterTo]);
+  }, [machines, dailyMachineLogs, sitePumpDates, hasDateFilter, filterFrom, filterTo]);
 
   // ── Overdue / due-soon list ─────────────────────────────────────────────────
   const overdueList = useMemo(() =>
-    maintenanceAssets
+    machines
       .filter(m => m.status === 'overdue' || m.status === 'due_soon')
       .sort((a, b) => (a.status === 'overdue' ? -1 : 1)),
-    [maintenanceAssets]);
+    [machines]);
 
   // ── Diesel summary per site ─────────────────────────────────────────────────
   const dieselSummary = useMemo(() => {

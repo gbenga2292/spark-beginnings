@@ -143,21 +143,70 @@ export function Client360() {
     toast.success(`Onboarding for "${site.siteName}" deleted.`);
   };
 
-  // Extract unique client names, excluding internal 'DCEL'
+  // Extract unique client names, excluding internal 'DCEL' and deleted client profiles
   const allClients = useMemo(() => {
     const names = new Set<string>();
-    // Include clients from active sites
-    sites.forEach(s => { 
-      const name = s.client?.trim();
-      if (name && name.toUpperCase() !== 'DCEL') names.add(name); 
-    });
-    // Also include clients who only exist in onboarding (no site record yet)
-    pendingSites.forEach(ps => {
-      const name = ps.clientName?.trim();
-      if (name && name.toUpperCase() !== 'DCEL') names.add(name);
-    });
+    
+    if (clientProfiles && clientProfiles.length > 0) {
+      // Primary source of truth: clientProfiles
+      clientProfiles.forEach(cp => {
+        const name = cp.name?.trim();
+        if (name && name.toUpperCase() !== 'DCEL') names.add(name);
+      });
+      
+      // Include active pending onboarding clients
+      pendingSites.forEach(ps => {
+        const name = ps.clientName?.trim();
+        if (name && name.toUpperCase() !== 'DCEL' && ps.status === 'Pending') {
+          names.add(name);
+        }
+      });
+    } else {
+      // Fallback if clientProfiles store has not loaded yet
+      sites.forEach(s => { 
+        const name = s.client?.trim();
+        if (name && name.toUpperCase() !== 'DCEL') names.add(name); 
+      });
+      pendingSites.forEach(ps => {
+        const name = ps.clientName?.trim();
+        if (name && name.toUpperCase() !== 'DCEL') names.add(name);
+      });
+    }
+    
     return Array.from(names).sort();
-  }, [sites, pendingSites]);
+  }, [clientProfiles, sites, pendingSites]);
+
+  // Precompute client status for color coding and indicators:
+  // 'active' = Client with 1+ active sites (Green)
+  // 'onboarding' = Client with 1+ pending onboarding sites and no active sites (Orange)
+  // 'normal' = Client without active or onboarding sites (Standard default)
+  const clientStatusMap = useMemo(() => {
+    const map = new Map<string, 'active' | 'onboarding' | 'normal'>();
+    allClients.forEach(clientName => {
+      const nameLow = clientName.trim().toLowerCase();
+      
+      const hasActive = sites.some(s => 
+        s.client?.trim().toLowerCase() === nameLow && 
+        (s.status === 'Active' || !s.status || s.status.toLowerCase() === 'active')
+      );
+      if (hasActive) {
+        map.set(clientName, 'active');
+        return;
+      }
+      
+      const hasOnboarding = pendingSites.some(ps => 
+        ps.clientName?.trim().toLowerCase() === nameLow && 
+        ps.status === 'Pending'
+      );
+      if (hasOnboarding) {
+        map.set(clientName, 'onboarding');
+        return;
+      }
+      
+      map.set(clientName, 'normal');
+    });
+    return map;
+  }, [allClients, sites, pendingSites]);
 
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -329,10 +378,16 @@ export function Client360() {
       resolvedSiteName = commForm.newSiteName.trim();
       isNewOnboarding = true;
     } else if (commForm.siteOption) {
-      const existing = clientData?.clientSites.find((s: any) => s.id === commForm.siteOption);
-      if (existing) {
-        resolvedSiteId = existing.id;
-        resolvedSiteName = existing.name;
+      const existingSite = clientSites.find((s: any) => s.id === commForm.siteOption);
+      if (existingSite) {
+        resolvedSiteId = existingSite.id;
+        resolvedSiteName = existingSite.name;
+      } else {
+        const existingPending = clientPendingSites.find((ps: any) => ps.id === commForm.siteOption);
+        if (existingPending) {
+          resolvedSiteId = existingPending.id;
+          resolvedSiteName = existingPending.siteName;
+        }
       }
     }
 
@@ -1244,27 +1299,69 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
         </div>
       )}
 
-      {/* Client Selector */}
-      <div className={cn("flex items-center gap-1.5 px-2 py-1 h-8 rounded-lg border shadow-sm transition-colors shrink-0 order-first md:order-last w-full md:w-auto", 
-        isDark ? "bg-slate-900 border-slate-700 hover:border-indigo-500" : "bg-white border-slate-200 hover:border-indigo-300"
-      )}>
-        <Building2 className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-        <div className="relative flex items-center w-full">
-          <select
-            value={selectedClient}
-            onChange={(e) => setSelectedClient(e.target.value)}
-            className={cn(
-              "appearance-none bg-transparent font-bold text-xs pr-5 focus:outline-none cursor-pointer w-full md:max-w-[150px] truncate",
-              isDark ? "text-white bg-slate-900" : "text-slate-900 bg-white"
-            )}
-          >
-            {allClients.map(client => (
-              <option key={client} value={client} className="font-semibold text-xs">{client}</option>
-            ))}
-          </select>
-          <ChevronDown className="w-3.5 h-3.5 absolute right-0 pointer-events-none text-slate-400" />
-        </div>
-      </div>
+      {/* Color-coded Minimalist Client Selector */}
+      {(() => {
+        const currentStatus = clientStatusMap.get(selectedClient) || 'normal';
+        return (
+          <div className={cn(
+            "flex items-center gap-1.5 px-2.5 py-1 h-8 rounded-lg border shadow-sm transition-all shrink-0 order-first md:order-last w-full md:w-auto",
+            currentStatus === 'active'
+              ? (isDark ? "bg-emerald-950/50 border-emerald-800/70" : "bg-emerald-50 border-emerald-200")
+              : currentStatus === 'onboarding'
+              ? (isDark ? "bg-amber-950/50 border-amber-800/70" : "bg-amber-50 border-amber-200")
+              : (isDark ? "bg-slate-900 border-slate-700 hover:border-indigo-500" : "bg-white border-slate-200 hover:border-indigo-300")
+          )}>
+            <Building2 className={cn(
+              "w-3.5 h-3.5 shrink-0 transition-colors",
+              currentStatus === 'active' ? "text-emerald-600 dark:text-emerald-400" :
+              currentStatus === 'onboarding' ? "text-amber-600 dark:text-amber-400" :
+              "text-indigo-600"
+            )} />
+            
+            <div className="relative flex items-center w-full">
+              <select
+                value={selectedClient}
+                onChange={(e) => setSelectedClient(e.target.value)}
+                className={cn(
+                  "appearance-none bg-transparent font-bold text-xs pr-5 focus:outline-none cursor-pointer w-full md:max-w-[150px] truncate transition-colors",
+                  currentStatus === 'active'
+                    ? "text-emerald-900 dark:text-emerald-200"
+                    : currentStatus === 'onboarding'
+                    ? "text-amber-900 dark:text-amber-200"
+                    : (isDark ? "text-white" : "text-slate-900")
+                )}
+              >
+                {allClients.map(client => {
+                  const status = clientStatusMap.get(client) || 'normal';
+                  return (
+                    <option 
+                      key={client} 
+                      value={client} 
+                      className="font-semibold text-xs"
+                      style={{
+                        backgroundColor: status === 'active' ? (isDark ? '#064e3b' : '#f0fdf4') : status === 'onboarding' ? (isDark ? '#78350f' : '#fffbeb') : (isDark ? '#0f172a' : '#ffffff'),
+                        color: status === 'active' ? (isDark ? '#a7f3d0' : '#065f46') : status === 'onboarding' ? (isDark ? '#fde68a' : '#92400e') : (isDark ? '#f8fafc' : '#0f172a')
+                      }}
+                    >
+                      {client}
+                    </option>
+                  );
+                })}
+                <option disabled value="__LEGEND_DIVIDER__">──────────────────────────</option>
+                <option disabled value="__LEGEND_KEY__" className="text-[10px] font-semibold" style={{ backgroundColor: isDark ? '#0f172a' : '#f8fafc', color: isDark ? '#94a3b8' : '#475569' }}>
+                  🟢 Active Sites  |  🟧 Onboarding
+                </option>
+              </select>
+              <ChevronDown className={cn(
+                "w-3.5 h-3.5 absolute right-0 pointer-events-none transition-colors",
+                currentStatus === 'active' ? "text-emerald-500 dark:text-emerald-400" :
+                currentStatus === 'onboarding' ? "text-amber-500 dark:text-amber-400" :
+                "text-slate-400"
+              )} />
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 
@@ -3349,9 +3446,22 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                 >
                   <option value="">Select site...</option>
                   <option value="NEW_ONBOARDING">+ Create new site onboarding...</option>
-                  {clientData?.clientSites?.map((s: any) => (
-                    <option key={s.id} value={s.id}>{s.name}</option>
-                  ))}
+                  
+                  {clientSites.length > 0 && (
+                    <optgroup label="Active Sites">
+                      {clientSites.map((s: any) => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                      ))}
+                    </optgroup>
+                  )}
+
+                  {clientPendingSites.length > 0 && (
+                    <optgroup label="Pending Onboarding Sites">
+                      {clientPendingSites.map((ps: any) => (
+                        <option key={ps.id} value={ps.id}>⏳ {ps.siteName} (Pending Onboarding)</option>
+                      ))}
+                    </optgroup>
+                  )}
                 </select>
               </div>
 
