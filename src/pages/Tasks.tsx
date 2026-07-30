@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, Suspense } from 'react';
 import { createPortal } from "react-dom";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
@@ -9,10 +9,11 @@ import { useWorkspace } from '@/src/hooks/use-workspace';
 import { useAppStore } from '@/src/store/appStore';
 import type { SubTask, SubTaskStatus, MainTask } from "@/src/types/tasks";
 
-import { CreateTaskDialog } from './Tasks/CreateTaskDialog';
-import { EditTaskDialog } from './Tasks/EditTaskDialog';
+// ── Always-needed on load (keep static) ──────────────────────────────────────
 import { AddSubtaskInline } from './Tasks/AddSubtaskInline';
-import { AssignUserDialog } from './Tasks/AssignUserDialog';
+import { ViewToggle, type TaskViewMode } from "@/src/components/tasks/ViewToggle";
+import { TaskSkeletonLoader } from "@/src/components/tasks/TaskSkeletonLoader";
+import { TaskPagination } from "@/src/components/tasks/TaskPagination";
 import type { AppUser } from "@/src/store/userStore";
 import type { TaskPriority } from "@/src/types/tasks";
 import { KanbanSquare, LayoutList, RotateCcw, Reply, Trash2, Archive, LayoutGrid, BarChart2, CheckCircle2, History, Plus, Search, Circle, Loader2, Calendar, X, Users, Clock, ChevronDown, ChevronRight, UserCheck, ArrowUpDown, Flag, MessageSquare, Send, Pencil, Lock, User, FolderOpen, List, Bell, RefreshCw, Link as LinkIcon, FileText, Paperclip, AtSign, MapPin } from 'lucide-react';
@@ -30,15 +31,21 @@ import {
 } from "@/src/components/ui/dropdown-menu";
 import { differenceInHours, addDays } from "date-fns";
 import { format, isToday, isTomorrow, isPast } from "date-fns";
-import { TaskDetailSheet } from "@/src/components/tasks/TaskDetailSheet";
-import { ViewToggle, type TaskViewMode } from "@/src/components/tasks/ViewToggle";
-import { SubtaskKanbanView, MainTaskKanbanView } from "@/src/components/tasks/TaskKanbanView";
-import { TaskFocusView } from "@/src/components/tasks/TaskFocusView";
-import { TaskGanttView } from "@/src/components/tasks/TaskGanttView";
-import { TaskInboxView } from "@/src/components/tasks/TaskInboxView";
+
+// ── Lazy-loaded: only parsed when the user opens them ─────────────────────
+const CreateTaskDialog    = React.lazy(() => import('./Tasks/CreateTaskDialog').then(m => ({ default: m.CreateTaskDialog })));
+const EditTaskDialog      = React.lazy(() => import('./Tasks/EditTaskDialog').then(m => ({ default: m.EditTaskDialog })));
+const AssignUserDialog    = React.lazy(() => import('./Tasks/AssignUserDialog').then(m => ({ default: m.AssignUserDialog })));
+const TaskDetailSheet     = React.lazy(() => import("@/src/components/tasks/TaskDetailSheet").then(m => ({ default: m.TaskDetailSheet })));
+const CreateProjectDialog = React.lazy(() => import("@/src/components/tasks/CreateProjectDialog").then(m => ({ default: m.CreateProjectDialog })));
+const SubtaskKanbanView   = React.lazy(() => import("@/src/components/tasks/TaskKanbanView").then(m => ({ default: m.SubtaskKanbanView })));
+const MainTaskKanbanView  = React.lazy(() => import("@/src/components/tasks/TaskKanbanView").then(m => ({ default: m.MainTaskKanbanView })));
+const TaskFocusView       = React.lazy(() => import("@/src/components/tasks/TaskFocusView").then(m => ({ default: m.TaskFocusView })));
+const TaskGanttView       = React.lazy(() => import("@/src/components/tasks/TaskGanttView").then(m => ({ default: m.TaskGanttView })));
+const TaskInboxView       = React.lazy(() => import("@/src/components/tasks/TaskInboxView").then(m => ({ default: m.TaskInboxView })));
 
 import type { Project } from "@/src/types/tasks/project";
-import { CreateProjectDialog } from "@/src/components/tasks/CreateProjectDialog";
+
 import {
   statusConfig,
   mainStatusConfig,
@@ -136,7 +143,9 @@ function applySortToMainTasks(tasks: MainTask[], sortBy: SortOption, allSubtasks
 function PersonalTasksView() {
   const { mainTasks, subtasks, users, createMainTask, addSubtask, deleteSubtask,
     updateSubtask, updateSubtaskStatus, deleteMainTask, updateMainTask, comments, reminders,
-    fetchArchivedSubtasks, restoreSubtask, deleteSubtaskPermanently } = useAppData();
+    fetchArchivedSubtasks, restoreSubtask, deleteSubtaskPermanently, isLoading, isLoaded } = useAppData();
+
+  const showSkeleton = !isLoaded && subtasks.length === 0;
   const { user: currentUser } = useAuth();
   const me = React.useMemo(() => users.find(u => u.id === currentUser?.id), [users, currentUser?.id]);
   const isHrConsultant = me?.privileges?.tasks?.isExternalHr;
@@ -157,6 +166,14 @@ function PersonalTasksView() {
   const { hrVariables } = useAppStore();
 
   const [viewMode, setViewModeState] = useState<TaskViewMode>(() => (localStorage.getItem('tf_default_view') as TaskViewMode) || loadDefaultView());
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, statusFilter, priorityFilter]);
+
 
   const setViewMode = (v: TaskViewMode) => {
     setViewModeState(v);
@@ -228,6 +245,16 @@ function PersonalTasksView() {
     return status === statusFilter;
   });
 
+  const sortedFiltered = React.useMemo(
+    () => applySortToMainTasks(filtered, sortBy, wsSubs),
+    [filtered, sortBy, wsSubs]
+  );
+  const totalPages = Math.max(1, Math.ceil(sortedFiltered.length / pageSize));
+  const paginatedFiltered = React.useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return sortedFiltered.slice(start, start + pageSize);
+  }, [sortedFiltered, currentPage, pageSize]);
+
   const viewableReminders = React.useMemo(() =>
     reminders.filter(r => r.isActive && (
       r.createdBy === currentUser?.id ||
@@ -272,6 +299,9 @@ function PersonalTasksView() {
     setExpanded(prev => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; });
 
   return (
+    <Suspense fallback={<TaskSkeletonLoader />}>
+    <>
+      {showSkeleton ? <TaskSkeletonLoader /> : (
     <motion.div variants={container} initial="hidden" animate="show" className="space-y-6">
       {/* Unified Search Toolbar */}
       <div className="relative w-full max-w-md">
@@ -384,7 +414,7 @@ function PersonalTasksView() {
               </div>
             ) : (
               <div className="space-y-3">
-                {applySortToMainTasks(filtered, sortBy, wsSubs).map(mt => {
+                {paginatedFiltered.map(mt => {
                   const isExpanded = expanded.has(mt.id);
                   const subs = applySortToSubs(wsSubs.filter(s => s.mainTaskId === mt.id), sortBy) as SubTask[];
                   const progress = getMainTaskProgress(mt.id, wsSubs);
@@ -579,6 +609,16 @@ function PersonalTasksView() {
                 })}
               </div>
             )}
+            {sortedFiltered.length > 0 && (
+              <TaskPagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                totalItems={sortedFiltered.length}
+                pageSize={pageSize}
+                onPageChange={setCurrentPage}
+                onPageSizeChange={(s) => { setPageSize(s); setCurrentPage(1); }}
+              />
+            )}
           </motion.div>
         </>
       )}
@@ -640,6 +680,9 @@ function PersonalTasksView() {
         />
       )}
     </motion.div>
+      )}
+    </>
+    </Suspense>
   );
 }
 
@@ -650,7 +693,9 @@ function AdminTasksView() {
   const { mainTasks, subtasks, users, comments, createMainTask, addSubtask, assignSubtask,
     updateSubtask, deleteSubtask, updateSubtaskStatus, deleteMainTask, updateMainTask,
     postComment, getMainTaskComments, projects, createProject, reminders,
-    fetchArchivedSubtasks, restoreSubtask, deleteSubtaskPermanently, getUnreadCount } = useAppData();
+    fetchArchivedSubtasks, restoreSubtask, deleteSubtaskPermanently, getUnreadCount, isLoading, isLoaded } = useAppData();
+
+  const showSkeleton = !isLoaded && subtasks.length === 0;
   const { user: currentUser } = useAuth();
   const { readMap, markRead } = useTaskReadTracker();
   const myId = currentUser?.id;
@@ -721,6 +766,15 @@ function AdminTasksView() {
 
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [myStatusFilter, setMyStatusFilter] = useState<string>("all");
+
+  // Pagination for list views
+  const [allTasksPage, setAllTasksPage] = useState(1);
+  const [allTasksPageSize, setAllTasksPageSize] = useState(20);
+  const [myTasksPage, setMyTasksPage] = useState(1);
+  const [myTasksPageSize, setMyTasksPageSize] = useState(20);
+
+  useEffect(() => { setAllTasksPage(1); }, [statusFilter, search, scope]);
+  useEffect(() => { setMyTasksPage(1); }, [myStatusFilter, mySearch, scope]);
 
   useEffect(() => {
     const openId = searchParams.get("open");
@@ -854,6 +908,28 @@ function AdminTasksView() {
     return sub.status === myStatusFilter;
   });
 
+  // All-tasks list: sorted + paginated
+  const sortedAllTasks = React.useMemo(
+    () => applySortToMainTasks(tabFiltered, sortBy, teamSubtasks),
+    [tabFiltered, sortBy, teamSubtasks]
+  );
+  const allTasksTotalPages = Math.max(1, Math.ceil(sortedAllTasks.length / allTasksPageSize));
+  const paginatedAllTasks = React.useMemo(
+    () => sortedAllTasks.slice((allTasksPage - 1) * allTasksPageSize, allTasksPage * allTasksPageSize),
+    [sortedAllTasks, allTasksPage, allTasksPageSize]
+  );
+
+  // My-tasks list: sorted + paginated
+  const sortedMySubs = React.useMemo(
+    () => applySortToSubs(filteredMySubs, sortBy) as SubTask[],
+    [filteredMySubs, sortBy]
+  );
+  const myTasksTotalPages = Math.max(1, Math.ceil(sortedMySubs.length / myTasksPageSize));
+  const paginatedMySubs = React.useMemo(
+    () => sortedMySubs.slice((myTasksPage - 1) * myTasksPageSize, myTasksPage * myTasksPageSize),
+    [sortedMySubs, myTasksPage, myTasksPageSize]
+  );
+
   const viewableReminders = React.useMemo(() =>
     reminders.filter(r => r.isActive && (
       r.createdBy === currentUser?.id ||
@@ -914,6 +990,9 @@ function AdminTasksView() {
   };
 
   return (
+    <Suspense fallback={<TaskSkeletonLoader />}>
+    <>
+      {showSkeleton ? <TaskSkeletonLoader /> : (
     <motion.div variants={container} initial="hidden" animate="show" className="space-y-6">
       {/* Unified Search Toolbar */}
       <div className="relative w-full max-w-md">
@@ -1329,7 +1408,7 @@ function AdminTasksView() {
               </div>
             ) : (
               <div className="space-y-2">
-                {applySortToSubs(filteredMySubs, sortBy).map((sub, i) => {
+                {paginatedMySubs.map((sub, i) => {
                   const sc = statusConfig[sub.status as SubTaskStatus];
                   const mt = mainTasks.find(m => m.id === sub.mainTaskId);
                   const isOverdue = sub.deadline && isPast(new Date(sub.deadline)) && sub.status !== "completed";
@@ -1410,6 +1489,16 @@ function AdminTasksView() {
                   );
                 })}
               </div>
+            )}
+            {sortedMySubs.length > 0 && (
+              <TaskPagination
+                currentPage={myTasksPage}
+                totalPages={myTasksTotalPages}
+                totalItems={sortedMySubs.length}
+                pageSize={myTasksPageSize}
+                onPageChange={setMyTasksPage}
+                onPageSizeChange={(s) => { setMyTasksPageSize(s); setMyTasksPage(1); }}
+              />
             )}
           </motion.div>
         </>
@@ -1519,7 +1608,7 @@ function AdminTasksView() {
             </div>
           ) : (
             <div className="space-y-3">
-              {applySortToMainTasks(tabFiltered, sortBy, teamSubtasks).map(mt => {
+              {paginatedAllTasks.map(mt => {
                 const isExpanded = expanded.has(mt.id);
                 const subs = teamSubtasks.filter(s => s.mainTaskId === mt.id);
                 const progress = getMainTaskProgress(mt.id, teamSubtasks);
@@ -1802,6 +1891,16 @@ function AdminTasksView() {
               })}
             </div>
           )}
+          {sortedAllTasks.length > 0 && (
+            <TaskPagination
+              currentPage={allTasksPage}
+              totalPages={allTasksTotalPages}
+              totalItems={sortedAllTasks.length}
+              pageSize={allTasksPageSize}
+              onPageChange={setAllTasksPage}
+              onPageSizeChange={(s) => { setAllTasksPageSize(s); setAllTasksPage(1); }}
+            />
+          )}
         </motion.div>
       </>)}
 
@@ -1924,6 +2023,9 @@ function AdminTasksView() {
         />
       )}
     </motion.div>
+      )}
+    </>
+    </Suspense>
   );
 }
 

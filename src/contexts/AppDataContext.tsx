@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase } from '@/src/integrations/supabase/client';
 import { useAuth } from '@/src/hooks/useAuth';
 import { toast, showConfirm } from '@/src/components/ui/toast';
@@ -11,8 +11,12 @@ import { useRef } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { LocalNotifications } from '@capacitor/local-notifications';
 
+import { TaskContext } from './TaskContext';
+export { TaskContext }; // re-export so existing imports from AppDataContext keep working
+
+
 // ── Typed context interface ──────────────────────────────────────────────────
-interface AppDataContextType {
+export interface AppDataContextType {
     mainTasks: any[];
     subtasks: any[];
     users: any[];
@@ -58,10 +62,13 @@ interface AppDataContextType {
     markMessageAsRead: (updateId: string, userId: string) => Promise<void>;
     /** Get unread count for a task thread for a specific user */
     getUnreadCount: (taskId: string, userId: string) => number;
+    isLoading: boolean;
+    isLoaded: boolean;
+    refetchAll: () => Promise<void>;
+    searchTasksServer: (query: string) => Promise<any[]>;
     importTaskBackupData: (data: any) => void;
 }
 
-export const TaskContext = createContext<AppDataContextType | null>(null);
 
 function showNativeNotification(title: string, body?: string) {
     // In Electron: delegate to main process so Windows shows the correct
@@ -191,6 +198,9 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
     /** Per-message receipts: task_update_receipts rows */
     const [updateReceipts, setUpdateReceipts] = useState<any[]>([]);
 
+    const [isLoading, setIsLoading] = useState<boolean>(true);
+    const [isLoaded, setIsLoaded] = useState<boolean>(false);
+
     useEffect(() => {
         if (!user) return;
         
@@ -198,13 +208,31 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         let fetchTimeout: ReturnType<typeof setTimeout>;
 
         // ── Initial fetch ─────────────────────────────────────────────────────
+        const CACHE_KEY = `tasks_swr_v1_${user.id}`;
         const fetchAll = async () => {
+            // ── 1. Serve stale cache immediately (instant UI) ──────────────
+            const CACHE_MAX_AGE_MS = 30 * 60 * 1000; // 30 minutes
+            try {
+                const cached = localStorage.getItem(CACHE_KEY);
+                if (cached) {
+                    const { mainTasks: cMT, subtasks: cST, cachedAt } = JSON.parse(cached);
+                    const age = Date.now() - (cachedAt ?? 0);
+                    if (Array.isArray(cMT) && Array.isArray(cST) && age < CACHE_MAX_AGE_MS) {
+                        setMainTasks(cMT);
+                        setSubtasks(cST);
+                        setIsLoaded(true); // show real UI immediately with fresh-enough data
+                    }
+                }
+            } catch { /* ignore malformed cache */ }
+
+            // ── 2. Fetch fresh data in background ─────────────────────────
+            setIsLoading(true);
             try {
                 const [mtRes, stRes, projRes, commRes, remRes, psRes, receiptRes] = await Promise.all([
                     supabase.from('main_tasks').select('*').eq('is_deleted', false),
                     supabase.from('subtasks').select('*').eq('is_deleted', false),
                     supabase.from('sites').select('*'),
-                    supabase.from('task_updates').select('*').order('created_at', { ascending: true }),
+                    supabase.from('task_updates').select('*').order('created_at', { ascending: false }).limit(250),
                     supabase.from('reminders').select('*'),
                     supabase.from('task_participant_status').select('*'),
                     supabase.from('task_update_receipts').select('*'),
@@ -223,6 +251,15 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                 if (mtRes.data) {
                     const mapped = mtRes.data.map(mapMainTaskToCamel);
                     setMainTasks(mapped);
+                    // ── 3. Persist fresh data to cache ────────────────────
+                    try {
+                        const stMapped = stRes.data ? stRes.data.map(mapSubtaskToCamel) : [];
+                        localStorage.setItem(CACHE_KEY, JSON.stringify({
+                            mainTasks: mapped,
+                            subtasks: stMapped,
+                            cachedAt: Date.now(),
+                        }));
+                    } catch { /* quota exceeded — skip cache */ }
                 }
                 if (stRes.data) {
                     const mapped = stRes.data.map(mapSubtaskToCamel);
@@ -302,6 +339,11 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                 }
                 console.error('Task data fetch failed:', err);
                 toast.error('Failed to load task data. Please refresh.');
+            } finally {
+                if (isActive) {
+                    setIsLoading(false);
+                    setIsLoaded(true);
+                }
             }
         };
 
@@ -1845,6 +1887,34 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         }
     }, []);
 
+    const searchTasksServer = useCallback(async (query: string): Promise<any[]> => {
+        if (!query || !query.trim()) return [];
+        const clean = query.trim();
+        try {
+            const [stRes, mtRes] = await Promise.all([
+                supabase.from('subtasks').select('*').ilike('title', `%${clean}%`).limit(50),
+                supabase.from('main_tasks').select('*').ilike('title', `%${clean}%`).limit(50),
+            ]);
+            const mappedSubs = (stRes.data || []).map(mapSubtaskToCamel);
+            const mappedMains = (mtRes.data || []).map(mapMainTaskToCamel);
+
+            setSubtasks(prev => {
+                const existingIds = new Set(prev.map(s => s.id));
+                const newSubs = mappedSubs.filter(s => !existingIds.has(s.id));
+                return newSubs.length > 0 ? [...prev, ...newSubs] : prev;
+            });
+            setMainTasks(prev => {
+                const existingIds = new Set(prev.map(m => m.id));
+                const newMains = mappedMains.filter(m => !existingIds.has(m.id));
+                return newMains.length > 0 ? [...prev, ...newMains] : prev;
+            });
+            return mappedSubs;
+        } catch (e) {
+            console.error('searchTasksServer error:', e);
+            return [];
+        }
+    }, []);
+
     const importTaskBackupData = useCallback((d: any) => {
         if (d.mainTasks && Array.isArray(d.mainTasks)) setMainTasks(d.mainTasks.map(mapMainTaskToCamel));
         if (d.subtasks && Array.isArray(d.subtasks)) setSubtasks(d.subtasks.map(mapSubtaskToCamel));
@@ -1897,6 +1967,10 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         markTaskAsRead,
         markMessageAsRead,
         getUnreadCount,
+        isLoading,
+        isLoaded,
+        refetchAll: async () => {},
+        searchTasksServer,
         importTaskBackupData,
     }), [mainTasks, subtasks, users, comments, projects, reminders, participantStatuses, updateReceipts,
         createProject, createMainTask, updateMainTask, deleteMainTask,
@@ -1904,7 +1978,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         updateSubtaskStatus, approveSubtask, rejectSubtask,
         postComment, updateComment, deleteComment, getMainTaskComments, getSubtaskComments, getMainTaskWorkflow,
         addReminder, updateReminder, deleteReminder, toggleReminderActive, snoozeReminder,
-        markTaskAsRead, markMessageAsRead, getUnreadCount, importTaskBackupData,
+        markTaskAsRead, markMessageAsRead, getUnreadCount, isLoading, isLoaded, searchTasksServer, importTaskBackupData,
         restoreMainTask, restoreSubtask, deleteMainTaskPermanently, deleteSubtaskPermanently, fetchArchivedSubtasks, fetchArchivedMainTasks]);
 
     return <TaskContext.Provider value={value}>{children}</TaskContext.Provider>;
@@ -1957,6 +2031,10 @@ export function useAppData(): AppDataContextType {
             markTaskAsRead: async () => {},
             markMessageAsRead: async () => {},
             getUnreadCount: () => 0,
+            isLoading: true,
+            isLoaded: false,
+            refetchAll: async () => {},
+            searchTasksServer: async () => [],
             importTaskBackupData: () => {},
         };
     }
