@@ -369,15 +369,27 @@ const MachineMultiSelect: React.FC<MachineMultiSelectProps> = ({
 
 export function Attendance() {
   const allEmployees = useAppStore((state) => state.employees);
-  // Memoized: avoids re-creating the filtered array on every parent render
+  const [registerDate, setRegisterDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [lastEntryDate, setLastEntryDate] = useState(format(new Date(Date.now() - 86400000), 'yyyy-MM-dd'));
+
+  // Date-based eligibility filtering for the daily register
   const employees = useMemo(
-    () => allEmployees.filter(e => e.status === 'Active' || e.status === 'On Leave'),
-    [allEmployees]
+    () => allEmployees.filter(e => {
+      if (e.startDate && e.startDate > registerDate) return false;
+      const exitDate = e.endDate || (e as any).offboardingDate || (e as any).terminationDate;
+      if (exitDate) {
+        if (exitDate < registerDate) return false;
+      } else if (e.status === 'Terminated') {
+        return false;
+      }
+      return true;
+    }),
+    [allEmployees, registerDate]
   );
-  // O(1) employee lookup — used by filteredDbRecords to avoid O(N) .find() per record
+  // O(1) employee lookup across all employees (including historical)
   const employeeMap = useMemo(
-    () => new Map(employees.map(e => [e.id, e])),
-    [employees]
+    () => new Map(allEmployees.map(e => [e.id, e])),
+    [allEmployees]
   );
   const isMobile = useIsMobile();
   const sites = useAppStore((state) => state.sites);
@@ -409,11 +421,7 @@ export function Attendance() {
       if (!current.parentDepartmentId) break;
       current = departments.find(d => d.id === current!.parentDepartmentId);
     }
-    return false;
   }, [departments]);
-
-  const [registerDate, setRegisterDate] = useState(format(new Date(), 'yyyy-MM-dd'));
-  const [lastEntryDate, setLastEntryDate] = useState(format(new Date(Date.now() - 86400000), 'yyyy-MM-dd'));
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('entry');
   const [staffTypeFilter, setStaffTypeFilter] = useState<'OFFICE' | 'FIELD'>('FIELD');

@@ -21,7 +21,7 @@ const MONTHS = [
 ];
 
 export function usePayrollCalculator() {
-  const employees = useAppStore((state) => state.employees).filter(e => e.status !== 'Terminated');
+  const employees = useAppStore((state) => state.employees);
   const salaryAdvances = useAppStore((state) => state.salaryAdvances);
   const loans = useAppStore((state) => state.loans);
   const payrollVariables = useAppStore((state) => state.payrollVariables);
@@ -56,14 +56,13 @@ export function usePayrollCalculator() {
           const empStart = new Date(e.startDate);
           if (empStart > periodEnd) return false;
         }
-        if (e.endDate) {
-          const empEnd = new Date(e.endDate);
+        
+        const exitDate = e.endDate || (e as any).offboardingDate || (e as any).terminationDate;
+        if (exitDate) {
+          const empEnd = new Date(exitDate);
           if (empEnd < periodStart) return false;
-        }
-
-        // If current status is not Active or On Leave, only show if they were active in the viewed month
-        if (e.status !== 'Active' && e.status !== 'On Leave') {
-          if (!e.endDate) return false;
+        } else if (e.status === 'Terminated') {
+          return false;
         }
 
         // Frequency logic for NON-EMPLOYEE (Quarterly/Half Year/Yearly)

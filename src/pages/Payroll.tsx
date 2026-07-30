@@ -66,7 +66,7 @@ const fmT = fm;
 
 export function Payroll() {
   const rawEmployees = useAppStore((state) => state.employees);
-  const employees = useMemo(() => rawEmployees.filter(e => e.status !== 'Terminated'), [rawEmployees]);
+  const employees = rawEmployees;
   const salaryAdvances = useAppStore((state) => state.salaryAdvances);
   const loans = useAppStore((state) => state.loans);
   const payrollVariables = useAppStore((state) => state.payrollVariables);
@@ -242,16 +242,13 @@ export function Payroll() {
             const empStart = new Date(e.startDate);
             if (empStart > periodEnd) return false;
           }
-          if (e.endDate) {
-            const empEnd = new Date(e.endDate);
-            if (empEnd < periodStart) return false;
-          }
 
-          // If current status is not Active or On Leave, only show if they were active in the viewed month
-          if (e.status !== 'Active' && e.status !== 'On Leave') {
-             // For payroll history, we might want to see someone who was active but is now Terminated.
-             // If endDate is empty, they should be Active.
-             if (!e.endDate) return false;
+          const exitDate = e.endDate || (e as any).offboardingDate || (e as any).terminationDate;
+          if (exitDate) {
+            const empEnd = new Date(exitDate);
+            if (empEnd < periodStart) return false;
+          } else if (e.status === 'Terminated') {
+            return false;
           }
 
           // Frequency logic for Non-Employees (NON-EMPLOYEE)

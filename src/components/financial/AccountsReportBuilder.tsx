@@ -359,7 +359,7 @@ export function AccountsReportBuilder({
   const pendingSites   = useAppStore(s => s.pendingSites);
   const vatRate        = useAppStore(s => s.payrollVariables.vatRate);
   
-  const employees = useAppStore(state => state.employees).filter(e => e.status !== 'Terminated');
+  const employees = useAppStore(state => state.employees);
   const { calculatePayrollForMonth } = usePayrollCalculator();
   const [selectedSources, setSelectedSources] = useState<DataSource[]>(['INVOICE']);
   const [selectedYears,   setSelectedYears]   = useState<number[]>([currentYear]);
@@ -1309,53 +1309,100 @@ export function AccountsReportBuilder({
 
     // Helper to draw the professional header on any page
     const drawHeader = (reportLabel: string, period?: string) => {
-      // Banner background
+      const HEADER_H = 56;
+
+      // ── Banner background ──────────────────────────────────────────────────
       doc.setFillColor(15, 23, 42); // slate-900
-      doc.rect(0, 0, pageW, 52, 'F');
+      doc.rect(0, 0, pageW, HEADER_H, 'F');
 
-      // Accent stripe
+      // Bottom accent stripe
       doc.setFillColor(79, 70, 229); // indigo-600
-      doc.rect(0, 49, pageW, 3, 'F');
+      doc.rect(0, HEADER_H - 3, pageW, 3, 'F');
 
-      // Logo — breathing room
-      try { doc.addImage(logoSrc, 'PNG', 10, 6, 38, 38); } catch (_) {}
+      // ── Logo (natural aspect ratio: ~2.73:1 to prevent squeezing) ────────
+      const logoW = 70;
+      const logoH = 25.6; // 70 / 2.73
+      const logoX = 10;
+      const logoY = Math.round((HEADER_H - 3 - logoH) / 2);
+      try { doc.addImage(logoSrc, 'PNG', logoX, logoY, logoW, logoH); } catch (_) {}
 
-      // Vertical divider
+      // Vertical divider line after logo
+      const dividerX = logoX + logoW + 6; // 86mm
       doc.setDrawColor(79, 70, 229);
-      doc.setLineWidth(0.6);
-      doc.line(56, 10, 56, 44);
+      doc.setLineWidth(0.5);
+      doc.line(dividerX, 10, dividerX, HEADER_H - 12);
 
-      // Company name
+      // ── Left column: company name + report label ───────────────────────────
+      const leftX = dividerX + 7; // 93mm
+
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(18);
+      doc.setFontSize(16);
       doc.setTextColor(255, 255, 255);
-      doc.text('DCEL Office Suite', 62, 22);
+      doc.text('DCEL Office Suite', leftX, 21);
 
-      // Report label
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(10);
+      doc.setFontSize(9.5);
       doc.setTextColor(165, 180, 252); // indigo-300
-      doc.text(reportLabel, 62, 31);
+      doc.text(reportLabel, leftX, 31);
 
-      // Department pill (if PAYROLL and depts selected)
+      // Dept tag (only when PAYROLL with departments selected)
       if (selectedSources.includes('PAYROLL') && selectedDepts.length > 0) {
-        doc.setFont('helvetica', 'bold');
+        doc.setFont('helvetica', 'italic');
         doc.setFontSize(7.5);
         doc.setTextColor(196, 181, 253); // purple-300
-        doc.text(`Dept: ${selectedDepts.join(' · ')}`, 62, 40);
+        doc.text(`Dept: ${selectedDepts.join(' · ')}`, leftX, 40);
       }
 
-      // Right-side meta
-      const rightX = pageW - 84;
+      // ── Right column: meta box ─────────────────────────────────────────────
+      const metaBoxW = 88;
+      const metaBoxX = pageW - metaBoxW - 8;
+      const metaBoxY = 7;
+      const metaBoxH = HEADER_H - 16;
+
+      // Subtle dark background for meta box
+      doc.setFillColor(5, 10, 25);
+      doc.roundedRect(metaBoxX, metaBoxY, metaBoxW, metaBoxH, 2, 2, 'F');
+
+      // Left accent strip on meta box
+      doc.setFillColor(79, 70, 229);
+      doc.rect(metaBoxX, metaBoxY, 2.5, metaBoxH, 'F');
+
+      // Column X positions — labelX and valueX are fixed so rows align neatly
+      const labelX = metaBoxX + 7;
+      const valueX = metaBoxX + 35;
+
+      const periodStr = period ??
+        (selectedMonths.map(m => MONTHS.find(mo => mo.key === m)?.label ?? '').filter(Boolean).join(', ') || '—');
+      const yearStr   = selectedYears.join(', ') || '—';
+      const genStr    = new Date().toLocaleDateString();
+      const sourceStr = selectedSources.map(s => SOURCE_LABELS[s]).join(' + ');
+
+      // Row 1 — Period
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(8);
-      doc.setTextColor(203, 213, 225);
-      doc.text('Period:', rightX, 20);
-      doc.text('Generated:', rightX, 28);
+      doc.setFontSize(7.5);
+      doc.setTextColor(148, 163, 184); // slate-400
+      doc.text('Period:', labelX, metaBoxY + 12);
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(255, 255, 255);
-      doc.text(period ?? selectedMonths.map(m => MONTHS.find(mo => mo.key === m)?.label ?? '').filter(Boolean).join(', '), rightX + 24, 20);
-      doc.text(new Date().toLocaleDateString(), rightX + 30, 28);
+      doc.text(`${periodStr} ${yearStr}`.trim(), valueX, metaBoxY + 12);
+
+      // Row 2 — Generated
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(7.5);
+      doc.setTextColor(148, 163, 184);
+      doc.text('Generated:', labelX, metaBoxY + 23);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(255, 255, 255);
+      doc.text(genStr, valueX, metaBoxY + 23);
+
+      // Row 3 — Source
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(7.5);
+      doc.setTextColor(148, 163, 184);
+      doc.text('Source:', labelX, metaBoxY + 34);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(165, 180, 252); // indigo-300
+      doc.text(sourceStr, valueX, metaBoxY + 34);
     };
 
     const reportTitleText = selectedSources.length === 1
@@ -1379,7 +1426,17 @@ export function AccountsReportBuilder({
           return typeof val === 'number' && c.summable ? fm(val) : String(val);
         }));
 
-    const totalsRow = orderedCols.map(c => c.summable ? fm(getColTotal(c.id)) : (c.id === 'client' || c.id === 's_client' ? 'TOTAL' : ''));
+    let totalLabelSet = false;
+    const totalsRow = orderedCols.map(c => {
+      if (c.summable) {
+        return fm(getColTotal(c.id));
+      }
+      if (!totalLabelSet) {
+        totalLabelSet = true;
+        return 'TOTALS';
+      }
+      return '';
+    });
     dataRows.push(totalsRow);
 
     const columnStyles: any = {};
@@ -1388,6 +1445,8 @@ export function AccountsReportBuilder({
         columnStyles[idx] = { halign: 'right' };
       }
     });
+
+    const pageH = doc.internal.pageSize.getHeight();
 
     if (separateMonths && !isMultiSource) {
       const rowsByMonth: Record<string, any[][]> = {};
@@ -1401,6 +1460,10 @@ export function AccountsReportBuilder({
         if (d) {
           const dateObj = new Date(d);
           mName = MONTHS[dateObj.getMonth()].label;
+        } else if ((rec as any).p_month || (rec as any).month || (rec as any)._raw?.month) {
+          const rawMonth = (rec as any).p_month || (rec as any).month || (rec as any)._raw?.month || '';
+          const mk = monthNameToKey(rawMonth);
+          mName = mk ? (MONTHS.find(m => m.key === mk)?.label ?? rawMonth) : rawMonth || 'Unknown';
         }
         if (!rowsByMonth[mName]) rowsByMonth[mName] = [];
         rowsByMonth[mName].push(rowData);
@@ -1409,31 +1472,39 @@ export function AccountsReportBuilder({
       let pageIdx = 0;
       Object.keys(rowsByMonth).forEach(m => {
         if (pageIdx > 0) doc.addPage();
-        drawHeader(`${reportTitleText} — ${m}`, m);
+        const currentTitle = `${reportTitleText} — ${m}`;
 
         autoTable(doc, {
-          startY: 62,
+          startY: 64,
+          margin: { top: 64, bottom: 15 },
           head: [headers],
           body: rowsByMonth[m],
           theme: 'grid',
           headStyles: { fillColor: [79, 70, 229] },
           styles: { fontSize: 7 },
-          columnStyles: columnStyles
+          columnStyles: columnStyles,
+          didDrawPage: () => {
+            drawHeader(currentTitle, m);
+          }
         });
         pageIdx++;
       });
       
       // Grand totals page
       doc.addPage();
-      drawHeader(`${reportTitleText} — Grand Totals`);
+      const grandTitle = `${reportTitleText} — Grand Totals`;
       autoTable(doc, {
-        startY: 62,
+        startY: 64,
+        margin: { top: 64, bottom: 15 },
         head: [headers],
         body: [totalsRow],
         theme: 'grid',
         headStyles: { fillColor: [79, 70, 229] },
         styles: { fontSize: 7 },
         columnStyles: columnStyles,
+        didDrawPage: () => {
+          drawHeader(grandTitle);
+        },
         didParseCell: function(cellData) {
           cellData.cell.styles.fontStyle = 'bold';
           cellData.cell.styles.fillColor = [241, 245, 249];
@@ -1441,13 +1512,17 @@ export function AccountsReportBuilder({
       });
     } else {
       autoTable(doc, {
-        startY: 62,
+        startY: 64,
+        margin: { top: 64, bottom: 15 },
         head: [headers],
         body: dataRows,
         theme: 'grid',
         headStyles: { fillColor: [79, 70, 229] },
         styles: { fontSize: 7 },
         columnStyles: columnStyles,
+        didDrawPage: () => {
+          drawHeader(reportTitleText);
+        },
         didParseCell: function(cellData) {
           if (cellData.row.index === dataRows.length - 1) {
             cellData.cell.styles.fontStyle = 'bold';
@@ -1457,9 +1532,18 @@ export function AccountsReportBuilder({
       });
     }
 
-    // Employee breakdown omitted for general query report.
+    // Post-process page numbers across all pages
+    const totalPageCount = (doc.internal as any).getNumberOfPages();
+    for (let p = 1; p <= totalPageCount; p++) {
+      doc.setPage(p);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7.5);
+      doc.setTextColor(148, 163, 184); // slate-400
+      doc.text(`Page ${p} of ${totalPageCount}`, pageW / 2, pageH - 5, { align: 'center' });
+    }
 
-    const fileName = `${selectedSources.map(s => s.toLowerCase()).join('_')}_report_${selectedYears.join('-')}.pdf`;
+    const monthsPart = selectedMonths.length > 0 ? `_${selectedMonths.join('-')}` : '';
+    const fileName = `${selectedSources.map(s => s.toLowerCase()).join('_')}_report${monthsPart}_${selectedYears.join('-')}.pdf`;
 
     if ((window as any).electronAPI?.savePathDialog) {
       const fp = await (window as any).electronAPI.savePathDialog({
@@ -1467,9 +1551,10 @@ export function AccountsReportBuilder({
         filters: [{ name: 'PDF Files', extensions: ['pdf'] }],
       });
       if (fp) {
-        // Need to save as blob, convert to buffer and write via electron
-        const pdfOutput = doc.output('arraybuffer');
-        const ok = await (window as any).electronAPI.writeFile(fp, pdfOutput, 'buffer');
+        // Convert jsPDF ArrayBuffer to Uint8Array for IPC serialization
+        const pdfArrayBuffer = doc.output('arraybuffer');
+        const uint8Array = new Uint8Array(pdfArrayBuffer);
+        const ok = await (window as any).electronAPI.writeFile(fp, uint8Array, 'binary');
         if (ok) toast.success(`Exported to ${fp}`); else toast.error('Failed to save.');
       }
     } else {
@@ -2177,8 +2262,8 @@ export function AccountsReportBuilder({
             }
           `}</style>
 
-          <div className="flex-1 overflow-auto bg-slate-200/60 p-2 sm:p-4 md:p-8 print:p-0 print:bg-white" id="arb-print-area">
-            <div className="bg-white mx-auto shadow-2xl max-w-7xl rounded-none sm:rounded-lg min-h-full print:shadow-none print:max-w-none mb-[100px] print:mb-0"
+          <div className="flex-1 overflow-auto bg-slate-200/60 p-1 sm:p-2.5 print:p-0 print:bg-white" id="arb-print-area">
+            <div className="bg-white mx-auto shadow-2xl w-full rounded-none sm:rounded-lg min-h-full print:shadow-none mb-[100px] print:mb-0"
               style={{ fontFamily: "'Segoe UI', system-ui, sans-serif" }}>
 
               {/* Document header */}

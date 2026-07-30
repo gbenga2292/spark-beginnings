@@ -671,7 +671,25 @@ function initIPC() {
       const fs = require('fs');
       const p = require('path');
       fs.mkdirSync(p.dirname(filePath), { recursive: true });
-      fs.writeFileSync(filePath, content, encoding);
+      let data = content;
+      if (encoding === 'binary' || encoding === 'buffer' || Buffer.isBuffer(content) || content instanceof ArrayBuffer || ArrayBuffer.isView(content) || (content && typeof content === 'object' && Array.isArray(content.data))) {
+        if (Buffer.isBuffer(content)) {
+          data = content;
+        } else if (content instanceof ArrayBuffer) {
+          data = Buffer.from(content);
+        } else if (ArrayBuffer.isView(content)) {
+          data = Buffer.from(content.buffer, content.byteOffset, content.byteLength);
+        } else if (content && typeof content === 'object' && Array.isArray(content.data)) {
+          data = Buffer.from(content.data);
+        } else if (Array.isArray(content)) {
+          data = Buffer.from(content);
+        } else if (typeof content === 'string') {
+          data = Buffer.from(content, 'binary');
+        }
+        fs.writeFileSync(filePath, data);
+      } else {
+        fs.writeFileSync(filePath, content, encoding || 'utf8');
+      }
       return true;
     } catch (err) {
       console.error('File write error:', err);
