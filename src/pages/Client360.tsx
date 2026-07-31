@@ -6,9 +6,10 @@ import {
   Activity, Briefcase, MessagesSquare, RefreshCcw, Filter, Send,
   ShieldAlert, ShieldCheck, Settings2, X, Edit2, ChevronRight, CheckSquare,
   Plus, Trash2, Circle, Eye, MoreVertical, BookOpen, MessageSquare, Pencil,
-  Hourglass,
+  Hourglass, Printer, Download, Globe, Check, RotateCcw,
 } from 'lucide-react';
 import { toast, showConfirm } from '@/src/components/ui/toast';
+import logoImg from '../../logo/logo-2.png';
 import { motion, AnimatePresence } from 'framer-motion';
 import { TaskDetailSheet } from '@/src/components/tasks/TaskDetailSheet';
 import { Button } from '@/src/components/ui/button';
@@ -37,7 +38,72 @@ import { CreateTaskDialog } from './Tasks/CreateTaskDialog';
 import { InvoiceDetailDialog } from './InvoiceDetailDialog';
 import { GlobalSearch } from '@/src/components/common/GlobalSearch';
 
-type TabType = 'overview' | 'contacts' | 'financials' | 'operations' | 'activity' | 'tasks' | 'onboarding';
+type TabType = 'overview' | 'contacts' | 'financials' | 'report' | 'operations' | 'activity' | 'tasks' | 'onboarding';
+
+const renderFormattedChatMessage = (content: string) => {
+  if (!content) return null;
+
+  const renderInlineText = (text: string) => {
+    if (!text) return null;
+    const parts = text.split(/(\*\*.*?\*\*|\*.*?\*)/g);
+    return (
+      <>
+        {parts.map((part, i) => {
+          if (part.startsWith('**') && part.endsWith('**') && part.length >= 4) {
+            return <strong key={i} className="font-extrabold text-white">{part.slice(2, -2)}</strong>;
+          }
+          if (part.startsWith('*') && part.endsWith('*') && part.length >= 2 && !part.startsWith('**')) {
+            return <em key={i} className="italic text-indigo-200">{part.slice(1, -1)}</em>;
+          }
+          // Clean up any loose lone asterisks or hashes
+          const cleanPart = part.replace(/\*\*/g, '').replace(/#/g, '');
+          return <span key={i}>{cleanPart}</span>;
+        })}
+      </>
+    );
+  };
+
+  const lines = content.split('\n');
+
+  return (
+    <div className="space-y-1.5 text-xs sm:text-sm leading-relaxed font-sans">
+      {lines.map((line, idx) => {
+        let trimmed = line.trim();
+        if (!trimmed) return <div key={idx} className="h-1" />;
+
+        // Header check (# or ## or ### or line wrapped in ** Header **)
+        if (trimmed.startsWith('#') || (/^\*\*[^*]+\*\*:?$/.test(trimmed) && trimmed.length < 60)) {
+          const cleanHeader = trimmed.replace(/^#+\s*/, '').replace(/\*\*/g, '').replace(/#/g, '').trim();
+          return (
+            <div key={idx} className="text-xs font-black tracking-wider text-indigo-300 uppercase mt-3.5 mb-1.5 border-b border-indigo-700/50 pb-1 flex items-center gap-1.5">
+              <span>{cleanHeader}</span>
+            </div>
+          );
+        }
+
+        // Bullet point item (- or * or •) or numbered (1. 2.)
+        if (/^[-*•]\s+/.test(trimmed) || /^\d+[\.\)]\s+/.test(trimmed)) {
+          const bulletText = trimmed.replace(/^[-*•]\s+/, '').replace(/^\d+[\.\)]\s+/, '');
+          return (
+            <div key={idx} className="flex items-start gap-2 pl-1.5 my-1 text-slate-100">
+              <span className="text-indigo-400 font-bold text-sm select-none leading-none mt-0.5">•</span>
+              <div className="flex-1">
+                {renderInlineText(bulletText)}
+              </div>
+            </div>
+          );
+        }
+
+        // Standard paragraph line
+        return (
+          <p key={idx} className="my-1 text-indigo-50">
+            {renderInlineText(trimmed)}
+          </p>
+        );
+      })}
+    </div>
+  );
+};
 
 export function Client360() {
   const { isDark } = useTheme();
@@ -77,6 +143,8 @@ export function Client360() {
   const [showContactsPanel, setShowContactsPanel] = useState(false);
   const [commDialogOpen, setCommDialogOpen] = useState(false);
   const [commForm, setCommForm] = useState({
+    clientName: '',
+    linkedTo: 'Existing Client',
     subject: '',
     notes: '',
     direction: 'Outgoing' as 'Incoming' | 'Outgoing',
@@ -96,6 +164,73 @@ export function Client360() {
     clientId?: string;
     siteId?: string;
   }>({ open: false, title: '', description: '' });
+
+  // Report Date Filter State
+  const [showReportDateModal, setShowReportDateModal] = useState(false);
+  const [reportDateModalMode, setReportDateModalMode] = useState<'filter' | 'print'>('filter');
+  const [reportStartDate, setReportStartDate] = useState<string>('');
+  const [reportEndDate, setReportEndDate] = useState<string>('');
+  const [reportPreset, setReportPreset] = useState<'all' | 'thisMonth' | 'lastMonth' | 'last90' | 'ytd' | 'custom'>('all');
+
+  // Company General Settings State
+  const [companyInfo, setCompanyInfo] = useState({
+    name: 'DEWATERING CONSTRUCTION ETC LIMITED',
+    address: '',
+    phone: '',
+    email: 'accounts@dcel.io',
+    regNumber: ''
+  });
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data } = await supabase.from('app_settings').select('*').limit(1).maybeSingle();
+        if (data) {
+          setCompanyInfo({
+            name: data.company_name || 'DEWATERING CONSTRUCTION ETC LIMITED',
+            address: data.company_address || '',
+            phone: data.company_phone || '',
+            email: data.company_email || 'accounts@dcel.io',
+            regNumber: data.company_reg_number || ''
+          });
+        }
+      } catch (err) {
+        console.error('Failed to load company info from app_settings:', err);
+      }
+    })();
+  }, []);
+
+  const handleApplyReportPreset = (preset: 'all' | 'thisMonth' | 'lastMonth' | 'last90' | 'ytd') => {
+    setReportPreset(preset);
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth();
+
+    if (preset === 'all') {
+      setReportStartDate('');
+      setReportEndDate('');
+    } else if (preset === 'thisMonth') {
+      const start = new Date(year, month, 1).toISOString().split('T')[0];
+      const end = now.toISOString().split('T')[0];
+      setReportStartDate(start);
+      setReportEndDate(end);
+    } else if (preset === 'lastMonth') {
+      const start = new Date(year, month - 1, 1).toISOString().split('T')[0];
+      const end = new Date(year, month, 0).toISOString().split('T')[0];
+      setReportStartDate(start);
+      setReportEndDate(end);
+    } else if (preset === 'last90') {
+      const start = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      const end = now.toISOString().split('T')[0];
+      setReportStartDate(start);
+      setReportEndDate(end);
+    } else if (preset === 'ytd') {
+      const start = `${year}-01-01`;
+      const end = now.toISOString().split('T')[0];
+      setReportStartDate(start);
+      setReportEndDate(end);
+    }
+  };
 
   // ── Permission checks & narrative state ──
   const sitePriv = currentUser?.privileges?.sites;
@@ -146,33 +281,25 @@ export function Client360() {
   // Extract unique client names, excluding internal 'DCEL' and deleted client profiles
   const allClients = useMemo(() => {
     const names = new Set<string>();
-    
-    if (clientProfiles && clientProfiles.length > 0) {
-      // Primary source of truth: clientProfiles
-      clientProfiles.forEach(cp => {
-        const name = cp.name?.trim();
-        if (name && name.toUpperCase() !== 'DCEL') names.add(name);
-      });
-      
-      // Include active pending onboarding clients
-      pendingSites.forEach(ps => {
-        const name = ps.clientName?.trim();
-        if (name && name.toUpperCase() !== 'DCEL' && ps.status === 'Pending') {
-          names.add(name);
-        }
-      });
-    } else {
-      // Fallback if clientProfiles store has not loaded yet
-      sites.forEach(s => { 
-        const name = s.client?.trim();
-        if (name && name.toUpperCase() !== 'DCEL') names.add(name); 
-      });
-      pendingSites.forEach(ps => {
-        const name = ps.clientName?.trim();
-        if (name && name.toUpperCase() !== 'DCEL') names.add(name);
-      });
-    }
-    
+
+    // Always include all clients from clientProfiles (primary source)
+    clientProfiles.forEach(cp => {
+      const name = cp.name?.trim();
+      if (name && name.toUpperCase() !== 'DCEL') names.add(name);
+    });
+
+    // Always merge in clients from sites — catches clients without a clientProfile record
+    sites.forEach(s => {
+      const name = s.client?.trim();
+      if (name && name.toUpperCase() !== 'DCEL') names.add(name);
+    });
+
+    // Always merge in pending onboarding clients
+    pendingSites.forEach(ps => {
+      const name = ps.clientName?.trim();
+      if (name && name.toUpperCase() !== 'DCEL') names.add(name);
+    });
+
     return Array.from(names).sort();
   }, [clientProfiles, sites, pendingSites]);
 
@@ -214,6 +341,574 @@ export function Client360() {
     const queryClient = new URLSearchParams(window.location.search).get('client');
     return queryClient || '';
   });
+
+  const selectedClientProfile = useMemo(() => {
+    if (!selectedClient) return null;
+    return clientProfiles.find(cp => cp.name?.trim().toLowerCase() === selectedClient.trim().toLowerCase());
+  }, [clientProfiles, selectedClient]);
+
+  const principalContact = useMemo(() => {
+    if (!selectedClient) return null;
+    const list = clientContacts.filter(c => c.clientName?.trim().toLowerCase() === selectedClient.trim().toLowerCase());
+    return list.find(c => c.isPrincipal) || list[0] || null;
+  }, [clientContacts, selectedClient]);
+
+  const handlePrintPDFReport = () => {
+    if (!selectedClient) return;
+
+    const isAll = selectedClient === 'ALL' || selectedClient === 'All Clients';
+    const matchesClient = (c?: string | null) => {
+      if (!c || c.toUpperCase() === 'DCEL') return false;
+      if (isAll) return true;
+      return c.trim().toLowerCase() === selectedClient.trim().toLowerCase();
+    };
+
+    const statementClientName = isAll ? 'ALL CORPORATE CLIENTS' : selectedClient;
+
+    const isWithinReportDate = (dateStr: string | undefined | null) => {
+      if (!dateStr) return true;
+      const norm = normalizeDate(dateStr);
+      if (!norm) return true;
+      if (reportStartDate && norm < reportStartDate) return false;
+      if (reportEndDate && norm > reportEndDate) return false;
+      if (!reportStartDate && !reportEndDate) {
+        return isWithinTimeFilter(dateStr);
+      }
+      return true;
+    };
+
+    const allClientInvoices = invoices.filter(i => 
+      matchesClient(i.client) && 
+      isWithinReportDate(i.date)
+    );
+
+    const allClientPayments = payments.filter(p => 
+      matchesClient(p.client) && 
+      isWithinReportDate(p.date)
+    );
+
+    const totalInvoiced = allClientInvoices.reduce((sum, i) => sum + (i.totalCharge || i.amount || 0), 0);
+    const totalPaid = allClientPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
+    const outstandingBalance = Math.max(0, totalInvoiced - totalPaid);
+    const pctPaid = totalInvoiced > 0 ? Math.min(100, Math.round((totalPaid / totalInvoiced) * 100)) : 0;
+    const overdueCount = allClientInvoices.filter(i => i.status === 'Overdue' || (i.status !== 'Paid' && i.dueDate && new Date(normalizeDate(i.dueDate)).getTime() < Date.now())).length;
+
+    const dateRangeLabel = reportStartDate || reportEndDate
+      ? `${reportStartDate ? new Date(reportStartDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Beginning'} — ${reportEndDate ? new Date(reportEndDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Present'}`
+      : (filterMonth !== 'all' || filterYear !== 'all' ? `Filtered Period (${filterMonth !== 'all' ? filterMonth + '/' : ''}${filterYear})` : 'All-Time Financial Statement');
+
+    const printWin = window.open('', '_blank', 'width=1000,height=800');
+    if (!printWin) {
+      toast.error('Pop-up blocked. Please allow pop-ups to print/download PDF.');
+      return;
+    }
+
+    const sitesHtml = clientSites.map(site => {
+      const siteInvoices = invoices.filter(i => 
+        matchesClient(i.client) &&
+        (i.siteId === site.id || 
+         i.siteName?.trim().toLowerCase() === site.name?.trim().toLowerCase() ||
+         i.project?.trim().toLowerCase() === site.name?.trim().toLowerCase()) &&
+        isWithinReportDate(i.date)
+      );
+
+      const sitePayments = payments.filter(p => 
+        matchesClient(p.client) &&
+        (p.site?.trim().toLowerCase() === site.name?.trim().toLowerCase() || 
+         p.site?.trim().toLowerCase() === site.id.toLowerCase()) &&
+        isWithinReportDate(p.date)
+      );
+
+      const siteTotalInvoiced = siteInvoices.reduce((sum, i) => sum + (i.totalCharge || i.amount || 0), 0);
+      const siteTotalCollected = sitePayments.reduce((sum, p) => sum + (p.amount || 0), 0);
+
+      const invoicesRows = siteInvoices.length > 0 ? siteInvoices.map(inv => `
+        <tr>
+          <td>${inv.date ? new Date(normalizeDate(inv.date)).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</td>
+          <td class="inv-num">${inv.invoiceNumber || '-'}</td>
+          <td>${inv.duration ? `${inv.duration} Days` : (inv.billingCycle || 'Net 30')}</td>
+          <td class="text-right font-bold">₦${(inv.totalCharge || inv.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+        </tr>
+      `).join('') : `<tr><td colspan="4" class="empty-cell">No invoices recorded for this site</td></tr>`;
+
+      const paymentsRows = sitePayments.length > 0 ? sitePayments.map(pay => {
+        const methodDisplay = pay.payVat === 'Add' ? 'Bank Transfer (Add VAT)' : pay.payVat === 'Yes' ? 'Direct Transfer (VAT Incl.)' : 'Bank Transfer / ACH';
+        return `
+          <tr>
+            <td>${pay.date ? new Date(normalizeDate(pay.date)).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</td>
+            <td>${methodDisplay}</td>
+            <td class="text-right font-bold green-text">₦${(pay.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+          </tr>
+        `;
+      }).join('') : `<tr><td colspan="3" class="empty-cell">Pending future disbursements for this site</td></tr>`;
+
+      return `
+        <div class="site-card">
+          <div class="site-header">
+            <div class="site-title">
+              📍 <strong>${site.name}</strong>
+            </div>
+            <div class="site-totals">
+              <span>Invoiced: <strong>₦${siteTotalInvoiced.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></span>
+              <span class="divider">|</span>
+              <span class="green-text">Collected: <strong>₦${siteTotalCollected.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></span>
+            </div>
+          </div>
+
+          <div class="dual-tables">
+            <div class="table-box">
+              <div class="table-box-header">
+                <span>INVOICES SENT</span>
+                <span class="total-tag">Total: ₦${siteTotalInvoiced.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+              </div>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Invoice #</th>
+                    <th>Duration</th>
+                    <th class="text-right">Amount</th>
+                  </tr>
+                </thead>
+                <tbody>${invoicesRows}</tbody>
+              </table>
+            </div>
+
+            <div class="table-box">
+              <div class="table-box-header green-header">
+                <span>PAYMENTS MADE</span>
+                <span class="total-tag green-tag">Collected: ₦${siteTotalCollected.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+              </div>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Payment Name / Method</th>
+                    <th class="text-right">Amount Paid</th>
+                  </tr>
+                </thead>
+                <tbody>${paymentsRows}</tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    printWin.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Client Financial Activity Statement — ${selectedClient}</title>
+        <style>
+          @page {
+            size: A4 portrait;
+            margin: 12mm 12mm 12mm 12mm;
+          }
+          * {
+            box-sizing: border-box;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            color: #0f172a;
+            background: #ffffff;
+            margin: 0;
+            padding: 0;
+            font-size: 11px;
+            line-height: 1.4;
+          }
+          .report-wrapper {
+            position: relative;
+            z-index: 1;
+            padding: 10px;
+            max-width: 1000px;
+            margin: 0 auto;
+          }
+          .header-grid {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 16px;
+            margin-bottom: 20px;
+          }
+          .watermark-bg {
+            position: fixed;
+            top: 45%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-25deg);
+            width: 520px;
+            height: auto;
+            opacity: 0.45;
+            pointer-events: none;
+            z-index: 0;
+          }
+          .company-title {
+            font-size: 11px;
+            font-weight: 800;
+            color: #4f46e5;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 4px;
+          }
+          .report-title {
+            font-size: 22px;
+            font-weight: 900;
+            color: #0f172a;
+            margin: 0 0 6px 0;
+          }
+          .company-sub {
+            font-size: 10px;
+            color: #64748b;
+            margin: 0;
+          }
+          .client-box {
+            background: rgba(248, 250, 252, 0.5);
+            border: 1px solid #cbd5e1;
+            border-radius: 12px;
+            padding: 12px 16px;
+            width: 380px;
+          }
+          .client-box-top {
+            display: flex;
+            justify-content: space-between;
+            border-bottom: 1px solid #e2e8f0;
+            padding-bottom: 8px;
+            margin-bottom: 8px;
+          }
+          .client-name {
+            font-size: 13px;
+            font-weight: 800;
+            color: #0f172a;
+          }
+          .ref-num {
+            font-family: monospace;
+            font-size: 9px;
+            color: #64748b;
+            text-align: right;
+          }
+          .contact-grid {
+            display: flex;
+            justify-content: space-between;
+            font-size: 10px;
+          }
+          .contact-col {
+            width: 48%;
+          }
+          .label {
+            font-size: 8px;
+            font-weight: 700;
+            color: #94a3b8;
+            text-transform: uppercase;
+            display: block;
+            margin-bottom: 2px;
+          }
+          .val {
+            font-weight: 700;
+            color: #1e293b;
+          }
+          .val-sub {
+            color: #64748b;
+            font-size: 9px;
+          }
+          .kpi-row {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 24px;
+          }
+          .kpi-card {
+            flex: 1;
+            background: rgba(248, 250, 252, 0.5);
+            border: 1px solid #cbd5e1;
+            border-radius: 12px;
+            padding: 12px 16px;
+          }
+          .kpi-card-header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 9px;
+            font-weight: 800;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+          }
+          .kpi-amount {
+            font-size: 20px;
+            font-weight: 900;
+            color: #0f172a;
+          }
+          .kpi-amount.green {
+            color: #059669;
+          }
+          .kpi-amount.rose {
+            color: #e11d48;
+          }
+          .kpi-sub {
+            font-size: 9px;
+            color: #64748b;
+            margin-top: 4px;
+          }
+          .progress-bar {
+            height: 6px;
+            background: #e2e8f0;
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 8px;
+          }
+          .progress-fill {
+            height: 100%;
+            background: #10b981;
+          }
+          .section-heading {
+            font-size: 11px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #64748b;
+            border-bottom: 1px solid #e2e8f0;
+            padding-bottom: 6px;
+            margin-bottom: 16px;
+          }
+          .site-card {
+            border: 1px solid #cbd5e1;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.45);
+            padding: 14px;
+            margin-bottom: 18px;
+            page-break-inside: avoid;
+          }
+          .site-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #f1f5f9;
+            padding-bottom: 8px;
+            margin-bottom: 12px;
+          }
+          .site-title {
+            font-size: 12px;
+            font-weight: 800;
+            color: #0f172a;
+          }
+          .site-id {
+            font-size: 10px;
+            color: #64748b;
+            font-weight: 500;
+          }
+          .site-totals {
+            font-size: 10px;
+            font-weight: 600;
+          }
+          .divider {
+            color: #cbd5e1;
+            margin: 0 6px;
+          }
+          .dual-tables {
+            display: flex;
+            gap: 12px;
+          }
+          .table-box {
+            flex: 1;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.35);
+            overflow: hidden;
+          }
+          .table-box-header {
+            background: rgba(241, 245, 249, 0.6);
+            padding: 6px 10px;
+            font-size: 9px;
+            font-weight: 800;
+            color: #475569;
+            display: flex;
+            justify-content: space-between;
+            border-bottom: 1px solid #e2e8f0;
+          }
+          .table-box-header.green-header {
+            background: rgba(236, 253, 245, 0.6);
+            color: #065f46;
+          }
+          .total-tag {
+            color: #4f46e5;
+          }
+          .total-tag.green-tag {
+            color: #059669;
+          }
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 10px;
+            background: transparent;
+          }
+          th {
+            background: rgba(250, 250, 250, 0.5);
+            border-bottom: 1px solid #e2e8f0;
+            color: #94a3b8;
+            font-size: 8px;
+            font-weight: 800;
+            text-transform: uppercase;
+            padding: 6px 8px;
+            text-align: left;
+          }
+          td {
+            padding: 6px 8px;
+            border-bottom: 1px solid #f1f5f9;
+            color: #334155;
+            background: transparent;
+          }
+          tr:last-child td {
+            border-bottom: none;
+          }
+          .inv-num {
+            font-weight: 800;
+            color: #4f46e5;
+          }
+          .green-text {
+            color: #059669;
+          }
+          .text-right {
+            text-align: right;
+          }
+          .font-bold {
+            font-weight: 700;
+          }
+          .empty-cell {
+            text-align: center;
+            color: #94a3b8;
+            font-style: italic;
+            padding: 12px;
+          }
+          .footer-section {
+            margin-top: 30px;
+            padding-top: 16px;
+            border-top: 1px solid #e2e8f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            page-break-inside: avoid;
+          }
+          .footer-note {
+            max-width: 450px;
+            font-size: 9px;
+            color: #64748b;
+          }
+          .signature-box {
+            text-align: right;
+            min-width: 200px;
+          }
+          .signature-space {
+            height: 40px;
+          }
+          .signature-line {
+            width: 200px;
+            height: 1px;
+            background: #94a3b8;
+            margin-left: auto;
+            margin-bottom: 6px;
+          }
+          .signature-title {
+            font-size: 10px;
+            font-weight: 800;
+            color: #0f172a;
+          }
+          .signature-company {
+            font-size: 8px;
+            color: #64748b;
+          }
+        </style>
+      </head>
+      <body>
+        <img src="${logoImg}" class="watermark-bg" alt="" />
+        <div class="report-wrapper">
+          <!-- Header -->
+          <div class="header-grid">
+            <div>
+              <div class="company-title">${companyInfo.name}</div>
+              <h1 class="report-title">Client Activity Statement</h1>
+              <p class="company-sub">${companyInfo.address || 'Operations & Dewatering Division'}</p>
+              <p class="company-sub">Tel: ${companyInfo.phone || 'N/A'} | Email: ${companyInfo.email || 'accounts@dcel.io'} | Period: ${dateRangeLabel}</p>
+            </div>
+
+            <div class="client-box">
+              <div class="client-box-top">
+                <div>
+                  <span class="label">Statement For</span>
+                  <div class="client-name">${statementClientName}</div>
+                </div>
+                <div class="ref-num">
+                  REF: REP-${selectedClient.replace(/[^a-zA-Z0-9]/g, '').substring(0, 4).toUpperCase()}-${new Date().getFullYear()}<br>
+                  DATE: ${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                </div>
+              </div>
+              <div class="contact-grid">
+                <div class="contact-col">
+                  <span class="label">Principal Contact</span>
+                  <div class="val">${principalContact?.name || selectedClientProfile?.mainContactPerson || 'Primary Contact'}</div>
+                  ${principalContact?.position ? `<div class="val-sub">${principalContact.position}</div>` : ''}
+                </div>
+                <div class="contact-col">
+                  <span class="label">Phone / Email</span>
+                  <div class="val">${principalContact?.phone || selectedClientProfile?.contactPhone || '—'}</div>
+                  ${principalContact?.email ? `<div class="val-sub">${principalContact.email}</div>` : ''}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- KPI Row -->
+          <div class="kpi-row">
+            <div class="kpi-card">
+              <div class="kpi-card-header">Total Invoiced</div>
+              <div class="kpi-amount">₦${totalInvoiced.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+              <div class="kpi-sub">Across ${clientSites.length} project sites</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-card-header">Total Paid</div>
+              <div class="kpi-amount green">₦${totalPaid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+              <div class="progress-bar"><div class="progress-fill" style="width:${pctPaid}%"></div></div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-card-header">Outstanding Balance</div>
+              <div class="kpi-amount ${outstandingBalance > 0 ? 'rose' : ''}">₦${outstandingBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+            </div>
+          </div>
+
+          <!-- Sites -->
+          <div class="section-heading">Site-by-Site Financial Breakdown</div>
+          ${sitesHtml || '<div class="empty-cell">No sites logged for this client</div>'}
+
+          <!-- Footer -->
+          <div class="footer-section">
+            <div class="footer-note">
+              <strong>${companyInfo.name}</strong><br>
+              This financial activity report is an automated summary of accounting and invoicing data recorded for ${selectedClient}. For disputes or detailed breakdowns, contact support.<br>
+              <strong>SUPPORT:</strong> ${companyInfo.email || 'accounts@dcel.io'} | <strong>TEL:</strong> ${companyInfo.phone || 'N/A'}
+            </div>
+            <div class="signature-box">
+              <div class="signature-space"></div>
+              <div class="signature-line"></div>
+              <div class="signature-title">Authorized Signature / Stamp</div>
+              <div class="signature-company">${companyInfo.name}</div>
+            </div>
+          </div>
+        </div>
+
+        <script>
+          window.onload = function() {
+            setTimeout(function() {
+              window.focus();
+              window.print();
+            }, 250);
+          };
+        </script>
+      </body>
+      </html>
+    `);
+    printWin.document.close();
+  };
 
   const [activeTab, setRawActiveTab] = useState<TabType>(() => {
     const queryTab = new URLSearchParams(window.location.search).get('tab');
@@ -268,19 +963,40 @@ export function Client360() {
   }, [allClients, searchParams, setSearchParams, selectedClient, activeTab]);
 
   const clientPendingSites = useMemo(() => {
+    const isAll = selectedClient === 'ALL' || selectedClient === 'All Clients';
     // All site names for this client that have been activated (exist as a site record, any status)
     const activatedSiteNames = new Set(
       sites
-        .filter(s => s.client?.trim().toLowerCase() === selectedClient?.trim().toLowerCase())
+        .filter(s => isAll || s.client?.trim().toLowerCase() === selectedClient?.trim().toLowerCase())
         .map(s => s.name?.trim().toLowerCase())
     );
 
     return pendingSites.filter(ps =>
-      ps.clientName?.trim().toLowerCase() === selectedClient?.trim().toLowerCase() &&
+      (isAll || ps.clientName?.trim().toLowerCase() === selectedClient?.trim().toLowerCase()) &&
       ps.status === 'Pending' &&
       !activatedSiteNames.has(ps.siteName?.trim().toLowerCase())
     );
   }, [pendingSites, selectedClient, sites]);
+
+  const effectiveFormClient = commForm.clientName || (selectedClient === 'ALL' ? (allClients[0] || 'ALL') : selectedClient);
+
+  const modalClientSites = useMemo(() => {
+    const isModalAll = effectiveFormClient === 'ALL' || effectiveFormClient === 'All Clients';
+    return sites.filter(s => {
+      if (!s.client || s.client.toUpperCase() === 'DCEL') return false;
+      return isModalAll || s.client.trim().toLowerCase() === effectiveFormClient.trim().toLowerCase();
+    });
+  }, [sites, effectiveFormClient]);
+
+  const modalClientPendingSites = useMemo(() => {
+    const isModalAll = effectiveFormClient === 'ALL' || effectiveFormClient === 'All Clients';
+    const activatedSiteNames = new Set(modalClientSites.map(s => s.name?.trim().toLowerCase()));
+    return pendingSites.filter(ps =>
+      (isModalAll || ps.clientName?.trim().toLowerCase() === effectiveFormClient.trim().toLowerCase()) &&
+      ps.status === 'Pending' &&
+      !activatedSiteNames.has(ps.siteName?.trim().toLowerCase())
+    );
+  }, [pendingSites, effectiveFormClient, modalClientSites]);
 
   const [activitySubTab, setActivitySubTab] = useState<'history' | 'onboarding'>('history');
   const [sitesSubTab, setSitesSubTab] = useState<'portfolio' | 'onboarding' | 'pending' | 'closed'>('portfolio');
@@ -365,6 +1081,8 @@ export function Client360() {
       toast.error('Please enter notes');
       return;
     }
+
+    const logClient = effectiveFormClient;
     
     let resolvedSiteId: string | undefined = undefined;
     let resolvedSiteName: string | undefined = undefined;
@@ -378,12 +1096,12 @@ export function Client360() {
       resolvedSiteName = commForm.newSiteName.trim();
       isNewOnboarding = true;
     } else if (commForm.siteOption) {
-      const existingSite = clientSites.find((s: any) => s.id === commForm.siteOption);
+      const existingSite = modalClientSites.find((s: any) => s.id === commForm.siteOption);
       if (existingSite) {
         resolvedSiteId = existingSite.id;
         resolvedSiteName = existingSite.name;
       } else {
-        const existingPending = clientPendingSites.find((ps: any) => ps.id === commForm.siteOption);
+        const existingPending = modalClientPendingSites.find((ps: any) => ps.id === commForm.siteOption);
         if (existingPending) {
           resolvedSiteId = existingPending.id;
           resolvedSiteName = existingPending.siteName;
@@ -412,7 +1130,7 @@ export function Client360() {
       direction: commForm.direction,
       channel: mappedChannel,
       contactType: 'Client',
-      client: selectedClient,
+      client: logClient,
       siteId: resolvedSiteId,
       siteName: resolvedSiteName,
       contactPerson: commForm.contactPerson.trim() || undefined,
@@ -431,7 +1149,7 @@ export function Client360() {
       const pendingSiteId = crypto.randomUUID();
       addPendingSite({
         id: pendingSiteId,
-        clientName: selectedClient,
+        clientName: logClient,
         siteName: resolvedSiteName,
         status: 'Pending',
         phase1: {
@@ -497,7 +1215,7 @@ export function Client360() {
     }
 
     if (commForm.createTask) {
-      const initialTitle = commForm.subject.trim() || `Follow-up: ${commForm.channel} with ${selectedClient}`;
+      const initialTitle = commForm.subject.trim() || `Follow-up: ${commForm.channel} with ${logClient}`;
       
       const buildTaskDescriptionLocal = () => {
         const lines: string[] = [];
@@ -505,7 +1223,7 @@ export function Client360() {
         const date = new Date().toISOString().split('T')[0];
         const who = commForm.contactPerson ? ` with ${commForm.contactPerson}` : '';
         const via = commForm.channel;
-        const clientPart = ` — ${selectedClient}`;
+        const clientPart = ` — ${logClient}`;
         const sitePart = resolvedSiteName ? ` / ${resolvedSiteName}` : '';
 
         lines.push(
@@ -527,7 +1245,7 @@ export function Client360() {
       };
 
       const matchedClient = clientProfiles.find(
-        c => c.name.trim().toLowerCase() === selectedClient.trim().toLowerCase()
+        c => c.name.trim().toLowerCase() === logClient.trim().toLowerCase()
       );
 
       setTaskDialog({
@@ -542,6 +1260,8 @@ export function Client360() {
     setCommDialogOpen(false);
     // Reset form
     setCommForm({
+      clientName: '',
+      linkedTo: 'Existing Client',
       subject: '',
       notes: '',
       direction: 'Outgoing',
@@ -599,6 +1319,7 @@ export function Client360() {
   // 1. Client Sites & Active Sites Info
   const clientSites = useMemo(() => {
     if (!selectedClient) return [];
+    const isAll = selectedClient === 'ALL' || selectedClient === 'All Clients';
 
     const isSiteActiveInFilter = (s: Site) => {
       if (filterMonth === 'all' && filterYear === 'all') return true;
@@ -635,7 +1356,11 @@ export function Client360() {
       }
     };
 
-    return sites.filter(s => s.client.trim() === selectedClient && isSiteActiveInFilter(s));
+    return sites.filter(s => {
+      if (!s.client || s.client.toUpperCase() === 'DCEL') return false;
+      const matches = isAll || s.client.trim().toLowerCase() === selectedClient.trim().toLowerCase();
+      return matches && isSiteActiveInFilter(s);
+    });
   }, [sites, selectedClient, filterMonth, filterYear]);
 
   const activeSites = useMemo(() => {
@@ -659,21 +1384,28 @@ export function Client360() {
       };
     }
 
-    const clientPayments = payments.filter(p => p.client?.trim() === selectedClient && isWithinTimeFilter(p.date));
+    const isAll = selectedClient === 'ALL' || selectedClient === 'All Clients';
+    const matchesClient = (c?: string | null) => {
+      if (!c || c.toUpperCase() === 'DCEL') return false;
+      if (isAll) return true;
+      return c.trim().toLowerCase() === selectedClient.trim().toLowerCase();
+    };
+
+    const clientPayments = payments.filter(p => matchesClient(p.client) && isWithinTimeFilter(p.date));
     const paymentsCleared = clientPayments.reduce((acc, p) => acc + (p.amount || 0), 0);
     const totalDiscounts = clientPayments.reduce((acc, p) => acc + (p.discount || 0), 0);
     const totalWht = clientPayments.reduce((acc, p) => acc + (p.withholdingTax || 0), 0);
 
-    const clientInvoicesFiltered = invoices.filter(i => i.client?.trim() === selectedClient && isWithinTimeFilter(i.date));
+    const clientInvoicesFiltered = invoices.filter(i => matchesClient(i.client) && isWithinTimeFilter(i.date));
     const totalRevenue = clientInvoicesFiltered.reduce((acc, i) => acc + (i.totalCharge || i.amount || 0), 0);
 
-    const clientVatPayments = vatPayments.filter(vp => vp.client?.trim() === selectedClient && isWithinTimeFilter(vp.date));
+    const clientVatPayments = vatPayments.filter(vp => matchesClient(vp.client) && isWithinTimeFilter(vp.date));
     const vatMonthsIncluded = Array.from(new Set(clientVatPayments.map(vp => `${vp.month} ${vp.year}`)));
 
     const vatDueByMonthYear: Record<string, number> = {};
     const vatPaymentsByMonthYear: Record<string, number> = {};
 
-    const allClientPayments = payments.filter(p => p.client?.trim() === selectedClient);
+    const allClientPayments = payments.filter(p => matchesClient(p.client));
     allClientPayments.forEach(p => {
       const normalized = normalizeDate(p.date);
       if (!normalized) return;
@@ -693,7 +1425,7 @@ export function Client360() {
       vatDueByMonthYear[key] = (vatDueByMonthYear[key] || 0) + vatAmount;
     });
 
-    const allClientVatPayments = vatPayments.filter(vp => vp.client?.trim() === selectedClient);
+    const allClientVatPayments = vatPayments.filter(vp => matchesClient(vp.client));
     allClientVatPayments.forEach(vp => {
       if (!vp.month || !vp.year) return;
       const key = `${vp.month.trim().toLowerCase()}-${vp.year.trim()}`;
@@ -755,10 +1487,10 @@ export function Client360() {
     );
     const vatDeficit = uniquePeriodsForDeficit.reduce((sum, period) => sum + Math.max(0, period.due - period.paid), 0);
 
-    const clientCosts = ledgerEntries.filter(l => l.client?.trim() === selectedClient && isWithinTimeFilter(l.date));
+    const clientCosts = ledgerEntries.filter(l => matchesClient(l.client) && isWithinTimeFilter(l.date));
     const totalCost = clientCosts.reduce((acc, l) => acc + (l.amount || 0), 0);
 
-    const rawClientInvoices = invoices.filter(i => i.client?.trim() === selectedClient);
+    const rawClientInvoices = invoices.filter(i => matchesClient(i.client));
 
     const clientInvoices = rawClientInvoices.map(inv => {
       const site = clientSites.find(s => s.id === inv.siteId || s.name === inv.siteName);
@@ -823,11 +1555,14 @@ export function Client360() {
       };
     }
 
+    const isAll = selectedClient === 'ALL' || selectedClient === 'All Clients';
     const clientNameLow = selectedClient.toLowerCase();
     const clientId = clientProfiles.find(c => c.name.trim() === selectedClient)?.id;
     const clientSiteIds = new Set(clientSites.map(s => s.id));
     
     const clientTasks = mainTasks.filter(t => {
+      if (t.isDeleted) return false;
+      if (isAll) return true;
       if (t.title?.toLowerCase().includes(clientNameLow)) return true;
       if (t.description && t.description.toLowerCase().includes(clientNameLow)) return true;
       if (clientId && t.clientId === clientId) return true;
@@ -880,21 +1615,28 @@ export function Client360() {
       };
     }
 
-    const contacts = clientContacts.filter(c => c.clientName?.trim().toLowerCase() === selectedClient?.trim().toLowerCase());
-    const logs = commLogs.filter(c => c.client?.trim().toLowerCase() === selectedClient?.trim().toLowerCase() && isWithinTimeFilter(c.date)).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    const isAll = selectedClient === 'ALL' || selectedClient === 'All Clients';
+    const matchesClient = (c?: string | null) => {
+      if (!c || c.toUpperCase() === 'DCEL') return false;
+      if (isAll) return true;
+      return c.trim().toLowerCase() === selectedClient.trim().toLowerCase();
+    };
+
+    const contacts = clientContacts.filter(c => matchesClient(c.clientName));
+    const logs = commLogs.filter(c => matchesClient(c.client) && isWithinTimeFilter(c.date)).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     
-    const clientAttendance = attendanceRecords.filter(a => isWithinTimeFilter(a.date) && (a.dayClient?.trim() === selectedClient || a.nightClient?.trim() === selectedClient));
+    const clientAttendance = attendanceRecords.filter(a => isWithinTimeFilter(a.date) && (matchesClient(a.dayClient) || matchesClient(a.nightClient)));
     const uniqueStaffIds = new Set(clientAttendance.map(a => a.staffId));
 
     const siteIds = new Set(clientSites.map(s => s.id));
     const siteNames = new Set(clientSites.map(s => s.name));
-    const clientMachineLogs = dailyMachineLogs.filter(l => siteIds.has(l.siteId) && isWithinTimeFilter(l.date));
+    const clientMachineLogs = dailyMachineLogs.filter(l => (isAll || siteIds.has(l.siteId)) && isWithinTimeFilter(l.date));
     
     const deployedMachines = assets.filter(a => 
-      a.type === 'equipment' && a.status === 'active' && a.location && siteNames.has(a.location)
+      a.type === 'equipment' && a.status === 'active' && a.location && (isAll || siteNames.has(a.location))
     );
 
-    const clientWaybills = waybills.filter(w => siteIds.has(w.siteId) && isWithinTimeFilter(w.issueDate));
+    const clientWaybills = waybills.filter(w => (isAll || siteIds.has(w.siteId)) && isWithinTimeFilter(w.issueDate));
 
     return {
       contacts,
@@ -1096,29 +1838,90 @@ export function Client360() {
     setIsGeneratingBrief(true);
 
     try {
-      const invoiceContext = clientData.clientInvoices.map(i => `Invoice ${i.invoiceNumber}: ₦${i.totalCharge}, Status: ${i.status}, Date: ${i.date}`).join(' | ');
-      const machineContext = clientData.machineLogs.slice(0, 10).map(m => `${m.assetName} on ${m.date}: ${m.dieselUsage}L used, Issues: ${m.issuesOnSite || 'None'}`).join(' | ');
-      const commContext = clientData.logs.slice(0, 5).map(l => `[${l.date}] ${l.channel} - ${l.notes}`).join(' | ');
-      const waybillContext = clientData.waybills.slice(0, 5).map(w => `${w.type} Waybill ${w.id.substring(0,6)}: ${w.items.map(i => `${i.quantity}x ${i.assetName}`).join(', ')} (${w.status})`).join(' | ');
-      const deployedMachinesList = clientData.deployedMachines.map(m => m.name).join(', ');
-      
-      const systemPrompt = `You are a Client 360 Decision Intelligence Assistant for DCEL.
-Your goal is to answer questions strictly based on the following context for client: ${selectedClient}.
-Context:
-- Active Sites: ${clientData.activeSites} out of ${clientData.totalSites}
-- Total Active Machines on Site: ${clientData.activeMachinesCount} ${deployedMachinesList ? `(${deployedMachinesList})` : ''}
-- VAT Deficit: ₦${clientData.vatDeficit}
-- Total Revenue Paid: ₦${clientData.paymentsCleared}
-- Profit Margin: ₦${clientData.profit}
-- Pending Workflow Tasks: ${clientData.pendingTasks.length}
-- Unique Staff Deployed in this period: ${clientData.deployedStaffCount}
-- Recent Invoices: ${invoiceContext || 'None'}
-- Recent Machine Logs: ${machineContext || 'None'}
-- Recent Communications/Comments: ${commContext || 'None'}
-- Recent Waybills/Materials: ${waybillContext || 'None'}
+      const isAll = selectedClient === 'ALL' || selectedClient === 'All Clients';
+      const clientLabel = isAll ? 'All Corporate Accounts (Consolidated Enterprise View)' : selectedClient;
 
-When asked to provide the initial intelligence brief, give a 3-sentence summary highlighting operational health, financial risk (VAT and Invoices), and workflow bottlenecks.
-Be extremely concise. If the user asks about invoices, machines, staff, materials, or comments, refer to the context provided.`;
+      // 1. Invoices & Overdue Breakdown
+      const overdueInvoices = clientData.clientInvoices.filter((i: any) => i.status === 'Overdue' || (i.status !== 'Paid' && i.dueDate && new Date(normalizeDate(i.dueDate)).getTime() < Date.now()));
+      const overdueSummary = overdueInvoices.slice(0, 15).map((i: any) => `Inv #${i.invoiceNumber} (${i.client || 'N/A'} - ${i.siteName || 'N/A'}): ₦${(i.totalCharge || i.amount || 0).toLocaleString()} (Due: ${i.dueDate || 'N/A'})`).join(' | ');
+      const recentInvoicesSummary = clientData.clientInvoices.slice(0, 20).map((i: any) => `Inv #${i.invoiceNumber} (${i.client || 'N/A'}): ₦${(i.totalCharge || i.amount || 0).toLocaleString()} [Status: ${i.status}]`).join(' | ');
+
+      // 2. Client & Sites Summary & Project Scope
+      const clientListSummary = isAll ? Array.from(new Set(sites.map(s => s.client))).filter(c => c && c.toUpperCase() !== 'DCEL').join(', ') : selectedClient;
+      const sitesSummary = clientData.clientSites.slice(0, 20).map((s: any) => `${s.name} (${s.client}) [Status: ${s.status}]`).join(' | ');
+      const siteProjectSummaries = clientData.clientSites.slice(0, 20).map((s: any) => {
+        const ps = pendingSites.find(p => p.siteName === s.name && p.clientName === s.client);
+        const scope = ps?.phase1?.whatIsBeingBuilt || s.description || 'Dewatering & Substructure Engineering';
+        return `Site "${s.name}" (${s.client || 'N/A'}): Status [${s.status}], Scope: "${scope}"`;
+      }).join(' | ');
+
+      // 3. Operational Machine, Equipment Logs & Reconciliation
+      const totalFleetCount = assets?.length || 0;
+      const deployedMachinesList = clientData.deployedMachines.slice(0, 25).map((m: any) => `${m.name} @ ${m.location || 'Onsite'} (Status: ${m.status || 'Active'})`).join(', ');
+      const underMaintenanceList = (assets || []).filter((a: any) => a.operationalStatus === 'under_maintenance' || a.status === 'in_service' || a.status === 'maintenance').map((a: any) => `${a.name} [Under Maintenance @ ${a.location || 'Yard'}]`).join(', ');
+      const machineLogsSummary = clientData.machineLogs.slice(0, 25).map((m: any) => `${m.assetName || 'Machine'} (${m.date || 'Log'}): ${m.hoursOperated || 0}hrs, ${m.dieselUsage || 0}L fuel${m.issuesOnSite ? `, Issue: "${m.issuesOnSite}"` : ''}`).join(' | ');
+
+      // 4. Communication & Waybills
+      const commLogsSummary = clientData.logs.slice(0, 20).map((l: any) => `[${l.date}] ${l.client || 'Client'} (${l.channel}): ${l.subject ? l.subject + ' - ' : ''}${l.notes}${l.outcome ? ` | Outcome: ${l.outcome}` : ''}`).join(' | ');
+      const waybillSummary = clientData.waybills.slice(0, 20).map((w: any) => `${w.type} Waybill ${w.id.substring(0, 6)}: ${w.items.map((i: any) => `${i.quantity}x ${i.assetName}`).join(', ')} (${w.status})`).join(' | ');
+
+      // 5. Tasks Summary
+      const pendingTasksSummary = clientData.pendingTasks.slice(0, 20).map((t: any) => `Task "${t.title}" [Status: ${t.status || 'Pending'}, Deadline: ${t.deadline || 'N/A'}]`).join(' | ');
+
+      const systemPrompt = `You are the Executive Personal Assistant & Chief of Staff for Dewatering Construction Etc Limited (DCEL). Your role is to provide direct, high-value, executive-level briefings and answer questions accurately without overwhelming the executive with raw, unorganized data dumps. Act like an intelligent, highly competent personal assistant giving a sharp status update.
+
+Target Context: ${clientLabel}
+
+REAL DATABASE RECORDS & EXECUTIVE METRICS:
+📊 FINANCIAL STANDING:
+- Total Invoiced Revenue: ₦${(clientData.totalRevenue || 0).toLocaleString()}
+- Total Cleared Payments: ₦${(clientData.paymentsCleared || 0).toLocaleString()}
+- Net Profit Margin: ₦${(clientData.profit || 0).toLocaleString()}
+- VAT Deficit Owed: ₦${(clientData.vatDeficit || 0).toLocaleString()}
+- Overdue Invoices Count: ${overdueInvoices.length} overdue invoice(s)
+- Top Overdue Invoices: ${overdueSummary || 'No overdue invoices'}
+
+🏗️ PROJECT SUMMARIES & SITE PORTFOLIO:
+- Active Sites: ${clientData.activeSites} / ${clientData.totalSites} Total Sites
+- Client Portfolio Accounts: ${clientListSummary}
+- Project Scope & Site Breakdown: ${siteProjectSummaries || 'None'}
+
+🚜 EQUIPMENT FLEET & MACHINE RECONCILIATION:
+- Total Equipment Assets: ${totalFleetCount}
+- Active Deployed Equipment: ${clientData.activeMachinesCount}
+- Deployed Machines Roster: ${deployedMachinesList || 'None'}
+- Equipment Under Maintenance / Service: ${underMaintenanceList || 'All machines operational'}
+- Recent Machine Recon Logs (Hours & Fuel): ${machineLogsSummary || 'No recent log issues'}
+
+👥 PERSONNEL & FIELD OPERATIONS:
+- Field Staff Deployed: ${clientData.deployedStaffCount}
+- Active Material Waybills: ${waybillSummary || 'None'}
+
+📋 WORKFLOWS & COMMUNICATIONS:
+- Open Workflow Tasks: ${clientData.pendingTasks.length} pending, ${clientData.approvalTasks.length} awaiting approval, ${clientData.completedTasks.length} completed
+- Pending Tasks List: ${pendingTasksSummary || 'None'}
+- Recent Client Communications: ${commLogsSummary || 'None'}
+
+EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
+1. Format output using clean Markdown with distinct section headers (###), bold bullet points (- **Label:** Value), and clean double line breaks.
+2. Tone: Professional Executive Assistant / Chief of Staff — concise, direct, helpful, focusing strictly on what the executive needs to know right now.
+3. For initial brief, divide into 3 focused executive sections:
+   ### 🎯 Executive Summary & Financial Exposure
+   - **Total Invoiced Revenue:** ₦[Amount]
+   - **Cleared Payments:** ₦[Amount]
+   - **VAT Deficit Owed:** ₦[Amount]
+   - **Critical Overdues:** Top overdue invoice numbers with amounts & client names
+
+   ### 🏗️ Project Summaries & Machine Recon
+   - **Active Projects Overview:** Summary of active sites, project scope & progress
+   - **Machine Fleet & Recon:** Deployed machines, runtime/fuel highlights & maintenance alerts
+
+   ### ⚡ Priority Actions For You Today
+   - **Immediate Priorities:** Top 3 actionable items requiring executive approval, task follow-up, or client recovery
+
+4. Bold key numbers, currency in Naira (₦), invoice IDs, client names, and site names (**Inv #293**, **Elfad**, **₦2,021,000**).
+5. Strict Factual Accuracy: Base answers strictly on the database records provided above. Never hallucinate non-existent figures or assets.
+6. NO UNFORMATTED PARAGRAPHS OR DATA DUMPS! Keep it sharp, clean, and executive-ready.`;
 
       let reply = '';
       if (selectedProvider === 'gemini') {
@@ -1133,7 +1936,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
           body: JSON.stringify({
             contents,
             systemInstruction: { parts: [{ text: systemPrompt }] },
-            generationConfig: { temperature: 0.3, maxOutputTokens: 300 }
+            generationConfig: { temperature: 0.3, maxOutputTokens: 800 }
           })
         });
         if (!res.ok) throw new Error('Gemini API Error');
@@ -1155,7 +1958,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
             model: selectedModel,
             messages: apiMessages,
             temperature: 0.3,
-            max_tokens: 300,
+            max_tokens: 800,
           }),
         });
         if (!res.ok) throw new Error('Groq API Error');
@@ -1301,36 +2104,56 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
 
       {/* Color-coded Minimalist Client Selector */}
       {(() => {
-        const currentStatus = clientStatusMap.get(selectedClient) || 'normal';
+        const isAll = selectedClient === 'ALL' || selectedClient === 'All Clients';
+        const currentStatus = isAll ? 'all' : (clientStatusMap.get(selectedClient) || 'normal');
         return (
           <div className={cn(
             "flex items-center gap-1.5 px-2.5 py-1 h-8 rounded-lg border shadow-sm transition-all shrink-0 order-first md:order-last w-full md:w-auto",
-            currentStatus === 'active'
+            isAll
+              ? (isDark ? "bg-indigo-950/60 border-indigo-800/80" : "bg-indigo-50 border-indigo-200")
+              : currentStatus === 'active'
               ? (isDark ? "bg-emerald-950/50 border-emerald-800/70" : "bg-emerald-50 border-emerald-200")
               : currentStatus === 'onboarding'
               ? (isDark ? "bg-amber-950/50 border-amber-800/70" : "bg-amber-50 border-amber-200")
               : (isDark ? "bg-slate-900 border-slate-700 hover:border-indigo-500" : "bg-white border-slate-200 hover:border-indigo-300")
           )}>
-            <Building2 className={cn(
-              "w-3.5 h-3.5 shrink-0 transition-colors",
-              currentStatus === 'active' ? "text-emerald-600 dark:text-emerald-400" :
-              currentStatus === 'onboarding' ? "text-amber-600 dark:text-amber-400" :
-              "text-indigo-600"
-            )} />
+            {isAll ? (
+              <Globe className="w-3.5 h-3.5 shrink-0 text-indigo-600 dark:text-indigo-400" />
+            ) : (
+              <Building2 className={cn(
+                "w-3.5 h-3.5 shrink-0 transition-colors",
+                currentStatus === 'active' ? "text-emerald-600 dark:text-emerald-400" :
+                currentStatus === 'onboarding' ? "text-amber-600 dark:text-amber-400" :
+                "text-indigo-600"
+              )} />
+            )}
             
             <div className="relative flex items-center w-full">
               <select
                 value={selectedClient}
                 onChange={(e) => setSelectedClient(e.target.value)}
                 className={cn(
-                  "appearance-none bg-transparent font-bold text-xs pr-5 focus:outline-none cursor-pointer w-full md:max-w-[150px] truncate transition-colors",
-                  currentStatus === 'active'
+                  "appearance-none bg-transparent font-bold text-xs pr-5 focus:outline-none cursor-pointer w-full md:max-w-[170px] truncate transition-colors",
+                  isAll
+                    ? "text-indigo-900 dark:text-indigo-200"
+                    : currentStatus === 'active'
                     ? "text-emerald-900 dark:text-emerald-200"
                     : currentStatus === 'onboarding'
                     ? "text-amber-900 dark:text-amber-200"
                     : (isDark ? "text-white" : "text-slate-900")
                 )}
               >
+                <option 
+                  value="ALL" 
+                  className="font-bold text-xs"
+                  style={{
+                    backgroundColor: isDark ? '#1e1b4b' : '#eef2ff',
+                    color: isDark ? '#c7d2fe' : '#4338ca'
+                  }}
+                >
+                  🌐 All Clients (Summary)
+                </option>
+                <option disabled value="__DIVIDER__">──────────────────────────</option>
                 {allClients.map(client => {
                   const status = clientStatusMap.get(client) || 'normal';
                   return (
@@ -1349,11 +2172,12 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                 })}
                 <option disabled value="__LEGEND_DIVIDER__">──────────────────────────</option>
                 <option disabled value="__LEGEND_KEY__" className="text-[10px] font-semibold" style={{ backgroundColor: isDark ? '#0f172a' : '#f8fafc', color: isDark ? '#94a3b8' : '#475569' }}>
-                  🟢 Active Sites  |  🟧 Onboarding
+                  🌐 All Clients  |  🟢 Active Sites  |  🟧 Onboarding
                 </option>
               </select>
               <ChevronDown className={cn(
                 "w-3.5 h-3.5 absolute right-0 pointer-events-none transition-colors",
+                isAll ? "text-indigo-500 dark:text-indigo-400" :
                 currentStatus === 'active' ? "text-emerald-500 dark:text-emerald-400" :
                 currentStatus === 'onboarding' ? "text-amber-500 dark:text-amber-400" :
                 "text-slate-400"
@@ -1482,7 +2306,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
 
 
             {currentUser?.privileges?.clients?.canViewDecisionIntelligence && (
-              <div className={cn("bg-gradient-to-br from-indigo-900 to-slate-900 rounded-2xl shadow-lg relative overflow-hidden group border border-indigo-700/50 flex flex-col transition-all duration-300", isChatCollapsed ? "h-auto" : "h-[350px]")}>
+              <div className={cn("bg-gradient-to-br from-indigo-900 to-slate-900 rounded-2xl shadow-lg relative overflow-hidden group border border-indigo-700/50 flex flex-col transition-all duration-300", isChatCollapsed ? "h-auto" : "h-[380px]")}>
                 <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none"><Sparkles className="w-48 h-48" /></div>
                 
                 <div className="flex items-center justify-between p-4 border-b border-indigo-800/50 relative z-10 shrink-0 cursor-pointer hover:bg-indigo-800/20 transition-colors" onClick={() => setIsChatCollapsed(!isChatCollapsed)}>
@@ -1512,12 +2336,30 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                         </select>
                       </div>
                     )}
-                    {!isChatCollapsed && messages.length === 0 && (
-                      <div className="flex items-center gap-1.5">
-                        <Button onClick={(e) => { e.stopPropagation(); sendChatMessage(true); }} disabled={isGeneratingBrief} size="sm" className="bg-indigo-600 hover:bg-indigo-500 text-white border-0 h-8 text-xs px-2 sm:px-3">
-                          {isGeneratingBrief ? <RefreshCcw className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5 sm:mr-1.5" />}
-                          <span className="hidden sm:inline">{isGeneratingBrief ? 'Analyzing...' : 'Generate Brief'}</span>
-                        </Button>
+                    {!isChatCollapsed && (
+                      <div className="flex items-center gap-1.5 border-l border-indigo-700/50 pl-2">
+                        {messages.length > 0 && (
+                          <Button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setMessages([]);
+                              toast.success('Chat history cleared!');
+                            }}
+                            size="sm"
+                            variant="ghost"
+                            className="text-indigo-300 hover:text-white hover:bg-indigo-800/50 h-8 px-2 text-xs flex items-center gap-1 rounded-lg"
+                            title="Clear conversation history"
+                          >
+                            <RotateCcw className="w-3.5 h-3.5" />
+                            <span className="hidden sm:inline">Clear Chat</span>
+                          </Button>
+                        )}
+                        {messages.length === 0 && (
+                          <Button onClick={(e) => { e.stopPropagation(); sendChatMessage(true); }} disabled={isGeneratingBrief} size="sm" className="bg-indigo-600 hover:bg-indigo-500 text-white border-0 h-8 text-xs px-2 sm:px-3 shadow-md">
+                            {isGeneratingBrief ? <RefreshCcw className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5 sm:mr-1.5" />}
+                            <span className="hidden sm:inline">{isGeneratingBrief ? 'Analyzing...' : 'Generate Brief'}</span>
+                          </Button>
+                        )}
                       </div>
                     )}
                     <Button variant="ghost" size="sm" className="text-indigo-200 hover:text-white hover:bg-indigo-800/50 h-8 w-8 p-0" onClick={(e) => { e.stopPropagation(); setIsChatCollapsed(!isChatCollapsed); }}>
@@ -1530,15 +2372,23 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                   <>
                     <div className="flex-1 overflow-y-auto p-4 space-y-4 style-scroll relative z-10">
                       {messages.length === 0 && !isGeneratingBrief && (
-                         <p className="text-sm text-indigo-300 italic text-center mt-8">Click "Generate Brief" or ask a question to analyze {selectedClient}'s data.</p>
+                         <p className="text-sm text-indigo-300 italic text-center mt-8">
+                           Click "Generate Brief" or ask a question to analyze {selectedClient === 'ALL' || selectedClient === 'All Clients' ? 'All Clients' : selectedClient}'s data.
+                         </p>
                       )}
                       {messages.map((msg, idx) => (
                         <div key={idx} className={cn("flex w-full", msg.role === 'user' ? "justify-end" : "justify-start")}>
                           <div className={cn(
-                            "max-w-[85%] rounded-xl p-3 text-sm",
-                            msg.role === 'user' ? "bg-indigo-600 text-white rounded-br-none" : "bg-slate-800/80 text-indigo-50 rounded-bl-none border border-indigo-700/30"
+                            "max-w-[90%] rounded-xl p-3.5 text-sm shadow-md",
+                            msg.role === 'user' 
+                              ? "bg-indigo-600 text-white rounded-br-none" 
+                              : "bg-slate-900/95 text-indigo-50 rounded-bl-none border border-indigo-700/50 backdrop-blur-md"
                           )}>
-                            {msg.content}
+                            {msg.role === 'user' ? (
+                              <p className="whitespace-pre-wrap">{msg.content}</p>
+                            ) : (
+                              renderFormattedChatMessage(msg.content)
+                            )}
                           </div>
                         </div>
                       ))}
@@ -1576,6 +2426,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                 {[
                   { id: 'overview', label: 'Overview', icon: Activity, show: currentUser?.privileges?.clients?.canView },
                   { id: 'financials', label: 'Financials', icon: DollarSign, show: currentUser?.privileges?.billing?.canView || currentUser?.privileges?.payments?.canView },
+                  { id: 'report', label: 'Client Report', icon: Printer, show: currentUser?.privileges?.billing?.canView || currentUser?.privileges?.payments?.canView },
                   { id: 'operations', label: 'Site 360', icon: Briefcase, show: currentUser?.privileges?.sites?.canView },
                   { id: 'contacts', label: 'Contacts', icon: Users, show: currentUser?.privileges?.clients?.canView },
                   { id: 'activity', label: 'Comms', icon: MessagesSquare, show: currentUser?.privileges?.commLog?.canView },
@@ -1590,7 +2441,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                     )}>
                     <span className="whitespace-nowrap">{tab.label}</span>
                     {tab.id === 'operations' && clientPendingSites.length > 0 && (
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500 text-white shrink-0 shadow-sm animate-in scale-in-50 duration-200">
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500 text-white shrink-0 shadow-sm ml-1.5">
                         {clientPendingSites.length}
                       </span>
                     )}
@@ -1622,7 +2473,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
               
               {/* OVERVIEW TAB */}
               {activeTab === 'overview' && (
-                <div className="space-y-6 animate-in fade-in zoom-in-[0.98] duration-200 ease-out">
+                <div className="space-y-6 transition-opacity duration-150">
                   {/* KPI Cards */}
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                     <div className={cn("p-3 sm:p-5 rounded-2xl border shadow-sm min-w-0", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
@@ -1709,7 +2560,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
 
               {/* FINANCIALS TAB */}
               {activeTab === 'financials' && (
-                <div className="space-y-6 animate-in fade-in zoom-in-[0.98] duration-200 ease-out">
+                <div className="space-y-6 transition-opacity duration-150">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {/* Revenue & Profit (Accrual Basis) */}
                     <div className={cn("p-6 rounded-3xl border shadow-sm flex flex-col justify-between", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
@@ -2449,9 +3300,434 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                 </div>
               )}
 
+              {/* CLIENT REPORT TAB */}
+              {activeTab === 'report' && (
+                <div className="space-y-6 transition-opacity duration-150">
+                  {/* Top Bar / Actions */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm no-print">
+                    <div>
+                      <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                        <Printer className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                        Client Financial Activity Statement
+                      </h3>
+                      <div className="flex flex-wrap items-center gap-2 mt-1">
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                          Statement for <span className="font-semibold text-slate-700 dark:text-slate-200">{selectedClient}</span>
+                        </p>
+                        <Badge variant="outline" className="text-[10px] bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-mono">
+                          {reportStartDate || reportEndDate
+                            ? `${reportStartDate ? new Date(reportStartDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Start'} — ${reportEndDate ? new Date(reportEndDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Present'}`
+                            : (filterMonth !== 'all' || filterYear !== 'all' ? `Filtered Period (${filterMonth !== 'all' ? filterMonth + '/' : ''}${filterYear})` : 'All-Time Statement')}
+                        </Badge>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+                      <Button
+                        onClick={() => {
+                          setReportDateModalMode('filter');
+                          setShowReportDateModal(true);
+                        }}
+                        variant="outline"
+                        className="h-9 px-3.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap shadow-sm shrink-0"
+                      >
+                        <Calendar className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                        <span>Select Date Range</span>
+                      </Button>
+
+                      <Button
+                        onClick={() => {
+                          setReportDateModalMode('print');
+                          setShowReportDateModal(true);
+                        }}
+                        className="h-9 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold border border-indigo-600 shadow-sm flex items-center gap-2 whitespace-nowrap shrink-0 transition-all active:scale-95"
+                      >
+                        <Printer className="w-4 h-4 text-white shrink-0" />
+                        <span>Download PDF / Print</span>
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Print Styles */}
+                  <style>{`
+                    @media print {
+                      body * {
+                        visibility: hidden !important;
+                      }
+                      #client-activity-report-print-area, #client-activity-report-print-area * {
+                        visibility: visible !important;
+                      }
+                      #client-activity-report-print-area {
+                        position: absolute !important;
+                        left: 0 !important;
+                        top: 0 !important;
+                        width: 100% !important;
+                        margin: 0 !important;
+                        padding: 24px !important;
+                        background: #ffffff !important;
+                        color: #0f172a !important;
+                        box-shadow: none !important;
+                        border: none !important;
+                      }
+                      .no-print {
+                        display: none !important;
+                      }
+                      .print-card-bg {
+                        background-color: #f8fafc !important;
+                        border-color: #e2e8f0 !important;
+                      }
+                      .print-table-header {
+                        background-color: #f1f5f9 !important;
+                        color: #475569 !important;
+                      }
+                      .print-text-dark {
+                        color: #0f172a !important;
+                      }
+                      .print-text-muted {
+                        color: #64748b !important;
+                      }
+                      .page-break-inside-avoid {
+                        page-break-inside: avoid;
+                      }
+                    }
+                  `}</style>
+
+                  {/* Printable Report Wrapper */}
+                  <div id="client-activity-report-print-area" className="relative overflow-hidden bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-8 shadow-sm space-y-8 print-text-dark">
+                    {/* 40% Transparent Watermark Background */}
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none overflow-hidden z-0">
+                      <img 
+                        src={logoImg} 
+                        alt="" 
+                        className="w-96 md:w-[480px] h-auto opacity-40 -rotate-12 select-none" 
+                      />
+                    </div>
+
+                    <div className="relative z-10 space-y-8">
+                      {/* Header */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-6 border-b border-slate-200 dark:border-slate-800">
+                        <div>
+                          <div className="text-xs font-bold uppercase tracking-widest text-indigo-600 dark:text-indigo-400 mb-1">
+                            {companyInfo.name}
+                          </div>
+                        <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900 dark:text-white">
+                          Client Financial Statement
+                        </h1>
+                        {companyInfo.address && (
+                          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm">
+                            {companyInfo.address}
+                          </p>
+                        )}
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-500 dark:text-slate-400 font-medium pt-1">
+                          {companyInfo.phone && <span>Tel: {companyInfo.phone}</span>}
+                          {companyInfo.phone && companyInfo.email && <span>•</span>}
+                          {companyInfo.email && <span>Email: {companyInfo.email}</span>}
+                          {companyInfo.regNumber && <span>• Reg: {companyInfo.regNumber}</span>}
+                        </div>
+                      </div>
+
+                      {/* Client Billing & Principal Contact Info */}
+                      <div className="bg-slate-50 dark:bg-slate-800/60 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 text-xs space-y-2 print-card-bg">
+                        <div className="flex justify-between items-start border-b border-slate-200 dark:border-slate-700/60 pb-2">
+                          <div>
+                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Statement For</span>
+                            <span className="text-sm font-black text-slate-900 dark:text-white">
+                              {selectedClient === 'ALL' || selectedClient === 'All Clients' ? 'ALL CORPORATE CLIENTS' : selectedClient}
+                            </span>
+                          </div>
+                          <div className="text-right font-mono text-[10px] text-slate-400">
+                            <div>REF: REP-{selectedClient.replace(/[^a-zA-Z0-9]/g, '').substring(0, 4).toUpperCase()}-{new Date().getFullYear()}</div>
+                            <div>DATE: {new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2 pt-1 text-[11px]">
+                          <div>
+                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Principal Contact</span>
+                            <span className="font-bold text-slate-800 dark:text-slate-200">
+                              {principalContact?.name || selectedClientProfile?.mainContactPerson || (selectedClient === 'ALL' || selectedClient === 'All Clients' ? 'All Accounts Summary' : 'Primary Contact')}
+                            </span>
+                            {principalContact?.position && (
+                              <span className="text-slate-500 block text-[10px]">{principalContact.position}</span>
+                            )}
+                          </div>
+                          <div>
+                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Phone & Email</span>
+                            <span className="font-semibold text-slate-700 dark:text-slate-300 block">
+                              {principalContact?.phone || selectedClientProfile?.contactPhone || (selectedClient === 'ALL' || selectedClient === 'All Clients' ? 'All Sites Consolidated' : '—')}
+                            </span>
+                            {principalContact?.email && (
+                              <span className="text-slate-500 text-[10px] block truncate">{principalContact.email}</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Report Summary Cards */}
+                    {(() => {
+                      const isAll = selectedClient === 'ALL' || selectedClient === 'All Clients';
+                      const matchesClient = (c?: string | null) => {
+                        if (!c || c.toUpperCase() === 'DCEL') return false;
+                        if (isAll) return true;
+                        return c.trim().toLowerCase() === selectedClient.trim().toLowerCase();
+                      };
+
+                      const isWithinReportDate = (dateStr: string | undefined | null) => {
+                        if (!dateStr) return true;
+                        const norm = normalizeDate(dateStr);
+                        if (!norm) return true;
+                        if (reportStartDate && norm < reportStartDate) return false;
+                        if (reportEndDate && norm > reportEndDate) return false;
+                        if (!reportStartDate && !reportEndDate) {
+                          return isWithinTimeFilter(dateStr);
+                        }
+                        return true;
+                      };
+
+                      const allClientInvoices = invoices.filter(i => matchesClient(i.client) && isWithinReportDate(i.date));
+                      const allClientPayments = payments.filter(p => matchesClient(p.client) && isWithinReportDate(p.date));
+
+                      const totalInvoiced = allClientInvoices.reduce((sum, i) => sum + (i.totalCharge || i.amount || 0), 0);
+                      const totalPaid = allClientPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
+                      const outstandingBalance = Math.max(0, totalInvoiced - totalPaid);
+                      const pctPaid = totalInvoiced > 0 ? Math.min(100, Math.round((totalPaid / totalInvoiced) * 100)) : 0;
+
+                      const overdueInvoicesCount = allClientInvoices.filter(i => i.status === 'Overdue' || (i.status !== 'Paid' && i.dueDate && new Date(normalizeDate(i.dueDate)).getTime() < Date.now())).length;
+
+                      return (
+                        <>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            {/* Total Invoiced Card */}
+                            <div className={cn("p-5 rounded-2xl border shadow-sm print-card-bg", isDark ? "bg-slate-800/60 border-slate-800" : "bg-slate-50 border-slate-200")}>
+                              <div className="flex justify-between items-start mb-2">
+                                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Total Invoiced</span>
+                                <div className="p-1.5 bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 rounded-lg">
+                                  <FileText className="w-4 h-4" />
+                                </div>
+                              </div>
+                              <div className="text-2xl font-black text-slate-900 dark:text-white">
+                                ₦{currentUser?.privileges?.billing?.canViewAmounts ? totalInvoiced.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '***'}
+                              </div>
+                              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                                Across {clientSites.length} project site{clientSites.length !== 1 ? 's' : ''}
+                              </p>
+                            </div>
+
+                            {/* Total Paid Card */}
+                            <div className={cn("p-5 rounded-2xl border shadow-sm print-card-bg", isDark ? "bg-slate-800/60 border-slate-800" : "bg-slate-50 border-slate-200")}>
+                              <div className="flex justify-between items-start mb-2">
+                                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Total Paid</span>
+                                <div className="p-1.5 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 rounded-lg">
+                                  <DollarSign className="w-4 h-4" />
+                                </div>
+                              </div>
+                              <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
+                                ₦{currentUser?.privileges?.billing?.canViewAmounts ? totalPaid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '***'}
+                              </div>
+                              <div className="mt-2 flex items-center gap-2">
+                                <div className="flex-1 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                                  <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${pctPaid}%` }} />
+                                </div>
+                                <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">{pctPaid}%</span>
+                              </div>
+                            </div>
+
+                            {/* Outstanding Balance Card */}
+                            <div className={cn("p-5 rounded-2xl border shadow-sm print-card-bg", isDark ? "bg-slate-800/60 border-slate-800" : "bg-slate-50 border-slate-200")}>
+                              <div className="flex justify-between items-start mb-2">
+                                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Outstanding Balance</span>
+                              </div>
+                              <div className={cn("text-2xl font-black", outstandingBalance > 0 ? "text-rose-600 dark:text-rose-400" : "text-slate-900 dark:text-white")}>
+                                ₦{currentUser?.privileges?.billing?.canViewAmounts ? outstandingBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '***'}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Site-by-Site Financial Breakdown */}
+                          <div className="space-y-8 mt-6">
+                            <h2 className="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800 pb-2">
+                              Site-by-Site Financial Statement
+                            </h2>
+
+                            {clientSites.length > 0 ? (
+                              clientSites.map((site) => {
+                                const siteInvoices = invoices.filter(i => 
+                                  matchesClient(i.client) &&
+                                  (i.siteId === site.id || 
+                                   i.siteName?.trim().toLowerCase() === site.name?.trim().toLowerCase() ||
+                                   i.project?.trim().toLowerCase() === site.name?.trim().toLowerCase()) &&
+                                  isWithinReportDate(i.date)
+                                );
+
+                                const sitePayments = payments.filter(p => 
+                                  matchesClient(p.client) &&
+                                  (p.site?.trim().toLowerCase() === site.name?.trim().toLowerCase() || 
+                                   p.site?.trim().toLowerCase() === site.id.toLowerCase()) &&
+                                  isWithinReportDate(p.date)
+                                );
+
+                                const siteTotalInvoiced = siteInvoices.reduce((sum, i) => sum + (i.totalCharge || i.amount || 0), 0);
+                                const siteTotalCollected = sitePayments.reduce((sum, p) => sum + (p.amount || 0), 0);
+
+                                return (
+                                  <div key={site.id} className="page-break-inside-avoid space-y-3 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 sm:p-5 bg-slate-50/30 dark:bg-slate-900/30 backdrop-blur-[0.5px] print-card-bg">
+                                    {/* Site Header Bar */}
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800 gap-2">
+                                      <div className="flex items-center gap-2">
+                                        <MapPin className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                                        <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                                          {site.name}
+                                        </h3>
+                                      </div>
+                                      <div className="flex items-center gap-3 text-xs font-semibold">
+                                        <span className="text-slate-500">Invoiced: <strong className="text-slate-800 dark:text-slate-200">₦{siteTotalInvoiced.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></span>
+                                        <span className="text-slate-300 dark:text-slate-700">|</span>
+                                        <span className="text-emerald-600 dark:text-emerald-400">Collected: <strong>₦{siteTotalCollected.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></span>
+                                      </div>
+                                    </div>
+
+                                    {/* Side-by-Side Dual Columns */}
+                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                      {/* Left Column: Invoices Sent */}
+                                      <div className="bg-white/40 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-xs">
+                                        <div className="px-4 py-2.5 bg-slate-100/60 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center print-table-header">
+                                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">Invoices Sent</span>
+                                          <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400">Total: ₦{siteTotalInvoiced.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                                        </div>
+                                        {siteInvoices.length > 0 ? (
+                                          <div className="overflow-x-auto">
+                                            <table className="w-full text-left text-xs border-collapse bg-transparent">
+                                              <thead>
+                                                <tr className="border-b border-slate-200 dark:border-slate-800 text-[9px] font-bold uppercase tracking-wider text-slate-400 bg-slate-50/30 dark:bg-slate-900/30">
+                                                  <th className="p-2.5">Date</th>
+                                                  <th className="p-2.5">Invoice #</th>
+                                                  <th className="p-2.5">Duration</th>
+                                                  <th className="p-2.5 text-right">Amount</th>
+                                                </tr>
+                                              </thead>
+                                              <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-[11px]">
+                                                {siteInvoices.map((inv, idx) => {
+                                                  const durationDisplay = inv.duration ? `${inv.duration} Days` : (inv.billingCycle || 'Net 30');
+                                                  return (
+                                                    <tr key={inv.id || idx} className="hover:bg-slate-50/40 dark:hover:bg-slate-800/30">
+                                                      <td className="p-2.5 text-slate-600 dark:text-slate-400 font-medium">
+                                                        {inv.date ? new Date(normalizeDate(inv.date)).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
+                                                      </td>
+                                                      <td className="p-2.5 font-bold text-indigo-600 dark:text-indigo-400">
+                                                        {inv.invoiceNumber || '-'}
+                                                      </td>
+                                                      <td className="p-2.5 text-slate-500 font-medium">
+                                                        {durationDisplay}
+                                                      </td>
+                                                      <td className="p-2.5 text-right font-bold text-slate-900 dark:text-white">
+                                                        ₦{(inv.totalCharge || inv.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                      </td>
+                                                    </tr>
+                                                  );
+                                                })}
+                                              </tbody>
+                                            </table>
+                                          </div>
+                                        ) : (
+                                          <div className="p-6 text-center text-xs text-slate-400 italic">
+                                            No invoices sent for this site.
+                                          </div>
+                                        )}
+                                      </div>
+
+                                      {/* Right Column: Payments Made */}
+                                      <div className="bg-white/40 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-xs">
+                                        <div className="px-4 py-2.5 bg-slate-100/60 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center print-table-header">
+                                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">Payments Made</span>
+                                          <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">Collected: ₦{siteTotalCollected.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                                        </div>
+                                        {sitePayments.length > 0 ? (
+                                          <div className="overflow-x-auto">
+                                            <table className="w-full text-left text-xs border-collapse bg-transparent">
+                                              <thead>
+                                                <tr className="border-b border-slate-200 dark:border-slate-800 text-[9px] font-bold uppercase tracking-wider text-slate-400 bg-slate-50/30 dark:bg-slate-900/30">
+                                                  <th className="p-2.5">Date</th>
+                                                  <th className="p-2.5">Payment Name / Method</th>
+                                                  <th className="p-2.5 text-right">Amount Paid</th>
+                                                </tr>
+                                              </thead>
+                                              <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-[11px]">
+                                                {sitePayments.map((pay, idx) => {
+                                                  const methodDisplay = pay.payVat === 'Add' 
+                                                    ? 'Bank Transfer (Add VAT)' 
+                                                    : pay.payVat === 'Yes' 
+                                                    ? 'Direct Transfer (VAT Incl.)' 
+                                                    : 'Bank Transfer / ACH';
+                                                  return (
+                                                    <tr key={pay.id || idx} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40">
+                                                      <td className="p-2.5 text-slate-600 dark:text-slate-400 font-medium">
+                                                        {pay.date ? new Date(normalizeDate(pay.date)).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
+                                                      </td>
+                                                      <td className="p-2.5 text-slate-700 dark:text-slate-300 font-medium">
+                                                        {methodDisplay}
+                                                      </td>
+                                                      <td className="p-2.5 text-right font-bold text-emerald-600 dark:text-emerald-400">
+                                                        ₦{(pay.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                      </td>
+                                                    </tr>
+                                                  );
+                                                })}
+                                              </tbody>
+                                            </table>
+                                          </div>
+                                        ) : (
+                                          <div className="p-6 text-center text-xs text-slate-400 italic">
+                                            Pending future disbursements for this site.
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })
+                            ) : (
+                              <div className="py-12 flex flex-col items-center justify-center text-center text-slate-500">
+                                <Building2 className="w-12 h-12 text-slate-300 dark:text-slate-700 mb-3" />
+                                <p className="font-semibold text-sm">No Active Sites Found</p>
+                                <p className="text-xs text-slate-400 mt-1">No project sites have been logged for this client.</p>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Footer & Dynamic Signatures */}
+                          <div className="pt-8 border-t border-slate-200 dark:border-slate-800 mt-8 flex flex-col sm:flex-row justify-between items-start sm:items-end gap-6 text-xs text-slate-500">
+                            <div className="space-y-1 max-w-md">
+                              <p className="font-bold text-slate-800 dark:text-slate-200">{companyInfo.name}</p>
+                              <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                                This financial activity report is an automated summary of accounting and invoicing data recorded for <strong className="text-slate-700 dark:text-slate-300">{selectedClient}</strong>. For disputes or detailed line-item breakdowns, please contact your account manager.
+                              </p>
+                              <div className="flex flex-wrap items-center gap-4 text-[10px] text-slate-400 font-mono mt-2">
+                                <span>SUPPORT: {companyInfo.email || 'accounts@dcel.io'}</span>
+                                {companyInfo.phone && <span>TEL: {companyInfo.phone}</span>}
+                              </div>
+                            </div>
+
+                            <div className="text-right sm:self-end min-w-[200px]">
+                              <div className="h-10" />
+                              <div className="h-0.5 w-48 bg-slate-300 dark:bg-slate-700 ml-auto mb-1.5" />
+                              <p className="font-bold text-slate-800 dark:text-slate-200 text-xs">
+                                Authorized Signature / Stamp
+                              </p>
+                              <p className="text-[10px] text-slate-400">{companyInfo.name}</p>
+                            </div>
+                          </div>
+                        </>
+                      );
+                    })()}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* CONTACTS TAB */}
               {activeTab === 'contacts' && (
-                <div className="space-y-4 col-span-full animate-in fade-in zoom-in-[0.98] duration-200 ease-out">
+                <div className="space-y-4 col-span-full transition-opacity duration-150">
                   <div className="flex justify-between items-center bg-slate-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-slate-100 dark:border-slate-800">
                     <div>
                       <h3 className="text-base font-bold text-slate-800 dark:text-slate-200">Contacts Directory</h3>
@@ -2503,7 +3779,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
 
               {/* OPERATIONS TAB */}
               {activeTab === 'operations' && (
-                <div className="space-y-6 w-full animate-in fade-in zoom-in-[0.98] duration-200 ease-out">
+                <div className="space-y-6 w-full transition-opacity duration-150">
                   {/* Secondary Tab Switcher */}
                   <div className="flex border-b border-slate-200 dark:border-slate-800 mb-2 overflow-x-auto style-scroll pb-px gap-1">
                     {[
@@ -2949,7 +4225,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
 
               {/* COMMUNICATIONS TAB */}
               {activeTab === 'activity' && (
-                <div className={cn("p-6 rounded-2xl border shadow-sm animate-in fade-in zoom-in-[0.98] duration-200 ease-out", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
+                <div className={cn("p-6 rounded-2xl border shadow-sm transition-opacity duration-150", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
                   <div className="flex justify-between items-center mb-6">
                     <div>
                       <h3 className="text-lg font-bold flex items-center gap-2">
@@ -3058,7 +4334,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
 
               {/* TASKS TAB */}
               {activeTab === 'tasks' && (
-                <div className="space-y-4 animate-in fade-in zoom-in-[0.98] duration-200 ease-out">
+                <div className="space-y-4 transition-opacity duration-150">
                   {/* Secondary Tab Switcher */}
                   <div className="flex border-b border-slate-200 dark:border-slate-800 mb-2 overflow-x-auto style-scroll pb-px gap-1">
                     {[
@@ -3418,21 +4694,25 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                 <div>
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Linked To *</label>
                   <select 
-                    disabled
-                    value="Existing Client" 
-                    className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none cursor-not-allowed opacity-75', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-100 border-slate-200 text-slate-600')}
+                    value={commForm.linkedTo || "Existing Client"} 
+                    onChange={e => setCommForm(f => ({ ...f, linkedTo: e.target.value }))}
+                    className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-semibold', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200 text-slate-800')}
                   >
                     <option value="Existing Client">🏢 Existing Client</option>
+                    <option value="All Clients">🌐 All Clients / General</option>
                   </select>
                 </div>
                 <div>
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Client *</label>
                   <select 
-                    disabled
-                    value={selectedClient} 
-                    className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none cursor-not-allowed opacity-75', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-100 border-slate-200 text-slate-600')}
+                    value={effectiveFormClient} 
+                    onChange={e => setCommForm(f => ({ ...f, clientName: e.target.value, siteOption: '' }))}
+                    className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-semibold', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200 text-slate-800')}
                   >
-                    <option value={selectedClient}>{selectedClient}</option>
+                    <option value="ALL">🌐 ALL (All Clients)</option>
+                    {allClients.map(c => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
                   </select>
                 </div>
               </div>
@@ -3447,18 +4727,18 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                   <option value="">Select site...</option>
                   <option value="NEW_ONBOARDING">+ Create new site onboarding...</option>
                   
-                  {clientSites.length > 0 && (
+                  {modalClientSites.length > 0 && (
                     <optgroup label="Active Sites">
-                      {clientSites.map((s: any) => (
-                        <option key={s.id} value={s.id}>{s.name}</option>
+                      {modalClientSites.map((s: any) => (
+                        <option key={s.id} value={s.id}>{s.name}{effectiveFormClient === 'ALL' || effectiveFormClient === 'All Clients' ? ` (${s.client})` : ''}</option>
                       ))}
                     </optgroup>
                   )}
 
-                  {clientPendingSites.length > 0 && (
+                  {modalClientPendingSites.length > 0 && (
                     <optgroup label="Pending Onboarding Sites">
-                      {clientPendingSites.map((ps: any) => (
-                        <option key={ps.id} value={ps.id}>⏳ {ps.siteName} (Pending Onboarding)</option>
+                      {modalClientPendingSites.map((ps: any) => (
+                        <option key={ps.id} value={ps.id}>⏳ {ps.siteName}{effectiveFormClient === 'ALL' || effectiveFormClient === 'All Clients' ? ` (${ps.clientName})` : ''} (Pending Onboarding)</option>
                       ))}
                     </optgroup>
                   )}
@@ -3747,6 +5027,150 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
               >
                 Close Summary
               </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Date Range Selection Modal */}
+      {showReportDateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200 no-print">
+          <div className={cn(
+            "w-full max-w-md rounded-2xl shadow-2xl border p-6 space-y-5 animate-in zoom-in-95 duration-200",
+            isDark ? "bg-slate-900 border-slate-800 text-white" : "bg-white border-slate-200 text-slate-900"
+          )}>
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-indigo-50 dark:bg-indigo-950/50 rounded-xl text-indigo-600 dark:text-indigo-400">
+                  <Calendar className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base">
+                    {reportDateModalMode === 'filter' ? 'Select Statement Date Range' : 'Select Print Date Range'}
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    {reportDateModalMode === 'filter'
+                      ? `Filter financial statement view for ${selectedClient === 'ALL' || selectedClient === 'All Clients' ? 'All Clients' : selectedClient}`
+                      : `Set date range & print statement PDF for ${selectedClient === 'ALL' || selectedClient === 'All Clients' ? 'All Clients' : selectedClient}`}
+                  </p>
+                </div>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 w-8 p-0 text-slate-400 hover:text-slate-600"
+                onClick={() => setShowReportDateModal(false)}
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+
+            {/* Quick Presets */}
+            <div>
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-2">Quick Presets</label>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { key: 'thisMonth', label: 'This Month' },
+                  { key: 'lastMonth', label: 'Last Month' },
+                  { key: 'last90', label: 'Last 90 Days' },
+                  { key: 'ytd', label: 'Year-to-Date' },
+                  { key: 'all', label: 'All Time' }
+                ].map(p => (
+                  <button
+                    key={p.key}
+                    type="button"
+                    onClick={() => handleApplyReportPreset(p.key as any)}
+                    className={cn(
+                      "px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-colors text-center truncate",
+                      reportPreset === p.key
+                        ? "bg-indigo-600 text-white border-indigo-600"
+                        : "bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100"
+                    )}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Date Inputs */}
+            <div className="grid grid-cols-2 gap-3 pt-2">
+              <div>
+                <label className="text-xs font-bold text-slate-600 dark:text-slate-400 block mb-1">Start Date</label>
+                <input
+                  type="date"
+                  value={reportStartDate}
+                  onChange={(e) => {
+                    setReportStartDate(e.target.value);
+                    setReportPreset('custom');
+                  }}
+                  className={cn(
+                    "w-full px-3 py-2 text-xs rounded-xl border focus:outline-none focus:ring-2 focus:ring-indigo-500",
+                    isDark ? "bg-slate-800 border-slate-700 text-white" : "bg-white border-slate-300 text-slate-900"
+                  )}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-600 dark:text-slate-400 block mb-1">End Date</label>
+                <input
+                  type="date"
+                  value={reportEndDate}
+                  onChange={(e) => {
+                    setReportEndDate(e.target.value);
+                    setReportPreset('custom');
+                  }}
+                  className={cn(
+                    "w-full px-3 py-2 text-xs rounded-xl border focus:outline-none focus:ring-2 focus:ring-indigo-500",
+                    isDark ? "bg-slate-800 border-slate-700 text-white" : "bg-white border-slate-300 text-slate-900"
+                  )}
+                />
+              </div>
+            </div>
+
+            {/* Selected Range Display Note */}
+            <div className="p-3 bg-indigo-50/60 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/50 rounded-xl text-xs text-indigo-700 dark:text-indigo-300 font-medium">
+              Statement Period: {reportStartDate || reportEndDate
+                ? `${reportStartDate ? new Date(reportStartDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Beginning'} — ${reportEndDate ? new Date(reportEndDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Present'}`
+                : 'All-Time Financial Records'}
+            </div>
+
+            {/* Actions */}
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowReportDateModal(false)}
+                className="text-xs h-9 font-semibold"
+              >
+                Cancel
+              </Button>
+              {reportDateModalMode === 'filter' ? (
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setShowReportDateModal(false);
+                    toast.success('Date range applied!');
+                  }}
+                  className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs h-9 px-6 flex items-center gap-1.5 shadow-md"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>OK</span>
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setShowReportDateModal(false);
+                    setTimeout(() => {
+                      handlePrintPDFReport();
+                    }, 150);
+                  }}
+                  className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs h-9 px-4 flex items-center gap-2 shadow-md"
+                >
+                  <Printer className="w-4 h-4" />
+                  <span>Generate & Print Executive PDF</span>
+                </Button>
+              )}
             </div>
           </div>
         </div>

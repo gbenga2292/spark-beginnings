@@ -88,6 +88,19 @@ export function Reports() {
   const [siteStaffTypeFilter, setSiteStaffTypeFilter] = useState<'All' | 'OFFICE' | 'FIELD'>('All');
   const [summaryStaffTypeFilter, setSummaryStaffTypeFilter] = useState<'All' | 'OFFICE' | 'FIELD'>('All');
   const [otStaffTypeFilter, setOtStaffTypeFilter] = useState<'All' | 'OFFICE' | 'FIELD'>('All');
+  const [ganttSiteFilter, setGanttSiteFilter] = useState<Set<string>>(new Set());
+
+  const toggleGanttSiteFilter = (siteName: string) => {
+    setGanttSiteFilter(prev => {
+      const next = new Set(prev);
+      if (next.has(siteName)) {
+        next.delete(siteName);
+      } else {
+        next.add(siteName);
+      }
+      return next;
+    });
+  };
   const [otYear, setOtYear] = useState<number>(currentYear);
   const [otChartView, setOtChartView] = useState<'table' | 'heatmap' | 'bar'>('table');
   const [fullScreenTable, setFullScreenTable] = useState<'site-work' | 'monthly-summary' | 'overtime-detail' | null>(null);
@@ -232,9 +245,14 @@ export function Reports() {
       if (!rec.date || !rec.date.startsWith(prefix)) return;
       if (!grid[rec.staffId]) return;
       const day = parseInt(rec.date.substring(8, 10), 10);
-      const isAbsent = rec.day?.toLowerCase() !== 'yes';
-      const isNight = !isAbsent && rec.night?.toLowerCase() === 'yes';
-      const site = isAbsent ? 'Absent' : (rec.daySite || rec.nightSite || '');
+      const isAbsent = rec.day?.toLowerCase() !== 'yes' && rec.night?.toLowerCase() !== 'yes';
+      const isNight = rec.night?.toLowerCase() === 'yes' && rec.day?.toLowerCase() !== 'yes';
+      // Prefer daySite for day workers, nightSite for night-only workers, 'Absent' if truly absent
+      const site = isAbsent
+        ? 'Absent'
+        : rec.day?.toLowerCase() === 'yes'
+        ? (rec.daySite || rec.nightSite || '')
+        : (rec.nightSite || rec.daySite || '');
       grid[rec.staffId][day] = { site, isAbsent, isNight };
     });
 
@@ -274,6 +292,26 @@ export function Reports() {
 
     return { grid, days };
   }, [attendanceRecords, selectedMonth, selectedYear, operationsStaff, departments, publicHolidays]);
+
+  // ── Per-employee site sets for the selected month (used for legend filter) ──
+  const empSiteSetsForMonth = useMemo(() => {
+    const prefix = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-`;
+    const map: Record<string, Set<string>> = {};
+    operationsStaff.forEach(emp => {
+      map[emp.id] = new Set<string>();
+      // OFFICE staff always have the OFFICE site
+      if (emp.staffType?.toUpperCase() === 'OFFICE') {
+        map[emp.id].add('OFFICE');
+      }
+    });
+    attendanceRecords.forEach(rec => {
+      if (!rec.date || !rec.date.startsWith(prefix)) return;
+      if (!map[rec.staffId]) return;
+      if (rec.day?.toLowerCase() === 'yes' && rec.daySite) map[rec.staffId].add(rec.daySite);
+      if (rec.night?.toLowerCase() === 'yes' && rec.nightSite) map[rec.staffId].add(rec.nightSite);
+    });
+    return map;
+  }, [attendanceRecords, selectedMonth, selectedYear, operationsStaff]);
 
   // ── Active sites for the selected month/year ──
   const activeSitesForMonth = useMemo(() => {
@@ -1679,31 +1717,80 @@ export function Reports() {
           ) : (
             /* ── GANTT / SCHEDULE CHART VIEW ── */
             <div className={`rounded-xl border border-slate-200 shadow-sm overflow-hidden ${fullScreenTable === 'site-work' ? 'flex-1 flex flex-col min-h-0' : ''}`}>
-              {/* Legend */}
-              <div className="flex flex-wrap items-center gap-3 px-4 py-3 bg-slate-50 border-b border-slate-200">
+              {/* Legend — click chips to filter rows */}
+              <div className="flex flex-wrap items-center gap-2 px-4 py-3 bg-slate-50 border-b border-slate-200">
                 <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide mr-1">Legend:</span>
-                {/* Show OFFICE chip first if any office staff are visible */}
-                {operationsStaff.some(e => e.staffType?.toUpperCase() === 'OFFICE') && (
-                  <span className="flex items-center gap-1.5 text-xs font-medium" style={{ color: '#334155' }}>
-                    <span className="inline-block w-3 h-3 rounded-sm flex-shrink-0" style={{ backgroundColor: '#334155' }}></span>
-                    OFFICE (default)
-                  </span>
+                {ganttSiteFilter.size > 0 && (
+                  <button
+                    onClick={() => setGanttSiteFilter(new Set())}
+                    className="flex items-center gap-1 text-[10px] font-semibold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-full px-2 py-0.5 transition-colors"
+                    title="Clear all filters"
+                  >
+                    ✕ Clear filter
+                  </button>
                 )}
+                {/* OFFICE chip */}
+                {operationsStaff.some(e => e.staffType?.toUpperCase() === 'OFFICE') && (
+                  <button
+                    onClick={() => toggleGanttSiteFilter('OFFICE')}
+                    className={`flex items-center gap-1.5 text-xs font-medium rounded-full px-2.5 py-1 border transition-all select-none ${
+                      ganttSiteFilter.has('OFFICE')
+                        ? 'ring-2 ring-offset-1 opacity-100 shadow-sm'
+                        : ganttSiteFilter.size > 0
+                        ? 'opacity-40 hover:opacity-70'
+                        : 'hover:opacity-80'
+                    } bg-slate-100 border-slate-300`}
+                    style={{
+                      color: '#334155',
+                      ...(ganttSiteFilter.has('OFFICE') ? { ringColor: '#334155', boxShadow: '0 0 0 2px #334155' } : {})
+                    }}
+                    title="Click to filter by OFFICE"
+                  >
+                    <span className="inline-block w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: '#334155' }}></span>
+                    OFFICE (default)
+                    {ganttSiteFilter.has('OFFICE') && <span className="ml-0.5 text-[9px]">✓</span>}
+                  </button>
+                )}
+                {/* Site chips */}
                 {activeSitesForMonth.map(site => {
                   const color = SITE_COLORS[site.name];
+                  const isActive = ganttSiteFilter.has(site.name);
+                  const isDimmed = ganttSiteFilter.size > 0 && !isActive;
                   return (
-                    <span key={site.id} className="flex items-center gap-1.5 text-xs font-medium" style={{ color: color?.bg ?? '#6366f1' }}>
-                      <span className="inline-block w-3 h-3 rounded-sm flex-shrink-0" style={{ backgroundColor: color?.bg ?? '#6366f1' }}></span>
+                    <button
+                      key={site.id}
+                      onClick={() => toggleGanttSiteFilter(site.name)}
+                      className={`flex items-center gap-1.5 text-xs font-medium rounded-full px-2.5 py-1 border transition-all select-none ${
+                        isActive
+                          ? 'opacity-100 shadow-sm'
+                          : isDimmed
+                          ? 'opacity-40 hover:opacity-70'
+                          : 'hover:opacity-80'
+                      }`}
+                      style={{
+                        color: color?.bg ?? '#6366f1',
+                        backgroundColor: `${color?.bg ?? '#6366f1'}15`,
+                        borderColor: `${color?.bg ?? '#6366f1'}50`,
+                        ...(isActive ? { boxShadow: `0 0 0 2px ${color?.bg ?? '#6366f1'}` } : {}),
+                      }}
+                      title={`Click to filter by ${site.name}`}
+                    >
+                      <span
+                        className="inline-block w-2.5 h-2.5 rounded-sm flex-shrink-0"
+                        style={{ backgroundColor: color?.bg ?? '#6366f1' }}
+                      ></span>
                       {site.name}
-                    </span>
+                      {isActive && <span className="ml-0.5 text-[9px]">✓</span>}
+                    </button>
                   );
                 })}
-                <span className="flex items-center gap-1.5 text-xs font-medium text-red-500">
-                  <span className="inline-block w-3 h-3 rounded-sm flex-shrink-0 bg-red-500"></span>
+                {/* Non-filterable info chips */}
+                <span className="flex items-center gap-1.5 text-xs font-medium text-red-500 px-2 py-1 bg-red-50 border border-red-200 rounded-full">
+                  <span className="inline-block w-2.5 h-2.5 rounded-sm flex-shrink-0 bg-red-500"></span>
                   Absent
                 </span>
-                <span className="flex items-center gap-1.5 text-xs font-medium text-slate-400">
-                  <span className="inline-block w-3 h-3 rounded-sm flex-shrink-0 bg-slate-200 border border-slate-300"></span>
+                <span className="flex items-center gap-1.5 text-xs font-medium text-slate-400 px-2 py-1 bg-white border border-slate-200 rounded-full">
+                  <span className="inline-block w-2.5 h-2.5 rounded-sm flex-shrink-0 bg-slate-200 border border-slate-300"></span>
                   No Record
                 </span>
               </div>
@@ -1761,6 +1848,10 @@ export function Reports() {
                           const totalAssigned = Object.values(empGrid).filter(v => v.site && v.site !== 'Absent').length;
                           const totalAbsent  = Object.values(empGrid).filter(v => v.isAbsent).length;
 
+                          // Check if this employee has any days at any of the filtered sites
+                          const empMatchesFilter = ganttSiteFilter.size === 0 ||
+                            [...ganttSiteFilter].some(site => empSiteSetsForMonth[emp.id]?.has(site));
+
                           return (
                             <div
                               key={emp.id}
@@ -1771,6 +1862,8 @@ export function Reports() {
                                 width: '100%',
                                 height: `${virtualRow.size}px`,
                                 transform: `translateY(${virtualRow.start}px)`,
+                                opacity: empMatchesFilter ? 1 : 0.25,
+                                transition: 'opacity 0.2s ease',
                               }}
                               className={`flex border-b border-slate-100 last:border-0 hover:bg-indigo-50/30 transition-colors ${
                                 idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'

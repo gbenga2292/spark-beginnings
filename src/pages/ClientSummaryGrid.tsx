@@ -233,20 +233,6 @@ export function ClientSummaryGrid() {
                   </div>
                 </div>
                 <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
-                  {canDeleteClient && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                      title="Delete Client"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteClient(client.name);
-                      }}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  )}
                   <div className="p-2 -mr-2 -mt-2 text-slate-300 group-hover:text-indigo-500 transition-colors">
                      <ChevronRight className="w-5 h-5" />
                   </div>
@@ -306,11 +292,7 @@ export function ClientSummaryGrid() {
                         <Button size="sm" variant="outline" className="text-indigo-600 border-indigo-200 hover:bg-indigo-50" onClick={() => navigate(`/sites?client=${encodeURIComponent(client.name)}`)}>
                           View Details
                         </Button>
-                        {canDeleteClient && (
-                          <Button size="sm" variant="ghost" className="text-slate-400 hover:text-rose-600 hover:bg-rose-50" title="Delete Client" onClick={() => handleDeleteClient(client.name)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        )}
+
                       </div>
                     </td>
                   </tr>

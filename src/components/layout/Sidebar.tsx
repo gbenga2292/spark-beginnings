@@ -257,11 +257,13 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
       (href !== '/' && location.pathname.startsWith(href + '/'))
     );
 
-    // Simulator and Machine Recon get the full canvas — collapse the sidebar automatically
+    // Simulator, Machine Recon, Client 360 and Site 360 get the full canvas — collapse the sidebar automatically
     const isFullCanvasPage = location.pathname === '/operations/simulator' ||
       location.pathname.startsWith('/operations/simulator/') ||
       location.pathname === '/operations/machine-reconciliation' ||
-      location.pathname.startsWith('/operations/machine-reconciliation');
+      location.pathname.startsWith('/operations/machine-reconciliation') ||
+      location.pathname === '/client-360' ||
+      location.pathname.startsWith('/client-360/');
 
     if (!isOnSidebarPage || isFullCanvasPage) {
       // Auto-collapse when on a non-sidebar page, Simulator, or Machine Recon

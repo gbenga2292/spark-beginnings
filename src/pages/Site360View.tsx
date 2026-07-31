@@ -38,6 +38,67 @@ interface Props {
   onEditSite: (site: Site) => void;
 }
 
+const renderFormattedChatMessage = (content: string) => {
+  if (!content) return null;
+
+  const renderInlineText = (text: string) => {
+    if (!text) return null;
+    const parts = text.split(/(\*\*.*?\*\*|\*.*?\*)/g);
+    return (
+      <>
+        {parts.map((part, i) => {
+          if (part.startsWith('**') && part.endsWith('**') && part.length >= 4) {
+            return <strong key={i} className="font-extrabold text-white">{part.slice(2, -2)}</strong>;
+          }
+          if (part.startsWith('*') && part.endsWith('*') && part.length >= 2 && !part.startsWith('**')) {
+            return <em key={i} className="italic text-indigo-200">{part.slice(1, -1)}</em>;
+          }
+          const cleanPart = part.replace(/\*\*/g, '').replace(/#/g, '');
+          return <span key={i}>{cleanPart}</span>;
+        })}
+      </>
+    );
+  };
+
+  const lines = content.split('\n');
+
+  return (
+    <div className="space-y-1.5 text-xs sm:text-sm leading-relaxed font-sans">
+      {lines.map((line, idx) => {
+        let trimmed = line.trim();
+        if (!trimmed) return <div key={idx} className="h-1" />;
+
+        if (trimmed.startsWith('#') || (/^\*\*[^*]+\*\*:?$/.test(trimmed) && trimmed.length < 60)) {
+          const cleanHeader = trimmed.replace(/^#+\s*/, '').replace(/\*\*/g, '').replace(/#/g, '').trim();
+          return (
+            <div key={idx} className="text-xs font-black tracking-wider text-indigo-300 uppercase mt-3.5 mb-1.5 border-b border-indigo-700/50 pb-1 flex items-center gap-1.5">
+              <span>{cleanHeader}</span>
+            </div>
+          );
+        }
+
+        if (/^[-*•]\s+/.test(trimmed) || /^\d+[\.\)]\s+/.test(trimmed)) {
+          const bulletText = trimmed.replace(/^[-*•]\s+/, '').replace(/^\d+[\.\)]\s+/, '');
+          return (
+            <div key={idx} className="flex items-start gap-2 pl-1.5 my-1 text-slate-100">
+              <span className="text-indigo-400 font-bold text-sm select-none leading-none mt-0.5">•</span>
+              <div className="flex-1">
+                {renderInlineText(bulletText)}
+              </div>
+            </div>
+          );
+        }
+
+        return (
+          <p key={idx} className="my-1 text-indigo-50">
+            {renderInlineText(trimmed)}
+          </p>
+        );
+      })}
+    </div>
+  );
+};
+
 export function Site360View({ site, clientSites, onSiteChange, onBack, onEditSite }: Props) {
   const { isDark } = useTheme();
   const { createMainTask, users, addSubtask } = useAppData();
@@ -995,7 +1056,9 @@ Answer site-specific questions using this context only. Be concise.`;
                     {messages.length === 0 && !isGeneratingBrief && <p className="text-sm text-indigo-300 italic text-center mt-6">Click "Generate Brief" to get a site intelligence summary.</p>}
                     {messages.map((msg, idx) => (
                       <div key={idx} className={cn('flex w-full', msg.role === 'user' ? 'justify-end' : 'justify-start')}>
-                        <div className={cn('max-w-[85%] rounded-xl p-3 text-sm', msg.role === 'user' ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-slate-800/80 text-indigo-50 rounded-bl-none border border-indigo-700/30')}>{msg.content}</div>
+                        <div className={cn('max-w-[90%] rounded-xl p-3.5 text-sm shadow-md', msg.role === 'user' ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-slate-900/95 text-indigo-50 rounded-bl-none border border-indigo-700/50 backdrop-blur-md')}>
+                          {msg.role === 'user' ? <p className="whitespace-pre-wrap">{msg.content}</p> : renderFormattedChatMessage(msg.content)}
+                        </div>
                       </div>
                     ))}
                     {isGeneratingBrief && <div className="flex justify-start"><div className="bg-slate-800/80 text-indigo-200 rounded-xl rounded-bl-none border border-indigo-700/30 p-3 text-sm flex items-center gap-2"><RefreshCcw className="w-4 h-4 animate-spin" /> Thinking...</div></div>}
@@ -1254,7 +1317,7 @@ Answer site-specific questions using this context only. Be concise.`;
 
             {/* FINANCIALS */}
             {activeTab === 'financials' && (
-              <div className="animate-in fade-in zoom-in-[0.98] duration-200 ease-out space-y-5">
+              <div className="space-y-5 transition-opacity duration-150">
                 {/* Financial Sub-Tabs */}
                 <div className="grid grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
                   {[
@@ -1403,7 +1466,7 @@ Answer site-specific questions using this context only. Be concise.`;
 
             {/* OPERATIONS */}
             {activeTab === 'operations' && (
-              <div className="animate-in fade-in zoom-in-[0.98] duration-200 ease-out space-y-5">
+              <div className="space-y-5 transition-opacity duration-150">
 
                 {/* ── Pumps on Site Panel ── */}
                 <div className={cn(card, 'border-cyan-200 dark:border-cyan-900/60')}>
@@ -1629,7 +1692,7 @@ Answer site-specific questions using this context only. Be concise.`;
 
             {/* MAINTENANCE */}
             {activeTab === 'maintenance' && (
-              <div className="animate-in fade-in zoom-in-[0.98] duration-200 ease-out space-y-5">
+              <div className="space-y-5 transition-opacity duration-150">
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
                   {[
                     { label: 'Assets Tracked', value: data.siteMaintAssets.length, color: 'text-indigo-600' },
@@ -1730,7 +1793,7 @@ Answer site-specific questions using this context only. Be concise.`;
 
             {/* TASKS */}
             {activeTab === 'tasks' && (
-              <div className="animate-in fade-in zoom-in-[0.98] duration-200 ease-out space-y-5">
+              <div className="space-y-5 transition-opacity duration-150">
                 <div className={card}>
                   <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-100 dark:border-slate-800 flex-wrap gap-2">
                     <h3 className="font-bold text-lg flex items-center gap-2">
@@ -2014,7 +2077,7 @@ Answer site-specific questions using this context only. Be concise.`;
 
             {/* COMMS */}
             {activeTab === 'comms' && (
-              <div className="animate-in fade-in zoom-in-[0.98] duration-200 ease-out space-y-5">
+              <div className="space-y-5 transition-opacity duration-150">
                 <div className={card}>
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="font-bold text-base sm:text-lg flex items-center gap-2"><MessagesSquare className="w-5 h-5 text-blue-500" /> Communication Logs ({data.siteComms.length})</h3>
@@ -2043,7 +2106,7 @@ Answer site-specific questions using this context only. Be concise.`;
 
             {/* CONTACTS */}
             {activeTab === 'contacts' && (
-              <div className="animate-in fade-in zoom-in-[0.98] duration-200 ease-out">
+              <div className="transition-opacity duration-150">
                 <ClientContactsPanel
                   clientName={site.client || site.name}
                   onClose={() => setActiveTab('financials')}

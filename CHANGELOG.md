@@ -2,7 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.7.13] - 2026-07-31
+
+### Added / Improved
+- **HR Report — Interactive Legend Filter (Schedule Chart)**:
+  - Legend chips in the Staff Site Work Report (Schedule Chart view) are now clickable toggle buttons.
+  - Clicking a site chip filters visible rows — non-matching employees fade to 25% opacity with a smooth transition.
+  - Multiple sites can be selected simultaneously (OR logic). A "× Clear filter" button appears when any filter is active.
+  - Fixed night-shift site detection: night-only workers' `nightSite` was previously lost and recorded as `Absent`; this is now correctly resolved.
+  - Added `empSiteSetsForMonth` memo that builds per-employee site sets directly from attendance records for accurate filtering.
+- **Client 360 — Complete Client Dropdown**:
+  - Fixed missing clients in the Client 360 selector: clients that existed in `sites` but had no `clientProfile` record were silently excluded.
+  - `allClients` derivation now always merges all three sources (`clientProfiles`, `sites`, `pendingSites`) using a `Set` to deduplicate.
+- **Clients Management — Removed Delete Icon from Cards**:
+  - Removed the `Trash2` delete button from each client card in both Grid and List views of the Clients Management page.
+  - The delete functionality is preserved internally but no longer surfaced on the summary grid.
+- **Sidebar — Auto-Collapse on Client 360 & Site 360**:
+  - The sidebar now automatically collapses (icon-only mode) when navigating to `/client-360` or any sub-path, matching existing behavior for Simulator and Machine Recon.
+  - The sidebar auto-restores when navigating away from these pages.
+- **Version Bump**:
+  - Updated application version to `1.7.13` in `package.json`.
+
 ## [1.7.12] - 2026-07-30
+
 
 ### Added / Improved
 - **Auto-Updater & Release Notes Viewer**:
