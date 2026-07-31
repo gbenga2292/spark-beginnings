@@ -8,7 +8,7 @@ import { Badge } from '@/src/components/ui/badge';
 import {
   Download, Upload, ReceiptText, Wallet, TrendingUp, Landmark, Activity, AlertCircle,
   PieChart as PieChartIcon, BarChart3, Filter, X, CheckCircle2, FileSpreadsheet, FileText, Backpack, CreditCard,
-  Eye, Save, Trash2, XCircle, Maximize2, Minimize2, MapPin
+  Eye, Save, Trash2, XCircle, Maximize2, Minimize2, MapPin, Receipt
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/src/components/ui/dialog';
 import { Checkbox } from '@/src/components/ui/checkbox';
@@ -24,6 +24,7 @@ import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import { usePayrollCalculator } from '@/src/hooks/usePayrollCalculator';
 import { usePriv } from '@/src/hooks/usePriv';
+import { attachDragScroll } from '@/src/hooks/useDragScroll';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { fetchInvoicesData, fetchLedgerData, fetchEmployeesData } from '@/src/lib/supabaseService';
 import { SiteSummary } from './SiteSummary';
@@ -236,9 +237,28 @@ export function FinancialReports() {
     return { vat, amountForVat };
   };
 
+  const calculateItemVat = (amount: number, vatMode: 'No' | 'Yes' | 'Add' = 'No', rate: number = 7.5) => {
+    const amtNum = Number(amount) || 0;
+    const r = Number(rate) || 7.5;
+    if (vatMode === 'Yes') {
+      const vatAmount = (amtNum * r) / 100;
+      const amountForVat = amtNum;
+      const grossAmount = amtNum + vatAmount;
+      return { vatAmount, amountForVat, grossAmount };
+    } else if (vatMode === 'Add') {
+      const vatAmount = (amtNum * r) / (100 + r);
+      const amountForVat = amtNum - vatAmount;
+      const grossAmount = amtNum;
+      return { vatAmount, amountForVat, grossAmount };
+    } else {
+      return { vatAmount: 0, amountForVat: 0, grossAmount: amtNum };
+    }
+  };
+
   const loans = useAppStore(state => state.loans);
   const salaryAdvances = useAppStore(state => state.salaryAdvances);
   const ledgerEntries = useAppStore(state => state.ledgerEntries);
+  const expenseVatRemittances = useAppStore(state => state.expenseVatRemittances);
   const clientProfiles = useAppStore(state => state.clientProfiles);
   const pendingSites = useAppStore(state => state.pendingSites);
   const employees = useAppStore(state => state.employees);
@@ -260,7 +280,7 @@ export function FinancialReports() {
   const [filterMonth, setFilterMonth] = useState<string>('All');
   const [filterClient, setFilterClient] = useState<string>('All');
   const [priorPeriodLimit, setPriorPeriodLimit] = useState<'none' | 'all' | 'this-year' | 'prev-month' | 'prev-2-months'>('none');
-  const [mainTab, setMainTab] = useState<'client-account' | 'payroll-summary' | 'site-summary' | 'ledger-summary'>('client-account');
+  const [mainTab, setMainTab] = useState<'client-account' | 'payroll-summary' | 'site-summary' | 'ledger-summary' | 'expenses-vat'>('client-account');
   const [reportBuilderOpen, setReportBuilderOpen] = useState(false);
   const sitesPriv = usePriv('sites');
   const [ledgerSummaryView, setLedgerSummaryView] = useState<'category' | 'bank' | 'client' | 'site'>('category');
@@ -330,6 +350,10 @@ export function FinancialReports() {
     'ledger-summary': {
       title: 'General Ledger Analysis',
       subtitle: 'Categorized breakdown of all financial ledger transactions.'
+    },
+    'expenses-vat': {
+      title: 'Expenses VAT Analysis & Reconciliation',
+      subtitle: 'Categorized monthly report of vatable expenses, accumulated VAT, and payment remittances.'
     }
   };
 
@@ -548,7 +572,21 @@ export function FinancialReports() {
     });
   }, [proratedMonthsPayroll, MONTHS]);
 
-  const [summaryTab, setSummaryTab] = useState<'client' | 'site' | 'vat'>('client');
+  const [summaryTab, setSummaryTab] = useState<'client' | 'site' | 'vat' | 'expenses-vat'>('client');
+  const expensesVatScrollRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (summaryTab !== 'expenses-vat') return;
+    let cleanup: (() => void) | undefined;
+    const frame = requestAnimationFrame(() => {
+      if (expensesVatScrollRef.current) {
+        cleanup = attachDragScroll(expensesVatScrollRef.current);
+      }
+    });
+    return () => {
+      cancelAnimationFrame(frame);
+      cleanup?.();
+    };
+  }, [summaryTab]);
   const [debtorView, setDebtorView] = useState<'client' | 'site'>('client');
   const [rankingView, setRankingView] = useState<'client' | 'site'>('client');
   const [rankingTooltip, setRankingTooltip] = useState<{ x: number; y: number; sites: string[]; count: number; accent: 'indigo' | 'emerald' } | null>(null);
@@ -1996,7 +2034,8 @@ export function FinancialReports() {
               { id: 'client-account', label: 'Client Account', icon: Landmark },
               { id: 'payroll-summary', label: 'Payroll Summary', icon: Wallet },
               { id: 'site-summary', label: 'Site Summary', icon: Activity, priv: sitesPriv.canViewClientSummary },
-              { id: 'ledger-summary', label: 'Ledger Summary', icon: BarChart3 }
+              { id: 'ledger-summary', label: 'Ledger Summary', icon: BarChart3 },
+              { id: 'expenses-vat', label: 'Expenses VAT', icon: Receipt }
             ].map(tab => {
               if (tab.priv === false) return null;
               const isActive = mainTab === tab.id;
@@ -2377,6 +2416,230 @@ export function FinancialReports() {
             </div>
           );
         })()
+      ) : mainTab === 'expenses-vat' ? (
+        /* ─────────────────────────────────────────────────────────────
+           EXPENSES VAT TAB — Monthly report of vatable expense entries
+           ───────────────────────────────────────────────────────────── */
+        (() => {
+          // Filter vatable entries based on filterYear, filterMonth, filterClient
+          const filteredVatEntries = ledgerEntries.filter(e => {
+            const isVat = e.isVatable || (e.vatMode && e.vatMode !== 'No');
+            if (!isVat) return false;
+            if (!e.date) return false;
+
+            const entryYear = e.date.substring(0, 4);
+            if (filterYear !== 'All' && !selectedYears.includes(entryYear)) return false;
+
+            if (filterMonth !== 'All') {
+              const d = new Date(e.date);
+              if (!isNaN(d.getTime())) {
+                const mNum = d.getMonth() + 1;
+                if (!selectedMonths.includes(mNum)) return false;
+              }
+            }
+
+            if (filterClient !== 'All') {
+              const entryClient = (e.client || '').trim();
+              if (entryClient !== filterClient.trim()) return false;
+            }
+            return true;
+          });
+
+          // Calculate aggregated stats
+          let totalAccVat = 0;
+          let totalBaseAmountForVat = 0;
+          let totalGrossVatable = 0;
+
+          filteredVatEntries.forEach(e => {
+            const vMode = e.vatMode || (e.isVatable ? 'Yes' : 'No');
+            const rateToUse = e.vatRate || vatRate;
+            const calculated = calculateItemVat(Number(e.amount), vMode, rateToUse);
+            totalAccVat += e.vatAmount ?? calculated.vatAmount;
+            totalBaseAmountForVat += e.amountForVat ?? calculated.amountForVat;
+            totalGrossVatable += Number(e.amount) || 0;
+          });
+
+          // Filter remittances for the period
+          const filteredRemittances = (expenseVatRemittances || []).filter(r => {
+            if (!r.date) return false;
+            const rYear = r.date.substring(0, 4);
+            if (filterYear !== 'All' && !selectedYears.includes(rYear)) return false;
+
+            if (filterMonth !== 'All') {
+              const d = new Date(r.date);
+              if (!isNaN(d.getTime())) {
+                const mNum = d.getMonth() + 1;
+                if (!selectedMonths.includes(mNum)) return false;
+              }
+            }
+            return true;
+          });
+
+          const totalVatPaidRemitted = filteredRemittances.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
+          const vatBalanceOwed = totalAccVat - totalVatPaidRemitted;
+
+          return (
+            <div className="space-y-6">
+              {/* Stat Cards Row */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+                <Card className="border-slate-200 shadow-sm bg-gradient-to-br from-emerald-500/10 to-teal-500/5">
+                  <CardContent className="p-4 flex items-center justify-between">
+                    <div>
+                      <p className="text-[10px] font-extrabold uppercase tracking-widest text-emerald-700">Accumulated Expenses VAT</p>
+                      <h3 className="text-xl font-extrabold text-slate-900 mt-1 tabular-nums">
+                        ₦{totalAccVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </h3>
+                      <p className="text-[11px] text-slate-500 mt-0.5">Total VAT on vatable purchases</p>
+                    </div>
+                    <div className="h-10 w-10 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center font-bold shrink-0">
+                      <Receipt className="h-5 w-5" />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-slate-200 shadow-sm bg-gradient-to-br from-teal-500/10 to-emerald-500/5">
+                  <CardContent className="p-4 flex items-center justify-between">
+                    <div>
+                      <p className="text-[10px] font-extrabold uppercase tracking-widest text-teal-700">VAT Paid / Remitted</p>
+                      <h3 className="text-xl font-extrabold text-slate-900 mt-1 tabular-nums">
+                        ₦{totalVatPaidRemitted.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </h3>
+                      <p className="text-[11px] text-slate-500 mt-0.5">Reconciled VAT remittances</p>
+                    </div>
+                    <div className="h-10 w-10 rounded-xl bg-teal-500/10 text-teal-600 flex items-center justify-center font-bold shrink-0">
+                      <CheckCircle2 className="h-5 w-5" />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className={`border-slate-200 shadow-sm ${vatBalanceOwed <= 0 ? 'bg-emerald-50/50' : 'bg-rose-50/50'}`}>
+                  <CardContent className="p-4 flex items-center justify-between">
+                    <div>
+                      <p className={`text-[10px] font-extrabold uppercase tracking-widest ${vatBalanceOwed <= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                        Outstanding Deficit
+                      </p>
+                      <h3 className="text-xl font-extrabold text-slate-900 mt-1 tabular-nums">
+                        ₦{Math.max(0, vatBalanceOwed).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </h3>
+                      <p className="text-[11px] text-slate-500 mt-0.5">
+                        {vatBalanceOwed <= 0 ? 'Fully Reconciled' : 'VAT payment deficit'}
+                      </p>
+                    </div>
+                    <div className={`h-10 w-10 rounded-xl flex items-center justify-center font-bold shrink-0 ${vatBalanceOwed <= 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
+                      {vatBalanceOwed <= 0 ? <CheckCircle2 className="h-5 w-5" /> : <AlertCircle className="h-5 w-5" />}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-slate-200 shadow-sm bg-gradient-to-br from-indigo-500/10 to-blue-500/5">
+                  <CardContent className="p-4 flex items-center justify-between">
+                    <div>
+                      <p className="text-[10px] font-extrabold uppercase tracking-widest text-indigo-700">Amount for VAT</p>
+                      <h3 className="text-xl font-extrabold text-slate-900 mt-1 tabular-nums">
+                        ₦{totalBaseAmountForVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </h3>
+                      <p className="text-[11px] text-slate-500 mt-0.5">Base gross amount for VAT</p>
+                    </div>
+                    <div className="h-10 w-10 rounded-xl bg-indigo-500/10 text-indigo-600 flex items-center justify-center font-bold shrink-0">
+                      <Landmark className="h-5 w-5" />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-slate-200 shadow-sm">
+                  <CardContent className="p-4 flex items-center justify-between">
+                    <div>
+                      <p className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500">Vatable Entries</p>
+                      <h3 className="text-xl font-extrabold text-slate-900 mt-1 tabular-nums">
+                        {filteredVatEntries.length}
+                      </h3>
+                      <p className="text-[11px] text-slate-500 mt-0.5">Line items in selection</p>
+                    </div>
+                    <div className="h-10 w-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold shrink-0">
+                      <ReceiptText className="h-5 w-5" />
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Expenses VAT Ledger Table Card */}
+              <Card className="border-slate-200 shadow-sm overflow-hidden">
+                <CardHeader className="bg-slate-50/50 border-b border-slate-100 py-3 px-4 flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle className="text-slate-800 text-base font-bold flex items-center gap-2">
+                      <Receipt className="h-4 w-4 text-emerald-600" /> Expenses VAT Financial Summary ({filterYear === 'All' ? 'All Time' : filterYear}{filterMonth !== 'All' ? ` - Month ${filterMonth}` : ''})
+                    </CardTitle>
+                    <CardDescription className="text-xs">
+                      Categorized report of vatable expenses, calculated VAT, base taxable amounts, and line details
+                    </CardDescription>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="overflow-x-auto max-h-[60vh] no-scrollbar">
+                    <table className="w-full text-left text-xs whitespace-nowrap">
+                      <thead className="bg-slate-900 text-white font-semibold sticky top-0 z-10 shadow-md">
+                        <tr>
+                          <th className="py-2.5 px-4 border-r border-slate-800">Voucher No.</th>
+                          <th className="py-2.5 px-3 border-r border-slate-800">Date</th>
+                          <th className="py-2.5 px-4 border-r border-slate-800 w-1/3">Description</th>
+                          <th className="py-2.5 px-3 border-r border-slate-800">Category</th>
+                          <th className="py-2.5 px-3 border-r border-slate-800">Vendor</th>
+                          <th className="py-2.5 px-3 border-r border-slate-800">Client / Site</th>
+                          <th className="py-2.5 px-3 border-r border-slate-800 text-center">VAT Policy</th>
+                          <th className="py-2.5 px-3 border-r border-slate-800 text-right">Line Amount (₦)</th>
+                          <th className="py-2.5 px-3 border-r border-slate-800 text-right">Amount for VAT (₦)</th>
+                          <th className="py-2.5 px-4 text-right">VAT Amount ({vatRate}%)</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 bg-white">
+                        {filteredVatEntries.length === 0 ? (
+                          <tr>
+                            <td colSpan={10} className="text-center py-12 text-slate-400 italic">
+                              No vatable expense entries match the selected report filters ({filterYear === 'All' ? 'All Years' : filterYear}, {filterMonth === 'All' ? 'All Months' : `Month ${filterMonth}`}).
+                            </td>
+                          </tr>
+                        ) : (
+                          filteredVatEntries.map((entry, idx) => {
+                            const vMode = entry.vatMode || (entry.isVatable ? 'Yes' : 'No');
+                            const calculated = calculateItemVat(Number(entry.amount), vMode, vatRate);
+                            const entryVat = entry.vatAmount ?? calculated.vatAmount;
+                            const entryBase = entry.amountForVat ?? calculated.amountForVat;
+                            return (
+                              <tr key={entry.id || idx} className="hover:bg-indigo-50/20 transition-colors">
+                                <td className="py-2.5 px-4 font-mono font-bold text-indigo-600">{entry.voucherNo}</td>
+                                <td className="py-2.5 px-3 font-mono text-slate-600">{formatDisplayDate(entry.date)}</td>
+                                <td className="py-2.5 px-4 font-medium text-slate-800 max-w-[250px] truncate" title={entry.description}>{entry.description || '—'}</td>
+                                <td className="py-2.5 px-3">
+                                  <span className="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full font-semibold">{entry.category}</span>
+                                </td>
+                                <td className="py-2.5 px-3 text-slate-600">{entry.vendor || '—'}</td>
+                                <td className="py-2.5 px-3 text-slate-500">{entry.client || '—'}{entry.site ? ` / ${entry.site}` : ''}</td>
+                                <td className="py-2.5 px-3 text-center">
+                                  <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-extrabold text-slate-700 border border-slate-200">
+                                    {vMode}
+                                  </span>
+                                </td>
+                                <td className="py-2.5 px-3 text-right font-semibold text-slate-800 tabular-nums">
+                                  ₦{Number(entry.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </td>
+                                <td className="py-2.5 px-3 text-right font-semibold text-indigo-700 tabular-nums">
+                                  ₦{entryBase.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </td>
+                                <td className="py-2.5 px-4 text-right font-extrabold text-emerald-700 bg-emerald-50/50 tabular-nums">
+                                  ₦{entryVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          );
+        })()
       ) : mainTab === 'client-account' ? (
         <>
       {/* Top Metrics */}
@@ -2500,10 +2763,13 @@ export function FinancialReports() {
               </Button>
             </div>
           </div>
-          <div className="flex px-5 gap-6 border-b border-slate-200">
-            <button className={`pb-3 text-sm font-semibold transition-all border-b-2 ${summaryTab === 'client' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-700'}`} onClick={() => setSummaryTab('client')}>Client Summary</button>
-            <button className={`pb-3 text-sm font-semibold transition-all border-b-2 ${summaryTab === 'site' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-700'}`} onClick={() => setSummaryTab('site')}>Site Summary</button>
-            <button className={`pb-3 text-sm font-semibold transition-all border-b-2 ${summaryTab === 'vat' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-700'}`} onClick={() => setSummaryTab('vat')}>VAT Summary</button>
+          <div className="flex px-5 gap-6 border-b border-slate-200 overflow-x-auto no-scrollbar">
+            <button className={`pb-3 text-sm font-semibold transition-all border-b-2 whitespace-nowrap ${summaryTab === 'client' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-700'}`} onClick={() => setSummaryTab('client')}>Client Summary</button>
+            <button className={`pb-3 text-sm font-semibold transition-all border-b-2 whitespace-nowrap ${summaryTab === 'site' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-700'}`} onClick={() => setSummaryTab('site')}>Site Summary</button>
+            <button className={`pb-3 text-sm font-semibold transition-all border-b-2 whitespace-nowrap ${summaryTab === 'vat' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-700'}`} onClick={() => setSummaryTab('vat')}>VAT Summary</button>
+            <button className={`pb-3 text-sm font-semibold transition-all border-b-2 whitespace-nowrap flex items-center gap-1.5 ${summaryTab === 'expenses-vat' ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-slate-500 hover:text-slate-700'}`} onClick={() => setSummaryTab('expenses-vat')}>
+              <Receipt className="h-3.5 w-3.5" /> Expenses VAT
+            </button>
           </div>
         </CardHeader>
         
@@ -2519,6 +2785,174 @@ export function FinancialReports() {
           </Button>
         )}
 
+        {summaryTab === 'expenses-vat' ? (
+          /* ── EXPENSES VAT TABLE ── */
+          <div ref={expensesVatScrollRef} className={`overflow-auto relative no-scrollbar cursor-grab active:cursor-grabbing ${fullScreenTable === 'ledger' ? 'flex-1 h-full min-h-0' : 'max-h-[70vh]'}`}>
+            <table className="w-full text-left text-[13px] whitespace-nowrap">
+              <thead className="bg-slate-900 text-white font-semibold sticky top-0 z-20 shadow-md">
+                <tr>
+                  <th className="py-3 px-5 sticky left-0 z-30 bg-slate-900 text-xs tracking-wider uppercase text-slate-300 border-r border-slate-700">Voucher No.</th>
+                  <th className="py-3 px-4 text-xs tracking-wider uppercase text-slate-300">Date</th>
+                  <th className="py-3 px-5 text-xs tracking-wider uppercase text-slate-300 w-1/4">Description</th>
+                  <th className="py-3 px-4 text-xs tracking-wider uppercase text-slate-300">Category</th>
+                  <th className="py-3 px-4 text-xs tracking-wider uppercase text-slate-300">Vendor</th>
+                  <th className="py-3 px-4 text-xs tracking-wider uppercase text-slate-300 text-center">VAT Policy</th>
+                  <th className="py-3 px-5 text-xs tracking-wider uppercase text-slate-300 text-right">Line Amount (₦)</th>
+                  <th className="py-3 px-5 text-xs tracking-wider uppercase text-indigo-200 text-right">Amt for VAT (₦)</th>
+                  <th className="py-3 px-5 text-xs tracking-wider uppercase text-emerald-300 text-right">VAT Amount (₦)</th>
+                  <th className="py-3 px-5 text-xs tracking-wider uppercase text-sky-300 text-right">VAT Remitted (₦)</th>
+                  <th className="py-3 px-5 text-xs tracking-wider uppercase text-rose-300 text-right">VAT Owed (₦)</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 bg-white">
+                {(() => {
+                  const vatEntries = ledgerEntries.filter(e => {
+                    const isVat = e.isVatable || (e.vatMode && e.vatMode !== 'No');
+                    if (!isVat) return false;
+                    if (!e.date) return false;
+                    if (filterYear !== 'All') {
+                      const yr = e.date.substring(0, 4);
+                      if (!filterYear.split(',').map(y => y.trim()).includes(yr)) return false;
+                    }
+                    if (filterMonth !== 'All') {
+                      const d = new Date(e.date);
+                      if (!isNaN(d.getTime())) {
+                        const mNum = String(d.getMonth() + 1);
+                        if (!filterMonth.split(',').map(m => m.trim()).includes(mNum)) return false;
+                      }
+                    }
+                    return true;
+                  });
+
+                  if (vatEntries.length === 0) return (
+                    <tr><td colSpan={11} className="py-12 text-center text-slate-400 italic">No vatable expense entries for the selected period.</td></tr>
+                  );
+
+                  // Build a map of monthKey → total VAT accumulated for that month
+                  // Then distribute remittances proportionally per-entry
+                  const monthVatTotals = new Map<string, number>();
+                  vatEntries.forEach(e => {
+                    if (!e.date) return;
+                    const mk = e.date.substring(0, 7); // YYYY-MM
+                    const vMode: 'No' | 'Yes' | 'Add' = (e.vatMode as any) || (e.isVatable ? 'Yes' : 'No');
+                    const calc = calculateItemVat(Number(e.amount), vMode, e.vatRate || vatRate);
+                    const entryVat = e.vatAmount ?? calc.vatAmount;
+                    monthVatTotals.set(mk, (monthVatTotals.get(mk) || 0) + entryVat);
+                  });
+
+                  // Build a map of monthKey → total remitted for that month
+                  const monthRemittedTotals = new Map<string, number>();
+                  (expenseVatRemittances || []).forEach(r => {
+                    if (!r.date) return;
+                    const mk = r.date.substring(0, 7);
+                    monthRemittedTotals.set(mk, (monthRemittedTotals.get(mk) || 0) + (Number(r.amount) || 0));
+                  });
+
+                  let grandLineAmt = 0, grandAmtForVat = 0, grandVatAmt = 0, grandRemitted = 0, grandOwed = 0;
+
+                  const rows = vatEntries.map((entry, idx) => {
+                    const vMode: 'No' | 'Yes' | 'Add' = (entry.vatMode as any) || (entry.isVatable ? 'Yes' : 'No');
+                    const calc = calculateItemVat(Number(entry.amount), vMode, entry.vatRate || vatRate);
+                    const lineAmt = Number(entry.amount) || 0;
+                    const amtForVat = entry.amountForVat ?? calc.amountForVat;
+                    const vatAmt = entry.vatAmount ?? calc.vatAmount;
+
+                    // Prorate this entry's share of the month's remittance
+                    const mk = entry.date?.substring(0, 7) || '';
+                    const monthTotalVat = monthVatTotals.get(mk) || 0;
+                    const monthTotalRemitted = monthRemittedTotals.get(mk) || 0;
+                    const entryShare = monthTotalVat > 0 ? vatAmt / monthTotalVat : 0;
+                    const entryRemitted = Math.min(vatAmt, monthTotalRemitted * entryShare);
+                    const entryOwed = Math.max(0, vatAmt - entryRemitted);
+
+                    grandLineAmt += lineAmt;
+                    grandAmtForVat += amtForVat;
+                    grandVatAmt += vatAmt;
+                    grandRemitted += entryRemitted;
+                    grandOwed += entryOwed;
+
+                    const isEven = idx % 2 === 0;
+                    const isFullyPaid = entryOwed <= 0.01;
+                    const isPartPaid = entryRemitted > 0.01 && !isFullyPaid;
+
+                    return (
+                      <tr key={entry.id || idx} className={`hover:bg-indigo-50/20 transition-colors ${isEven ? 'bg-white' : 'bg-slate-50/30'}`}>
+                        <td className={`py-2.5 px-5 sticky left-0 z-10 border-r border-slate-100 shadow-[1px_0_3px_rgba(0,0,0,0.05)] font-mono font-bold text-indigo-600 ${isEven ? 'bg-white' : 'bg-[#fcfdfe]'}`}>{entry.voucherNo || '—'}</td>
+                        <td className="py-2.5 px-4 font-mono text-slate-500 text-xs">{formatDisplayDate(entry.date)}</td>
+                        <td className="py-2.5 px-5 font-medium text-slate-800 max-w-[220px] truncate" title={entry.description}>{entry.description || '—'}</td>
+                        <td className="py-2.5 px-4">
+                          <span className="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full text-[11px] font-semibold">{entry.category || '—'}</span>
+                        </td>
+                        <td className="py-2.5 px-4 text-slate-500 text-[12px]">{entry.vendor || '—'}</td>
+                        <td className="py-2.5 px-4 text-center">
+                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-extrabold border ${
+                            vMode === 'Yes' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                            vMode === 'Add' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                            'bg-slate-100 text-slate-500 border-slate-200'
+                          }`}>{vMode}</span>
+                        </td>
+                        <td className="py-2.5 px-5 text-right font-mono font-semibold text-slate-700 tabular-nums">
+                          {lineAmt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </td>
+                        <td className="py-2.5 px-5 text-right font-mono font-semibold text-indigo-600 tabular-nums">
+                          {amtForVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </td>
+                        <td
+                          className="py-2.5 px-5 text-right font-mono font-extrabold text-emerald-700 bg-emerald-50/40 tabular-nums"
+                          title={`Amt for VAT: ₦${amtForVat.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})} | VAT Amount: ₦${vatAmt.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`}
+                        >
+                          {vatAmt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </td>
+                        <td
+                          className="py-2.5 px-5 text-right font-mono font-semibold text-sky-600 tabular-nums"
+                          title={`Amt for VAT: ₦${amtForVat.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})} | VAT Amount: ₦${vatAmt.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})} | Remitted: ₦${entryRemitted > 0.005 ? entryRemitted.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}) : '0.00'}`}
+                        >
+                          {entryRemitted > 0.005
+                            ? entryRemitted.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                            : <span className="text-slate-300">—</span>}
+                        </td>
+                        <td
+                          className="py-2.5 px-5 text-right tabular-nums"
+                          title={`Amt for VAT: ₦${amtForVat.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})} | VAT Amount: ₦${vatAmt.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})} | Remitted: ₦${entryRemitted > 0.005 ? entryRemitted.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}) : '0.00'} | Owed: ₦${entryOwed.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`}
+                        >
+                          {isFullyPaid ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5">
+                              <CheckCircle2 className="h-3 w-3" /> Paid
+                            </span>
+                          ) : isPartPaid ? (
+                            <span className="font-mono font-bold text-amber-600 text-xs">
+                              {entryOwed.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
+                          ) : (
+                            <span className="font-mono font-bold text-rose-600 text-xs">
+                              {vatAmt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  });
+
+                  return (
+                    <>
+                      {rows}
+                      <tr className="bg-slate-900 border-t-4 border-emerald-500 sticky bottom-0 z-10">
+                        <td className="sticky left-0 z-20 bg-slate-900 py-3.5 px-5 font-bold text-slate-200 text-sm tracking-wider uppercase border-r border-slate-700" colSpan={6}>Grand Total — {vatEntries.length} entries</td>
+                        <td className="py-3.5 px-5 text-right font-mono font-bold text-slate-200 tabular-nums">{grandLineAmt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        <td className="py-3.5 px-5 text-right font-mono font-bold text-indigo-300 tabular-nums">{grandAmtForVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        <td className="py-3.5 px-5 text-right font-mono font-bold text-emerald-400 tabular-nums">{grandVatAmt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        <td className="py-3.5 px-5 text-right font-mono font-bold text-sky-400 tabular-nums">{grandRemitted > 0 ? grandRemitted.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}</td>
+                        <td className={`py-3.5 px-5 text-right font-mono font-bold tabular-nums ${grandOwed <= 0.01 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                          {grandOwed <= 0.01 ? '✓ Cleared' : grandOwed.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </td>
+                      </tr>
+                    </>
+                  );
+                })()}
+              </tbody>
+            </table>
+          </div>
+        ) : (
         <div className={`overflow-auto relative no-scrollbar ${fullScreenTable === 'ledger' ? 'flex-1 h-full min-h-0' : 'max-h-[70vh]'}`}>
           <Table className="whitespace-nowrap min-w-full text-[13px]">
             <TableHeader className="bg-slate-900 sticky top-0 z-20 shadow-md">
@@ -2698,6 +3132,7 @@ export function FinancialReports() {
             </TableBody>
           </Table>
         </div>
+        )}
       </Card>
 
       {/* Charts Row */}
