@@ -50,6 +50,54 @@ function isNewerVersion(latest, current) {
   }
 }
 
+function getChangelogForVersion(targetVersion) {
+  if (!targetVersion) return null;
+  const fs = require('fs');
+  const path = require('path');
+  const cleanVer = targetVersion.replace(/^v/i, '').trim();
+
+  const possiblePaths = [
+    path.join(__dirname, '../CHANGELOG.md'),
+    path.join(app.getAppPath(), 'CHANGELOG.md'),
+    path.join(process.resourcesPath, 'CHANGELOG.md'),
+    path.join(process.cwd(), 'CHANGELOG.md'),
+  ];
+
+  for (const p of possiblePaths) {
+    if (fs.existsSync(p)) {
+      try {
+        const content = fs.readFileSync(p, 'utf8');
+        const lines = content.split(/\r?\n/);
+        let capturing = false;
+        const result = [];
+
+        for (const line of lines) {
+          const headerMatch = line.match(/^##\s*\[?v?(\d+\.\d+\.\d+)\]?/i);
+          if (headerMatch) {
+            const ver = headerMatch[1];
+            if (ver === cleanVer) {
+              capturing = true;
+              continue;
+            } else if (capturing) {
+              break;
+            }
+          }
+          if (capturing) {
+            result.push(line);
+          }
+        }
+
+        const changelogText = result.join('\n').trim();
+        if (changelogText) return changelogText;
+      } catch (err) {
+        console.error('Error parsing CHANGELOG.md:', err);
+      }
+    }
+  }
+
+  return null;
+}
+
 function checkNasUpdatesDirectly(nasPath) {
   const fs = require('fs');
   const path = require('path');
@@ -63,14 +111,17 @@ function checkNasUpdatesDirectly(nasPath) {
   const ymlPath = path.join(targetDir, 'latest.yml');
   let latestVersion = null;
   let exeFileName = null;
+  let releaseNotes = null;
 
   if (fs.existsSync(ymlPath)) {
     try {
       const ymlContent = fs.readFileSync(ymlPath, 'utf8');
       const versionMatch = ymlContent.match(/version:\s*['"]?([^\r\n"']+)['"]?/i);
       const pathMatch = ymlContent.match(/path:\s*['"]?([^\r\n"']+)['"]?/i);
+      const notesMatch = ymlContent.match(/releaseNotes:\s*\|?\s*([\s\S]*?)(?=\n\w+:|$)/i);
       if (versionMatch) latestVersion = versionMatch[1].trim();
       if (pathMatch) exeFileName = pathMatch[1].trim();
+      if (notesMatch) releaseNotes = notesMatch[1].trim();
     } catch (err) {
       console.error('Error reading latest.yml from NAS:', err);
     }
@@ -101,6 +152,10 @@ function checkNasUpdatesDirectly(nasPath) {
     }
   }
 
+  if (!releaseNotes && latestVersion) {
+    releaseNotes = getChangelogForVersion(latestVersion);
+  }
+
   const currentVersion = app.getVersion();
   if (latestVersion && isNewerVersion(latestVersion, currentVersion)) {
     const fullExePath = exeFileName ? path.join(targetDir, exeFileName) : null;
@@ -110,6 +165,7 @@ function checkNasUpdatesDirectly(nasPath) {
       currentVersion,
       exePath: fullExePath,
       nasPath: targetDir,
+      releaseNotes: releaseNotes || null,
     };
   }
 
@@ -126,6 +182,7 @@ function initAutoUpdater() {
   });
   autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.disableDifferentialDownload = true;
 
   autoUpdater.on('checking-for-update', () => {
     if (manualCheck) {
@@ -134,8 +191,9 @@ function initAutoUpdater() {
   });
 
   autoUpdater.on('update-available', (info) => {
+    const notes = (typeof info.releaseNotes === 'string' ? info.releaseNotes : null) || getChangelogForVersion(info.version);
     if (manualCheck) {
-      mainWindow?.webContents.send('updater:status', { type: 'available', version: info.version });
+      mainWindow?.webContents.send('updater:status', { type: 'available', version: info.version, releaseNotes: notes });
       autoUpdater.downloadUpdate();
     } else {
       dialog
@@ -533,7 +591,7 @@ function initIPC() {
       }
 
       // NAS update available! Notify renderer
-      mainWindow?.webContents.send('updater:status', { type: 'available', version: nasRes.version });
+      mainWindow?.webContents.send('updater:status', { type: 'available', version: nasRes.version, releaseNotes: nasRes.releaseNotes });
 
       if (nasRes.exePath && fs.existsSync(nasRes.exePath)) {
         try {
@@ -588,21 +646,31 @@ function initIPC() {
     }
   });
 
-  ipcMain.on('updater:quit-and-install', () => {
+  ipcMain.on('updater:quit-and-install', async () => {
     if (downloadedInstallerPath && require('fs').existsSync(downloadedInstallerPath)) {
-      const { spawn } = require('child_process');
       const exe = downloadedInstallerPath;
       downloadedInstallerPath = null;
       try {
-        const child = spawn(exe, [], {
-          detached: true,
-          stdio: 'ignore'
-        });
-        child.unref();
+        const openErr = await shell.openPath(exe);
+        if (openErr) {
+          console.error('shell.openPath failed, attempting spawn fallback:', openErr);
+          const { spawn } = require('child_process');
+          const child = spawn(`"${exe}"`, [], {
+            detached: true,
+            stdio: 'ignore',
+            shell: true
+          });
+          child.on('error', (err) => {
+            console.error('Failed to launch detached installer:', err);
+          });
+          child.unref();
+        }
       } catch (err) {
-        console.error('Failed to launch detached installer:', err);
+        console.error('Failed to launch installer:', err);
       }
-      app.quit();
+      setTimeout(() => {
+        app.quit();
+      }, 500);
     } else {
       autoUpdater.quitAndInstall();
     }

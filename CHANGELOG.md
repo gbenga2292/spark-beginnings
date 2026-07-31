@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.7.12] - 2026-07-30
+
+### Added / Improved
+- **Auto-Updater & Release Notes Viewer**:
+  - Added automatic release notes parsing from `CHANGELOG.md` in `electron/main.cjs` for direct NAS and auto-updater update checks.
+  - Updated `UpdateModal.tsx` to dynamically present release notes to users during update download and ready-to-install phases.
+  - Enhanced installer execution flow in Electron main process via `shell.openPath` with graceful fallback handling.
+- **Version Bump**:
+  - Updated application version to `1.7.12` in `package.json` and `src/constants/version.ts`.
+
 ## [1.7.11] - 2026-07-30
 
 ### Added / Improved

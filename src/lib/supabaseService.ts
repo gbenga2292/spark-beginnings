@@ -2029,6 +2029,7 @@ export const db = {
     monthValues?: any;
     hrVariables?: any;
     onboardingTemplates?: any;
+    expenseVatRemittances?: any;
     superAdminCreated?: boolean;
     superAdminSignupEnabled?: boolean;
   }) {
@@ -2038,6 +2039,7 @@ export const db = {
     if (data.monthValues !== undefined) update.month_values = data.monthValues;
     if (data.hrVariables !== undefined) update.hr_variables = data.hrVariables;
     if (data.onboardingTemplates !== undefined) update.onboarding_templates = data.onboardingTemplates;
+    if (data.expenseVatRemittances !== undefined) update.expense_vat_remittances = data.expenseVatRemittances;
     if (data.superAdminCreated !== undefined) update.super_admin_created = data.superAdminCreated;
     if (data.superAdminSignupEnabled !== undefined) update.super_admin_signup_enabled = data.superAdminSignupEnabled;
     update.updated_at = new Date().toISOString();

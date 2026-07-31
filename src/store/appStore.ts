@@ -111,6 +111,7 @@ export interface LedgerEntry {
   id: string; voucherNo: string; date: string; description: string;
   category: string; amount: number; client: string; site: string;
   vendor: string; bank: string; enteredBy: string;
+  isVatable?: boolean; vatMode?: 'No' | 'Yes' | 'Add'; vatAmount?: number; vatRate?: number; amountForVat?: number;
 }
 
 // ─── Budget Item ───────────────────────────────────────────────
@@ -699,6 +700,20 @@ export interface VatPayment {
   amount: number;
 }
 
+export interface ExpenseVatRemittance {
+  id: string;
+  monthKey: string;           // YYYY-MM
+  category?: string;          // Optional category filter linkage
+  ledgerEntryId?: string;     // Linked ledger payment entry ID
+  voucherNo?: string;         // Voucher number of linked ledger entry
+  date: string;               // YYYY-MM-DD
+  amount: number;             // Amount paid/remitted
+  bank: string;               // Payment bank
+  notes?: string;             // Payment description or reference
+  createdAt: string;
+  createdBy: string;
+}
+
 export interface MonthValue {
   workDays: number;
   overtimeRate: number;
@@ -860,6 +875,13 @@ interface AppState {
   setDepartmentTasksList: (list: DepartmentTasks[]) => Promise<void>;
   bulkAddLedgerEntries: (entries: LedgerEntry[]) => void;
   bulkUpdateLedgerEntries: (ids: string[], update: Partial<LedgerEntry>) => void;
+
+  // Expenses VAT Remittances
+  expenseVatRemittances: ExpenseVatRemittance[];
+  addExpenseVatRemittance: (remittance: ExpenseVatRemittance) => void;
+  updateExpenseVatRemittance: (id: string, remittance: Partial<ExpenseVatRemittance>) => void;
+  deleteExpenseVatRemittance: (id: string) => void;
+  setExpenseVatRemittances: (remittances: ExpenseVatRemittance[]) => void;
 
   addCompanyExpense: (expense: CompanyExpense) => void;
   updateCompanyExpense: (id: string, expense: Partial<CompanyExpense>) => void;
@@ -1301,6 +1323,25 @@ export const useAppStore = create<AppState>()(
         }));
         db.bulkUpdateLedgerEntries(ids, update);
       },
+
+      // Expenses VAT Remittances
+      expenseVatRemittances: [],
+      addExpenseVatRemittance: (remittance) => set(s => {
+        const updated = [...(s.expenseVatRemittances || []), remittance];
+        db.updateSettings({ expenseVatRemittances: updated }).catch(console.error);
+        return { expenseVatRemittances: updated };
+      }),
+      updateExpenseVatRemittance: (id, remittance) => set(s => {
+        const updated = (s.expenseVatRemittances || []).map(r => r.id === id ? { ...r, ...remittance } : r);
+        db.updateSettings({ expenseVatRemittances: updated }).catch(console.error);
+        return { expenseVatRemittances: updated };
+      }),
+      deleteExpenseVatRemittance: (id) => set(s => {
+        const updated = (s.expenseVatRemittances || []).filter(r => r.id !== id);
+        db.updateSettings({ expenseVatRemittances: updated }).catch(console.error);
+        return { expenseVatRemittances: updated };
+      }),
+      setExpenseVatRemittances: (remittances) => set({ expenseVatRemittances: remittances }),
 
       // Company Expenses
       addCompanyExpense: (expense) => { set(s => ({ companyExpenses: [...s.companyExpenses, expense] })); db.insertCompanyExpense(expense); },

@@ -5,18 +5,20 @@ import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
 import { TabsContent } from '@/src/components/ui/tabs';
-import { Search, Download, Upload, FileText, ChevronLeft, ChevronRight, X, Eye, BookOpen, RotateCcw, Trash2, LayoutGrid, BarChart2, CheckCircle2, History, ChevronDown, Filter, Plus, Users, Edit2 } from 'lucide-react';
+import { Search, Download, Upload, FileText, ChevronLeft, ChevronRight, X, Eye, BookOpen, RotateCcw, Trash2, LayoutGrid, BarChart2, CheckCircle2, History, ChevronDown, ChevronUp, Filter, Plus, Users, Edit2, Receipt, Percent, Calendar, Building2, Calculator, Link, AlertCircle, Clock, ArrowUpRight, Layers } from 'lucide-react';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from '@/src/components/ui/dropdown-menu';
 import { ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/src/components/ui/dialog';
-import { useAppStore, LedgerEntry } from '@/src/store/appStore';
+import { useAppStore, LedgerEntry, ExpenseVatRemittance } from '@/src/store/appStore';
 import { useUserStore } from '@/src/store/userStore';
 import { usePriv } from '@/src/hooks/usePriv';
 import * as XLSX from 'xlsx';
 import { toast, showConfirm } from '@/src/components/ui/toast';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
-import { generateId } from '@/src/lib/utils';
+import { generateId, cn } from '@/src/lib/utils';
 import { fetchLedgerData } from '@/src/lib/supabaseService';
+
+export type VatMode = 'No' | 'Yes' | 'Add';
 
 type EntryItem = {
   id?: string;
@@ -27,17 +29,49 @@ type EntryItem = {
   client: string;
   site: string;
   vendor: string;
+  isVatable?: boolean;
+  vatMode: VatMode;
+  vatAmount?: number;
+  amountForVat?: number;
 };
 
 const getEmptyItem = (): EntryItem => ({
-  transactionDate: '', description: '', category: '', amount: '', client: 'none', site: 'none', vendor: 'none'
+  transactionDate: '', description: '', category: '', amount: '', client: 'none', site: 'none', vendor: 'none', isVatable: false, vatMode: 'No', vatAmount: 0, amountForVat: 0
 });
+
+export function calculateItemVat(amtNum: number, mode: VatMode, rate: number) {
+  if (mode === 'No' || !amtNum || amtNum <= 0) {
+    return { vatAmount: 0, amountForVat: 0, grossAmount: amtNum || 0 };
+  }
+  if (mode === 'Yes') {
+    // Exclusive VAT: Net Amount entered. VAT added on top.
+    const vatAmount = (amtNum * rate) / 100;
+    return {
+      vatAmount,
+      amountForVat: amtNum,
+      grossAmount: amtNum + vatAmount,
+    };
+  }
+  if (mode === 'Add') {
+    // Inclusive VAT (Add policy): Gross Amount entered.
+    const vatAmount = (amtNum * rate) / (100 + rate);
+    const amountForVat = amtNum - vatAmount;
+    return {
+      vatAmount,
+      amountForVat,
+      grossAmount: amtNum,
+    };
+  }
+  return { vatAmount: 0, amountForVat: 0, grossAmount: amtNum || 0 };
+}
 
 export function Ledger() {
   const priv = usePriv('ledger');
   const currentUser = useUserStore((s) => s.getCurrentUser());
 
   const ledgerEntries = useAppStore((state) => state.ledgerEntries);
+  const payrollVariables = useAppStore((state) => state.payrollVariables);
+  const vatRate = payrollVariables?.vatRate ?? 7.5;
   const ledgerCategories = useAppStore((state) => state.ledgerCategories);
   const ledgerBanks = useAppStore((state) => state.ledgerBanks);
   const ledgerVendors = useAppStore((state) => state.ledgerVendors);
@@ -67,7 +101,137 @@ export function Ledger() {
     }
   }, [ledgerEntries.length]);
 
-  const [tab, setTab] = useState('entry');
+  const [tab, setTab] = useState<'entry' | 'records' | 'vat'>('entry');
+  const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set());
+  const [selectedVatMonth, setSelectedVatMonth] = useState<string>('all');
+  const [selectedVatCategory, setSelectedVatCategory] = useState<string>('all');
+
+  const expenseVatRemittances = useAppStore((state) => state.expenseVatRemittances);
+  const addExpenseVatRemittance = useAppStore((state) => state.addExpenseVatRemittance);
+  const deleteExpenseVatRemittance = useAppStore((state) => state.deleteExpenseVatRemittance);
+
+  // Reconciliation modal state
+  const [reconcileMonthKey, setReconcileMonthKey] = useState<string | null>(null);
+  const [reconcileSearchQuery, setReconcileSearchQuery] = useState('');
+  const [reconcileTab, setReconcileTab] = useState<'link' | 'direct'>('link');
+  const [directForm, setDirectForm] = useState({
+    date: new Date().toISOString().split('T')[0],
+    amount: '',
+    bank: '',
+    voucherNo: '',
+    notes: '',
+  });
+
+  const toggleMonthExpand = (monthKey: string) => {
+    setExpandedMonths(prev => {
+      const next = new Set(prev);
+      if (next.has(monthKey)) next.delete(monthKey);
+      else next.add(monthKey);
+      return next;
+    });
+  };
+
+  const monthlyVatSummaries = useMemo(() => {
+    const vatableEntries = ledgerEntries.filter(e => {
+      const isVat = e.isVatable || (e.vatMode && e.vatMode !== 'No');
+      if (!isVat) return false;
+      if (selectedVatCategory !== 'all' && e.category !== selectedVatCategory) return false;
+      return true;
+    });
+
+    const groups: Record<string, {
+      monthKey: string;
+      monthLabel: string;
+      entries: LedgerEntry[];
+      totalVatableAmount: number;
+      totalVatAmount: number;
+      totalVatPaid: number;
+      vatBalance: number;
+      status: 'Fully Paid' | 'Partially Paid' | 'Unpaid';
+      remittances: ExpenseVatRemittance[];
+    }> = {};
+
+    vatableEntries.forEach(entry => {
+      if (!entry.date) return;
+      const monthKey = entry.date.slice(0, 7);
+      const parts = monthKey.split('-');
+      if (parts.length < 2) return;
+      const yearStr = parts[0];
+      const monthStr = parts[1];
+      const monthIndex = parseInt(monthStr, 10) - 1;
+      const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+      const monthLabel = `${monthNames[monthIndex] || monthStr} ${yearStr}`;
+
+      if (!groups[monthKey]) {
+        groups[monthKey] = {
+          monthKey,
+          monthLabel,
+          entries: [],
+          totalVatableAmount: 0,
+          totalVatAmount: 0,
+          totalVatPaid: 0,
+          vatBalance: 0,
+          status: 'Unpaid',
+          remittances: [],
+        };
+      }
+      const vMode: VatMode = entry.vatMode || (entry.isVatable ? 'Yes' : 'No');
+      const rateToUse = entry.vatRate || vatRate;
+      const numAmt = Number(entry.amount) || 0;
+      const calculated = calculateItemVat(numAmt, vMode, rateToUse);
+
+      const entryVat = entry.vatAmount ?? calculated.vatAmount;
+      const entryAmtForVat = entry.amountForVat ?? calculated.amountForVat;
+
+      groups[monthKey].entries.push(entry);
+      groups[monthKey].totalVatableAmount += entryAmtForVat;
+      groups[monthKey].totalVatAmount += entryVat;
+    });
+
+    // Compute remittances, paid total, balance, and status per month
+    Object.values(groups).forEach(group => {
+      const monthRemittances = (expenseVatRemittances || []).filter(r => {
+        if (r.monthKey !== group.monthKey) return false;
+        if (selectedVatCategory !== 'all' && r.category && r.category !== 'all' && r.category !== selectedVatCategory) return false;
+        return true;
+      });
+      group.remittances = monthRemittances;
+      group.totalVatPaid = monthRemittances.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
+      group.vatBalance = group.totalVatAmount - group.totalVatPaid;
+
+      if (group.totalVatPaid >= group.totalVatAmount && group.totalVatAmount > 0) {
+        group.status = 'Fully Paid';
+      } else if (group.totalVatPaid > 0) {
+        group.status = 'Partially Paid';
+      } else {
+        group.status = 'Unpaid';
+      }
+    });
+
+    return Object.values(groups).sort((a, b) => b.monthKey.localeCompare(a.monthKey));
+  }, [ledgerEntries, vatRate, selectedVatCategory, expenseVatRemittances]);
+
+  const availableVatMonths = useMemo(() => {
+    return monthlyVatSummaries.map(g => ({
+      key: g.monthKey,
+      label: g.monthLabel,
+    }));
+  }, [monthlyVatSummaries]);
+
+  const filteredVatSummaries = useMemo(() => {
+    if (selectedVatMonth === 'all') return monthlyVatSummaries;
+    return monthlyVatSummaries.filter(g => g.monthKey === selectedVatMonth);
+  }, [monthlyVatSummaries, selectedVatMonth]);
+
+  const overallVatStats = useMemo(() => {
+    const totalVat = filteredVatSummaries.reduce((sum, g) => sum + g.totalVatAmount, 0);
+    const totalVatPaid = filteredVatSummaries.reduce((sum, g) => sum + g.totalVatPaid, 0);
+    const totalVatable = filteredVatSummaries.reduce((sum, g) => sum + g.totalVatableAmount, 0);
+    const totalCount = filteredVatSummaries.reduce((sum, g) => sum + g.entries.length, 0);
+    const vatBalance = totalVat - totalVatPaid;
+    const amountForVat = totalVatable; // Total base amount subject to VAT
+    return { totalVat, totalVatPaid, vatBalance, totalVatable, totalCount, amountForVat };
+  }, [filteredVatSummaries]);
 
   // VOUCHER FORM STATE
   const [voucherDate, setVoucherDate] = useState(new Date().toISOString().split('T')[0]);
@@ -283,6 +447,7 @@ export function Ledger() {
     const loadedItems: EntryItem[] = Array(8).fill(null).map(() => getEmptyItem());
     records.forEach((r, idx) => {
       if (idx < 8) {
+        const vMode: VatMode = r.vatMode || (r.isVatable ? 'Yes' : 'No');
         loadedItems[idx] = {
           id: r.id,
           transactionDate: r.date,
@@ -292,6 +457,10 @@ export function Ledger() {
           client: r.client || 'none',
           site: r.site || 'none',
           vendor: r.vendor || 'none',
+          isVatable: vMode !== 'No',
+          vatMode: vMode,
+          vatAmount: r.vatAmount || 0,
+          amountForVat: r.amountForVat || 0,
         };
       }
     });
@@ -454,18 +623,28 @@ export function Ledger() {
         ? item.transactionDate
         : voucherDate || new Date().toISOString().split('T')[0];
       
+      const vMode: VatMode = item.vatMode || (item.isVatable ? 'Yes' : 'No');
+      const isVatable = vMode !== 'No';
+      const numAmt = Number(item.amount) || 0;
+      const calculatedVat = calculateItemVat(numAmt, vMode, vatRate);
+
       const payload: LedgerEntry = {
         id: item.id || generateId(),
         voucherNo: targetVoucherNo,
         date: entryDate,
         description: item.description,
         category: item.category,
-        amount: Number(item.amount),
+        amount: numAmt,
         client: item.client === 'none' || !item.client ? '' : item.client,
         site: item.site === 'none' || !item.site ? '' : item.site,
         vendor: item.vendor === 'none' || !item.vendor ? '' : item.vendor,
         bank: paidFrom,
         enteredBy: currentUser?.name || 'Unknown',
+        isVatable,
+        vatMode: vMode,
+        vatAmount: calculatedVat.vatAmount,
+        vatRate: isVatable ? vatRate : undefined,
+        amountForVat: calculatedVat.amountForVat,
       };
       
       keptIds.add(payload.id);
@@ -521,7 +700,7 @@ export function Ledger() {
     }
   };
 
-  const setItemField = (idx: number, field: keyof EntryItem, val: string) => {
+  const setItemField = (idx: number, field: keyof EntryItem, val: any) => {
     const newItems = [...items];
     newItems[idx] = { ...newItems[idx], [field]: val };
     setItems(newItems);
@@ -531,8 +710,70 @@ export function Ledger() {
     return items.reduce((acc, curr) => acc + (parseFloat(curr.amount) || 0), 0);
   }, [items]);
 
+  const formNetTotal = useMemo(() => {
+    return items.reduce((acc, curr) => {
+      const mode = curr.vatMode || (curr.isVatable ? 'Yes' : 'No');
+      const amt = parseFloat(curr.amount) || 0;
+      const calc = calculateItemVat(amt, mode, vatRate);
+      if (mode === 'No') return acc + amt;
+      return acc + calc.amountForVat;
+    }, 0);
+  }, [items, vatRate]);
+
+  const formVatTotal = useMemo(() => {
+    return items.reduce((acc, curr) => {
+      const mode = curr.vatMode || (curr.isVatable ? 'Yes' : 'No');
+      const amt = parseFloat(curr.amount) || 0;
+      const calc = calculateItemVat(amt, mode, vatRate);
+      return acc + calc.vatAmount;
+    }, 0);
+  }, [items, vatRate]);
+
+  const formGrossTotal = useMemo(() => {
+    return items.reduce((acc, curr) => {
+      const mode = curr.vatMode || (curr.isVatable ? 'Yes' : 'No');
+      const amt = parseFloat(curr.amount) || 0;
+      const calc = calculateItemVat(amt, mode, vatRate);
+      return acc + calc.grossAmount;
+    }, 0);
+  }, [items, vatRate]);
+
   // Dialog state: which voucher's transactions to show
   const [dialogVoucher, setDialogVoucher] = useState<string | null>(null);
+
+  const dialogTransactions = useMemo(() => {
+    if (!dialogVoucher) return [];
+    return ledgerEntries.filter(e => e.voucherNo === dialogVoucher);
+  }, [dialogVoucher, ledgerEntries]);
+
+  const dialogNetTotal = useMemo(() => {
+    return dialogTransactions.reduce((acc, curr) => {
+      const mode = curr.vatMode || (curr.isVatable ? 'Yes' : 'No');
+      const amt = Number(curr.amount) || 0;
+      const calc = calculateItemVat(amt, mode, curr.vatRate || vatRate);
+      if (mode === 'No') return acc + amt;
+      return acc + (curr.amountForVat ?? calc.amountForVat);
+    }, 0);
+  }, [dialogTransactions, vatRate]);
+
+  const dialogVatTotal = useMemo(() => {
+    return dialogTransactions.reduce((acc, curr) => {
+      const mode = curr.vatMode || (curr.isVatable ? 'Yes' : 'No');
+      const amt = Number(curr.amount) || 0;
+      const calc = calculateItemVat(amt, mode, curr.vatRate || vatRate);
+      return acc + (curr.vatAmount ?? calc.vatAmount);
+    }, 0);
+  }, [dialogTransactions, vatRate]);
+
+  const dialogGrossTotal = useMemo(() => {
+    return dialogTransactions.reduce((acc, curr) => {
+      const mode = curr.vatMode || (curr.isVatable ? 'Yes' : 'No');
+      const amt = Number(curr.amount) || 0;
+      const calc = calculateItemVat(amt, mode, curr.vatRate || vatRate);
+      return acc + calc.grossAmount;
+    }, 0);
+  }, [dialogTransactions, vatRate]);
+
   // Description callout dialog: { idx, value } | null
   const [descDialog, setDescDialog] = useState<{ idx: number; value: string } | null>(null);
 
@@ -843,18 +1084,16 @@ export function Ledger() {
 
 
 
-  // Transactions for the dialog (all lines — no cap)
-  const dialogTransactions = useMemo(() =>
-    dialogVoucher ? ledgerEntries.filter(e => e.voucherNo === dialogVoucher) : [],
-    [dialogVoucher, ledgerEntries]
-  );
+
 
 
   useSetPageTitle(
-    tab === 'entry' ? 'Company Ledger' : 'Voucher Records',
+    tab === 'entry' ? 'Company Ledger' : tab === 'records' ? 'Voucher Records' : 'Expenses VAT',
     tab === 'entry'
       ? 'Record vouchers, manage expenses, and track financial outflows across banks and sites'
-      : `Click any voucher to view its transactions. Showing ${voucherSummaries.length} voucher${voucherSummaries.length !== 1 ? 's' : ''}.`,
+      : tab === 'records'
+      ? `Click any voucher to view its transactions. Showing ${voucherSummaries.length} voucher${voucherSummaries.length !== 1 ? 's' : ''}.`
+      : 'Monthly accumulated VAT on ledger expenses for tax remittance planning',
     <div className="relative flex items-center gap-2">
       <div className="flex items-center gap-2 md:gap-3">
         <div className="flex bg-slate-100/80 p-0.5 rounded-lg border border-slate-200/60 shadow-sm backdrop-blur-sm">
@@ -863,6 +1102,9 @@ export function Ledger() {
           </button>
           <button onClick={() => setTab('records')} className={`px-2 sm:px-3 py-1.5 rounded-md text-[10px] uppercase tracking-wider font-extrabold transition-all duration-200 flex items-center gap-1.5 ${tab === 'records' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-indigo-600'}`}>
             <History className="h-3.5 w-3.5" /> <span className="hidden sm:inline">History</span>
+          </button>
+          <button onClick={() => setTab('vat')} className={`px-2 sm:px-3 py-1.5 rounded-md text-[10px] uppercase tracking-wider font-extrabold transition-all duration-200 flex items-center gap-1.5 ${tab === 'vat' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500 hover:text-emerald-600'}`}>
+            <Receipt className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Expenses VAT</span>
           </button>
         </div>
         <div className="hidden sm:block h-8 w-[1px] bg-slate-200 mx-1" />
@@ -1151,12 +1393,62 @@ export function Ledger() {
                         </select>
                       </div>
                     </div>
+                    <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                      <div className="flex items-center gap-2">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase">VAT Policy</label>
+                        <select
+                          className="h-8 px-2 rounded border border-slate-200 text-xs bg-white font-bold text-indigo-700 outline-none cursor-pointer"
+                          value={item.vatMode || (item.isVatable ? 'Yes' : 'No')}
+                          onChange={e => {
+                            const mode = e.target.value as VatMode;
+                            const newItems = [...items];
+                            newItems[idx] = {
+                              ...newItems[idx],
+                              vatMode: mode,
+                              isVatable: mode !== 'No',
+                            };
+                            setItems(newItems);
+                          }}
+                        >
+                          <option value="No">No VAT (No)</option>
+                          <option value="Yes">Exclusive VAT (Yes)</option>
+                          <option value="Add">Inclusive VAT (Add)</option>
+                        </select>
+                      </div>
+                      {(() => {
+                        const mode = item.vatMode || (item.isVatable ? 'Yes' : 'No');
+                        if (mode === 'No') return null;
+                        const amt = parseFloat(item.amount) || 0;
+                        const calc = calculateItemVat(amt, mode, vatRate);
+                        return (
+                          <div className="text-right font-extrabold text-emerald-700 text-xs bg-emerald-50 px-2 py-1 rounded border border-emerald-100">
+                            VAT ({mode}): ₦{calc.vatAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </div>
+                        );
+                      })()}
+                    </div>
                   </div>
                 </div>
               ))}
-              <div className="p-4 bg-indigo-50 flex justify-between items-center">
-                <span className="font-bold text-slate-700 text-sm uppercase tracking-wider">Total Amount</span>
-                <span className="font-bold text-indigo-700 text-lg tabular-nums">₦{formTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              <div className="p-4 bg-indigo-50 flex flex-col gap-1">
+                <div className="flex justify-between items-center text-xs">
+                  <span className="font-bold text-slate-700 uppercase tracking-wider">Subtotal (Line Items)</span>
+                  <span className="font-bold text-slate-800 text-sm tabular-nums">₦{formTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </div>
+                <div className="flex justify-between items-center text-xs text-indigo-700 font-semibold">
+                  <span>Base Vatable Amount</span>
+                  <span className="tabular-nums">₦{formNetTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </div>
+                {formVatTotal > 0 && (
+                  <div className="flex justify-between items-center text-emerald-700 font-bold text-xs">
+                    <span>Total VAT ({vatRate}%)</span>
+                    <span className="tabular-nums">₦{formVatTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  </div>
+                )}
+                <div className="flex justify-between items-center pt-1 border-t border-indigo-200/60 font-extrabold text-indigo-900 text-sm">
+                  <span>Gross Total</span>
+                  <span className="tabular-nums">₦{formGrossTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </div>
               </div>
             </div>
 
@@ -1167,10 +1459,12 @@ export function Ledger() {
                   <th className="py-2.5 px-3 text-center border-r border-slate-800 w-10 text-[10px] uppercase tracking-widest opacity-70">Nº</th>
                   <th className="py-2.5 px-3 border-r border-slate-800 w-[140px] text-[10px] uppercase tracking-widest opacity-70">Date</th>
                   <th className="py-2.5 px-3 border-r border-slate-800 w-1/4 text-[10px] uppercase tracking-widest opacity-70">Description</th>
-                  <th className="py-2.5 px-3 border-r border-slate-800 w-48 text-[10px] uppercase tracking-widest opacity-70">Category</th>
+                  <th className="py-2.5 px-3 border-r border-slate-800 w-44 text-[10px] uppercase tracking-widest opacity-70">Category</th>
                   <th className="py-2.5 px-3 border-r border-slate-800 w-32 text-[10px] uppercase tracking-widest opacity-70">Amount</th>
-                  <th className="py-2.5 px-3 border-r border-slate-800 w-40 text-[10px] uppercase tracking-widest opacity-70">Client</th>
-                  <th className="py-2.5 px-3 border-r border-slate-800 w-40 text-[10px] uppercase tracking-widest opacity-70">Site</th>
+                  <th className="py-2.5 px-2 border-r border-slate-800 w-24 text-center text-[10px] uppercase tracking-widest opacity-70">VAT Policy</th>
+                  <th className="py-2.5 px-3 border-r border-slate-800 w-32 text-right text-[10px] uppercase tracking-widest opacity-70">VAT ({vatRate}%)</th>
+                  <th className="py-2.5 px-3 border-r border-slate-800 w-36 text-[10px] uppercase tracking-widest opacity-70">Client</th>
+                  <th className="py-2.5 px-3 border-r border-slate-800 w-36 text-[10px] uppercase tracking-widest opacity-70">Site</th>
                   <th className="py-2.5 px-3 text-[10px] uppercase tracking-widest opacity-70">Vendor</th>
                 </tr>
               </thead>
@@ -1229,6 +1523,45 @@ export function Ledger() {
                         />
                       </div>
                     </td>
+                    <td className={tdClass + " text-center"}>
+                      <select 
+                        className="w-full h-8 px-1.5 rounded border border-slate-200 text-xs bg-white font-extrabold text-indigo-700 outline-none cursor-pointer text-center" 
+                        value={item.vatMode || (item.isVatable ? 'Yes' : 'No')} 
+                        onChange={e => {
+                          const mode = e.target.value as VatMode;
+                          const newItems = [...items];
+                          newItems[idx] = {
+                            ...newItems[idx],
+                            vatMode: mode,
+                            isVatable: mode !== 'No',
+                          };
+                          setItems(newItems);
+                        }} 
+                        title="VAT Policy: No (No VAT), Yes (Exclusive VAT added), Add (Inclusive VAT in amount)"
+                      >
+                        <option value="No">No</option>
+                        <option value="Yes">Yes</option>
+                        <option value="Add">Add</option>
+                      </select>
+                    </td>
+                    <td className={tdClass + " bg-slate-50/60 text-right pr-3 font-mono"}>
+                      {(() => {
+                        const mode = item.vatMode || (item.isVatable ? 'Yes' : 'No');
+                        if (mode === 'No') return <span className="text-slate-300 text-xs">—</span>;
+                        const amt = parseFloat(item.amount) || 0;
+                        const calc = calculateItemVat(amt, mode, vatRate);
+                        return (
+                          <div className="flex flex-col items-end">
+                            <span className="text-emerald-700 font-extrabold text-xs">
+                              ₦{calc.vatAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
+                            <span className="text-[9px] font-bold text-slate-400">
+                              ({mode})
+                            </span>
+                          </div>
+                        );
+                      })()}
+                    </td>
                     <td className={tdClass}>
                       <select
                         className={inputClass}
@@ -1265,13 +1598,19 @@ export function Ledger() {
                 ))}
                 <tr>
                   <td colSpan={4} className="text-right py-3 px-4 font-bold text-slate-700 bg-white border border-slate-200">
-                    Total
+                    Totals
                   </td>
                   <td className="py-3 px-3 font-bold text-indigo-700 border border-slate-200 bg-indigo-50/50">
                     ₦{formTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </td>
-                  <td colSpan={3} className="bg-white border border-slate-200 text-slate-300 px-4 text-xs italic">
-                    All amounts aggregated per voucher automatically.
+                  <td className="border border-slate-200 bg-slate-50 text-center text-xs font-bold text-slate-400">
+                    VAT
+                  </td>
+                  <td className="py-3 px-3 font-extrabold text-emerald-700 border border-slate-200 bg-emerald-50/50 text-right">
+                    ₦{formVatTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </td>
+                  <td colSpan={3} className="bg-white border border-slate-200 text-slate-500 px-4 text-xs italic">
+                    Base Vatable Amount: ₦{formNetTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} | Total VAT ({vatRate}%): ₦{formVatTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} | Gross Total: ₦{formGrossTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </td>
                 </tr>
               </tbody>
@@ -1496,6 +1835,7 @@ export function Ledger() {
                           Amount {sortField === 'amount' ? (sortOrder === 'asc' ? <ArrowUp className="h-3 w-3 text-indigo-600" /> : <ArrowDown className="h-3 w-3 text-indigo-600" />) : <ArrowUpDown className="h-3 w-3 text-slate-300 group-hover:text-slate-400" />}
                         </div>
                       </th>
+                      <th className="py-2.5 px-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider w-28">VAT ({vatRate}%)</th>
                       <th className="py-2.5 px-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-28 cursor-pointer hover:bg-slate-100 transition-colors group" onClick={() => toggleSort('vendor')}>
                         <div className="flex items-center gap-1.5">
                           Vendor {sortField === 'vendor' ? (sortOrder === 'asc' ? <ArrowUp className="h-3 w-3 text-indigo-600" /> : <ArrowDown className="h-3 w-3 text-indigo-600" />) : <ArrowUpDown className="h-3 w-3 text-slate-300 group-hover:text-slate-400" />}
@@ -1542,6 +1882,15 @@ export function Ledger() {
                           <td className="py-2.5 px-3 text-slate-400 text-xs whitespace-nowrap">{entry.bank || '—'}</td>
                           <td className="py-2.5 px-3 text-right font-bold text-slate-900 tabular-nums text-xs">
                             ₦{Number(entry.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </td>
+                          <td className="py-2.5 px-3 text-right font-medium text-xs whitespace-nowrap">
+                            {entry.isVatable ? (
+                              <span className="inline-flex items-center gap-1 text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded-full text-[11px]">
+                                ₦{(entry.vatAmount ?? (Number(entry.amount) * (vatRate / 100))).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </span>
+                            ) : (
+                              <span className="text-slate-300">—</span>
+                            )}
                           </td>
                           <td className="py-2.5 px-3 text-slate-400 text-xs">{entry.vendor || '—'}</td>
                           <td className="py-2.5 px-3 text-center">
@@ -1712,6 +2061,691 @@ export function Ledger() {
         </Card>
       </TabsContent>
 
+      {/* Expenses VAT Tab */}
+      <TabsContent active={tab === 'vat'} className="m-0 focus-visible:outline-none">
+        <div className="space-y-6">
+          {/* Stat Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+            <Card className="border-slate-200 shadow-sm bg-gradient-to-br from-emerald-500/10 to-teal-500/5">
+              <CardContent className="p-4 flex items-center justify-between">
+                <div>
+                  <p className="text-[10px] font-extrabold uppercase tracking-widest text-emerald-700">Accumulated VAT</p>
+                  <h3 className="text-xl font-extrabold text-slate-900 mt-1 tabular-nums">
+                    ₦{overallVatStats.totalVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </h3>
+                  <p className="text-[11px] text-slate-500 mt-0.5">Total VAT to remit</p>
+                </div>
+                <div className="h-10 w-10 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center font-bold shrink-0">
+                  <Receipt className="h-5 w-5" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-slate-200 shadow-sm bg-gradient-to-br from-teal-500/10 to-emerald-500/5">
+              <CardContent className="p-4 flex items-center justify-between">
+                <div>
+                  <p className="text-[10px] font-extrabold uppercase tracking-widest text-teal-700">VAT Paid / Remitted</p>
+                  <h3 className="text-xl font-extrabold text-slate-900 mt-1 tabular-nums">
+                    ₦{overallVatStats.totalVatPaid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </h3>
+                  <p className="text-[11px] text-slate-500 mt-0.5">Reconciled VAT payments</p>
+                </div>
+                <div className="h-10 w-10 rounded-xl bg-teal-500/10 text-teal-600 flex items-center justify-center font-bold shrink-0">
+                  <CheckCircle2 className="h-5 w-5" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className={cn(
+              "border-slate-200 shadow-sm",
+              overallVatStats.vatBalance <= 0 ? "bg-emerald-50/50" : overallVatStats.totalVatPaid > 0 ? "bg-amber-50/50" : "bg-rose-50/50"
+            )}>
+              <CardContent className="p-4 flex items-center justify-between">
+                <div>
+                  <p className={cn(
+                    "text-[10px] font-extrabold uppercase tracking-widest",
+                    overallVatStats.vatBalance <= 0 ? "text-emerald-700" : overallVatStats.totalVatPaid > 0 ? "text-amber-700" : "text-rose-700"
+                  )}>
+                    Outstanding Balance
+                  </p>
+                  <h3 className="text-xl font-extrabold text-slate-900 mt-1 tabular-nums">
+                    ₦{Math.max(0, overallVatStats.vatBalance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </h3>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    {overallVatStats.vatBalance <= 0 ? 'Fully Reconciled' : 'VAT payment due'}
+                  </p>
+                </div>
+                <div className={cn(
+                  "h-10 w-10 rounded-xl flex items-center justify-center font-bold shrink-0",
+                  overallVatStats.vatBalance <= 0 ? "bg-emerald-100 text-emerald-700" : overallVatStats.totalVatPaid > 0 ? "bg-amber-100 text-amber-700" : "bg-rose-100 text-rose-700"
+                )}>
+                  {overallVatStats.vatBalance <= 0 ? <CheckCircle2 className="h-5 w-5" /> : <AlertCircle className="h-5 w-5" />}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Amount for VAT Card */}
+            <Card className="border-slate-200 shadow-sm bg-gradient-to-br from-indigo-500/10 to-blue-500/5">
+              <CardContent className="p-4 flex items-center justify-between">
+                <div>
+                  <p className="text-[10px] font-extrabold uppercase tracking-widest text-indigo-700">Amount for VAT</p>
+                  <h3 className="text-xl font-extrabold text-slate-900 mt-1 tabular-nums">
+                    ₦{overallVatStats.amountForVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </h3>
+                  <p className="text-[11px] text-slate-500 mt-0.5">Base gross amount for VAT</p>
+                </div>
+                <div className="h-10 w-10 rounded-xl bg-indigo-500/10 text-indigo-600 flex items-center justify-center font-bold shrink-0">
+                  <Calculator className="h-5 w-5" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-slate-200 shadow-sm">
+              <CardContent className="p-4 flex items-center justify-between">
+                <div>
+                  <p className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500">Current VAT Rate</p>
+                  <h3 className="text-xl font-extrabold text-slate-900 mt-1 tabular-nums">
+                    {vatRate}%
+                  </h3>
+                  <p className="text-[11px] text-slate-500 mt-0.5">Set in Variables Settings</p>
+                </div>
+                <div className="h-10 w-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold shrink-0">
+                  <Percent className="h-5 w-5" />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Monthly Accumulated VAT Breakdown */}
+          <Card className="border-slate-200 shadow-sm">
+            <CardHeader className="bg-slate-50/50 border-b border-slate-100 pb-4">
+              <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+                <div>
+                  <CardTitle className="text-base font-bold text-slate-800 flex items-center gap-2">
+                    <Receipt className="h-4 w-4 text-emerald-600" /> Expenses VAT Reconciliation & Remittances
+                  </CardTitle>
+                  <CardDescription className="text-xs">
+                    Track monthly expenses VAT, filter by category, and reconcile linked ledger payment vouchers
+                  </CardDescription>
+                </div>
+
+                {/* Filter Controls: Month Dropdown + Category Dropdown + Search Input */}
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full lg:w-auto">
+                  <div className="relative min-w-[150px]">
+                    <select
+                      value={selectedVatMonth}
+                      onChange={e => setSelectedVatMonth(e.target.value)}
+                      className="h-9 w-full rounded-md border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 shadow-sm focus:border-indigo-500 focus:outline-none cursor-pointer"
+                    >
+                      <option value="all">📅 All Months</option>
+                      {availableVatMonths.map(m => (
+                        <option key={m.key} value={m.key}>{m.label}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="relative min-w-[170px]">
+                    <select
+                      value={selectedVatCategory}
+                      onChange={e => setSelectedVatCategory(e.target.value)}
+                      className="h-9 w-full rounded-md border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 shadow-sm focus:border-indigo-500 focus:outline-none cursor-pointer"
+                    >
+                      <option value="all">📁 All Categories</option>
+                      {sortedCategories.map(c => (
+                        <option key={c.id} value={c.name}>{c.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="relative w-full sm:w-56">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
+                    <Input 
+                      placeholder="Search vatable records..." 
+                      className="pl-9 h-9 border-slate-200 bg-white text-xs" 
+                      value={search} 
+                      onChange={e => setSearch(e.target.value)} 
+                    />
+                  </div>
+                </div>
+              </div>
+            </CardHeader>
+
+            <CardContent className="p-4 space-y-4">
+              {filteredVatSummaries.length === 0 ? (
+                <div className="text-center py-12 text-slate-400 space-y-2">
+                  <Receipt className="h-10 w-10 mx-auto text-slate-300" />
+                  <p className="text-sm font-medium">
+                    No vatable ledger transactions found
+                    {selectedVatMonth !== 'all' ? ' for the selected month' : ''}
+                    {selectedVatCategory !== 'all' ? ` in ${selectedVatCategory}` : ''}.
+                  </p>
+                  <p className="text-xs text-slate-400">When creating ledger vouchers in the Entry tab, set the VAT Policy to "Yes" or "Add" on transaction lines to accumulate VAT here.</p>
+                </div>
+              ) : (
+                filteredVatSummaries.map((monthGroup) => {
+                  const isExpanded = expandedMonths.has(monthGroup.monthKey);
+
+                  const displayEntries = search.trim()
+                    ? monthGroup.entries.filter(e => 
+                        (e.voucherNo || '').toLowerCase().includes(search.toLowerCase()) ||
+                        (e.description || '').toLowerCase().includes(search.toLowerCase()) ||
+                        (e.category || '').toLowerCase().includes(search.toLowerCase()) ||
+                        (e.vendor || '').toLowerCase().includes(search.toLowerCase()) ||
+                        (e.client || '').toLowerCase().includes(search.toLowerCase())
+                      )
+                    : monthGroup.entries;
+
+                  if (search.trim() && displayEntries.length === 0 && monthGroup.remittances.length === 0) return null;
+
+                  const pctPaid = monthGroup.totalVatAmount > 0 
+                    ? Math.min(100, Math.round((monthGroup.totalVatPaid / monthGroup.totalVatAmount) * 100))
+                    : 100;
+
+                  return (
+                    <div key={monthGroup.monthKey} className="border border-slate-200 rounded-xl overflow-hidden shadow-sm bg-white">
+                      {/* Month Header Card Bar */}
+                      <div className="p-4 bg-slate-50/90 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-slate-200/60">
+                        <div 
+                          onClick={() => toggleMonthExpand(monthGroup.monthKey)}
+                          className="flex items-center gap-3 cursor-pointer group flex-1"
+                        >
+                          <div className="h-10 w-10 rounded-xl bg-indigo-100 text-indigo-700 font-extrabold flex items-center justify-center text-xs shadow-sm group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                            <Calendar className="h-5 w-5" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h4 className="font-extrabold text-slate-900 text-base group-hover:text-indigo-600 transition-colors">{monthGroup.monthLabel}</h4>
+                              <span className={cn(
+                                "px-2 py-0.5 rounded-full text-[10px] font-extrabold border flex items-center gap-1",
+                                monthGroup.status === 'Fully Paid' ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
+                                monthGroup.status === 'Partially Paid' ? "bg-amber-50 text-amber-700 border-amber-200" :
+                                "bg-rose-50 text-rose-700 border-rose-200"
+                              )}>
+                                {monthGroup.status === 'Fully Paid' && <CheckCircle2 className="h-3 w-3" />}
+                                {monthGroup.status === 'Partially Paid' && <Clock className="h-3 w-3" />}
+                                {monthGroup.status === 'Unpaid' && <AlertCircle className="h-3 w-3" />}
+                                {monthGroup.status}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-3 text-xs text-slate-500 mt-0.5 font-medium">
+                              <span>{monthGroup.entries.length} vatable transaction{monthGroup.entries.length !== 1 ? 's' : ''}</span>
+                              <span>•</span>
+                              <span>{monthGroup.remittances.length} remittance payment{monthGroup.remittances.length !== 1 ? 's' : ''}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Totals & Actions */}
+                        <div className="flex flex-wrap items-center gap-4 w-full md:w-auto justify-between md:justify-end">
+                          <div className="text-right">
+                            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Accumulated VAT</div>
+                            <div className="text-sm font-extrabold text-slate-900 tabular-nums">
+                              ₦{monthGroup.totalVatAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </div>
+                          </div>
+
+                          <div className="text-right">
+                            <div className="text-[10px] font-bold text-teal-600 uppercase tracking-widest">VAT Paid</div>
+                            <div className="text-sm font-extrabold text-teal-700 tabular-nums">
+                              ₦{monthGroup.totalVatPaid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </div>
+                          </div>
+
+                          <div className="text-right">
+                            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Balance</div>
+                            <div className={cn(
+                              "text-sm font-extrabold tabular-nums",
+                              monthGroup.vatBalance <= 0 ? "text-emerald-600" : "text-rose-600"
+                            )}>
+                              ₦{Math.max(0, monthGroup.vatBalance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </div>
+                          </div>
+
+                          {/* Reconcile / Pay Action Button */}
+                          <Button
+                            size="sm"
+                            className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs gap-1.5 shadow-sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setReconcileMonthKey(monthGroup.monthKey);
+                              setReconcileSearchQuery('');
+                            }}
+                          >
+                            <Link className="h-3.5 w-3.5" /> Reconcile / Pay VAT
+                          </Button>
+
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 w-8 p-0 text-slate-500 hover:text-slate-800"
+                            onClick={() => toggleMonthExpand(monthGroup.monthKey)}
+                          >
+                            {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Reconciliation Progress Bar */}
+                      <div className="w-full bg-slate-100 h-1.5 relative overflow-hidden">
+                        <div 
+                          className={cn(
+                            "h-full transition-all duration-500",
+                            pctPaid >= 100 ? "bg-emerald-500" : pctPaid > 0 ? "bg-amber-500" : "bg-rose-400"
+                          )} 
+                          style={{ width: `${pctPaid}%` }}
+                        />
+                      </div>
+
+                      {/* Expandable Table Content */}
+                      {isExpanded && (
+                        <div className="divide-y divide-slate-100">
+                          {/* 1. Vatable Expense Transactions Table */}
+                          <div className="p-4 space-y-2">
+                            <h5 className="text-xs font-extrabold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                              <Receipt className="h-3.5 w-3.5 text-indigo-600" /> Vatable Expenses ({displayEntries.length})
+                            </h5>
+                            <div className="overflow-x-auto rounded-lg border border-slate-200">
+                              <table className="w-full text-left text-xs whitespace-nowrap">
+                                <thead className="bg-slate-900 text-white font-semibold">
+                                  <tr>
+                                    <th className="py-2.5 px-3 border-r border-slate-800">Voucher No.</th>
+                                    <th className="py-2.5 px-3 border-r border-slate-800">Date</th>
+                                    <th className="py-2.5 px-3 border-r border-slate-800 w-1/3">Description</th>
+                                    <th className="py-2.5 px-3 border-r border-slate-800">Category</th>
+                                    <th className="py-2.5 px-3 border-r border-slate-800">Vendor</th>
+                                    <th className="py-2.5 px-3 border-r border-slate-800">Client / Site</th>
+                                    <th className="py-2.5 px-3 border-r border-slate-800 text-center">VAT Policy</th>
+                                    <th className="py-2.5 px-3 border-r border-slate-800 text-right">Line Amount (₦)</th>
+                                    <th className="py-2.5 px-3 text-right">VAT Amount ({vatRate}%)</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100 bg-white">
+                                  {displayEntries.map((entry) => {
+                                    const vMode: VatMode = entry.vatMode || (entry.isVatable ? 'Yes' : 'No');
+                                    const calculated = calculateItemVat(Number(entry.amount), vMode, vatRate);
+                                    const entryVat = entry.vatAmount ?? calculated.vatAmount;
+                                    return (
+                                      <tr key={entry.id} className="hover:bg-indigo-50/20 transition-colors">
+                                        <td className="py-2.5 px-3 font-mono font-bold text-indigo-600">
+                                          <button 
+                                            className="hover:underline"
+                                            onClick={(e) => { e.stopPropagation(); setDialogVoucher(entry.voucherNo); }}
+                                          >
+                                            {entry.voucherNo}
+                                          </button>
+                                        </td>
+                                        <td className="py-2.5 px-3 font-mono text-slate-600">{formatDisplayDate(entry.date)}</td>
+                                        <td className="py-2.5 px-3 font-medium text-slate-800 max-w-[250px] truncate" title={entry.description}>{entry.description || '—'}</td>
+                                        <td className="py-2.5 px-3">
+                                          <span className="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full font-semibold">{entry.category}</span>
+                                        </td>
+                                        <td className="py-2.5 px-3 text-slate-600">{entry.vendor || '—'}</td>
+                                        <td className="py-2.5 px-3 text-slate-500">{entry.client || '—'}{entry.site ? ` / ${entry.site}` : ''}</td>
+                                        <td className="py-2.5 px-3 text-center">
+                                          <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-extrabold text-slate-700 border border-slate-200">
+                                            {vMode}
+                                          </span>
+                                        </td>
+                                        <td className="py-2.5 px-3 text-right font-semibold text-slate-800 tabular-nums">
+                                          ₦{Number(entry.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </td>
+                                        <td className="py-2.5 px-3 text-right font-extrabold text-emerald-700 bg-emerald-50/50 tabular-nums">
+                                          ₦{entryVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+
+                          {/* 2. Linked VAT Remittance Payments Table */}
+                          <div className="p-4 bg-slate-50/50 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <h5 className="text-xs font-extrabold text-teal-800 uppercase tracking-wider flex items-center gap-1.5">
+                                <CheckCircle2 className="h-3.5 w-3.5 text-teal-600" /> Reconciled VAT Remittances ({monthGroup.remittances.length})
+                              </h5>
+                              <Button 
+                                size="sm" 
+                                variant="outline" 
+                                className="h-7 text-[11px] font-bold text-teal-700 border-teal-200 hover:bg-teal-50 gap-1"
+                                onClick={() => {
+                                  setReconcileMonthKey(monthGroup.monthKey);
+                                  setReconcileSearchQuery('');
+                                }}
+                              >
+                                <Plus className="h-3 w-3" /> Add Remittance
+                              </Button>
+                            </div>
+
+                            {monthGroup.remittances.length === 0 ? (
+                              <div className="p-4 text-center text-xs text-slate-400 bg-white rounded-lg border border-dashed border-slate-200">
+                                No VAT payments linked for this month yet. Click <strong>"Reconcile / Pay VAT"</strong> to link a ledger payment voucher or record a direct remittance.
+                              </div>
+                            ) : (
+                              <div className="overflow-x-auto rounded-lg border border-teal-200 bg-white">
+                                <table className="w-full text-left text-xs whitespace-nowrap">
+                                  <thead className="bg-teal-950 text-teal-100 font-semibold">
+                                    <tr>
+                                      <th className="py-2.5 px-3">Date</th>
+                                      <th className="py-2.5 px-3">Voucher / Ref No.</th>
+                                      <th className="py-2.5 px-3">Bank</th>
+                                      <th className="py-2.5 px-3 w-1/3">Notes / Description</th>
+                                      <th className="py-2.5 px-3">Recorded By</th>
+                                      <th className="py-2.5 px-3 text-right">Amount Remitted (₦)</th>
+                                      <th className="py-2.5 px-3 text-center">Action</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-slate-100">
+                                    {monthGroup.remittances.map((rem) => (
+                                      <tr key={rem.id} className="hover:bg-teal-50/30 transition-colors">
+                                        <td className="py-2.5 px-3 font-mono text-slate-700">{formatDisplayDate(rem.date)}</td>
+                                        <td className="py-2.5 px-3 font-mono font-bold text-indigo-600">
+                                          {rem.voucherNo ? (
+                                            <button className="hover:underline" onClick={() => setDialogVoucher(rem.voucherNo!)}>
+                                              {rem.voucherNo}
+                                            </button>
+                                          ) : 'Direct'}
+                                        </td>
+                                        <td className="py-2.5 px-3 text-slate-700 font-medium">{rem.bank || 'Bank Transfer'}</td>
+                                        <td className="py-2.5 px-3 text-slate-600 max-w-[220px] truncate" title={rem.notes}>{rem.notes || 'VAT Remittance'}</td>
+                                        <td className="py-2.5 px-3 text-slate-500 text-[11px]">{rem.createdBy || 'User'}</td>
+                                        <td className="py-2.5 px-3 text-right font-extrabold text-teal-700 tabular-nums">
+                                          ₦{Number(rem.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </td>
+                                        <td className="py-2.5 px-3 text-center">
+                                          <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            className="h-7 w-7 p-0 text-rose-500 hover:bg-rose-50 hover:text-rose-700"
+                                            title="Remove VAT remittance link"
+                                            onClick={async () => {
+                                              const ok = await showConfirm('Remove this VAT remittance link?', { variant: 'danger', confirmLabel: 'Unlink' });
+                                              if (ok) {
+                                                deleteExpenseVatRemittance(rem.id);
+                                                toast.success('VAT remittance link removed.');
+                                              }
+                                            }}
+                                          >
+                                            <Trash2 className="h-3.5 w-3.5" />
+                                          </Button>
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </TabsContent>
+
+      {/* Expenses VAT Reconciliation Modal Dialog */}
+      {reconcileMonthKey && (
+        <Dialog open={reconcileMonthKey !== null} onOpenChange={() => setReconcileMonthKey(null)}>
+          <DialogContent className="max-w-5xl w-[95vw] overflow-hidden p-0 rounded-2xl">
+            <DialogHeader className="bg-indigo-700 px-6 py-4 text-white">
+              <div className="flex justify-between items-center">
+                <div>
+                  <DialogTitle className="text-white text-lg font-bold flex items-center gap-2">
+                    <Link className="h-5 w-5 text-indigo-200" /> Reconcile Expenses VAT — {monthlyVatSummaries.find(g => g.monthKey === reconcileMonthKey)?.monthLabel}
+                  </DialogTitle>
+                  <p className="text-indigo-200 text-xs mt-1">
+                    Link existing ledger payment vouchers or record direct VAT remittance payments
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setReconcileMonthKey(null)}
+                  className="h-8 w-8 rounded-full bg-indigo-800/60 hover:bg-indigo-900 text-white flex items-center justify-center transition-colors shrink-0 cursor-pointer"
+                  title="Close modal"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </DialogHeader>
+
+            {/* Reconciliation Tabs Header */}
+            <div className="bg-slate-100 border-b border-slate-200 px-6 py-2 flex items-center gap-3 text-xs font-bold">
+              <button
+                onClick={() => setReconcileTab('link')}
+                className={cn(
+                  "px-3 py-1.5 rounded-md transition-colors flex items-center gap-1.5",
+                  reconcileTab === 'link' ? "bg-white text-indigo-700 shadow-sm" : "text-slate-600 hover:text-slate-900"
+                )}
+              >
+                <Search className="h-3.5 w-3.5" /> Link Ledger Payment
+              </button>
+              <button
+                onClick={() => setReconcileTab('direct')}
+                className={cn(
+                  "px-3 py-1.5 rounded-md transition-colors flex items-center gap-1.5",
+                  reconcileTab === 'direct' ? "bg-white text-indigo-700 shadow-sm" : "text-slate-600 hover:text-slate-900"
+                )}
+              >
+                <Plus className="h-3.5 w-3.5" /> Record Direct VAT Payment
+              </button>
+            </div>
+
+            <div className="p-6 max-h-[75vh] overflow-y-auto space-y-4">
+              {reconcileTab === 'link' ? (
+                <div className="space-y-4">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                    <Input
+                      placeholder="Search ledger entries by voucher no, category, vendor, or bank..."
+                      className="pl-9 h-9 text-xs"
+                      value={reconcileSearchQuery}
+                      onChange={e => setReconcileSearchQuery(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="border border-slate-200 rounded-lg overflow-x-auto overflow-y-auto max-h-[50vh] max-w-full">
+                    <table className="w-full min-w-[700px] text-left text-xs whitespace-nowrap">
+                      <thead className="bg-slate-900 text-white font-semibold sticky top-0 z-10">
+                        <tr>
+                          <th className="py-2.5 px-3">Voucher No.</th>
+                          <th className="py-2.5 px-3">Date</th>
+                          <th className="py-2.5 px-3">Category</th>
+                          <th className="py-2.5 px-3">Bank</th>
+                          <th className="py-2.5 px-3 w-1/3">Description</th>
+                          <th className="py-2.5 px-3 text-right">Amount (₦)</th>
+                          <th className="py-2.5 px-3 text-center sticky right-0 bg-slate-900">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 bg-white">
+                        {ledgerEntries
+                          .filter(e => {
+                            if (!reconcileSearchQuery.trim()) return true;
+                            const q = reconcileSearchQuery.toLowerCase();
+                            return (
+                              (e.voucherNo || '').toLowerCase().includes(q) ||
+                              (e.category || '').toLowerCase().includes(q) ||
+                              (e.description || '').toLowerCase().includes(q) ||
+                              (e.bank || '').toLowerCase().includes(q) ||
+                              (e.vendor || '').toLowerCase().includes(q)
+                            );
+                          })
+                          .slice(0, 30)
+                          .map((entry) => {
+                            const isAlreadyLinked = (expenseVatRemittances || []).some(
+                              r => r.ledgerEntryId === entry.id && r.monthKey === reconcileMonthKey
+                            );
+                            return (
+                              <tr key={entry.id} className="hover:bg-indigo-50/20 transition-colors">
+                                <td className="py-2.5 px-3 font-mono font-bold text-indigo-600">{entry.voucherNo}</td>
+                                <td className="py-2.5 px-3 font-mono text-slate-600">{formatDisplayDate(entry.date)}</td>
+                                <td className="py-2.5 px-3"><span className="bg-slate-100 px-2 py-0.5 rounded font-semibold text-slate-700">{entry.category}</span></td>
+                                <td className="py-2.5 px-3 text-slate-600">{entry.bank || '—'}</td>
+                                <td className="py-2.5 px-3 text-slate-700 max-w-[200px] truncate" title={entry.description}>{entry.description || '—'}</td>
+                                <td className="py-2.5 px-3 text-right font-extrabold text-slate-900 tabular-nums">
+                                  ₦{Number(entry.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </td>
+                                <td className="py-2.5 px-3 text-center sticky right-0 bg-white shadow-[ -4px_0_6px_-2px_rgba(0,0,0,0.05) ]">
+                                  {isAlreadyLinked ? (
+                                    <span className="text-emerald-600 font-bold text-[10px] bg-emerald-50 px-2 py-0.5 rounded">Linked</span>
+                                  ) : (
+                                    <Button
+                                      size="sm"
+                                      className="h-7 px-2.5 text-[11px] font-bold bg-indigo-600 hover:bg-indigo-700 text-white"
+                                      onClick={() => {
+                                        addExpenseVatRemittance({
+                                          id: generateId(),
+                                          monthKey: reconcileMonthKey,
+                                          category: selectedVatCategory !== 'all' ? selectedVatCategory : undefined,
+                                          ledgerEntryId: entry.id,
+                                          voucherNo: entry.voucherNo,
+                                          date: entry.date,
+                                          amount: Number(entry.amount),
+                                          bank: entry.bank || 'Bank Transfer',
+                                          notes: entry.description,
+                                          createdAt: new Date().toISOString(),
+                                          createdBy: currentUser?.name || 'User',
+                                        });
+                                        toast.success(`Linked voucher ${entry.voucherNo} to VAT remittance!`);
+                                      }}
+                                    >
+                                      Link to VAT
+                                    </Button>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div className="flex justify-end pt-2 border-t border-slate-100">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setReconcileMonthKey(null)}
+                      className="font-bold text-slate-700 hover:bg-slate-100 gap-1.5"
+                    >
+                      <X className="h-3.5 w-3.5" /> Close
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <form
+                  onSubmit={e => {
+                    e.preventDefault();
+                    if (!directForm.amount || parseFloat(directForm.amount) <= 0) {
+                      toast.error('Please enter a valid VAT payment amount.');
+                      return;
+                    }
+                    addExpenseVatRemittance({
+                      id: generateId(),
+                      monthKey: reconcileMonthKey,
+                      category: selectedVatCategory !== 'all' ? selectedVatCategory : undefined,
+                      voucherNo: directForm.voucherNo || undefined,
+                      date: directForm.date,
+                      amount: parseFloat(directForm.amount),
+                      bank: directForm.bank || 'Bank Remittance',
+                      notes: directForm.notes,
+                      createdAt: new Date().toISOString(),
+                      createdBy: currentUser?.name || 'User',
+                    });
+                    toast.success('Recorded VAT remittance payment!');
+                    setDirectForm({
+                      date: new Date().toISOString().split('T')[0],
+                      amount: '',
+                      bank: '',
+                      voucherNo: '',
+                      notes: '',
+                    });
+                    setReconcileMonthKey(null);
+                  }}
+                  className="space-y-4 text-xs"
+                >
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <label className="font-bold text-slate-700 uppercase">Payment Date</label>
+                      <Input
+                        type="date"
+                        className="h-9 text-xs"
+                        value={directForm.date}
+                        onChange={e => setDirectForm(prev => ({ ...prev, date: e.target.value }))}
+                        required
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="font-bold text-slate-700 uppercase">Amount Paid (₦)</label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder="0.00"
+                        className="h-9 text-xs"
+                        value={directForm.amount}
+                        onChange={e => setDirectForm(prev => ({ ...prev, amount: e.target.value }))}
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <label className="font-bold text-slate-700 uppercase">Bank / Source</label>
+                      <select
+                        className="w-full h-9 px-2 rounded-md border border-slate-200 text-xs bg-white"
+                        value={directForm.bank}
+                        onChange={e => setDirectForm(prev => ({ ...prev, bank: e.target.value }))}
+                      >
+                        <option value="">Select Bank...</option>
+                        {sortedBanks.map(b => (
+                          <option key={b.id} value={b.name}>{b.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="font-bold text-slate-700 uppercase">Voucher / Ref No. (Optional)</label>
+                      <Input
+                        type="text"
+                        placeholder="e.g. VAT-REM-001"
+                        className="h-9 text-xs"
+                        value={directForm.voucherNo}
+                        onChange={e => setDirectForm(prev => ({ ...prev, voucherNo: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="font-bold text-slate-700 uppercase">Notes / Description</label>
+                    <Input
+                      type="text"
+                      placeholder="e.g. FIRS Monthly VAT Remittance Payment"
+                      className="h-9 text-xs"
+                      value={directForm.notes}
+                      onChange={e => setDirectForm(prev => ({ ...prev, notes: e.target.value }))}
+                    />
+                  </div>
+
+                  <DialogFooter className="pt-2">
+                    <Button type="button" variant="outline" size="sm" onClick={() => setReconcileMonthKey(null)}>
+                      Cancel
+                    </Button>
+                    <Button type="submit" size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold">
+                      Save VAT Remittance
+                    </Button>
+                  </DialogFooter>
+                </form>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
       {/* Voucher Dialog Popup */}
       {dialogVoucher && (
         <div
@@ -1728,12 +2762,28 @@ export function Ledger() {
                 <p className="text-indigo-200 text-xs font-semibold uppercase tracking-wider">Voucher Transactions</p>
                 <h2 className="text-white font-bold text-xl tracking-wide font-mono">{dialogVoucher}</h2>
               </div>
-              <div className="flex items-center gap-4">
-                <div className="text-right">
-                  <p className="text-indigo-200 text-xs">Total Amount</p>
-                  <p className="text-white font-bold text-lg">
-                    ₦{dialogTransactions.reduce((s, e) => s + e.amount, 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </p>
+              <div className="flex items-center gap-5">
+                <div className="text-right flex items-center gap-4">
+                  <div>
+                    <p className="text-indigo-200 text-[10px] uppercase font-bold tracking-wider">Subtotal</p>
+                    <p className="text-white font-bold text-sm tabular-nums">
+                      ₦{dialogNetTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </p>
+                  </div>
+                  {dialogVatTotal > 0 && (
+                    <div>
+                      <p className="text-emerald-200 text-[10px] uppercase font-bold tracking-wider">VAT ({vatRate}%)</p>
+                      <p className="text-emerald-300 font-extrabold text-sm tabular-nums">
+                        ₦{dialogVatTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                  )}
+                  <div>
+                    <p className="text-indigo-200 text-[10px] uppercase font-bold tracking-wider">Total Amount</p>
+                    <p className="text-white font-extrabold text-lg tabular-nums">
+                      ₦{dialogGrossTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </p>
+                  </div>
                 </div>
                 <button
                   onClick={() => setDialogVoucher(null)}
@@ -1768,52 +2818,60 @@ export function Ledger() {
             <div className="overflow-y-auto flex-1 bg-slate-50 sm:bg-white">
               {/* Mobile View */}
               <div className="md:hidden divide-y divide-slate-100">
-                {dialogTransactions.map((t, idx) => (
-                  <div key={t.id || `t-${idx}`} className="p-4 bg-white">
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Line {idx + 1}</span>
-                      <span className="text-xs font-mono text-slate-500">{t.date ? formatDisplayDate(t.date) : '—'}</span>
-                    </div>
-                    <div className="mb-3">
-                      <p className="text-sm font-medium text-slate-800 break-words">{t.description || <span className="text-slate-300 italic">No description</span>}</p>
-                      <div className="flex flex-wrap gap-2 mt-2">
-                        <span className="inline-flex items-center rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-700">{t.category}</span>
-                        {t.client && <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-600">{t.client}</span>}
-                        {t.site && <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-600">{t.site}</span>}
+                {dialogTransactions.map((t, idx) => {
+                  const lineVat = t.vatAmount ?? ((t.amount * (t.vatRate ?? vatRate)) / 100);
+                  return (
+                    <div key={t.id || `t-${idx}`} className="p-4 bg-white">
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Line {idx + 1}</span>
+                        <span className="text-xs font-mono text-slate-500">{t.date ? formatDisplayDate(t.date) : '—'}</span>
+                      </div>
+                      <div className="mb-3">
+                        <p className="text-sm font-medium text-slate-800 break-words">{t.description || <span className="text-slate-300 italic">No description</span>}</p>
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          <span className="inline-flex items-center rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-700">{t.category}</span>
+                          {t.client && <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-600">{t.client}</span>}
+                          {t.site && <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-600">{t.site}</span>}
+                          {t.isVatable && (
+                            <span className="inline-flex items-center rounded-full bg-emerald-50 text-emerald-700 px-2 py-0.5 text-[10px] font-bold border border-emerald-200/60">
+                              VAT: ₦{lineVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex justify-between items-center pt-3 border-t border-slate-100">
+                        <span className="text-xs text-slate-500 truncate max-w-[120px]">{t.vendor || '—'}</span>
+                        <div className="flex items-center gap-3">
+                          <span className="font-bold text-slate-900 tabular-nums">₦{t.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                          {priv?.canDelete && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0 text-rose-500 hover:bg-rose-50 hover:text-rose-600 shrink-0"
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                const isLast = dialogTransactions.length === 1;
+                                const ok = await showConfirm(
+                                  isLast
+                                    ? `This is the only transaction in voucher ${dialogVoucher}. Deleting it will remove the entire voucher. Continue?`
+                                    : 'Delete this transaction line from the voucher?',
+                                  { variant: 'danger', confirmLabel: 'Delete Line' }
+                                );
+                                if (ok) {
+                                  deleteLedgerEntry(t.id);
+                                  toast.success('Transaction line removed.');
+                                  if (isLast) setDialogVoucher(null);
+                                }
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
                       </div>
                     </div>
-                    <div className="flex justify-between items-center pt-3 border-t border-slate-100">
-                      <span className="text-xs text-slate-500 truncate max-w-[120px]">{t.vendor || '—'}</span>
-                      <div className="flex items-center gap-3">
-                        <span className="font-bold text-slate-900 tabular-nums">₦{t.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                        {priv?.canDelete && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0 text-rose-500 hover:bg-rose-50 hover:text-rose-600 shrink-0"
-                            onClick={async (e) => {
-                              e.stopPropagation();
-                              const isLast = dialogTransactions.length === 1;
-                              const ok = await showConfirm(
-                                isLast
-                                  ? `This is the only transaction in voucher ${dialogVoucher}. Deleting it will remove the entire voucher. Continue?`
-                                  : 'Delete this transaction line from the voucher?',
-                                { variant: 'danger', confirmLabel: 'Delete Line' }
-                              );
-                              if (ok) {
-                                deleteLedgerEntry(t.id);
-                                toast.success('Transaction line removed.');
-                                if (isLast) setDialogVoucher(null);
-                              }
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
               {/* Desktop View */}
@@ -1826,63 +2884,90 @@ export function Ledger() {
                     <th className="py-2.5 px-3 text-left font-semibold text-slate-600 w-32">Category</th>
                     <th className="py-2.5 px-3 text-left font-semibold text-slate-600 w-28">Client</th>
                     <th className="py-2.5 px-3 text-left font-semibold text-slate-600 w-28">Site</th>
-                    <th className="py-2.5 px-3 text-right font-semibold text-slate-600 w-32">Amount</th>
+                    <th className="py-2.5 px-3 text-right font-semibold text-slate-600 w-28">Amount</th>
+                    <th className="py-2.5 px-3 text-center font-semibold text-slate-600 w-20">Vatable</th>
+                    <th className="py-2.5 px-3 text-right font-semibold text-slate-600 w-28">VAT</th>
                     <th className="py-2.5 px-3 text-left font-semibold text-slate-600 w-28">Vendor</th>
                     {priv?.canDelete && <th className="py-2.5 px-3 text-center font-semibold text-slate-600 w-16">Action</th>}
                   </tr>
                 </thead>
                 <tbody>
-                  {dialogTransactions.map((t, idx) => (
-                    <tr key={t.id || `t-${idx}`} className={`border-b border-slate-100 hover:bg-indigo-50/30 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'}`}>
-                      <td className="py-2.5 px-4 text-slate-400 text-xs font-semibold">{idx + 1}</td>
-                      <td className="py-2.5 px-3 text-slate-600 text-xs font-mono whitespace-nowrap">
-                        {t.date ? formatDisplayDate(t.date) : '—'}
-                      </td>
-                      <td className="py-2.5 px-3 text-slate-700 font-medium">{t.description || <span className="text-slate-300 italic">—</span>}</td>
-                      <td className="py-2.5 px-3">
-                        <span className="inline-flex items-center rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-semibold text-indigo-700">{t.category}</span>
-                      </td>
-                      <td className="py-2.5 px-3 text-slate-500 text-xs">{t.client || '—'}</td>
-                      <td className="py-2.5 px-3 text-slate-500 text-xs">{t.site || '—'}</td>
-                      <td className="py-2.5 px-3 text-right font-bold text-slate-900 tabular-nums">
-                        ₦{t.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </td>
-                      <td className="py-2.5 px-3 text-slate-400 text-xs">{t.vendor || '—'}</td>
-                      {priv?.canDelete && (
-                        <td className="py-2.5 px-3 text-center">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 w-7 p-0 text-rose-500 hover:bg-rose-50 hover:text-rose-600"
-                            onClick={async (e) => {
-                              e.stopPropagation();
-                              const isLast = dialogTransactions.length === 1;
-                              const ok = await showConfirm(
-                                isLast
-                                  ? `This is the only transaction in voucher ${dialogVoucher}. Deleting it will remove the entire voucher. Continue?`
-                                  : 'Delete this transaction line from the voucher?',
-                                { variant: 'danger', confirmLabel: 'Delete Line' }
-                              );
-                              if (ok) {
-                                deleteLedgerEntry(t.id);
-                                toast.success('Transaction line removed.');
-                                if (isLast) setDialogVoucher(null);
-                              }
-                            }}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
+                  {dialogTransactions.map((t, idx) => {
+                    const lineVat = t.vatAmount ?? ((t.amount * (t.vatRate ?? vatRate)) / 100);
+                    return (
+                      <tr key={t.id || `t-${idx}`} className={`border-b border-slate-100 hover:bg-indigo-50/30 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'}`}>
+                        <td className="py-2.5 px-4 text-slate-400 text-xs font-semibold">{idx + 1}</td>
+                        <td className="py-2.5 px-3 text-slate-600 text-xs font-mono whitespace-nowrap">
+                          {t.date ? formatDisplayDate(t.date) : '—'}
                         </td>
-                      )}
-                    </tr>
-                  ))}
+                        <td className="py-2.5 px-3 text-slate-700 font-medium">{t.description || <span className="text-slate-300 italic">—</span>}</td>
+                        <td className="py-2.5 px-3">
+                          <span className="inline-flex items-center rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-semibold text-indigo-700">{t.category}</span>
+                        </td>
+                        <td className="py-2.5 px-3 text-slate-500 text-xs">{t.client || '—'}</td>
+                        <td className="py-2.5 px-3 text-slate-500 text-xs">{t.site || '—'}</td>
+                        <td className="py-2.5 px-3 text-right font-semibold text-slate-900 tabular-nums">
+                          ₦{t.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </td>
+                        <td className="py-2.5 px-3 text-center">
+                          {t.isVatable || (t.vatMode && t.vatMode !== 'No') ? (
+                            <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-200/60">
+                              {t.vatMode || 'Yes'}
+                            </span>
+                          ) : (
+                            <span className="text-slate-300 text-xs">—</span>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-extrabold text-emerald-700 tabular-nums bg-emerald-50/40">
+                          {t.isVatable ? (
+                            `₦${lineVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                          ) : (
+                            <span className="text-slate-300 font-normal">—</span>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-3 text-slate-400 text-xs">{t.vendor || '—'}</td>
+                        {priv?.canDelete && (
+                          <td className="py-2.5 px-3 text-center">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 w-7 p-0 text-rose-500 hover:bg-rose-50 hover:text-rose-600"
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                const isLast = dialogTransactions.length === 1;
+                                const ok = await showConfirm(
+                                  isLast
+                                    ? `This is the only transaction in voucher ${dialogVoucher}. Deleting it will remove the entire voucher. Continue?`
+                                    : 'Delete this transaction line from the voucher?',
+                                  { variant: 'danger', confirmLabel: 'Delete Line' }
+                                );
+                                if (ok) {
+                                  deleteLedgerEntry(t.id);
+                                  toast.success('Transaction line removed.');
+                                  if (isLast) setDialogVoucher(null);
+                                }
+                              }}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </td>
+                        )}
+                      </tr>
+                    );
+                  })}
                   {/* Grand total row */}
-                  <tr key="voucher-total-row" className="bg-indigo-50 border-t-2 border-indigo-200">
-                    <td colSpan={priv?.canDelete ? 6 : 5} className="py-3 px-4 text-right font-bold text-slate-700">Total</td>
-                    <td className="py-3 px-3 text-right font-extrabold text-indigo-700 tabular-nums">
-                      ₦{dialogTransactions.reduce((s, e) => s + e.amount, 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  <tr key="voucher-total-row" className="bg-indigo-50/70 border-t-2 border-indigo-200">
+                    <td colSpan={6} className="py-3 px-4 text-right font-bold text-slate-700">Totals</td>
+                    <td className="py-3 px-3 text-right font-bold text-slate-900 tabular-nums">
+                      ₦{dialogNetTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </td>
-                    <td colSpan={2}></td>
+                    <td className="py-3 px-2 text-center text-xs font-bold text-slate-400">VAT</td>
+                    <td className="py-3 px-3 text-right font-extrabold text-emerald-700 tabular-nums bg-emerald-50">
+                      ₦{dialogVatTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </td>
+                    <td colSpan={priv?.canDelete ? 2 : 1} className="py-3 px-3 text-right font-extrabold text-indigo-900 tabular-nums bg-indigo-100/50">
+                      Gross: ₦{dialogGrossTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </td>
                   </tr>
                 </tbody>
               </table>

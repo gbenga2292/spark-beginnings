@@ -13,7 +13,8 @@ import {
   Lock, 
   ShieldAlert, 
   Download, 
-  WifiOff 
+  WifiOff,
+  Sparkles 
 } from 'lucide-react';
 import { toast } from '@/src/components/ui/toast';
 
@@ -37,6 +38,7 @@ export function UpdateModal({ isOpen, onClose }: UpdateModalProps) {
   const [downloadPercent, setDownloadPercent] = useState(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [newVersion, setNewVersion] = useState<string | null>(null);
+  const [releaseNotes, setReleaseNotes] = useState<string | null>(null);
 
   const nasPath = '\\\\MYCLOUDEX2ULTRA\\DCEL_Share\\Updates\\';
 
@@ -62,6 +64,7 @@ export function UpdateModal({ isOpen, onClose }: UpdateModalProps) {
       setAuthError(null);
       setErrorMessage(null);
       setNewVersion(null);
+      setReleaseNotes(null);
       setDownloadPercent(0);
       performNasCheck();
     }
@@ -80,6 +83,9 @@ export function UpdateModal({ isOpen, onClose }: UpdateModalProps) {
         case 'available':
           setStep('downloading');
           setNewVersion(status.version);
+          if (status.releaseNotes) {
+            setReleaseNotes(status.releaseNotes);
+          }
           break;
         case 'not-available':
           setStep('up-to-date');
@@ -395,6 +401,19 @@ export function UpdateModal({ isOpen, onClose }: UpdateModalProps) {
                   />
                 </div>
               </div>
+
+              {/* Release Notes for Target Version */}
+              {releaseNotes && (
+                <div className="p-3.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-700/60 max-h-40 overflow-y-auto text-left">
+                  <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">
+                    <Sparkles className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                    <span>What's New in v{newVersion}</span>
+                  </div>
+                  <div className="text-xs text-slate-600 dark:text-slate-300 font-medium whitespace-pre-wrap leading-relaxed">
+                    {releaseNotes}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -412,6 +431,20 @@ export function UpdateModal({ isOpen, onClose }: UpdateModalProps) {
                   Version {newVersion} has successfully downloaded. The application will restart to complete the installation.
                 </p>
               </div>
+
+              {/* Release Notes for Target Version */}
+              {releaseNotes && (
+                <div className="w-full p-3.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-700/60 max-h-36 overflow-y-auto text-left">
+                  <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">
+                    <Sparkles className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                    <span>What's New in v{newVersion}</span>
+                  </div>
+                  <div className="text-xs text-slate-600 dark:text-slate-300 font-medium whitespace-pre-wrap leading-relaxed">
+                    {releaseNotes}
+                  </div>
+                </div>
+              )}
+
               <Button
                 onClick={handleInstall}
                 className="bg-emerald-600 text-white hover:bg-emerald-700 font-bold px-6 h-9 text-xs flex items-center gap-1.5 mt-2"

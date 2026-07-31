@@ -203,12 +203,15 @@ export function LogisticsEstimatorDialog({ open, onClose, siteName, clientName }
   const [warehouse, setWarehouse] = useState<{lat: number, lng: number, label: string}>({
     lat: 6.5055, lng: 3.3745, label: '7 Musiliu Smith Street, Yaba, Lagos'
   });
+  const [originQuery, setOriginQuery] = useState(warehouse.label);
+  const [searchingOrigin, setSearchingOrigin] = useState(false);
 
   useEffect(() => {
     async function loadCompanyAddress() {
       try {
         const { data, error } = await supabase.from('app_settings').select('company_address').limit(1).single();
         if (data && data.company_address) {
+          setOriginQuery(data.company_address);
           const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(data.company_address)}&limit=1`);
           const geocodeData = await res.json();
           if (geocodeData && geocodeData.length > 0) {
@@ -225,6 +228,65 @@ export function LogisticsEstimatorDialog({ open, onClose, siteName, clientName }
     }
     if (open) loadCompanyAddress();
   }, [open]);
+
+  // Update field helper
+  const set = useCallback(<K extends keyof LogisticsInputs>(field: K, value: LogisticsInputs[K]) => {
+    setInputs(prev => ({ ...prev, [field]: value }));
+  }, []);
+
+  const setNum = useCallback((field: keyof LogisticsInputs, raw: string) => {
+    const v = parseFloat(raw);
+    set(field, isNaN(v) ? 0 as any : v as any);
+  }, [set]);
+
+  // Geocode Origin location
+  const handleOriginSearch = useCallback(async (queryToSearch?: string) => {
+    const query = queryToSearch !== undefined ? queryToSearch : originQuery;
+    if (!query.trim()) return;
+    setSearchingOrigin(true);
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`
+      );
+      const data = await res.json();
+      if (data.length > 0) {
+        const { lat, lon } = data[0];
+        const newWarehouse = {
+          lat: parseFloat(lat),
+          lng: parseFloat(lon),
+          label: query
+        };
+        setWarehouse(newWarehouse);
+
+        if (sitePos) {
+          const straight = haversineKm(newWarehouse.lat, newWarehouse.lng, sitePos[0], sitePos[1]);
+          const roadEstimate = straight * 1.3;
+          set('distance', Math.round(roadEstimate * 10) / 10);
+          const speed = inputs.travelSpeed || 50;
+          set('travelTime', Math.round((roadEstimate / speed) * 100) / 100);
+
+          try {
+            const routeRes = await fetch(
+              `https://router.project-osrm.org/route/v1/driving/${newWarehouse.lng},${newWarehouse.lat};${sitePos[1]},${sitePos[0]}?overview=full&geometries=geojson`
+            );
+            const routeData = await routeRes.json();
+            if (routeData.routes?.[0]) {
+              const r = routeData.routes[0];
+              setRouteCoords(r.geometry.coordinates.map((c: number[]) => [c[1], c[0]] as [number, number]));
+              set('distance', Math.round((r.distance / 1000) * 10) / 10);
+              set('travelTime', Math.round((r.duration / 3600) * 100) / 100);
+            }
+          } catch {
+            setRouteCoords([[newWarehouse.lat, newWarehouse.lng], sitePos]);
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Origin geocoding failed:', err);
+    } finally {
+      setSearchingOrigin(false);
+    }
+  }, [originQuery, sitePos, inputs.travelSpeed, set]);
 
   // Form state
 
@@ -254,16 +316,6 @@ export function LogisticsEstimatorDialog({ open, onClose, siteName, clientName }
       setLeafletLoaded(true);
     });
   }, [leafletLoaded]);
-
-  // Update field helper
-  const set = useCallback(<K extends keyof LogisticsInputs>(field: K, value: LogisticsInputs[K]) => {
-    setInputs(prev => ({ ...prev, [field]: value }));
-  }, []);
-
-  const setNum = useCallback((field: keyof LogisticsInputs, raw: string) => {
-    const v = parseFloat(raw);
-    set(field, isNaN(v) ? 0 as any : v as any);
-  }, [set]);
 
   // ── Geocode search ────────────────────────────────────────────
   const handleSearch = useCallback(async () => {
@@ -503,25 +555,54 @@ export function LogisticsEstimatorDialog({ open, onClose, siteName, clientName }
             {/* ── LEFT: Map + Route Info ──────────────── */}
             <div className="flex flex-col border-r border-slate-200 overflow-y-auto">
               {/* Search bar & Map Toggle */}
-              <div className="px-4 py-3 bg-slate-50/80 border-b border-slate-200 flex items-center justify-between gap-2 shrink-0">
-                <div className="flex gap-2 flex-1 min-w-0">
-                  <div className="relative flex-1">
-                    <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
-                    <input
-                      value={searchQuery}
-                      onChange={e => setSearchQuery(e.target.value)}
-                      onKeyDown={e => e.key === 'Enter' && handleSearch()}
-                      placeholder="Search site location or click on map..."
-                      className="w-full h-9 pl-9 pr-3 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 transition-all bg-white"
-                    />
+              <div className="px-3 sm:px-4 py-3 bg-slate-50/80 border-b border-slate-200 flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-2 shrink-0">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 flex-1 min-w-0">
+                  {/* Origin / Home location */}
+                  <div className="flex gap-1.5 flex-1 min-w-0">
+                    <div className="relative flex-1">
+                      <Home className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-indigo-600" />
+                      <input
+                        value={originQuery}
+                        onChange={e => setOriginQuery(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && handleOriginSearch()}
+                        placeholder="Home / Origin location..."
+                        className="w-full h-9 pl-9 pr-3 rounded-lg border border-slate-200 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 transition-all bg-white"
+                        title="Home / Origin location"
+                      />
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleOriginSearch()}
+                      disabled={searchingOrigin}
+                      className="h-9 px-3 text-indigo-700 bg-indigo-50/80 border-indigo-200 hover:bg-indigo-100 text-xs font-bold shrink-0"
+                    >
+                      {searchingOrigin ? 'Setting…' : 'Set Origin'}
+                    </Button>
                   </div>
-                  <Button size="sm" onClick={handleSearch} disabled={searching} className="h-9 px-4 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shrink-0">
-                    {searching ? 'Searching…' : 'Find'}
-                  </Button>
+
+                  {/* Destination / Site location */}
+                  <div className="flex gap-1.5 flex-1 min-w-0">
+                    <div className="relative flex-1">
+                      <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-rose-500" />
+                      <input
+                        value={searchQuery}
+                        onChange={e => setSearchQuery(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && handleSearch()}
+                        placeholder="Search site location or click on map..."
+                        className="w-full h-9 pl-9 pr-3 rounded-lg border border-slate-200 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-rose-500/30 focus:border-rose-400 transition-all bg-white"
+                        title="Destination site location"
+                      />
+                    </div>
+                    <Button size="sm" onClick={handleSearch} disabled={searching} className="h-9 px-3 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shrink-0">
+                      {searching ? 'Searching…' : 'Find Site'}
+                    </Button>
+                  </div>
                 </div>
+
                 <button 
                   onClick={() => setIsMapOpen(!isMapOpen)} 
-                  className="h-9 px-3 flex items-center gap-1.5 text-xs font-bold text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors shrink-0 shadow-sm"
+                  className="h-9 px-3 flex items-center justify-center gap-1.5 text-xs font-bold text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors shrink-0 shadow-sm"
                   title={isMapOpen ? "Hide Map View" : "Show Map View"}
                 >
                   <MapPin className="h-3.5 w-3.5 text-indigo-600" />
@@ -718,6 +799,34 @@ export function LogisticsEstimatorDialog({ open, onClose, siteName, clientName }
 
               {/* Route info */}
               <Section icon={<Route className="h-4 w-4" />} title="Route & Distance" accentColor="indigo">
+                {/* Home / Origin location field */}
+                <div className="space-y-1.5 pb-2.5 border-b border-slate-100 mb-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                      <Home className="h-3 w-3 text-indigo-600" /> Home / Origin Location
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => handleOriginSearch()}
+                      disabled={searchingOrigin}
+                      className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 disabled:opacity-50"
+                    >
+                      {searchingOrigin ? 'Updating…' : 'Set Origin'}
+                    </button>
+                  </div>
+                  <Input
+                    type="text"
+                    value={originQuery}
+                    onChange={e => setOriginQuery(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleOriginSearch()}
+                    placeholder="Home / Origin address..."
+                    className="h-8 text-xs font-medium bg-white text-slate-700 border-slate-200 focus:border-indigo-400"
+                  />
+                  <p className="text-[9px] text-slate-400 truncate">
+                    Active: <span className="font-semibold text-slate-600">{warehouse.label}</span>
+                  </p>
+                </div>
+
                 <Field label="Distance" value={inputs.distance} onChange={v => setNum('distance', v)} suffix="km" />
                 <Field label="Travel Time" value={inputs.travelTime} onChange={v => setNum('travelTime', v)} suffix="hrs" step={0.1} />
                 <SliderField
@@ -925,6 +1034,7 @@ export function LogisticsEstimatorDialog({ open, onClose, siteName, clientName }
                     setSitePos(null);
                     setRouteCoords([]);
                     setSearchQuery('');
+                    setOriginQuery(warehouse.label);
                   }}
                 >
                   Reset to Defaults
