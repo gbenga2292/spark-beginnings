@@ -257,12 +257,14 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
       (href !== '/' && location.pathname.startsWith(href + '/'))
     );
 
-    // Simulator gets the full canvas — collapse the sidebar automatically
-    const isSimulatorPage = location.pathname === '/operations/simulator' ||
-      location.pathname.startsWith('/operations/simulator/');
+    // Simulator and Machine Recon get the full canvas — collapse the sidebar automatically
+    const isFullCanvasPage = location.pathname === '/operations/simulator' ||
+      location.pathname.startsWith('/operations/simulator/') ||
+      location.pathname === '/operations/machine-reconciliation' ||
+      location.pathname.startsWith('/operations/machine-reconciliation');
 
-    if (!isOnSidebarPage || isSimulatorPage) {
-      // Auto-collapse when on a non-sidebar page or the Simulator
+    if (!isOnSidebarPage || isFullCanvasPage) {
+      // Auto-collapse when on a non-sidebar page, Simulator, or Machine Recon
       if (!isCollapsed) {
         autoCollapsedRef.current = true;
         setIsCollapsed(true);
