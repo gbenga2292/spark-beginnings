@@ -289,10 +289,25 @@ export function dbToLedgerBeneficiaryBank(r: any): LedgerBeneficiaryBank {
 }
 
 export function dbToLedgerEntry(r: any): LedgerEntry {
+  const isVatable = r.is_vatable ?? (r.vat_mode && r.vat_mode !== 'No') ?? false;
+  const vatMode = r.vat_mode || (isVatable ? 'Yes' : 'No');
   return {
-    id: r.id, voucherNo: r.voucher_no, date: r.date, description: r.description,
-    category: r.category, amount: Number(r.amount), client: r.client, site: r.site,
-    vendor: r.vendor, bank: r.bank, enteredBy: r.entered_by
+    id: r.id,
+    voucherNo: r.voucher_no,
+    date: r.date,
+    description: r.description,
+    category: r.category,
+    amount: Number(r.amount),
+    client: r.client,
+    site: r.site,
+    vendor: r.vendor,
+    bank: r.bank,
+    enteredBy: r.entered_by,
+    isVatable,
+    vatMode,
+    vatRate: r.vat_rate !== null && r.vat_rate !== undefined ? Number(r.vat_rate) : undefined,
+    vatAmount: r.vat_amount !== null && r.vat_amount !== undefined ? Number(r.vat_amount) : 0,
+    amountForVat: r.amount_for_vat !== null && r.amount_for_vat !== undefined ? Number(r.amount_for_vat) : 0,
   };
 }
 
@@ -870,10 +885,31 @@ function evaluationToDb(e: EvaluationRecord) {
 function ledgerEntryToDb(e: LedgerEntry) {
   // Ensure date is always a valid date string; fallback to today
   const safeDate = e.date && e.date.trim() !== '' ? e.date : new Date().toISOString().split('T')[0];
+  const isVatable = e.isVatable ?? (e.vatMode && e.vatMode !== 'No') ?? false;
+  const vatMode = e.vatMode || (isVatable ? 'Yes' : 'No');
+  const numAmt = Number(e.amount) || 0;
+  const vatAmt = e.vatAmount !== undefined ? Number(e.vatAmount) : 0;
+  const amtForVat = e.amountForVat !== undefined ? Number(e.amountForVat) : (isVatable ? numAmt : 0);
+  const grossAmt = isVatable ? (amtForVat + vatAmt) : numAmt;
+
   return {
-    id: e.id, voucher_no: e.voucherNo, date: safeDate, description: e.description,
-    category: e.category, amount: e.amount, client: e.client || null, site: e.site || null,
-    vendor: e.vendor || null, bank: e.bank, entered_by: e.enteredBy
+    id: e.id,
+    voucher_no: e.voucherNo,
+    date: safeDate,
+    description: e.description,
+    category: e.category,
+    amount: numAmt,
+    client: e.client || null,
+    site: e.site || null,
+    vendor: e.vendor || null,
+    bank: e.bank,
+    entered_by: e.enteredBy,
+    is_vatable: isVatable,
+    vat_mode: vatMode,
+    vat_rate: e.vatRate !== undefined ? Number(e.vatRate) : 7.5,
+    vat_amount: vatAmt,
+    amount_for_vat: amtForVat,
+    gross_amount: grossAmt,
   };
 }
 
@@ -1126,6 +1162,7 @@ export async function fetchAllAppData(privs?: any) {
     monthValues: settings?.month_values || undefined,
     hrVariables: settings?.hr_variables || undefined,
     onboardingTemplates: settings?.onboarding_templates || [],
+    expenseVatRemittances: settings?.expense_vat_remittances || [],
     superAdminCreated: settings?.super_admin_created ?? false,
     superAdminSignupEnabled: settings?.super_admin_signup_enabled ?? true,
     settingsId: settings?.id,
@@ -1160,13 +1197,14 @@ export async function fetchAttendanceData() {
 }
 
 export async function fetchLedgerData() {
-  const [lCatRes, lVenRes, lBankRes, lBenBankRes, lEntRes, compExpRes] = await Promise.all([
+  const [lCatRes, lVenRes, lBankRes, lBenBankRes, lEntRes, compExpRes, settingsRes] = await Promise.all([
     supabase.from('ledger_categories').select('*').order('name').limit(50000),
     supabase.from('ledger_vendors').select('*').order('name').limit(50000),
     supabase.from('ledger_banks').select('*').order('name').limit(50000),
     supabase.from('ledger_beneficiary_banks').select('*').order('name').limit(50000),
     supabase.from('ledger_entries').select('*').order('date', { ascending: false }).limit(50000),
-    supabase.from('company_expenses').select('*').order('date', { ascending: false }).limit(50000)
+    supabase.from('company_expenses').select('*').order('date', { ascending: false }).limit(50000),
+    supabase.from('app_settings').select('expense_vat_remittances, payroll_variables').limit(1).maybeSingle(),
   ]);
   
   return {
@@ -1176,6 +1214,8 @@ export async function fetchLedgerData() {
     ledgerBeneficiaryBanks: (lBenBankRes.data || []).map(dbToLedgerBeneficiaryBank),
     ledgerEntries: (lEntRes.data || []).map(dbToLedgerEntry),
     companyExpenses: (compExpRes.data || []).map(dbToCompanyExpense),
+    expenseVatRemittances: settingsRes?.data?.expense_vat_remittances || [],
+    payrollVariables: settingsRes?.data?.payroll_variables || undefined,
   };
 }
 
@@ -2159,6 +2199,11 @@ export const db = {
     if (e.vendor !== undefined) update.vendor = e.vendor || null;
     if (e.bank !== undefined) update.bank = e.bank;
     if (e.enteredBy !== undefined) update.entered_by = e.enteredBy;
+    if (e.isVatable !== undefined) update.is_vatable = e.isVatable;
+    if (e.vatMode !== undefined) update.vat_mode = e.vatMode;
+    if (e.vatRate !== undefined) update.vat_rate = e.vatRate;
+    if (e.vatAmount !== undefined) update.vat_amount = e.vatAmount;
+    if (e.amountForVat !== undefined) update.amount_for_vat = e.amountForVat;
     const { error } = await supabase.from('ledger_entries').update(update).eq('id', id);
     if (error) {
       console.error('updateLedgerEntry:', error.message, error.details, error.hint);

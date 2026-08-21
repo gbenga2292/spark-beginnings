@@ -39,10 +39,47 @@ export interface TaskPopup {
   subtaskUrl?: string;
   timestamp: number;
   reminderId?: string;
+  dedupeKey?: string;
 }
 
 const POPUP_TTL_MS = 15000; // auto-dismiss after 15 s
 const MAX_POPUPS   = 4;    // max stacked popups
+
+/* ─── Persistent Local Storage Dismissal Helpers ─────────────────────────── */
+function getDismissedPopupKeys(userId: string): Set<string> {
+  try {
+    const raw = localStorage.getItem(`dcel_dismissed_popups_${userId}`);
+    if (!raw) return new Set();
+    const data: Record<string, number> = JSON.parse(raw);
+    const now = Date.now();
+    const validKeys = new Set<string>();
+    let changed = false;
+    // Retain dismissal history for 30 days
+    for (const [k, ts] of Object.entries(data)) {
+      if (now - ts < 30 * 24 * 60 * 60 * 1000) {
+        validKeys.add(k);
+      } else {
+        delete data[k];
+        changed = true;
+      }
+    }
+    if (changed) {
+      localStorage.setItem(`dcel_dismissed_popups_${userId}`, JSON.stringify(data));
+    }
+    return validKeys;
+  } catch {
+    return new Set();
+  }
+}
+
+function saveDismissedPopupKey(userId: string, key: string) {
+  try {
+    const raw = localStorage.getItem(`dcel_dismissed_popups_${userId}`);
+    const data: Record<string, number> = raw ? JSON.parse(raw) : {};
+    data[key] = Date.now();
+    localStorage.setItem(`dcel_dismissed_popups_${userId}`, JSON.stringify(data));
+  } catch {}
+}
 
 /* ─── Icons per type ─────────────────────────────────────────────────────── */
 function TypeIcon({ type }: { type: TaskPopup['type'] }) {
@@ -75,7 +112,7 @@ function PopupCard({
   isDark,
 }: {
   popup: TaskPopup;
-  onDismiss: (id: string) => void;
+  onDismiss: (popup: TaskPopup) => void;
   onNavigate: (popup: TaskPopup) => void;
   onMarkAsDone?: (popup: TaskPopup) => void;
   isDark: boolean;
@@ -84,10 +121,10 @@ function PopupCard({
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      onDismiss(popup.id);
+      onDismiss(popup);
     }, POPUP_TTL_MS);
     return () => clearTimeout(timer);
-  }, [popup.id, onDismiss]);
+  }, [popup, onDismiss]);
 
   return (
     <motion.div
@@ -131,7 +168,7 @@ function PopupCard({
         {/* Actions */}
         <div className="flex flex-col gap-1 flex-shrink-0 ml-1">
           <button
-            onClick={(e) => { e.stopPropagation(); onDismiss(popup.id); }}
+            onClick={(e) => { e.stopPropagation(); onDismiss(popup); }}
             className={`p-1 rounded-lg transition-colors flex items-center justify-center ${
               isDark ? 'text-slate-500 hover:text-slate-300 hover:bg-slate-700' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'
             }`}
@@ -165,7 +202,7 @@ export function TaskPopupNotifications() {
   const { isDark } = useTheme();
 
   const [popups, setPopups] = useState<TaskPopup[]>([]);
-  // Track reminder IDs we've already shown to prevent duplicates on re-render
+  // Track reminder IDs we've already shown in the current runtime to prevent duplicates
   const shownIds = useRef<Set<string>>(new Set());
   // Track comment IDs processed by real-time so we don't re-process on initial load
   const processedCommentIds = useRef<Set<string>>(new Set());
@@ -175,11 +212,22 @@ export function TaskPopupNotifications() {
   const pushPopup = useCallback((p: Omit<TaskPopup, 'id' | 'timestamp'> & { dedupeKey?: string; nativeId?: number; skipNative?: boolean }) => {
     const dedupeKey = p.dedupeKey || `${p.type}-${p.title}-${p.body}`;
     if (shownIds.current.has(dedupeKey)) return;
+
+    // Check if dismissed in persistent storage
+    if (user?.id) {
+      const dismissedSet = getDismissedPopupKeys(user.id);
+      if (dismissedSet.has(dedupeKey)) {
+        shownIds.current.add(dedupeKey);
+        return;
+      }
+    }
+
     shownIds.current.add(dedupeKey);
 
     const popup: TaskPopup = {
       id: `popup-${Date.now()}-${Math.random()}`,
       timestamp: Date.now(),
+      dedupeKey,
       ...p,
     };
     setPopups(prev => [popup, ...prev].slice(0, MAX_POPUPS));
@@ -187,11 +235,6 @@ export function TaskPopupNotifications() {
     // NOTE: We only fire a native notification here for immediate events (mentions, assignments, etc.)
     // Scheduled reminders are handled by the syncLocalNotifications logic in AppDataContext.
     if (Capacitor.isNativePlatform() && !p.skipNative) {
-      // Use a deterministic ID: 
-      // 1. Provided nativeId
-      // 2. Hash of reminderId (matches AppDataContext logic)
-      // 3. Hash of dedupeKey
-      // 4. Fallback: Hash of title
       let notificationId = p.nativeId;
       
       if (!notificationId) {
@@ -214,38 +257,59 @@ export function TaskPopupNotifications() {
         new Notification(p.title, { body: p.body });
       }
     }
-  }, []);
+  }, [user?.id]);
 
-  const dismiss = useCallback((id: string) => {
+  const dismiss = useCallback((target: TaskPopup | string) => {
+    const id = typeof target === 'string' ? target : target.id;
+    const popup = typeof target === 'string' ? popups.find(p => p.id === target) : target;
+    if (user?.id && popup) {
+      const key = popup.dedupeKey || (popup.reminderId ? `rem-popup-${popup.reminderId}` : null);
+      if (key) {
+        saveDismissedPopupKey(user.id, key);
+        shownIds.current.add(key);
+      }
+    }
     setPopups(prev => prev.filter(x => x.id !== id));
-  }, []);
+  }, [user?.id, popups]);
 
   const handleNavigate = useCallback((popup: TaskPopup) => {
     // Always navigate to the main task detail page, not the subtask slip
     const url = popup.taskUrl;
     if (url) navigate(url);
-    dismiss(popup.id);
+    dismiss(popup);
   }, [navigate, dismiss]);
 
   const handleMarkAsDone = useCallback((popup: TaskPopup) => {
     if (!popup.reminderId) return;
     const rem = reminders.find(r => r.id === popup.reminderId);
+
+    // Save as dismissed in local storage immediately
+    if (user?.id) {
+      const key = popup.dedupeKey || `rem-popup-${popup.reminderId}`;
+      saveDismissedPopupKey(user.id, key);
+      shownIds.current.add(key);
+    }
+
     if (!rem) {
-      dismiss(popup.id);
+      dismiss(popup);
       return;
     }
 
     if (!rem.frequency || rem.frequency === 'once') {
       updateReminder(rem.id, { isActive: false });
     } else {
-      const current = new Date(rem.remindAt);
-      let nextDate = current;
-      switch (rem.frequency) {
-        case 'hourly': nextDate = addHours(current, 1); break;
-        case 'every_6_hours': nextDate = addHours(current, 6); break;
-        case 'daily': nextDate = addDays(current, 1); break;
-        case 'weekly': nextDate = addDays(current, 7); break;
-        case 'monthly': nextDate = addMonths(current, 1); break;
+      const now = new Date();
+      let nextDate = new Date(rem.remindAt);
+      // Advance iteratively into future relative to now
+      while (nextDate <= now) {
+        switch (rem.frequency) {
+          case 'hourly': nextDate = addHours(nextDate, 1); break;
+          case 'every_6_hours': nextDate = addHours(nextDate, 6); break;
+          case 'daily': nextDate = addDays(nextDate, 1); break;
+          case 'weekly': nextDate = addDays(nextDate, 7); break;
+          case 'monthly': nextDate = addMonths(nextDate, 1); break;
+          default: nextDate = addDays(nextDate, 1); break;
+        }
       }
       
       if (rem.endAt && isBefore(new Date(rem.endAt), nextDate)) {
@@ -255,8 +319,8 @@ export function TaskPopupNotifications() {
       }
     }
     
-    dismiss(popup.id);
-  }, [reminders, updateReminder, dismiss]);
+    dismiss(popup);
+  }, [reminders, updateReminder, dismiss, user?.id]);
 
   /* ── Mark all existing comments as already 'seen' on mount ───────────── */
   useEffect(() => {
@@ -273,6 +337,11 @@ export function TaskPopupNotifications() {
 
     const checkReminders = () => {
       const now = Date.now();
+      const dismissedSet = getDismissedPopupKeys(userId);
+
+      // Startup window: only trigger popups for reminders due within the last 15 minutes or now
+      // Any older reminders stay in the Header Notification Bell dropdown and Reminders page
+      const RECENT_DUE_WINDOW_MS = 15 * 60 * 1000;
 
       reminders.forEach(rem => {
         if (!rem.isActive) return;
@@ -297,7 +366,7 @@ export function TaskPopupNotifications() {
 
         const diff = now - popupStartDate;
         
-        // Fire for any unacknowledged past reminder
+        // Not due yet
         if (diff < 0) return;
 
         // If it is an invoice reminder:
@@ -305,11 +374,13 @@ export function TaskPopupNotifications() {
           // 1. Stop popping up after the actual end date
           if (now > remindAt) return;
 
-          // 2. Check if we've already popped up today (Database tracked via lastSentAt)
+          // 2. Check if we've already popped up today (Database tracked via lastSentAt or dismissed locally)
           const lastSent = rem.lastSentAt ? new Date(rem.lastSentAt) : null;
           const todayStr = new Date().toISOString().split('T')[0];
           const lastSentStr = lastSent ? lastSent.toISOString().split('T')[0] : '';
-          if (lastSentStr === todayStr) {
+          const invDedupeKey = `inv-rem-${rem.id}-${todayStr}`;
+          
+          if (lastSentStr === todayStr || dismissedSet.has(invDedupeKey) || shownIds.current.has(invDedupeKey)) {
             return; // Already notified today
           }
 
@@ -328,6 +399,12 @@ export function TaskPopupNotifications() {
 
             // Set sendEmail to false in DB so it only sends once
             updateReminder(rem.id, { sendEmail: false });
+          }
+        } else {
+          // For regular reminders: if it was due longer than RECENT_DUE_WINDOW_MS ago (e.g. from previous days/hours),
+          // don't bombard user with floating toasts on startup — it is already in Notification Center.
+          if (diff > RECENT_DUE_WINDOW_MS) {
+            return;
           }
         }
 
@@ -356,13 +433,15 @@ export function TaskPopupNotifications() {
         if (isNewTask)  type = 'new_task';
         else if (isAssigned) type = 'assignment';
 
-        // If it's an assignment reminder, use the same dedupe key as the subtask listener
-        // to prevent double notifications (one from real-time subtask, one from reminder table).
-        const dedupeKey = (isAssigned && rem.subtaskId) 
-          ? `assign-sub-${rem.subtaskId}`
-          : (isAssigned && rem.mainTaskId)
-            ? `assign-main-${rem.mainTaskId}`
-            : `rem-popup-${rem.id}`;
+        const dedupeKey = isInvoiceReminder
+          ? `inv-rem-${rem.id}-${new Date().toISOString().split('T')[0]}`
+          : (isAssigned && rem.subtaskId) 
+            ? `assign-sub-${rem.subtaskId}`
+            : (isAssigned && rem.mainTaskId)
+              ? `assign-main-${rem.mainTaskId}`
+              : `rem-popup-${rem.id}`;
+
+        if (dismissedSet.has(dedupeKey) || shownIds.current.has(dedupeKey)) return;
 
         pushPopup({
           type,

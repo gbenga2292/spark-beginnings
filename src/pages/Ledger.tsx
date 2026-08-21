@@ -2063,163 +2063,113 @@ export function Ledger() {
 
       {/* Expenses VAT Tab */}
       <TabsContent active={tab === 'vat'} className="m-0 focus-visible:outline-none">
-        <div className="space-y-6">
-          {/* Stat Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
-            <Card className="border-slate-200 shadow-sm bg-gradient-to-br from-emerald-500/10 to-teal-500/5">
-              <CardContent className="p-4 flex items-center justify-between">
-                <div>
-                  <p className="text-[10px] font-extrabold uppercase tracking-widest text-emerald-700">Accumulated VAT</p>
-                  <h3 className="text-xl font-extrabold text-slate-900 mt-1 tabular-nums">
-                    ₦{overallVatStats.totalVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </h3>
-                  <p className="text-[11px] text-slate-500 mt-0.5">Total VAT to remit</p>
-                </div>
-                <div className="h-10 w-10 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center font-bold shrink-0">
-                  <Receipt className="h-5 w-5" />
-                </div>
-              </CardContent>
-            </Card>
+        <div className="space-y-4">
+          {/* Minimalist Top KPI Strip */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-sm transition-all hover:border-slate-300">
+              <span className="text-[11px] font-medium text-slate-500 block">Accumulated VAT</span>
+              <div className="text-lg font-bold text-slate-900 mt-0.5 tabular-nums tracking-tight">
+                ₦{overallVatStats.totalVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+              <span className="text-[10px] text-slate-400 font-medium">To remit</span>
+            </div>
 
-            <Card className="border-slate-200 shadow-sm bg-gradient-to-br from-teal-500/10 to-emerald-500/5">
-              <CardContent className="p-4 flex items-center justify-between">
-                <div>
-                  <p className="text-[10px] font-extrabold uppercase tracking-widest text-teal-700">VAT Paid / Remitted</p>
-                  <h3 className="text-xl font-extrabold text-slate-900 mt-1 tabular-nums">
-                    ₦{overallVatStats.totalVatPaid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </h3>
-                  <p className="text-[11px] text-slate-500 mt-0.5">Reconciled VAT payments</p>
-                </div>
-                <div className="h-10 w-10 rounded-xl bg-teal-500/10 text-teal-600 flex items-center justify-center font-bold shrink-0">
-                  <CheckCircle2 className="h-5 w-5" />
-                </div>
-              </CardContent>
-            </Card>
+            <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-sm transition-all hover:border-slate-300">
+              <span className="text-[11px] font-medium text-slate-500 block">VAT Remitted</span>
+              <div className="text-lg font-bold text-teal-600 mt-0.5 tabular-nums tracking-tight">
+                ₦{overallVatStats.totalVatPaid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+              <span className="text-[10px] text-slate-400 font-medium">Reconciled</span>
+            </div>
 
-            <Card className={cn(
-              "border-slate-200 shadow-sm",
-              overallVatStats.vatBalance <= 0 ? "bg-emerald-50/50" : overallVatStats.totalVatPaid > 0 ? "bg-amber-50/50" : "bg-rose-50/50"
-            )}>
-              <CardContent className="p-4 flex items-center justify-between">
-                <div>
-                  <p className={cn(
-                    "text-[10px] font-extrabold uppercase tracking-widest",
-                    overallVatStats.vatBalance <= 0 ? "text-emerald-700" : overallVatStats.totalVatPaid > 0 ? "text-amber-700" : "text-rose-700"
-                  )}>
-                    Outstanding Balance
-                  </p>
-                  <h3 className="text-xl font-extrabold text-slate-900 mt-1 tabular-nums">
-                    ₦{Math.max(0, overallVatStats.vatBalance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </h3>
-                  <p className="text-[11px] text-slate-500 mt-0.5">
-                    {overallVatStats.vatBalance <= 0 ? 'Fully Reconciled' : 'VAT payment due'}
-                  </p>
-                </div>
-                <div className={cn(
-                  "h-10 w-10 rounded-xl flex items-center justify-center font-bold shrink-0",
-                  overallVatStats.vatBalance <= 0 ? "bg-emerald-100 text-emerald-700" : overallVatStats.totalVatPaid > 0 ? "bg-amber-100 text-amber-700" : "bg-rose-100 text-rose-700"
-                )}>
-                  {overallVatStats.vatBalance <= 0 ? <CheckCircle2 className="h-5 w-5" /> : <AlertCircle className="h-5 w-5" />}
-                </div>
-              </CardContent>
-            </Card>
+            <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-sm transition-all hover:border-slate-300">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-medium text-slate-500">Outstanding Balance</span>
+                <span className={cn("h-2 w-2 rounded-full", overallVatStats.vatBalance <= 0 ? "bg-emerald-500" : "bg-rose-500")} />
+              </div>
+              <div className={cn(
+                "text-lg font-bold mt-0.5 tabular-nums tracking-tight",
+                overallVatStats.vatBalance <= 0 ? "text-emerald-600" : "text-rose-600"
+              )}>
+                ₦{Math.max(0, overallVatStats.vatBalance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+              <span className="text-[10px] text-slate-400 font-medium">
+                {overallVatStats.vatBalance <= 0 ? 'Fully Reconciled' : 'Due'}
+              </span>
+            </div>
 
-            {/* Amount for VAT Card */}
-            <Card className="border-slate-200 shadow-sm bg-gradient-to-br from-indigo-500/10 to-blue-500/5">
-              <CardContent className="p-4 flex items-center justify-between">
-                <div>
-                  <p className="text-[10px] font-extrabold uppercase tracking-widest text-indigo-700">Amount for VAT</p>
-                  <h3 className="text-xl font-extrabold text-slate-900 mt-1 tabular-nums">
-                    ₦{overallVatStats.amountForVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </h3>
-                  <p className="text-[11px] text-slate-500 mt-0.5">Base gross amount for VAT</p>
-                </div>
-                <div className="h-10 w-10 rounded-xl bg-indigo-500/10 text-indigo-600 flex items-center justify-center font-bold shrink-0">
-                  <Calculator className="h-5 w-5" />
-                </div>
-              </CardContent>
-            </Card>
+            <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-sm transition-all hover:border-slate-300">
+              <span className="text-[11px] font-medium text-slate-500 block">Base Amount for VAT</span>
+              <div className="text-lg font-bold text-slate-900 mt-0.5 tabular-nums tracking-tight">
+                ₦{overallVatStats.amountForVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+              <span className="text-[10px] text-slate-400 font-medium">Gross vatable base</span>
+            </div>
 
-            <Card className="border-slate-200 shadow-sm">
-              <CardContent className="p-4 flex items-center justify-between">
-                <div>
-                  <p className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500">Current VAT Rate</p>
-                  <h3 className="text-xl font-extrabold text-slate-900 mt-1 tabular-nums">
-                    {vatRate}%
-                  </h3>
-                  <p className="text-[11px] text-slate-500 mt-0.5">Set in Variables Settings</p>
-                </div>
-                <div className="h-10 w-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold shrink-0">
-                  <Percent className="h-5 w-5" />
-                </div>
-              </CardContent>
-            </Card>
+            <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-sm transition-all hover:border-slate-300 col-span-2 sm:col-span-1">
+              <span className="text-[11px] font-medium text-slate-500 block">VAT Rate</span>
+              <div className="text-lg font-bold text-slate-900 mt-0.5 tabular-nums tracking-tight">
+                {vatRate}%
+              </div>
+              <span className="text-[10px] text-slate-400 font-medium">System standard</span>
+            </div>
           </div>
 
-          {/* Monthly Accumulated VAT Breakdown */}
-          <Card className="border-slate-200 shadow-sm">
-            <CardHeader className="bg-slate-50/50 border-b border-slate-100 pb-4">
-              <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
-                <div>
-                  <CardTitle className="text-base font-bold text-slate-800 flex items-center gap-2">
-                    <Receipt className="h-4 w-4 text-emerald-600" /> Expenses VAT Reconciliation & Remittances
-                  </CardTitle>
-                  <CardDescription className="text-xs">
-                    Track monthly expenses VAT, filter by category, and reconcile linked ledger payment vouchers
-                  </CardDescription>
-                </div>
+          {/* Minimalist Filter Bar & Table Section */}
+          <div className="bg-white border border-slate-200/80 rounded-xl shadow-sm overflow-hidden">
+            {/* Filter Bar */}
+            <div className="p-3.5 border-b border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3">
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <span className="text-xs font-bold text-slate-700 whitespace-nowrap">Monthly Summary</span>
+                <span className="text-[11px] text-slate-400 font-normal">({filteredVatSummaries.length} month{filteredVatSummaries.length !== 1 ? 's' : ''})</span>
+              </div>
 
-                {/* Filter Controls: Month Dropdown + Category Dropdown + Search Input */}
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full lg:w-auto">
-                  <div className="relative min-w-[150px]">
-                    <select
-                      value={selectedVatMonth}
-                      onChange={e => setSelectedVatMonth(e.target.value)}
-                      className="h-9 w-full rounded-md border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 shadow-sm focus:border-indigo-500 focus:outline-none cursor-pointer"
-                    >
-                      <option value="all">📅 All Months</option>
-                      {availableVatMonths.map(m => (
-                        <option key={m.key} value={m.key}>{m.label}</option>
-                      ))}
-                    </select>
-                  </div>
+              <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                <select
+                  value={selectedVatMonth}
+                  onChange={e => setSelectedVatMonth(e.target.value)}
+                  className="h-8 rounded-lg border border-slate-200 bg-slate-50/50 px-2.5 text-xs font-medium text-slate-700 shadow-none focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer"
+                >
+                  <option value="all">All Months</option>
+                  {availableVatMonths.map(m => (
+                    <option key={m.key} value={m.key}>{m.label}</option>
+                  ))}
+                </select>
 
-                  <div className="relative min-w-[170px]">
-                    <select
-                      value={selectedVatCategory}
-                      onChange={e => setSelectedVatCategory(e.target.value)}
-                      className="h-9 w-full rounded-md border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 shadow-sm focus:border-indigo-500 focus:outline-none cursor-pointer"
-                    >
-                      <option value="all">📁 All Categories</option>
-                      {sortedCategories.map(c => (
-                        <option key={c.id} value={c.name}>{c.name}</option>
-                      ))}
-                    </select>
-                  </div>
+                <select
+                  value={selectedVatCategory}
+                  onChange={e => setSelectedVatCategory(e.target.value)}
+                  className="h-8 rounded-lg border border-slate-200 bg-slate-50/50 px-2.5 text-xs font-medium text-slate-700 shadow-none focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer"
+                >
+                  <option value="all">All Categories</option>
+                  {sortedCategories.map(c => (
+                    <option key={c.id} value={c.name}>{c.name}</option>
+                  ))}
+                </select>
 
-                  <div className="relative w-full sm:w-56">
-                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
-                    <Input 
-                      placeholder="Search vatable records..." 
-                      className="pl-9 h-9 border-slate-200 bg-white text-xs" 
-                      value={search} 
-                      onChange={e => setSearch(e.target.value)} 
-                    />
-                  </div>
+                <div className="relative flex-1 sm:w-48">
+                  <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
+                  <Input 
+                    placeholder="Search records..." 
+                    className="pl-8 h-8 text-xs border-slate-200 bg-slate-50/50" 
+                    value={search} 
+                    onChange={e => setSearch(e.target.value)} 
+                  />
                 </div>
               </div>
-            </CardHeader>
+            </div>
 
-            <CardContent className="p-4 space-y-4">
+            {/* Content List */}
+            <div className="p-3.5 space-y-3">
               {filteredVatSummaries.length === 0 ? (
-                <div className="text-center py-12 text-slate-400 space-y-2">
-                  <Receipt className="h-10 w-10 mx-auto text-slate-300" />
-                  <p className="text-sm font-medium">
-                    No vatable ledger transactions found
-                    {selectedVatMonth !== 'all' ? ' for the selected month' : ''}
-                    {selectedVatCategory !== 'all' ? ` in ${selectedVatCategory}` : ''}.
+                <div className="text-center py-10 text-slate-400 space-y-1.5">
+                  <Receipt className="h-8 w-8 mx-auto text-slate-300 stroke-[1.5]" />
+                  <p className="text-xs font-medium text-slate-600">
+                    No vatable ledger transactions found{selectedVatMonth !== 'all' ? ' for this month' : ''}{selectedVatCategory !== 'all' ? ` in ${selectedVatCategory}` : ''}.
                   </p>
-                  <p className="text-xs text-slate-400">When creating ledger vouchers in the Entry tab, set the VAT Policy to "Yes" or "Add" on transaction lines to accumulate VAT here.</p>
+                  <p className="text-[11px] text-slate-400 max-w-sm mx-auto">
+                    Set the VAT Policy to "Yes" or "Add" on transaction lines in the Entry tab to record vatable expenses.
+                  </p>
                 </div>
               ) : (
                 filteredVatSummaries.map((monthGroup) => {
@@ -2237,126 +2187,99 @@ export function Ledger() {
 
                   if (search.trim() && displayEntries.length === 0 && monthGroup.remittances.length === 0) return null;
 
-                  const pctPaid = monthGroup.totalVatAmount > 0 
-                    ? Math.min(100, Math.round((monthGroup.totalVatPaid / monthGroup.totalVatAmount) * 100))
-                    : 100;
-
                   return (
-                    <div key={monthGroup.monthKey} className="border border-slate-200 rounded-xl overflow-hidden shadow-sm bg-white">
-                      {/* Month Header Card Bar */}
-                      <div className="p-4 bg-slate-50/90 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-slate-200/60">
-                        <div 
-                          onClick={() => toggleMonthExpand(monthGroup.monthKey)}
-                          className="flex items-center gap-3 cursor-pointer group flex-1"
-                        >
-                          <div className="h-10 w-10 rounded-xl bg-indigo-100 text-indigo-700 font-extrabold flex items-center justify-center text-xs shadow-sm group-hover:bg-indigo-600 group-hover:text-white transition-colors">
-                            <Calendar className="h-5 w-5" />
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <h4 className="font-extrabold text-slate-900 text-base group-hover:text-indigo-600 transition-colors">{monthGroup.monthLabel}</h4>
-                              <span className={cn(
-                                "px-2 py-0.5 rounded-full text-[10px] font-extrabold border flex items-center gap-1",
-                                monthGroup.status === 'Fully Paid' ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
-                                monthGroup.status === 'Partially Paid' ? "bg-amber-50 text-amber-700 border-amber-200" :
-                                "bg-rose-50 text-rose-700 border-rose-200"
-                              )}>
-                                {monthGroup.status === 'Fully Paid' && <CheckCircle2 className="h-3 w-3" />}
-                                {monthGroup.status === 'Partially Paid' && <Clock className="h-3 w-3" />}
-                                {monthGroup.status === 'Unpaid' && <AlertCircle className="h-3 w-3" />}
-                                {monthGroup.status}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-3 text-xs text-slate-500 mt-0.5 font-medium">
-                              <span>{monthGroup.entries.length} vatable transaction{monthGroup.entries.length !== 1 ? 's' : ''}</span>
-                              <span>•</span>
-                              <span>{monthGroup.remittances.length} remittance payment{monthGroup.remittances.length !== 1 ? 's' : ''}</span>
-                            </div>
-                          </div>
+                    <div key={monthGroup.monthKey} className="border border-slate-200/80 rounded-xl overflow-hidden shadow-none bg-white">
+                      {/* Month Header Bar */}
+                      <div 
+                        onClick={() => toggleMonthExpand(monthGroup.monthKey)}
+                        className="p-3.5 bg-slate-50/60 hover:bg-slate-50 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 cursor-pointer transition-colors border-b border-slate-100"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <h4 className="font-bold text-slate-900 text-sm">{monthGroup.monthLabel}</h4>
+                          <span className={cn(
+                            "px-2 py-0.5 rounded-full text-[10px] font-semibold border",
+                            monthGroup.status === 'Fully Paid' ? "bg-emerald-50 text-emerald-700 border-emerald-200/60" :
+                            monthGroup.status === 'Partially Paid' ? "bg-amber-50 text-amber-700 border-amber-200/60" :
+                            "bg-slate-100 text-slate-600 border-slate-200"
+                          )}>
+                            {monthGroup.status}
+                          </span>
+                          <span className="text-[11px] text-slate-400 font-normal">
+                            ({monthGroup.entries.length} items)
+                          </span>
                         </div>
 
-                        {/* Totals & Actions */}
-                        <div className="flex flex-wrap items-center gap-4 w-full md:w-auto justify-between md:justify-end">
+                        {/* Metric figures & Actions */}
+                        <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end text-xs">
                           <div className="text-right">
-                            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Accumulated VAT</div>
-                            <div className="text-sm font-extrabold text-slate-900 tabular-nums">
+                            <span className="text-[10px] text-slate-400 block font-medium">Accumulated</span>
+                            <span className="font-bold text-slate-800 tabular-nums">
                               ₦{monthGroup.totalVatAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </div>
+                            </span>
                           </div>
 
                           <div className="text-right">
-                            <div className="text-[10px] font-bold text-teal-600 uppercase tracking-widest">VAT Paid</div>
-                            <div className="text-sm font-extrabold text-teal-700 tabular-nums">
+                            <span className="text-[10px] text-teal-600 block font-medium">Paid</span>
+                            <span className="font-bold text-teal-600 tabular-nums">
                               ₦{monthGroup.totalVatPaid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </div>
+                            </span>
                           </div>
 
                           <div className="text-right">
-                            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Balance</div>
-                            <div className={cn(
-                              "text-sm font-extrabold tabular-nums",
+                            <span className="text-[10px] text-slate-400 block font-medium">Balance</span>
+                            <span className={cn(
+                              "font-bold tabular-nums",
                               monthGroup.vatBalance <= 0 ? "text-emerald-600" : "text-rose-600"
                             )}>
                               ₦{Math.max(0, monthGroup.vatBalance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </div>
+                            </span>
                           </div>
 
-                          {/* Reconcile / Pay Action Button */}
-                          <Button
-                            size="sm"
-                            className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs gap-1.5 shadow-sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setReconcileMonthKey(monthGroup.monthKey);
-                              setReconcileSearchQuery('');
-                            }}
-                          >
-                            <Link className="h-3.5 w-3.5" /> Reconcile / Pay VAT
-                          </Button>
+                          <div className="flex items-center gap-1.5 pl-1">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 text-xs font-semibold px-2.5 border-slate-200 hover:bg-slate-100 text-slate-700"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setReconcileMonthKey(monthGroup.monthKey);
+                                setReconcileSearchQuery('');
+                              }}
+                            >
+                              Reconcile
+                            </Button>
 
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-8 w-8 p-0 text-slate-500 hover:text-slate-800"
-                            onClick={() => toggleMonthExpand(monthGroup.monthKey)}
-                          >
-                            {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                          </Button>
+                            <button
+                              type="button"
+                              className="h-7 w-7 rounded flex items-center justify-center text-slate-400 hover:text-slate-700"
+                            >
+                              {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                            </button>
+                          </div>
                         </div>
                       </div>
 
-                      {/* Reconciliation Progress Bar */}
-                      <div className="w-full bg-slate-100 h-1.5 relative overflow-hidden">
-                        <div 
-                          className={cn(
-                            "h-full transition-all duration-500",
-                            pctPaid >= 100 ? "bg-emerald-500" : pctPaid > 0 ? "bg-amber-500" : "bg-rose-400"
-                          )} 
-                          style={{ width: `${pctPaid}%` }}
-                        />
-                      </div>
-
-                      {/* Expandable Table Content */}
+                      {/* Expandable Tables */}
                       {isExpanded && (
                         <div className="divide-y divide-slate-100">
                           {/* 1. Vatable Expense Transactions Table */}
-                          <div className="p-4 space-y-2">
-                            <h5 className="text-xs font-extrabold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-                              <Receipt className="h-3.5 w-3.5 text-indigo-600" /> Vatable Expenses ({displayEntries.length})
-                            </h5>
-                            <div className="overflow-x-auto rounded-lg border border-slate-200">
+                          <div className="p-3 space-y-2">
+                            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
+                              Vatable Expense Lines ({displayEntries.length})
+                            </span>
+                            <div className="overflow-x-auto rounded-lg border border-slate-100">
                               <table className="w-full text-left text-xs whitespace-nowrap">
-                                <thead className="bg-slate-900 text-white font-semibold">
+                                <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-100">
                                   <tr>
-                                    <th className="py-2.5 px-3 border-r border-slate-800">Voucher No.</th>
-                                    <th className="py-2.5 px-3 border-r border-slate-800">Date</th>
-                                    <th className="py-2.5 px-3 border-r border-slate-800 w-1/3">Description</th>
-                                    <th className="py-2.5 px-3 border-r border-slate-800">Category</th>
-                                    <th className="py-2.5 px-3 border-r border-slate-800">Vendor</th>
-                                    <th className="py-2.5 px-3 border-r border-slate-800">Client / Site</th>
-                                    <th className="py-2.5 px-3 border-r border-slate-800 text-center">VAT Policy</th>
-                                    <th className="py-2.5 px-3 border-r border-slate-800 text-right">Line Amount (₦)</th>
-                                    <th className="py-2.5 px-3 text-right">VAT Amount ({vatRate}%)</th>
+                                    <th className="py-2 px-3">Voucher</th>
+                                    <th className="py-2 px-3">Date</th>
+                                    <th className="py-2 px-3">Description</th>
+                                    <th className="py-2 px-3">Category</th>
+                                    <th className="py-2 px-3">Vendor</th>
+                                    <th className="py-2 px-3">Client / Site</th>
+                                    <th className="py-2 px-3 text-center">VAT Policy</th>
+                                    <th className="py-2 px-3 text-right">Amount (₦)</th>
+                                    <th className="py-2 px-3 text-right">VAT (₦)</th>
                                   </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100 bg-white">
@@ -2365,8 +2288,8 @@ export function Ledger() {
                                     const calculated = calculateItemVat(Number(entry.amount), vMode, vatRate);
                                     const entryVat = entry.vatAmount ?? calculated.vatAmount;
                                     return (
-                                      <tr key={entry.id} className="hover:bg-indigo-50/20 transition-colors">
-                                        <td className="py-2.5 px-3 font-mono font-bold text-indigo-600">
+                                      <tr key={entry.id} className="hover:bg-slate-50/60 transition-colors">
+                                        <td className="py-2 px-3 font-mono font-medium text-indigo-600">
                                           <button 
                                             className="hover:underline"
                                             onClick={(e) => { e.stopPropagation(); setDialogVoucher(entry.voucherNo); }}
@@ -2374,22 +2297,20 @@ export function Ledger() {
                                             {entry.voucherNo}
                                           </button>
                                         </td>
-                                        <td className="py-2.5 px-3 font-mono text-slate-600">{formatDisplayDate(entry.date)}</td>
-                                        <td className="py-2.5 px-3 font-medium text-slate-800 max-w-[250px] truncate" title={entry.description}>{entry.description || '—'}</td>
-                                        <td className="py-2.5 px-3">
-                                          <span className="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full font-semibold">{entry.category}</span>
-                                        </td>
-                                        <td className="py-2.5 px-3 text-slate-600">{entry.vendor || '—'}</td>
-                                        <td className="py-2.5 px-3 text-slate-500">{entry.client || '—'}{entry.site ? ` / ${entry.site}` : ''}</td>
-                                        <td className="py-2.5 px-3 text-center">
-                                          <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-extrabold text-slate-700 border border-slate-200">
+                                        <td className="py-2 px-3 text-slate-500">{formatDisplayDate(entry.date)}</td>
+                                        <td className="py-2 px-3 font-medium text-slate-800 max-w-[220px] truncate" title={entry.description}>{entry.description || '—'}</td>
+                                        <td className="py-2 px-3 text-slate-600">{entry.category}</td>
+                                        <td className="py-2 px-3 text-slate-500">{entry.vendor || '—'}</td>
+                                        <td className="py-2 px-3 text-slate-500">{entry.client || '—'}{entry.site ? ` / ${entry.site}` : ''}</td>
+                                        <td className="py-2 px-3 text-center">
+                                          <span className="text-[10px] font-semibold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded">
                                             {vMode}
                                           </span>
                                         </td>
-                                        <td className="py-2.5 px-3 text-right font-semibold text-slate-800 tabular-nums">
+                                        <td className="py-2 px-3 text-right text-slate-700 tabular-nums">
                                           ₦{Number(entry.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                         </td>
-                                        <td className="py-2.5 px-3 text-right font-extrabold text-emerald-700 bg-emerald-50/50 tabular-nums">
+                                        <td className="py-2 px-3 text-right font-bold text-emerald-600 tabular-nums">
                                           ₦{entryVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                         </td>
                                       </tr>
@@ -2400,66 +2321,66 @@ export function Ledger() {
                             </div>
                           </div>
 
-                          {/* 2. Linked VAT Remittance Payments Table */}
-                          <div className="p-4 bg-slate-50/50 space-y-2">
+                          {/* 2. Linked VAT Remittances */}
+                          <div className="p-3 bg-slate-50/40 space-y-2">
                             <div className="flex items-center justify-between">
-                              <h5 className="text-xs font-extrabold text-teal-800 uppercase tracking-wider flex items-center gap-1.5">
-                                <CheckCircle2 className="h-3.5 w-3.5 text-teal-600" /> Reconciled VAT Remittances ({monthGroup.remittances.length})
-                              </h5>
+                              <span className="text-[11px] font-bold text-teal-700 uppercase tracking-wider block">
+                                Reconciled Payments ({monthGroup.remittances.length})
+                              </span>
                               <Button 
                                 size="sm" 
-                                variant="outline" 
-                                className="h-7 text-[11px] font-bold text-teal-700 border-teal-200 hover:bg-teal-50 gap-1"
+                                variant="ghost" 
+                                className="h-6 text-[11px] font-semibold text-teal-700 hover:bg-teal-50 gap-1 p-1"
                                 onClick={() => {
                                   setReconcileMonthKey(monthGroup.monthKey);
                                   setReconcileSearchQuery('');
                                 }}
                               >
-                                <Plus className="h-3 w-3" /> Add Remittance
+                                <Plus className="h-3 w-3" /> Add Payment
                               </Button>
                             </div>
 
                             {monthGroup.remittances.length === 0 ? (
-                              <div className="p-4 text-center text-xs text-slate-400 bg-white rounded-lg border border-dashed border-slate-200">
-                                No VAT payments linked for this month yet. Click <strong>"Reconcile / Pay VAT"</strong> to link a ledger payment voucher or record a direct remittance.
+                              <div className="p-3 text-center text-xs text-slate-400 bg-white rounded-lg border border-slate-100">
+                                No VAT remittance payments linked for this month.
                               </div>
                             ) : (
-                              <div className="overflow-x-auto rounded-lg border border-teal-200 bg-white">
+                              <div className="overflow-x-auto rounded-lg border border-slate-200/80 bg-white">
                                 <table className="w-full text-left text-xs whitespace-nowrap">
-                                  <thead className="bg-teal-950 text-teal-100 font-semibold">
+                                  <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-100">
                                     <tr>
-                                      <th className="py-2.5 px-3">Date</th>
-                                      <th className="py-2.5 px-3">Voucher / Ref No.</th>
-                                      <th className="py-2.5 px-3">Bank</th>
-                                      <th className="py-2.5 px-3 w-1/3">Notes / Description</th>
-                                      <th className="py-2.5 px-3">Recorded By</th>
-                                      <th className="py-2.5 px-3 text-right">Amount Remitted (₦)</th>
-                                      <th className="py-2.5 px-3 text-center">Action</th>
+                                      <th className="py-2 px-3">Date</th>
+                                      <th className="py-2 px-3">Ref No.</th>
+                                      <th className="py-2 px-3">Bank</th>
+                                      <th className="py-2 px-3">Notes</th>
+                                      <th className="py-2 px-3">User</th>
+                                      <th className="py-2 px-3 text-right">Remitted (₦)</th>
+                                      <th className="py-2 px-3 text-center">Action</th>
                                     </tr>
                                   </thead>
                                   <tbody className="divide-y divide-slate-100">
                                     {monthGroup.remittances.map((rem) => (
-                                      <tr key={rem.id} className="hover:bg-teal-50/30 transition-colors">
-                                        <td className="py-2.5 px-3 font-mono text-slate-700">{formatDisplayDate(rem.date)}</td>
-                                        <td className="py-2.5 px-3 font-mono font-bold text-indigo-600">
+                                      <tr key={rem.id} className="hover:bg-slate-50/60 transition-colors">
+                                        <td className="py-2 px-3 text-slate-600">{formatDisplayDate(rem.date)}</td>
+                                        <td className="py-2 px-3 font-mono font-medium text-indigo-600">
                                           {rem.voucherNo ? (
                                             <button className="hover:underline" onClick={() => setDialogVoucher(rem.voucherNo!)}>
                                               {rem.voucherNo}
                                             </button>
                                           ) : 'Direct'}
                                         </td>
-                                        <td className="py-2.5 px-3 text-slate-700 font-medium">{rem.bank || 'Bank Transfer'}</td>
-                                        <td className="py-2.5 px-3 text-slate-600 max-w-[220px] truncate" title={rem.notes}>{rem.notes || 'VAT Remittance'}</td>
-                                        <td className="py-2.5 px-3 text-slate-500 text-[11px]">{rem.createdBy || 'User'}</td>
-                                        <td className="py-2.5 px-3 text-right font-extrabold text-teal-700 tabular-nums">
+                                        <td className="py-2 px-3 text-slate-700">{rem.bank || 'Bank Transfer'}</td>
+                                        <td className="py-2 px-3 text-slate-500 max-w-[200px] truncate" title={rem.notes}>{rem.notes || '—'}</td>
+                                        <td className="py-2 px-3 text-slate-400 text-[11px]">{rem.createdBy || 'User'}</td>
+                                        <td className="py-2 px-3 text-right font-bold text-teal-600 tabular-nums">
                                           ₦{Number(rem.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                         </td>
-                                        <td className="py-2.5 px-3 text-center">
+                                        <td className="py-2 px-3 text-center">
                                           <Button
                                             size="sm"
                                             variant="ghost"
-                                            className="h-7 w-7 p-0 text-rose-500 hover:bg-rose-50 hover:text-rose-700"
-                                            title="Remove VAT remittance link"
+                                            className="h-6 w-6 p-0 text-rose-400 hover:text-rose-600 hover:bg-rose-50"
+                                            title="Unlink"
                                             onClick={async () => {
                                               const ok = await showConfirm('Remove this VAT remittance link?', { variant: 'danger', confirmLabel: 'Unlink' });
                                               if (ok) {
@@ -2484,10 +2405,11 @@ export function Ledger() {
                   );
                 })
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </div>
       </TabsContent>
+
 
       {/* Expenses VAT Reconciliation Modal Dialog */}
       {reconcileMonthKey && (

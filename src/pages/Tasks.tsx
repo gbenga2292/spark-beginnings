@@ -536,6 +536,8 @@ function PersonalTasksView() {
                                                       label = `${m.refType === 'loan' ? 'Loan' : 'Salary Advance'} Application`;
                                                     } else if (m.refType === 'site') {
                                                       label = `Site Onboarding Workflow`;
+                                                    } else if (m.refType === 'employee_onboarding' || m.refType === 'post_onboarding') {
+                                                      label = `Post-Onboarding Verification`;
                                                     } else if (m.refType === 'vehicle_doc_renewal') {
                                                       label = `Vehicle Document Renewal`;
                                                     }
@@ -1793,6 +1795,8 @@ function AdminTasksView() {
                                                 label = `${m.refType === 'loan' ? 'Loan' : 'Salary Advance'} Application`;
                                               } else if (m.refType === 'site') {
                                                 label = `Site Onboarding Workflow`;
+                                              } else if (m.refType === 'employee_onboarding' || m.refType === 'post_onboarding') {
+                                                label = `Post-Onboarding Verification`;
                                               } else if (m.refType === 'vehicle_doc_renewal') {
                                                 label = `Vehicle Document Renewal`;
                                               } else if (m.refType === 'probation_eval') {

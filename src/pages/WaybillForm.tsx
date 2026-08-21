@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useOperations } from '../contexts/OperationsContext';
 import { useAppStore } from '@/src/store/appStore';
 import { useUserStore } from '@/src/store/userStore';
@@ -28,7 +28,7 @@ const SERVICES = ['Dewatering', 'Waterproofing', 'Jetting', 'Tiling', 'General']
 
 export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName = '', editWaybill }: WaybillFormProps) {
   const { assets, createWaybill, updateWaybill, vehicles } = useOperations();
-  const { sites, employees } = useAppStore();
+  const { sites, pendingSites, employees } = useAppStore();
   const currentUser = useUserStore(s => s.getCurrentUser());
 
   const isEditing = !!editWaybill;
@@ -106,7 +106,63 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
   const [bulkText, setBulkText] = useState('');
   const [parsedItems, setParsedItems] = useState<{ id: string; originalText: string; quantity: number; matchedAssetId: string | null; isRematching?: boolean }[]>([]);
 
-  const siteOptions = sites.map(s => s.name);
+  const { activeSitesList, onboardingSitesList, closedSitesList } = useMemo(() => {
+    const operational = filterOperationalSites(sites);
+    
+    // Check if site is closed/ended
+    const isClosedSite = (s: { status?: string; endDate?: string }) => {
+      if (s.status === 'Ended' || s.status?.toLowerCase() === 'ended') return true;
+      if (s.endDate && s.endDate.trim() !== '') return true;
+      return false;
+    };
+
+    // 1. Active sites pushed to the very top (Active status and not closed)
+    const active = operational
+      .filter(s => !isClosedSite(s) && (s.status === 'Active' || !s.status || s.status.toLowerCase() === 'active'))
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    const activeNamesSet = new Set(active.map(s => s.name.trim().toLowerCase()));
+
+    // 2. Closed / Ended projects (has end date or status === 'Ended')
+    const closed = operational
+      .filter(s => isClosedSite(s))
+      .map(s => ({ id: s.id, name: s.name, client: s.client || 'Unknown', status: 'Ended', endDate: s.endDate }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    const closedNamesSet = new Set(closed.map(s => s.name.trim().toLowerCase()));
+
+    // 3. Inactive / Pending sites in `sites` (not active and not closed)
+    const inactiveFromSites = operational
+      .filter(s => !isClosedSite(s) && s.status && s.status !== 'Active' && s.status.toLowerCase() !== 'active')
+      .map(s => ({ id: s.id, name: s.name, client: s.client || 'Unknown', status: s.status }));
+
+    // 4. Pending onboarding records in `pendingSites` (not in active and not in closed)
+    const fromPending = (pendingSites || [])
+      .filter(ps => ps.siteName && 
+        !activeNamesSet.has(ps.siteName.trim().toLowerCase()) && 
+        !closedNamesSet.has(ps.siteName.trim().toLowerCase()) &&
+        !inactiveFromSites.some(is => is.name.trim().toLowerCase() === ps.siteName.trim().toLowerCase()))
+      .map(ps => ({ id: ps.id, name: ps.siteName, client: ps.clientName || 'Unknown', status: 'Onboarding' }));
+
+    const onboarding = [...inactiveFromSites, ...fromPending].sort((a, b) => a.name.localeCompare(b.name));
+
+    return { activeSitesList: active, onboardingSitesList: onboarding, closedSitesList: closed };
+  }, [sites, pendingSites]);
+
+  const selectedSiteStatus = useMemo(() => {
+    if (!siteName) return null;
+    const nameLow = siteName.trim().toLowerCase();
+    if (activeSitesList.some(s => s.name.trim().toLowerCase() === nameLow)) return 'active';
+    if (onboardingSitesList.some(s => s.name.trim().toLowerCase() === nameLow)) return 'onboarding';
+    if (closedSitesList.some(s => s.name.trim().toLowerCase() === nameLow)) return 'closed';
+    return null;
+  }, [siteName, activeSitesList, onboardingSitesList, closedSitesList]);
+
+  const siteOptions = [
+    ...activeSitesList.map(s => s.name),
+    ...onboardingSitesList.map(s => s.name),
+    ...closedSitesList.map(s => s.name)
+  ];
 
   const addItem = () => setItems([...items, { rowId: `row-${Date.now()}-${Math.random()}`, assetId: '', quantity: 1 }]);
   const updateItemAsset = (rowId: string, assetId: string) => setItems(items.map(i => i.rowId === rowId ? { ...i, assetId } : i));
@@ -176,10 +232,14 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
 
     const selectedDateISO = waybillDate ? new Date(waybillDate).toISOString() : (editWaybill?.issueDate || new Date().toISOString());
 
+    const resolvedSiteId = sites.find(s => s.name === siteName)?.id || 
+                           pendingSites.find(ps => ps.siteName === siteName)?.id || 
+                           (isEditing && editWaybill ? editWaybill.siteId : `site-${Date.now()}`);
+
     if (isEditing && editWaybill) {
       updateWaybill(editWaybill.id, {
         siteName,
-        siteId: sites.find(s => s.name === siteName)?.id || editWaybill.siteId,
+        siteId: resolvedSiteId,
         driverName,
         vehicle: vehicleName === 'Select Vehicle' ? '' : vehicleName,
         issueDate: selectedDateISO,
@@ -190,7 +250,7 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
       toast.success(`Waybill ${editWaybill.id} updated successfully`);
     } else {
       createWaybill({
-        siteId: sites.find(s => s.name === siteName)?.id || `site-${Date.now()}`,
+        siteId: resolvedSiteId,
         siteName,
         type: initialType,
         issueDate: selectedDateISO,
@@ -337,17 +397,97 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
 
               {/* Site */}
               <div className="space-y-1.5">
-                <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Site *</Label>
+                <div className="flex items-center justify-between">
+                  <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Site *</Label>
+                  {selectedSiteStatus === 'active' && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/50 flex items-center gap-1 animate-in fade-in duration-200">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                      Active Site
+                    </span>
+                  )}
+                  {selectedSiteStatus === 'onboarding' && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-900/50 flex items-center gap-1 animate-in fade-in duration-200">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                      In Onboarding
+                    </span>
+                  )}
+                  {selectedSiteStatus === 'closed' && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/50 flex items-center gap-1 animate-in fade-in duration-200">
+                      <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                      Closed Project
+                    </span>
+                  )}
+                </div>
                 <div className="relative">
                   <select
                     value={siteName}
                     onChange={e => setSiteName(e.target.value)}
-                    className="w-full h-10 rounded-xl border border-border bg-background px-3 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 appearance-none"
+                    className={cn(
+                      "w-full h-10 rounded-xl border bg-background px-3 text-sm font-medium text-foreground focus:outline-none focus:ring-2 appearance-none",
+                      selectedSiteStatus === 'active' ? "border-emerald-300 dark:border-emerald-800 focus:ring-emerald-500/30" :
+                      selectedSiteStatus === 'onboarding' ? "border-amber-300 dark:border-amber-800 focus:ring-amber-500/30" :
+                      selectedSiteStatus === 'closed' ? "border-rose-300 dark:border-rose-800 focus:ring-rose-500/30" :
+                      "border-border focus:ring-primary/30"
+                    )}
                   >
                     <option value="">Select Site</option>
-                    {filterOperationalSites(sites).map(s => <option key={s.id} value={s.name}>{s.name} ({s.client})</option>)}
+                    
+                    {activeSitesList.length > 0 && (
+                      <optgroup label="🟢 Active Sites">
+                        {activeSitesList.map(s => (
+                          <option 
+                            key={s.id} 
+                            value={s.name}
+                            className="font-medium"
+                          >
+                            🟢 {s.name} ({s.client})
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+
+                    {onboardingSitesList.length > 0 && (
+                      <optgroup label="🟧 Sites in Onboarding">
+                        {onboardingSitesList.map(s => (
+                          <option 
+                            key={s.id} 
+                            value={s.name}
+                            className="font-medium text-amber-700 dark:text-amber-400"
+                          >
+                            🟧 {s.name} ({s.client})
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+
+                    {closedSitesList.length > 0 && (
+                      <optgroup label="🔴 Closed / Ended Projects">
+                        {closedSitesList.map(s => (
+                          <option 
+                            key={s.id} 
+                            value={s.name}
+                            className="font-medium text-rose-700 dark:text-rose-400"
+                          >
+                            🔴 {s.name} ({s.client})
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
                   </select>
                   <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                </div>
+                <div className="flex items-center flex-wrap gap-3 pt-0.5 text-[10px] text-muted-foreground font-semibold">
+                  <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+                    <span>🟢</span> Active ({activeSitesList.length})
+                  </span>
+                  <span>|</span>
+                  <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400">
+                    <span>🟧</span> Onboarding ({onboardingSitesList.length})
+                  </span>
+                  <span>|</span>
+                  <span className="flex items-center gap-1 text-rose-600 dark:text-rose-400">
+                    <span>🔴</span> Closed ({closedSitesList.length})
+                  </span>
                 </div>
               </div>
 

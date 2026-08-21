@@ -173,14 +173,17 @@ export function TaskReminders() {
     if (!rem.frequency || rem.frequency === 'once') {
       updateReminder(rem.id, { isActive: false });
     } else {
-      const current = new Date(rem.remindAt);
-      let nextDate = current;
-      switch (rem.frequency) {
-        case 'hourly': nextDate = addHours(current, 1); break;
-        case 'every_6_hours': nextDate = addHours(current, 6); break;
-        case 'daily': nextDate = addDays(current, 1); break;
-        case 'weekly': nextDate = addDays(current, 7); break;
-        case 'monthly': nextDate = addMonths(current, 1); break;
+      const now = new Date();
+      let nextDate = new Date(rem.remindAt);
+      while (nextDate <= now) {
+        switch (rem.frequency) {
+          case 'hourly': nextDate = addHours(nextDate, 1); break;
+          case 'every_6_hours': nextDate = addHours(nextDate, 6); break;
+          case 'daily': nextDate = addDays(nextDate, 1); break;
+          case 'weekly': nextDate = addDays(nextDate, 7); break;
+          case 'monthly': nextDate = addMonths(nextDate, 1); break;
+          default: nextDate = addDays(nextDate, 1); break;
+        }
       }
       
       if (rem.endAt && isBefore(new Date(rem.endAt), nextDate)) {

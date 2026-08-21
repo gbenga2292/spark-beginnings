@@ -553,8 +553,9 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
                     let label = 'Preview';
                     let privKey: keyof UserPrivileges | null = null;
                     let onClick: (() => void) | undefined = undefined;
-                    const mtTitle = activeMainTask.title.toLowerCase();
-                    const stTitle = activeSubtask.title.toLowerCase();
+                    const mtTitle = (activeMainTask.title || '').toLowerCase();
+                    const stTitle = (activeSubtask.title || '').toLowerCase();
+                    const isHrTask = !!activeMainTask.is_hr_task;
 
                     try {
                       const meta = JSON.parse(activeSubtask.description || '{}');
@@ -568,7 +569,16 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
                           }
                       }
                       if (meta.refType === 'salary_advance' || meta.refType === 'loan') { link = '/salary-loans'; label = 'View Loan'; privKey = 'salaryLoans'; }
-                      if (meta.refId && (meta.refType === 'site' || mtTitle.includes('onboard'))) { link = `/sites/onboarding/${meta.refId}`; label = 'View Onboarding'; privKey = 'sites'; }
+                      if (meta.refType === 'site' || meta.refType === 'site_onboarding') { 
+                        link = meta.refId ? `/sites/onboarding/${meta.refId}` : `/sites`; 
+                        label = meta.refId ? 'View Onboarding' : 'Site Onboarding'; 
+                        privKey = 'sites'; 
+                      }
+                      if (meta.refType === 'employee_onboarding' || meta.refType === 'post_onboarding') {
+                        link = '/employees';
+                        label = 'Employee Onboarding';
+                        privKey = 'employees';
+                      }
                       if (meta.refType === 'vehicle_doc_renewal') { link = '/operations/vehicles'; label = 'View Vehicle'; privKey = 'operations'; }
                       if (meta.refType === 'employee' || meta.refType === 'new_hire') { link = `/employees`; label = 'View Employee'; privKey = 'employees'; }
                       if (meta.refType === 'probation_eval' && meta.employeeId) { link = `/evaluations?employeeId=${meta.employeeId}&mainTaskId=${activeMainTask.id}&subtaskId=${activeSubtask.id}`; label = 'Log Evaluation'; privKey = 'evaluations'; }
@@ -576,8 +586,24 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
                       if (meta.refType === 'panel_approval') { label = 'Review & Finalize'; }
                     } catch(e) {}
 
-                    if (!link) {
-                      if (mtTitle.includes('onboard') || stTitle.includes('onboard')) {
+                    if (!link && !onClick) {
+                      const isEmployeeOrHr = isHrTask ||
+                        mtTitle.includes('post-onboarding') ||
+                        mtTitle.includes('employee') ||
+                        mtTitle.includes('new hire') ||
+                        mtTitle.includes('probation') ||
+                        stTitle.includes('employee') ||
+                        stTitle.includes('new hire') ||
+                        stTitle.includes('lashma') ||
+                        stTitle.includes('pension') ||
+                        stTitle.includes('guarantor') ||
+                        stTitle.includes('paye');
+
+                      if (isEmployeeOrHr && (mtTitle.includes('onboard') || stTitle.includes('onboard') || mtTitle.includes('post-onboarding') || mtTitle.includes('verification'))) {
+                        link = '/employees';
+                        label = 'Employee Onboarding';
+                        privKey = 'employees';
+                      } else if ((mtTitle.includes('site') && mtTitle.includes('onboard')) || (stTitle.includes('site') && stTitle.includes('onboard'))) {
                         link = '/sites';
                         label = 'Site Onboarding';
                         privKey = 'sites';
@@ -597,7 +623,7 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
                         link = '/operations/waybills';
                         label = 'View Waybills';
                         privKey = 'operations';
-                      } else if (mtTitle.includes('employee') || mtTitle.includes('new hire') || stTitle.includes('employee') || stTitle.includes('new hire')) {
+                      } else if (isEmployeeOrHr) {
                         link = '/employees';
                         label = 'View Employee';
                         privKey = 'employees';

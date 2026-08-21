@@ -957,6 +957,7 @@ export function useRealtimeData(isAuthenticated: boolean) {
                 if (newRow.month_values !== undefined) payload.monthValues = newRow.month_values;
                 if (newRow.hr_variables !== undefined) payload.hrVariables = newRow.hr_variables;
                 if (newRow.onboarding_templates !== undefined) payload.onboardingTemplates = newRow.onboarding_templates;
+                if (newRow.expense_vat_remittances !== undefined) payload.expenseVatRemittances = newRow.expense_vat_remittances;
                 if (newRow.super_admin_created !== undefined) payload.superAdminCreated = newRow.super_admin_created;
                 if (newRow.super_admin_signup_enabled !== undefined) payload.superAdminSignupEnabled = newRow.super_admin_signup_enabled;
                 if (newRow.id !== undefined) payload.settingsId = newRow.id;

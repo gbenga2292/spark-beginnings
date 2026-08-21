@@ -612,24 +612,30 @@ export function Onboarding() {
     try {
       const subtasksToCreate: any[] = [];
       
+      const postOnboardingMeta = JSON.stringify({
+        refType: 'employee_onboarding',
+        employeeId: selectedEmployee.id,
+        employeeName: `${selectedEmployee.firstname} ${selectedEmployee.surname}`,
+      });
+
       if (!cl.addressVerification) {
-        subtasksToCreate.push({ title: 'Verify Address', assignedTo: user?.id, priority: 'High' });
+        subtasksToCreate.push({ title: 'Verify Address', assignedTo: user?.id, priority: 'High', description: postOnboardingMeta });
       }
       if (!cl.accountDetailsVerified) {
-        subtasksToCreate.push({ title: 'Verify Bank Account Details', assignedTo: user?.id, priority: 'High' });
+        subtasksToCreate.push({ title: 'Verify Bank Account Details', assignedTo: user?.id, priority: 'High', description: postOnboardingMeta });
       }
       if (!cl.pensionVerified) {
-        subtasksToCreate.push({ title: 'Verify Pension Information', assignedTo: user?.id, priority: 'Medium' });
+        subtasksToCreate.push({ title: 'Verify Pension Information', assignedTo: user?.id, priority: 'Medium', description: postOnboardingMeta });
       }
       if (!cl.payeVerified) {
-        subtasksToCreate.push({ title: 'Verify PAYE Information', assignedTo: user?.id, priority: 'Medium' });
+        subtasksToCreate.push({ title: 'Verify PAYE Information', assignedTo: user?.id, priority: 'Medium', description: postOnboardingMeta });
       }
       if (!cl.lashmaVerified) {
-        subtasksToCreate.push({ title: 'Verify LASHMA Policy', assignedTo: user?.id, priority: 'Medium' });
+        subtasksToCreate.push({ title: 'Verify LASHMA Policy', assignedTo: user?.id, priority: 'Medium', description: postOnboardingMeta });
       }
       cl.guarantors.forEach((g, i) => {
         if (!g.verified) {
-          subtasksToCreate.push({ title: `Verify Guarantor ${i + 1}${g.name ? ': ' + g.name : ''}`, assignedTo: user?.id, priority: 'High' });
+          subtasksToCreate.push({ title: `Verify Guarantor ${i + 1}${g.name ? ': ' + g.name : ''}`, assignedTo: user?.id, priority: 'High', description: postOnboardingMeta });
         }
       });
 
