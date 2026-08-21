@@ -102,9 +102,12 @@ export function Ledger() {
   }, [ledgerEntries.length]);
 
   const [tab, setTab] = useState<'entry' | 'records' | 'vat'>('entry');
-  const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set());
+  const [vatSearch, setVatSearch] = useState('');
+  const [vatFilterPolicy, setVatFilterPolicy] = useState<'vatable' | 'all' | 'Yes' | 'Add' | 'No'>('vatable');
   const [selectedVatMonth, setSelectedVatMonth] = useState<string>('all');
   const [selectedVatCategory, setSelectedVatCategory] = useState<string>('all');
+  const [selectedVatBank, setSelectedVatBank] = useState<string>('all');
+  const [selectedVatVendor, setSelectedVatVendor] = useState<string>('all');
 
   const expenseVatRemittances = useAppStore((state) => state.expenseVatRemittances);
   const addExpenseVatRemittance = useAppStore((state) => state.addExpenseVatRemittance);
@@ -122,116 +125,181 @@ export function Ledger() {
     notes: '',
   });
 
-  const toggleMonthExpand = (monthKey: string) => {
-    setExpandedMonths(prev => {
-      const next = new Set(prev);
-      if (next.has(monthKey)) next.delete(monthKey);
-      else next.add(monthKey);
-      return next;
-    });
+  const [vatSortField, setVatSortField] = useState<string>('date');
+  const [vatSortOrder, setVatSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [vatPage, setVatPage] = useState<number>(1);
+  const [vatPageSize, setVatPageSize] = useState<number>(25);
+
+  const toggleVatSort = (field: string) => {
+    if (vatSortField === field) {
+      setVatSortOrder(vatSortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setVatSortField(field);
+      setVatSortOrder('asc');
+    }
+    setVatPage(1);
   };
 
-  const monthlyVatSummaries = useMemo(() => {
-    const vatableEntries = ledgerEntries.filter(e => {
-      const isVat = e.isVatable || (e.vatMode && e.vatMode !== 'No');
-      if (!isVat) return false;
-      if (selectedVatCategory !== 'all' && e.category !== selectedVatCategory) return false;
-      return true;
-    });
-
-    const groups: Record<string, {
-      monthKey: string;
-      monthLabel: string;
-      entries: LedgerEntry[];
-      totalVatableAmount: number;
-      totalVatAmount: number;
-      totalVatPaid: number;
-      vatBalance: number;
-      status: 'Fully Paid' | 'Partially Paid' | 'Unpaid';
-      remittances: ExpenseVatRemittance[];
-    }> = {};
-
-    vatableEntries.forEach(entry => {
-      if (!entry.date) return;
-      const monthKey = entry.date.slice(0, 7);
-      const parts = monthKey.split('-');
-      if (parts.length < 2) return;
-      const yearStr = parts[0];
-      const monthStr = parts[1];
-      const monthIndex = parseInt(monthStr, 10) - 1;
-      const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-      const monthLabel = `${monthNames[monthIndex] || monthStr} ${yearStr}`;
-
-      if (!groups[monthKey]) {
-        groups[monthKey] = {
-          monthKey,
-          monthLabel,
-          entries: [],
-          totalVatableAmount: 0,
-          totalVatAmount: 0,
-          totalVatPaid: 0,
-          vatBalance: 0,
-          status: 'Unpaid',
-          remittances: [],
-        };
+  const availableVatMonths = useMemo(() => {
+    const monthsMap = new Map<string, string>();
+    ledgerEntries.forEach(e => {
+      if (!e.date) return;
+      const monthKey = e.date.slice(0, 7);
+      if (!monthsMap.has(monthKey)) {
+        const parts = monthKey.split('-');
+        if (parts.length >= 2) {
+          const yearStr = parts[0];
+          const monthIndex = parseInt(parts[1], 10) - 1;
+          const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+          monthsMap.set(monthKey, `${monthNames[monthIndex] || parts[1]} ${yearStr}`);
+        }
       }
+    });
+    return Array.from(monthsMap.entries())
+      .sort((a, b) => b[0].localeCompare(a[0]))
+      .map(([key, label]) => ({ key, label }));
+  }, [ledgerEntries]);
+
+  const processedVatEntries = useMemo(() => {
+    return ledgerEntries.map(entry => {
       const vMode: VatMode = entry.vatMode || (entry.isVatable ? 'Yes' : 'No');
-      const rateToUse = entry.vatRate || vatRate;
+      const rateToUse = entry.vatRate !== undefined ? Number(entry.vatRate) : vatRate;
       const numAmt = Number(entry.amount) || 0;
       const calculated = calculateItemVat(numAmt, vMode, rateToUse);
 
-      const entryVat = entry.vatAmount ?? calculated.vatAmount;
-      const entryAmtForVat = entry.amountForVat ?? calculated.amountForVat;
+      const vatAmount = entry.vatAmount !== undefined ? Number(entry.vatAmount) : calculated.vatAmount;
+      const amountForVat = entry.amountForVat !== undefined ? Number(entry.amountForVat) : calculated.amountForVat;
+      const grossAmount = entry.grossAmount !== undefined ? Number(entry.grossAmount) : (amountForVat + vatAmount);
+      const isVatable = entry.isVatable ?? (vMode !== 'No');
 
-      groups[monthKey].entries.push(entry);
-      groups[monthKey].totalVatableAmount += entryAmtForVat;
-      groups[monthKey].totalVatAmount += entryVat;
+      return {
+        ...entry,
+        vatMode: vMode,
+        vatRate: rateToUse,
+        vatAmount,
+        amountForVat,
+        grossAmount,
+        isVatable,
+      };
     });
+  }, [ledgerEntries, vatRate]);
 
-    // Compute remittances, paid total, balance, and status per month
-    Object.values(groups).forEach(group => {
-      const monthRemittances = (expenseVatRemittances || []).filter(r => {
-        if (r.monthKey !== group.monthKey) return false;
-        if (selectedVatCategory !== 'all' && r.category && r.category !== 'all' && r.category !== selectedVatCategory) return false;
-        return true;
-      });
-      group.remittances = monthRemittances;
-      group.totalVatPaid = monthRemittances.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
-      group.vatBalance = group.totalVatAmount - group.totalVatPaid;
+  const filteredVatEntries = useMemo(() => {
+    return processedVatEntries.filter(entry => {
+      // 1. VAT Policy Filter
+      if (vatFilterPolicy === 'vatable' && !entry.isVatable) return false;
+      if (vatFilterPolicy === 'Yes' && entry.vatMode !== 'Yes') return false;
+      if (vatFilterPolicy === 'Add' && entry.vatMode !== 'Add') return false;
+      if (vatFilterPolicy === 'No' && entry.vatMode !== 'No') return false;
 
-      if (group.totalVatPaid >= group.totalVatAmount && group.totalVatAmount > 0) {
-        group.status = 'Fully Paid';
-      } else if (group.totalVatPaid > 0) {
-        group.status = 'Partially Paid';
-      } else {
-        group.status = 'Unpaid';
+      // 2. Month Filter
+      if (selectedVatMonth !== 'all') {
+        if (!entry.date || !entry.date.startsWith(selectedVatMonth)) return false;
       }
+
+      // 3. Category Filter
+      if (selectedVatCategory !== 'all' && entry.category !== selectedVatCategory) return false;
+
+      // 4. Bank Filter
+      if (selectedVatBank !== 'all' && entry.bank !== selectedVatBank) return false;
+
+      // 5. Vendor Filter
+      if (selectedVatVendor !== 'all' && entry.vendor !== selectedVatVendor) return false;
+
+      // 6. Search Filter
+      if (vatSearch.trim()) {
+        const q = vatSearch.toLowerCase();
+        const matches =
+          (entry.voucherNo || '').toLowerCase().includes(q) ||
+          (entry.description || '').toLowerCase().includes(q) ||
+          (entry.category || '').toLowerCase().includes(q) ||
+          (entry.vendor || '').toLowerCase().includes(q) ||
+          (entry.client || '').toLowerCase().includes(q) ||
+          (entry.site || '').toLowerCase().includes(q) ||
+          (entry.bank || '').toLowerCase().includes(q);
+        if (!matches) return false;
+      }
+
+      return true;
+    });
+  }, [processedVatEntries, vatFilterPolicy, selectedVatMonth, selectedVatCategory, selectedVatBank, selectedVatVendor, vatSearch]);
+
+  const sortedVatEntries = useMemo(() => {
+    return [...filteredVatEntries].sort((a, b) => {
+      let aVal: any = (a as any)[vatSortField];
+      let bVal: any = (b as any)[vatSortField];
+
+      if (vatSortField === 'amount' || vatSortField === 'vatAmount' || vatSortField === 'amountForVat' || vatSortField === 'grossAmount' || vatSortField === 'vatRate') {
+        aVal = Number(aVal) || 0;
+        bVal = Number(bVal) || 0;
+      } else {
+        aVal = (aVal || '').toString().toLowerCase();
+        bVal = (bVal || '').toString().toLowerCase();
+      }
+
+      if (aVal < bVal) return vatSortOrder === 'asc' ? -1 : 1;
+      if (aVal > bVal) return vatSortOrder === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [filteredVatEntries, vatSortField, vatSortOrder]);
+
+  const paginatedVatEntries = useMemo(() => {
+    const start = (vatPage - 1) * vatPageSize;
+    return sortedVatEntries.slice(start, start + vatPageSize);
+  }, [sortedVatEntries, vatPage, vatPageSize]);
+
+  const totalVatPages = Math.ceil(sortedVatEntries.length / vatPageSize) || 1;
+
+  const vatTableTotals = useMemo(() => {
+    let totalBase = 0;
+    let totalVat = 0;
+    let totalGross = 0;
+    let vatableCount = 0;
+
+    filteredVatEntries.forEach(e => {
+      totalBase += e.amountForVat || 0;
+      totalVat += e.vatAmount || 0;
+      totalGross += e.grossAmount || 0;
+      if (e.isVatable) vatableCount++;
     });
 
-    return Object.values(groups).sort((a, b) => b.monthKey.localeCompare(a.monthKey));
-  }, [ledgerEntries, vatRate, selectedVatCategory, expenseVatRemittances]);
+    return {
+      count: filteredVatEntries.length,
+      vatableCount,
+      totalBase,
+      totalVat,
+      totalGross,
+    };
+  }, [filteredVatEntries]);
 
-  const availableVatMonths = useMemo(() => {
-    return monthlyVatSummaries.map(g => ({
-      key: g.monthKey,
-      label: g.monthLabel,
+  const handleExportVatExcel = () => {
+    if (filteredVatEntries.length === 0) {
+      toast.error('No records to export');
+      return;
+    }
+    const exportData = filteredVatEntries.map(e => ({
+      'Voucher No': e.voucherNo,
+      'Date': e.date,
+      'Description': e.description,
+      'Category': e.category,
+      'Vendor': e.vendor || '',
+      'Client': e.client || '',
+      'Site': e.site || '',
+      'Bank': e.bank,
+      'VAT Policy': e.vatMode === 'Yes' ? 'Exclusive (Yes)' : e.vatMode === 'Add' ? 'Inclusive (Add)' : 'No VAT (No)',
+      'Base Amount (NGN)': e.amountForVat,
+      'VAT Rate (%)': e.vatRate,
+      'VAT Amount (NGN)': e.vatAmount,
+      'Gross Amount (NGN)': e.grossAmount,
+      'Entered By': e.enteredBy,
     }));
-  }, [monthlyVatSummaries]);
 
-  const filteredVatSummaries = useMemo(() => {
-    if (selectedVatMonth === 'all') return monthlyVatSummaries;
-    return monthlyVatSummaries.filter(g => g.monthKey === selectedVatMonth);
-  }, [monthlyVatSummaries, selectedVatMonth]);
-
-  const overallVatStats = useMemo(() => {
-    const totalVat = filteredVatSummaries.reduce((sum, g) => sum + g.totalVatAmount, 0);
-    const totalVatPaid = filteredVatSummaries.reduce((sum, g) => sum + g.totalVatPaid, 0);
-    const totalVatable = filteredVatSummaries.reduce((sum, g) => sum + g.totalVatableAmount, 0);
-    const totalCount = filteredVatSummaries.reduce((sum, g) => sum + g.entries.length, 0);
-    const vatBalance = totalVat - totalVatPaid;
-    const amountForVat = totalVatable; // Total base amount subject to VAT
-    return { totalVat, totalVatPaid, vatBalance, totalVatable, totalCount, amountForVat };
-  }, [filteredVatSummaries]);
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Expenses_VAT');
+    XLSX.writeFile(wb, `Expenses_VAT_${selectedVatMonth}_${new Date().toISOString().split('T')[0]}.xlsx`);
+    toast.success('Exported Expenses VAT records to Excel');
+  };
 
   // VOUCHER FORM STATE
   const [voucherDate, setVoucherDate] = useState(new Date().toISOString().split('T')[0]);
@@ -2064,71 +2132,88 @@ export function Ledger() {
       {/* Expenses VAT Tab */}
       <TabsContent active={tab === 'vat'} className="m-0 focus-visible:outline-none">
         <div className="space-y-4">
-          {/* Minimalist Top KPI Strip */}
+          {/* Top KPI Stat Strip */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
             <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-sm transition-all hover:border-slate-300">
-              <span className="text-[11px] font-medium text-slate-500 block">Accumulated VAT</span>
+              <span className="text-[11px] font-medium text-slate-500 block">Total Records</span>
               <div className="text-lg font-bold text-slate-900 mt-0.5 tabular-nums tracking-tight">
-                ₦{overallVatStats.totalVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                {vatTableTotals.count.toLocaleString()}
+                <span className="text-xs font-normal text-slate-400 ml-1.5">({vatTableTotals.vatableCount} vatable)</span>
               </div>
-              <span className="text-[10px] text-slate-400 font-medium">To remit</span>
+              <span className="text-[10px] text-slate-400 font-medium">Filtered transactions</span>
             </div>
 
             <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-sm transition-all hover:border-slate-300">
-              <span className="text-[11px] font-medium text-slate-500 block">VAT Remitted</span>
-              <div className="text-lg font-bold text-teal-600 mt-0.5 tabular-nums tracking-tight">
-                ₦{overallVatStats.totalVatPaid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </div>
-              <span className="text-[10px] text-slate-400 font-medium">Reconciled</span>
-            </div>
-
-            <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-sm transition-all hover:border-slate-300">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-medium text-slate-500">Outstanding Balance</span>
-                <span className={cn("h-2 w-2 rounded-full", overallVatStats.vatBalance <= 0 ? "bg-emerald-500" : "bg-rose-500")} />
-              </div>
-              <div className={cn(
-                "text-lg font-bold mt-0.5 tabular-nums tracking-tight",
-                overallVatStats.vatBalance <= 0 ? "text-emerald-600" : "text-rose-600"
-              )}>
-                ₦{Math.max(0, overallVatStats.vatBalance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </div>
-              <span className="text-[10px] text-slate-400 font-medium">
-                {overallVatStats.vatBalance <= 0 ? 'Fully Reconciled' : 'Due'}
-              </span>
-            </div>
-
-            <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-sm transition-all hover:border-slate-300">
-              <span className="text-[11px] font-medium text-slate-500 block">Base Amount for VAT</span>
+              <span className="text-[11px] font-medium text-slate-500 block">Base Vatable Amount</span>
               <div className="text-lg font-bold text-slate-900 mt-0.5 tabular-nums tracking-tight">
-                ₦{overallVatStats.amountForVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                ₦{vatTableTotals.totalBase.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
-              <span className="text-[10px] text-slate-400 font-medium">Gross vatable base</span>
+              <span className="text-[10px] text-slate-400 font-medium">Net base subject to VAT</span>
+            </div>
+
+            <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-sm transition-all hover:border-slate-300">
+              <span className="text-[11px] font-medium text-slate-500 block">Total VAT Amount</span>
+              <div className="text-lg font-bold text-emerald-600 mt-0.5 tabular-nums tracking-tight">
+                ₦{vatTableTotals.totalVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+              <span className="text-[10px] text-slate-400 font-medium">Accumulated VAT</span>
+            </div>
+
+            <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-sm transition-all hover:border-slate-300">
+              <span className="text-[11px] font-medium text-slate-500 block">Total Gross Amount</span>
+              <div className="text-lg font-bold text-slate-900 mt-0.5 tabular-nums tracking-tight">
+                ₦{vatTableTotals.totalGross.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+              <span className="text-[10px] text-slate-400 font-medium">Base + VAT total</span>
             </div>
 
             <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-sm transition-all hover:border-slate-300 col-span-2 sm:col-span-1">
-              <span className="text-[11px] font-medium text-slate-500 block">VAT Rate</span>
+              <span className="text-[11px] font-medium text-slate-500 block">Standard VAT Rate</span>
               <div className="text-lg font-bold text-slate-900 mt-0.5 tabular-nums tracking-tight">
                 {vatRate}%
               </div>
-              <span className="text-[10px] text-slate-400 font-medium">System standard</span>
+              <span className="text-[10px] text-slate-400 font-medium">Default rate</span>
             </div>
           </div>
 
-          {/* Minimalist Filter Bar & Table Section */}
+          {/* Straight Table Container */}
           <div className="bg-white border border-slate-200/80 rounded-xl shadow-sm overflow-hidden">
             {/* Filter Bar */}
-            <div className="p-3.5 border-b border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3">
-              <div className="flex items-center gap-2 w-full sm:w-auto">
-                <span className="text-xs font-bold text-slate-700 whitespace-nowrap">Monthly Summary</span>
-                <span className="text-[11px] text-slate-400 font-normal">({filteredVatSummaries.length} month{filteredVatSummaries.length !== 1 ? 's' : ''})</span>
+            <div className="p-3 border-b border-slate-100 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2.5 bg-slate-50/50">
+              {/* Left search */}
+              <div className="relative flex-1 min-w-[180px] max-w-xs">
+                <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
+                <Input
+                  placeholder="Search voucher, description, client..."
+                  className="pl-8 h-8 text-xs bg-white border-slate-200"
+                  value={vatSearch}
+                  onChange={e => { setVatSearch(e.target.value); setVatPage(1); }}
+                />
               </div>
 
-              <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+              {/* Right Filter Selects */}
+              <div className="flex flex-wrap items-center gap-2">
+                {/* VAT Type Filter */}
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[11px] font-semibold text-slate-500 whitespace-nowrap">VAT Type:</span>
+                  <select
+                    value={vatFilterPolicy}
+                    onChange={e => { setVatFilterPolicy(e.target.value as any); setVatPage(1); }}
+                    className="h-8 rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold text-indigo-700 shadow-none focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer"
+                  >
+                    <option value="vatable">Vatable Only (Yes & Add)</option>
+                    <option value="all">All VAT Types</option>
+                    <option value="Yes">Exclusive VAT (Yes)</option>
+                    <option value="Add">Inclusive VAT (Add)</option>
+                    <option value="No">Non-Vatable (No)</option>
+                  </select>
+                </div>
+
+                {/* Month Select */}
                 <select
                   value={selectedVatMonth}
-                  onChange={e => setSelectedVatMonth(e.target.value)}
-                  className="h-8 rounded-lg border border-slate-200 bg-slate-50/50 px-2.5 text-xs font-medium text-slate-700 shadow-none focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer"
+                  onChange={e => { setSelectedVatMonth(e.target.value); setVatPage(1); }}
+                  className="h-8 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 shadow-none focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer"
                 >
                   <option value="all">All Months</option>
                   {availableVatMonths.map(m => (
@@ -2136,10 +2221,11 @@ export function Ledger() {
                   ))}
                 </select>
 
+                {/* Category Select */}
                 <select
                   value={selectedVatCategory}
-                  onChange={e => setSelectedVatCategory(e.target.value)}
-                  className="h-8 rounded-lg border border-slate-200 bg-slate-50/50 px-2.5 text-xs font-medium text-slate-700 shadow-none focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer"
+                  onChange={e => { setSelectedVatCategory(e.target.value); setVatPage(1); }}
+                  className="h-8 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 shadow-none focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer"
                 >
                   <option value="all">All Categories</option>
                   {sortedCategories.map(c => (
@@ -2147,263 +2233,233 @@ export function Ledger() {
                   ))}
                 </select>
 
-                <div className="relative flex-1 sm:w-48">
-                  <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
-                  <Input 
-                    placeholder="Search records..." 
-                    className="pl-8 h-8 text-xs border-slate-200 bg-slate-50/50" 
-                    value={search} 
-                    onChange={e => setSearch(e.target.value)} 
-                  />
-                </div>
+                {/* Export Button */}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8 text-xs font-semibold px-2.5 border-slate-200 bg-white hover:bg-slate-100 text-slate-700 gap-1"
+                  onClick={handleExportVatExcel}
+                  title="Export filtered records to Excel"
+                >
+                  <Download className="h-3.5 w-3.5" /> Export
+                </Button>
+
+                {(vatSearch || vatFilterPolicy !== 'vatable' || selectedVatMonth !== 'all' || selectedVatCategory !== 'all' || selectedVatBank !== 'all') && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-8 text-xs font-semibold px-2 text-rose-600 hover:bg-rose-50 hover:text-rose-700"
+                    onClick={() => {
+                      setVatSearch('');
+                      setVatFilterPolicy('vatable');
+                      setSelectedVatMonth('all');
+                      setSelectedVatCategory('all');
+                      setSelectedVatBank('all');
+                      setSelectedVatVendor('all');
+                      setVatPage(1);
+                    }}
+                  >
+                    Reset
+                  </Button>
+                )}
               </div>
             </div>
 
-            {/* Content List */}
-            <div className="p-3.5 space-y-3">
-              {filteredVatSummaries.length === 0 ? (
-                <div className="text-center py-10 text-slate-400 space-y-1.5">
-                  <Receipt className="h-8 w-8 mx-auto text-slate-300 stroke-[1.5]" />
-                  <p className="text-xs font-medium text-slate-600">
-                    No vatable ledger transactions found{selectedVatMonth !== 'all' ? ' for this month' : ''}{selectedVatCategory !== 'all' ? ` in ${selectedVatCategory}` : ''}.
-                  </p>
-                  <p className="text-[11px] text-slate-400 max-w-sm mx-auto">
-                    Set the VAT Policy to "Yes" or "Add" on transaction lines in the Entry tab to record vatable expenses.
-                  </p>
-                </div>
-              ) : (
-                filteredVatSummaries.map((monthGroup) => {
-                  const isExpanded = expandedMonths.has(monthGroup.monthKey);
-
-                  const displayEntries = search.trim()
-                    ? monthGroup.entries.filter(e => 
-                        (e.voucherNo || '').toLowerCase().includes(search.toLowerCase()) ||
-                        (e.description || '').toLowerCase().includes(search.toLowerCase()) ||
-                        (e.category || '').toLowerCase().includes(search.toLowerCase()) ||
-                        (e.vendor || '').toLowerCase().includes(search.toLowerCase()) ||
-                        (e.client || '').toLowerCase().includes(search.toLowerCase())
-                      )
-                    : monthGroup.entries;
-
-                  if (search.trim() && displayEntries.length === 0 && monthGroup.remittances.length === 0) return null;
-
-                  return (
-                    <div key={monthGroup.monthKey} className="border border-slate-200/80 rounded-xl overflow-hidden shadow-none bg-white">
-                      {/* Month Header Bar */}
-                      <div 
-                        onClick={() => toggleMonthExpand(monthGroup.monthKey)}
-                        className="p-3.5 bg-slate-50/60 hover:bg-slate-50 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 cursor-pointer transition-colors border-b border-slate-100"
-                      >
-                        <div className="flex items-center gap-2.5">
-                          <h4 className="font-bold text-slate-900 text-sm">{monthGroup.monthLabel}</h4>
-                          <span className={cn(
-                            "px-2 py-0.5 rounded-full text-[10px] font-semibold border",
-                            monthGroup.status === 'Fully Paid' ? "bg-emerald-50 text-emerald-700 border-emerald-200/60" :
-                            monthGroup.status === 'Partially Paid' ? "bg-amber-50 text-amber-700 border-amber-200/60" :
-                            "bg-slate-100 text-slate-600 border-slate-200"
-                          )}>
-                            {monthGroup.status}
-                          </span>
-                          <span className="text-[11px] text-slate-400 font-normal">
-                            ({monthGroup.entries.length} items)
-                          </span>
-                        </div>
-
-                        {/* Metric figures & Actions */}
-                        <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end text-xs">
-                          <div className="text-right">
-                            <span className="text-[10px] text-slate-400 block font-medium">Accumulated</span>
-                            <span className="font-bold text-slate-800 tabular-nums">
-                              ₦{monthGroup.totalVatAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </span>
-                          </div>
-
-                          <div className="text-right">
-                            <span className="text-[10px] text-teal-600 block font-medium">Paid</span>
-                            <span className="font-bold text-teal-600 tabular-nums">
-                              ₦{monthGroup.totalVatPaid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </span>
-                          </div>
-
-                          <div className="text-right">
-                            <span className="text-[10px] text-slate-400 block font-medium">Balance</span>
-                            <span className={cn(
-                              "font-bold tabular-nums",
-                              monthGroup.vatBalance <= 0 ? "text-emerald-600" : "text-rose-600"
-                            )}>
-                              ₦{Math.max(0, monthGroup.vatBalance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </span>
-                          </div>
-
-                          <div className="flex items-center gap-1.5 pl-1">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-7 text-xs font-semibold px-2.5 border-slate-200 hover:bg-slate-100 text-slate-700"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setReconcileMonthKey(monthGroup.monthKey);
-                                setReconcileSearchQuery('');
-                              }}
-                            >
-                              Reconcile
-                            </Button>
-
-                            <button
-                              type="button"
-                              className="h-7 w-7 rounded flex items-center justify-center text-slate-400 hover:text-slate-700"
-                            >
-                              {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                            </button>
-                          </div>
-                        </div>
+            {/* Flat Table */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50/80 text-slate-600 font-semibold border-b border-slate-200/80 select-none">
+                  <tr>
+                    <th className="py-2.5 px-3.5 whitespace-nowrap cursor-pointer hover:bg-slate-100 transition-colors group" onClick={() => toggleVatSort('voucherNo')}>
+                      <div className="flex items-center gap-1.5">
+                        Voucher No. {vatSortField === 'voucherNo' ? (vatSortOrder === 'asc' ? <ArrowUp className="h-3 w-3 text-indigo-600" /> : <ArrowDown className="h-3 w-3 text-indigo-600" />) : <ArrowUpDown className="h-3 w-3 text-slate-300 group-hover:text-slate-400" />}
                       </div>
-
-                      {/* Expandable Tables */}
-                      {isExpanded && (
-                        <div className="divide-y divide-slate-100">
-                          {/* 1. Vatable Expense Transactions Table */}
-                          <div className="p-3 space-y-2">
-                            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
-                              Vatable Expense Lines ({displayEntries.length})
+                    </th>
+                    <th className="py-2.5 px-3 whitespace-nowrap cursor-pointer hover:bg-slate-100 transition-colors group" onClick={() => toggleVatSort('date')}>
+                      <div className="flex items-center gap-1.5">
+                        Date {vatSortField === 'date' ? (vatSortOrder === 'asc' ? <ArrowUp className="h-3 w-3 text-indigo-600" /> : <ArrowDown className="h-3 w-3 text-indigo-600" />) : <ArrowUpDown className="h-3 w-3 text-slate-300 group-hover:text-slate-400" />}
+                      </div>
+                    </th>
+                    <th className="py-2.5 px-3 cursor-pointer hover:bg-slate-100 transition-colors group" onClick={() => toggleVatSort('description')}>
+                      <div className="flex items-center gap-1.5">
+                        Description {vatSortField === 'description' ? (vatSortOrder === 'asc' ? <ArrowUp className="h-3 w-3 text-indigo-600" /> : <ArrowDown className="h-3 w-3 text-indigo-600" />) : <ArrowUpDown className="h-3 w-3 text-slate-300 group-hover:text-slate-400" />}
+                      </div>
+                    </th>
+                    <th className="py-2.5 px-3 whitespace-nowrap cursor-pointer hover:bg-slate-100 transition-colors group" onClick={() => toggleVatSort('category')}>
+                      <div className="flex items-center gap-1.5">
+                        Category {vatSortField === 'category' ? (vatSortOrder === 'asc' ? <ArrowUp className="h-3 w-3 text-indigo-600" /> : <ArrowDown className="h-3 w-3 text-indigo-600" />) : <ArrowUpDown className="h-3 w-3 text-slate-300 group-hover:text-slate-400" />}
+                      </div>
+                    </th>
+                    <th className="py-2.5 px-3 whitespace-nowrap cursor-pointer hover:bg-slate-100 transition-colors group" onClick={() => toggleVatSort('client')}>
+                      <div className="flex items-center gap-1.5">
+                        Client / Site {vatSortField === 'client' ? (vatSortOrder === 'asc' ? <ArrowUp className="h-3 w-3 text-indigo-600" /> : <ArrowDown className="h-3 w-3 text-indigo-600" />) : <ArrowUpDown className="h-3 w-3 text-slate-300 group-hover:text-slate-400" />}
+                      </div>
+                    </th>
+                    <th className="py-2.5 px-3 text-center whitespace-nowrap cursor-pointer hover:bg-slate-100 transition-colors group" onClick={() => toggleVatSort('vatMode')}>
+                      <div className="flex items-center justify-center gap-1.5">
+                        VAT Policy {vatSortField === 'vatMode' ? (vatSortOrder === 'asc' ? <ArrowUp className="h-3 w-3 text-indigo-600" /> : <ArrowDown className="h-3 w-3 text-indigo-600" />) : <ArrowUpDown className="h-3 w-3 text-slate-300 group-hover:text-slate-400" />}
+                      </div>
+                    </th>
+                    <th className="py-2.5 px-3.5 text-right whitespace-nowrap cursor-pointer hover:bg-slate-100 transition-colors group min-w-[150px]" onClick={() => toggleVatSort('grossAmount')}>
+                      <div className="flex items-center justify-end gap-1.5">
+                        Amount & VAT (₦) {vatSortField === 'grossAmount' ? (vatSortOrder === 'asc' ? <ArrowUp className="h-3 w-3 text-indigo-600" /> : <ArrowDown className="h-3 w-3 text-indigo-600" />) : <ArrowUpDown className="h-3 w-3 text-slate-300 group-hover:text-slate-400" />}
+                      </div>
+                    </th>
+                    <th className="py-2.5 px-3 text-center w-12 whitespace-nowrap">View</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 bg-white">
+                  {paginatedVatEntries.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="py-12 text-center text-slate-400 italic">
+                        <Receipt className="h-8 w-8 mx-auto text-slate-300 mb-1.5 stroke-[1.5]" />
+                        No transactions match the selected VAT filter criteria.
+                      </td>
+                    </tr>
+                  ) : (
+                    paginatedVatEntries.map((entry, idx) => {
+                      return (
+                        <tr
+                          key={entry.id || `vat-row-${idx}`}
+                          className={cn(
+                            "hover:bg-slate-50/80 transition-colors",
+                            idx % 2 === 0 ? "bg-white" : "bg-slate-50/30"
+                          )}
+                        >
+                          <td className="py-2.5 px-3.5 font-mono font-bold text-indigo-600 whitespace-nowrap">
+                            <button
+                              className="hover:underline text-left"
+                              onClick={() => setDialogVoucher(entry.voucherNo)}
+                              title="View full voucher"
+                            >
+                              {entry.voucherNo || '—'}
+                            </button>
+                          </td>
+                          <td className="py-2.5 px-3 text-slate-600 font-mono whitespace-nowrap">
+                            {entry.date ? formatDisplayDate(entry.date) : '—'}
+                          </td>
+                          <td className="py-2.5 px-3 font-medium text-slate-800 max-w-[240px] truncate" title={entry.description}>
+                            {entry.description || '—'}
+                          </td>
+                          <td className="py-2.5 px-3 whitespace-nowrap">
+                            <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700">
+                              {entry.category}
                             </span>
-                            <div className="overflow-x-auto rounded-lg border border-slate-100">
-                              <table className="w-full text-left text-xs whitespace-nowrap">
-                                <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-100">
-                                  <tr>
-                                    <th className="py-2 px-3">Voucher</th>
-                                    <th className="py-2 px-3">Date</th>
-                                    <th className="py-2 px-3">Description</th>
-                                    <th className="py-2 px-3">Category</th>
-                                    <th className="py-2 px-3">Vendor</th>
-                                    <th className="py-2 px-3">Client / Site</th>
-                                    <th className="py-2 px-3 text-center">VAT Policy</th>
-                                    <th className="py-2 px-3 text-right">Amount (₦)</th>
-                                    <th className="py-2 px-3 text-right">VAT (₦)</th>
-                                  </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100 bg-white">
-                                  {displayEntries.map((entry) => {
-                                    const vMode: VatMode = entry.vatMode || (entry.isVatable ? 'Yes' : 'No');
-                                    const calculated = calculateItemVat(Number(entry.amount), vMode, vatRate);
-                                    const entryVat = entry.vatAmount ?? calculated.vatAmount;
-                                    return (
-                                      <tr key={entry.id} className="hover:bg-slate-50/60 transition-colors">
-                                        <td className="py-2 px-3 font-mono font-medium text-indigo-600">
-                                          <button 
-                                            className="hover:underline"
-                                            onClick={(e) => { e.stopPropagation(); setDialogVoucher(entry.voucherNo); }}
-                                          >
-                                            {entry.voucherNo}
-                                          </button>
-                                        </td>
-                                        <td className="py-2 px-3 text-slate-500">{formatDisplayDate(entry.date)}</td>
-                                        <td className="py-2 px-3 font-medium text-slate-800 max-w-[220px] truncate" title={entry.description}>{entry.description || '—'}</td>
-                                        <td className="py-2 px-3 text-slate-600">{entry.category}</td>
-                                        <td className="py-2 px-3 text-slate-500">{entry.vendor || '—'}</td>
-                                        <td className="py-2 px-3 text-slate-500">{entry.client || '—'}{entry.site ? ` / ${entry.site}` : ''}</td>
-                                        <td className="py-2 px-3 text-center">
-                                          <span className="text-[10px] font-semibold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded">
-                                            {vMode}
-                                          </span>
-                                        </td>
-                                        <td className="py-2 px-3 text-right text-slate-700 tabular-nums">
-                                          ₦{Number(entry.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                        </td>
-                                        <td className="py-2 px-3 text-right font-bold text-emerald-600 tabular-nums">
-                                          ₦{entryVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                        </td>
-                                      </tr>
-                                    );
-                                  })}
-                                </tbody>
-                              </table>
+                          </td>
+                          <td className="py-2.5 px-3 text-slate-500 whitespace-nowrap">
+                            {entry.client || '—'}{entry.site && entry.site !== 'none' ? ` / ${entry.site}` : ''}
+                          </td>
+                          <td className="py-2.5 px-3 text-center whitespace-nowrap">
+                            <span className={cn(
+                              "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold border",
+                              entry.vatMode === 'Yes' ? "bg-indigo-50 text-indigo-700 border-indigo-200" :
+                              entry.vatMode === 'Add' ? "bg-amber-50 text-amber-700 border-amber-200" :
+                              "bg-slate-100 text-slate-500 border-slate-200"
+                            )}>
+                              {entry.vatMode === 'Yes' ? 'Exclusive (Yes)' : entry.vatMode === 'Add' ? 'Inclusive (Add)' : 'No VAT'}
+                            </span>
+                          </td>
+                          <td className="py-2 px-3.5 text-right whitespace-nowrap">
+                            <div className="font-bold text-slate-900 tabular-nums text-xs">
+                              ₦{entry.grossAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </div>
-                          </div>
-
-                          {/* 2. Linked VAT Remittances */}
-                          <div className="p-3 bg-slate-50/40 space-y-2">
-                            <div className="flex items-center justify-between">
-                              <span className="text-[11px] font-bold text-teal-700 uppercase tracking-wider block">
-                                Reconciled Payments ({monthGroup.remittances.length})
+                            <div className="text-[10px] text-slate-400 tabular-nums font-medium flex items-center justify-end gap-1.5 mt-0.5">
+                              <span>Base: ₦{entry.amountForVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                              <span className="text-slate-300">·</span>
+                              <span className={cn(entry.vatAmount > 0 ? "text-emerald-600 font-semibold" : "text-slate-400")}>
+                                VAT: ₦{entry.vatAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                               </span>
-                              <Button 
-                                size="sm" 
-                                variant="ghost" 
-                                className="h-6 text-[11px] font-semibold text-teal-700 hover:bg-teal-50 gap-1 p-1"
-                                onClick={() => {
-                                  setReconcileMonthKey(monthGroup.monthKey);
-                                  setReconcileSearchQuery('');
-                                }}
-                              >
-                                <Plus className="h-3 w-3" /> Add Payment
-                              </Button>
                             </div>
+                          </td>
+                          <td className="py-2.5 px-3 text-center whitespace-nowrap">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 w-7 p-0 text-indigo-600 hover:bg-indigo-50"
+                              onClick={() => setDialogVoucher(entry.voucherNo)}
+                              title="View voucher details"
+                            >
+                              <Eye className="h-3.5 w-3.5" />
+                            </Button>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
 
-                            {monthGroup.remittances.length === 0 ? (
-                              <div className="p-3 text-center text-xs text-slate-400 bg-white rounded-lg border border-slate-100">
-                                No VAT remittance payments linked for this month.
-                              </div>
-                            ) : (
-                              <div className="overflow-x-auto rounded-lg border border-slate-200/80 bg-white">
-                                <table className="w-full text-left text-xs whitespace-nowrap">
-                                  <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-100">
-                                    <tr>
-                                      <th className="py-2 px-3">Date</th>
-                                      <th className="py-2 px-3">Ref No.</th>
-                                      <th className="py-2 px-3">Bank</th>
-                                      <th className="py-2 px-3">Notes</th>
-                                      <th className="py-2 px-3">User</th>
-                                      <th className="py-2 px-3 text-right">Remitted (₦)</th>
-                                      <th className="py-2 px-3 text-center">Action</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody className="divide-y divide-slate-100">
-                                    {monthGroup.remittances.map((rem) => (
-                                      <tr key={rem.id} className="hover:bg-slate-50/60 transition-colors">
-                                        <td className="py-2 px-3 text-slate-600">{formatDisplayDate(rem.date)}</td>
-                                        <td className="py-2 px-3 font-mono font-medium text-indigo-600">
-                                          {rem.voucherNo ? (
-                                            <button className="hover:underline" onClick={() => setDialogVoucher(rem.voucherNo!)}>
-                                              {rem.voucherNo}
-                                            </button>
-                                          ) : 'Direct'}
-                                        </td>
-                                        <td className="py-2 px-3 text-slate-700">{rem.bank || 'Bank Transfer'}</td>
-                                        <td className="py-2 px-3 text-slate-500 max-w-[200px] truncate" title={rem.notes}>{rem.notes || '—'}</td>
-                                        <td className="py-2 px-3 text-slate-400 text-[11px]">{rem.createdBy || 'User'}</td>
-                                        <td className="py-2 px-3 text-right font-bold text-teal-600 tabular-nums">
-                                          ₦{Number(rem.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                        </td>
-                                        <td className="py-2 px-3 text-center">
-                                          <Button
-                                            size="sm"
-                                            variant="ghost"
-                                            className="h-6 w-6 p-0 text-rose-400 hover:text-rose-600 hover:bg-rose-50"
-                                            title="Unlink"
-                                            onClick={async () => {
-                                              const ok = await showConfirm('Remove this VAT remittance link?', { variant: 'danger', confirmLabel: 'Unlink' });
-                                              if (ok) {
-                                                deleteExpenseVatRemittance(rem.id);
-                                                toast.success('VAT remittance link removed.');
-                                              }
-                                            }}
-                                          >
-                                            <Trash2 className="h-3.5 w-3.5" />
-                                          </Button>
-                                        </td>
-                                      </tr>
-                                    ))}
-                                  </tbody>
-                                </table>
-                              </div>
-                            )}
-                          </div>
+                {/* Table Footer Totals */}
+                {paginatedVatEntries.length > 0 && (
+                  <tfoot className="bg-slate-50 border-t-2 border-slate-200 select-none">
+                    <tr>
+                      <td colSpan={6} className="py-3 px-3.5 text-right uppercase tracking-wider text-[11px] font-bold text-slate-500">
+                        Totals ({filteredVatEntries.length} items):
+                      </td>
+                      <td className="py-2.5 px-3.5 text-right whitespace-nowrap">
+                        <div className="font-extrabold text-slate-900 tabular-nums text-xs">
+                          ₦{vatTableTotals.totalGross.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </div>
-                      )}
-                    </div>
-                  );
-                })
+                        <div className="text-[10px] text-slate-500 tabular-nums font-semibold flex items-center justify-end gap-1.5 mt-0.5">
+                          <span>Base: ₦{vatTableTotals.totalBase.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                          <span className="text-slate-300">·</span>
+                          <span className="text-emerald-700 font-bold">
+                            VAT: ₦{vatTableTotals.totalVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      </td>
+                      <td></td>
+                    </tr>
+                  </tfoot>
+                )}
+              </table>
+            </div>
+
+            {/* Pagination Bar */}
+            <div className="p-3 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500 bg-slate-50/40">
+              <div className="flex items-center gap-2">
+                <span>
+                  Showing {sortedVatEntries.length === 0 ? 0 : (vatPage - 1) * vatPageSize + 1} to {Math.min(vatPage * vatPageSize, sortedVatEntries.length)} of {sortedVatEntries.length} entries
+                </span>
+                <span className="text-slate-300">|</span>
+                <div className="flex items-center gap-1">
+                  <span>Per page:</span>
+                  <select
+                    value={vatPageSize}
+                    onChange={e => { setVatPageSize(Number(e.target.value)); setVatPage(1); }}
+                    className="h-6 rounded border border-slate-200 bg-white px-1 text-xs font-semibold text-slate-700 focus:outline-none"
+                  >
+                    <option value={15}>15</option>
+                    <option value={25}>25</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                  </select>
+                </div>
+              </div>
+
+              {totalVatPages > 1 && (
+                <div className="flex items-center gap-1.5">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs px-2.5 border-slate-200 bg-white"
+                    onClick={() => setVatPage(p => Math.max(1, p - 1))}
+                    disabled={vatPage === 1}
+                  >
+                    Previous
+                  </Button>
+                  <span className="font-semibold px-1">
+                    Page {vatPage} of {totalVatPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs px-2.5 border-slate-200 bg-white"
+                    onClick={() => setVatPage(p => Math.min(totalVatPages, p + 1))}
+                    disabled={vatPage === totalVatPages}
+                  >
+                    Next
+                  </Button>
+                </div>
               )}
             </div>
           </div>
@@ -2419,7 +2475,7 @@ export function Ledger() {
               <div className="flex justify-between items-center">
                 <div>
                   <DialogTitle className="text-white text-lg font-bold flex items-center gap-2">
-                    <Link className="h-5 w-5 text-indigo-200" /> Reconcile Expenses VAT — {monthlyVatSummaries.find(g => g.monthKey === reconcileMonthKey)?.monthLabel}
+                    <Link className="h-5 w-5 text-indigo-200" /> Reconcile Expenses VAT — {availableVatMonths.find(g => g.key === reconcileMonthKey)?.label || reconcileMonthKey}
                   </DialogTitle>
                   <p className="text-indigo-200 text-xs mt-1">
                     Link existing ledger payment vouchers or record direct VAT remittance payments

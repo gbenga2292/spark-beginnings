@@ -111,7 +111,7 @@ export interface LedgerEntry {
   id: string; voucherNo: string; date: string; description: string;
   category: string; amount: number; client: string; site: string;
   vendor: string; bank: string; enteredBy: string;
-  isVatable?: boolean; vatMode?: 'No' | 'Yes' | 'Add'; vatAmount?: number; vatRate?: number; amountForVat?: number;
+  isVatable?: boolean; vatMode?: 'No' | 'Yes' | 'Add'; vatAmount?: number; vatRate?: number; amountForVat?: number; grossAmount?: number;
 }
 
 // ─── Budget Item ───────────────────────────────────────────────
