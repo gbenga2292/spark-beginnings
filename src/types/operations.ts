@@ -50,6 +50,21 @@ export interface AssetPumpDate {
   created_at?: string;
 }
 
+export interface SiteHoldPeriod {
+  id: string;
+  siteId: string;
+  siteName: string;
+  holdStart: string;        // YYYY-MM-DD
+  holdEnd: string | null;   // null = site is currently on hold
+  holdDays: number | null;  // computed when hold ends; null while ongoing
+  holdNote: string;         // mandatory reason for putting on hold
+  resumeNote: string | null; // mandatory note added when resuming
+  createdBy: string;
+  resumedBy: string | null;
+  createdAt: string;
+  updatedAt?: string;
+}
+
 export type WaybillStatus = 
   | 'outstanding' 
   | 'sent_to_site' 

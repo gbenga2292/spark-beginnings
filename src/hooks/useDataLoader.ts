@@ -3,7 +3,7 @@ import { useAppStore, DEFAULT_OFFBOARDING_TASKS, DEFAULT_LEAVE_TYPES } from '@/s
 import { useUserStore, NO_ACCESS, FULL_ACCESS, UserPrivileges } from '@/src/store/userStore';
 import { fetchAllAppData, fetchAllUsers, fetchPresets, db } from '@/src/lib/supabaseService';
 import { supabase } from '@/src/integrations/supabase/client';
-import { dbToSite, dbToEmployee, dbToAttendance, dbToInvoice, dbToPendingInvoice, dbToSalaryAdvance, dbToLoan, dbToPayment, dbToVatPayment, dbToLeave, dbToProfile, dbToDisciplinary, dbToEvaluation, dbToCommLog, dbToCompanyExpense, dbToPendingSite, dbToLedgerEntry, dbToClientProfile, dbToDailyJournal, dbToSiteJournalEntry, dbToVehicle, dbToVehicleMovement, dbToVehicleDocumentType, dbToInterviewCandidate, dbToLeaveType, dbToStaffMerit, dbToClientContact, dbToBudgetItem } from '@/src/lib/supabaseService';
+import { dbToSite, dbToEmployee, dbToAttendance, dbToInvoice, dbToPendingInvoice, dbToSalaryAdvance, dbToLoan, dbToPayment, dbToVatPayment, dbToLeave, dbToProfile, dbToDisciplinary, dbToEvaluation, dbToCommLog, dbToCommLogRead, dbToCompanyExpense, dbToPendingSite, dbToLedgerEntry, dbToClientProfile, dbToDailyJournal, dbToSiteJournalEntry, dbToVehicle, dbToVehicleMovement, dbToVehicleDocumentType, dbToInterviewCandidate, dbToLeaveType, dbToStaffMerit, dbToClientContact, dbToBudgetItem } from '@/src/lib/supabaseService';
 import { generateId } from '@/src/lib/utils';
 import { cacheSet, cacheGet } from '@/src/lib/offlineCache';
 import { useNetworkStore } from '@/src/store/networkStore';
@@ -165,6 +165,7 @@ export function useDataLoader(isAuthenticated: boolean) {
         // Build the app state payload
         const appStatePayload = {
           commLogs: appData.commLogs || [],
+          commLogReads: appData.commLogReads || [],
           clientContacts,
           sites: appData.sites,
           clients: appData.clients,
@@ -628,6 +629,20 @@ export function useRealtimeData(isAuthenticated: boolean) {
                 useAppStore.setState({ commLogs: current.map(l => l.id === updated.id ? updated : l) });
               } else if (eventType === 'DELETE') {
                 useAppStore.setState({ commLogs: current.filter(l => l.id !== oldRow.id) });
+              }
+              break;
+            }
+            case 'comm_log_reads': {
+              const currentReads = appState.commLogReads || [];
+              if (eventType === 'INSERT' || eventType === 'UPDATE') {
+                const read = dbToCommLogRead(newRow);
+                const exists = currentReads.some(r => r.logId === read.logId && r.userId === read.userId);
+                const updated = exists
+                  ? currentReads.map(r => (r.logId === read.logId && r.userId === read.userId) ? read : r)
+                  : [...currentReads, read];
+                useAppStore.setState({ commLogReads: updated });
+              } else if (eventType === 'DELETE') {
+                useAppStore.setState({ commLogReads: currentReads.filter(r => r.id !== oldRow.id) });
               }
               break;
             }

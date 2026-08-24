@@ -4,7 +4,7 @@ import {
   Checkout, MaintenanceAsset, MaintenanceSession, MaintenanceLogType, ServiceStatus,
   OperationalStatus,
   Vehicle, VehicleTripLeg, VehicleDocumentType, DailyMachineLog, AssetPumpDate,
-  MaintenanceCertificate, VehicleFuelLog, DieselRefill
+  MaintenanceCertificate, VehicleFuelLog, DieselRefill, SiteHoldPeriod
 } from '../types/operations';
 import { supabase } from '@/src/integrations/supabase/client';
 import { useAppStore } from '../store/appStore';
@@ -112,6 +112,11 @@ interface OperationsContextType {
   sitePumpDates: AssetPumpDate[];
   persistSitePumpDates: (assetId: string, siteId: string, pumpStartDate: string, pumpStopDate: string | null) => Promise<void>;
 
+  // Site Hold Periods
+  siteHoldPeriods: SiteHoldPeriod[];
+  addSiteHold: (siteId: string, siteName: string, holdNote: string, createdBy: string, holdStart?: string) => Promise<SiteHoldPeriod>;
+  endSiteHold: (holdId: string, resumeNote: string, resumedBy: string, resumeDate?: string) => Promise<void>;
+
   // Certificates
   maintenanceCertificates: MaintenanceCertificate[];
   issueCertificate: (cert: Omit<MaintenanceCertificate, 'id'>) => Promise<void>;
@@ -153,6 +158,7 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
   const [maintenanceCertificates, setMaintenanceCertificates] = useState<MaintenanceCertificate[]>([]);
   const [vehicleFuelLogs, setVehicleFuelLogs] = useState<VehicleFuelLog[]>([]);
   const [dieselRefills, setDieselRefills] = useState<DieselRefill[]>([]);
+  const [siteHoldPeriods, setSiteHoldPeriods] = useState<SiteHoldPeriod[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
 
   const { 
@@ -355,7 +361,8 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
           { data: dbDailyLogs },
           { data: dbPumpDates },
           { data: dbFuelLogs },
-          { data: dbDieselRefills }
+          { data: dbDieselRefills },
+          { data: dbHoldPeriods }
         ] = await Promise.all([
           supabase.from('operations_assets').select('*'),
           supabase.from('operations_waybills').select('*'),
@@ -364,7 +371,8 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
           supabase.from('operations_daily_logs').select('*'),
           supabase.from('operations_site_pump_dates').select('*'),
           supabase.from('vehicle_fuel_logs').select('*').order('date', { ascending: false }),
-          supabase.from('diesel_refills').select('*').order('date', { ascending: false })
+          supabase.from('diesel_refills').select('*').order('date', { ascending: false }),
+          supabase.from('site_hold_periods').select('*').order('created_at', { ascending: false })
         ]);
 
         if (dbAssets) {
@@ -414,6 +422,23 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
             pumpStartDate: p.pump_start_date,
             pumpStopDate: p.pump_stop_date,
             created_at: p.created_at
+          })));
+        }
+
+        if (dbHoldPeriods) {
+          setSiteHoldPeriods(dbHoldPeriods.map((h: any) => ({
+            id: h.id,
+            siteId: h.site_id,
+            siteName: h.site_name,
+            holdStart: h.hold_start,
+            holdEnd: h.hold_end,
+            holdDays: h.hold_days,
+            holdNote: h.hold_note,
+            resumeNote: h.resume_note,
+            createdBy: h.created_by,
+            resumedBy: h.resumed_by,
+            createdAt: h.created_at,
+            updatedAt: h.updated_at,
           })));
         }
 
@@ -1754,6 +1779,40 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  // ── Site Hold Period actions ───────────────────────────────────────────────
+  const addSiteHold = async (siteId: string, siteName: string, holdNote: string, createdBy: string, holdStart?: string): Promise<SiteHoldPeriod> => {
+    const startDate = holdStart || new Date().toISOString().split('T')[0];
+    const { data, error } = await supabase
+      .from('site_hold_periods')
+      .insert({ site_id: siteId, site_name: siteName, hold_start: startDate, hold_note: holdNote, created_by: createdBy })
+      .select()
+      .single();
+    if (error) { console.error('addSiteHold:', error); throw error; }
+    const newHold: SiteHoldPeriod = {
+      id: data.id, siteId: data.site_id, siteName: data.site_name,
+      holdStart: data.hold_start, holdEnd: null, holdDays: null,
+      holdNote: data.hold_note, resumeNote: null, createdBy: data.created_by,
+      resumedBy: null, createdAt: data.created_at,
+    };
+    setSiteHoldPeriods(prev => [newHold, ...prev]);
+    return newHold;
+  };
+
+  const endSiteHold = async (holdId: string, resumeNote: string, resumedBy: string, resumeDate?: string): Promise<void> => {
+    const hold = siteHoldPeriods.find(h => h.id === holdId);
+    if (!hold) throw new Error('Hold period not found');
+    const endDate = resumeDate || new Date().toISOString().split('T')[0];
+    const holdDays = Math.max(1, Math.round((new Date(endDate).getTime() - new Date(hold.holdStart).getTime()) / 86400000));
+    const { error } = await supabase
+      .from('site_hold_periods')
+      .update({ hold_end: endDate, hold_days: holdDays, resume_note: resumeNote, resumed_by: resumedBy, updated_at: new Date().toISOString() })
+      .eq('id', holdId);
+    if (error) { console.error('endSiteHold:', error); throw error; }
+    setSiteHoldPeriods(prev => prev.map(h =>
+      h.id === holdId ? { ...h, holdEnd: endDate, holdDays, resumeNote, resumedBy } : h
+    ));
+  };
+
   return (
     <OperationsContext.Provider value={{
       assets,
@@ -1764,6 +1823,9 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
       dailyMachineLogs,
       sitePumpDates,
       persistSitePumpDates,
+      siteHoldPeriods,
+      addSiteHold,
+      endSiteHold,
       maintenanceCertificates,
       issueCertificate,
       addAsset,

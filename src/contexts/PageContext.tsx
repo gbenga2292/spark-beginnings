@@ -141,3 +141,18 @@ export function useHideLayout(shouldHide: boolean) {
     };
   }, [dispatch, shouldHide]);
 }
+
+/**
+ * Hook to automatically collapse the sidebar when a page or view mounts,
+ * and restore it when unmounted.
+ */
+export function useAutoCollapseSidebar(enabled: boolean = true) {
+  useEffect(() => {
+    if (!enabled) return;
+    window.dispatchEvent(new CustomEvent('sidebar:collapse'));
+    return () => {
+      window.dispatchEvent(new CustomEvent('sidebar:restore'));
+    };
+  }, [enabled]);
+}
+

@@ -7,7 +7,7 @@ import type {
   Site, Employee, AttendanceRecord, Invoice, PendingInvoice,
   SalaryAdvance, Loan, Payment, VatPayment, LeaveRecord, DepartmentTasks,
   DisciplinaryRecord, EvaluationRecord, Department, Position,
-  LedgerCategory, LedgerVendor, LedgerBank, LedgerBeneficiaryBank, LedgerEntry, CommLog,
+  LedgerCategory, LedgerVendor, LedgerBank, LedgerBeneficiaryBank, LedgerEntry, CommLog, CommLogRead,
   CompanyExpense, StaffMeritRecord, LeaveType, DailyJournal, SiteJournalEntry, ClientContact, BudgetItem
 } from '@/src/store/appStore';
 import { useUserStore, type AppUser, type PrivilegePreset } from '@/src/store/userStore';
@@ -370,7 +370,18 @@ export function dbToCommLog(r: any): CommLog {
     loggedBy: r.logged_by ?? '',
     parentId: r.parent_id ?? undefined,
     reportedBy: r.reported_by || [],
+    registeredNewSite: r.registered_new_site ?? false,
     createdAt: r.created_at ?? new Date().toISOString(),
+  };
+}
+
+export function dbToCommLogRead(r: any): CommLogRead {
+  return {
+    id: r.id,
+    logId: r.log_id,
+    userId: r.user_id,
+    userName: r.user_name,
+    readAt: r.read_at ?? new Date().toISOString(),
   };
 }
 
@@ -968,6 +979,7 @@ function commLogToDb(l: CommLog) {
     logged_by: l.loggedBy,
     parent_id: l.parentId ?? null,
     reported_by: l.reportedBy || [],
+    registered_new_site: l.registeredNewSite ?? false,
     created_at: l.createdAt,
   };
 }
@@ -1070,6 +1082,7 @@ export async function fetchAllAppData(privs?: any) {
     positionsRes, departmentsRes,
     disciplinaryRes, evaluationsRes,
     commLogsRes,
+    commLogReadsRes,
     pendingSitesRes,
     staffMeritRes,
     vehicleDocTypesRes,
@@ -1097,6 +1110,7 @@ export async function fetchAllAppData(privs?: any) {
     canView('disciplinary') ? supabase.from('disciplinary_records').select('*').order('date', { ascending: false }).limit(50000) : Promise.resolve({ data: [] }),
     canView('evaluations') ? supabase.from('evaluations').select('*').order('date', { ascending: false }).limit(50000) : Promise.resolve({ data: [] }),
     supabase.from('comm_logs').select('*').order('date', { ascending: false }).limit(50000),
+    supabase.from('comm_log_reads').select('*').limit(50000),
     supabase.from('pending_sites').select('*').order('created_at').limit(50000),
     supabase.from('staff_merit_record').select('*').order('incident_date', { ascending: false }).limit(50000),
     supabase.from('vehicle_document_types').select('*').order('name').limit(50000),
@@ -1105,7 +1119,7 @@ export async function fetchAllAppData(privs?: any) {
     canView('employees') ? supabase.from('employees').select('*').order('surname').limit(50000) : Promise.resolve({ data: [] }),
     canView('attendance') ? fetchAttendanceByYearRaw(new Date().getFullYear()) : Promise.resolve([]),
     canView('invoices') ? supabase.from('invoices').select('*').order('date', { ascending: false }).limit(50000) : Promise.resolve({ data: [] }),
-    canView('invoices') ? supabase.from('pending_invoices').select('*').order('created_at').limit(50000) : Promise.resolve({ data: [] }),
+    canView('pending_invoices') ? supabase.from('pending_invoices').select('*').order('created_at').limit(50000) : Promise.resolve({ data: [] }),
     canView('ledger') ? supabase.from('ledger_categories').select('*').order('name').limit(50000) : Promise.resolve({ data: [] }),
     canView('ledger') ? supabase.from('ledger_vendors').select('*').order('name').limit(50000) : Promise.resolve({ data: [] }),
     canView('ledger') ? supabase.from('ledger_banks').select('*').order('name').limit(50000) : Promise.resolve({ data: [] }),
@@ -1123,6 +1137,7 @@ export async function fetchAllAppData(privs?: any) {
 
   return {
     commLogs: (commLogsRes.data || []).map(dbToCommLog),
+    commLogReads: (commLogReadsRes.data || []).map(dbToCommLogRead),
     clientContacts: (clientContactsRes.data || []).map(dbToClientContact),
     pendingSites: (pendingSitesRes.data || []).map(dbToPendingSite),
     sites: (sitesRes.data || []).map(dbToSite),
@@ -2287,6 +2302,7 @@ export const db = {
     if (l.parentId !== undefined) update.parent_id = l.parentId ?? null;
     if (l.isInternal !== undefined) update.is_internal = l.isInternal;
     if (l.reportedBy !== undefined) update.reported_by = l.reportedBy || [];
+    if (l.registeredNewSite !== undefined) update.registered_new_site = l.registeredNewSite;
     update.updated_at = new Date().toISOString();
     const { error } = await supabase.from('comm_logs').update(update).eq('id', id);
     if (error) { console.error('Database error:', error); throw error; }
@@ -2294,6 +2310,17 @@ export const db = {
   async deleteCommLog(id: string) {
     const { error } = await supabase.from('comm_logs').delete().eq('id', id);
     if (error) { console.error('Database error:', error); throw error; }
+  },
+  async markCommLogsAsRead(logIds: string[], userId: string, userName: string) {
+    if (!logIds.length || !userId) return;
+    const rows = logIds.map(logId => ({
+      log_id: logId,
+      user_id: userId,
+      user_name: userName,
+      read_at: new Date().toISOString()
+    }));
+    const { error } = await supabase.from('comm_log_reads').upsert(rows, { onConflict: 'log_id,user_id' });
+    if (error) { console.error('Database error in markCommLogsAsRead:', error); throw error; }
   },
 
   // Staff Merit Records

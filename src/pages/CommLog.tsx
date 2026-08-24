@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAppStore } from '@/src/store/appStore';
-import type { CommLog, ClientContact } from '@/src/store/appStore';
+import type { CommLog, ClientContact, CommLogRead } from '@/src/store/appStore';
 import { useUserStore } from '@/src/store/userStore';
 import { useTheme } from '@/src/hooks/useTheme';
 import { cn, generateId } from '@/src/lib/utils';
@@ -13,6 +13,7 @@ import {
   Trash2, Pencil, X, Save, ChevronDown, ChevronUp,
   Bell, BellOff, CheckCircle2, MapPin, Building2,
   UserCheck, AlertCircle, ClipboardList, ListPlus, Briefcase, BarChart2,
+  CheckCheck,
 } from 'lucide-react';
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
@@ -95,6 +96,7 @@ function emptyForm() {
     parentId: undefined as string | undefined,
     isInternal: false,
     reportedBy: [] as string[],
+    registeredNewSite: false,
   };
 }
 
@@ -349,6 +351,7 @@ function LogForm({ form, onChange, onSave, onCancel, isEdit, editingId, isDark }
       },
     });
     addPendingSite(newSite);
+    onChange({ registeredNewSite: true });
     setProcessedKeys(prev => new Set([...prev, siteName.toLowerCase()]));
     setOnboardBannerFor(null);
     setRecentlyOnboardedSite({ id: newSite.id, name: newSite.siteName });
@@ -363,6 +366,7 @@ function LogForm({ form, onChange, onSave, onCancel, isEdit, editingId, isDark }
         next.delete(recentlyOnboardedSite.name.toLowerCase());
         return next;
       });
+      onChange({ registeredNewSite: false });
       setRecentlyOnboardedSite(null);
       toast.info(`Registration of "${recentlyOnboardedSite.name}" undone.`);
     }
@@ -652,6 +656,34 @@ function LogForm({ form, onChange, onSave, onCancel, isEdit, editingId, isDark }
             </div>
           </div>
         )}
+
+        {/* Registered New Site Checkbox / Badge toggle */}
+        <div className="pt-1">
+          <label className={cn(
+            'flex items-center gap-2.5 p-2.5 rounded-lg border transition-colors cursor-pointer select-none',
+            form.registeredNewSite
+              ? (isDark ? 'bg-amber-950/30 border-amber-600/60 text-amber-200' : 'bg-amber-50 border-amber-300 text-amber-900')
+              : (isDark ? 'bg-slate-800/40 border-slate-700 text-slate-400 hover:border-slate-600' : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-slate-300')
+          )}>
+            <input
+              type="checkbox"
+              checked={!!form.registeredNewSite}
+              onChange={e => onChange({ registeredNewSite: e.target.checked })}
+              className="rounded border-amber-400 text-amber-600 focus:ring-amber-500 w-4 h-4 cursor-pointer"
+            />
+            <div className="flex items-center gap-1.5 flex-1 min-w-0">
+              <Building2 className={cn('w-4 h-4 flex-shrink-0', form.registeredNewSite ? 'text-amber-500' : 'text-slate-400')} />
+              <span className="text-xs font-semibold">
+                This communication was used to register / initiate a new site
+              </span>
+            </div>
+            {form.registeredNewSite && (
+              <span className="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider bg-amber-200 dark:bg-amber-900 text-amber-900 dark:text-amber-200">
+                Badge Active
+              </span>
+            )}
+          </label>
+        </div>
 
         {/* Contact Person (External) / Reported By (Internal) */}
         {form.isInternal ? (
@@ -1112,19 +1144,23 @@ interface LogCardProps {
   isDark: boolean;
   expanded: boolean;
   onToggleExpand: () => void;
-  currentUserName: string;
-  isAdmin: boolean;
+  currentUserName?: string;
+  currentUserId?: string;
+  isAdmin?: boolean;
   isChild?: boolean;
-  mainTasks: any[];
-  subtasks: any[];
-  onNavigateTask: (taskId: string) => void;
+  mainTasks?: any[];
+  subtasks?: any[];
+  onNavigateTask?: (taskId: string) => void;
   // thread collapse props (only meaningful on parent/non-child cards)
   childCount?: number;
   isThreadCollapsed?: boolean;
   onToggleThread?: () => void;
+  isUnread?: boolean;
+  receipts?: CommLogRead[];
+  users?: any[];
 }
 
-function LogCard({ log, onEdit, onDelete, onToggleFollowUp, onAddFollowUpNote, isDark, expanded, onToggleExpand, currentUserName, isAdmin, isChild, mainTasks, subtasks, onNavigateTask, childCount, isThreadCollapsed, onToggleThread }: LogCardProps) {
+function LogCard({ log, onEdit, onDelete, onToggleFollowUp, onAddFollowUpNote, isDark, expanded, onToggleExpand, currentUserName = '', currentUserId = '', isAdmin = false, isChild, mainTasks = [], subtasks = [], onNavigateTask, childCount, isThreadCollapsed, onToggleThread, isUnread, receipts, users }: LogCardProps) {
   const canDelete = isAdmin || log.loggedBy === currentUserName;
   const isOverdue = log.followUpDate && !log.followUpDone && isBefore(parseISO(log.followUpDate), startOfDay(new Date()));
 
@@ -1135,10 +1171,11 @@ function LogCard({ log, onEdit, onDelete, onToggleFollowUp, onAddFollowUpNote, i
 
   return (
     <div className={cn(
-      'rounded-xl border overflow-hidden transition-all duration-200',
+      'rounded-xl border overflow-hidden transition-all duration-200 relative',
       isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200',
       'hover:shadow-md',
-      isChild && (isDark ? 'ml-8 border-l-2 border-l-slate-600 bg-slate-900/50' : 'ml-8 border-l-2 border-l-slate-300 bg-slate-50')
+      isChild && (isDark ? 'ml-8 border-l-2 border-l-slate-600 bg-slate-900/50' : 'ml-8 border-l-2 border-l-slate-300 bg-slate-50'),
+      isUnread && (isDark ? 'ring-1 ring-indigo-500/50 border-indigo-500/50 bg-indigo-950/20' : 'ring-2 ring-indigo-500/20 border-indigo-300 bg-indigo-50/30')
     )}>
       <div className={cn(
         'h-1',
@@ -1158,7 +1195,7 @@ function LogCard({ log, onEdit, onDelete, onToggleFollowUp, onAddFollowUpNote, i
             </div>
 
             <div className="flex-1 min-w-0">
-              {/* Row 1: Date, Channel, Direction */}
+              {/* Row 1: Date, Channel, Direction, Unread pill, Read receipt */}
               <div className="flex flex-wrap items-center gap-1.5 mb-1">
                 <span className={cn('text-sm font-bold', isDark ? 'text-slate-100' : 'text-slate-900')}>
                   {format(parseISO(log.date), 'dd MMM yyyy')}
@@ -1179,6 +1216,47 @@ function LogCard({ log, onEdit, onDelete, onToggleFollowUp, onAddFollowUpNote, i
                     INTERNAL
                   </span>
                 )}
+
+                {isUnread && (
+                  <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-bold bg-indigo-600 text-white shadow-sm animate-pulse">
+                    ● New
+                  </span>
+                )}
+
+                {log.registeredNewSite && (
+                  <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/70 dark:text-amber-300 border border-amber-300 dark:border-amber-700 shadow-sm">
+                    <Building2 className="w-3 h-3 text-amber-600 dark:text-amber-400" />
+                    Registered New Site
+                  </span>
+                )}
+
+                {/* WhatsApp-style Read Receipts */}
+                {(() => {
+                  const othersRead = (receipts || []).filter(r => r.userId !== currentUserId);
+                  const hasBeenReadByOthers = othersRead.length > 0;
+                  const title = hasBeenReadByOthers 
+                    ? `Read by: ${othersRead.map(r => `${r.userName} (${format(parseISO(r.readAt), 'dd MMM, HH:mm')})`).join(', ')}` 
+                    : 'Delivered (Unread by team)';
+
+                  return (
+                    <span
+                      title={title}
+                      className={cn(
+                        'inline-flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded transition-colors cursor-default select-none ml-1',
+                        hasBeenReadByOthers ? 'text-blue-600 dark:text-blue-400 font-bold' : 'text-slate-400 dark:text-slate-500'
+                      )}
+                    >
+                      <span className="font-extrabold text-sm tracking-tighter">
+                        {hasBeenReadByOthers ? '✓✓' : '✓'}
+                      </span>
+                      {hasBeenReadByOthers && (
+                        <span className="text-[10px] hidden sm:inline ml-0.5 opacity-80">
+                          {othersRead.length}
+                        </span>
+                      )}
+                    </span>
+                  );
+                })()}
               </div>
 
               {/* Row 2: Client/Site/Person text summary */}
@@ -1191,7 +1269,14 @@ function LogCard({ log, onEdit, onDelete, onToggleFollowUp, onAddFollowUpNote, i
                  {log.siteName && (
                    <>
                      <span className="text-slate-300 dark:text-slate-600">•</span>
-                     <span className="inline-flex items-center gap-0.5">📍 {log.siteName}</span>
+                     <span className="inline-flex items-center gap-1">
+                       📍 {log.siteName}
+                       {log.registeredNewSite && (
+                         <span className="text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700">
+                           Site Registered
+                         </span>
+                       )}
+                     </span>
                    </>
                  )}
 
@@ -1323,6 +1408,47 @@ function LogCard({ log, onEdit, onDelete, onToggleFollowUp, onAddFollowUpNote, i
             <div className={cn('text-xs', isDark ? 'text-slate-600' : 'text-slate-400')}>
               Logged by {log.loggedBy}
             </div>
+
+            {/* Detailed read receipts list (avatars only) */}
+            {(receipts && receipts.length > 0) && (
+              <div className={cn('pt-2 mt-2 border-t flex items-center gap-2', isDark ? 'border-slate-800' : 'border-slate-100')}>
+                <span className={cn('text-xs font-semibold', isDark ? 'text-indigo-400' : 'text-indigo-600')}>Seen by:</span>
+                <div className="flex items-center -space-x-1.5 overflow-hidden py-0.5">
+                  {receipts.map(r => {
+                    const u = (users || []).find((user: any) => user.id === r.userId || user.name === r.userName);
+                    const initials = (r.userName || 'U').split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase();
+                    const color = u?.avatarColor || 'bg-indigo-600';
+                    const tooltipText = `${r.userName} (${format(parseISO(r.readAt), 'dd MMM, HH:mm')})`;
+
+                    if (u?.avatar) {
+                      return (
+                        <img
+                          key={r.id}
+                          src={u.avatar}
+                          alt={r.userName}
+                          title={tooltipText}
+                          className="w-5 h-5 rounded-full object-cover ring-2 ring-white dark:ring-slate-900 flex-shrink-0 cursor-default"
+                        />
+                      );
+                    }
+
+                    return (
+                      <div
+                        key={r.id}
+                        title={tooltipText}
+                        className={cn(
+                          'w-5 h-5 rounded-full ring-2 ring-white dark:ring-slate-900 text-[8px] font-bold text-white flex items-center justify-center flex-shrink-0 cursor-default',
+                          color.startsWith('bg-') ? color : 'bg-indigo-600'
+                        )}
+                        style={!color.startsWith('bg-') ? { backgroundColor: color } : undefined}
+                      >
+                        {initials}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -1370,6 +1496,8 @@ export function CommLog() {
   const [searchParams, setSearchParams] = useSearchParams();
   const currentUser = useUserStore(s => s.getCurrentUser());
   const commLogs = useAppStore(s => s.commLogs);
+  const commLogReads = useAppStore(s => s.commLogReads);
+  const markCommLogsAsRead = useAppStore(s => s.markCommLogsAsRead);
   const addCommLog = useAppStore(s => s.addCommLog);
   const updateCommLog = useAppStore(s => s.updateCommLog);
   const deleteCommLog = useAppStore(s => s.deleteCommLog);
@@ -1399,6 +1527,8 @@ export function CommLog() {
   const [filterInternal, setFilterInternal] = useState('All'); // 'All', 'External', 'Internal'
   const [filterClient, setFilterClient] = useState('All');
   const [filterFollowUp, setFilterFollowUp] = useState('All');
+  const [filterReadStatus, setFilterReadStatus] = useState('All'); // 'All', 'Unread', 'Read'
+  const [filterSiteRegistration, setFilterSiteRegistration] = useState('All'); // 'All', 'RegisteredSite'
   const [showFilters, setShowFilters] = useState(false);
   const [showStats, setShowStats] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
@@ -1410,17 +1540,55 @@ export function CommLog() {
     isDark ? 'bg-slate-800 border-slate-600 text-slate-200' : 'bg-white border-slate-200 text-slate-700'
   );
 
+  const isLogUnread = useMemo(() => {
+    return (log: CommLog) => {
+      if (!currentUser?.id) return false;
+      if (log.loggedBy === currentUser.name) return false;
+      return !(commLogReads || []).some(r => r.logId === log.id && r.userId === currentUser.id);
+    };
+  }, [commLogReads, currentUser]);
+
+  const unreadCommLogCount = useMemo(() => {
+    if (!currentUser?.id) return 0;
+    return (commLogs || []).filter(l => isLogUnread(l)).length;
+  }, [commLogs, isLogUnread, currentUser]);
+
+  const handleMarkAllAsRead = async () => {
+    if (!currentUser?.id) return;
+    const unreadLogs = (commLogs || []).filter(l => isLogUnread(l));
+    if (!unreadLogs.length) {
+      toast.info('No unread logs to mark as read');
+      return;
+    }
+    await markCommLogsAsRead(unreadLogs.map(l => l.id), currentUser.id, currentUser.name);
+    toast.success('All communication logs marked as read');
+  };
+
   // Set page title and header button
   useSetPageTitle(
     'Communication Log',
     'Track client & site interactions',
     !showForm && (
-      <Button
-        onClick={() => { setShowForm(true); setEditingId(null); setForm(emptyForm()); }}
-        className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm h-9 px-2 sm:px-4 rounded-lg flex items-center gap-2"
-      >
-        <Plus className="w-4 h-4" /> <span className="hidden sm:inline">New Log</span>
-      </Button>
+      <div className="flex items-center gap-2">
+        {unreadCommLogCount > 0 && (
+          <Button
+            variant="outline"
+            onClick={handleMarkAllAsRead}
+            className="h-9 px-2.5 sm:px-3 rounded-lg flex items-center gap-1.5 text-xs font-semibold border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 shadow-sm"
+            title="Mark all unread logs as read"
+          >
+            <CheckCheck className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+            <span className="hidden sm:inline">Mark All as Read ({unreadCommLogCount})</span>
+            <span className="sm:hidden">({unreadCommLogCount})</span>
+          </Button>
+        )}
+        <Button
+          onClick={() => { setShowForm(true); setEditingId(null); setForm(emptyForm()); }}
+          className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm h-9 px-2 sm:px-4 rounded-lg flex items-center gap-2"
+        >
+          <Plus className="w-4 h-4" /> <span className="hidden sm:inline">New Log</span>
+        </Button>
+      </div>
     )
   );
 
@@ -1449,6 +1617,9 @@ export function CommLog() {
         if (filterFollowUp === 'Pending' && !(l.followUpDate && !l.followUpDone)) return false;
         if (filterFollowUp === 'Overdue' && !(l.followUpDate && !l.followUpDone && isBefore(parseISO(l.followUpDate), startOfDay(new Date())))) return false;
         if (filterFollowUp === 'Done' && !l.followUpDone) return false;
+        if (filterReadStatus === 'Unread' && !isLogUnread(l)) return false;
+        if (filterReadStatus === 'Read' && isLogUnread(l)) return false;
+        if (filterSiteRegistration === 'RegisteredSite' && !l.registeredNewSite) return false;
         if (dateFrom && isBefore(parseISO(l.date), parseISO(dateFrom))) return false;
         if (dateTo && isAfter(parseISO(l.date), parseISO(dateTo))) return false;
         if (searchTerm) {
@@ -1467,7 +1638,7 @@ export function CommLog() {
         if (dateDiff !== 0) return dateDiff;
         return (b.time || '').localeCompare(a.time || '');
       });
-  }, [commLogs, filterDirection, filterChannel, filterContactType, filterInternal, filterClient, filterFollowUp, searchTerm, dateFrom, dateTo]);
+  }, [commLogs, filterDirection, filterChannel, filterContactType, filterInternal, filterClient, filterFollowUp, filterReadStatus, filterSiteRegistration, isLogUnread, searchTerm, dateFrom, dateTo]);
 
   const allLogClients = useMemo(() => {
     return [...new Set(commLogs.map(l => l.client).filter(Boolean))].sort();
@@ -1502,6 +1673,7 @@ export function CommLog() {
         parentId: form.parentId || undefined,
         isInternal: form.isInternal,
         reportedBy: form.isInternal ? (form.reportedBy.length > 0 ? form.reportedBy : undefined) : undefined,
+        registeredNewSite: form.registeredNewSite,
       });
       toast.success('Log updated');
       setEditingId(null);
@@ -1529,6 +1701,7 @@ export function CommLog() {
         createdAt: new Date().toISOString(),
         isInternal: form.isInternal,
         reportedBy: form.isInternal ? (form.reportedBy.length > 0 ? form.reportedBy : undefined) : undefined,
+        registeredNewSite: form.registeredNewSite,
       });
       // Auto-save external contact person
       if (!form.isInternal && form.contactPerson?.trim() && form.client?.trim()) {
@@ -1626,6 +1799,7 @@ export function CommLog() {
       parentId: log.parentId,
       isInternal: log.isInternal || false,
       reportedBy: log.reportedBy || [],
+      registeredNewSite: log.registeredNewSite || false,
     });
     setEditingId(log.id);
     setShowForm(true);
@@ -1652,7 +1826,16 @@ export function CommLog() {
   const toggleExpand = (id: string) => {
     setExpandedIds(prev => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
+      const willExpand = !next.has(id);
+      if (willExpand) {
+        next.add(id);
+        const log = commLogs.find(l => l.id === id);
+        if (log && currentUser?.id && isLogUnread(log)) {
+          markCommLogsAsRead([log.id], currentUser.id, currentUser.name);
+        }
+      } else {
+        next.delete(id);
+      }
       return next;
     });
   };
@@ -1668,7 +1851,18 @@ export function CommLog() {
   const toggleClient = (client: string) => {
     setExpandedClients(prev => {
       const next = new Set(prev);
-      if (next.has(client)) next.delete(client); else next.add(client);
+      const willExpand = !next.has(client);
+      if (willExpand) {
+        next.add(client);
+        if (currentUser?.id) {
+          const clientLogs = commLogs.filter(l => (l.client || '(No Client)') === client && isLogUnread(l));
+          if (clientLogs.length > 0) {
+            markCommLogsAsRead(clientLogs.map(l => l.id), currentUser.id, currentUser.name);
+          }
+        }
+      } else {
+        next.delete(client);
+      }
       return next;
     });
   };
@@ -1805,10 +1999,14 @@ export function CommLog() {
                         setEditingId(null);
                       }}
                       currentUserName={currentUser?.name || ''}
+                      currentUserId={currentUser?.id || ''}
                       isAdmin={currentUser?.role === 'admin' || currentUser?.role === 'co-admin'}
                       mainTasks={mainTasks}
                       subtasks={subtasks}
                       onNavigateTask={(taskId) => navigate(`/tasks?openTask=${taskId}`)}
+                      isUnread={isLogUnread(anchorLog)}
+                      receipts={(commLogReads || []).filter(r => r.logId === anchorLog.id)}
+                      users={users}
                     />
 
                     {/* Follow-up children */}
@@ -1824,10 +2022,14 @@ export function CommLog() {
                         onDelete={() => handleDelete(child.id)}
                         onToggleFollowUp={() => updateCommLog(child.id, { followUpDone: !child.followUpDone })}
                         currentUserName={currentUser?.name || ''}
+                        currentUserId={currentUser?.id || ''}
                         isAdmin={currentUser?.role === 'admin' || currentUser?.role === 'co-admin'}
                         mainTasks={mainTasks}
                         subtasks={subtasks}
                         onNavigateTask={(taskId) => navigate(`/tasks?openTask=${taskId}`)}
+                        isUnread={isLogUnread(child)}
+                        receipts={(commLogReads || []).filter(r => r.logId === child.id)}
+                        users={users}
                       />
                     ))}
                   </div>
@@ -1945,6 +2147,17 @@ export function CommLog() {
                     <option value="Done">Done</option>
                   </select>
 
+                  <select value={filterReadStatus} onChange={e => setFilterReadStatus(e.target.value)} className={selectCls}>
+                    <option value="All">All Read Status</option>
+                    <option value="Unread">● Unread Only {unreadCommLogCount > 0 ? `(${unreadCommLogCount})` : ''}</option>
+                    <option value="Read">✓ Read Only</option>
+                  </select>
+
+                  <select value={filterSiteRegistration} onChange={e => setFilterSiteRegistration(e.target.value)} className={selectCls}>
+                    <option value="All">All Site Logs</option>
+                    <option value="RegisteredSite">🏗️ Registered New Site Only</option>
+                  </select>
+
                   <button
                     onClick={() => setShowFilters(!showFilters)}
                     className={cn('hidden md:flex h-9 px-3 rounded-md border text-sm items-center gap-1.5 transition-colors',
@@ -1971,7 +2184,7 @@ export function CommLog() {
                     {allLogClients.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
                   <button
-                    onClick={() => { setFilterDirection('All'); setFilterChannel('All'); setFilterContactType('All'); setFilterInternal('All'); setFilterClient('All'); setFilterFollowUp('All'); setDateFrom(''); setDateTo(''); setSearchTerm(''); }}
+                    onClick={() => { setFilterDirection('All'); setFilterChannel('All'); setFilterContactType('All'); setFilterInternal('All'); setFilterClient('All'); setFilterFollowUp('All'); setFilterReadStatus('All'); setFilterSiteRegistration('All'); setDateFrom(''); setDateTo(''); setSearchTerm(''); }}
                     className="text-xs text-red-500 hover:text-red-700 underline"
                   >
                     Clear all filters
@@ -2031,6 +2244,11 @@ export function CommLog() {
                     const isClientCollapsed = !expandedClients.has(clientName);
                     const threadCount = threads.length;
                     const replyCount = threads.reduce((sum, t) => sum + t.children.length, 0);
+                    const clientUnreadCount = threads.reduce((sum, t) => {
+                      const parentUnread = isLogUnread(t.parentLog) ? 1 : 0;
+                      const childUnread = t.children.filter(c => isLogUnread(c)).length;
+                      return sum + parentUnread + childUnread;
+                    }, 0);
 
                     return (
                       <div key={`client-${clientName}`} className={cn(
@@ -2048,10 +2266,17 @@ export function CommLog() {
                           )}
                         >
                           <Building2 className={cn('w-4 h-4 flex-shrink-0', isDark ? 'text-indigo-400' : 'text-indigo-500')} />
-                          <span className={cn('font-semibold text-sm flex-1 text-left', isDark ? 'text-slate-100' : 'text-slate-800')}>
-                            {clientName}
-                          </span>
-                          <span className={cn('text-xs px-2 py-0.5 rounded-full font-medium', isDark ? 'bg-slate-700 text-slate-300' : 'bg-slate-200 text-slate-600')}>
+                          <div className="flex items-center gap-2 flex-1 min-w-0">
+                            <span className={cn('font-semibold text-sm truncate', isDark ? 'text-slate-100' : 'text-slate-800')}>
+                              {clientName}
+                            </span>
+                            {clientUnreadCount > 0 && (
+                              <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-indigo-600 text-white shadow-sm animate-pulse leading-none flex-shrink-0">
+                                ● {clientUnreadCount} new
+                              </span>
+                            )}
+                          </div>
+                          <span className={cn('text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0', isDark ? 'bg-slate-700 text-slate-300' : 'bg-slate-200 text-slate-600')}>
                             {threadCount} log{threadCount !== 1 ? 's' : ''}{replyCount > 0 ? ` · ${replyCount} follow-up${replyCount !== 1 ? 's' : ''}` : ''}
                           </span>
                           {isClientCollapsed
@@ -2092,6 +2317,7 @@ export function CommLog() {
                                           setEditingId(null);
                                         }}
                                         currentUserName={currentUser?.name || ''}
+                                        currentUserId={currentUser?.id || ''}
                                         isAdmin={currentUser?.role === 'admin' || currentUser?.role === 'co-admin'}
                                         mainTasks={mainTasks}
                                         subtasks={subtasks}
@@ -2099,6 +2325,9 @@ export function CommLog() {
                                         childCount={hasChildren ? children.length : undefined}
                                         isThreadCollapsed={isThreadCollapsed}
                                         onToggleThread={() => toggleThread(parentLog.id)}
+                                        isUnread={isLogUnread(parentLog)}
+                                        receipts={(commLogReads || []).filter(r => r.logId === parentLog.id)}
+                                        users={users}
                                       />
                                     </div>
                                   )}
@@ -2133,10 +2362,14 @@ export function CommLog() {
                                         onDelete={() => handleDelete(child.id)}
                                         onToggleFollowUp={() => updateCommLog(child.id, { followUpDone: !child.followUpDone })}
                                         currentUserName={currentUser?.name || ''}
+                                        currentUserId={currentUser?.id || ''}
                                         isAdmin={currentUser?.role === 'admin' || currentUser?.role === 'co-admin'}
                                         mainTasks={mainTasks}
                                         subtasks={subtasks}
                                         onNavigateTask={(taskId) => navigate(`/tasks?openTask=${taskId}`)}
+                                        isUnread={isLogUnread(child)}
+                                        receipts={(commLogReads || []).filter(r => r.logId === child.id)}
+                                        users={users}
                                       />
                                     </div>
                                   ))}

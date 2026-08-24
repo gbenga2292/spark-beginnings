@@ -6,7 +6,7 @@ import {
   Activity, Briefcase, MessagesSquare, RefreshCcw, Filter, Send,
   ShieldAlert, ShieldCheck, Settings2, X, Edit2, ChevronRight, CheckSquare,
   Plus, Trash2, Circle, Eye, MoreVertical, BookOpen, MessageSquare, Pencil,
-  Hourglass, Printer, Download, Globe, Check, RotateCcw,
+  Hourglass, Printer, Download, Globe, Check, RotateCcw, PauseCircle, PlayCircle,
 } from 'lucide-react';
 import { toast, showConfirm } from '@/src/components/ui/toast';
 import logoImg from '../../logo/logo-2.png';
@@ -132,7 +132,7 @@ export function Client360() {
   const addCommLog = useAppStore(s => s.addCommLog);
   const addPendingSite = useAppStore(s => s.addPendingSite);
   const { mainTasks, subtasks, users } = useAppData();
-  const { dailyMachineLogs, assets, waybills } = useOperations();
+  const { dailyMachineLogs, assets, waybills, siteHoldPeriods } = useOperations();
   const navigate = useNavigate();
   const workspaceId = useAppStore(s => (s as any).workspaceId || 'default');
 
@@ -3820,100 +3820,126 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                       <div className={cn("p-6 rounded-2xl border shadow-sm flex flex-col", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
                         <h3 className="text-lg font-bold mb-4 flex items-center gap-2"><MapPin className="w-5 h-5 text-indigo-500"/> Site Portfolio ({activeSitesList.length})</h3>
                         <div className="space-y-3 flex-1 overflow-y-auto max-h-[400px] style-scroll pr-2">
-                          {activeSitesList.length > 0 ? activeSitesList.map(site => (
-                            <div key={site.id}
-                              className={cn('p-3 rounded-lg border cursor-pointer transition-all hover:border-indigo-400 hover:shadow-md group relative', isDark ? 'border-slate-800 bg-slate-800/50 hover:bg-slate-800' : 'border-slate-100 bg-slate-50 hover:bg-white')}
-                              onClick={() => setSelectedSite(site)}
-                            >
-                              <div className="flex justify-between items-center">
-                                <div className="flex items-center gap-2">
-                                  <MapPin className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
-                                  <span className="font-semibold text-sm">{site.name}</span>
-                                </div>
-                                <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                                  <Badge className={site.status === 'Active' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700'}>{site.status}</Badge>
-                                  <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                      <Button
-                                        variant="ghost" size="icon"
-                                        className="h-8 w-8 text-slate-400 hover:text-indigo-600 hover:bg-slate-200/50 dark:hover:bg-slate-700/50 rounded-lg flex items-center justify-center shrink-0 border-0 bg-transparent cursor-pointer"
-                                      >
-                                        <MoreVertical className="h-4 w-4" />
-                                      </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end" className="w-[180px]">
-                                      <DropdownMenuItem 
-                                        onClick={() => setNarrativeSite({ site, q: pendingSites.find(ps => ps.siteName === site.name && ps.clientName === site.client) || null })}
-                                        className="gap-2"
-                                      >
-                                        <FileText className="h-4 w-4 text-slate-400" />
-                                        <span>Site Summary</span>
-                                      </DropdownMenuItem>
-                                      
-                                      {canEditSite && (
+                          {activeSitesList.length > 0 ? activeSitesList.map((site: any) => {
+                            const activeHold = siteHoldPeriods?.find(h => h.siteId === site.id && !h.holdEnd);
+                            const holdDays = activeHold ? Math.max(1, Math.round((new Date().getTime() - new Date(activeHold.holdStart).getTime()) / 86400000)) : 0;
+                            return (
+                              <div key={site.id}
+                                className={cn(
+                                  'p-3 rounded-lg border cursor-pointer transition-all hover:border-indigo-400 hover:shadow-md group relative',
+                                  activeHold
+                                    ? (isDark ? 'border-amber-900/60 bg-amber-950/20 hover:bg-amber-950/40' : 'border-amber-200 bg-amber-50/40 hover:bg-amber-50/70')
+                                    : (isDark ? 'border-slate-800 bg-slate-800/50 hover:bg-slate-800' : 'border-slate-100 bg-slate-50 hover:bg-white')
+                                )}
+                                onClick={() => setSelectedSite(site)}
+                              >
+                                <div className="flex justify-between items-center">
+                                  <div className="flex items-center gap-2">
+                                    <MapPin className={cn("w-3.5 h-3.5 shrink-0", activeHold ? "text-amber-500" : "text-indigo-500")} />
+                                    <span className="font-semibold text-sm">{site.name}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                    {activeHold ? (
+                                      <Badge className="bg-amber-100 text-amber-800 border border-amber-300 dark:bg-amber-950/60 dark:text-amber-300 flex items-center gap-1 font-bold">
+                                        <PauseCircle className="w-3 h-3" /> On Hold ({holdDays}d)
+                                      </Badge>
+                                    ) : (
+                                      <Badge className={site.status === 'Active' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700'}>{site.status}</Badge>
+                                    )}
+                                    <DropdownMenu>
+                                      <DropdownMenuTrigger asChild>
+                                        <Button
+                                          variant="ghost" size="icon"
+                                          className="h-8 w-8 text-slate-400 hover:text-indigo-600 hover:bg-slate-200/50 dark:hover:bg-slate-700/50 rounded-lg flex items-center justify-center shrink-0 border-0 bg-transparent cursor-pointer"
+                                        >
+                                          <MoreVertical className="h-4 w-4" />
+                                        </Button>
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent align="end" className="w-[180px]">
                                         <DropdownMenuItem 
-                                          onClick={() => {
-                                            const linkedQ = pendingSites.find(ps => ps.siteName === site.name && ps.clientName === site.client);
-                                            if (linkedQ) navigate(`/sites/onboarding/${linkedQ.id}`);
-                                            else navigate('/sites/onboarding/new', { state: { linkedSite: site } });
-                                          }}
+                                          onClick={() => setNarrativeSite({ site, q: pendingSites.find(ps => ps.siteName === site.name && ps.clientName === site.client) || null })}
                                           className="gap-2"
                                         >
-                                          <Eye className="h-4 w-4 text-slate-400" />
-                                          <span>View Onboarding</span>
+                                          <FileText className="h-4 w-4 text-slate-400" />
+                                          <span>Site Summary</span>
                                         </DropdownMenuItem>
-                                      )}
-                                      {canViewComm && (
-                                        <DropdownMenuItem 
-                                          onClick={() => {
-                                            navigate(`/sites/conversations/${site.id}`);
-                                          }}
-                                          className="gap-2"
-                                        >
-                                          <MessageSquare className="h-4 w-4 text-slate-400" />
-                                          <span>Site Conversations</span>
-                                        </DropdownMenuItem>
-                                      )}
-
-                                      <DropdownMenuItem 
-                                        onClick={() => {
-                                          navigate(`/sites/diary/${site.id}`);
-                                        }}
-                                        className="gap-2 text-emerald-600 focus:text-emerald-700"
-                                      >
-                                        <BookOpen className="h-4 w-4" />
-                                        <span>Site Diary</span>
-                                      </DropdownMenuItem>
-      
-                                      {canEditSite && (
-                                        <DropdownMenuItem 
-                                          onClick={() => openSiteEdit(site)}
-                                          className="gap-2 text-indigo-700 focus:text-indigo-700 focus:bg-indigo-50"
-                                        >
-                                          <Pencil className="h-4 w-4" />
-                                          <span>Edit Site</span>
-                                        </DropdownMenuItem>
-                                      )}
-      
-                                      {canDeleteSite && (
-                                        <>
-                                          <DropdownMenuSeparator />
+                                        
+                                        {canEditSite && (
                                           <DropdownMenuItem 
-                                            onClick={() => handleDeleteSite(site.id)}
-                                            className="gap-2 text-red-600 focus:text-red-600 focus:bg-red-50"
+                                            onClick={() => {
+                                              const linkedQ = pendingSites.find(ps => ps.siteName === site.name && ps.clientName === site.client);
+                                              if (linkedQ) navigate(`/sites/onboarding/${linkedQ.id}`);
+                                              else navigate('/sites/onboarding/new', { state: { linkedSite: site } });
+                                            }}
+                                            className="gap-2"
                                           >
-                                            <Trash2 className="h-4 w-4" />
-                                            <span>Delete</span>
+                                            <Eye className="h-4 w-4 text-slate-400" />
+                                            <span>View Onboarding</span>
                                           </DropdownMenuItem>
-                                        </>
-                                      )}
-                                    </DropdownMenuContent>
-                                  </DropdownMenu>
+                                        )}
+                                        {canViewComm && (
+                                          <DropdownMenuItem 
+                                            onClick={() => {
+                                              navigate(`/sites/conversations/${site.id}`);
+                                            }}
+                                            className="gap-2"
+                                          >
+                                            <MessageSquare className="h-4 w-4 text-slate-400" />
+                                            <span>Site Conversations</span>
+                                          </DropdownMenuItem>
+                                        )}
+
+                                        <DropdownMenuItem 
+                                          onClick={() => {
+                                            navigate(`/sites/diary/${site.id}`);
+                                          }}
+                                          className="gap-2 text-emerald-600 focus:text-emerald-700"
+                                        >
+                                          <BookOpen className="h-4 w-4" />
+                                          <span>Site Diary</span>
+                                        </DropdownMenuItem>
+        
+                                        {canEditSite && (
+                                          <DropdownMenuItem 
+                                            onClick={() => openSiteEdit(site)}
+                                            className="gap-2 text-indigo-700 focus:text-indigo-700 focus:bg-indigo-50"
+                                          >
+                                            <Pencil className="h-4 w-4" />
+                                            <span>Edit Site</span>
+                                          </DropdownMenuItem>
+                                        )}
+        
+                                        {canDeleteSite && (
+                                          <>
+                                            <DropdownMenuSeparator />
+                                            <DropdownMenuItem 
+                                              onClick={() => handleDeleteSite(site.id)}
+                                              className="gap-2 text-red-600 focus:text-red-600 focus:bg-red-50"
+                                            >
+                                              <Trash2 className="h-4 w-4" />
+                                              <span>Delete</span>
+                                            </DropdownMenuItem>
+                                          </>
+                                        )}
+                                      </DropdownMenuContent>
+                                    </DropdownMenu>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2 mt-1.5 ml-5.5 flex-wrap">
+                                  {site.startDate && (
+                                    <span className="text-xs text-slate-400">
+                                      Since {new Date(site.startDate).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}
+                                    </span>
+                                  )}
+                                  {activeHold && (
+                                    <span className="text-amber-700 dark:text-amber-400 font-semibold bg-amber-100/60 dark:bg-amber-950/50 px-2 py-0.5 rounded text-[11px] border border-amber-300 dark:border-amber-800/50 truncate max-w-[280px]" title={activeHold.holdNote}>
+                                      On Hold: "{activeHold.holdNote}"
+                                    </span>
+                                  )}
                                 </div>
                               </div>
-                              {site.startDate && <p className="text-xs text-slate-400 mt-1.5 ml-5.5">Since {new Date(site.startDate).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}</p>}
-                            </div>
-                          )) : (
+                            );
+                          }) : (
                             <div className="py-12 flex flex-col items-center justify-center text-center text-slate-500">
                               <MapPin className="w-12 h-12 text-slate-300 dark:text-slate-700 mb-3" />
                               <p className="font-semibold text-sm">No Active Sites</p>

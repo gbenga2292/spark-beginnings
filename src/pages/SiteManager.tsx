@@ -3,7 +3,7 @@ import { useAppStore, Site } from '@/src/store/appStore';
 import { useOperations } from '../contexts/OperationsContext';
 import {
   MapPin, Building2, Search, MoreVertical, Package, FileText,
-  ListFilter, CheckCircle2, Clock, XCircle, Activity, Eye
+  ListFilter, CheckCircle2, Clock, XCircle, Activity, Eye, PauseCircle
 } from 'lucide-react';
 import { Card, CardContent } from '@/src/components/ui/card';
 import { Button } from '@/src/components/ui/button';
@@ -62,7 +62,7 @@ export function SiteManager() {
   const sites = useAppStore(s => s.sites);
   const operationalSites = useMemo(() => filterOperationalSites(sites), [sites]);
   const pendingSites = useAppStore(s => s.pendingSites);
-  const { waybills } = useOperations();
+  const { waybills, siteHoldPeriods } = useOperations();
   const location = useLocation();
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -248,7 +248,7 @@ export function SiteManager() {
                       </h3>
 
                       {/* Status badge */}
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         <span className={cn(
                           'inline-flex items-center gap-1 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border',
                           cfg.badgeBg
@@ -262,6 +262,17 @@ export function SiteManager() {
                           <StatusIcon className="h-2.5 w-2.5" />
                           {cfg.label}
                         </span>
+                        {(() => {
+                          const activeHold = siteHoldPeriods?.find(h => (h.siteId === site.id || h.siteName === site.name) && !h.holdEnd);
+                          const holdDays = activeHold ? Math.max(1, Math.round((new Date().getTime() - new Date(activeHold.holdStart).getTime()) / 86400000)) : 0;
+                          if (!activeHold) return null;
+                          return (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-700/60 shadow-sm" title={`On Hold: ${activeHold.holdNote}`}>
+                              <PauseCircle className="h-2.5 w-2.5" />
+                              On Hold ({holdDays}d)
+                            </span>
+                          );
+                        })()}
                       </div>
                     </div>
                   </div>

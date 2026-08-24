@@ -19,7 +19,7 @@ import { Input } from '@/src/components/ui/input';
 import { Dialog, DialogContent } from '@/src/components/ui/dialog';
 import { Label } from '@/src/components/ui/label';
 
-import { useSetPageTitle } from '@/src/contexts/PageContext';
+import { useSetPageTitle, useAutoCollapseSidebar } from '@/src/contexts/PageContext';
 import { useAppStore } from '../store/appStore';
 import { useUserStore } from '../store/userStore';
 import { isInternalSite } from '@/src/lib/siteUtils';
@@ -40,6 +40,7 @@ function WaybillManagerHeader({ onCreate, activeTab }: { onCreate: () => void, a
 }
 
 export function WaybillManager() {
+  useAutoCollapseSidebar();
   const { waybills, updateWaybillStatus, deleteWaybill } = useOperations();
   const sites = useAppStore(state => state.sites);
   const currentUser = useUserStore(s => s.getCurrentUser());

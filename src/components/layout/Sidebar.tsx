@@ -1,3 +1,4 @@
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import { Browser } from '@capacitor/browser';
@@ -57,7 +58,6 @@ import {
   HardHat,
   PiggyBank
 } from 'lucide-react';
-import { useState, useEffect, useRef } from 'react';
 import { NairaSign } from '@/src/components/ui/naira-sign';
 import { APP_VERSION } from '@/src/constants/version';
 import { 
@@ -237,10 +237,20 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
   const location = useLocation();
   const currentUser = useUserStore((s) => s.getCurrentUser());
   const pendingLedgerEntries = useAppStore((s) => s.pendingLedgerEntries);
+  const commLogs = useAppStore((s) => s.commLogs);
+  const commLogReads = useAppStore((s) => s.commLogReads);
   const { isDark } = useTheme();
   const navigate = useNavigate();
   const [expandedCategories, setExpandedCategories] = useState<string[]>([]);
   const [isCollapsed, setIsCollapsed] = useState(false);
+
+  const unreadCommCount = useMemo(() => {
+    if (!currentUser?.id) return 0;
+    return (commLogs || []).filter(
+      l => l.loggedBy !== currentUser.name &&
+      !(commLogReads || []).some(r => r.logId === l.id && r.userId === currentUser.id)
+    ).length;
+  }, [commLogs, commLogReads, currentUser]);
 
   // Track whether collapse was triggered automatically (non-sidebar page)
   // vs manually by the user. We only auto-restore on auto-collapse.
@@ -600,12 +610,22 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
                       else toggleCategory(category.name);
                     }}
                     className={cn(
-                      'flex w-full items-center justify-between px-3 py-2 text-xs font-bold uppercase tracking-wider transition-colors',
+                      'flex w-full items-center justify-between px-3 py-2 text-xs font-bold uppercase tracking-wider transition-colors relative',
                       isDark ? 'text-slate-500 hover:text-slate-700' : 'text-white/80 hover:text-white',
                       isCollapsed && 'justify-center cursor-default'
                     )}
                   >
-                    <span>{isCollapsed ? '•••' : category.name}</span>
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span>{isCollapsed ? '•••' : category.name}</span>
+                      {!isCollapsed && category.name === 'Comms & Journals' && unreadCommCount > 0 && !isExpanded && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full font-bold bg-indigo-500 text-white leading-none animate-pulse">
+                          {unreadCommCount}
+                        </span>
+                      )}
+                      {isCollapsed && category.name === 'Comms & Journals' && unreadCommCount > 0 && (
+                        <span className="absolute top-1 right-2 w-2 h-2 rounded-full bg-indigo-400 ring-2 ring-indigo-900 animate-pulse" />
+                      )}
+                    </div>
                     {!isCollapsed && (
                       <ChevronDown className={cn('h-3.5 w-3.5 transition-transform duration-200', isExpanded ? 'rotate-180' : '')} />
                     )}
@@ -617,6 +637,8 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
                       {visibleItems.map((item) => {
                         const visibleSubItems = item.subItems ? getVisibleItems(item.subItems) : [];
                         const isActive = location.pathname === item.href || visibleSubItems.some(sub => location.pathname === sub.href);
+                        const isCommLog = item.href === '/comm-log';
+                        const itemUnread = isCommLog ? unreadCommCount : 0;
                         
                         return (
                           <div key={item.name} className="flex flex-col gap-0.5">
@@ -624,22 +646,37 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
                               to={item.href}
                               onClick={(e) => handleLinkClick(e, item.href)}
                               onMouseEnter={() => prefetchRoute(item.href)}
-                              title={isCollapsed ? item.name : undefined}
+                              title={isCollapsed ? (itemUnread > 0 ? `${item.name} (${itemUnread} unread)` : item.name) : undefined}
                               className={cn(
                                 'group flex items-center rounded-md py-2.5 text-sm font-medium transition-colors',
                                 isCollapsed ? 'px-0 justify-center' : 'px-3',
                                 isActive ? itemActive : itemBase
                               )}
                             >
-                              <item.icon
-                                className={cn(
-                                  'h-[18px] w-[18px] flex-shrink-0 transition-colors',
-                                  !isCollapsed && 'mr-3',
-                                  isActive ? iconActive : iconBase
+                              <div className="relative flex-shrink-0">
+                                <item.icon
+                                  className={cn(
+                                    'h-[18px] w-[18px] transition-colors',
+                                    !isCollapsed && 'mr-3',
+                                    isActive ? iconActive : iconBase
+                                  )}
+                                  aria-hidden="true"
+                                />
+                                {isCollapsed && itemUnread > 0 && (
+                                  <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-indigo-500 rounded-full ring-2 ring-white dark:ring-slate-900 animate-pulse" />
                                 )}
-                                aria-hidden="true"
-                              />
-                              {!isCollapsed && <span className="truncate">{item.name}</span>}
+                              </div>
+                              {!isCollapsed && <span className="truncate flex-1">{item.name}</span>}
+                              {!isCollapsed && itemUnread > 0 && (
+                                <span className={cn(
+                                  'ml-auto text-[11px] font-extrabold px-2 py-0.5 rounded-full shadow-sm animate-pulse',
+                                  isActive
+                                    ? (isDark ? 'bg-white text-indigo-700' : 'bg-indigo-600 text-white')
+                                    : (isDark ? 'bg-indigo-500 text-white' : 'bg-white text-indigo-700')
+                                )}>
+                                  {itemUnread}
+                                </span>
+                              )}
                             </Link>
 
                             {/* Rendering sub-items if not collapsed */}

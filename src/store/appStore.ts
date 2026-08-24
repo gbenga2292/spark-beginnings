@@ -44,7 +44,16 @@ export interface CommLog {
   parentId?: string;
   isInternal?: boolean;   // true = internal staff comm, false/undefined = external client comm
   reportedBy?: string[];  // for internal logs: list of reporter names
+  registeredNewSite?: boolean; // true = this log was used to register/initiate a new site
   createdAt: string;
+}
+
+export interface CommLogRead {
+  id: string;
+  logId: string;
+  userId: string;
+  userName: string;
+  readAt: string;
 }
 
 export interface ClientContact {
@@ -991,6 +1000,10 @@ interface AppState {
   setEmployeeFormDirty: (val: boolean) => void;
   isSimulatorDirty: boolean;
   setSimulatorDirty: (val: boolean) => void;
+  commLogReads: CommLogRead[];
+  addCommLogRead: (read: CommLogRead) => void;
+  setCommLogReads: (reads: CommLogRead[]) => void;
+  markCommLogsAsRead: (logIds: string[], userId: string, userName: string) => Promise<void>;
 }
 
 export const useAppStore = create<AppState>()(
@@ -998,6 +1011,7 @@ export const useAppStore = create<AppState>()(
     (set, get) => ({
       // ── Default state (empty - data comes from Supabase) ──
       commLogs: [],
+      commLogReads: [],
       dailyJournals: [],
       siteJournalEntries: [],
       leaves: [],
@@ -1102,6 +1116,29 @@ export const useAppStore = create<AppState>()(
       addCommLog: (log) => { set((s) => ({ commLogs: [...s.commLogs, log] })); db.insertCommLog(log); },
       updateCommLog: (id, log) => { set((s) => ({ commLogs: s.commLogs.map(l => l.id === id ? { ...l, ...log } : l) })); db.updateCommLog(id, log); },
       deleteCommLog: (id) => { set((s) => ({ commLogs: s.commLogs.filter(l => l.id !== id) })); db.deleteCommLog(id); },
+      addCommLogRead: (read) => set(s => ({
+        commLogReads: s.commLogReads.some(r => r.logId === read.logId && r.userId === read.userId)
+          ? s.commLogReads.map(r => (r.logId === read.logId && r.userId === read.userId) ? read : r)
+          : [...s.commLogReads, read]
+      })),
+      setCommLogReads: (reads) => set({ commLogReads: reads }),
+      markCommLogsAsRead: async (logIds, userId, userName) => {
+        if (!logIds.length || !userId) return;
+        const now = new Date().toISOString();
+        const newReads: CommLogRead[] = logIds.map(logId => ({
+          id: `${logId}-${userId}`,
+          logId,
+          userId,
+          userName,
+          readAt: now
+        }));
+        set(s => {
+          const existingMap = new Map(s.commLogReads.map(r => [`${r.logId}-${r.userId}`, r]));
+          newReads.forEach(r => existingMap.set(`${r.logId}-${r.userId}`, r));
+          return { commLogReads: Array.from(existingMap.values()) };
+        });
+        (db as any).markCommLogsAsRead?.(logIds, userId, userName)?.catch((err: any) => console.error('markCommLogsAsRead DB sync failed:', err));
+      },
 
       // Client Contacts
       addClientContact: (contact) => {

@@ -395,12 +395,13 @@ export function Sites() {
     const nameTrim = clientName.trim();
     const nameLow = nameTrim.toLowerCase();
     
-    const clientSites = sites.filter(s => s.client.trim().toLowerCase() === nameLow);
-    
-    let confirmPrompt = `Are you sure you want to delete client "${nameTrim}"? This will remove the client record.`;
+    const clientSites = sites.filter(s => s.client?.trim().toLowerCase() === nameLow);
     if (clientSites.length > 0) {
-      confirmPrompt = `Client "${nameTrim}" currently has ${clientSites.length} site(s) associated with it. Are you sure you want to permanently delete this client?`;
+      toast.error(`Cannot delete client "${nameTrim}". Please delete or reassign its ${clientSites.length} associated site(s) first.`);
+      return;
     }
+
+    const confirmPrompt = `Are you sure you want to delete client "${nameTrim}"? This will permanently remove the client record.`;
 
     const ok = await showConfirm(confirmPrompt, {
       title: `Delete Client — ${nameTrim}`,
@@ -1173,11 +1174,30 @@ export function Sites() {
                         <Edit2 className="w-4 h-4 text-indigo-500" /><span className="text-xs sm:text-sm">Edit Client</span>
                       </Button>
                     )}
-                    {(!currentUser || currentUser?.privileges?.clients?.canDelete !== false) && (
-                      <Button onClick={() => handleDeleteClient(selectedClient.name)} variant="outline" className="h-9 border-rose-200 text-rose-700 bg-rose-50/50 hover:bg-rose-100 hover:text-rose-800 font-semibold flex items-center gap-2 shadow-sm" title="Delete Client">
-                        <Trash2 className="w-4 h-4 text-rose-600" /><span className="text-xs sm:text-sm">Delete Client</span>
-                      </Button>
-                    )}
+                    {(!currentUser || currentUser?.privileges?.clients?.canDelete !== false) && (() => {
+                      const nameTrim = selectedClient.name.trim();
+                      const nameLow = nameTrim.toLowerCase();
+                      const associatedSitesCount = sites.filter(s => s.client?.trim().toLowerCase() === nameLow).length;
+                      const hasSites = associatedSitesCount > 0;
+
+                      return (
+                        <Button
+                          onClick={() => handleDeleteClient(selectedClient.name)}
+                          disabled={hasSites}
+                          variant="outline"
+                          className={cn(
+                            "h-9 font-semibold flex items-center gap-2 shadow-sm transition-colors",
+                            hasSites
+                              ? "border-slate-200 text-slate-400 bg-slate-100/50 cursor-not-allowed opacity-60 hover:bg-slate-100/50 hover:text-slate-400"
+                              : "border-rose-200 text-rose-700 bg-rose-50/50 hover:bg-rose-100 hover:text-rose-800"
+                          )}
+                          title={hasSites ? `Cannot delete client with ${associatedSitesCount} existing site(s). Delete or reassign all sites first.` : "Delete Client"}
+                        >
+                          <Trash2 className={cn("w-4 h-4", hasSites ? "text-slate-400" : "text-rose-600")} />
+                          <span className="text-xs sm:text-sm">Delete Client</span>
+                        </Button>
+                      );
+                    })()}
                   </>
                 )}
               </>

@@ -8,10 +8,12 @@ import {
   Building2, ArrowLeft, MapPin, DollarSign, Activity, Wrench, MessagesSquare,
   AlertTriangle, Clock, Fuel, Calendar, FileText, Users, Settings2,
   ChevronDown, Sparkles, RefreshCcw, Send, ChevronUp, Filter, CheckCircle2, Plus, Pencil, ChevronRight,
-  CheckSquare, ShieldAlert, ShieldCheck, ClipboardList, Package, Truck, X, Phone, Mail, Droplets
+  CheckSquare, ShieldAlert, ShieldCheck, ClipboardList, Package, Truck, X, Phone, Mail, Droplets,
+  PauseCircle, PlayCircle, History
 } from 'lucide-react';
 import { Badge } from '@/src/components/ui/badge';
 import { Button } from '@/src/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/src/components/ui/dialog';
 import { cn } from '@/src/lib/utils';
 import { useTheme } from '@/src/hooks/useTheme';
 import { useAppStore, Site } from '@/src/store/appStore';
@@ -301,6 +303,52 @@ export function Site360View({ site, clientSites, onSiteChange, onBack, onEditSit
   const [showCommDialog, setShowCommDialog] = useState(false);
   const [finTab, setFinTab] = useState<'invoices' | 'payments' | 'expenses' | 'vat'>('invoices');
 
+  const { dailyMachineLogs, maintenanceAssets, maintenanceSessions, waybills, assets, sitePumpDates, siteHoldPeriods, addSiteHold, endSiteHold } = useOperations();
+  const { mainTasks, subtasks } = useAppData();
+
+  // ── Site Hold state & handlers ───────────────────────────────────────────
+  const [showHoldModal, setShowHoldModal] = useState(false);
+  const [holdModalNote, setHoldModalNote] = useState('');
+  const [holdModalDate, setHoldModalDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [isSubmittingHold, setIsSubmittingHold] = useState(false);
+  const [holdModalError, setHoldModalError] = useState('');
+
+  const activeHold = useMemo(() => {
+    return siteHoldPeriods.find(h => h.siteId === site.id && !h.holdEnd);
+  }, [siteHoldPeriods, site.id]);
+  const isOnHold = !!activeHold;
+
+  const currentHoldDays = useMemo(() => {
+    if (!activeHold) return 0;
+    const s = new Date(activeHold.holdStart).getTime();
+    const now = new Date().getTime();
+    return Math.max(1, Math.round((now - s) / 86400000));
+  }, [activeHold]);
+
+  const handleConfirmHoldToggle = async () => {
+    if (!holdModalNote.trim()) {
+      setHoldModalError('A note is required.');
+      return;
+    }
+    setIsSubmittingHold(true);
+    setHoldModalError('');
+    try {
+      const actorName = currentUser?.name || authUser?.email || 'User';
+      if (isOnHold && activeHold) {
+        await endSiteHold(activeHold.id, holdModalNote.trim(), actorName, holdModalDate);
+      } else {
+        await addSiteHold(site.id, site.name, holdModalNote.trim(), actorName, holdModalDate);
+      }
+      setShowHoldModal(false);
+      setHoldModalNote('');
+    } catch (err: any) {
+      console.error('Failed to toggle site hold:', err);
+      setHoldModalError(err.message || 'Failed to update site hold status.');
+    } finally {
+      setIsSubmittingHold(false);
+    }
+  };
+
   const invoices = useAppStore(s => s.invoices);
   const payments = useAppStore(s => s.payments);
   const vatPayments = useAppStore(s => s.vatPayments);
@@ -331,8 +379,6 @@ export function Site360View({ site, clientSites, onSiteChange, onBack, onEditSit
   const commLogs = useAppStore(s => s.commLogs);
   const addCommLog = useAppStore(s => s.addCommLog);
   const clientContacts = useAppStore(s => s.clientContacts);
-  const { dailyMachineLogs, maintenanceAssets, maintenanceSessions, waybills, assets, sitePumpDates } = useOperations();
-  const { mainTasks, subtasks } = useAppData();
 
   const getInvoiceDates = (inv: any) => {
     const startDate = normalizeDate(inv.startDate || inv.date);
@@ -1104,6 +1150,12 @@ Answer site-specific questions using this context only. Be concise.`;
                       site.status === 'Active' ? 'bg-emerald-50 text-emerald-700 border-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-400' :
                         site.status === 'Ended' ? 'bg-rose-50 text-rose-700 border-rose-600 dark:bg-rose-950/30 dark:text-rose-400' : 'bg-slate-100 text-slate-600 border-slate-400 dark:bg-slate-800'
                     )}>{(site.status === 'Active' && !site.startDate) ? 'Pending' : site.status}</span>
+                    {/* On Hold badge */}
+                    {siteHoldPeriods.some(h => h.siteId === site.id && !h.holdEnd) && (
+                      <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 border bg-amber-100 text-amber-800 border-amber-500 dark:bg-amber-950/60 dark:text-amber-300 flex items-center gap-1">
+                        <PauseCircle className="w-3 h-3" /> On Hold
+                      </span>
+                    )}
                     <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 border border-slate-300 dark:border-slate-700">VAT: {site.vat}</span>
                     <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 border border-slate-300 dark:border-slate-700 max-w-[150px] sm:max-w-[200px] truncate">
                       CLIENT: {site.client}
@@ -1130,6 +1182,26 @@ Answer site-specific questions using this context only. Be concise.`;
                       <span>ENDED {new Date(site.endDate).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })}</span>
                     ) : <span>NO DATE LOGGED</span>}
                   </div>
+
+                  {/* Prominent On-Hold Banner */}
+                  {isOnHold && activeHold && (
+                    <div className="mt-2 p-2.5 rounded-lg border bg-amber-500/10 border-amber-500/30 text-amber-900 dark:text-amber-200 flex items-start gap-2.5">
+                      <PauseCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <p className="text-xs font-black uppercase tracking-wider text-amber-800 dark:text-amber-300">
+                            Site Currently On Hold ({currentHoldDays} day{currentHoldDays !== 1 ? 's' : ''})
+                          </p>
+                          <span className="text-[10px] font-mono opacity-80">
+                            Since {new Date(activeHold.holdStart).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                          </span>
+                        </div>
+                        <p className="text-xs text-amber-700 dark:text-amber-300/90 mt-0.5">
+                          <span className="font-semibold">Reason:</span> "{activeHold.holdNote}"
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
                 
                 <Button 
@@ -1303,7 +1375,32 @@ Answer site-specific questions using this context only. Be concise.`;
                 </button>
               ))}
             </div>
-            <div className="shrink-0 pb-1">
+            <div className="shrink-0 pb-1 flex items-center gap-2">
+              {currentUser?.privileges?.sites?.canEditSite && (() => {
+                const activeHold = siteHoldPeriods.find(h => h.siteId === site.id && !h.holdEnd);
+                const isOnHold = !!activeHold;
+                return (
+                  <Button
+                    onClick={() => {
+                      setHoldModalNote('');
+                      setHoldModalError('');
+                      setHoldModalDate(new Date().toISOString().split('T')[0]);
+                      setShowHoldModal(true);
+                    }}
+                    variant="outline"
+                    size="sm"
+                    className={cn(
+                      'h-8 text-xs px-2 font-medium shadow-sm transition-colors flex items-center gap-1',
+                      isOnHold
+                        ? (isDark ? 'bg-slate-900 border-emerald-600 hover:bg-emerald-950/30 text-emerald-400' : 'bg-white border-emerald-500 hover:bg-emerald-50 text-emerald-700')
+                        : (isDark ? 'bg-slate-900 border-amber-600 hover:bg-amber-950/30 text-amber-400' : 'bg-white border-amber-400 hover:bg-amber-50 text-amber-700')
+                    )}
+                  >
+                    {isOnHold ? <PlayCircle className="w-3.5 h-3.5 shrink-0" /> : <PauseCircle className="w-3.5 h-3.5 shrink-0" />}
+                    <span className="hidden min-[600px]:inline">{isOnHold ? 'Resume Site' : 'Hold Site'}</span>
+                  </Button>
+                );
+              })()}
               {currentUser?.privileges?.sites?.canEditSite && (
                 <Button onClick={() => onEditSite(site)} variant="outline" size="sm" title="Edit Site" className={cn("h-8 text-xs px-2 font-medium shadow-sm transition-colors flex items-center gap-1", isDark ? "bg-slate-900 border-slate-700 hover:bg-slate-800 text-slate-200" : "bg-white border-slate-200 hover:bg-slate-50 text-slate-700")}>
                   <Settings2 className="w-3.5 h-3.5 shrink-0" /><span className="hidden min-[600px]:inline">Edit Site</span>
@@ -1791,7 +1888,70 @@ Answer site-specific questions using this context only. Be concise.`;
               </div>
             )}
 
-            {/* TASKS */}
+            {/* HOLD HISTORY — inside Operations tab */}
+            {activeTab === 'operations' && (() => {
+              const holdHistory = siteHoldPeriods.filter(h => h.siteId === site.id);
+              if (holdHistory.length === 0) return null;
+              return (
+                <div className={cn(card, 'border-amber-200 dark:border-amber-900/60')}>
+                  <div className="flex items-center gap-2 mb-4 pb-2 border-b border-amber-100 dark:border-amber-900/40">
+                    <History className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                    <h3 className="font-bold text-sm text-amber-700 dark:text-amber-300 uppercase tracking-wider">Hold History</h3>
+                    <span className={cn('text-xs font-extrabold px-2 py-0.5 rounded-full', isDark ? 'bg-amber-900/50 text-amber-300' : 'bg-amber-100 text-amber-700')}>
+                      {holdHistory.length}
+                    </span>
+                  </div>
+                  <div className="divide-y divide-amber-50 dark:divide-amber-900/20">
+                    {holdHistory.map(h => {
+                      const isActive = !h.holdEnd;
+                      const days = h.holdDays ?? Math.max(1, Math.round((new Date().getTime() - new Date(h.holdStart).getTime()) / 86400000));
+                      return (
+                        <div key={h.id} className="py-3 flex flex-col gap-1.5">
+                          <div className="flex items-center justify-between gap-3 flex-wrap">
+                            <div className="flex items-center gap-2">
+                              <span className={cn(
+                                'text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 border rounded-sm',
+                                isActive
+                                  ? 'bg-amber-100 text-amber-800 border-amber-400 dark:bg-amber-950/60 dark:text-amber-300'
+                                  : 'bg-slate-100 text-slate-600 border-slate-300 dark:bg-slate-800 dark:text-slate-400'
+                              )}>
+                                {isActive ? 'On Hold' : 'Resumed'}
+                              </span>
+                              <span className="text-xs font-mono text-slate-500">
+                                {new Date(h.holdStart).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                {' → '}
+                                {h.holdEnd
+                                  ? new Date(h.holdEnd).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+                                  : <span className="text-amber-600 dark:text-amber-400 font-bold">Ongoing</span>}
+                              </span>
+                            </div>
+                            <span className={cn(
+                              'text-[10px] font-extrabold px-2 py-0.5 rounded-full',
+                              isActive ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
+                            )}>
+                              {days} day{days !== 1 ? 's' : ''}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-600 dark:text-slate-400">
+                            <span className="font-semibold text-amber-700 dark:text-amber-400">Hold reason: </span>
+                            {h.holdNote}
+                          </p>
+                          {h.resumeNote && (
+                            <p className="text-xs text-slate-600 dark:text-slate-400">
+                              <span className="font-semibold text-emerald-700 dark:text-emerald-400">Resume note: </span>
+                              {h.resumeNote}
+                            </p>
+                          )}
+                          <p className="text-[10px] text-slate-400">Recorded by {h.createdBy || 'unknown'}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
+
+
             {activeTab === 'tasks' && (
               <div className="space-y-5 transition-opacity duration-150">
                 <div className={card}>
@@ -2128,6 +2288,107 @@ Answer site-specific questions using this context only. Be concise.`;
             onPrint={() => alert('To print this invoice, please visit the Invoices & Billing module.')}
           />
 
+          {/* Site Hold / Resume Dialog */}
+          <Dialog open={showHoldModal} onOpenChange={setShowHoldModal}>
+            <DialogContent className="sm:max-w-[480px] p-6">
+              <DialogHeader>
+                <div className="flex items-center gap-2.5">
+                  <div className={cn(
+                    "p-2 rounded-xl",
+                    isOnHold ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400" : "bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400"
+                  )}>
+                    {isOnHold ? <PlayCircle className="w-5 h-5" /> : <PauseCircle className="w-5 h-5" />}
+                  </div>
+                  <div>
+                    <DialogTitle className="text-lg font-black text-slate-900 dark:text-white">
+                      {isOnHold ? `Resume Operations on ${site.name}` : `Place ${site.name} On Hold`}
+                    </DialogTitle>
+                    <DialogDescription className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                      {isOnHold
+                        ? `This will end the current hold period (${currentHoldDays} days) and resume normal tracking.`
+                        : 'This records a hold start date and preserves all machine and site history.'}
+                    </DialogDescription>
+                  </div>
+                </div>
+              </DialogHeader>
+
+              <div className="space-y-4 my-2">
+                {isOnHold && activeHold && (
+                  <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/60 text-xs text-slate-600 dark:text-slate-300">
+                    <p className="font-bold text-slate-700 dark:text-slate-200 mb-1">Current Hold Summary:</p>
+                    <p>• Started: <span className="font-semibold">{new Date(activeHold.holdStart).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span> ({currentHoldDays} day{currentHoldDays !== 1 ? 's' : ''} on hold)</p>
+                    <p className="mt-0.5">• Initial Reason: <span className="italic">"{activeHold.holdNote}"</span></p>
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-1.5">
+                    {isOnHold ? 'Resume Date *' : 'Hold Start Date *'}
+                  </label>
+                  <input
+                    type="date"
+                    value={holdModalDate}
+                    onChange={e => setHoldModalDate(e.target.value)}
+                    required
+                    className="w-full h-10 px-3 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-900 dark:text-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-1.5">
+                    {isOnHold ? 'Resume Reason / Outcome Note *' : 'Reason for Placing Site On Hold *'}
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={holdModalNote}
+                    onChange={e => {
+                      setHoldModalNote(e.target.value);
+                      if (holdModalError) setHoldModalError('');
+                    }}
+                    placeholder={isOnHold
+                      ? 'E.g., Client approved resumption of works; all site permits active.'
+                      : 'E.g., Heavy rainfall / client requested temporary pause during excavation phase.'
+                    }
+                    className="w-full p-3 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none text-slate-900 dark:text-white"
+                  />
+                  {holdModalError && (
+                    <p className="text-xs font-semibold text-rose-500 mt-1">{holdModalError}</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-slate-800">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowHoldModal(false)}
+                  disabled={isSubmittingHold}
+                  className="text-xs font-semibold"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleConfirmHoldToggle}
+                  disabled={!holdModalNote.trim() || isSubmittingHold}
+                  className={cn(
+                    "text-xs font-bold text-white",
+                    isOnHold ? "bg-emerald-600 hover:bg-emerald-700" : "bg-amber-600 hover:bg-amber-700"
+                  )}
+                >
+                  {isSubmittingHold ? (
+                    <span className="flex items-center gap-1.5">
+                      <RefreshCcw className="w-3.5 h-3.5 animate-spin" />
+                      Saving...
+                    </span>
+                  ) : (
+                    isOnHold ? 'Confirm & Resume Site' : 'Confirm & Place On Hold'
+                  )}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+
           <ExternalCommDialog
             open={showCommDialog}
             onClose={() => setShowCommDialog(false)}
@@ -2353,3 +2614,5 @@ function ExternalCommDialog({ open, onClose, site, contacts = [], onSave }: { op
     </div>
   );
 }
+
+{/* ── This closing brace ends the Site360View component ── */}
