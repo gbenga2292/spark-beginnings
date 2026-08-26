@@ -1764,26 +1764,59 @@ export const db = {
     if (error) { console.error('Database error:', error); throw error; }
   },
   async updateInvoice(id: string, i: Partial<Invoice>) {
+    const map: Record<string, string> = {
+      invoiceNumber: 'invoice_number',
+      client: 'client',
+      project: 'project',
+      siteId: 'site_id',
+      siteName: 'site_name',
+      amount: 'amount',
+      date: 'date',
+      dueDate: 'due_date',
+      billingCycle: 'billing_cycle',
+      reminderDate: 'reminder_date',
+      status: 'status',
+      vatInc: 'vat_inc',
+      noOfMachine: 'no_of_machine',
+      dailyRentalCost: 'daily_rental_cost',
+      dieselCostPerLtr: 'diesel_cost_per_ltr',
+      dailyUsage: 'daily_usage',
+      noOfTechnician: 'no_of_technician',
+      techniciansDailyRate: 'technicians_daily_rate',
+      mobDemob: 'mob_demob',
+      installation: 'installation',
+      damages: 'damages',
+      duration: 'duration',
+      rentalCost: 'rental_cost',
+      dieselCost: 'diesel_cost',
+      techniciansCost: 'technicians_cost',
+      totalCost: 'total_cost',
+      vat: 'vat',
+      totalCharge: 'total_charge',
+      totalExclusiveOfVat: 'total_exclusive_of_vat',
+      printLayout: 'print_layout',
+      historyLog: 'history_log',
+      machineConfigs: 'machine_configs',
+      countOffDays: 'count_off_days',
+      technicianDuration: 'technician_duration',
+      technicianDurationSameAsMachine: 'technician_duration_same_as_machine',
+      technicianNightFee: 'technician_night_fee',
+      technicianAccommodation: 'technician_accommodation',
+      technicianNightDuration: 'technician_night_duration',
+      technicianNightDurationSameAsMachine: 'technician_night_duration_same_as_machine',
+      noOfTechnicianNight: 'no_of_technician_night',
+      technicianNightCountSameAsDay: 'technician_night_count_same_as_day',
+      technicianAccommodationUseNightCount: 'technician_accommodation_use_night_count'
+    };
+    const validDbColumns = new Set(Object.values(map));
     const update: any = {};
     Object.entries(i).forEach(([k, v]) => {
-      const map: Record<string, string> = {
-        invoiceNumber: 'invoice_number', siteId: 'site_id', siteName: 'site_name',
-        dueDate: 'due_date', billingCycle: 'billing_cycle', reminderDate: 'reminder_date',
-        vatInc: 'vat_inc', noOfMachine: 'no_of_machine', dailyRentalCost: 'daily_rental_cost',
-        dieselCostPerLtr: 'diesel_cost_per_ltr', dailyUsage: 'daily_usage',
-        noOfTechnician: 'no_of_technician', techniciansDailyRate: 'technicians_daily_rate',
-        mobDemob: 'mob_demob', rentalCost: 'rental_cost', dieselCost: 'diesel_cost',
-        techniciansCost: 'technicians_cost', totalCost: 'total_cost', totalCharge: 'total_charge',
-        totalExclusiveOfVat: 'total_exclusive_of_vat', printLayout: 'print_layout', historyLog: 'history_log',
-        machineConfigs: 'machine_configs', countOffDays: 'count_off_days',
-        technicianDuration: 'technician_duration', technicianDurationSameAsMachine: 'technician_duration_same_as_machine',
-        technicianNightFee: 'technician_night_fee', technicianAccommodation: 'technician_accommodation',
-        technicianNightDuration: 'technician_night_duration', technicianNightDurationSameAsMachine: 'technician_night_duration_same_as_machine',
-        noOfTechnicianNight: 'no_of_technician_night', technicianNightCountSameAsDay: 'technician_night_count_same_as_day',
-        technicianAccommodationUseNightCount: 'technician_accommodation_use_night_count'
-      };
-      update[map[k] || k] = v;
+      const dbKey = map[k] || (validDbColumns.has(k) ? k : null);
+      if (dbKey && v !== undefined) {
+        update[dbKey] = v;
+      }
     });
+    if (Object.keys(update).length === 0) return;
     const { error } = await supabase.from('invoices').update(update).eq('id', id);
     if (error) { console.error('updateInvoice:', error); throw error; }
   },
@@ -1798,26 +1831,53 @@ export const db = {
     if (error) { console.error('Database error:', error); throw error; }
   },
   async updatePendingInvoice(id: string, p: Partial<PendingInvoice>) {
+    const map: Record<string, string> = {
+      invoiceNo: 'invoice_no',
+      client: 'client',
+      site: 'site',
+      vatInc: 'vat_inc',
+      noOfMachine: 'no_of_machine',
+      dailyRentalCost: 'daily_rental_cost',
+      dieselCostPerLtr: 'diesel_cost_per_ltr',
+      dailyUsage: 'daily_usage',
+      noOfTechnician: 'no_of_technician',
+      techniciansDailyRate: 'technicians_daily_rate',
+      mobDemob: 'mob_demob',
+      installation: 'installation',
+      damages: 'damages',
+      startDate: 'start_date',
+      duration: 'duration',
+      endDate: 'end_date',
+      rentalCost: 'rental_cost',
+      dieselCost: 'diesel_cost',
+      techniciansCost: 'technicians_cost',
+      totalCost: 'total_cost',
+      vat: 'vat',
+      totalCharge: 'total_charge',
+      totalExclusiveOfVat: 'total_exclusive_of_vat',
+      printLayout: 'print_layout',
+      historyLog: 'history_log',
+      machineConfigs: 'machine_configs',
+      countOffDays: 'count_off_days',
+      technicianDuration: 'technician_duration',
+      technicianDurationSameAsMachine: 'technician_duration_same_as_machine',
+      technicianNightFee: 'technician_night_fee',
+      technicianAccommodation: 'technician_accommodation',
+      technicianNightDuration: 'technician_night_duration',
+      technicianNightDurationSameAsMachine: 'technician_night_duration_same_as_machine',
+      noOfTechnicianNight: 'no_of_technician_night',
+      technicianNightCountSameAsDay: 'technician_night_count_same_as_day',
+      technicianAccommodationUseNightCount: 'technician_accommodation_use_night_count'
+    };
+    const validDbColumns = new Set(Object.values(map));
     const update: any = {};
     Object.entries(p).forEach(([k, v]) => {
-      const map: Record<string, string> = {
-        invoiceNo: 'invoice_no', vatInc: 'vat_inc', noOfMachine: 'no_of_machine',
-        dailyRentalCost: 'daily_rental_cost', dieselCostPerLtr: 'diesel_cost_per_ltr',
-        dailyUsage: 'daily_usage', noOfTechnician: 'no_of_technician',
-        techniciansDailyRate: 'technicians_daily_rate', mobDemob: 'mob_demob',
-        startDate: 'start_date', endDate: 'end_date', rentalCost: 'rental_cost',
-        dieselCost: 'diesel_cost', techniciansCost: 'technicians_cost',
-        totalCost: 'total_cost', totalCharge: 'total_charge',
-        totalExclusiveOfVat: 'total_exclusive_of_vat', printLayout: 'print_layout', historyLog: 'history_log',
-        machineConfigs: 'machine_configs', countOffDays: 'count_off_days',
-        technicianDuration: 'technician_duration', technicianDurationSameAsMachine: 'technician_duration_same_as_machine',
-        technicianNightFee: 'technician_night_fee', technicianAccommodation: 'technician_accommodation',
-        technicianNightDuration: 'technician_night_duration', technicianNightDurationSameAsMachine: 'technician_night_duration_same_as_machine',
-        noOfTechnicianNight: 'no_of_technician_night', technicianNightCountSameAsDay: 'technician_night_count_same_as_day',
-        technicianAccommodationUseNightCount: 'technician_accommodation_use_night_count'
-      };
-      update[map[k] || k] = v;
+      const dbKey = map[k] || (validDbColumns.has(k) ? k : null);
+      if (dbKey && v !== undefined) {
+        update[dbKey] = v;
+      }
     });
+    if (Object.keys(update).length === 0) return;
     const { error } = await supabase.from('pending_invoices').update(update).eq('id', id);
     if (error) { console.error('Database error:', error); throw error; }
   },

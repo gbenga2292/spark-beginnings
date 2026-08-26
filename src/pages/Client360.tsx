@@ -37,8 +37,9 @@ import { ClientContactsPanel } from './ClientContactsPanel';
 import { CreateTaskDialog } from './Tasks/CreateTaskDialog';
 import { InvoiceDetailDialog } from './InvoiceDetailDialog';
 import { GlobalSearch } from '@/src/components/common/GlobalSearch';
+import { ClientSitesTimeline } from '@/src/components/sites/ClientSitesTimeline';
 
-type TabType = 'overview' | 'contacts' | 'financials' | 'report' | 'operations' | 'activity' | 'tasks' | 'onboarding';
+type TabType = 'overview' | 'timeline' | 'contacts' | 'financials' | 'report' | 'operations' | 'activity' | 'tasks' | 'onboarding';
 
 const renderFormattedChatMessage = (content: string) => {
   if (!content) return null;
@@ -50,10 +51,10 @@ const renderFormattedChatMessage = (content: string) => {
       <>
         {parts.map((part, i) => {
           if (part.startsWith('**') && part.endsWith('**') && part.length >= 4) {
-            return <strong key={i} className="font-extrabold text-white">{part.slice(2, -2)}</strong>;
+            return <strong key={i} className="font-extrabold text-slate-900 dark:text-white">{part.slice(2, -2)}</strong>;
           }
           if (part.startsWith('*') && part.endsWith('*') && part.length >= 2 && !part.startsWith('**')) {
-            return <em key={i} className="italic text-indigo-200">{part.slice(1, -1)}</em>;
+            return <em key={i} className="italic text-indigo-600 dark:text-indigo-200">{part.slice(1, -1)}</em>;
           }
           // Clean up any loose lone asterisks or hashes
           const cleanPart = part.replace(/\*\*/g, '').replace(/#/g, '');
@@ -75,18 +76,19 @@ const renderFormattedChatMessage = (content: string) => {
         if (trimmed.startsWith('#') || (/^\*\*[^*]+\*\*:?$/.test(trimmed) && trimmed.length < 60)) {
           const cleanHeader = trimmed.replace(/^#+\s*/, '').replace(/\*\*/g, '').replace(/#/g, '').trim();
           return (
-            <div key={idx} className="text-xs font-black tracking-wider text-indigo-300 uppercase mt-3.5 mb-1.5 border-b border-indigo-700/50 pb-1 flex items-center gap-1.5">
+            <div key={idx} className="text-xs font-black tracking-wider text-indigo-700 dark:text-indigo-300 uppercase mt-3.5 mb-1.5 border-b border-indigo-200 dark:border-indigo-700/50 pb-1 flex items-center gap-1.5">
               <span>{cleanHeader}</span>
             </div>
           );
         }
 
         // Bullet point item (- or * or •) or numbered (1. 2.)
-        if (/^[-*•]\s+/.test(trimmed) || /^\d+[\.\)]\s+/.test(trimmed)) {
-          const bulletText = trimmed.replace(/^[-*•]\s+/, '').replace(/^\d+[\.\)]\s+/, '');
+        if (/^[-*•](\s+|$)/.test(trimmed) || /^\d+[\.\)](\s+|$)/.test(trimmed)) {
+          const bulletText = trimmed.replace(/^[-*•]\s*/, '').replace(/^\d+[\.\)]\s*/, '').trim();
+          if (!bulletText) return null;
           return (
-            <div key={idx} className="flex items-start gap-2 pl-1.5 my-1 text-slate-100">
-              <span className="text-indigo-400 font-bold text-sm select-none leading-none mt-0.5">•</span>
+            <div key={idx} className="flex items-start gap-2 pl-1.5 my-1 text-slate-800 dark:text-slate-100">
+              <span className="text-indigo-600 dark:text-indigo-400 font-bold text-sm select-none leading-none mt-0.5">•</span>
               <div className="flex-1">
                 {renderInlineText(bulletText)}
               </div>
@@ -96,7 +98,7 @@ const renderFormattedChatMessage = (content: string) => {
 
         // Standard paragraph line
         return (
-          <p key={idx} className="my-1 text-indigo-50">
+          <p key={idx} className="my-1 text-slate-700 dark:text-indigo-50">
             {renderInlineText(trimmed)}
           </p>
         );
@@ -131,6 +133,8 @@ export function Client360() {
   const updatePendingSite = useAppStore(s => s.updatePendingSite);
   const addCommLog = useAppStore(s => s.addCommLog);
   const addPendingSite = useAppStore(s => s.addPendingSite);
+  const dailyJournals = useAppStore(s => s.dailyJournals);
+  const siteJournalEntries = useAppStore(s => s.siteJournalEntries);
   const { mainTasks, subtasks, users } = useAppData();
   const { dailyMachineLogs, assets, waybills, siteHoldPeriods } = useOperations();
   const navigate = useNavigate();
@@ -341,6 +345,23 @@ export function Client360() {
     const queryClient = new URLSearchParams(window.location.search).get('client');
     return queryClient || '';
   });
+
+  useEffect(() => {
+    const siteIdParam = searchParams.get('siteId');
+    const siteNameParam = searchParams.get('site');
+    if (siteIdParam || siteNameParam) {
+      const match = sites.find(s => 
+        (siteIdParam && s.id === siteIdParam) || 
+        (siteNameParam && s.name.toLowerCase().trim() === siteNameParam.toLowerCase().trim())
+      );
+      if (match) {
+        setSelectedSite(match);
+        if (match.client) {
+          setRawSelectedClient(match.client);
+        }
+      }
+    }
+  }, [searchParams, sites]);
 
   const selectedClientProfile = useMemo(() => {
     if (!selectedClient) return null;
@@ -1002,7 +1023,8 @@ export function Client360() {
   const [sitesSubTab, setSitesSubTab] = useState<'portfolio' | 'onboarding' | 'pending' | 'closed'>('portfolio');
   const [filterMonth, setFilterMonth] = useState<string>('all');
   const [filterYear, setFilterYear] = useState<string>('all');
-  const [isChatCollapsed, setIsChatCollapsed] = useState(true);
+  const [isAiDrawerOpen, setIsAiDrawerOpen] = useState(false);
+  const [isQuickStatsOpen, setIsQuickStatsOpen] = useState(false);
   const [showFilterMenu, setShowFilterMenu] = useState(false);
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   const [expandedLogs, setExpandedLogs] = useState<Set<string>>(new Set());
@@ -1805,15 +1827,21 @@ export function Client360() {
     if (!isInitialBrief && !chatInput.trim()) return;
 
     let apiKey = '';
+    let provider = selectedProvider;
+    let model = selectedModel;
 
     try {
       const { data: keys } = await supabase
         .from('api_keys')
-        .select('key_value,provider')
+        .select('key_value,provider,default_model,is_default')
         .eq('workspace_id', workspaceId);
-      const matchKey = keys?.find(k => k.provider === selectedProvider);
-      if (matchKey) {
-        apiKey = matchKey.key_value;
+      if (keys && keys.length > 0) {
+        const defaultKey = keys.find(k => k.is_default) || keys.find(k => k.provider === selectedProvider) || keys[0];
+        if (defaultKey) {
+          apiKey = defaultKey.key_value;
+          provider = (defaultKey.provider === 'gemini' || defaultKey.provider === 'groq') ? defaultKey.provider : (defaultKey.key_value?.startsWith('AIza') ? 'gemini' : 'groq');
+          if (defaultKey.default_model) model = defaultKey.default_model;
+        }
       }
     } catch (err) {
       console.error('Failed to load API key from DB:', err);
@@ -1824,12 +1852,12 @@ export function Client360() {
     }
 
     if (!apiKey) {
-      apiKey = window.prompt(`Please enter your ${selectedProvider === 'gemini' ? 'Gemini' : 'Groq'} API Key for the Intelligence Assistant:`) || '';
+      apiKey = window.prompt(`Please enter your ${provider === 'gemini' ? 'Gemini' : 'Groq'} API Key for the Intelligence Assistant:`) || '';
       if (!apiKey) return;
       localStorage.setItem('GROQ_API_KEY', apiKey);
     }
 
-    const newUserMessage = isInitialBrief ? "Please provide an initial 3-sentence Intelligence Brief for this client." : chatInput;
+    const newUserMessage = isInitialBrief ? "Please provide a comprehensive Executive Intelligence Brief for this client across financial standing, active sites & field progress, machine fleet reconciliation, and priority action items." : chatInput;
     if (!isInitialBrief) {
       setMessages(prev => [...prev, { role: 'user', content: newUserMessage }]);
       setChatInput('');
@@ -1839,15 +1867,20 @@ export function Client360() {
 
     try {
       const isAll = selectedClient === 'ALL' || selectedClient === 'All Clients';
-      const clientLabel = isAll ? 'All Corporate Accounts (Consolidated Enterprise View)' : selectedClient;
+      const clientLabel = isAll ? 'ALL CLIENTS PORTFOLIO (Consolidated)' : `CLIENT: ${selectedClient}`;
 
-      // 1. Invoices & Overdue Breakdown
-      const overdueInvoices = clientData.clientInvoices.filter((i: any) => i.status === 'Overdue' || (i.status !== 'Paid' && i.dueDate && new Date(normalizeDate(i.dueDate)).getTime() < Date.now()));
-      const overdueSummary = overdueInvoices.slice(0, 15).map((i: any) => `Inv #${i.invoiceNumber} (${i.client || 'N/A'} - ${i.siteName || 'N/A'}): ₦${(i.totalCharge || i.amount || 0).toLocaleString()} (Due: ${i.dueDate || 'N/A'})`).join(' | ');
-      const recentInvoicesSummary = clientData.clientInvoices.slice(0, 20).map((i: any) => `Inv #${i.invoiceNumber} (${i.client || 'N/A'}): ₦${(i.totalCharge || i.amount || 0).toLocaleString()} [Status: ${i.status}]`).join(' | ');
+      // 1. Financial Exposure & Overdues
+      const overdueInvoices = clientData.clientInvoices.filter((inv: any) => {
+        const isOverdue = inv.status === 'Overdue' || (inv.dueDate && new Date(inv.dueDate) < new Date() && inv.status !== 'Paid');
+        return isOverdue;
+      });
 
-      // 2. Client & Sites Summary & Project Scope
-      const clientListSummary = isAll ? Array.from(new Set(sites.map(s => s.client))).filter(c => c && c.toUpperCase() !== 'DCEL').join(', ') : selectedClient;
+      const overdueSummary = overdueInvoices.slice(0, 10).map((inv: any) => 
+        `Invoice #${inv.invoiceNumber || inv.id?.substring(0, 8)} (${inv.site || 'General'}): ₦${(inv.totalCharge || inv.amount || 0).toLocaleString()} [Due: ${inv.dueDate || 'N/A'}]`
+      ).join(' | ');
+
+      // 2. Project Sites & Scope Breakdowns
+      const clientListSummary = (allClients || []).slice(0, 30).join(', ');
       const sitesSummary = clientData.clientSites.slice(0, 20).map((s: any) => `${s.name} (${s.client}) [Status: ${s.status}]`).join(' | ');
       const siteProjectSummaries = clientData.clientSites.slice(0, 20).map((s: any) => {
         const ps = pendingSites.find(p => p.siteName === s.name && p.clientName === s.client);
@@ -1868,6 +1901,37 @@ export function Client360() {
       // 5. Tasks Summary
       const pendingTasksSummary = clientData.pendingTasks.slice(0, 20).map((t: any) => `Task "${t.title}" [Status: ${t.status || 'Pending'}, Deadline: ${t.deadline || 'N/A'}]`).join(' | ');
 
+      // 6. Site Journals & Daily Field Progress across client's sites
+      const clientSiteNames = new Set(clientData.clientSites.map((s: any) => s.name?.trim().toLowerCase()));
+      const clientSiteIds = new Set(clientData.clientSites.map((s: any) => s.id));
+
+      const clientJournals = siteJournalEntries
+        .filter(e => {
+          if (isAll) return true;
+          const matchesClient = e.clientName?.trim().toLowerCase() === selectedClient.trim().toLowerCase();
+          const matchesSiteName = e.siteName && clientSiteNames.has(e.siteName.trim().toLowerCase());
+          const matchesSiteId = e.siteId && clientSiteIds.has(e.siteId);
+          return matchesClient || matchesSiteName || matchesSiteId;
+        })
+        .map(e => {
+          const parentJournal = dailyJournals.find(j => j.id === e.journalId);
+          const date = parentJournal?.date || e.createdAt?.split('T')[0] || 'Unknown Date';
+          return {
+            date,
+            siteName: e.siteName || 'Site',
+            clientName: e.clientName || selectedClient,
+            stage: e.dewateringStage || 'operational',
+            progress: e.progressPercentage !== undefined ? `${e.progressPercentage}%` : 'N/A',
+            narration: e.narration || 'No narrative logged',
+            loggedBy: e.loggedBy || parentJournal?.loggedBy || 'Site Team'
+          };
+        })
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+      const clientJournalsSummary = clientJournals.slice(0, 20).map(j =>
+        `[${j.date} | Site: ${j.siteName}] (Stage: ${j.stage}, Progress: ${j.progress}, Logged By: ${j.loggedBy}) -> "${j.narration}"`
+      ).join('\n') || 'No site journal entries recorded.';
+
       const systemPrompt = `You are the Executive Personal Assistant & Chief of Staff for Dewatering Construction Etc Limited (DCEL). Your role is to provide direct, high-value, executive-level briefings and answer questions accurately without overwhelming the executive with raw, unorganized data dumps. Act like an intelligent, highly competent personal assistant giving a sharp status update.
 
 Target Context: ${clientLabel}
@@ -1885,6 +1949,9 @@ REAL DATABASE RECORDS & EXECUTIVE METRICS:
 - Active Sites: ${clientData.activeSites} / ${clientData.totalSites} Total Sites
 - Client Portfolio Accounts: ${clientListSummary}
 - Project Scope & Site Breakdown: ${siteProjectSummaries || 'None'}
+
+📖 SITE JOURNALS & DAILY FIELD PROGRESS:
+${clientJournalsSummary}
 
 🚜 EQUIPMENT FLEET & MACHINE RECONCILIATION:
 - Total Equipment Assets: ${totalFleetCount}
@@ -1924,19 +1991,19 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
 6. NO UNFORMATTED PARAGRAPHS OR DATA DUMPS! Keep it sharp, clean, and executive-ready.`;
 
       let reply = '';
-      if (selectedProvider === 'gemini') {
+      if (provider === 'gemini') {
         const contents = messages.map(m => ({
           role: m.role === 'assistant' ? 'model' : (m.role === 'system' ? 'user' : 'user'),
           parts: [{ text: m.content }]
         }));
         contents.push({ role: 'user', parts: [{ text: newUserMessage }] });
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent?key=${apiKey}`, {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model || 'gemini-2.0-flash'}:generateContent?key=${apiKey}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             contents,
             systemInstruction: { parts: [{ text: systemPrompt }] },
-            generationConfig: { temperature: 0.3, maxOutputTokens: 800 }
+            generationConfig: { temperature: 0.3, maxOutputTokens: 2048 }
           })
         });
         if (!res.ok) throw new Error('Gemini API Error');
@@ -1955,10 +2022,10 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            model: selectedModel,
+            model: model || 'llama-3.3-70b-versatile',
             messages: apiMessages,
             temperature: 0.3,
-            max_tokens: 800,
+            max_tokens: 2048,
           }),
         });
         if (!res.ok) throw new Error('Groq API Error');
@@ -1995,13 +2062,50 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
   ];
 
   const headerActions = (
-    <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3 w-full md:w-auto">
+    <div className="flex flex-col md:flex-row items-stretch md:items-center gap-2 w-full md:w-auto">
       {/* Search Input and Dropdown */}
       <GlobalSearch 
         isDark={isDark} 
         allClients={allClients} 
         onSelectResult={handleSearchNavigation} 
       />
+
+      {/* Quick Stats Toggle */}
+      {clientData && (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setIsQuickStatsOpen(!isQuickStatsOpen)}
+          className={cn(
+            "h-8 px-2.5 flex items-center gap-1.5 border shadow-none rounded-md text-xs font-semibold transition-colors",
+            isQuickStatsOpen
+              ? "bg-indigo-50 border-indigo-300 text-indigo-700 dark:bg-indigo-950/60 dark:border-indigo-800 dark:text-indigo-300"
+              : isDark ? "bg-slate-900 border-slate-700 text-slate-200 hover:bg-slate-800" : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
+          )}
+          title="Toggle quick telemetry overview"
+        >
+          <Activity className="w-3.5 h-3.5 text-indigo-500" />
+          <span className="hidden sm:inline">Quick Stats</span>
+        </Button>
+      )}
+
+      {/* AI Brief Trigger Button */}
+      {currentUser?.privileges?.clients?.canViewDecisionIntelligence && (
+        <Button
+          size="sm"
+          onClick={() => {
+            setIsAiDrawerOpen(true);
+            if (messages.length === 0) {
+              sendChatMessage(true);
+            }
+          }}
+          className="h-8 px-2.5 flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-md text-xs font-semibold shadow-none transition-all"
+          title="Open Decision Intelligence Assistant"
+        >
+          <Sparkles className="w-3.5 h-3.5" />
+          <span>AI Brief</span>
+        </Button>
+      )}
 
       {/* Filters Dropdown */}
       {clientData && (
@@ -2011,9 +2115,9 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
             size="sm"
             onClick={() => setShowFilterMenu(!showFilterMenu)}
             className={cn(
-              "h-9 w-9 p-0 flex items-center justify-center border shadow-sm rounded-lg transition-colors",
+              "h-8 w-8 p-0 flex items-center justify-center border shadow-none rounded-md transition-colors",
               isDark ? "bg-slate-900 border-slate-700 text-white hover:bg-slate-800" : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50",
-              (filterMonth !== 'all' || filterYear !== 'all') && "border-indigo-500 text-indigo-650 dark:text-indigo-400"
+              (filterMonth !== 'all' || filterYear !== 'all') && "border-indigo-500 text-indigo-600 dark:text-indigo-400"
             )}
             title="Filter by period"
           >
@@ -2027,11 +2131,11 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
 
           {showFilterMenu && (
             <div className={cn(
-              "absolute right-0 top-full mt-2 w-64 p-4 rounded-2xl border shadow-xl z-50 space-y-3 animate-in fade-in-50 zoom-in-95 duration-200",
+              "absolute right-0 top-full mt-2 w-64 p-3.5 rounded-md border shadow-xl z-50 space-y-3 animate-in fade-in-50 zoom-in-95 duration-200",
               isDark ? "bg-slate-900 border-slate-800 text-white" : "bg-white border-slate-200 text-slate-900"
             )}>
               <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Filter By Period</span>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Filter By Period</span>
                 {(filterMonth !== 'all' || filterYear !== 'all') && (
                   <button 
                     onClick={() => { setFilterMonth('all'); setFilterYear('all'); }} 
@@ -2043,8 +2147,8 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
               </div>
               
               <div>
-                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">Month</label>
-                <div className={cn("flex items-center px-2 py-1.5 rounded-lg border shadow-sm transition-colors", 
+                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Month</label>
+                <div className={cn("flex items-center px-2 py-1 rounded-md border transition-colors", 
                   isDark ? "bg-slate-800 border-slate-700 focus-within:border-indigo-500" : "bg-slate-50 border-slate-200 focus-within:border-indigo-300"
                 )}>
                   <div className="relative w-full">
@@ -2067,8 +2171,8 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
               </div>
 
               <div>
-                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">Year</label>
-                <div className={cn("flex items-center px-2 py-1.5 rounded-lg border shadow-sm transition-colors", 
+                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Year</label>
+                <div className={cn("flex items-center px-2 py-1 rounded-md border transition-colors", 
                   isDark ? "bg-slate-800 border-slate-700 focus-within:border-indigo-500" : "bg-slate-50 border-slate-200 focus-within:border-indigo-300"
                 )}>
                   <div className="relative w-full">
@@ -2092,7 +2196,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
 
               <Button 
                 size="sm" 
-                className="w-full bg-indigo-600 hover:bg-indigo-500 text-white text-xs h-8 mt-2" 
+                className="w-full bg-indigo-600 hover:bg-indigo-500 text-white text-xs h-7.5 rounded-md mt-1" 
                 onClick={() => setShowFilterMenu(false)}
               >
                 Apply Filters
@@ -2108,7 +2212,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
         const currentStatus = isAll ? 'all' : (clientStatusMap.get(selectedClient) || 'normal');
         return (
           <div className={cn(
-            "flex items-center gap-1.5 px-2.5 py-1 h-8 rounded-lg border shadow-sm transition-all shrink-0 order-first md:order-last w-full md:w-auto",
+            "flex items-center gap-1.5 px-2.5 py-1 h-8 rounded-md border shadow-none transition-all shrink-0 order-first md:order-last w-full md:w-auto",
             isAll
               ? (isDark ? "bg-indigo-950/60 border-indigo-800/80" : "bg-indigo-50 border-indigo-200")
               : currentStatus === 'active'
@@ -2193,7 +2297,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
     selectedSite ? null : 'Client 360 Dashboard', 
     selectedSite ? '' : 'Unified view of financial, operational, and relationship health', 
     selectedSite ? null : headerActions, 
-    [selectedClient, filterMonth, filterYear, clientData, allClients, isDark, selectedSite, showFilterMenu]
+    [selectedClient, filterMonth, filterYear, clientData, allClients, isDark, selectedSite, showFilterMenu, isQuickStatsOpen]
   );
 
   if (allClients.length === 0) {
@@ -2303,174 +2407,195 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
           <div className="flex-1 overflow-y-auto p-2 sm:p-4 lg:p-6 style-scroll">
             {clientData ? (
               <div className="max-w-6xl mx-auto space-y-4">
-
-
-            {currentUser?.privileges?.clients?.canViewDecisionIntelligence && (
-              <div className={cn("bg-gradient-to-br from-indigo-900 to-slate-900 rounded-2xl shadow-lg relative overflow-hidden group border border-indigo-700/50 flex flex-col transition-all duration-300", isChatCollapsed ? "h-auto" : "h-[380px]")}>
-                <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none"><Sparkles className="w-48 h-48" /></div>
-                
-                <div className="flex items-center justify-between p-4 border-b border-indigo-800/50 relative z-10 shrink-0 cursor-pointer hover:bg-indigo-800/20 transition-colors" onClick={() => setIsChatCollapsed(!isChatCollapsed)}>
-                  <div className="flex items-center gap-2">
-                    <div className="p-1.5 bg-indigo-500/20 rounded-lg"><Sparkles className="w-4 h-4 text-indigo-300" /></div>
-                    <span className="text-xs sm:text-sm font-bold uppercase tracking-wider text-indigo-200">Decision Intelligence Assistant</span>
+                {/* ── Compact Client Identity Bar ── */}
+                <div className="flex flex-wrap items-center justify-between gap-2.5 px-3.5 py-2.5 rounded-md border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 shadow-none">
+              {/* Left: Client Identity & Chips */}
+              <div className="flex flex-wrap items-center gap-2 min-w-0">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <div className="p-1 rounded bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 shrink-0">
+                    {selectedClient === 'ALL' || selectedClient === 'All Clients' ? <Globe className="w-4 h-4" /> : <Building2 className="w-4 h-4" />}
                   </div>
-                  <div className="flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
-                    {!isChatCollapsed && (
-                      <div className="flex items-center gap-1.5 mr-2">
-                        <select 
-                          value={selectedProvider} 
-                          onChange={e => handleProviderChange(e.target.value as 'gemini' | 'groq')} 
-                          className="bg-indigo-950/70 border border-indigo-750/70 text-indigo-200 text-[10px] font-bold rounded-full px-2 py-0.5 focus:outline-none cursor-pointer hover:border-indigo-500"
-                        >
-                          <option value="gemini">Gemini</option>
-                          <option value="groq">Groq</option>
-                        </select>
-                        <select 
-                          value={selectedModel} 
-                          onChange={e => setSelectedModel(e.target.value)} 
-                          className="bg-indigo-950/70 border border-indigo-750/70 text-indigo-200 text-[10px] font-bold rounded-full px-2 py-0.5 focus:outline-none cursor-pointer hover:border-indigo-500"
-                        >
-                          {modelOptions.map(opt => (
-                            <option key={opt.value} value={opt.value}>{opt.label}</option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
-                    {!isChatCollapsed && (
-                      <div className="flex items-center gap-1.5 border-l border-indigo-700/50 pl-2">
-                        {messages.length > 0 && (
-                          <Button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setMessages([]);
-                              toast.success('Chat history cleared!');
-                            }}
-                            size="sm"
-                            variant="ghost"
-                            className="text-indigo-300 hover:text-white hover:bg-indigo-800/50 h-8 px-2 text-xs flex items-center gap-1 rounded-lg"
-                            title="Clear conversation history"
-                          >
-                            <RotateCcw className="w-3.5 h-3.5" />
-                            <span className="hidden sm:inline">Clear Chat</span>
-                          </Button>
-                        )}
-                        {messages.length === 0 && (
-                          <Button onClick={(e) => { e.stopPropagation(); sendChatMessage(true); }} disabled={isGeneratingBrief} size="sm" className="bg-indigo-600 hover:bg-indigo-500 text-white border-0 h-8 text-xs px-2 sm:px-3 shadow-md">
-                            {isGeneratingBrief ? <RefreshCcw className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5 sm:mr-1.5" />}
-                            <span className="hidden sm:inline">{isGeneratingBrief ? 'Analyzing...' : 'Generate Brief'}</span>
-                          </Button>
-                        )}
-                      </div>
-                    )}
-                    <Button variant="ghost" size="sm" className="text-indigo-200 hover:text-white hover:bg-indigo-800/50 h-8 w-8 p-0" onClick={(e) => { e.stopPropagation(); setIsChatCollapsed(!isChatCollapsed); }}>
-                      {isChatCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
-                    </Button>
-                  </div>
+                  <h1 className="text-sm sm:text-base font-bold text-slate-900 dark:text-slate-100 truncate tracking-tight">
+                    {selectedClient === 'ALL' || selectedClient === 'All Clients' ? 'All Clients Portfolio' : selectedClient}
+                  </h1>
                 </div>
-                
-                {!isChatCollapsed && (
-                  <>
-                    <div className="flex-1 overflow-y-auto p-4 space-y-4 style-scroll relative z-10">
-                      {messages.length === 0 && !isGeneratingBrief && (
-                         <p className="text-sm text-indigo-300 italic text-center mt-8">
-                           Click "Generate Brief" or ask a question to analyze {selectedClient === 'ALL' || selectedClient === 'All Clients' ? 'All Clients' : selectedClient}'s data.
-                         </p>
-                      )}
-                      {messages.map((msg, idx) => (
-                        <div key={idx} className={cn("flex w-full", msg.role === 'user' ? "justify-end" : "justify-start")}>
-                          <div className={cn(
-                            "max-w-[90%] rounded-xl p-3.5 text-sm shadow-md",
-                            msg.role === 'user' 
-                              ? "bg-indigo-600 text-white rounded-br-none" 
-                              : "bg-slate-900/95 text-indigo-50 rounded-bl-none border border-indigo-700/50 backdrop-blur-md"
-                          )}>
-                            {msg.role === 'user' ? (
-                              <p className="whitespace-pre-wrap">{msg.content}</p>
-                            ) : (
-                              renderFormattedChatMessage(msg.content)
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                      {isGeneratingBrief && (
-                        <div className="flex justify-start">
-                          <div className="bg-slate-800/80 text-indigo-200 rounded-xl rounded-bl-none border border-indigo-700/30 p-3 text-sm flex items-center gap-2">
-                            <RefreshCcw className="w-4 h-4 animate-spin" /> Thinking...
-                          </div>
-                        </div>
-                      )}
-                      <div ref={chatEndRef} />
-                    </div>
 
-                    <div className="p-3 bg-slate-900/80 border-t border-indigo-800/50 shrink-0 relative z-10 flex items-center gap-2">
-                      <input 
-                        type="text" 
-                        value={chatInput} 
-                        onChange={(e) => setChatInput(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && sendChatMessage()}
-                        placeholder="Ask about invoices, staff, or machines..." 
-                        className="flex-1 bg-slate-800 border border-slate-700 text-white placeholder:text-slate-400 text-sm rounded-lg h-9 px-3 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                      />
-                      <Button size="icon" onClick={() => sendChatMessage()} disabled={!chatInput.trim() || isGeneratingBrief} className="h-9 w-9 bg-indigo-600 hover:bg-indigo-500 shrink-0">
-                        <Send className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
+                {/* Micro Badges */}
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {(() => {
+                    const isAll = selectedClient === 'ALL' || selectedClient === 'All Clients';
+                    const currentStatus = isAll ? 'all' : (clientStatusMap.get(selectedClient) || 'normal');
+                    return (
+                      <Badge className={cn(
+                        'text-[10px] font-bold uppercase tracking-wide border px-1.5 py-0.5 rounded shadow-none',
+                        isAll ? 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/60 dark:text-indigo-300 dark:border-indigo-800' :
+                        currentStatus === 'active' ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800' :
+                        currentStatus === 'onboarding' ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800' :
+                        'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700'
+                      )}>
+                        {isAll ? 'PORTFOLIO' : currentStatus.toUpperCase()}
+                      </Badge>
+                    );
+                  })()}
 
-            {/* Navigation Tabs */}
-            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 mb-6 gap-2 min-w-0 overflow-hidden">
-              <div className="flex items-center gap-1 overflow-x-auto style-scroll pb-px flex-1 min-w-0">
-                {[
-                  { id: 'overview', label: 'Overview', icon: Activity, show: currentUser?.privileges?.clients?.canView },
-                  { id: 'financials', label: 'Financials', icon: DollarSign, show: currentUser?.privileges?.billing?.canView || currentUser?.privileges?.payments?.canView },
-                  { id: 'report', label: 'Client Report', icon: Printer, show: currentUser?.privileges?.billing?.canView || currentUser?.privileges?.payments?.canView },
-                  { id: 'operations', label: 'Site 360', icon: Briefcase, show: currentUser?.privileges?.sites?.canView },
-                  { id: 'contacts', label: 'Contacts', icon: Users, show: currentUser?.privileges?.clients?.canView },
-                  { id: 'activity', label: 'Comms', icon: MessagesSquare, show: currentUser?.privileges?.commLog?.canView },
-                  { id: 'tasks', label: 'Tasks', icon: CheckSquare, show: currentUser?.privileges?.tasks?.canView || currentUser?.privileges?.tasks?.canViewMyTasks }
-                ].filter(tab => tab.show !== false).map(tab => (
-                  <button key={tab.id} onClick={() => setActiveTab(tab.id as TabType)}
-                    className={cn(
-                      "flex flex-1 justify-center items-center px-1.5 sm:px-4 py-3 text-[11px] min-[400px]:text-xs sm:text-sm font-semibold border-b-2 transition-colors",
-                      activeTab === tab.id 
-                        ? "border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400" 
-                        : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
-                    )}>
-                    <span className="whitespace-nowrap">{tab.label}</span>
-                    {tab.id === 'operations' && clientPendingSites.length > 0 && (
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500 text-white shrink-0 shadow-sm ml-1.5">
-                        {clientPendingSites.length}
-                      </span>
-                    )}
-                  </button>
-                ))}
+                  <div className="flex items-center gap-1 text-[11px] font-mono text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 px-2 py-0.5 rounded">
+                    <MapPin className="w-3 h-3 text-slate-400" />
+                    <span>{clientData.activeSites} / {clientData.totalSites} Sites</span>
+                  </div>
+
+                  {principalContact && (
+                    <div className="hidden sm:flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 px-2 py-0.5 rounded truncate max-w-[200px]" title={`Principal Contact: ${principalContact.name} (${principalContact.phone || principalContact.email || 'No contact info'})`}>
+                      <Users className="w-3 h-3 text-slate-400 shrink-0" />
+                      <span className="truncate">{principalContact.name}</span>
+                    </div>
+                  )}
+                </div>
               </div>
-              <div className="flex items-center gap-1 shrink-0 pb-1">
-                {currentUser?.privileges?.sites?.canView && (
-                  <Button 
-                    onClick={() => navigate('/sites')} 
-                    variant="outline" 
-                    size="sm" 
-                    className={cn(
-                      "h-8 text-xs px-2 font-medium shadow-sm transition-colors flex items-center gap-1", 
-                      isDark ? "bg-slate-900 border-slate-700 hover:bg-slate-800 text-slate-200" : "bg-white border-slate-200 hover:bg-slate-50 text-slate-700"
-                    )}
-                    title="Client Overview"
+
+              {/* Right: Quick Action Buttons */}
+              <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+                {canViewComm && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setCommForm(f => ({ ...f, clientName: selectedClient === 'ALL' ? '' : selectedClient }));
+                      setCommDialogOpen(true);
+                    }}
+                    className="h-7 px-2 text-xs font-semibold rounded-md border-slate-200 dark:border-slate-700"
                   >
-                    <MapPin className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
-                    <span className="hidden min-[600px]:inline">Client Overview</span>
+                    <MessageSquare className="w-3.5 h-3.5 sm:mr-1 text-indigo-500" />
+                    <span className="hidden sm:inline">Log Comm</span>
+                    <span className="sm:hidden">Log</span>
                   </Button>
                 )}
 
+                {currentUser?.privileges?.billing?.canView && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setReportDateModalMode('print');
+                      setShowReportDateModal(true);
+                    }}
+                    className="h-7 px-2 text-xs font-semibold rounded-md border-slate-200 dark:border-slate-700"
+                  >
+                    <Printer className="w-3.5 h-3.5 sm:mr-1 text-slate-500" />
+                    <span className="hidden sm:inline">Statement PDF</span>
+                    <span className="sm:hidden">PDF</span>
+                  </Button>
+                )}
+
+                {currentUser?.privileges?.sites?.canView && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => navigate('/sites')}
+                    className="h-7 px-2 text-xs font-semibold rounded-md border-slate-200 dark:border-slate-700"
+                  >
+                    <MapPin className="w-3.5 h-3.5 sm:mr-1 text-indigo-500" />
+                    <span className="hidden sm:inline">Site Manager</span>
+                    <span className="sm:hidden">Sites</span>
+                  </Button>
+                )}
               </div>
             </div>
 
+            {/* ── Expandable Quick Stats Telemetry Strip ── */}
+            {isQuickStatsOpen && (
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 p-2.5 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/50 animate-in fade-in-50 duration-150">
+                <div className="p-2 rounded bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Total Revenue</span>
+                  <span className="text-xs sm:text-sm font-black text-emerald-600 dark:text-emerald-400 font-mono">
+                    ₦{currentUser?.privileges?.billing?.canViewAmounts ? Math.round(clientData.totalRevenue).toLocaleString() : '***'}
+                  </span>
+                </div>
+                <div className="p-2 rounded bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">VAT Deficit</span>
+                  <span className={cn("text-xs sm:text-sm font-black font-mono", clientData.vatDeficit > 0 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400")}>
+                    ₦{currentUser?.privileges?.billing?.canViewAmounts ? Math.round(clientData.vatDeficit).toLocaleString() : '***'}
+                  </span>
+                </div>
+                <div className="p-2 rounded bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Active Sites</span>
+                  <span className="text-xs sm:text-sm font-black text-indigo-600 dark:text-indigo-400 font-mono">
+                    {clientData.activeSites} <span className="text-[10px] text-slate-400 font-normal">/ {clientData.totalSites}</span>
+                  </span>
+                </div>
+                <div className="p-2 rounded bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Health Score</span>
+                  <span className={cn("text-xs sm:text-sm font-black font-mono", clientData.healthScore > 80 ? "text-emerald-600" : clientData.healthScore > 50 ? "text-amber-600" : "text-rose-600")}>
+                    {clientData.healthScore}/100
+                  </span>
+                </div>
+                <div className="p-2 rounded bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Invoices</span>
+                  <span className="text-xs sm:text-sm font-bold text-slate-700 dark:text-slate-200 font-mono">
+                    {clientData.clientInvoices.length} issued
+                  </span>
+                </div>
+                <div className="p-2 rounded bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Pending Tasks</span>
+                  <span className="text-xs sm:text-sm font-bold text-slate-700 dark:text-slate-200 font-mono">
+                    {clientData.pendingTasks.length} tasks
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* ── Flat Segmented Navigation Tabs (Mobile Optimized Touch Strip) ── */}
+            <div className="flex items-center gap-1 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden touch-pan-x scroll-smooth py-1 border-b border-slate-200 dark:border-slate-800">
+              {[
+                { id: 'overview', label: 'Overview', icon: Activity, show: currentUser?.privileges?.clients?.canView },
+                { id: 'timeline', label: 'Timeline & History', icon: Clock, show: currentUser?.privileges?.sites?.canView !== false },
+                { id: 'financials', label: 'Financials', icon: DollarSign, count: currentUser?.privileges?.billing?.canViewAmounts ? `₦${Math.round(clientData.totalRevenue).toLocaleString()}` : undefined, show: currentUser?.privileges?.billing?.canView || currentUser?.privileges?.payments?.canView },
+                { id: 'report', label: 'Client Statement', icon: Printer, show: currentUser?.privileges?.billing?.canView || currentUser?.privileges?.payments?.canView },
+                { id: 'operations', label: 'Site 360', icon: Briefcase, count: clientPendingSites.length > 0 ? `${clientPendingSites.length} onboarding` : undefined, show: currentUser?.privileges?.sites?.canView },
+                { id: 'contacts', label: 'Contacts', icon: Users, count: clientContacts.filter(c => selectedClient === 'ALL' || c.clientName?.trim().toLowerCase() === selectedClient?.trim().toLowerCase()).length, show: currentUser?.privileges?.clients?.canView },
+                { id: 'activity', label: 'Comms', icon: MessagesSquare, count: commLogs.filter(l => selectedClient === 'ALL' || l.client?.trim().toLowerCase() === selectedClient?.trim().toLowerCase()).length, show: currentUser?.privileges?.commLog?.canView },
+                { id: 'tasks', label: 'Tasks', icon: CheckSquare, count: clientData.pendingTasks.length, show: currentUser?.privileges?.tasks?.canView || currentUser?.privileges?.tasks?.canViewMyTasks },
+              ].filter(tab => tab.show !== false).map(tab => {
+                const isActive = activeTab === tab.id;
+                const Icon = tab.icon;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id as TabType)}
+                    className={cn(
+                      'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold whitespace-nowrap transition-all border shrink-0',
+                      isActive
+                        ? 'bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 text-indigo-600 dark:text-indigo-400 shadow-xs'
+                        : 'bg-transparent border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-900/60'
+                    )}
+                  >
+                    <Icon className={cn('w-3.5 h-3.5', isActive ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400')} />
+                    <span>{tab.label}</span>
+                    {tab.count !== undefined && tab.count !== null && (
+                      <span className={cn(
+                        'text-[10px] px-1.5 py-0.2 rounded font-mono font-medium',
+                        isActive ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
+                      )}>
+                        {tab.count}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
             {/* Tab Content */}
-            <div className="">
+            <div className="space-y-4">
               
+              {/* TIMELINE TAB */}
+              {activeTab === 'timeline' && (
+                <div className="space-y-6 transition-opacity duration-150">
+                  <ClientSitesTimeline
+                    selectedClient={selectedClient}
+                    onOpenSite360={setSelectedSite}
+                  />
+                </div>
+              )}
+
               {/* OVERVIEW TAB */}
               {activeTab === 'overview' && (
                 <div className="space-y-6 transition-opacity duration-150">
@@ -2615,26 +2740,28 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                     </div>
                   </div>
 
-                  {/* Secondary Tab Switcher */}
-                  <div className="flex border-b border-slate-200 dark:border-slate-800 mb-2 overflow-x-auto style-scroll pb-px gap-1">
+                  {/* Flat Financial Segmented Pills */}
+                  <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-900 rounded-md border border-slate-200 dark:border-slate-800 w-fit max-w-full overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden touch-pan-x">
                     {[
-                      { id: 'invoices', label: 'Invoice Issuance Registry', icon: FileText },
-                      { id: 'payments', label: 'Payments & VAT Settlement Registry', icon: CheckCircle2 }
+                      { id: 'invoices', label: 'Invoices Registry', count: clientData.clientInvoices.length, amount: currentUser?.privileges?.billing?.canViewAmounts ? `₦${Math.round(clientData.totalRevenue).toLocaleString()}` : '***', icon: FileText },
+                      { id: 'payments', label: 'Payments & Settlement', count: clientData.paymentsWithVatStatus.length, amount: currentUser?.privileges?.billing?.canViewAmounts ? `₦${Math.round(clientData.paymentsCleared).toLocaleString()}` : '***', icon: CheckCircle2 }
                     ].map(subTab => {
-                      const isActive = financialsSubTab === subTab.id;
+                      const isSubActive = financialsSubTab === subTab.id;
+                      const SubIcon = subTab.icon;
                       return (
                         <button
                           key={subTab.id}
                           onClick={() => setFinancialsSubTab(subTab.id as any)}
                           className={cn(
-                            "flex items-center gap-2 px-3.5 py-2.5 text-xs sm:text-sm font-bold border-b-2 transition-all relative shrink-0",
-                            isActive
-                              ? "border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400"
-                              : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                            "flex items-center gap-2 px-3 py-1.5 rounded text-xs font-semibold transition-all whitespace-nowrap outline-none",
+                            isSubActive
+                              ? "bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-xs border border-slate-200/80 dark:border-slate-700 font-bold"
+                              : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
                           )}
                         >
-                          <subTab.icon className={cn("w-4 h-4", isActive ? "text-indigo-600 dark:text-indigo-400" : "text-slate-400")} />
-                          <span>{subTab.label}</span>
+                          <SubIcon className="w-3.5 h-3.5" />
+                          <span>{subTab.label} ({subTab.count})</span>
+                          <span className="font-mono text-[11px] opacity-90">{subTab.amount}</span>
                         </button>
                       );
                     })}
@@ -3780,31 +3907,33 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
               {/* OPERATIONS TAB */}
               {activeTab === 'operations' && (
                 <div className="space-y-6 w-full transition-opacity duration-150">
-                  {/* Secondary Tab Switcher */}
-                  <div className="flex border-b border-slate-200 dark:border-slate-800 mb-2 overflow-x-auto style-scroll pb-px gap-1">
+                  {/* Flat Operations Segmented Pills */}
+                  <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-900 rounded-md border border-slate-200 dark:border-slate-800 w-fit max-w-full overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden touch-pan-x">
                     {[
-                      { id: 'portfolio', label: 'Active', count: clientData.clientSites.filter((s: any) => s.status === 'Active' && s.startDate).length, color: 'text-indigo-650 bg-indigo-50 dark:bg-indigo-950/20 dark:text-indigo-400', icon: MapPin },
-                      { id: 'onboarding', label: 'Onboarding', count: clientPendingSites.length, color: 'text-amber-700 bg-amber-50 dark:bg-amber-950/20 dark:text-amber-400', icon: Clock },
-                      { id: 'pending', label: 'Pending', count: clientData.clientSites.filter((s: any) => s.status === 'Inactive' || (s.status === 'Active' && !s.startDate)).length, color: 'text-blue-650 bg-blue-50 dark:bg-blue-950/20 dark:text-blue-400', icon: Hourglass },
-                      { id: 'closed', label: 'Closed', count: clientData.clientSites.filter((s: any) => s.status === 'Ended').length, color: 'text-slate-600 bg-slate-100 dark:bg-slate-800 dark:text-slate-300', icon: CheckCircle2 }
+                      { id: 'all_sites', label: 'All Sites', count: clientData.clientSites.length, icon: Building2 },
+                      { id: 'portfolio', label: 'Active Sites', count: clientData.clientSites.filter((s: any) => s.status === 'Active' && s.startDate).length, icon: MapPin },
+                      { id: 'onboarding', label: 'Onboarding', count: clientPendingSites.length, icon: Clock },
+                      { id: 'pending', label: 'Pending', count: clientData.clientSites.filter((s: any) => s.status === 'Inactive' || (s.status === 'Active' && !s.startDate)).length, icon: Hourglass },
+                      { id: 'closed', label: 'Closed', count: clientData.clientSites.filter((s: any) => s.status === 'Ended').length, icon: CheckCircle2 }
                     ].map(subTab => {
-                      const isActive = sitesSubTab === subTab.id;
+                      const isSubActive = (sitesSubTab === subTab.id) || (!sitesSubTab && subTab.id === 'all_sites');
+                      const SubIcon = subTab.icon;
                       return (
                         <button
                           key={subTab.id}
                           onClick={() => setSitesSubTab(subTab.id as any)}
                           className={cn(
-                            "flex items-center gap-2 px-3.5 py-2.5 text-xs sm:text-sm font-bold border-b-2 transition-all relative shrink-0",
-                            isActive
-                              ? "border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400"
-                              : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                            "flex items-center gap-2 px-3 py-1.5 rounded text-xs font-semibold transition-all whitespace-nowrap outline-none",
+                            isSubActive
+                              ? "bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-xs border border-slate-200/80 dark:border-slate-700 font-bold"
+                              : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
                           )}
                         >
-                          <subTab.icon className={cn("w-4 h-4", isActive ? "text-indigo-600 dark:text-indigo-400" : "text-slate-400")} />
+                          <SubIcon className="w-3.5 h-3.5" />
                           <span>{subTab.label}</span>
                           <span className={cn(
-                            "text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0",
-                            isActive ? subTab.color : "bg-slate-100 text-slate-650 dark:bg-slate-800 dark:text-slate-400"
+                            "text-[10px] font-mono px-1.5 py-0.2 rounded font-medium",
+                            isSubActive ? "bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800" : "bg-slate-200 dark:bg-slate-800 text-slate-500"
                           )}>
                             {subTab.count}
                           </span>
@@ -3812,6 +3941,150 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                       );
                     })}
                   </div>
+
+                  {/* Sub-tab: All Sites */}
+                  {((sitesSubTab as string) === 'all_sites' || !sitesSubTab) && (() => {
+                    const allSitesList = clientData.clientSites;
+                    return (
+                      <div className={cn("p-6 rounded-2xl border shadow-sm flex flex-col", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
+                        <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                          <Building2 className="w-5 h-5 text-indigo-500"/> All Sites ({allSitesList.length})
+                        </h3>
+                        <div className="space-y-3 flex-1 overflow-y-auto max-h-[500px] style-scroll pr-2">
+                          {allSitesList.length > 0 ? allSitesList.map((site: any) => {
+                            const activeHold = siteHoldPeriods?.find(h => h.siteId === site.id && !h.holdEnd);
+                            const holdDays = activeHold ? Math.max(1, Math.round((new Date().getTime() - new Date(activeHold.holdStart).getTime()) / 86400000)) : 0;
+                            return (
+                              <div key={site.id}
+                                className={cn(
+                                  'p-3 rounded-lg border cursor-pointer transition-all hover:border-indigo-400 hover:shadow-md group relative',
+                                  activeHold
+                                    ? (isDark ? 'border-amber-900/60 bg-amber-950/20 hover:bg-amber-950/40' : 'border-amber-200 bg-amber-50/40 hover:bg-amber-50/70')
+                                    : (isDark ? 'border-slate-800 bg-slate-800/50 hover:bg-slate-800' : 'border-slate-100 bg-slate-50 hover:bg-white')
+                                )}
+                                onClick={() => setSelectedSite(site)}
+                              >
+                                <div className="flex justify-between items-center">
+                                  <div className="flex items-center gap-2">
+                                    <MapPin className={cn("w-3.5 h-3.5 shrink-0", activeHold ? "text-amber-500" : "text-indigo-500")} />
+                                    <div>
+                                      <span className="font-semibold text-sm">{site.name}</span>
+                                      {(selectedClient === 'ALL' || selectedClient === 'All Clients') && (
+                                        <span className="text-xs text-slate-400 ml-2 font-normal">({site.client})</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                    {activeHold ? (
+                                      <Badge className="bg-amber-100 text-amber-800 border border-amber-300 dark:bg-amber-950/60 dark:text-amber-300 flex items-center gap-1 font-bold">
+                                        <PauseCircle className="w-3 h-3" /> On Hold ({holdDays}d)
+                                      </Badge>
+                                    ) : (
+                                      <Badge className={site.status === 'Active' ? 'bg-emerald-100 text-emerald-700' : site.status === 'Ended' ? 'bg-slate-100 text-slate-700' : 'bg-blue-100 text-blue-700'}>
+                                        {site.status || 'Active'}
+                                      </Badge>
+                                    )}
+                                    <DropdownMenu>
+                                      <DropdownMenuTrigger asChild>
+                                        <Button
+                                          variant="ghost" size="icon"
+                                          className="h-8 w-8 text-slate-400 hover:text-indigo-600 hover:bg-slate-200/50 dark:hover:bg-slate-700/50 rounded-lg flex items-center justify-center shrink-0 border-0 bg-transparent cursor-pointer"
+                                        >
+                                          <MoreVertical className="h-4 w-4" />
+                                        </Button>
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent align="end" className="w-[180px]">
+                                        <DropdownMenuItem 
+                                          onClick={() => setNarrativeSite({ site, q: pendingSites.find(ps => ps.siteName === site.name && ps.clientName === site.client) || null })}
+                                          className="gap-2"
+                                        >
+                                          <FileText className="h-4 w-4 text-slate-400" />
+                                          <span>Site Summary</span>
+                                        </DropdownMenuItem>
+                                        {canEditSite && (
+                                          <DropdownMenuItem 
+                                            onClick={() => {
+                                              const linkedQ = pendingSites.find(ps => ps.siteName === site.name && ps.clientName === site.client);
+                                              if (linkedQ) navigate(`/sites/onboarding/${linkedQ.id}`);
+                                              else navigate('/sites/onboarding/new', { state: { linkedSite: site } });
+                                            }}
+                                            className="gap-2"
+                                          >
+                                            <Eye className="h-4 w-4 text-slate-400" />
+                                            <span>View Onboarding</span>
+                                          </DropdownMenuItem>
+                                        )}
+                                        {canViewComm && (
+                                          <DropdownMenuItem 
+                                            onClick={() => navigate(`/sites/conversations/${site.id}`)}
+                                            className="gap-2"
+                                          >
+                                            <MessageSquare className="h-4 w-4 text-slate-400" />
+                                            <span>Site Conversations</span>
+                                          </DropdownMenuItem>
+                                        )}
+                                        <DropdownMenuItem 
+                                          onClick={() => navigate(`/sites/diary/${site.id}`)}
+                                          className="gap-2 text-emerald-600 focus:text-emerald-700"
+                                        >
+                                          <BookOpen className="h-4 w-4" />
+                                          <span>Site Diary</span>
+                                        </DropdownMenuItem>
+                                        {canEditSite && (
+                                          <DropdownMenuItem 
+                                            onClick={() => openSiteEdit(site)}
+                                            className="gap-2 text-indigo-700 focus:text-indigo-700 focus:bg-indigo-50"
+                                          >
+                                            <Pencil className="h-4 w-4" />
+                                            <span>Edit Site</span>
+                                          </DropdownMenuItem>
+                                        )}
+                                        {canDeleteSite && (
+                                          <>
+                                            <DropdownMenuSeparator />
+                                            <DropdownMenuItem 
+                                              onClick={() => handleDeleteSite(site.id)}
+                                              className="gap-2 text-red-600 focus:text-red-600 focus:bg-red-50"
+                                            >
+                                              <Trash2 className="h-4 w-4" />
+                                              <span>Delete</span>
+                                            </DropdownMenuItem>
+                                          </>
+                                        )}
+                                      </DropdownMenuContent>
+                                    </DropdownMenu>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2 mt-1.5 ml-5.5 flex-wrap">
+                                  {site.startDate && (
+                                    <span className="text-xs text-slate-400">
+                                      Since {new Date(site.startDate).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}
+                                    </span>
+                                  )}
+                                  {site.endDate && (
+                                    <span className="text-xs text-slate-400">
+                                      · Ended {new Date(site.endDate).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}
+                                    </span>
+                                  )}
+                                  {activeHold && (
+                                    <span className="text-amber-700 dark:text-amber-400 font-semibold bg-amber-100/60 dark:bg-amber-950/50 px-2 py-0.5 rounded text-[11px] border border-amber-300 dark:border-amber-800/50 truncate max-w-[280px]" title={activeHold.holdNote}>
+                                      On Hold: "{activeHold.holdNote}"
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          }) : (
+                            <div className="py-12 flex flex-col items-center justify-center text-center text-slate-500">
+                              <Building2 className="w-12 h-12 text-slate-300 dark:text-slate-700 mb-3" />
+                              <p className="font-semibold text-sm">No Sites Found</p>
+                              <p className="text-xs text-slate-400 mt-1">No sites exist for this selection.</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   {/* Sub-tab: Active Sites */}
                   {sitesSubTab === 'portfolio' && (() => {
@@ -5201,6 +5474,166 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
           </div>
         </div>
       )}
+
+      {/* ── Slide-Over Decision Intelligence AI Drawer ── */}
+      <AnimatePresence>
+        {isAiDrawerOpen && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsAiDrawerOpen(false)}
+              className="fixed inset-0 bg-black/40 backdrop-blur-xs z-50 transition-opacity"
+            />
+
+            {/* Drawer */}
+            <motion.div
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 220 }}
+              className={cn(
+                "fixed top-0 right-0 h-full w-full max-w-md shadow-2xl border-l z-50 flex flex-col transition-colors",
+                isDark ? "bg-slate-900 text-slate-100 border-slate-800" : "bg-white text-slate-900 border-slate-200"
+              )}
+            >
+              {/* Drawer Header */}
+              <div className={cn(
+                "flex items-center justify-between p-3.5 border-b shrink-0 transition-colors",
+                isDark ? "bg-slate-950/60 border-slate-800" : "bg-slate-50 border-slate-200"
+              )}>
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className={cn(
+                    "p-1.5 rounded-md shrink-0",
+                    isDark ? "bg-indigo-500/20 text-indigo-400" : "bg-indigo-50 text-indigo-600"
+                  )}>
+                    <Sparkles className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <h2 className={cn(
+                      "text-xs font-bold uppercase tracking-wider truncate",
+                      isDark ? "text-indigo-200" : "text-indigo-900"
+                    )}>Decision Intelligence</h2>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">{selectedClient === 'ALL' || selectedClient === 'All Clients' ? 'All Clients Portfolio' : selectedClient}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {selectedModel && (
+                    <span className="hidden sm:inline-block text-[10px] font-bold px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/80">
+                      {selectedModel}
+                    </span>
+                  )}
+                  {messages.length > 0 && (
+                    <Button
+                      onClick={() => {
+                        setMessages([]);
+                        toast.success('Chat history cleared!');
+                      }}
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 w-7 p-0 text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md"
+                      title="Clear chat history"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                    </Button>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setIsAiDrawerOpen(false)}
+                    className="h-7 w-7 p-0 text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md"
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+
+              {/* Drawer Body / Message Stream */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-3 style-scroll">
+                {messages.length === 0 && !isGeneratingBrief && (
+                  <div className="text-center py-10 space-y-3">
+                    <div className={cn(
+                      "w-10 h-10 mx-auto rounded-full flex items-center justify-center border",
+                      isDark ? "bg-indigo-500/10 text-indigo-400 border-indigo-500/20" : "bg-indigo-50 text-indigo-600 border-indigo-200"
+                    )}>
+                      <Sparkles className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-slate-900 dark:text-slate-200">Client 360 AI Assistant</p>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 max-w-[260px] mx-auto">Instant portfolio insights, payment risks, overdue invoices, and operational status.</p>
+                    </div>
+                    <Button
+                      onClick={() => sendChatMessage(true)}
+                      disabled={isGeneratingBrief}
+                      size="sm"
+                      className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs rounded-md shadow-sm h-8 font-semibold"
+                    >
+                      {isGeneratingBrief ? <RefreshCcw className="w-3.5 h-3.5 animate-spin mr-1.5" /> : <Sparkles className="w-3.5 h-3.5 mr-1.5" />}
+                      Generate Intelligence Brief
+                    </Button>
+                  </div>
+                )}
+
+                {messages.map((msg, idx) => (
+                  <div key={idx} className={cn('flex w-full', msg.role === 'user' ? 'justify-end' : 'justify-start')}>
+                    <div className={cn(
+                      'max-w-[90%] rounded-lg p-3 text-xs shadow-xs',
+                      msg.role === 'user'
+                        ? 'bg-indigo-600 text-white'
+                        : isDark
+                          ? 'bg-slate-950 text-indigo-50 border border-slate-800'
+                          : 'bg-slate-50 text-slate-800 border border-slate-200'
+                    )}>
+                      {msg.role === 'user' ? <p className="whitespace-pre-wrap">{msg.content}</p> : renderFormattedChatMessage(msg.content)}
+                    </div>
+                  </div>
+                ))}
+
+                {isGeneratingBrief && (
+                  <div className="flex justify-start">
+                    <div className={cn(
+                      "rounded-lg border p-2.5 text-xs flex items-center gap-2",
+                      isDark ? "bg-slate-950 text-indigo-200 border-slate-800" : "bg-slate-50 text-indigo-900 border-slate-200"
+                    )}>
+                      <RefreshCcw className="w-3.5 h-3.5 animate-spin text-indigo-600 dark:text-indigo-400" /> Analyzing client intelligence...
+                    </div>
+                  </div>
+                )}
+                <div ref={chatEndRef} />
+              </div>
+
+              {/* Drawer Footer Input */}
+              <div className={cn(
+                "p-3 border-t shrink-0 flex items-center gap-2 transition-colors",
+                isDark ? "bg-slate-950 border-slate-800" : "bg-slate-50 border-slate-200"
+              )}>
+                <input
+                  type="text"
+                  value={chatInput}
+                  onChange={e => setChatInput(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && sendChatMessage()}
+                  placeholder="Ask about invoices, staff, or machines..."
+                  className={cn(
+                    "flex-1 text-xs rounded-md h-8.5 px-3 focus:outline-none focus:ring-1 focus:ring-indigo-500 border transition-colors",
+                    isDark ? "bg-slate-900 border-slate-700 text-white placeholder:text-slate-500" : "bg-white border-slate-300 text-slate-900 placeholder:text-slate-400"
+                  )}
+                />
+                <Button
+                  size="icon"
+                  onClick={() => sendChatMessage()}
+                  disabled={!chatInput.trim() || isGeneratingBrief}
+                  className="h-8.5 w-8.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-md shrink-0"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                </Button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </>
   );
 }

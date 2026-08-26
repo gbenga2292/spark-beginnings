@@ -426,7 +426,7 @@ export function Header({ onMenuClick }: HeaderProps) {
             {title || 'Dashboard'}
           </h1>
           {subtitle && (
-            <p className={`text-[10px] line-clamp-2 sm:truncate leading-tight font-medium mt-0.5 ${
+            <p className={`hidden sm:block text-[10px] sm:truncate leading-tight font-medium mt-0.5 ${
               isDark ? 'text-slate-400' : 'text-slate-500'
             }`}>
               {subtitle}

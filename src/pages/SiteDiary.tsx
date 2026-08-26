@@ -10,13 +10,76 @@ import { useNetworkStore } from '@/src/store/networkStore';
 import { toast } from '@/src/components/ui/toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogClose, DialogFooter } from '@/src/components/ui/dialog';
 import { cacheSet } from '@/src/lib/offlineCache';
-import { Calendar, BookOpen, Image as ImageIcon, FileVideo, Play, ChevronDown, Loader2, Wrench, RefreshCw, Download, Upload } from 'lucide-react';
+import { Calendar, BookOpen, Image as ImageIcon, FileVideo, Play, ChevronDown, Loader2, Wrench, RefreshCw, Download, Upload, Sparkles, Copy, Check, Printer, Filter, Bot, Activity, FileText, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/src/components/ui/button';
+import { Input } from '@/src/components/ui/input';
 import { format } from 'date-fns';
 import { cn } from '@/src/lib/utils';
 import { MediaViewer, type MediaItem } from '@/src/components/ui/MediaViewer';
 
 const MEDIA_SERVER_URL = import.meta.env.VITE_MEDIA_SERVER_URL || 'https://dewaterconstruct.com/dcel-media';
+
+const renderFormattedChatMessage = (content: string) => {
+  if (!content) return null;
+
+  const renderInlineText = (text: string) => {
+    if (!text) return null;
+    const parts = text.split(/(\*\*.*?\*\*|\*.*?\*)/g);
+    return (
+      <>
+        {parts.map((part, i) => {
+          if (part.startsWith('**') && part.endsWith('**') && part.length >= 4) {
+            return <strong key={i} className="font-extrabold text-slate-900 dark:text-white">{part.slice(2, -2)}</strong>;
+          }
+          if (part.startsWith('*') && part.endsWith('*') && part.length >= 2 && !part.startsWith('**')) {
+            return <em key={i} className="italic text-indigo-600 dark:text-indigo-200">{part.slice(1, -1)}</em>;
+          }
+          const cleanPart = part.replace(/\*\*/g, '').replace(/#/g, '');
+          return <span key={i}>{cleanPart}</span>;
+        })}
+      </>
+    );
+  };
+
+  const lines = content.split('\n');
+
+  return (
+    <div className="space-y-1.5 text-xs sm:text-sm leading-relaxed font-sans">
+      {lines.map((line, idx) => {
+        let trimmed = line.trim();
+        if (!trimmed) return <div key={idx} className="h-1" />;
+
+        if (trimmed.startsWith('#') || (/^\*\*[^*]+\*\*:?$/.test(trimmed) && trimmed.length < 60)) {
+          const cleanHeader = trimmed.replace(/^#+\s*/, '').replace(/\*\*/g, '').replace(/#/g, '').trim();
+          return (
+            <div key={idx} className="text-xs font-black tracking-wider text-indigo-700 dark:text-indigo-300 uppercase mt-3.5 mb-1.5 border-b border-indigo-200 dark:border-indigo-700/50 pb-1 flex items-center gap-1.5">
+              <span>{cleanHeader}</span>
+            </div>
+          );
+        }
+
+        if (/^[-*•](\s+|$)/.test(trimmed) || /^\d+[\.\)](\s+|$)/.test(trimmed)) {
+          const bulletText = trimmed.replace(/^[-*•]\s*/, '').replace(/^\d+[\.\)]\s*/, '').trim();
+          if (!bulletText) return null;
+          return (
+            <div key={idx} className="flex items-start gap-2 pl-1.5 my-1 text-slate-800 dark:text-slate-100">
+              <span className="text-indigo-600 dark:text-indigo-400 font-bold text-sm select-none leading-none mt-0.5">•</span>
+              <div className="flex-1">
+                {renderInlineText(bulletText)}
+              </div>
+            </div>
+          );
+        }
+
+        return (
+          <p key={idx} className="my-1 text-slate-700 dark:text-indigo-50">
+            {renderInlineText(trimmed)}
+          </p>
+        );
+      })}
+    </div>
+  );
+};
 
 // ─── Media thumbnail strip ────────────────────────────────────────────────────
 
@@ -231,6 +294,20 @@ export function SiteDiary() {
   const [error, setError] = useState<string | null>(null);
   const [pendingUploads, setPendingUploads] = useState<{ journals: DailyJournal[], entries: SiteJournalEntry[] }>({ journals: [], entries: [] });
   const [isComparisonOpen, setIsComparisonOpen] = useState(false);
+
+  // AI Summary State
+  const [showAiModal, setShowAiModal] = useState(false);
+  const [aiPreset, setAiPreset] = useState<'all' | '7days' | '30days' | 'thisMonth' | 'custom'>('all');
+  const [aiStartDate, setAiStartDate] = useState('');
+  const [aiEndDate, setAiEndDate] = useState('');
+  const [aiScope, setAiScope] = useState({
+    journals: true,
+    machineLogs: true,
+    internalNotes: true,
+  });
+  const [isGeneratingAi, setIsGeneratingAi] = useState(false);
+  const [aiSummary, setAiSummary] = useState<string | null>(null);
+  const [isCopied, setIsCopied] = useState(false);
 
   const { connectionStatus } = useNetworkStore();
 
@@ -453,6 +530,8 @@ export function SiteDiary() {
           timestamp: entry.createdAt,
           loggedBy: entry.loggedBy || 'Unknown',
           narration: entry.narration,
+          progressPercentage: entry.progressPercentage,
+          dewateringStage: entry.dewateringStage,
           type: 'Journal' as const,
           machineLog: undefined as DailyMachineLog | undefined,
         };
@@ -567,8 +646,260 @@ export function SiteDiary() {
     }
   }, [handleSync]);
 
+  const handleGenerateAiSummary = useCallback(() => {
+    setIsGeneratingAi(true);
+
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+    let startLimit = '';
+    let endLimit = todayStr;
+
+    if (aiPreset === '7days') {
+      const d = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      startLimit = d.toISOString().split('T')[0];
+    } else if (aiPreset === '30days') {
+      const d = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      startLimit = d.toISOString().split('T')[0];
+    } else if (aiPreset === 'thisMonth') {
+      startLimit = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+    } else if (aiPreset === 'custom') {
+      startLimit = aiStartDate;
+      endLimit = aiEndDate || todayStr;
+    }
+
+    const filtered = entries.filter(entry => {
+      if (startLimit && entry.date < startLimit) return false;
+      if (endLimit && entry.date > endLimit) return false;
+      if (entry.type === 'Journal' && !aiScope.journals) return false;
+      if (entry.type === 'Machine Log' && !aiScope.machineLogs) return false;
+      if (entry.type === 'Comm Log' && !aiScope.internalNotes) return false;
+      return true;
+    });
+
+    if (filtered.length === 0) {
+      setAiSummary('⚠️ **No logs found** matching the selected date range and filter criteria. Please broaden your dates.');
+      setIsGeneratingAi(false);
+      return;
+    }
+
+    const formatPrettyDate = (dStr: string) => {
+      try {
+        const [y, m, d] = dStr.split('-').map(Number);
+        if (y && m && d) {
+          const dateObj = new Date(y, m - 1, d);
+          return dateObj.toLocaleDateString('en-US', {
+            weekday: 'long',
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric'
+          });
+        }
+        return dStr;
+      } catch {
+        return dStr;
+      }
+    };
+
+    const dates = Array.from(new Set(filtered.map(e => e.date))).sort();
+    const firstDateLabel = formatPrettyDate(dates[0]);
+    const lastDateLabel = formatPrettyDate(dates[dates.length - 1]);
+
+    const journalLogs = filtered.filter(e => e.type === 'Journal');
+    const machineLogs = filtered.filter(e => e.type === 'Machine Log' && e.machineLog);
+    const internalLogs = filtered.filter(e => e.type === 'Comm Log');
+
+    let fullDays = 0;
+    let halfDays = 0;
+    let inactiveDays = 0;
+    const machinesSeen = new Set<string>();
+    const standbyRemarks = new Set<string>();
+
+    machineLogs.forEach(entry => {
+      const log = entry.machineLog!;
+      const mName = (log as any).machineName || (log as any).machine_name || log.assetName || log.assetId;
+      if (mName) machinesSeen.add(mName);
+      const status = log.operationalDay ?? (log.isActive ? 'full' : 'none');
+      if (status === 'full') fullDays++;
+      else if (status === 'half') halfDays++;
+      else inactiveDays++;
+
+      const dReason = (log as any).downtimeReason || (log as any).downtime_reason;
+      const rem = (log as any).remarks || (log as any).comments || log.issuesOnSite;
+      if (dReason) standbyRemarks.add(String(dReason).trim());
+      if (rem) standbyRemarks.add(String(rem).trim());
+    });
+
+    const loggedBySet = new Set<string>();
+    filtered.forEach(e => {
+      if (e.loggedBy && e.loggedBy.toLowerCase() !== 'system' && e.loggedBy.toLowerCase() !== 'unknown') {
+        loggedBySet.add(e.loggedBy);
+      }
+    });
+
+    const fieldNotes: string[] = [];
+    journalLogs.forEach(j => {
+      if (j.narration && j.narration.trim().length > 2) {
+        fieldNotes.push(j.narration.trim());
+      }
+    });
+
+    // Group logs by date in descending order (latest first)
+    const dateMap = new Map<string, typeof filtered>();
+    filtered.forEach(entry => {
+      const arr = dateMap.get(entry.date) || [];
+      arr.push(entry);
+      dateMap.set(entry.date, arr);
+    });
+    const sortedDatesDesc = Array.from(dateMap.keys()).sort((a, b) => b.localeCompare(a));
+
+    const timelineNarrative: string[] = [];
+    sortedDatesDesc.forEach(d => {
+      const dayLogs = dateMap.get(d) || [];
+      const prettyDate = formatPrettyDate(d);
+
+      const jLogs = dayLogs.filter(e => e.type === 'Journal');
+      const mLogs = dayLogs.filter(e => e.type === 'Machine Log' && e.machineLog);
+      const cLogs = dayLogs.filter(e => e.type === 'Comm Log');
+
+      const narrativeParts: string[] = [];
+
+      jLogs.forEach(j => {
+        const stageStr = (j as any).dewateringStage ? `[Stage: ${(j as any).dewateringStage}] ` : '';
+        const progStr = (j as any).progressPercentage !== undefined ? `(${ (j as any).progressPercentage}% progress) ` : '';
+        const author = j.loggedBy && j.loggedBy !== 'Unknown' ? `by ${j.loggedBy}` : '';
+        const authorSuffix = author ? ` (${author})` : '';
+        if (j.narration && j.narration.trim()) {
+          narrativeParts.push(`• **${prettyDate}**${authorSuffix}: ${stageStr}${progStr}"${j.narration.trim()}"`);
+        } else {
+          narrativeParts.push(`• **${prettyDate}**${authorSuffix}: Daily field journal logged.`);
+        }
+      });
+
+      if (mLogs.length > 0 && jLogs.length === 0) {
+        const mSummaries = mLogs.map(ml => {
+          const log = ml.machineLog!;
+          const name = log.assetName || (log as any).machineName || log.assetId;
+          const status = log.operationalDay === 'full' ? 'ran full day' : log.operationalDay === 'half' ? 'ran half day' : (log.isActive ? 'active' : 'on standby (inactive)');
+          const diesel = log.dieselUsage > 0 ? ` with ${log.dieselUsage}L diesel consumed` : '';
+          const remarks = log.issuesOnSite ? ` (Notes: ${log.issuesOnSite})` : ((log as any).remarks ? ` (${(log as any).remarks})` : '');
+          return `${name} was ${status}${diesel}${remarks}`;
+        }).join('; ');
+        narrativeParts.push(`• **${prettyDate}** [Equipment Update]: ${mSummaries}.`);
+      }
+
+      cLogs.forEach(c => {
+        if (c.narration && c.narration.trim()) {
+          narrativeParts.push(`• **${prettyDate}** [Internal Note]: ${c.narration.trim()}`);
+        }
+      });
+
+      if (narrativeParts.length > 0) {
+        timelineNarrative.push(narrativeParts.join('\n'));
+      }
+    });
+
+    const totalDaysCount = dates.length;
+    const activeRate = totalDaysCount > 0 ? Math.round(((fullDays + halfDays * 0.5) / Math.max(1, machineLogs.length || 1)) * 100) : 0;
+    
+    const isInactiveOrStandby = (machineLogs.length === 0 && journalLogs.length > 0 && fieldNotes.some(n => n.toLowerCase().includes('inactive') || n.toLowerCase().includes('standby'))) || (activeRate === 0 && fullDays === 0);
+
+    const overallNarrativeParagraph = isInactiveOrStandby
+      ? `During this period, the site remained primarily on **standby / inactive status**. No active dewatering pump operations or diesel consumption were logged on site.`
+      : (activeRate > 70) 
+        ? `Operations on site were **actively progressing** during this period, with steady machine runtime and daily routine tracking recorded.` 
+        : `Site operations were **intermittent / in a standby phase**, with activity recorded on select dates while other days remained idle.`;
+
+    const siteTitle = site ? `${site.name}` : 'Site';
+    const clientTitle = site?.client ? ` (Client: ${site.client})` : '';
+
+    const markdown = [
+      `Here is your executive site briefing for **${siteTitle}**${clientTitle} covering **${firstDateLabel}** to **${lastDateLabel}**:`,
+      ``,
+      `### 📋 Executive Status & Overview`,
+      `${overallNarrativeParagraph} A total of **${filtered.length} log entry/entries** were documented across **${totalDaysCount} active date(s)**, recorded by **${loggedBySet.size > 0 ? Array.from(loggedBySet).join(', ') : 'the operations team'}**.`,
+      ``,
+      `### 🗓️ Day-by-Day Field Update`,
+      timelineNarrative.length > 0 ? timelineNarrative.join('\n\n') : `• *No specific activity narratives were entered for these dates.*`,
+      ``,
+      `### 🚜 Equipment & Machinery Status`,
+      machinesSeen.size > 0
+        ? [
+            `• **Stationed Equipment:** ${Array.from(machinesSeen).join(', ')}`,
+            `• **Runtime Summary:** ${fullDays} full operational day(s), ${halfDays} half day(s), and ${inactiveDays} standby/off day(s).`,
+            standbyRemarks.size > 0 ? `• **Standby / Downtime Notes:** ${Array.from(standbyRemarks).slice(0, 3).join('; ')}` : `• **Status:** Stationed equipment is in standby readiness.`
+          ].join('\n')
+        : `• No heavy machinery logs recorded for this timeframe.`,
+      ``,
+      `### 💡 Key Action Points`,
+      `1. **Site Verification:** ${isInactiveOrStandby ? `Follow up with ${site?.client || 'the client'} regarding their scheduled start date to align pump mobilization and standby charges.` : 'Ensure daily machine logs continue to be submitted to maintain contract runtime tracking.'}`,
+      `2. **Resource Auditing:** Verify diesel refills and technician attendance match on-site logs prior to invoice finalization.`
+    ].join('\n');
+
+    setTimeout(() => {
+      setAiSummary(markdown);
+      setIsGeneratingAi(false);
+    }, 300);
+  }, [entries, aiPreset, aiStartDate, aiEndDate, aiScope, site]);
+
+  const handleCopySummary = () => {
+    if (!aiSummary) return;
+    navigator.clipboard.writeText(aiSummary.replace(/###/g, '').replace(/####/g, '').replace(/\*\*/g, ''));
+    setIsCopied(true);
+    toast.success('AI summary copied to clipboard.');
+    setTimeout(() => setIsCopied(false), 2000);
+  };
+
+  const handlePrintSummary = () => {
+    if (!aiSummary) return;
+    const printWin = window.open('', '_blank');
+    if (!printWin) return;
+    printWin.document.write(`
+      <html>
+        <head>
+          <title>${site?.name || 'Site'} — AI Executive Briefing</title>
+          <style>
+            body { font-family: 'Inter', system-ui, sans-serif; padding: 40px; color: #1e293b; line-height: 1.6; }
+            h1 { font-size: 20px; color: #0f172a; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; margin-bottom: 16px; }
+            h2 { font-size: 15px; color: #4338ca; margin-top: 24px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em; }
+            p, li { font-size: 13px; margin: 4px 0; }
+            .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; border-bottom: 1px solid #cbd5e1; padding-bottom: 12px; }
+            .badge { background: #eef2ff; color: #4338ca; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 11px; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div>
+              <h1 style="margin:0;border:none;padding:0;">${site?.name || 'Site'} — AI Executive Briefing</h1>
+              <p style="margin:4px 0 0 0;color:#64748b;">Client: ${site?.client || 'N/A'}</p>
+            </div>
+            <span class="badge">DCEL AI INTELLIGENCE</span>
+          </div>
+          <div>${aiSummary.replace(/\n/g, '<br/>').replace(/### (.*?)/g, '<h2>$1</h2>').replace(/#### (.*?)/g, '<h2>$1</h2>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')}</div>
+          <script>window.print();</script>
+        </body>
+      </html>
+    `);
+    printWin.document.close();
+  };
+
   const headerActions = (
     <div className="flex items-center gap-2">
+      {/* AI Summarize */}
+      <Button
+        id="site-diary-ai-summary-btn"
+        size="sm"
+        onClick={() => {
+          setShowAiModal(true);
+          if (!aiSummary) {
+            handleGenerateAiSummary();
+          }
+        }}
+        className="h-8 gap-1.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white font-semibold text-xs shadow-xs active:scale-95 transition-all"
+      >
+        <Sparkles className="h-3.5 w-3.5" />
+        <span className="hidden sm:inline">Summarize with AI</span>
+        <span className="sm:hidden">AI Summary</span>
+      </Button>
       {/* Import */}
       <label
         id="site-diary-import-btn"
@@ -698,11 +1029,23 @@ export function SiteDiary() {
             </div>
           ) : (
             <>
-              {/* Entry count banner */}
-              <div className="mb-5 flex items-center justify-between">
+              {/* Entry count banner & AI Action */}
+              <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
                 <p className="text-xs text-slate-400 font-medium">
                   Showing <span className="font-bold text-slate-600">{entries.length}</span> logs (Years: {currentYear} to {new Date().getFullYear()})
                 </p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setShowAiModal(true);
+                    if (!aiSummary) handleGenerateAiSummary();
+                  }}
+                  className="h-7 px-2.5 text-xs font-semibold border-indigo-200 text-indigo-700 hover:bg-indigo-50 dark:border-indigo-800 dark:text-indigo-400 dark:hover:bg-indigo-950/30 gap-1.5 shadow-xs transition-all"
+                >
+                  <Sparkles className="h-3.5 w-3.5 text-indigo-500" />
+                  <span>AI Log Digest</span>
+                </Button>
               </div>
 
               {/* Timeline */}
@@ -754,36 +1097,46 @@ export function SiteDiary() {
                       {entry.type === 'Machine Log' && entry.machineLog ? (
                         <MachineLogDetails log={entry.machineLog} />
                       ) : (
-                        <p className="text-slate-700 whitespace-pre-line leading-relaxed text-[15px]">
-                          {entry.narration}
-                        </p>
+                        <div className="space-y-3">
+                          {((entry as any).dewateringStage || (entry as any).progressPercentage !== undefined) && (
+                            <div className="flex flex-wrap items-center gap-2">
+                              {(entry as any).dewateringStage && (
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-indigo-50 border border-indigo-200 text-indigo-700 dark:bg-indigo-950/40 dark:border-indigo-800 dark:text-indigo-300 uppercase tracking-wider">
+                                  Stage: {(entry as any).dewateringStage}
+                                </span>
+                              )}
+                              {(entry as any).progressPercentage !== undefined && (
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-700 dark:bg-emerald-950/40 dark:border-emerald-800 dark:text-emerald-300 uppercase tracking-wider">
+                                  Progress: {(entry as any).progressPercentage}%
+                                </span>
+                              )}
+                            </div>
+                          )}
+                          <p className="text-slate-700 dark:text-slate-200 whitespace-pre-line leading-relaxed text-[15px]">
+                            {entry.narration}
+                          </p>
+                        </div>
                       )}
                       
                       {entry.type === 'Journal' && siteId && (
                         <>
                           <EntryMediaStrip siteId={siteId} date={entry.date} journalId={entry.journalId} />
                           {(() => {
-                            const machineLogs = allMachineLogs.filter(l => l.siteId === siteId && l.date === entry.date);
-                            if (machineLogs.length === 0) return null;
+                            const matchingMachineLogs = allMachineLogs.filter(l => 
+                              (l.siteId === siteId || (site && l.siteName && l.siteName.toLowerCase().trim() === site.name.toLowerCase().trim())) && 
+                              l.date === entry.date
+                            );
+                            if (matchingMachineLogs.length === 0) return null;
                             return (
-                              <div className="mt-4 bg-slate-50 dark:bg-slate-900/40 rounded-lg p-3.5 border border-slate-100 dark:border-slate-800">
-                                <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">Machine Log Narrative</p>
-                                <ul className="space-y-1.5 list-none">
-                                  {machineLogs.map(ml => {
-                                    const opLabel = ml.operationalDay === 'full' ? 'Full Day' : ml.operationalDay === 'half' ? 'Half Day' : ml.operationalDay === 'none' ? 'Not Operational' : (ml.isActive ? 'Full Day' : 'Not Operational');
-                                    return (
-                                      <li key={ml.id} className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed relative pl-4 pb-1">
-                                        <div className={cn("absolute left-0 top-2 h-1.5 w-1.5 rounded-full", ml.isActive ? "bg-emerald-500" : "bg-rose-500")} />
-                                        <span className="font-semibold text-slate-800 dark:text-slate-200">{ml.assetName}</span>
-                                        {` - ${opLabel}`}
-                                        {ml.dieselUsage > 0 ? ` • Diesel: ${ml.dieselUsage}L` : ''}
-                                        {ml.supervisorOnSite ? ` • Supervisor: ${ml.supervisorOnSite}` : ''}
-                                        {ml.issuesOnSite ? ` • Notes: ${ml.issuesOnSite}` : ''}
-                                        {ml.maintenanceDetails ? ` • Maintenance: ${ml.maintenanceDetails}` : ''}
-                                      </li>
-                                    );
-                                  })}
-                                </ul>
+                              <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 space-y-3">
+                                <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                                  On-Site Equipment Logs ({matchingMachineLogs.length})
+                                </p>
+                                <div className="space-y-3">
+                                  {matchingMachineLogs.map(ml => (
+                                    <MachineLogDetails key={ml.id} log={ml} />
+                                  ))}
+                                </div>
                               </div>
                             );
                           })()}
@@ -825,8 +1178,205 @@ export function SiteDiary() {
         </div>
       </div>
       {renderComparisonModal()}
+      {renderAiSummaryModal()}
     </div>
   );
+
+  function renderAiSummaryModal() {
+    return (
+      <Dialog open={showAiModal} onOpenChange={setShowAiModal}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col p-0 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800">
+          <DialogHeader className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 flex-shrink-0 flex flex-row items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400">
+                <Sparkles className="w-5 h-5" />
+              </div>
+              <div>
+                <DialogTitle className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                  AI Operations & Diary Digest
+                </DialogTitle>
+                <DialogDescription className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  {site?.name} ({site?.client}) — Automated intelligence synthesis
+                </DialogDescription>
+              </div>
+            </div>
+            <DialogClose className="h-8 w-8 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors" />
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4 style-scroll">
+            {/* Filter Configuration Toolbar */}
+            <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/30 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                  <Filter className="w-3.5 h-3.5 text-indigo-500" /> Reporting Timeframe:
+                </span>
+                
+                {/* Date Preset Buttons */}
+                <div className="flex flex-wrap gap-1 bg-white dark:bg-slate-800 p-1 rounded-lg border border-slate-200 dark:border-slate-700">
+                  {[
+                    { id: 'all', label: 'All Logs' },
+                    { id: '7days', label: 'Last 7 Days' },
+                    { id: 'thisMonth', label: 'This Month' },
+                    { id: '30days', label: 'Last 30 Days' },
+                    { id: 'custom', label: 'Custom Range' },
+                  ].map(preset => (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() => {
+                        setAiPreset(preset.id as any);
+                      }}
+                      className={cn(
+                        "px-2.5 py-1 text-xs font-medium rounded-md transition-all",
+                        aiPreset === preset.id
+                          ? "bg-indigo-600 text-white font-semibold shadow-xs"
+                          : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                      )}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Custom Date Pickers */}
+              {aiPreset === 'custom' && (
+                <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-slate-200 dark:border-slate-700/60">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-500 font-medium">From:</span>
+                    <Input
+                      type="date"
+                      value={aiStartDate}
+                      onChange={e => setAiStartDate(e.target.value)}
+                      className="h-8 text-xs w-36 bg-white dark:bg-slate-800"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-500 font-medium">To:</span>
+                    <Input
+                      type="date"
+                      value={aiEndDate}
+                      onChange={e => setAiEndDate(e.target.value)}
+                      className="h-8 text-xs w-36 bg-white dark:bg-slate-800"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Scope Checkboxes & Generate Trigger */}
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-200 dark:border-slate-700/60">
+                <div className="flex flex-wrap items-center gap-3 text-xs text-slate-600 dark:text-slate-300">
+                  <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={aiScope.journals}
+                      onChange={e => setAiScope(s => ({ ...s, journals: e.target.checked }))}
+                      className="rounded text-indigo-600 focus:ring-indigo-500"
+                    />
+                    <span>Field Journals</span>
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={aiScope.machineLogs}
+                      onChange={e => setAiScope(s => ({ ...s, machineLogs: e.target.checked }))}
+                      className="rounded text-indigo-600 focus:ring-indigo-500"
+                    />
+                    <span>Machine Operations</span>
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={aiScope.internalNotes}
+                      onChange={e => setAiScope(s => ({ ...s, internalNotes: e.target.checked }))}
+                      className="rounded text-indigo-600 focus:ring-indigo-500"
+                    />
+                    <span>Internal Notes</span>
+                  </label>
+                </div>
+
+                <Button
+                  size="sm"
+                  onClick={handleGenerateAiSummary}
+                  disabled={isGeneratingAi}
+                  className="h-8 px-3.5 text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white gap-1.5 shadow-sm active:scale-95"
+                >
+                  {isGeneratingAi ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Synthesizing...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>Generate AI Brief</span>
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            {/* AI Summary Content Output */}
+            {isGeneratingAi ? (
+              <div className="py-16 text-center space-y-3">
+                <div className="inline-flex p-3 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 animate-pulse">
+                  <Sparkles className="w-6 h-6 animate-spin" />
+                </div>
+                <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">Analyzing field journals & equipment logs...</p>
+                <p className="text-xs text-slate-400">Synthesizing operational highlights, runtime patterns, and standby reasons.</p>
+              </div>
+            ) : aiSummary ? (
+              <div className="p-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 shadow-sm space-y-3 text-xs leading-relaxed font-sans">
+                <div className="prose prose-sm dark:prose-invert max-w-none text-slate-700 dark:text-slate-200">
+                  {renderFormattedChatMessage(aiSummary)}
+                </div>
+              </div>
+            ) : (
+              <div className="py-12 text-center text-slate-400">
+                <Sparkles className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                <p className="text-sm font-medium">Select your date range and click Generate AI Brief.</p>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="px-6 py-3.5 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2 shrink-0 bg-slate-50/50 dark:bg-slate-900/20">
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCopySummary}
+                disabled={!aiSummary || isGeneratingAi}
+                className="h-8 text-xs font-semibold gap-1.5"
+              >
+                {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5 text-slate-500" />}
+                <span>{isCopied ? 'Copied!' : 'Copy Summary'}</span>
+              </Button>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handlePrintSummary}
+                disabled={!aiSummary || isGeneratingAi}
+                className="h-8 text-xs font-semibold gap-1.5"
+              >
+                <Printer className="w-3.5 h-3.5 text-slate-500" />
+                <span>Print / PDF</span>
+              </Button>
+            </div>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowAiModal(false)}
+              className="h-8 text-xs font-semibold"
+            >
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   function renderComparisonModal() {
     return (

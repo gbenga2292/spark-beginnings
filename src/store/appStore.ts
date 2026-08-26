@@ -80,7 +80,31 @@ export interface DailyJournal {
   createdAt: string;
 }
 
-export type DewateringStage = 'mobilization' | 'installation' | 'operation' | 'demobilisation';
+export type DewateringStage = 'mobilization' | 'installation' | 'jetting' | 'rejetting' | 'operation' | 'demobilisation';
+
+export type SiteTimelineEventType =
+  | 'mobilisation'
+  | 'jetting'
+  | 'rejetting'
+  | 'machine_operation'
+  | 'machine_downtime'
+  | 'hold'
+  | 'demobilisation'
+  | 'milestone'
+  | 'custom';
+
+export interface SiteTimelineEvent {
+  id: string;
+  siteId: string;
+  siteName?: string;
+  title: string;
+  eventType: SiteTimelineEventType;
+  startDate: string; // YYYY-MM-DD
+  endDate?: string;   // YYYY-MM-DD
+  notes?: string;
+  loggedBy?: string;
+  createdAt?: string;
+}
 
 export interface SiteJournalEntry {
   id: string;
@@ -751,6 +775,11 @@ interface AppState {
   deleteDailyJournal: (journalId: string) => void;
   deleteSiteJournalEntry: (entryId: string) => void;
 
+  siteTimelineEvents: SiteTimelineEvent[];
+  addSiteTimelineEvent: (event: SiteTimelineEvent) => void;
+  updateSiteTimelineEvent: (id: string, updates: Partial<SiteTimelineEvent>) => void;
+  deleteSiteTimelineEvent: (id: string) => void;
+
   sites: Site[];
   pendingSites: SiteQuestionnaire[];
   clients: string[]; // Keep this for legacy dropdowns and backward compat
@@ -1014,6 +1043,7 @@ export const useAppStore = create<AppState>()(
       commLogReads: [],
       dailyJournals: [],
       siteJournalEntries: [],
+      siteTimelineEvents: [],
       leaves: [],
       isVariablesDirty: false,
       setVariablesDirty: (val) => set({ isVariablesDirty: val }),
@@ -1200,6 +1230,23 @@ export const useAppStore = create<AppState>()(
           siteJournalEntries: s.siteJournalEntries.filter((e) => e.id !== entryId),
         }));
         db.deleteSiteJournalEntry(entryId);
+      },
+
+      // Site Timeline Events
+      addSiteTimelineEvent: (event) => {
+        set((s) => ({ siteTimelineEvents: [...(s.siteTimelineEvents || []), event] }));
+      },
+      updateSiteTimelineEvent: (id, updates) => {
+        set((s) => ({
+          siteTimelineEvents: (s.siteTimelineEvents || []).map((e) =>
+            e.id === id ? { ...e, ...updates } : e
+          ),
+        }));
+      },
+      deleteSiteTimelineEvent: (id) => {
+        set((s) => ({
+          siteTimelineEvents: (s.siteTimelineEvents || []).filter((e) => e.id !== id),
+        }));
       },
 
       // Leaves

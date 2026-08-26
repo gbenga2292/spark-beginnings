@@ -260,22 +260,22 @@ export function Sites() {
     if (q) {
       // Phase 1 — Project Scope
       const p1 = q.phase1;
-      if (p1.whatIsBeingBuilt) {
+      if (p1?.whatIsBeingBuilt) {
         lines.push(`The project ${getVerb('involves', 'involved')} ${p1.whatIsBeingBuilt.toLowerCase()}.`);
       }
-      if (p1.excavationDepthMeters) {
+      if (p1?.excavationDepthMeters) {
         lines.push(`Excavation ${getVerb('is planned', 'was')} to a depth of ${p1.excavationDepthMeters} metres.`);
       }
-      if (p1.siteLength && p1.siteWidth) {
+      if (p1?.siteLength && p1?.siteWidth) {
         lines.push(`The site ${getVerb('measures', 'measured')} approximately ${p1.siteLength}m by ${p1.siteWidth}m.`);
       }
-      if (p1.timelineStartDate) {
+      if (p1?.timelineStartDate) {
         lines.push(`Works ${getVerb('are scheduled to commence', 'commenced')} on ${p1.timelineStartDate}.`);
       }
       
       const dataAvail = [
-        p1.geotechnicalReportAvailable && 'geotechnical report', 
-        p1.hydrogeologicalDataAvailable && 'hydrogeological data'
+        p1?.geotechnicalReportAvailable && 'geotechnical report', 
+        p1?.hydrogeologicalDataAvailable && 'hydrogeological data'
       ].filter(Boolean);
       
       if (dataAvail.length) {
@@ -284,58 +284,58 @@ export function Sites() {
 
       // Phase 2 — Site Assessment
       const p2 = q.phase2;
-      const visited = p2.siteVisited || p2.walkthroughCompleted;
+      const visited = p2?.siteVisited || p2?.walkthroughCompleted;
       if (visited) {
         lines.push(`A site visit and walkthrough were conducted to assess site conditions.`);
       }
-      if (p2.knownObstacles) {
+      if (p2?.knownObstacles) {
         lines.push(`Known site obstacles ${getVerb('include', 'included')}: ${p2.knownObstacles}.`);
       }
-      if (p2.dischargeLocation) {
+      if (p2?.dischargeLocation) {
         lines.push(`Dewatering discharge ${getVerb('will be', 'was')} directed to ${p2.dischargeLocation}.`);
       }
-      if (p2.dieselSupplyStrategy) {
+      if (p2?.dieselSupplyStrategy) {
         lines.push(`Diesel supply ${getVerb('is to be', 'was')} provided by ${p2.dieselSupplyStrategy}.`);
       }
 
       // Phase 3 — Engineering
       const p3 = q.phase3;
-      const methods = (p3.dewateringMethods || []);
+      const methods = (p3?.dewateringMethods || []);
       if (methods.length) {
         lines.push(`The approved dewatering method(s) for this site: ${methods.join(', ')}.`);
       }
-      if (p3.totalWellpointsRequired) {
-        lines.push(`The system ${getVerb('requires', 'required')} ${p3.totalWellpointsRequired} wellpoints across ${p3.totalHeadersRequired || '—'} header pipes.`);
+      if (p3?.totalWellpointsRequired) {
+        lines.push(`The system ${getVerb('requires', 'required')} ${p3.totalWellpointsRequired} wellpoints across ${p3?.totalHeadersRequired || '—'} header pipes.`);
       }
-      if (p3.totalPumpsRequired) {
+      if (p3?.totalPumpsRequired) {
         lines.push(`A total of ${p3.totalPumpsRequired} pump(s) ${getVerb('will be', 'were')} deployed.`);
       }
-      if (p3.expectedDailyDieselUsage) {
+      if (p3?.expectedDailyDieselUsage) {
         lines.push(`${getVerb('Estimated daily', 'Actual')} diesel consumption ${getVerb('is', 'was')} ${p3.expectedDailyDieselUsage}.`);
       }
 
       // Phase 4 — Commercial
       const p4 = q.phase4;
-      if (p4.scopeOfWorkSummary) lines.push(`Scope of work: ${p4.scopeOfWorkSummary}`);
-      if (p4.scopeExclusionsSummary) lines.push(`Exclusions from scope: ${p4.scopeExclusionsSummary}`);
-      if (p4.clientTaxStatus) lines.push(`Client tax classification is ${p4.clientTaxStatus}.`);
-      if (p4.proposalAccepted) lines.push(`The client formally accepted the proposal.`);
+      if (p4?.scopeOfWorkSummary) lines.push(`Scope of work: ${p4.scopeOfWorkSummary}`);
+      if (p4?.scopeExclusionsSummary) lines.push(`Exclusions from scope: ${p4.scopeExclusionsSummary}`);
+      if (p4?.clientTaxStatus) lines.push(`Client tax classification is ${p4.clientTaxStatus}.`);
+      if (p4?.proposalAccepted) lines.push(`The client formally accepted the proposal.`);
 
       // Phase 5 — Handover
       const p5 = q.phase5;
       const milestones: string[] = [];
-      if (p5.safetyPlanIntegrated) milestones.push('site safety plan integrated');
-      if (p5.stage1AdvanceReceived) milestones.push('50% advance payment received');
-      if (p5.stage2InstallationComplete) milestones.push(isEnded ? 'installation completed' : 'installation complete and system started');
-      if (p5.stage2FirstInvoiceIssued) milestones.push('first hire invoice issued');
-      if (p5.stage3TimelyBilling) milestones.push(isEnded ? 'billing cycle completed' : 'regular hire invoicing ongoing');
-      if (p5.stage4DemobilizationComplete) milestones.push('demobilisation complete');
-      if (p5.stage4FinalInvoiceIssued) milestones.push('final invoice and WHT credit issued');
+      if (p5?.safetyPlanIntegrated) milestones.push('site safety plan integrated');
+      if (p5?.stage1AdvanceReceived) milestones.push('50% advance payment received');
+      if (p5?.stage2InstallationComplete) milestones.push(isEnded ? 'installation completed' : 'installation complete and system started');
+      if (p5?.stage2FirstInvoiceIssued) milestones.push('first hire invoice issued');
+      if (p5?.stage3TimelyBilling) milestones.push(isEnded ? 'billing cycle completed' : 'regular hire invoicing ongoing');
+      if (p5?.stage4DemobilizationComplete) milestones.push('demobilisation complete');
+      if (p5?.stage4FinalInvoiceIssued) milestones.push('final invoice and WHT credit issued');
       
       if (milestones.length) {
         lines.push(`Project milestones achieved: ${milestones.join(', ')}.`);
       }
-      if (p5.actualEndDate) {
+      if (p5?.actualEndDate) {
         lines.push(`The project concluded on ${p5.actualEndDate}.`);
       }
     } else {
@@ -1410,6 +1410,16 @@ export function Sites() {
                                     <FileText className="h-4 w-4 text-slate-400" />
                                     <span>Site Summary</span>
                                   </DropdownMenuItem>
+
+                                  <DropdownMenuItem 
+                                    onClick={() => {
+                                      navigate(`/client-360?client=${encodeURIComponent(site.client)}&siteId=${site.id}`);
+                                    }}
+                                    className="gap-2 text-indigo-600 focus:text-indigo-700 focus:bg-indigo-50"
+                                  >
+                                    <Sparkles className="h-4 w-4 text-indigo-500" />
+                                    <span>Site 360</span>
+                                  </DropdownMenuItem>
                                   
                                   {canEditSite && (
                                     <DropdownMenuItem 
@@ -1583,6 +1593,15 @@ export function Sites() {
                                   <DropdownMenuItem onClick={() => setNarrativeSite({ site, q: q || null })} className="gap-2">
                                     <FileText className="h-4 w-4 text-slate-400" />
                                     <span>Site Summary</span>
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem 
+                                    onClick={() => {
+                                      navigate(`/client-360?client=${encodeURIComponent(site.client)}&siteId=${site.id}`);
+                                    }}
+                                    className="gap-2 text-indigo-600 focus:text-indigo-700 focus:bg-indigo-50"
+                                  >
+                                    <Sparkles className="h-4 w-4 text-indigo-500" />
+                                    <span>Site 360</span>
                                   </DropdownMenuItem>
                                   {canEditSite && (
                                     <DropdownMenuItem 

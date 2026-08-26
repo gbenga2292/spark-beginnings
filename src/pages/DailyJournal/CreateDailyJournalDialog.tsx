@@ -216,20 +216,26 @@ function SiteLogCard({
               className="w-full h-10 rounded-xl border border-white/10 px-3 text-sm bg-[#0f111a] text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
             >
               <option value="">— Select Stage —</option>
-              <option value="mobilization">🚚 Mobilization</option>
-              <option value="installation">🔧 Installation</option>
-              <option value="operation">⚙️ Operation</option>
-              <option value="demobilisation">📦 Demobilisation</option>
+              <option value="mobilization">🚚 Mobilization / Setup</option>
+              <option value="jetting">🌊 Jetting (Initial Wellpoints)</option>
+              <option value="rejetting">🔄 Re-Jetting / Wellpoint Modification</option>
+              <option value="installation">🔧 Installation / Header Setup</option>
+              <option value="operation">⚙️ Active Dewatering / Pumping</option>
+              <option value="demobilisation">📦 Demobilisation / Extraction</option>
             </select>
             {entry.dewateringStage && (
               <div className="flex items-center gap-2 mt-1">
                 <span className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-0.5 rounded-full ${
                   entry.dewateringStage === 'mobilization' ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30' :
+                  entry.dewateringStage === 'jetting' ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30' :
+                  entry.dewateringStage === 'rejetting' ? 'bg-teal-500/20 text-teal-300 border border-teal-500/30' :
                   entry.dewateringStage === 'installation' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' :
                   entry.dewateringStage === 'operation' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' :
                   'bg-rose-500/20 text-rose-300 border border-rose-500/30'
                 }`}>
                   {entry.dewateringStage === 'mobilization' && '🚚 Mobilizing'}
+                  {entry.dewateringStage === 'jetting' && '🌊 Jetting (Initial)'}
+                  {entry.dewateringStage === 'rejetting' && '🔄 Re-Jetting'}
                   {entry.dewateringStage === 'installation' && '🔧 Installing'}
                   {entry.dewateringStage === 'operation' && '⚙️ In Operation'}
                   {entry.dewateringStage === 'demobilisation' && '📦 Demobilising'}

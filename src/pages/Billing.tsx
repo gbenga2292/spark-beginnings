@@ -5,7 +5,7 @@ import InvoiceLogo from '../../logo/logo-2.png';
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction, AlertDialogCancel } from '@/src/components/task_ui/alert-dialog';
 import { useAppStore, PendingInvoice, Invoice } from '@/src/store/appStore';
 import { toast, showConfirm } from '@/src/components/ui/toast';
-import { Trash2, Edit, CheckCircle, Plus, X, ArrowRightCircle, Upload, Download, Mail, ChevronUp, ChevronDown, ChevronRight, Printer, PlusCircle, ArrowLeft, Save, FileText, Layers, Users, Settings, Truck, Info, Calculator } from 'lucide-react';
+import { Trash2, Edit, CheckCircle, Plus, X, ArrowRightCircle, Upload, Download, Mail, ChevronUp, ChevronDown, ChevronRight, Printer, PlusCircle, ArrowLeft, Save, FileText, Layers, Users, Settings, Truck, Info, Calculator, History, Calendar } from 'lucide-react';
 import { Input } from '@/src/components/ui/input';
 import { Button } from '@/src/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
@@ -232,6 +232,94 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
       return true;
     }).sort((a, b) => a.name.localeCompare(b.name));
   }, [siteRegistry, form.client, form.site]);
+
+  const lastInvoiceForSelectedSite = useMemo(() => {
+    if (!form.client || !form.site) return null;
+
+    const normClient = form.client.trim().toLowerCase();
+    const normSite = form.site.trim().toLowerCase();
+
+    // 1. Check active invoices
+    const matchingActive = invoices.filter(inv => {
+      if (selectedId && inv.id === selectedId) return false;
+      const c = (inv.client || '').trim().toLowerCase();
+      const s = (inv.siteName || inv.project || '').trim().toLowerCase();
+      return c === normClient && s === normSite;
+    });
+
+    // 2. Check quotations / pending invoices
+    const matchingPending = pendingInvoices.filter(inv => {
+      if (selectedId && inv.id === selectedId) return false;
+      const c = (inv.client || '').trim().toLowerCase();
+      const s = (inv.site || '').trim().toLowerCase();
+      return c === normClient && s === normSite;
+    });
+
+    const candidates: Array<{
+      id: string;
+      invoiceNumber: string;
+      amount: number;
+      startDate: string;
+      endDate: string;
+      isQuotation: boolean;
+      duration?: number;
+    }> = [
+      ...matchingActive.map(inv => ({
+        id: inv.id,
+        invoiceNumber: inv.invoiceNumber,
+        amount: inv.totalCharge ?? inv.amount ?? 0,
+        startDate: inv.date || '',
+        endDate: inv.dueDate || inv.date || '',
+        isQuotation: false,
+        duration: inv.duration,
+      })),
+      ...matchingPending.map(inv => ({
+        id: inv.id,
+        invoiceNumber: inv.invoiceNo,
+        amount: inv.totalCharge ?? inv.totalCost ?? 0,
+        startDate: inv.startDate || '',
+        endDate: inv.endDate || inv.startDate || '',
+        isQuotation: true,
+        duration: inv.duration,
+      })),
+    ];
+
+    if (candidates.length === 0) return null;
+
+    // Sort descending by endDate/startDate, then invoiceNumber
+    candidates.sort((a, b) => {
+      const dateA = a.endDate || a.startDate || '';
+      const dateB = b.endDate || b.startDate || '';
+      if (dateA && dateB && dateA !== dateB) {
+        return dateB.localeCompare(dateA);
+      }
+      return (b.invoiceNumber || '').localeCompare(a.invoiceNumber || '', undefined, { numeric: true });
+    });
+
+    const latest = candidates[0];
+
+    // Compute suggested next start date: day after latest.endDate
+    let suggestedNextStartDate = '';
+    if (latest.endDate) {
+      const normalizedEnd = normalizeDate(latest.endDate);
+      if (normalizedEnd) {
+        const parts = normalizedEnd.split('-');
+        if (parts.length === 3) {
+          const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+          d.setDate(d.getDate() + 1);
+          const y = d.getFullYear();
+          const m = String(d.getMonth() + 1).padStart(2, '0');
+          const day = String(d.getDate()).padStart(2, '0');
+          suggestedNextStartDate = `${y}-${m}-${day}`;
+        }
+      }
+    }
+
+    return {
+      ...latest,
+      suggestedNextStartDate,
+    };
+  }, [form.client, form.site, invoices, pendingInvoices, selectedId]);
 
   const handleChange = (field: string, value: string | boolean) => {
     setForm(prev => ({ ...prev, [field]: value }));
@@ -2243,9 +2331,40 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                           onChange={e => {
                             const val = e.target.value;
                             const siteObj = siteRegistry.find(s => s.name === val && s.client === form.client);
+                            
+                            // Auto-suggest start date if empty and previous invoice exists
+                            let nextStart = form.startDate;
+                            if (!nextStart && val) {
+                              const normClient = form.client.trim().toLowerCase();
+                              const normSite = val.trim().toLowerCase();
+                              const prevMatches = invoices
+                                .filter(i => {
+                                  if (selectedId && i.id === selectedId) return false;
+                                  return (i.client || '').trim().toLowerCase() === normClient && 
+                                         ((i.siteName || i.project || '').trim().toLowerCase() === normSite);
+                                })
+                                .sort((a, b) => (b.dueDate || b.date || '').localeCompare(a.dueDate || a.date || ''));
+                              
+                              if (prevMatches.length > 0 && (prevMatches[0].dueDate || prevMatches[0].date)) {
+                                const normEnd = normalizeDate(prevMatches[0].dueDate || prevMatches[0].date);
+                                if (normEnd) {
+                                  const parts = normEnd.split('-');
+                                  if (parts.length === 3) {
+                                    const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+                                    d.setDate(d.getDate() + 1);
+                                    const y = d.getFullYear();
+                                    const m = String(d.getMonth() + 1).padStart(2, '0');
+                                    const day = String(d.getDate()).padStart(2, '0');
+                                    nextStart = `${y}-${m}-${day}`;
+                                  }
+                                }
+                              }
+                            }
+
                             setForm(f => ({ 
                               ...f, 
                               site: val,
+                              startDate: nextStart,
                               vatInc: siteObj ? siteObj.vat : f.vatInc
                             }));
                           }}
@@ -2257,6 +2376,67 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                         </select>
                       </div>
                     </div>
+
+                    {/* Last Invoice Reference Banner */}
+                    {form.client && form.site && (
+                      <div className={cn(
+                        "rounded-xl border p-3.5 transition-all",
+                        lastInvoiceForSelectedSite 
+                          ? "bg-gradient-to-r from-indigo-50/70 via-slate-50 to-blue-50/60 dark:from-indigo-950/30 dark:via-slate-900/60 dark:to-blue-950/20 border-indigo-200/80 dark:border-indigo-900/50"
+                          : "bg-slate-50/60 dark:bg-slate-900/40 border-slate-200 dark:border-slate-800"
+                      )}>
+                        {lastInvoiceForSelectedSite ? (
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-lg bg-indigo-600/10 dark:bg-indigo-500/20 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0">
+                                <History className="w-4 h-4" />
+                              </div>
+                              <div className="space-y-0.5">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-bold text-slate-700 dark:text-slate-200">
+                                    Last {lastInvoiceForSelectedSite.isQuotation ? 'Quotation' : 'Invoice'}:
+                                  </span>
+                                  <span className="font-mono font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-100/80 dark:bg-indigo-950/70 px-1.5 py-0.5 rounded text-[11px]">
+                                    #{lastInvoiceForSelectedSite.invoiceNumber || '—'}
+                                  </span>
+                                </div>
+                                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-slate-600 dark:text-slate-350">
+                                  <span>
+                                    Last End Date: <strong className="text-slate-900 dark:text-white font-bold">{formatDisplayDate(lastInvoiceForSelectedSite.endDate)}</strong>
+                                  </span>
+                                  <span className="text-slate-300 dark:text-slate-700 hidden sm:inline">•</span>
+                                  <span>
+                                    Last Invoice Amount: <strong className="text-slate-900 dark:text-white font-bold">
+                                      {priv?.canViewAmounts === false ? '***' : `₦${lastInvoiceForSelectedSite.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                                    </strong>
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                            {lastInvoiceForSelectedSite.suggestedNextStartDate && (
+                              <div className="flex items-center gap-2 self-start sm:self-center shrink-0">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleChange('startDate', lastInvoiceForSelectedSite.suggestedNextStartDate)}
+                                  className="h-8 px-2.5 text-[11px] font-semibold bg-white dark:bg-slate-900 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800 shadow-2xs gap-1.5 transition-all"
+                                  title={`Set Start Date to ${formatDisplayDate(lastInvoiceForSelectedSite.suggestedNextStartDate)}`}
+                                >
+                                  <Calendar className="w-3.5 h-3.5" />
+                                  <span>Use Next Day ({formatDisplayDate(lastInvoiceForSelectedSite.suggestedNextStartDate)})</span>
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                            <Info className="w-4 h-4 text-slate-400 shrink-0" />
+                            <span>No previous invoice found for this site (First billing cycle).</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-1.5">
@@ -2271,13 +2451,32 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                       </div>
 
                       <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-slate-500 dark:text-slate-450 uppercase tracking-wider">Start Date</label>
+                        <div className="flex items-center justify-between">
+                          <label className="text-xs font-bold text-slate-500 dark:text-slate-450 uppercase tracking-wider">Start Date</label>
+                          {lastInvoiceForSelectedSite?.endDate && (
+                            <span className="text-[10px] text-slate-400">
+                              Prev Ended: <span className="font-semibold text-slate-600 dark:text-slate-300">{formatDisplayDate(lastInvoiceForSelectedSite.endDate)}</span>
+                            </span>
+                          )}
+                        </div>
                         <Input 
                           type="date" 
                           value={form.startDate} 
                           onChange={e => handleChange('startDate', e.target.value)} 
                           className="bg-white dark:bg-slate-900 border-slate-205 dark:border-slate-800 h-11 font-semibold text-slate-800 dark:text-white" 
                         />
+                        {lastInvoiceForSelectedSite?.suggestedNextStartDate && form.startDate !== lastInvoiceForSelectedSite.suggestedNextStartDate && (
+                          <div className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center justify-between pt-0.5">
+                            <span>Suggested next cycle:</span>
+                            <button
+                              type="button"
+                              onClick={() => handleChange('startDate', lastInvoiceForSelectedSite.suggestedNextStartDate)}
+                              className="text-indigo-600 dark:text-indigo-400 hover:underline font-semibold cursor-pointer"
+                            >
+                              Set to {formatDisplayDate(lastInvoiceForSelectedSite.suggestedNextStartDate)}
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
 

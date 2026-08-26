@@ -9,13 +9,14 @@ import {
   AlertTriangle, Clock, Fuel, Calendar, FileText, Users, Settings2,
   ChevronDown, Sparkles, RefreshCcw, Send, ChevronUp, Filter, CheckCircle2, Plus, Pencil, ChevronRight,
   CheckSquare, ShieldAlert, ShieldCheck, ClipboardList, Package, Truck, X, Phone, Mail, Droplets,
-  PauseCircle, PlayCircle, History
+  PauseCircle, PlayCircle, History, RotateCcw
 } from 'lucide-react';
 import { Badge } from '@/src/components/ui/badge';
 import { Button } from '@/src/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/src/components/ui/dialog';
 import { cn } from '@/src/lib/utils';
 import { useTheme } from '@/src/hooks/useTheme';
+import { toast } from 'sonner';
 import { useAppStore, Site } from '@/src/store/appStore';
 import { supabase } from '@/src/integrations/supabase/client';
 import { useOperations } from '@/src/contexts/OperationsContext';
@@ -28,9 +29,10 @@ import { Invoice } from '@/src/store/appStore';
 import { ClientContactsPanel } from './ClientContactsPanel';
 import { TaskDetailSheet } from '@/src/components/tasks/TaskDetailSheet';
 import { AddSubtaskInline } from './Tasks/AddSubtaskInline';
+import { SiteGanttStoryboard } from '@/src/components/sites/SiteGanttStoryboard';
 
 
-type SiteTab = 'financials' | 'operations' | 'maintenance' | 'comms' | 'tasks' | 'contacts';
+type SiteTab = 'timeline' | 'financials' | 'operations' | 'maintenance' | 'comms' | 'tasks' | 'contacts';
 
 interface Props {
   site: Site;
@@ -50,10 +52,10 @@ const renderFormattedChatMessage = (content: string) => {
       <>
         {parts.map((part, i) => {
           if (part.startsWith('**') && part.endsWith('**') && part.length >= 4) {
-            return <strong key={i} className="font-extrabold text-white">{part.slice(2, -2)}</strong>;
+            return <strong key={i} className="font-extrabold text-slate-900 dark:text-white">{part.slice(2, -2)}</strong>;
           }
           if (part.startsWith('*') && part.endsWith('*') && part.length >= 2 && !part.startsWith('**')) {
-            return <em key={i} className="italic text-indigo-200">{part.slice(1, -1)}</em>;
+            return <em key={i} className="italic text-indigo-600 dark:text-indigo-200">{part.slice(1, -1)}</em>;
           }
           const cleanPart = part.replace(/\*\*/g, '').replace(/#/g, '');
           return <span key={i}>{cleanPart}</span>;
@@ -73,17 +75,18 @@ const renderFormattedChatMessage = (content: string) => {
         if (trimmed.startsWith('#') || (/^\*\*[^*]+\*\*:?$/.test(trimmed) && trimmed.length < 60)) {
           const cleanHeader = trimmed.replace(/^#+\s*/, '').replace(/\*\*/g, '').replace(/#/g, '').trim();
           return (
-            <div key={idx} className="text-xs font-black tracking-wider text-indigo-300 uppercase mt-3.5 mb-1.5 border-b border-indigo-700/50 pb-1 flex items-center gap-1.5">
+            <div key={idx} className="text-xs font-black tracking-wider text-indigo-700 dark:text-indigo-300 uppercase mt-3.5 mb-1.5 border-b border-indigo-200 dark:border-indigo-700/50 pb-1 flex items-center gap-1.5">
               <span>{cleanHeader}</span>
             </div>
           );
         }
 
-        if (/^[-*•]\s+/.test(trimmed) || /^\d+[\.\)]\s+/.test(trimmed)) {
-          const bulletText = trimmed.replace(/^[-*•]\s+/, '').replace(/^\d+[\.\)]\s+/, '');
+        if (/^[-*•](\s+|$)/.test(trimmed) || /^\d+[\.\)](\s+|$)/.test(trimmed)) {
+          const bulletText = trimmed.replace(/^[-*•]\s*/, '').replace(/^\d+[\.\)]\s*/, '').trim();
+          if (!bulletText) return null;
           return (
-            <div key={idx} className="flex items-start gap-2 pl-1.5 my-1 text-slate-100">
-              <span className="text-indigo-400 font-bold text-sm select-none leading-none mt-0.5">•</span>
+            <div key={idx} className="flex items-start gap-2 pl-1.5 my-1 text-slate-800 dark:text-slate-100">
+              <span className="text-indigo-600 dark:text-indigo-400 font-bold text-sm select-none leading-none mt-0.5">•</span>
               <div className="flex-1">
                 {renderInlineText(bulletText)}
               </div>
@@ -92,7 +95,7 @@ const renderFormattedChatMessage = (content: string) => {
         }
 
         return (
-          <p key={idx} className="my-1 text-indigo-50">
+          <p key={idx} className="my-1 text-slate-700 dark:text-indigo-50">
             {renderInlineText(trimmed)}
           </p>
         );
@@ -162,8 +165,8 @@ export function Site360View({ site, clientSites, onSiteChange, onBack, onEditSit
   const [messages, setMessages] = useState<{ role: 'user' | 'assistant', content: string }[]>([]);
   const [chatInput, setChatInput] = useState('');
   const [isGeneratingBrief, setIsGeneratingBrief] = useState(false);
-  const [isChatCollapsed, setIsChatCollapsed] = useState(true);
-  const [isSiteInfoCollapsed, setIsSiteInfoCollapsed] = useState(false);
+  const [isAiDrawerOpen, setIsAiDrawerOpen] = useState(false);
+  const [isQuickStatsOpen, setIsQuickStatsOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 1024);
   const [selectedProvider, setSelectedProvider] = useState<'gemini' | 'groq'>('groq');
   const [selectedModel, setSelectedModel] = useState<string>('llama-3.1-8b-instant');
@@ -379,6 +382,8 @@ export function Site360View({ site, clientSites, onSiteChange, onBack, onEditSit
   const commLogs = useAppStore(s => s.commLogs);
   const addCommLog = useAppStore(s => s.addCommLog);
   const clientContacts = useAppStore(s => s.clientContacts);
+  const dailyJournals = useAppStore(s => s.dailyJournals);
+  const siteJournalEntries = useAppStore(s => s.siteJournalEntries);
 
   const getInvoiceDates = (inv: any) => {
     const startDate = normalizeDate(inv.startDate || inv.date);
@@ -783,31 +788,38 @@ export function Site360View({ site, clientSites, onSiteChange, onBack, onEditSit
     };
   }, [site, filterMonth, filterYear, invoices, payments, vatPayments, ledgerEntries, vatRate, dailyMachineLogs, maintenanceAssets, maintenanceSessions, mainTasks, subtasks, commLogs, clientContacts, waybills, assets, sitePumpDates]);
 
-  const card = cn('p-5 rounded-2xl border shadow-sm', isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200');
+  const card = cn('p-4 sm:p-5 rounded-md border shadow-none', isDark ? 'bg-slate-900/90 border-slate-800' : 'bg-white border-slate-200');
 
-  const tabs: { id: SiteTab; label: string; icon: React.ElementType; show?: boolean }[] = [
-    { id: 'financials', label: 'Financials', icon: DollarSign, show: currentUser?.privileges?.billing?.canView || currentUser?.privileges?.payments?.canView },
-    { id: 'operations', label: 'Operations', icon: Activity, show: currentUser?.privileges?.sites?.canView },
-    { id: 'maintenance', label: 'Maintenance', icon: Wrench, show: currentUser?.privileges?.sites?.canView },
-    { id: 'comms', label: 'Comms', icon: MessagesSquare, show: currentUser?.privileges?.commLog?.canView },
-    { id: 'tasks', label: 'Tasks', icon: CheckSquare, show: currentUser?.privileges?.tasks?.canView || currentUser?.privileges?.tasks?.canViewMyTasks },
-    { id: 'contacts', label: 'Contacts', icon: Users, show: currentUser?.privileges?.clients?.canView },
-  ].filter(tab => tab.show !== false) as { id: SiteTab; label: string; icon: React.ElementType }[];
+  const tabs: { id: SiteTab; label: string; icon: any; count?: number | string; show?: boolean }[] = [
+    { id: 'timeline', label: 'Timeline', icon: Clock, show: true },
+    { id: 'financials', label: 'Financials', icon: DollarSign, count: currentUser?.privileges?.billing?.canViewAmounts ? `₦${Math.round(data.totalBilled).toLocaleString()}` : undefined, show: currentUser?.privileges?.billing?.canView || currentUser?.privileges?.payments?.canView },
+    { id: 'operations', label: 'Operations', icon: Activity, count: data.machinesOnSiteCount + data.pumpsOnSite.length, show: currentUser?.privileges?.sites?.canView },
+    { id: 'maintenance', label: 'Maintenance', icon: Wrench, count: data.siteMaintAssets.length, show: currentUser?.privileges?.sites?.canView },
+    { id: 'comms', label: 'Comms', icon: MessagesSquare, count: data.siteComms.length, show: currentUser?.privileges?.commLog?.canView },
+    { id: 'tasks', label: 'Tasks', icon: CheckSquare, count: data.pendingSiteTasks.length, show: currentUser?.privileges?.tasks?.canView || currentUser?.privileges?.tasks?.canViewMyTasks },
+    { id: 'contacts', label: 'Contacts', icon: Users, count: data.siteContacts.length, show: currentUser?.privileges?.clients?.canView },
+  ].filter(tab => tab.show !== false) as { id: SiteTab; label: string; icon: any; count?: number | string }[];
 
   // AI Chat
   const sendChatMessage = async (isInitialBrief = false) => {
     if (!isInitialBrief && !chatInput.trim()) return;
 
     let apiKey = '';
+    let provider = selectedProvider;
+    let model = selectedModel;
 
     try {
       const { data: keys } = await supabase
         .from('api_keys')
-        .select('key_value,provider')
+        .select('key_value,provider,default_model,is_default')
         .eq('workspace_id', workspaceId);
-      const matchKey = keys?.find(k => k.provider === selectedProvider);
-      if (matchKey) {
-        apiKey = matchKey.key_value;
+      if (keys && keys.length > 0) {
+        const defaultKey = keys.find(k => k.is_default) || keys.find(k => k.provider === selectedProvider) || keys[0];
+        if (defaultKey) {
+          apiKey = defaultKey.key_value;
+          provider = (defaultKey.provider === 'gemini' || defaultKey.provider === 'groq') ? defaultKey.provider : (defaultKey.key_value?.startsWith('AIza') ? 'gemini' : 'groq');
+          if (defaultKey.default_model) model = defaultKey.default_model;
+        }
       }
     } catch (err) {
       console.error('Failed to load API key from DB:', err);
@@ -818,36 +830,60 @@ export function Site360View({ site, clientSites, onSiteChange, onBack, onEditSit
     }
 
     if (!apiKey) {
-      apiKey = window.prompt(`Enter your ${selectedProvider === 'gemini' ? 'Gemini' : 'Groq'} API Key:`) || '';
+      apiKey = window.prompt(`Enter your ${provider === 'gemini' ? 'Gemini' : 'Groq'} API Key:`) || '';
       if (!apiKey) return;
       localStorage.setItem('GROQ_API_KEY', apiKey);
     }
 
-    const newUserMessage = isInitialBrief ? 'Provide a 3-sentence intelligence brief for this site.' : chatInput;
+    const newUserMessage = isInitialBrief ? 'Provide an Executive Intelligence Brief for this site covering financial health, field progress & dewatering stage, equipment/diesel status, and immediate priorities.' : chatInput;
     if (!isInitialBrief) { setMessages(prev => [...prev, { role: 'user', content: newUserMessage }]); setChatInput(''); }
     setIsGeneratingBrief(true);
     try {
+      // Collect relevant site journal entries (matching site.id or site.name)
+      const siteJournals = siteJournalEntries
+        .filter(e => e.siteId === site.id || e.siteName?.trim().toLowerCase() === site.name?.trim().toLowerCase())
+        .map(e => {
+          const parentJournal = dailyJournals.find(j => j.id === e.journalId);
+          const date = parentJournal?.date || e.createdAt?.split('T')[0] || 'Unknown Date';
+          return {
+            date,
+            stage: e.dewateringStage || 'operational',
+            progress: e.progressPercentage !== undefined ? `${e.progressPercentage}%` : 'N/A',
+            narration: e.narration || 'No narrative logged',
+            loggedBy: e.loggedBy || parentJournal?.loggedBy || 'Site Team'
+          };
+        })
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+      const siteJournalsSummary = siteJournals.slice(0, 15).map(j =>
+        `[${j.date}] Stage: ${j.stage} | Progress: ${j.progress} | Logged by: ${j.loggedBy} -> "${j.narration}"`
+      ).join('\n') || 'No site journal entries recorded yet.';
+
       const systemPrompt = `You are a Site 360 Intelligence Assistant for DCEL. Site: ${site.name} (${site.client}). Status: ${site.status}.
 Financials: Billed ₦${data.totalBilled.toLocaleString()}, Received ₦${data.totalReceived.toLocaleString()}, Outstanding ₦${data.outstanding.toLocaleString()}, Profit ₦${data.profit.toLocaleString()}.
 Operations: ${data.machineLogs.length} log days, ${data.activeDays} active days, ${data.totalDiesel}L diesel used.
 Maintenance: ${data.siteMaintAssets.length} assets tracked. Overdue: ${data.siteMaintAssets.filter(a => a.status === 'overdue').map(a => a.name).join(', ') || 'None'}.
 Pending Tasks: ${data.siteTasks.length}. Alerts: ${data.alerts.map(a => a.title).join('; ') || 'None'}.
-Answer site-specific questions using this context only. Be concise.`;
+
+📖 RECENT SITE JOURNALS & FIELD PROGRESS:
+${siteJournalsSummary}
+
+Answer site-specific questions and field progress accurately using this context. Be concise, structured, and insightful.`;
 
       let reply = '';
-      if (selectedProvider === 'gemini') {
+      if (provider === 'gemini') {
         const contents = messages.map(m => ({
           role: m.role === 'assistant' ? 'model' : 'user',
           parts: [{ text: m.content }]
         }));
         contents.push({ role: 'user', parts: [{ text: newUserMessage }] });
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent?key=${apiKey}`, {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model || 'gemini-2.0-flash'}:generateContent?key=${apiKey}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             contents,
             systemInstruction: { parts: [{ text: systemPrompt }] },
-            generationConfig: { temperature: 0.3, maxOutputTokens: 300 }
+            generationConfig: { temperature: 0.3, maxOutputTokens: 2048 }
           })
         });
         if (!res.ok) throw new Error('Gemini API Error');
@@ -857,7 +893,7 @@ Answer site-specific questions using this context only. Be concise.`;
         const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ model: selectedModel, messages: [{ role: 'system', content: systemPrompt }, ...messages, { role: 'user', content: newUserMessage }], temperature: 0.3, max_tokens: 300 }),
+          body: JSON.stringify({ model: model || 'llama-3.3-70b-versatile', messages: [{ role: 'system', content: systemPrompt }, ...messages, { role: 'user', content: newUserMessage }], temperature: 0.3, max_tokens: 2048 }),
         });
         if (!res.ok) throw new Error('Groq API Error');
         const resData = await res.json();
@@ -870,12 +906,12 @@ Answer site-specific questions using this context only. Be concise.`;
     finally { setIsGeneratingBrief(false); }
   };
 
-  // Header actions with Filters dropdown and Site Selector
+  // Header actions with Filters dropdown, Site Selector, AI Assistant & Quick Stats
   const headerActions = (
-    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full justify-end">
+    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-1.5 w-full justify-end">
       {/* Site Selector - Order First on Mobile */}
-      <div className={cn('flex items-center gap-1.5 px-2 py-1 h-8 rounded-lg border shadow-sm transition-colors order-first sm:order-last w-full sm:w-auto', isDark ? 'bg-slate-900 border-slate-700 hover:border-indigo-500' : 'bg-white border-slate-200 hover:border-indigo-300')}>
-        <Building2 className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+      <div className={cn('flex items-center gap-1.5 px-2 py-1 h-8 rounded-md border transition-colors order-first sm:order-last w-full sm:w-auto', isDark ? 'bg-slate-900 border-slate-700 hover:border-slate-600' : 'bg-white border-slate-300 hover:border-slate-400')}>
+        <Building2 className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
         <div className="relative flex items-center w-full">
           <select
             value={site.id}
@@ -891,13 +927,49 @@ Answer site-specific questions using this context only. Be concise.`;
         </div>
       </div>
 
-      <div className="flex items-center gap-2 justify-end">
+      <div className="flex items-center gap-1.5 justify-end">
+        {/* Quick Stats Toggle */}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setIsQuickStatsOpen(prev => !prev)}
+          className={cn(
+            "h-8 px-2.5 text-xs font-semibold flex items-center gap-1.5 rounded-md transition-colors",
+            isQuickStatsOpen 
+              ? (isDark ? "bg-slate-800 border-indigo-500 text-indigo-300" : "bg-slate-100 border-indigo-400 text-indigo-700")
+              : (isDark ? "border-slate-700 hover:bg-slate-800 text-slate-300" : "border-slate-300 hover:bg-slate-100 text-slate-700")
+          )}
+          title="Toggle Site Overview & Key Metrics"
+        >
+          <Activity className="w-3.5 h-3.5 text-indigo-500" />
+          <span className="hidden min-[480px]:inline">Quick Stats</span>
+        </Button>
+
+        {/* AI Assistant Trigger Button */}
+        {currentUser?.privileges?.sites?.canViewDecisionIntelligence && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsAiDrawerOpen(true)}
+            className={cn(
+              "h-8 px-2.5 text-xs font-semibold flex items-center gap-1.5 rounded-md border transition-all",
+              isDark ? "bg-slate-900 border-indigo-700/60 hover:bg-indigo-950/40 text-indigo-300" : "bg-indigo-50/50 border-indigo-300 hover:bg-indigo-100/60 text-indigo-700"
+            )}
+            title="Open Site Intelligence Assistant"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
+            <span className="hidden min-[480px]:inline">AI Brief</span>
+          </Button>
+        )}
+
+        {/* Date Filter Dropdown */}
         <div className="relative">
           <Button
             variant="outline"
             size="sm"
             onClick={() => setShowFilters(!showFilters)}
-            className={cn("h-8 w-8 p-0 flex items-center justify-center relative shrink-0", isDark ? "border-slate-700 hover:bg-slate-800 text-slate-300" : "border-slate-300 hover:bg-slate-100 text-slate-700")}
+            className={cn("h-8 w-8 p-0 flex items-center justify-center relative shrink-0 rounded-md", isDark ? "border-slate-700 hover:bg-slate-800 text-slate-300" : "border-slate-300 hover:bg-slate-100 text-slate-700")}
+            title="Filter by Month/Year"
           >
             <Filter className="w-3.5 h-3.5" />
             {(filterMonth !== 'all' || filterYear !== 'all') && (
@@ -906,17 +978,17 @@ Answer site-specific questions using this context only. Be concise.`;
           </Button>
 
           {showFilters && (
-            <div className={cn("absolute right-0 top-full mt-2 p-4 rounded-2xl border shadow-xl z-50 flex flex-col gap-3 w-56", isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-200")}>
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Month</label>
-                <select value={filterMonth} onChange={e => { setFilterMonth(e.target.value); setShowFilters(false); }} className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}>
+            <div className={cn("absolute right-0 top-full mt-2 p-3 rounded-lg border shadow-xl z-50 flex flex-col gap-3 w-56", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Month</label>
+                <select value={filterMonth} onChange={e => { setFilterMonth(e.target.value); setShowFilters(false); }} className={cn('w-full rounded-md border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500', isDark ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-200')}>
                   <option value="all">All Months</option>
                   {months.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
                 </select>
               </div>
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Year</label>
-                <select value={filterYear} onChange={e => { setFilterYear(e.target.value); setShowFilters(false); }} className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}>
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Year</label>
+                <select value={filterYear} onChange={e => { setFilterYear(e.target.value); setShowFilters(false); }} className={cn('w-full rounded-md border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500', isDark ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-200')}>
                   <option value="all">All Years</option>
                   {years.map(y => <option key={y} value={y}>{y}</option>)}
                 </select>
@@ -928,7 +1000,7 @@ Answer site-specific questions using this context only. Be concise.`;
     </div>
   );
 
-  useSetPageTitle('Site 360', `Operational command center for ${site.name}`, headerActions, [filterMonth, filterYear, site.name, isDark, showFilters, clientSites], onBack);
+  useSetPageTitle('Site 360', `Operational command center for ${site.name}`, headerActions, [filterMonth, filterYear, site.name, isDark, showFilters, clientSites, isQuickStatsOpen, isAiDrawerOpen], onBack);
 
 
 
@@ -1044,338 +1116,72 @@ Answer site-specific questions using this context only. Be concise.`;
   };
 
   return (
-    <div className="flex flex-col h-full min-h-0 overflow-hidden bg-slate-50 dark:bg-slate-950">
-      <div ref={containerRef} className="flex-1 overflow-y-auto p-2 sm:p-4 lg:p-6 style-scroll">
-        <div className="max-w-6xl mx-auto space-y-4">
+    <div className="flex flex-col h-full min-h-0 overflow-hidden bg-slate-50 dark:bg-slate-950 relative">
+      <div ref={containerRef} className="flex-1 overflow-y-auto p-2 sm:p-4 lg:p-5 style-scroll">
+        <div className="max-w-6xl mx-auto space-y-3">
 
-
-          {/* ── Hero: AI Assistant + Site Identity side by side ── */}
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 items-stretch">
-
-            {/* AI Chat — conditionally shown based on privileges */}
-            {currentUser?.privileges?.sites?.canViewDecisionIntelligence && (
-              <div className={cn('lg:col-span-3 bg-gradient-to-br from-indigo-900 to-slate-900 rounded-2xl shadow-lg relative overflow-hidden border border-indigo-700/50 flex flex-col transition-all duration-300', isChatCollapsed ? 'h-auto' : 'lg:h-[300px] h-[260px]')}>
-              <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none"><Sparkles className="w-48 h-48" /></div>
-              <div className="flex items-center justify-between p-4 border-b border-indigo-800/50 relative z-10 shrink-0 cursor-pointer hover:bg-indigo-800/20 transition-colors" onClick={() => setIsChatCollapsed(!isChatCollapsed)}>
-                <div className="flex items-center gap-2">
-                  <div className="p-1.5 bg-indigo-500/20 rounded-lg"><Sparkles className="w-4 h-4 text-indigo-300" /></div>
-                  <span className="text-xs sm:text-sm font-bold uppercase tracking-wider text-indigo-200">Site Intelligence Assistant</span>
-                </div>
-                <div className="flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
-                  {!isChatCollapsed && (
-                    <div className="flex items-center gap-1.5 mr-2">
-                      <select 
-                        value={selectedProvider} 
-                        onChange={e => handleProviderChange(e.target.value as 'gemini' | 'groq')} 
-                        className="bg-indigo-950/70 border border-indigo-750/70 text-indigo-200 text-[10px] font-bold rounded-full px-2 py-0.5 focus:outline-none cursor-pointer hover:border-indigo-500"
-                      >
-                        <option value="gemini">Gemini</option>
-                        <option value="groq">Groq</option>
-                      </select>
-                      <select 
-                        value={selectedModel} 
-                        onChange={e => setSelectedModel(e.target.value)} 
-                        className="bg-indigo-950/70 border border-indigo-750/70 text-indigo-200 text-[10px] font-bold rounded-full px-2 py-0.5 focus:outline-none cursor-pointer hover:border-indigo-500"
-                      >
-                        {modelOptions.map(opt => (
-                          <option key={opt.value} value={opt.value}>{opt.label}</option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-                  {!isChatCollapsed && messages.length === 0 && (
-                    <div className="flex items-center gap-1.5">
-                      <Button onClick={e => { e.stopPropagation(); sendChatMessage(true); }} disabled={isGeneratingBrief} size="sm" className="bg-indigo-600 hover:bg-indigo-500 text-white border-0 h-8 text-xs px-2 sm:px-3">
-                        {isGeneratingBrief ? <RefreshCcw className="w-3.5 h-3.5 animate-spin sm:mr-1.5" /> : <Sparkles className="w-3.5 h-3.5 sm:mr-1.5" />}
-                        <span className="hidden sm:inline">{isGeneratingBrief ? 'Analyzing...' : 'Generate Brief'}</span>
-                      </Button>
-                    </div>
-                  )}
-                  <Button variant="ghost" size="sm" className="text-indigo-200 hover:text-white hover:bg-indigo-800/50 h-8 w-8 p-0" onClick={e => { e.stopPropagation(); setIsChatCollapsed(!isChatCollapsed); }}>
-                    {isChatCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
-                  </Button>
-                </div>
-              </div>
-              {!isChatCollapsed && (
-                <>
-                  <div className="flex-1 overflow-y-auto p-4 space-y-3 style-scroll relative z-10">
-                    {messages.length === 0 && !isGeneratingBrief && <p className="text-sm text-indigo-300 italic text-center mt-6">Click "Generate Brief" to get a site intelligence summary.</p>}
-                    {messages.map((msg, idx) => (
-                      <div key={idx} className={cn('flex w-full', msg.role === 'user' ? 'justify-end' : 'justify-start')}>
-                        <div className={cn('max-w-[90%] rounded-xl p-3.5 text-sm shadow-md', msg.role === 'user' ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-slate-900/95 text-indigo-50 rounded-bl-none border border-indigo-700/50 backdrop-blur-md')}>
-                          {msg.role === 'user' ? <p className="whitespace-pre-wrap">{msg.content}</p> : renderFormattedChatMessage(msg.content)}
-                        </div>
-                      </div>
-                    ))}
-                    {isGeneratingBrief && <div className="flex justify-start"><div className="bg-slate-800/80 text-indigo-200 rounded-xl rounded-bl-none border border-indigo-700/30 p-3 text-sm flex items-center gap-2"><RefreshCcw className="w-4 h-4 animate-spin" /> Thinking...</div></div>}
-                    <div ref={chatEndRef} />
-                  </div>
-                  <div className="p-3 bg-slate-900/80 border-t border-indigo-800/50 shrink-0 relative z-10 flex items-center gap-2">
-                    <input type="text" value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && sendChatMessage()} placeholder="Ask about invoices, machines, maintenance..." className="flex-1 bg-slate-800 border border-slate-700 text-white placeholder:text-slate-400 text-sm rounded-lg h-9 px-3 focus:outline-none focus:ring-1 focus:ring-indigo-500" />
-                    <Button size="icon" onClick={() => sendChatMessage()} disabled={!chatInput.trim() || isGeneratingBrief} className="h-9 w-9 bg-indigo-600 hover:bg-indigo-500 shrink-0"><Send className="w-4 h-4" /></Button>
-                  </div>
-                </>
-              )}
-              </div>
-            )}
-
-            {/* Site Identity Card */}
-            <div className={cn(
-              currentUser?.privileges?.sites?.canViewDecisionIntelligence ? 'lg:col-span-2' : 'lg:col-span-5',
-              'p-5 rounded-sm border shadow-sm flex flex-col transition-all duration-300 overflow-x-hidden relative',
-              isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-300',
-              // On mobile: use independent isSiteInfoCollapsed state
-              // On desktop (lg): use linked isChatCollapsed state
-              isMobile
-                ? (isSiteInfoCollapsed ? 'h-auto py-3 justify-center' : 'h-auto justify-start')
-                : (isChatCollapsed ? 'h-auto py-3 justify-center' : 'lg:h-[300px] justify-between overflow-y-auto style-scroll')
-            )}>
-              {/* Industrial Accent Line */}
-              <div className="absolute top-0 left-0 w-full h-1 bg-slate-900 dark:bg-slate-100" />
-              
-              <div 
-                className="flex flex-col sm:flex-row sm:items-start justify-between cursor-pointer group select-none gap-3 shrink-0"
-                onClick={() => {
-                  // On mobile: toggle site info independently
-                  // On desktop: toggle linked chat state
-                  if (isMobile) setIsSiteInfoCollapsed(!isSiteInfoCollapsed);
-                  else setIsChatCollapsed(!isChatCollapsed);
-                }}
-              >
-                <div className="flex flex-col gap-2 min-w-0 flex-1 relative shrink-0">
-                  {/* Status Badges Overlayed Top */}
-                  <div className="flex items-center gap-2 flex-wrap mt-1">
-                    <span className={cn('text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 border',
-                      (site.status === 'Active' && !site.startDate) ? 'bg-amber-50 text-amber-700 border-amber-600 dark:bg-amber-950/30 dark:text-amber-400' :
-                      site.status === 'Active' ? 'bg-emerald-50 text-emerald-700 border-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-400' :
-                        site.status === 'Ended' ? 'bg-rose-50 text-rose-700 border-rose-600 dark:bg-rose-950/30 dark:text-rose-400' : 'bg-slate-100 text-slate-600 border-slate-400 dark:bg-slate-800'
-                    )}>{(site.status === 'Active' && !site.startDate) ? 'Pending' : site.status}</span>
-                    {/* On Hold badge */}
-                    {siteHoldPeriods.some(h => h.siteId === site.id && !h.holdEnd) && (
-                      <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 border bg-amber-100 text-amber-800 border-amber-500 dark:bg-amber-950/60 dark:text-amber-300 flex items-center gap-1">
-                        <PauseCircle className="w-3 h-3" /> On Hold
-                      </span>
-                    )}
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 border border-slate-300 dark:border-slate-700">VAT: {site.vat}</span>
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 border border-slate-300 dark:border-slate-700 max-w-[150px] sm:max-w-[200px] truncate">
-                      CLIENT: {site.client}
-                    </span>
-                  </div>
-
-                  {/* Massive Typographic Hero */}
-                  <h1 className="text-lg sm:text-xl md:text-2xl font-black text-slate-900 dark:text-white leading-tight tracking-tight truncate group-hover:text-slate-600 dark:group-hover:text-slate-300 transition-colors mt-0.5">
-                    {site.name}
-                  </h1>
-
-                  {/* Date range below title */}
-                  <div className="text-[10px] font-mono text-slate-500 uppercase tracking-wider flex items-center gap-1.5 mt-0.5">
-                    <Calendar className="w-3 h-3" />
-                    {site.startDate ? (
-                      site.endDate ? (
-                        <span>
-                          {new Date(site.startDate).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })} — {new Date(site.endDate).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })}
-                        </span>
-                      ) : (
-                        <span>SINCE {new Date(site.startDate).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })}</span>
-                      )
-                    ) : site.endDate ? (
-                      <span>ENDED {new Date(site.endDate).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })}</span>
-                    ) : <span>NO DATE LOGGED</span>}
-                  </div>
-
-                  {/* Prominent On-Hold Banner */}
-                  {isOnHold && activeHold && (
-                    <div className="mt-2 p-2.5 rounded-lg border bg-amber-500/10 border-amber-500/30 text-amber-900 dark:text-amber-200 flex items-start gap-2.5">
-                      <PauseCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center justify-between gap-2 flex-wrap">
-                          <p className="text-xs font-black uppercase tracking-wider text-amber-800 dark:text-amber-300">
-                            Site Currently On Hold ({currentHoldDays} day{currentHoldDays !== 1 ? 's' : ''})
-                          </p>
-                          <span className="text-[10px] font-mono opacity-80">
-                            Since {new Date(activeHold.holdStart).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
-                          </span>
-                        </div>
-                        <p className="text-xs text-amber-700 dark:text-amber-300/90 mt-0.5">
-                          <span className="font-semibold">Reason:</span> "{activeHold.holdNote}"
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-                
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className="text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 h-8 w-8 p-0 shrink-0 self-start sm:ml-2 mt-1" 
-                  onClick={e => {
-                    e.stopPropagation();
-                    if (isMobile) setIsSiteInfoCollapsed(!isSiteInfoCollapsed);
-                    else setIsChatCollapsed(!isChatCollapsed);
-                  }}
-                >
-                  {(isMobile ? isSiteInfoCollapsed : isChatCollapsed) ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
-                </Button>
+          {/* ── Compact Site Identity & Controls Strip ── */}
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md p-3 flex flex-wrap items-center justify-between gap-3 shadow-none">
+            <div className="flex items-center gap-2.5 flex-wrap min-w-0">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <Building2 className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                <h1 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white tracking-tight truncate">
+                  {site.name}
+                </h1>
               </div>
 
-              {/* Fragmented Stats Strip */}
-              <AnimatePresence initial={false}>
-                {/* On mobile: show when site info is expanded; On desktop: show when chat is expanded */}
-                {(isMobile ? !isSiteInfoCollapsed : !isChatCollapsed) && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    transition={{ duration: 0.3, ease: 'easeInOut' }}
-                    className="overflow-hidden shrink-0"
-                  >
-                    <div className="flex flex-col gap-2 mt-4 pt-4 border-t-2 border-slate-200/60 dark:border-slate-800">
-                      {/* Dominant Financial Plane */}
-                      <div className="flex gap-2 w-full">
-                        <div className={cn('flex-1 border p-3 transition-transform hover:-translate-y-0.5 duration-200', isDark ? 'bg-slate-800/80 border-slate-700' : 'bg-slate-50 border-slate-300')}>
-                          <p className="text-[9px] font-bold uppercase tracking-widest text-slate-500 mb-1">Total Billed</p>
-                          <p className="text-base sm:text-lg font-black text-slate-900 dark:text-white truncate">
-                            {currentUser?.privileges?.billing?.canViewAmounts ? `₦${Math.round(data.totalBilled).toLocaleString()}` : '***'}
-                          </p>
-                          <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500">
-                            {data.siteInvoices.length} INVOICE{data.siteInvoices.length !== 1 ? 'S' : ''}
-                          </span>
-                        </div>
-                        <div className={cn('flex-1 border p-3 transition-transform hover:-translate-y-0.5 duration-200', isDark ? 'bg-slate-800/80 border-slate-700' : 'bg-slate-50 border-slate-300')}>
-                          <p className="text-[9px] font-bold uppercase tracking-widest text-slate-500 mb-1">Unpaid</p>
-                          <p className={cn('text-base sm:text-lg font-black truncate', data.outstanding > 0 ? 'text-rose-600 dark:text-rose-500' : 'text-emerald-600 dark:text-emerald-500')}>
-                            {currentUser?.privileges?.billing?.canViewAmounts ? `₦${Math.round(data.outstanding).toLocaleString()}` : '***'}
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Dense Operational Data Block */}
-                      <div className="flex flex-col gap-2">
-                        <details className={cn('border p-2 sm:p-2.5 group transition-all duration-200 relative', isDark ? 'border-slate-700 hover:border-slate-500' : 'border-slate-200 hover:border-slate-400')}>
-                          <summary className="outline-none list-none [&::-webkit-details-marker]:hidden cursor-pointer select-none">
-                            <div className="flex items-center justify-between">
-                              <p className="text-[9px] font-bold uppercase tracking-widest text-slate-500">
-                                Machine Days
-                              </p>
-                              {data.machineDaysBreakdown.length > 0 && (
-                                <span className="text-[8px] whitespace-nowrap bg-slate-200 dark:bg-slate-700 px-1 rounded text-slate-600 dark:text-slate-300 group-hover:bg-slate-300 dark:group-hover:bg-slate-600 transition-colors">Click for Detail ▼</span>
-                              )}
-                            </div>
-                            <p className="text-sm font-black text-slate-800 dark:text-slate-200 mt-0.5">{data.machineDays}</p>
-                          </summary>
-                          {data.machineDaysBreakdown.length > 0 && (
-                            <div className="mt-2 flex flex-col gap-0.5 w-full text-[10px] max-h-32 overflow-y-auto style-scroll pt-1 border-t border-slate-200 dark:border-slate-700">
-                              {data.machineDaysBreakdown.map((m, idx) => (
-                                <div key={idx} className="flex justify-between pb-0.5">
-                                  <span className="font-semibold text-slate-700 dark:text-slate-300 truncate pr-2">{m.name}</span>
-                                  <span className="text-slate-500 shrink-0">{m.total}d</span>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </details>
-
-                        <div className="grid grid-cols-3 gap-2">
-                          <div className={cn('border p-2 sm:p-2.5 group transition-all duration-200', isDark ? 'border-slate-700 hover:border-slate-500' : 'border-slate-200 hover:border-slate-400')}>
-                            <p className="text-[9px] font-bold uppercase tracking-widest text-slate-500">Tasks</p>
-                            <p className="text-sm font-black text-slate-800 dark:text-slate-200 mt-0.5">{data.siteTasks.length}</p>
-                          </div>
-                          <div className={cn('border p-2 sm:p-2.5 group transition-all duration-200', isDark ? 'border-slate-700 hover:border-slate-500' : 'border-slate-200 hover:border-slate-400')}>
-                            <p className="text-[9px] font-bold uppercase tracking-widest text-slate-500">Diesel</p>
-                            <p className="text-sm font-black text-slate-800 dark:text-slate-200 mt-0.5 truncate">{Math.round(data.totalDiesel).toLocaleString()}L</p>
-                            <p className="text-[8px] font-mono text-slate-400 truncate hidden sm:block mt-0.5">{data.machineLogs.length} LOGS</p>
-                          </div>
-                          <div className={cn('border p-2 sm:p-2.5 group transition-all duration-200', isDark ? 'border-slate-700 hover:border-slate-500' : 'border-slate-200 hover:border-slate-400')}>
-                            <p className="text-[9px] font-bold uppercase tracking-widest text-slate-500">Maint.</p>
-                            <p className="text-sm font-black text-rose-600 dark:text-rose-500 mt-0.5 truncate">
-                              {currentUser?.privileges?.billing?.canViewAmounts ? `₦${Math.round(data.totalMaintenanceCost).toLocaleString()}` : '***'}
-                            </p>
-                            <p className="text-[8px] font-mono text-slate-400 truncate hidden sm:block mt-0.5">{data.siteMaintAssets.length} ASSETS</p>
-                          </div>
-                        </div>
-
-                        {/* Pumps Full Width Row */}
-                        <div 
-                          onClick={() => setActiveTab('operations')}
-                          className={cn('border p-3 group transition-all duration-200 cursor-pointer hover:-translate-y-0.5 flex flex-col gap-2', isDark ? 'border-cyan-900/60 hover:border-cyan-700 bg-slate-900/30' : 'border-cyan-200 hover:border-cyan-400 bg-cyan-50/20')}
-                        >
-                          <div className="flex items-center justify-between w-full gap-3">
-                            <div className="flex items-center gap-3">
-                              <div className="p-1.5 bg-cyan-100 dark:bg-cyan-950/60 text-cyan-600 dark:text-cyan-400 rounded-lg shrink-0">
-                                <Droplets className="w-4 h-4" />
-                              </div>
-                              <div className="min-w-0">
-                                <p className="text-[9px] font-bold uppercase tracking-wider text-cyan-600 dark:text-cyan-400">Pumps on Site</p>
-                                <div className="flex items-center gap-1.5 mt-0.5">
-                                  <span className="text-sm font-black text-slate-800 dark:text-slate-100 leading-none">
-                                    {data.pumpsOnSite.length}
-                                  </span>
-                                  <Badge className={cn(
-                                    "text-[8px] font-bold uppercase tracking-wider px-1 py-0 border shrink-0",
-                                    data.activePumpsCount > 0 
-                                      ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800/50"
-                                      : "bg-slate-50 text-slate-600 border-slate-200 dark:bg-slate-900/50 dark:text-slate-400 dark:border-slate-800"
-                                  )}>
-                                    {data.activePumpsCount > 0 ? `${data.activePumpsCount} Active` : 'Inactive'}
-                                  </Badge>
-                                </div>
-                              </div>
-                            </div>
-                            
-                            <span className="text-[10px] bg-cyan-100 dark:bg-cyan-900/50 px-2.5 py-1 rounded-xl text-cyan-600 dark:text-cyan-400 font-extrabold group-hover:bg-cyan-200 dark:group-hover:bg-cyan-800 transition-colors">Details</span>
-                          </div>
-                          
-                          {data.pumpsOnSite.length > 0 && (
-                            <div className="flex items-center justify-between w-full border-t border-slate-100 dark:border-slate-800/40 pt-2 mt-0.5">
-                              <span className="text-[8px] font-bold uppercase tracking-wider text-slate-400">Operation Window</span>
-                              <span className="text-[10px] font-mono font-bold text-slate-600 dark:text-slate-300">
-                                {data.earliestPumpStart ? formatDisplayDate(data.earliestPumpStart) : '—'}
-                                {' → '}
-                                {data.latestPumpStop ? formatDisplayDate(data.latestPumpStop) : 'Running'}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          </div>
-
-          {/* Alerts */}
-          {data.alerts.length > 0 && (
-            <div className="space-y-2">
-              {data.alerts.map((alert, i) => (
-                <div key={i} className={cn('p-3 rounded-xl border flex items-center gap-3',
-                  alert.type === 'danger'
-                    ? (isDark ? 'bg-rose-900/20 border-rose-800/50' : 'bg-rose-50 border-rose-200')
-                    : (isDark ? 'bg-amber-900/20 border-amber-800/50' : 'bg-amber-50 border-amber-200')
+              {/* Badges */}
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className={cn(
+                  'text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border',
+                  (site.status === 'Active' && !site.startDate) ? 'bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800/50' :
+                  site.status === 'Active' ? 'bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800/50' :
+                  site.status === 'Ended' ? 'bg-rose-50 text-rose-700 border-rose-300 dark:bg-rose-950/30 dark:text-rose-400 dark:border-rose-800/50' :
+                  'bg-slate-100 text-slate-600 border-slate-300 dark:bg-slate-800 dark:border-slate-700'
                 )}>
-                  <AlertTriangle className={cn('w-4 h-4 shrink-0', alert.type === 'danger' ? 'text-rose-500' : 'text-amber-500')} />
-                  <p className={cn('text-sm font-semibold', alert.type === 'danger' ? 'text-rose-700 dark:text-rose-400' : 'text-amber-700 dark:text-amber-400')}>{alert.title}</p>
-                </div>
-              ))}
-            </div>
-          )}
+                  {(site.status === 'Active' && !site.startDate) ? 'Pending' : site.status}
+                </span>
 
-          {/* Tabs */}
-          <div className={cn('flex items-center justify-between border-b mb-6 gap-2 min-w-0 overflow-hidden', isDark ? 'border-slate-800' : 'border-slate-200')}>
-            <div className="flex items-center gap-1 overflow-x-auto style-scroll pb-px flex-1 min-w-0">
-              {tabs.map(tab => (
-                <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-                  className={cn(
-                    'flex items-center gap-1.5 min-[480px]:gap-1.5 px-3 min-[480px]:px-3.5 sm:px-4 py-3 text-xs sm:text-sm font-semibold border-b-2 transition-colors shrink-0',
-                    activeTab === tab.id
-                      ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400'
-                      : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
-                  )}>
-                  <span className="whitespace-nowrap">{tab.label}</span>
-                </button>
-              ))}
+                {isOnHold && activeHold && (
+                  <span
+                    className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border bg-amber-50 text-amber-800 border-amber-300 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800 flex items-center gap-1"
+                    title={`On Hold since ${new Date(activeHold.holdStart).toLocaleDateString('en-GB')}: "${activeHold.holdNote}"`}
+                  >
+                    <PauseCircle className="w-3 h-3 text-amber-600 shrink-0" />
+                    <span>Hold ({currentHoldDays}d)</span>
+                  </span>
+                )}
+
+                <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-600 dark:text-slate-400">
+                  VAT: {site.vat}
+                </span>
+
+                {site.client && (
+                  <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-600 dark:text-slate-400 max-w-[150px] truncate">
+                    {site.client}
+                  </span>
+                )}
+
+                {/* Date span */}
+                <div className="text-[10px] font-mono text-slate-500 flex items-center gap-1 ml-1">
+                  <Calendar className="w-3 h-3 text-slate-400 shrink-0" />
+                  {site.startDate ? (
+                    site.endDate ? (
+                      <span>{formatDisplayDate(site.startDate)} – {formatDisplayDate(site.endDate)}</span>
+                    ) : (
+                      <span>Since {formatDisplayDate(site.startDate)}</span>
+                    )
+                  ) : site.endDate ? (
+                    <span>Ended {formatDisplayDate(site.endDate)}</span>
+                  ) : (
+                    <span>No Date Logged</span>
+                  )}
+                </div>
+              </div>
             </div>
-            <div className="shrink-0 pb-1 flex items-center gap-2">
+
+            {/* Action Buttons Right */}
+            <div className="flex items-center gap-1.5 shrink-0">
               {currentUser?.privileges?.sites?.canEditSite && (() => {
                 const activeHold = siteHoldPeriods.find(h => h.siteId === site.id && !h.holdEnd);
                 const isOnHold = !!activeHold;
@@ -1390,64 +1196,162 @@ Answer site-specific questions using this context only. Be concise.`;
                     variant="outline"
                     size="sm"
                     className={cn(
-                      'h-8 text-xs px-2 font-medium shadow-sm transition-colors flex items-center gap-1',
+                      'h-7.5 text-xs px-2.5 font-medium rounded-md transition-colors flex items-center gap-1',
                       isOnHold
                         ? (isDark ? 'bg-slate-900 border-emerald-600 hover:bg-emerald-950/30 text-emerald-400' : 'bg-white border-emerald-500 hover:bg-emerald-50 text-emerald-700')
                         : (isDark ? 'bg-slate-900 border-amber-600 hover:bg-amber-950/30 text-amber-400' : 'bg-white border-amber-400 hover:bg-amber-50 text-amber-700')
                     )}
                   >
                     {isOnHold ? <PlayCircle className="w-3.5 h-3.5 shrink-0" /> : <PauseCircle className="w-3.5 h-3.5 shrink-0" />}
-                    <span className="hidden min-[600px]:inline">{isOnHold ? 'Resume Site' : 'Hold Site'}</span>
+                    <span>{isOnHold ? 'Resume Site' : 'Hold Site'}</span>
                   </Button>
                 );
               })()}
               {currentUser?.privileges?.sites?.canEditSite && (
-                <Button onClick={() => onEditSite(site)} variant="outline" size="sm" title="Edit Site" className={cn("h-8 text-xs px-2 font-medium shadow-sm transition-colors flex items-center gap-1", isDark ? "bg-slate-900 border-slate-700 hover:bg-slate-800 text-slate-200" : "bg-white border-slate-200 hover:bg-slate-50 text-slate-700")}>
-                  <Settings2 className="w-3.5 h-3.5 shrink-0" /><span className="hidden min-[600px]:inline">Edit Site</span>
+                <Button onClick={() => onEditSite(site)} variant="outline" size="sm" title="Edit Site" className={cn("h-7.5 text-xs px-2.5 font-medium rounded-md transition-colors flex items-center gap-1", isDark ? "bg-slate-900 border-slate-700 hover:bg-slate-800 text-slate-200" : "bg-white border-slate-300 hover:bg-slate-50 text-slate-700")}>
+                  <Settings2 className="w-3.5 h-3.5 shrink-0" /><span>Edit Site</span>
                 </Button>
               )}
             </div>
           </div>
 
+          {/* ── Expandable Quick Stats Strip ── */}
+          <AnimatePresence>
+            {isQuickStatsOpen && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="overflow-hidden"
+              >
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md">
+                  <div className="p-2 border border-slate-100 dark:border-slate-800/80 rounded bg-slate-50/50 dark:bg-slate-950/40">
+                    <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500">Total Billed</p>
+                    <p className="text-sm font-bold font-mono text-slate-900 dark:text-white truncate">
+                      {currentUser?.privileges?.billing?.canViewAmounts ? `₦${Math.round(data.totalBilled).toLocaleString()}` : '***'}
+                    </p>
+                    <span className="text-[9px] text-slate-400">{data.siteInvoices.length} Invoices</span>
+                  </div>
+                  <div className="p-2 border border-slate-100 dark:border-slate-800/80 rounded bg-slate-50/50 dark:bg-slate-950/40">
+                    <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500">Unpaid</p>
+                    <p className={cn("text-sm font-bold font-mono truncate", data.outstanding > 0 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400")}>
+                      {currentUser?.privileges?.billing?.canViewAmounts ? `₦${Math.round(data.outstanding).toLocaleString()}` : '***'}
+                    </p>
+                    <span className="text-[9px] text-slate-400">Outstanding</span>
+                  </div>
+                  <div className="p-2 border border-slate-100 dark:border-slate-800/80 rounded bg-slate-50/50 dark:bg-slate-950/40">
+                    <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500">Machine Days</p>
+                    <p className="text-sm font-bold font-mono text-slate-900 dark:text-white">{data.machineDays}d</p>
+                    <span className="text-[9px] text-slate-400">{data.machinesOnSiteCount} Machines</span>
+                  </div>
+                  <div className="p-2 border border-slate-100 dark:border-slate-800/80 rounded bg-slate-50/50 dark:bg-slate-950/40">
+                    <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500">Diesel Used</p>
+                    <p className="text-sm font-bold font-mono text-slate-900 dark:text-white">{Math.round(data.totalDiesel).toLocaleString()}L</p>
+                    <span className="text-[9px] text-slate-400">{data.machineLogs.length} logs</span>
+                  </div>
+                  <div className="p-2 border border-slate-100 dark:border-slate-800/80 rounded bg-slate-50/50 dark:bg-slate-950/40">
+                    <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500">Maintenance</p>
+                    <p className="text-sm font-bold font-mono text-rose-600 dark:text-rose-400 truncate">
+                      {currentUser?.privileges?.billing?.canViewAmounts ? `₦${Math.round(data.totalMaintenanceCost).toLocaleString()}` : '***'}
+                    </p>
+                    <span className="text-[9px] text-slate-400">{data.siteMaintAssets.length} assets</span>
+                  </div>
+                  <div className="p-2 border border-slate-100 dark:border-slate-800/80 rounded bg-slate-50/50 dark:bg-slate-950/40">
+                    <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500">Pumps on Site</p>
+                    <p className="text-sm font-bold font-mono text-cyan-600 dark:text-cyan-400">{data.activePumpsCount} Active</p>
+                    <span className="text-[9px] text-slate-400">{data.pumpsOnSite.length} total</span>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* ── Alerts ── */}
+          {data.alerts.length > 0 && (
+            <div className="space-y-1.5">
+              {data.alerts.map((alert, i) => (
+                <div key={i} className={cn('p-2.5 rounded-md border flex items-center gap-2.5 text-xs',
+                  alert.type === 'danger'
+                    ? (isDark ? 'bg-rose-950/30 border-rose-800 text-rose-300' : 'bg-rose-50 border-rose-200 text-rose-800')
+                    : (isDark ? 'bg-amber-950/30 border-amber-800 text-amber-300' : 'bg-amber-50 border-amber-200 text-amber-800')
+                )}>
+                  <AlertTriangle className={cn('w-4 h-4 shrink-0', alert.type === 'danger' ? 'text-rose-500' : 'text-amber-500')} />
+                  <p className="font-semibold">{alert.title}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* ── Flat Main Navigation Tabs (Mobile Optimized Touch Strip) ── */}
+          <div className="flex items-center gap-1 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden touch-pan-x scroll-smooth py-1 border-b border-slate-200 dark:border-slate-800">
+            {tabs.map(tab => {
+              const isActive = activeTab === tab.id;
+              const Icon = tab.icon;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={cn(
+                    'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold whitespace-nowrap transition-all border shrink-0',
+                    isActive
+                      ? 'bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 text-indigo-600 dark:text-indigo-400 shadow-xs'
+                      : 'bg-transparent border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-900/60'
+                  )}
+                >
+                  <Icon className={cn('w-3.5 h-3.5', isActive ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400')} />
+                  <span>{tab.label}</span>
+                  {tab.count !== undefined && tab.count !== null && (
+                    <span className={cn(
+                      'text-[10px] px-1.5 py-0.2 rounded font-mono font-medium',
+                      isActive ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
+                    )}>
+                      {tab.count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
           {/* Tab Content */}
-          <div className="space-y-5">
+          <div className="space-y-4">
+
+            {/* TIMELINE STORYBOARD */}
+            {activeTab === 'timeline' && (
+              <div className="space-y-4 transition-opacity duration-150">
+                <SiteGanttStoryboard site={site} />
+              </div>
+            )}
 
             {/* FINANCIALS */}
             {activeTab === 'financials' && (
-              <div className="space-y-5 transition-opacity duration-150">
-                {/* Financial Sub-Tabs */}
-                <div className="grid grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
+              <div className="space-y-3 transition-opacity duration-150">
+                {/* Flat Financial Segmented Pills */}
+                <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-900 rounded-md border border-slate-200 dark:border-slate-800 w-fit max-w-full overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden touch-pan-x">
                   {[
                     { id: 'invoices', label: 'Invoices', count: data.siteInvoices.length, amount: currentUser?.privileges?.billing?.canViewAmounts ? `₦${Math.round(data.totalBilled).toLocaleString()}` : '***', icon: FileText },
                     { id: 'payments', label: 'Payments', count: data.sitePayments.length, amount: currentUser?.privileges?.billing?.canViewAmounts ? `₦${Math.round(data.totalReceived).toLocaleString()}` : '***', icon: DollarSign },
                     { id: 'expenses', label: 'Expenses', count: data.siteCosts.length, amount: currentUser?.privileges?.billing?.canViewAmounts ? `₦${Math.round(data.totalCost).toLocaleString()}` : '***', icon: FileText },
-                  ].map(t => (
-                    <button
-                      key={t.id}
-                      onClick={() => setFinTab(t.id as any)}
-                      className={cn(
-                        "flex flex-col items-start p-3 sm:p-4 rounded-xl border text-left transition-all duration-200 outline-none w-full",
-                        finTab === t.id
-                          ? "bg-blue-50/50 border-blue-500 shadow-sm dark:bg-blue-900/20 dark:border-blue-500"
-                          : "bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50 dark:bg-slate-900 dark:border-slate-800 dark:hover:border-slate-700"
-                      )}
-                    >
-                      <div className="flex items-center justify-between w-full mb-1 sm:mb-2">
-                        <span className={cn(
-                          "text-[10px] sm:text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5",
-                          finTab === t.id ? "text-blue-600 dark:text-blue-400" : "text-slate-500 dark:text-slate-400"
-                        )}>
-                          <t.icon className="w-3.5 h-3.5 shrink-0" />
-                          <span className="truncate">{t.label} {t.count !== null && `(${t.count})`}</span>
-                        </span>
-                        {finTab === t.id && <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-blue-500 shrink-0" />}
-                      </div>
-                      <p className={cn(
-                        "text-sm sm:text-lg lg:text-xl font-black truncate w-full",
-                        isDark ? "text-slate-100" : "text-slate-900"
-                      )}>{t.amount}</p>
-                    </button>
-                  ))}
+                  ].map(t => {
+                    const isSubActive = finTab === t.id;
+                    const SubIcon = t.icon;
+                    return (
+                      <button
+                        key={t.id}
+                        onClick={() => setFinTab(t.id as any)}
+                        className={cn(
+                          "flex items-center gap-2 px-3 py-1.5 rounded text-xs font-semibold transition-all whitespace-nowrap outline-none",
+                          isSubActive
+                            ? "bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-xs border border-slate-200/80 dark:border-slate-700 font-bold"
+                            : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                        )}
+                      >
+                        <SubIcon className="w-3.5 h-3.5" />
+                        <span>{t.label} ({t.count})</span>
+                        <span className="font-mono text-[11px] opacity-90">{t.amount}</span>
+                      </button>
+                    );
+                  })}
                 </div>
 
                 {/* Tab Content */}
@@ -2403,6 +2307,166 @@ Answer site-specific questions using this context only. Be concise.`;
       </div>
       
       <TaskDetailSheet subtaskId={openSubtaskId} onClose={() => setOpenSubtaskId(null)} />
+
+      {/* ── Slide-Over AI Assistant Drawer ── */}
+      <AnimatePresence>
+        {isAiDrawerOpen && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsAiDrawerOpen(false)}
+              className="fixed inset-0 bg-black/40 backdrop-blur-xs z-50 transition-opacity"
+            />
+
+            {/* Drawer */}
+            <motion.div
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 220 }}
+              className={cn(
+                "fixed top-0 right-0 h-full w-full max-w-md shadow-2xl border-l z-50 flex flex-col transition-colors",
+                isDark ? "bg-slate-900 text-slate-100 border-slate-800" : "bg-white text-slate-900 border-slate-200"
+              )}
+            >
+              {/* Drawer Header */}
+              <div className={cn(
+                "flex items-center justify-between p-3.5 border-b shrink-0 transition-colors",
+                isDark ? "bg-slate-950/60 border-slate-800" : "bg-slate-50 border-slate-200"
+              )}>
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className={cn(
+                    "p-1.5 rounded-md shrink-0",
+                    isDark ? "bg-indigo-500/20 text-indigo-400" : "bg-indigo-50 text-indigo-600"
+                  )}>
+                    <Sparkles className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <h2 className={cn(
+                      "text-xs font-bold uppercase tracking-wider truncate",
+                      isDark ? "text-indigo-200" : "text-indigo-900"
+                    )}>Site Intelligence</h2>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">{site.name}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {selectedModel && (
+                    <span className="hidden sm:inline-block text-[10px] font-bold px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/80">
+                      {selectedModel}
+                    </span>
+                  )}
+                  {messages.length > 0 && (
+                    <Button
+                      onClick={() => {
+                        setMessages([]);
+                        toast.success('Chat history cleared!');
+                      }}
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 w-7 p-0 text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md"
+                      title="Clear chat history"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                    </Button>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setIsAiDrawerOpen(false)}
+                    className="h-7 w-7 p-0 text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md"
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+
+              {/* Drawer Body / Message Stream */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-3 style-scroll">
+                {messages.length === 0 && !isGeneratingBrief && (
+                  <div className="text-center py-10 space-y-3">
+                    <div className={cn(
+                      "w-10 h-10 mx-auto rounded-full flex items-center justify-center border",
+                      isDark ? "bg-indigo-500/10 text-indigo-400 border-indigo-500/20" : "bg-indigo-50 text-indigo-600 border-indigo-200"
+                    )}>
+                      <Sparkles className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-slate-900 dark:text-slate-200">Site 360 AI Assistant</p>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 max-w-[260px] mx-auto">Instant intelligence on diesel consumption, active machines, pending tasks, and financial risks.</p>
+                    </div>
+                    <Button
+                      onClick={() => sendChatMessage(true)}
+                      disabled={isGeneratingBrief}
+                      size="sm"
+                      className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs rounded-md shadow-sm h-8 font-semibold"
+                    >
+                      {isGeneratingBrief ? <RefreshCcw className="w-3.5 h-3.5 animate-spin mr-1.5" /> : <Sparkles className="w-3.5 h-3.5 mr-1.5" />}
+                      Generate Intelligence Brief
+                    </Button>
+                  </div>
+                )}
+
+                {messages.map((msg, idx) => (
+                  <div key={idx} className={cn('flex w-full', msg.role === 'user' ? 'justify-end' : 'justify-start')}>
+                    <div className={cn(
+                      'max-w-[90%] rounded-lg p-3 text-xs shadow-xs',
+                      msg.role === 'user'
+                        ? 'bg-indigo-600 text-white'
+                        : isDark
+                          ? 'bg-slate-950 text-indigo-50 border border-slate-800'
+                          : 'bg-slate-50 text-slate-800 border border-slate-200'
+                    )}>
+                      {msg.role === 'user' ? <p className="whitespace-pre-wrap">{msg.content}</p> : renderFormattedChatMessage(msg.content)}
+                    </div>
+                  </div>
+                ))}
+
+                {isGeneratingBrief && (
+                  <div className="flex justify-start">
+                    <div className={cn(
+                      "rounded-lg border p-2.5 text-xs flex items-center gap-2",
+                      isDark ? "bg-slate-950 text-indigo-200 border-slate-800" : "bg-slate-50 text-indigo-900 border-slate-200"
+                    )}>
+                      <RefreshCcw className="w-3.5 h-3.5 animate-spin text-indigo-600 dark:text-indigo-400" /> Analyzing site telemetry...
+                    </div>
+                  </div>
+                )}
+                <div ref={chatEndRef} />
+              </div>
+
+              {/* Drawer Footer Input */}
+              <div className={cn(
+                "p-3 border-t shrink-0 flex items-center gap-2 transition-colors",
+                isDark ? "bg-slate-950 border-slate-800" : "bg-slate-50 border-slate-200"
+              )}>
+                <input
+                  type="text"
+                  value={chatInput}
+                  onChange={e => setChatInput(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && sendChatMessage()}
+                  placeholder="Ask about invoices, machines, pumps..."
+                  className={cn(
+                    "flex-1 text-xs rounded-md h-8.5 px-3 focus:outline-none focus:ring-1 focus:ring-indigo-500 border transition-colors",
+                    isDark ? "bg-slate-900 border-slate-700 text-white placeholder:text-slate-500" : "bg-white border-slate-300 text-slate-900 placeholder:text-slate-400"
+                  )}
+                />
+                <Button
+                  size="icon"
+                  onClick={() => sendChatMessage()}
+                  disabled={!chatInput.trim() || isGeneratingBrief}
+                  className="h-8.5 w-8.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-md shrink-0"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                </Button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
