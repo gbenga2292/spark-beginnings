@@ -52,6 +52,17 @@ export function TitleBar() {
     return () => window.removeEventListener('electron-navigate', handler as EventListener);
   }, []);
 
+  // Listen for update modal trigger from main process (e.g. clicking "Open Update Manager" on native dialog)
+  useEffect(() => {
+    if (!getElectronAPI()?.onOpenUpdateModal) return;
+    const unsubscribe = getElectronAPI().onOpenUpdateModal(() => {
+      setIsUpdateModalOpen(true);
+    });
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, []);
+
   if (!isElectron) return null;
 
   const handleMenuClick = (e: React.MouseEvent<HTMLButtonElement>, id: string) => {

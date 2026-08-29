@@ -4,6 +4,59 @@ export type AssetCondition = 'good' | 'fair' | 'poor' | 'damaged' | 'missing';
 export type AssetStatus = 'active' | 'archived';
 export type OperationalStatus = 'active' | 'idle' | 'under_maintenance';
 
+export type BatchStatus = 'active' | 'depleted' | 'expired';
+
+export interface AssetBatch {
+  id: string;
+  assetId: string;
+  batchNumber: string;
+  supplier?: string;
+  receivedDate: string;
+  expiryDate?: string | null;
+  initialQuantity: number;
+  remainingQuantity: number;
+  unitCost: number;
+  status: BatchStatus;
+}
+
+export type MovementType = 
+  | 'restock' 
+  | 'waybill_dispatch' 
+  | 'waybill_return' 
+  | 'consumable_burn' 
+  | 'consumed'
+  | 'checkout' 
+  | 'checkout_return' 
+  | 'adjustment' 
+  | 'damage'
+  | 'damage_writeoff' 
+  | 'loss'
+  | 'missing_writeoff' 
+  | 'initial';
+
+export interface AssetMovement {
+  id: string;
+  assetId: string;
+  assetName: string;
+  movementType: MovementType;
+  quantityDelta: number;
+  previousQuantity: number;
+  newQuantity: number;
+  unitCost?: number;
+  totalCost?: number;
+  reasonCode?: string;
+  referenceId?: string;
+  referenceType?: string;
+  siteId?: string;
+  siteName?: string;
+  batchId?: string;
+  batchNumber?: string;
+  actorId?: string;
+  actorName?: string;
+  notes?: string;
+  createdAt: string;
+}
+
 export interface RestockRecord {
   id: string;
   assetId: string;
@@ -11,6 +64,9 @@ export interface RestockRecord {
   totalCost: number;
   unitCost: number;
   date: string;
+  batchNumber?: string;
+  expiryDate?: string | null;
+  supplier?: string;
 }
 
 export interface Asset {
@@ -26,6 +82,10 @@ export interface Asset {
   damagedQuantity: number;
   usedQuantity: number;
   unitOfMeasurement: string;
+  packUnit?: string;
+  packSize?: number;
+  hasExpiry?: boolean;
+  batches?: AssetBatch[];
   cost?: number;
   lowStockLevel?: number;
   criticalStockLevel?: number;
@@ -47,6 +107,8 @@ export interface AssetPumpDate {
   siteId: string;
   pumpStartDate: string;
   pumpStopDate: string | null;
+  replacedAssetId?: string | null;
+  swapReason?: string | null;
   created_at?: string;
 }
 
@@ -116,7 +178,7 @@ export interface OperationalSite {
   activeWaybills: string[]; // IDs
 }
 
-export type CheckoutStatus = 'outstanding' | 'returned' | 'partial_returned';
+export type CheckoutStatus = 'outstanding' | 'returned' | 'partial_returned' | 'consumed';
 
 export interface Checkout {
   id: string;
@@ -130,6 +192,8 @@ export interface Checkout {
   returnInDays: number;
   expectedReturnDate?: string;
   status: CheckoutStatus;
+  condition?: string;
+  notes?: string;
 }
 
 export type ServiceStatus = 'ok' | 'due_soon' | 'overdue' | 'in_service';
@@ -198,6 +262,15 @@ export interface VehicleDocumentType {
   created_at?: string;
 }
 
+export interface VehicleDocumentRenewalRecord {
+  id: string;
+  doc_type: string;
+  previous_date?: string;
+  new_date: string;
+  updated_at: string;
+  note?: string;
+}
+
 export interface Vehicle {
   id: string;
   name: string;
@@ -205,7 +278,7 @@ export interface Vehicle {
   registration_number: string;
   status: 'active' | 'inactive';
   operationalStatus?: OperationalStatus;
-  documents?: Record<string, string>; // Mapping of document type name (or ID) to expiry date
+  documents?: Record<string, any>; // Mapping of document type name (or ID) to expiry date, and optional _history
   created_at?: string;
   updated_at?: string;
 }

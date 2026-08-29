@@ -136,8 +136,8 @@ export function UpdateModal({ isOpen, onClose }: UpdateModalProps) {
 
   const handleAuthSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!username.trim() || !password.trim()) {
-      setAuthError('Please enter both username and password.');
+    if (!username.trim()) {
+      setAuthError('Please enter your NAS username.');
       return;
     }
 
@@ -310,13 +310,16 @@ export function UpdateModal({ isOpen, onClose }: UpdateModalProps) {
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label htmlFor="password" className="text-xs font-bold text-slate-600 dark:text-slate-400">Password</Label>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="password" className="text-xs font-bold text-slate-600 dark:text-slate-400">Password</Label>
+                    <span className="text-[10px] text-slate-400 font-medium">Leave blank if none</span>
+                  </div>
                   <Input
                     id="password"
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
+                    placeholder="Optional (blank if no password)"
                     className="h-9 text-xs focus:ring-indigo-500 focus:border-indigo-500"
                     disabled={isAuthenticating}
                   />

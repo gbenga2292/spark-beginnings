@@ -116,18 +116,18 @@ export default function CalendarPage({ onNavigate, showCompleted: externalShowCo
   const { dailyMachineLogs } = useOperations();
 
   useEffect(() => {
-    fetchOperationsData()
-      .then((data) => {
-        useAppStore.setState(data);
-      })
-      .catch(console.error);
-  }, []);
+    // Only fetch if store doesn't already have operations data
+    if (dailyJournals.length === 0 && siteJournalEntries.length === 0) {
+      fetchOperationsData()
+        .then((data) => {
+          useAppStore.setState(data);
+        })
+        .catch(console.error);
+    }
+  }, [dailyJournals.length, siteJournalEntries.length]);
 
-  // Load journals for the currently viewed month range (including adjacent months for calendar safety)
-  // Removed partial data fetch effects to rely on full data loaded by fetchOperationsData
-  
-  // Update local state if external prop changes
-  useMemo(() => {
+  // Sync external showCompleted prop
+  useEffect(() => {
     if (externalShowCompleted !== undefined) {
       setShowCompleted(externalShowCompleted);
     }

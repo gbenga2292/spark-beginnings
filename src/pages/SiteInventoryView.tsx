@@ -28,6 +28,7 @@ import { SiteConsumablesAnalyticsModal } from './SiteConsumablesAnalyticsModal';
 import { BulkMachineLogModal } from './BulkMachineLogModal';
 import { SiteMachineAnalyticsModal } from './SiteMachineAnalyticsModal';
 import { WaybillDetailView } from './WaybillDetailView';
+import { SwapMachineModal } from '@/src/components/operations/SwapMachineModal';
 
 interface SiteInventoryViewProps {
   site: Site;
@@ -65,6 +66,7 @@ export function SiteInventoryView({ site, questionnaire, onBack, onSiteChange, i
   const [showConsumablesAnalytics, setShowConsumablesAnalytics] = useState(false);
   const [showMachineBulkLog, setShowMachineBulkLog] = useState(false);
   const [showMachineAnalytics, setShowMachineAnalytics] = useState(false);
+  const [swappingMachine, setSwappingMachine] = useState<{ id: string, name: string } | null>(null);
   const [viewingWaybill, setViewingWaybill] = useState<any | null>(null);
   const [editingWaybill, setEditingWaybill] = useState<Waybill | null>(null);
   const [returnToDetailOnClose, setReturnToDetailOnClose] = useState(false);
@@ -136,6 +138,71 @@ export function SiteInventoryView({ site, questionnaire, onBack, onSiteChange, i
   };
 
   const { consumableLogs, addConsumableLogs } = useAppStore();
+
+  // Helper to compute machine lineage stats (individual asset vs unbroken slot continuity)
+  const getMachineLineageStats = (machineId: string) => {
+    const configured = sitePumpDates?.find(p => p.assetId === machineId && p.siteId === site.id);
+    const thisLogs = dailyMachineLogs.filter(l => l.assetId === machineId && l.siteId === site.id);
+    
+    const thisActiveDays = thisLogs.reduce((acc, l) => {
+      const day = l.operationalDay ?? (l.isActive ? 'full' : 'none');
+      return acc + (day === 'full' ? 1 : day === 'half' ? 0.5 : 0);
+    }, 0);
+
+    const thisOffDays = thisLogs.filter(l => {
+      const day = l.operationalDay ?? (l.isActive ? 'full' : 'none');
+      return day === 'none';
+    }).length;
+
+    const thisDiesel = thisLogs.reduce((acc, l) => acc + (Number(l.dieselUsage) || 0), 0);
+
+    // Collect predecessor lineage on this site
+    const predecessorIds: string[] = [];
+    let currentPred = configured?.replacedAssetId;
+    const visited = new Set<string>([machineId]);
+
+    while (currentPred && !visited.has(currentPred)) {
+      visited.add(currentPred);
+      predecessorIds.push(currentPred);
+      const predRecord = sitePumpDates?.find(p => p.assetId === currentPred && p.siteId === site.id);
+      currentPred = predRecord?.replacedAssetId || undefined;
+    }
+
+    const predLogs = dailyMachineLogs.filter(l => predecessorIds.includes(l.assetId) && l.siteId === site.id);
+    const predActiveDays = predLogs.reduce((acc, l) => {
+      const day = l.operationalDay ?? (l.isActive ? 'full' : 'none');
+      return acc + (day === 'full' ? 1 : day === 'half' ? 0.5 : 0);
+    }, 0);
+    const predDiesel = predLogs.reduce((acc, l) => acc + (Number(l.dieselUsage) || 0), 0);
+
+    const immediatePredecessor = configured?.replacedAssetId 
+      ? assets.find(a => a.id === configured.replacedAssetId) || maintenanceAssets.find(ma => ma.id === configured.replacedAssetId)
+      : null;
+
+    // Also check if this machine was replaced by another machine on this site
+    const successorRecord = sitePumpDates?.find(p => p.replacedAssetId === machineId && p.siteId === site.id);
+    const successorMachine = successorRecord
+      ? assets.find(a => a.id === successorRecord.assetId) || maintenanceAssets.find(ma => ma.id === successorRecord.assetId)
+      : null;
+
+    return {
+      thisLogCount: thisLogs.length,
+      thisActiveDays,
+      thisOffDays,
+      thisDiesel,
+      hasPredecessor: predecessorIds.length > 0,
+      predecessorName: immediatePredecessor?.name,
+      predecessorActiveDays: predActiveDays,
+      predecessorDiesel: predDiesel,
+      totalSlotLogs: thisLogs.length + predLogs.length,
+      cumulativeActiveDays: thisActiveDays + predActiveDays,
+      cumulativeDiesel: thisDiesel + predDiesel,
+      swapReason: configured?.swapReason,
+      isReplaced: !!successorRecord,
+      successorName: successorMachine?.name,
+      successorDate: successorRecord?.pumpStartDate,
+    };
+  };
 
   // All waybills for this site
   const siteWaybills = waybills.filter(w =>
@@ -553,7 +620,6 @@ export function SiteInventoryView({ site, questionnaire, onBack, onSiteChange, i
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                           {currentMachines.map(machine => {
                             const mAsset = maintenanceAssets.find(ma => ma.id === machine.id);
-                            const machineLogCount = dailyMachineLogs.filter(l => l.assetId === machine.id && l.siteId === site.id).length;
                             const inventoryItem = allItems.find(i => i.assetId === machine.id);
                             const isPendingReturn = inventoryItem?.pendingReturnQuantity && inventoryItem.pendingReturnQuantity > 0;
 
@@ -563,15 +629,7 @@ export function SiteInventoryView({ site, questionnaire, onBack, onSiteChange, i
                               ? machineLogs.reduce((acc, log) => log.date < acc ? log.date : acc, machineLogs[0].date)
                               : null;
 
-                            const activeDaysCount = machineLogs.filter(l => {
-                              const day = l.operationalDay ?? (l.isActive ? 'full' : 'none');
-                              return day === 'full' || day === 'half';
-                            }).length;
-
-                            const offDaysCount = machineLogs.filter(l => {
-                              const day = l.operationalDay ?? (l.isActive ? 'full' : 'none');
-                              return day === 'none';
-                            }).length;
+                            const lineage = getMachineLineageStats(machine.id);
 
                             const isFallback = !configured?.pumpStartDate;
                             const pumpStart = configured?.pumpStartDate || earliestLogDate;
@@ -610,6 +668,16 @@ export function SiteInventoryView({ site, questionnaire, onBack, onSiteChange, i
                                             Pending Return: {inventoryItem.pendingReturnQuantity}
                                           </Badge>
                                         )}
+                                        {lineage.hasPredecessor && (
+                                          <Badge
+                                            variant="outline"
+                                            className="bg-indigo-50 dark:bg-indigo-950/20 text-indigo-700 dark:text-indigo-300 border-indigo-200/60 font-bold px-1.5 py-0 text-[10px] rounded shrink-0 flex items-center gap-1"
+                                            title={`Replaces ${lineage.predecessorName} (${lineage.swapReason || 'Machine Swap'})`}
+                                          >
+                                            <ArrowRightLeft className="h-2.5 w-2.5" />
+                                            Replaces {lineage.predecessorName}
+                                          </Badge>
+                                        )}
                                       </div>
                                     </div>
                                     {mAsset && (
@@ -642,18 +710,32 @@ export function SiteInventoryView({ site, questionnaire, onBack, onSiteChange, i
                                       </p>
                                     </div>
                                     <div className="flex flex-col items-center justify-center px-1">
-                                      <p className="text-[10px] sm:text-[11px] text-slate-500 mb-1 whitespace-nowrap">Log Days</p>
-                                      <p className="text-[11px] sm:text-xs font-bold text-slate-800 dark:text-slate-200">{machineLogCount}</p>
+                                      <p className="text-[10px] sm:text-[11px] text-slate-500 mb-1 whitespace-nowrap">Asset Days</p>
+                                      <p className="text-[11px] sm:text-xs font-bold text-emerald-600 dark:text-emerald-400" title={`Individual machine active days on site`}>
+                                        {lineage.thisActiveDays}d
+                                      </p>
                                     </div>
                                     <div className="flex flex-col items-center justify-center px-1">
-                                      <p className="text-[10px] sm:text-[11px] text-slate-500 mb-1 whitespace-nowrap">Active Days</p>
-                                      <p className="text-[11px] sm:text-xs font-bold text-emerald-600 dark:text-emerald-400">{activeDaysCount}</p>
+                                      <p className="text-[10px] sm:text-[11px] text-slate-500 mb-1 whitespace-nowrap">Slot Total</p>
+                                      <p className="text-[11px] sm:text-xs font-bold text-indigo-600 dark:text-indigo-400" title={`Continuous site operational days across replacements`}>
+                                        {lineage.cumulativeActiveDays}d
+                                      </p>
                                     </div>
                                     <div className="flex flex-col items-center justify-center px-1">
-                                      <p className="text-[10px] sm:text-[11px] text-slate-500 mb-1 whitespace-nowrap">Off Days</p>
-                                      <p className="text-[11px] sm:text-xs font-bold text-rose-600 dark:text-rose-400">{offDaysCount}</p>
+                                      <p className="text-[10px] sm:text-[11px] text-slate-500 mb-1 whitespace-nowrap">Diesel</p>
+                                      <p className="text-[11px] sm:text-xs font-bold text-blue-600 dark:text-blue-400" title={`Machine: ${lineage.thisDiesel}L · Slot Total: ${lineage.cumulativeDiesel}L`}>
+                                        {lineage.thisDiesel}L
+                                      </p>
                                     </div>
                                   </div>
+
+                                  {/* Lineage Info Banner if replaced */}
+                                  {lineage.hasPredecessor && (
+                                    <div className="px-4 py-1.5 bg-indigo-50/50 dark:bg-indigo-950/20 border-t border-indigo-100 dark:border-indigo-900/30 text-[11px] text-indigo-700 dark:text-indigo-300 flex items-center justify-between">
+                                      <span>Continuous Slot Days:</span>
+                                      <span className="font-bold">{lineage.cumulativeActiveDays} days ({lineage.predecessorActiveDays}d + {lineage.thisActiveDays}d)</span>
+                                    </div>
+                                  )}
 
                                   {/* Pump Range Info Box */}
                                   <div className="px-4 py-2.5 border-t border-slate-100 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-900/30 text-xs flex items-center justify-between">
@@ -700,10 +782,20 @@ export function SiteInventoryView({ site, questionnaire, onBack, onSiteChange, i
                                 </div>
 
                                 {/* Actions */}
-                                <div className="p-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between bg-white dark:bg-slate-900">
+                                <div className="p-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2 bg-white dark:bg-slate-900">
                                   <Button
                                     size="sm"
-                                    className="bg-blue-600 hover:bg-blue-700 text-white gap-1.5 h-8 px-3 rounded-lg font-medium shadow-sm"
+                                    variant="outline"
+                                    className="border-blue-200 hover:bg-blue-50 text-blue-600 dark:border-blue-900/60 dark:hover:bg-blue-950/40 gap-1.5 h-8 px-2.5 rounded-lg font-medium text-xs shadow-none"
+                                    onClick={() => setSwappingMachine({ id: machine.id, name: machine.name })}
+                                    title="Swap / Replace this machine with another unit"
+                                  >
+                                    <ArrowRightLeft className="h-3.5 w-3.5" />
+                                    Swap Machine
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    className="bg-blue-600 hover:bg-blue-700 text-white gap-1.5 h-8 px-3 rounded-lg font-medium shadow-sm text-xs"
                                     onClick={() => setSelectedMachine({ id: machine.id, name: machine.name })}
                                   >
                                     View Logs
@@ -974,32 +1066,6 @@ export function SiteInventoryView({ site, questionnaire, onBack, onSiteChange, i
         </DialogContent>
       </Dialog>
 
-      {/* Configure Pump Dates Dialog */}
-      <Dialog open={isConfiguringPumpDates} onOpenChange={setIsConfiguringPumpDates}>
-        <DialogContent className="sm:max-w-[520px] p-6 rounded-2xl">
-          <DialogHeader className="mb-2">
-            <DialogTitle className="text-xl text-center text-slate-800">Configure Pump Dates</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleSavePumpDates} className="space-y-4 mt-2">
-            <p className="text-sm text-slate-600">Machine: <span className="font-semibold">{configuringMachine?.name}</span></p>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Start Date</label>
-                <Input type="date" value={modalStartDate} onChange={e => setModalStartDate(e.target.value)} />
-              </div>
-              <div>
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Stop Date</label>
-                <Input type="date" value={modalStopDate} onChange={e => setModalStopDate(e.target.value)} />
-              </div>
-            </div>
-            {modalError && <p className="text-sm text-rose-600">{modalError}</p>}
-            <div className="flex items-center justify-end gap-2">
-              <Button variant="outline" size="sm" onClick={() => { setIsConfiguringPumpDates(false); setConfiguringMachine(null); }}>Cancel</Button>
-              <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white" type="submit">Save</Button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
 
       <BulkConsumableLogModal
         isOpen={showBulkLog}
@@ -1109,6 +1175,16 @@ export function SiteInventoryView({ site, questionnaire, onBack, onSiteChange, i
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* ── Swap Machine Modal ───────────────────────────────── */}
+      {swappingMachine && (
+        <SwapMachineModal
+          isOpen={!!swappingMachine}
+          onClose={() => setSwappingMachine(null)}
+          site={site}
+          outgoingMachine={swappingMachine}
+        />
+      )}
     </div>
   );
 }

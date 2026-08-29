@@ -4,7 +4,8 @@ import {
   CheckCircle2, Fuel, User, MessageSquare, 
   BarChart3, History, Plus, Save, Trash2, Edit2, Wrench, Activity,
   ChevronLeft, ChevronRight, ChevronDown, Eye, Lock,
-  Image as ImageIcon, Video, X, UploadCloud, FileVideo, Camera
+  Image as ImageIcon, Video, X, UploadCloud, FileVideo, Camera,
+  Check, CheckSquare, Layers, ArrowRightLeft
 } from 'lucide-react';
 import { useOperations } from '../contexts/OperationsContext';
 import { useAppStore, AttendanceRecord, DewateringStage } from '../store/appStore';
@@ -37,7 +38,7 @@ interface DailyLogManagerProps {
 }
 
 export function DailyLogManager({ assetId, assetName, siteId, siteName, initialDate, isEmbedded, onBack }: DailyLogManagerProps) {
-  const { dailyMachineLogs, logDailyActivity, deleteDailyLog, waybills, sitePumpDates } = useOperations();
+  const { dailyMachineLogs, logDailyActivity, deleteDailyLog, waybills, sitePumpDates, assets, maintenanceAssets } = useOperations();
   const { employees, attendanceRecords, sites, siteJournalEntries, dailyJournals, updateSite, addDailyJournal, updateDailyJournal } = useAppStore();
   const currentSite = useMemo(() => sites.find(s => s.id === siteId || s.name.toLowerCase().trim() === siteName.toLowerCase().trim()), [sites, siteId, siteName]);
   const currentUser = useUserStore(s => s.users.find(u => u.id === s.currentUserId));
@@ -264,6 +265,23 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
     return { effectiveStart, effectiveStop, isConfigured, configured };
   }, [sitePumpDates, assetId, siteId, logs]);
 
+  const lineageInfo = useMemo(() => {
+    const configured = sitePumpDates?.find(p => p.assetId === assetId && p.siteId === siteId);
+    if (!configured?.replacedAssetId) return null;
+    const predAsset = assets.find(a => a.id === configured.replacedAssetId) || maintenanceAssets.find(ma => ma.id === configured.replacedAssetId);
+    const predLogs = dailyMachineLogs.filter(l => l.assetId === configured.replacedAssetId && l.siteId === siteId);
+    const predActiveDays = predLogs.reduce((acc, l) => {
+      const day = l.operationalDay ?? (l.isActive ? 'full' : 'none');
+      return acc + (day === 'full' ? 1 : day === 'half' ? 0.5 : 0);
+    }, 0);
+    return {
+      predName: predAsset?.name || 'Previous Machine',
+      predActiveDays,
+      swapDate: configured.pumpStartDate,
+      swapReason: configured.swapReason,
+    };
+  }, [sitePumpDates, assetId, siteId, assets, maintenanceAssets, dailyMachineLogs]);
+
   const filteredLogs = useMemo(() => {
     return logs.filter(l => {
       const d = new Date(l.date);
@@ -327,6 +345,178 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
       setDeleteConfirmId(null);
     } catch (err) {
       toast.error('Failed to delete log');
+    }
+  };
+
+  // Multi-select & Bulk Operations State
+  const [selectedLogIds, setSelectedLogIds] = useState<Set<string>>(new Set());
+  const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
+  const [showBulkEditDialog, setShowBulkEditDialog] = useState(false);
+  const [isBulkProcessing, setIsBulkProcessing] = useState(false);
+
+  // Bulk Edit Form State
+  const [bulkUpdateOpDay, setBulkUpdateOpDay] = useState(false);
+  const [bulkOpDay, setBulkOpDay] = useState<OperationalDay>('full');
+  const [bulkUpdateDiesel, setBulkUpdateDiesel] = useState(false);
+  const [bulkDiesel, setBulkDiesel] = useState<string>('0');
+  const [bulkUpdateSupervisor, setBulkUpdateSupervisor] = useState(false);
+  const [bulkSupervisorMode, setBulkSupervisorMode] = useState<'fixed' | 'auto_sync'>('fixed');
+  const [bulkSupervisor, setBulkSupervisor] = useState<string>('');
+  const [bulkUpdateStage, setBulkUpdateStage] = useState(false);
+  const [bulkStage, setBulkStage] = useState<DewateringStage | ''>('');
+  const [bulkUpdateFeedback, setBulkUpdateFeedback] = useState(false);
+  const [bulkFeedback, setBulkFeedback] = useState<string>('');
+  const [bulkUpdateIssues, setBulkUpdateIssues] = useState(false);
+  const [bulkIssues, setBulkIssues] = useState<string>('');
+  const [bulkUpdateMaintenance, setBulkUpdateMaintenance] = useState(false);
+  const [bulkMaintenance, setBulkMaintenance] = useState<string>('');
+
+  const toggleSelectLog = (id: string) => {
+    setSelectedLogIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedLogIds.size === logs.length) {
+      setSelectedLogIds(new Set());
+    } else {
+      setSelectedLogIds(new Set(logs.map(l => l.id)));
+    }
+  };
+
+  const clearSelection = () => {
+    setSelectedLogIds(new Set());
+  };
+
+  const resetBulkEditForm = () => {
+    setBulkUpdateOpDay(false);
+    setBulkOpDay('full');
+    setBulkUpdateDiesel(false);
+    setBulkDiesel('0');
+    setBulkUpdateSupervisor(false);
+    setBulkSupervisorMode('fixed');
+    setBulkSupervisor('');
+    setBulkUpdateStage(false);
+    setBulkStage('');
+    setBulkUpdateFeedback(false);
+    setBulkFeedback('');
+    setBulkUpdateIssues(false);
+    setBulkIssues('');
+    setBulkUpdateMaintenance(false);
+    setBulkMaintenance('');
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedLogIds.size === 0) return;
+    setIsBulkProcessing(true);
+    try {
+      const ids = Array.from(selectedLogIds);
+      for (const id of ids) {
+        await deleteDailyLog(id);
+      }
+      toast.success(`Successfully deleted ${ids.length} log${ids.length !== 1 ? 's' : ''}`);
+      setSelectedLogIds(new Set());
+      setShowBulkDeleteDialog(false);
+    } catch (err) {
+      toast.error('Failed to delete some logs. Please try again.');
+    } finally {
+      setIsBulkProcessing(false);
+    }
+  };
+
+  const handleBulkEdit = async () => {
+    if (selectedLogIds.size === 0) return;
+    
+    if (
+      !bulkUpdateOpDay &&
+      !bulkUpdateDiesel &&
+      !bulkUpdateSupervisor &&
+      !bulkUpdateStage &&
+      !bulkUpdateFeedback &&
+      !bulkUpdateIssues &&
+      !bulkUpdateMaintenance
+    ) {
+      toast.error('Please select at least one field to update.');
+      return;
+    }
+
+    setIsBulkProcessing(true);
+    try {
+      const selectedLogsList = logs.filter(l => selectedLogIds.has(l.id));
+      let updatedCount = 0;
+
+      for (const log of selectedLogsList) {
+        const updatedOpDay = bulkUpdateOpDay ? bulkOpDay : (log.operationalDay ?? (log.isActive ? 'full' : 'none'));
+        const updatedIsActive = updatedOpDay !== 'none';
+        const updatedDiesel = bulkUpdateDiesel ? Number(bulkDiesel || 0) : log.dieselUsage;
+        
+        let updatedSupervisor = log.supervisorOnSite || '';
+        if (bulkUpdateSupervisor) {
+          if (bulkSupervisorMode === 'auto_sync') {
+            const autoSup = findAutoSupervisorForDate(log.date);
+            updatedSupervisor = autoSup || updatedSupervisor;
+          } else {
+            updatedSupervisor = bulkSupervisor;
+          }
+        }
+
+        const updatedFeedback = bulkUpdateFeedback ? bulkFeedback : (log.clientFeedback || '');
+        const updatedIssues = bulkUpdateIssues ? bulkIssues : (log.issuesOnSite || '');
+        const updatedMaintenance = bulkUpdateMaintenance ? bulkMaintenance : (log.maintenanceDetails || '');
+
+        await logDailyActivity({
+          ...log,
+          operationalDay: updatedOpDay,
+          isActive: updatedIsActive,
+          dieselUsage: updatedDiesel,
+          supervisorOnSite: updatedSupervisor,
+          clientFeedback: updatedFeedback,
+          issuesOnSite: updatedIssues,
+          maintenanceDetails: updatedMaintenance,
+          loggedBy: currentUser?.name || log.loggedBy || 'Unknown'
+        });
+
+        if (bulkUpdateStage && bulkStage) {
+          await updateSite(siteId, { currentDewateringStage: bulkStage });
+          const journalForDate = dailyJournals.find(j => j.date === log.date);
+          if (journalForDate) {
+            const existingEntry = siteJournalEntries.find(e => e.journalId === journalForDate.id && e.siteId === siteId);
+            if (existingEntry) {
+              await updateDailyJournal(journalForDate.id, { date: log.date }, [{
+                ...existingEntry,
+                dewateringStage: bulkStage
+              }]);
+            } else {
+              await updateDailyJournal(journalForDate.id, { date: log.date }, [{
+                id: crypto.randomUUID(),
+                journalId: journalForDate.id,
+                siteId,
+                siteName,
+                clientName: currentSite?.client || 'Client',
+                narration: 'Bulk updated dewatering stage from daily machine register.',
+                dewateringStage: bulkStage,
+                createdAt: new Date().toISOString(),
+                loggedBy: currentUser?.name || 'System'
+              }]);
+            }
+          }
+        }
+
+        updatedCount++;
+      }
+
+      toast.success(`Successfully updated ${updatedCount} log${updatedCount !== 1 ? 's' : ''}`);
+      setSelectedLogIds(new Set());
+      setShowBulkEditDialog(false);
+    } catch (err) {
+      console.error('Bulk edit error:', err);
+      toast.error('Failed to apply bulk updates. Please check connection and try again.');
+    } finally {
+      setIsBulkProcessing(false);
     }
   };
 
@@ -581,26 +771,26 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
   // inside component, right before return:
   useSetPageTitle(
     assetName,
-    <div className="flex items-center gap-1.5 flex-wrap text-xs text-slate-500 font-semibold mt-0.5">
-      <span>Site: <strong>{siteName}</strong></span>
+    <div className="flex items-center gap-2 flex-wrap text-xs text-slate-500 font-medium mt-0.5">
+      <span>{siteName}</span>
       {currentSite && (
         <>
           <span className="text-slate-300 dark:text-slate-700">•</span>
-          <span className="text-slate-600 dark:text-slate-400 font-bold">{currentSite.currentProgressPercentage ?? 0}% Deployed Progress</span>
+          <span className="font-semibold text-slate-700 dark:text-slate-300">{currentSite.currentProgressPercentage ?? 0}% Progress</span>
           {currentSite.currentDewateringStage && (
             <>
               <span className="text-slate-300 dark:text-slate-700">•</span>
-              <span className={`inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0 rounded-full ${
-                currentSite.currentDewateringStage === 'mobilization' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' :
-                currentSite.currentDewateringStage === 'installation' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' :
-                currentSite.currentDewateringStage === 'operation' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' :
-                'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300'
+              <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full ${
+                currentSite.currentDewateringStage === 'mobilization' ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 border border-blue-200/50' :
+                currentSite.currentDewateringStage === 'installation' ? 'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 border border-amber-200/50' :
+                currentSite.currentDewateringStage === 'operation' ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300 border border-emerald-200/50' :
+                'bg-rose-50 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300 border border-rose-200/50'
               }`}>
                 {currentSite.currentDewateringStage === 'mobilization' && '🚚'}
                 {currentSite.currentDewateringStage === 'installation' && '🔧'}
                 {currentSite.currentDewateringStage === 'operation' && '⚙️'}
                 {currentSite.currentDewateringStage === 'demobilisation' && '📦'}
-                {' '}{currentSite.currentDewateringStage.charAt(0).toUpperCase() + currentSite.currentDewateringStage.slice(1)}
+                <span className="capitalize">{currentSite.currentDewateringStage}</span>
               </span>
             </>
           )}
@@ -669,6 +859,21 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
       <div className="flex-1 overflow-y-auto p-6">
         {view === 'history' && (
           <div className="max-w-4xl mx-auto space-y-4 pb-12">
+            {/* Lineage Info Banner */}
+            {lineageInfo && (
+              <div className="flex items-center justify-between p-3.5 px-4 bg-indigo-50/80 dark:bg-indigo-950/40 border border-indigo-200/80 dark:border-indigo-900/60 rounded-xl text-xs text-indigo-900 dark:text-indigo-200 shadow-sm">
+                <div className="flex items-center gap-2">
+                  <ArrowRightLeft className="h-4 w-4 text-indigo-600 shrink-0" />
+                  <span>
+                    Replaced <span className="font-bold text-indigo-700 dark:text-indigo-300">{lineageInfo.predName}</span> on {formatDisplayDate(lineageInfo.swapDate)} ({lineageInfo.predActiveDays} earlier days on this slot).
+                  </span>
+                </div>
+                <span className="hidden sm:inline-block font-semibold text-[10px] bg-white/80 dark:bg-indigo-900/60 px-2 py-0.5 rounded-md border border-indigo-200 dark:border-indigo-800 uppercase tracking-wider text-indigo-600 dark:text-indigo-300">
+                  Slot History Linked
+                </span>
+              </div>
+            )}
+
             {logs.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-24 text-slate-300 bg-white dark:bg-slate-900 rounded-3xl border-2 border-dashed border-slate-100 dark:border-slate-800 shadow-sm">
                 <div className="h-20 w-20 rounded-full bg-slate-50 dark:bg-slate-800/50 flex items-center justify-center mb-6">
@@ -685,99 +890,203 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
                 </Button>
               </div>
             ) : (
-              logs.map(log => (
-                <Card key={log.id} className="border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm hover:shadow-md transition-all rounded-lg group overflow-hidden">
-                  <div className="flex justify-between items-start p-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-lg bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0">
-                        <Calendar className="h-5 w-5" />
+              <>
+                {/* Multi-Select Action Toolbar */}
+                <div className="flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-slate-900 p-3 px-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm transition-all">
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={toggleSelectAll}
+                      className="flex items-center gap-2.5 text-xs font-bold text-slate-700 dark:text-slate-200 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                    >
+                      <div className={cn(
+                        "h-5 w-5 rounded-md border flex items-center justify-center transition-all cursor-pointer",
+                        selectedLogIds.size === logs.length && logs.length > 0
+                          ? "bg-blue-600 border-blue-600 text-white shadow-sm"
+                          : selectedLogIds.size > 0
+                            ? "bg-blue-50 border-blue-400 text-blue-600 dark:bg-blue-900/30"
+                            : "border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 hover:border-slate-400"
+                      )}>
+                        {selectedLogIds.size === logs.length && logs.length > 0 ? (
+                          <Check className="h-3.5 w-3.5 stroke-[3]" />
+                        ) : selectedLogIds.size > 0 ? (
+                          <div className="h-2 w-2 rounded-sm bg-blue-600" />
+                        ) : null}
                       </div>
-                      <div>
-                        <p className="text-base font-bold text-slate-800 dark:text-white">{formatDisplayDate(log.date)}</p>
-                        <div className="flex items-center gap-2 mt-0.5">
-                            {(() => {
-                              const day = log.operationalDay ?? (log.isActive ? 'full' : 'none');
-                              return (
-                                <Badge className={cn(
-                                  "text-[10px] font-bold px-2 py-0 rounded-full",
-                                  day === 'full' ? "bg-emerald-50 text-emerald-700 border-emerald-100" :
-                                  day === 'half' ? "bg-amber-50 text-amber-700 border-amber-100" :
-                                  "bg-rose-50 text-rose-700 border-rose-100"
-                                )}>
-                                  {day === 'full' ? 'FULL DAY' : day === 'half' ? 'HALF DAY' : 'OFF'}
-                                </Badge>
-                              );
-                            })()}
-                            {log.downtimeEntries.length > 0 && (
-                              <Badge variant="outline" className="text-[10px] font-bold px-2 py-0 rounded-full bg-amber-50 text-amber-700 border-amber-100">
-                                {log.downtimeEntries.length} DOWNTIME INCIDENTS
-                              </Badge>
-                            )}
-                          </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800" onClick={() => editLog(log)}>
-                        <Edit2 className="h-4 w-4" />
+                      <span>
+                        {selectedLogIds.size === 0
+                          ? `Select All (${logs.length})`
+                          : `${selectedLogIds.size} of ${logs.length} Selected`}
+                      </span>
+                    </button>
+                  </div>
+
+                  {selectedLogIds.size > 0 ? (
+                    <div className="flex items-center gap-2 animate-in fade-in zoom-in-95 duration-150">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8 gap-1.5 text-xs font-bold border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 dark:border-blue-900/40 dark:bg-blue-950/30 dark:text-blue-300 rounded-lg shadow-sm"
+                        onClick={() => {
+                          resetBulkEditForm();
+                          setShowBulkEditDialog(true);
+                        }}
+                      >
+                        <Edit2 className="h-3.5 w-3.5" />
+                        <span>Bulk Edit ({selectedLogIds.size})</span>
                       </Button>
+
                       {currentUser?.privileges?.operations?.canDeleteLogs && (
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-8 w-8 text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-900/20" 
-                          onClick={() => setDeleteConfirmId(log.id)}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 gap-1.5 text-xs font-bold border-rose-200 text-rose-700 bg-rose-50 hover:bg-rose-100 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-300 rounded-lg shadow-sm"
+                          onClick={() => setShowBulkDeleteDialog(true)}
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Trash2 className="h-3.5 w-3.5" />
+                          <span>Delete ({selectedLogIds.size})</span>
                         </Button>
                       )}
-                    </div>
-                  </div>
 
-                  <div className="p-4 grid grid-cols-2 md:grid-cols-4 gap-6">
-                    <div className="space-y-1">
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Supervisor</p>
-                      <p className="text-sm font-medium text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
-                        <User className="h-3.5 w-3.5 text-slate-400" /> {log.supervisorOnSite || '—'}
-                      </p>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 px-2 text-xs font-bold text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 rounded-lg"
+                        onClick={clearSelection}
+                        title="Clear Selection"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
                     </div>
-                    <div className="space-y-1">
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Diesel Usage</p>
-                      <p className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                        <Fuel className="h-3.5 w-3.5 text-slate-400" /> {log.dieselUsage} L
-                      </p>
-                    </div>
-                    <div className="space-y-1 col-span-2">
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Client Feedback</p>
-                      <p className="text-sm text-slate-500 dark:text-slate-400 italic line-clamp-1">
-                        "{log.clientFeedback || 'No feedback provided'}"
-                      </p>
-                    </div>
-                  </div>
-
-                  {(log.issuesOnSite || log.maintenanceDetails) && (
-                    <div className="px-4 pb-4">
-                      <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/40 space-y-2 border border-slate-100 dark:border-slate-800">
-                        {log.issuesOnSite && (
-                        <div className="flex gap-3">
-                          <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
-                          <p className="text-xs text-slate-600 dark:text-slate-400">
-                            <span className="font-bold text-slate-700 dark:text-slate-200">Site Issues:</span> {log.issuesOnSite}
-                          </p>
-                        </div>
-                      )}
-                      {log.maintenanceDetails && (
-                        <div className="flex gap-3">
-                          <Wrench className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
-                          <p className="text-xs text-slate-600 dark:text-slate-400">
-                            <span className="font-semibold text-slate-700 dark:text-slate-200">Maintenance:</span> {log.maintenanceDetails}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                    </div>
+                  ) : (
+                    <span className="text-xs text-slate-400 font-medium">
+                      Select logs to bulk edit or delete
+                    </span>
                   )}
-                </Card>
-              ))
+                </div>
+
+                {/* Log Cards */}
+                {logs.map(log => {
+                  const isSelected = selectedLogIds.has(log.id);
+                  return (
+                    <Card 
+                      key={log.id} 
+                      className={cn(
+                        "border bg-white dark:bg-slate-900 shadow-sm hover:shadow-md transition-all rounded-xl group overflow-hidden",
+                        isSelected
+                          ? "border-blue-400 dark:border-blue-600 ring-2 ring-blue-500/20 bg-blue-50/[0.03]"
+                          : "border-slate-200 dark:border-slate-800"
+                      )}
+                    >
+                      <div className="flex justify-between items-start p-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
+                        <div className="flex items-center gap-3">
+                          {/* Checkbox */}
+                          <div
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleSelectLog(log.id);
+                            }}
+                            className={cn(
+                              "h-6 w-6 rounded-lg border flex items-center justify-center transition-all cursor-pointer shrink-0",
+                              isSelected
+                                ? "bg-blue-600 border-blue-600 text-white shadow-sm"
+                                : "border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 hover:border-blue-400 group-hover:border-slate-400"
+                            )}
+                          >
+                            {isSelected && <Check className="h-3.5 w-3.5 stroke-[3]" />}
+                          </div>
+
+                          <div className="h-10 w-10 rounded-lg bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0">
+                            <Calendar className="h-5 w-5" />
+                          </div>
+                          <div>
+                            <p className="text-base font-bold text-slate-800 dark:text-white">{formatDisplayDate(log.date)}</p>
+                            <div className="flex items-center gap-2 mt-0.5">
+                                {(() => {
+                                  const day = log.operationalDay ?? (log.isActive ? 'full' : 'none');
+                                  return (
+                                    <Badge className={cn(
+                                      "text-[10px] font-bold px-2 py-0 rounded-full",
+                                      day === 'full' ? "bg-emerald-50 text-emerald-700 border-emerald-100" :
+                                      day === 'half' ? "bg-amber-50 text-amber-700 border-amber-100" :
+                                      "bg-rose-50 text-rose-700 border-rose-100"
+                                    )}>
+                                      {day === 'full' ? 'FULL DAY' : day === 'half' ? 'HALF DAY' : 'OFF'}
+                                    </Badge>
+                                  );
+                                })()}
+                                {log.downtimeEntries.length > 0 && (
+                                  <Badge variant="outline" className="text-[10px] font-bold px-2 py-0 rounded-full bg-amber-50 text-amber-700 border-amber-100">
+                                    {log.downtimeEntries.length} DOWNTIME INCIDENTS
+                                  </Badge>
+                                )}
+                              </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800" onClick={() => editLog(log)}>
+                            <Edit2 className="h-4 w-4" />
+                          </Button>
+                          {currentUser?.privileges?.operations?.canDeleteLogs && (
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-8 w-8 text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-900/20" 
+                              onClick={() => setDeleteConfirmId(log.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="p-4 grid grid-cols-2 md:grid-cols-4 gap-6">
+                        <div className="space-y-1">
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Supervisor</p>
+                          <p className="text-sm font-medium text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
+                            <User className="h-3.5 w-3.5 text-slate-400" /> {log.supervisorOnSite || '—'}
+                          </p>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Diesel Usage</p>
+                          <p className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                            <Fuel className="h-3.5 w-3.5 text-slate-400" /> {log.dieselUsage} L
+                          </p>
+                        </div>
+                        <div className="space-y-1 col-span-2">
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Client Feedback</p>
+                          <p className="text-sm text-slate-500 dark:text-slate-400 italic line-clamp-1">
+                            "{log.clientFeedback || 'No feedback provided'}"
+                          </p>
+                        </div>
+                      </div>
+
+                      {(log.issuesOnSite || log.maintenanceDetails) && (
+                        <div className="px-4 pb-4">
+                          <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/40 space-y-2 border border-slate-100 dark:border-slate-800">
+                            {log.issuesOnSite && (
+                            <div className="flex gap-3">
+                              <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+                              <p className="text-xs text-slate-600 dark:text-slate-400">
+                                <span className="font-bold text-slate-700 dark:text-slate-200">Site Issues:</span> {log.issuesOnSite}
+                              </p>
+                            </div>
+                          )}
+                          {log.maintenanceDetails && (
+                            <div className="flex gap-3">
+                              <Wrench className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
+                              <p className="text-xs text-slate-600 dark:text-slate-400">
+                                <span className="font-semibold text-slate-700 dark:text-slate-200">Maintenance:</span> {log.maintenanceDetails}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                        </div>
+                      )}
+                    </Card>
+                  );
+                })}
+              </>
             )}
           </div>
         )}
@@ -1613,6 +1922,359 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
               Delete Log
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Delete Dialog */}
+      <Dialog open={showBulkDeleteDialog} onOpenChange={setShowBulkDeleteDialog}>
+        <DialogContent className="sm:max-w-[440px] rounded-2xl bg-white dark:bg-slate-900 p-6 border-slate-200 dark:border-slate-800 shadow-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <div className="h-9 w-9 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-600 flex items-center justify-center">
+                <Trash2 className="h-5 w-5" />
+              </div>
+              <span>Delete {selectedLogIds.size} Selected Log{selectedLogIds.size !== 1 ? 's' : ''}</span>
+            </DialogTitle>
+            <DialogDescription className="text-sm text-slate-500 dark:text-slate-400 pt-2">
+              Are you sure you want to permanently delete {selectedLogIds.size} operational log{selectedLogIds.size !== 1 ? 's' : ''}? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* List of dates being deleted */}
+          <div className="my-2 max-h-36 overflow-y-auto p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-800">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Logs to delete:</p>
+            <div className="flex flex-wrap gap-1.5">
+              {logs
+                .filter(l => selectedLogIds.has(l.id))
+                .map(l => (
+                  <Badge 
+                    key={l.id} 
+                    variant="outline" 
+                    className="text-[11px] font-semibold bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300"
+                  >
+                    {formatDisplayDate(l.date)}
+                  </Badge>
+                ))}
+            </div>
+          </div>
+
+          <DialogFooter className="mt-4 flex flex-col sm:flex-row gap-2">
+            <Button 
+              variant="outline" 
+              className="flex-1 rounded-xl border-slate-200 dark:border-slate-700 font-bold text-xs" 
+              onClick={() => setShowBulkDeleteDialog(false)}
+              disabled={isBulkProcessing}
+            >
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive" 
+              className="flex-1 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs gap-1.5" 
+              onClick={handleBulkDelete}
+              disabled={isBulkProcessing}
+            >
+              {isBulkProcessing ? (
+                <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : (
+                <Trash2 className="h-4 w-4" />
+              )}
+              <span>{isBulkProcessing ? 'Deleting...' : `Delete ${selectedLogIds.size} Logs`}</span>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Edit Dialog */}
+      <Dialog open={showBulkEditDialog} onOpenChange={setShowBulkEditDialog}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white dark:bg-slate-900 p-6 border-slate-200 dark:border-slate-800 shadow-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <div className="h-9 w-9 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 flex items-center justify-center">
+                <Edit2 className="h-5 w-5" />
+              </div>
+              <span>Bulk Edit ({selectedLogIds.size} Selected Logs)</span>
+            </DialogTitle>
+            <DialogDescription className="text-xs text-slate-500 dark:text-slate-400 pt-1">
+              Check the toggle next to each field you wish to update across all {selectedLogIds.size} selected logs. Unchecked fields will remain untouched.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-3">
+            {/* Selected logs preview */}
+            <div className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-100 dark:border-slate-800">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Applying changes to dates:</p>
+              <div className="flex flex-wrap gap-1 max-h-20 overflow-y-auto">
+                {logs
+                  .filter(l => selectedLogIds.has(l.id))
+                  .map(l => (
+                    <Badge 
+                      key={l.id} 
+                      variant="outline" 
+                      className="text-[10px] font-medium bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300"
+                    >
+                      {formatDisplayDate(l.date)}
+                    </Badge>
+                  ))}
+              </div>
+            </div>
+
+            {/* Field 1: Operational Day */}
+            <div className={cn(
+              "p-3.5 rounded-xl border transition-all",
+              bulkUpdateOpDay 
+                ? "bg-blue-50/40 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900/50" 
+                : "bg-slate-50/50 dark:bg-slate-800/20 border-slate-200 dark:border-slate-800"
+            )}>
+              <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={bulkUpdateOpDay}
+                  onChange={(e) => setBulkUpdateOpDay(e.target.checked)}
+                  className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-4 w-4 cursor-pointer"
+                />
+                <span className="text-xs font-bold text-slate-800 dark:text-white uppercase tracking-wider">
+                  Update Day Type / Status
+                </span>
+              </label>
+              {bulkUpdateOpDay && (
+                <div className="mt-3 pl-6">
+                  <div className="flex p-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg gap-1 max-w-sm">
+                    <button
+                      type="button"
+                      onClick={() => setBulkOpDay('full')}
+                      className={cn(
+                        "flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-bold rounded-md transition-all",
+                        bulkOpDay === 'full'
+                          ? "bg-emerald-500 text-white shadow-sm"
+                          : "text-slate-500 hover:text-emerald-600 hover:bg-emerald-50"
+                      )}
+                    >
+                      <CheckCircle2 className="h-3.5 w-3.5" /> Full Day
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setBulkOpDay('half')}
+                      className={cn(
+                        "flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-bold rounded-md transition-all",
+                        bulkOpDay === 'half'
+                          ? "bg-amber-400 text-white shadow-sm"
+                          : "text-slate-500 hover:text-amber-600 hover:bg-amber-50"
+                      )}
+                    >
+                      <Clock className="h-3.5 w-3.5" /> Half Day
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setBulkOpDay('none')}
+                      className={cn(
+                        "flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-bold rounded-md transition-all",
+                        bulkOpDay === 'none'
+                          ? "bg-rose-500 text-white shadow-sm"
+                          : "text-slate-500 hover:text-rose-600 hover:bg-rose-50"
+                      )}
+                    >
+                      <AlertTriangle className="h-3.5 w-3.5" /> Off
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Field 2: Diesel Usage */}
+            <div className={cn(
+              "p-3.5 rounded-xl border transition-all",
+              bulkUpdateDiesel 
+                ? "bg-blue-50/40 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900/50" 
+                : "bg-slate-50/50 dark:bg-slate-800/20 border-slate-200 dark:border-slate-800"
+            )}>
+              <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={bulkUpdateDiesel}
+                  onChange={(e) => setBulkUpdateDiesel(e.target.checked)}
+                  className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-4 w-4 cursor-pointer"
+                />
+                <span className="text-xs font-bold text-slate-800 dark:text-white uppercase tracking-wider">
+                  Update Diesel Usage
+                </span>
+              </label>
+              {bulkUpdateDiesel && (
+                <div className="mt-3 pl-6 max-w-xs">
+                  <div className="relative">
+                    <Fuel className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                    <Input
+                      type="number"
+                      value={bulkDiesel}
+                      onChange={e => setBulkDiesel(e.target.value)}
+                      className="pl-9 h-9 text-xs border-slate-200 dark:border-slate-700 rounded-md"
+                      placeholder="0.00"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Field 3: Supervisor on Site */}
+            <div className={cn(
+              "p-3.5 rounded-xl border transition-all",
+              bulkUpdateSupervisor 
+                ? "bg-blue-50/40 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900/50" 
+                : "bg-slate-50/50 dark:bg-slate-800/20 border-slate-200 dark:border-slate-800"
+            )}>
+              <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={bulkUpdateSupervisor}
+                  onChange={(e) => setBulkUpdateSupervisor(e.target.checked)}
+                  className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-4 w-4 cursor-pointer"
+                />
+                <span className="text-xs font-bold text-slate-800 dark:text-white uppercase tracking-wider">
+                  Update Supervisor on Site
+                </span>
+              </label>
+              {bulkUpdateSupervisor && (
+                <div className="mt-3 pl-6 space-y-2.5">
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setBulkSupervisorMode('fixed')}
+                      className={cn(
+                        "px-3 py-1.5 text-xs font-bold rounded-md transition-all border",
+                        bulkSupervisorMode === 'fixed'
+                          ? "bg-blue-600 border-blue-600 text-white shadow-sm"
+                          : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 hover:bg-slate-50"
+                      )}
+                    >
+                      Assign Supervisor
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setBulkSupervisorMode('auto_sync')}
+                      className={cn(
+                        "px-3 py-1.5 text-xs font-bold rounded-md transition-all border flex items-center gap-1.5",
+                        bulkSupervisorMode === 'auto_sync'
+                          ? "bg-blue-600 border-blue-600 text-white shadow-sm"
+                          : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 hover:bg-slate-50"
+                      )}
+                    >
+                      <Clock className="h-3 w-3" /> Auto-Sync from Attendance (Per Date)
+                    </button>
+                  </div>
+
+                  {bulkSupervisorMode === 'fixed' ? (
+                    <div className="relative max-w-sm">
+                      <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+                      <select
+                        value={bulkSupervisor}
+                        onChange={(e) => setBulkSupervisor(e.target.value)}
+                        className="w-full h-9 pl-9 pr-8 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md text-xs font-medium focus:ring-2 focus:ring-blue-500/20"
+                      >
+                        <option value="">— Select Supervisor —</option>
+                        {dewateringStaff.map(staff => (
+                          <option key={staff.id} value={`${staff.firstname} ${staff.surname}`}>
+                            {staff.firstname} {staff.surname}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">
+                      ⚡ For each selected log date, Antigravity will look up the dewatering supervisor from attendance records on that specific day.
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Field 4: Dewatering Stage */}
+            <div className={cn(
+              "p-3.5 rounded-xl border transition-all",
+              bulkUpdateStage 
+                ? "bg-blue-50/40 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900/50" 
+                : "bg-slate-50/50 dark:bg-slate-800/20 border-slate-200 dark:border-slate-800"
+            )}>
+              <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={bulkUpdateStage}
+                  onChange={(e) => setBulkUpdateStage(e.target.checked)}
+                  className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-4 w-4 cursor-pointer"
+                />
+                <span className="text-xs font-bold text-slate-800 dark:text-white uppercase tracking-wider">
+                  Update Dewatering Stage
+                </span>
+              </label>
+              {bulkUpdateStage && (
+                <div className="mt-3 pl-6 max-w-sm">
+                  <select
+                    value={bulkStage}
+                    onChange={e => setBulkStage(e.target.value as DewateringStage)}
+                    className="w-full h-9 px-3 text-xs bg-background border border-slate-200 dark:border-slate-700 rounded-md outline-none"
+                  >
+                    <option value="">-- Select Stage --</option>
+                    <option value="Initial Setup">Initial Setup</option>
+                    <option value="Active Pumping">Active Pumping</option>
+                    <option value="Stabilization">Stabilization</option>
+                    <option value="Drawdown Monitoring">Drawdown Monitoring</option>
+                    <option value="Completion / Demobilization">Completion / Demobilization</option>
+                  </select>
+                </div>
+              )}
+            </div>
+
+            {/* Field 5: Issues on Site */}
+            <div className={cn(
+              "p-3.5 rounded-xl border transition-all",
+              bulkUpdateIssues 
+                ? "bg-blue-50/40 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900/50" 
+                : "bg-slate-50/50 dark:bg-slate-800/20 border-slate-200 dark:border-slate-800"
+            )}>
+              <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={bulkUpdateIssues}
+                  onChange={(e) => setBulkUpdateIssues(e.target.checked)}
+                  className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-4 w-4 cursor-pointer"
+                />
+                <span className="text-xs font-bold text-slate-800 dark:text-white uppercase tracking-wider">
+                  Update Issues on Site
+                </span>
+              </label>
+              {bulkUpdateIssues && (
+                <div className="mt-3 pl-6">
+                  <Textarea
+                    value={bulkIssues}
+                    onChange={e => setBulkIssues(e.target.value)}
+                    className="min-h-[70px] text-xs border-slate-200 dark:border-slate-700 rounded-md"
+                    placeholder="Enter issues to apply to all selected logs..."
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="px-6 py-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/70 flex flex-col sm:flex-row gap-2 shrink-0">
+            <Button 
+              variant="outline" 
+              className="flex-1 rounded-xl border-slate-200 dark:border-slate-700 font-bold text-xs" 
+              onClick={() => setShowBulkEditDialog(false)}
+              disabled={isBulkProcessing}
+            >
+              Cancel
+            </Button>
+            <Button 
+              className="flex-1 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs gap-1.5" 
+              onClick={handleBulkEdit}
+              disabled={isBulkProcessing}
+            >
+              {isBulkProcessing ? (
+                <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : (
+                <Save className="h-4 w-4" />
+              )}
+              <span>{isBulkProcessing ? 'Applying Changes...' : `Apply to ${selectedLogIds.size} Logs`}</span>
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

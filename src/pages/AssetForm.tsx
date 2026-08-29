@@ -36,6 +36,10 @@ export function AssetForm({ onClose, assetToEdit }: AssetFormProps) {
   const [requiresLogging, setLogging]       = useState(assetToEdit?.requiresLogging || false);
   const [serialNumber, setSerialNumber]     = useState(assetToEdit?.serialNumber || '');
   const [serviceInterval, setServiceInterval] = useState(assetToEdit?.serviceIntervalMonths || 2);
+  const [enablePackaging, setEnablePackaging] = useState(Boolean(assetToEdit?.packUnit && assetToEdit?.packSize));
+  const [packUnit, setPackUnit]             = useState(assetToEdit?.packUnit || 'Box');
+  const [packSize, setPackSize]             = useState(assetToEdit?.packSize || 10);
+  const [hasExpiry, setHasExpiry]           = useState(assetToEdit?.hasExpiry || false);
 
   const handleSubmit = (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -44,6 +48,9 @@ export function AssetForm({ onClose, assetToEdit }: AssetFormProps) {
     const assetData: Omit<Asset, 'id' | 'availableQuantity' | 'reservedQuantity' | 'missingQuantity' | 'damagedQuantity' | 'usedQuantity'> = {
       name, description, unitOfMeasurement, quantity, cost, category,
       type: assetType, lowStockLevel, criticalStockLevel, location: finalLocation,
+      packUnit: enablePackaging ? packUnit : undefined,
+      packSize: enablePackaging ? Number(packSize) : undefined,
+      hasExpiry: assetType === 'consumable' ? hasExpiry : false,
       powerSource: assetType === 'equipment' ? powerSource : undefined,
       requiresLogging: assetType === 'equipment' ? requiresLogging : undefined,
       serialNumber: assetType === 'equipment' ? serialNumber : undefined,
@@ -215,6 +222,84 @@ export function AssetForm({ onClose, assetToEdit }: AssetFormProps) {
               </div>
             </div>
           </div>
+
+          {/* Dual-Unit Packaging & Conversion Configuration */}
+          <div className="border border-border/80 rounded-2xl bg-muted/20 p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-bold text-foreground">Packaging & Dual-Unit Conversion</p>
+                <p className="text-[11px] text-muted-foreground">Track bulk packs (Boxes, Cartons, Rolls, Bags, Drums) along with single units</p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={enablePackaging}
+                  onChange={e => setEnablePackaging(e.target.checked)}
+                  className="sr-only peer"
+                />
+                <div className="w-9 h-5 bg-muted peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
+              </label>
+            </div>
+
+            {enablePackaging && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-border/50">
+                <div>
+                  <label className={labelCls}>Pack Unit Name</label>
+                  <div className="relative">
+                    <select value={packUnit} onChange={e => setPackUnit(e.target.value)} className={selectCls}>
+                      <option value="Box">Box / Boxes</option>
+                      <option value="Carton">Carton / Cartons</option>
+                      <option value="Roll">Roll / Rolls</option>
+                      <option value="Bag">Bag / Bags</option>
+                      <option value="Drum">Drum / Drums</option>
+                      <option value="Pack">Pack / Packs</option>
+                      <option value="Bundle">Bundle / Bundles</option>
+                    </select>
+                    <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                  </div>
+                </div>
+                <div>
+                  <label className={labelCls}>Units per {packUnit}</label>
+                  <input
+                    type="number"
+                    min="2"
+                    value={packSize}
+                    onChange={e => setPackSize(Math.max(2, Number(e.target.value)))}
+                    placeholder="e.g. 50"
+                    className={inputCls}
+                  />
+                </div>
+                {quantity > 0 && packSize > 1 && (
+                  <div className="sm:col-span-2 bg-primary/5 border border-primary/10 rounded-xl p-2.5 text-xs text-foreground font-medium">
+                    💡 <span className="font-bold">{quantity} {unitOfMeasurement}</span> will display as{' '}
+                    <span className="text-primary font-bold">
+                      {Math.floor(quantity / packSize)} {packUnit}s
+                      {quantity % packSize > 0 ? ` + ${quantity % packSize} ${unitOfMeasurement}` : ''}
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Expiry Tracking (for Consumables / Chemicals) */}
+          {assetType === 'consumable' && (
+            <div className="border border-border/80 rounded-2xl bg-muted/20 p-4 flex items-center justify-between">
+              <div>
+                <p className="text-xs font-bold text-foreground">FIFO Batch & Expiry Date Tracking</p>
+                <p className="text-[11px] text-muted-foreground">Enforce FIFO depletion and track expiration dates for chemicals, primers, membranes, and cements</p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={hasExpiry}
+                  onChange={e => setHasExpiry(e.target.checked)}
+                  className="sr-only peer"
+                />
+                <div className="w-9 h-5 bg-muted peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
+              </label>
+            </div>
+          )}
 
           {/* Location */}
           <div>

@@ -933,7 +933,7 @@ export function Client360() {
 
   const [activeTab, setRawActiveTab] = useState<TabType>(() => {
     const queryTab = new URLSearchParams(window.location.search).get('tab');
-    return (queryTab as TabType) || 'overview';
+    return (queryTab as TabType) || 'timeline';
   });
 
   const setSelectedClient = (clientName: string | ((prev: string) => string)) => {
@@ -953,7 +953,7 @@ export function Client360() {
       const next = new URLSearchParams(prev);
       next.set('tab', nextTab);
       return next;
-    });
+    }, { replace: true });
   };
 
   useEffect(() => {
@@ -969,19 +969,13 @@ export function Client360() {
         const next = new URLSearchParams(prev);
         next.set('client', defaultClient);
         return next;
-      });
+      }, { replace: true });
     }
 
     if (queryTab && queryTab !== activeTab) {
       setRawActiveTab(queryTab as TabType);
-    } else if (!queryTab && activeTab) {
-      setSearchParams(prev => {
-        const next = new URLSearchParams(prev);
-        next.set('tab', activeTab);
-        return next;
-      });
     }
-  }, [allClients, searchParams, setSearchParams, selectedClient, activeTab]);
+  }, [allClients, searchParams, selectedClient, activeTab]);
 
   const clientPendingSites = useMemo(() => {
     const isAll = selectedClient === 'ALL' || selectedClient === 'All Clients';
@@ -2404,9 +2398,9 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
       ) : (
         <div className="flex flex-col h-full min-h-0 overflow-hidden bg-slate-50 dark:bg-slate-950">
           {/* Main Content Area */}
-          <div className="flex-1 overflow-y-auto p-2 sm:p-4 lg:p-6 style-scroll">
+          <div className="flex-1 overflow-y-auto px-2 sm:px-4 lg:px-6 pb-6 style-scroll">
             {clientData ? (
-              <div className="max-w-6xl mx-auto space-y-4">
+              <div className="max-w-6xl mx-auto space-y-3 pt-2">
                 {/* ── Compact Client Identity Bar ── */}
                 <div className="flex flex-wrap items-center justify-between gap-2.5 px-3.5 py-2.5 rounded-md border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 shadow-none">
               {/* Left: Client Identity & Chips */}
@@ -2470,22 +2464,6 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                   </Button>
                 )}
 
-                {currentUser?.privileges?.billing?.canView && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      setReportDateModalMode('print');
-                      setShowReportDateModal(true);
-                    }}
-                    className="h-7 px-2 text-xs font-semibold rounded-md border-slate-200 dark:border-slate-700"
-                  >
-                    <Printer className="w-3.5 h-3.5 sm:mr-1 text-slate-500" />
-                    <span className="hidden sm:inline">Statement PDF</span>
-                    <span className="sm:hidden">PDF</span>
-                  </Button>
-                )}
-
                 {currentUser?.privileges?.sites?.canView && (
                   <Button
                     size="sm"
@@ -2493,9 +2471,9 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                     onClick={() => navigate('/sites')}
                     className="h-7 px-2 text-xs font-semibold rounded-md border-slate-200 dark:border-slate-700"
                   >
-                    <MapPin className="w-3.5 h-3.5 sm:mr-1 text-indigo-500" />
-                    <span className="hidden sm:inline">Site Manager</span>
-                    <span className="sm:hidden">Sites</span>
+                    <Building2 className="w-3.5 h-3.5 sm:mr-1 text-indigo-500" />
+                    <span className="hidden sm:inline">Client Manager</span>
+                    <span className="sm:hidden">Clients</span>
                   </Button>
                 )}
               </div>
@@ -2543,11 +2521,11 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
               </div>
             )}
 
-            {/* ── Flat Segmented Navigation Tabs (Mobile Optimized Touch Strip) ── */}
-            <div className="flex items-center gap-1 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden touch-pan-x scroll-smooth py-1 border-b border-slate-200 dark:border-slate-800">
+            {/* ── Flat Segmented Navigation Tabs (Sticky Header Strip) ── */}
+            <div className="sticky top-0 z-20 bg-slate-50/95 dark:bg-slate-950/95 backdrop-blur-md flex items-center gap-1 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden touch-pan-x scroll-smooth py-1.5 border-b border-slate-200 dark:border-slate-800">
               {[
-                { id: 'overview', label: 'Overview', icon: Activity, show: currentUser?.privileges?.clients?.canView },
                 { id: 'timeline', label: 'Timeline & History', icon: Clock, show: currentUser?.privileges?.sites?.canView !== false },
+                { id: 'overview', label: 'Overview', icon: Activity, show: currentUser?.privileges?.clients?.canView },
                 { id: 'financials', label: 'Financials', icon: DollarSign, count: currentUser?.privileges?.billing?.canViewAmounts ? `₦${Math.round(clientData.totalRevenue).toLocaleString()}` : undefined, show: currentUser?.privileges?.billing?.canView || currentUser?.privileges?.payments?.canView },
                 { id: 'report', label: 'Client Statement', icon: Printer, show: currentUser?.privileges?.billing?.canView || currentUser?.privileges?.payments?.canView },
                 { id: 'operations', label: 'Site 360', icon: Briefcase, count: clientPendingSites.length > 0 ? `${clientPendingSites.length} onboarding` : undefined, show: currentUser?.privileges?.sites?.canView },
@@ -2588,7 +2566,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
               
               {/* TIMELINE TAB */}
               {activeTab === 'timeline' && (
-                <div className="space-y-6 transition-opacity duration-150">
+                <div className="space-y-6 animate-in fade-in-50 duration-100">
                   <ClientSitesTimeline
                     selectedClient={selectedClient}
                     onOpenSite360={setSelectedSite}
@@ -2598,7 +2576,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
 
               {/* OVERVIEW TAB */}
               {activeTab === 'overview' && (
-                <div className="space-y-6 transition-opacity duration-150">
+                <div className="space-y-6 animate-in fade-in-50 duration-100">
                   {/* KPI Cards */}
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                     <div className={cn("p-3 sm:p-5 rounded-2xl border shadow-sm min-w-0", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
@@ -2685,7 +2663,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
 
               {/* FINANCIALS TAB */}
               {activeTab === 'financials' && (
-                <div className="space-y-6 transition-opacity duration-150">
+                <div className="space-y-6 animate-in fade-in-50 duration-100">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {/* Revenue & Profit (Accrual Basis) */}
                     <div className={cn("p-6 rounded-3xl border shadow-sm flex flex-col justify-between", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>

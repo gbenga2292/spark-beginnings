@@ -49,6 +49,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   authenticateNas: (path, username, password) => ipcRenderer.invoke('updater:authenticate-nas', { path, username, password }),
   startUpdateCheck: (source) => ipcRenderer.send('updater:start-check', source),
   quitAndInstall: () => ipcRenderer.send('updater:quit-and-install'),
+  onOpenUpdateModal: (callback) => {
+    const subscription = () => callback();
+    ipcRenderer.on('updater:open-modal', subscription);
+    return () => ipcRenderer.removeListener('updater:open-modal', subscription);
+  },
   onUpdateStatus: (callback) => {
     const subscription = (_event, status) => callback(status);
     ipcRenderer.on('updater:status', subscription);

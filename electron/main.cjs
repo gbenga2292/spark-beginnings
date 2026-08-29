@@ -540,8 +540,10 @@ function initIPC() {
       const shareRoot = `\\\\${parts[0]}\\${parts[1]}`;
 
       const { exec } = require('child_process');
-      const safePassword = password.replace(/"/g, '\\"');
-      const cmd = `net use "${shareRoot}" "${safePassword}" /user:"${username}" /persistent:no`;
+      const pass = password != null ? String(password) : '';
+      const safePassword = pass.replace(/"/g, '\\"');
+      const cleanUser = (username || '').trim();
+      const cmd = `net use "${shareRoot}" "${safePassword}" /user:"${cleanUser}" /persistent:no`;
 
       exec(cmd, (error, stdout, stderr) => {
         if (error) {

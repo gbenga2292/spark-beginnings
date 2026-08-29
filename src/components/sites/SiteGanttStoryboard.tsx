@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import {
   format, parseISO, differenceInDays, addDays, subDays, startOfMonth, endOfMonth,
   eachDayOfInterval, isSameDay, isToday, isWithinInterval, eachWeekOfInterval
@@ -37,6 +37,8 @@ interface TimelineBar {
   status: 'completed' | 'active' | 'upcoming' | 'interrupted';
   details: {
     durationDays: number;
+    activeDays?: number;
+    offDays?: number;
     machineName?: string;
     dieselLitres?: number;
     reason?: string;
@@ -44,13 +46,17 @@ interface TimelineBar {
     loggedBy?: string;
     source: 'waybill' | 'journal' | 'machinelog' | 'holdperiod' | 'manual';
     rawId?: string;
+    isSwapped?: boolean;
+    swapReason?: string;
+    predecessorName?: string;
+    successorName?: string;
   };
 }
 
 export function SiteGanttStoryboard({ site }: Props) {
   const { isDark } = useTheme();
   const currentUser = useUserStore(s => s.getCurrentUser());
-  const { dailyMachineLogs, waybills, siteHoldPeriods } = useOperations();
+  const { dailyMachineLogs, waybills, siteHoldPeriods, sitePumpDates, assets, maintenanceAssets } = useOperations();
   const { siteJournalEntries, dailyJournals, siteTimelineEvents = [], addSiteTimelineEvent, deleteSiteTimelineEvent } = useAppStore();
 
   const [selectedMachine, setSelectedMachine] = useState<string>('all');
@@ -59,6 +65,63 @@ export function SiteGanttStoryboard({ site }: Props) {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [zoomScale, setZoomScale] = useState<'days' | 'weeks' | 'months'>('days');
   const [userZoomSelected, setUserZoomSelected] = useState(false);
+
+  // Drag-to-Scroll (Hand Pan) State & Handlers
+  const ganttScrollRef = useRef<HTMLDivElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStartX = useRef(0);
+  const dragStartY = useRef(0);
+  const scrollLeftRef = useRef(0);
+  const scrollTopRef = useRef(0);
+  const hasDragged = useRef(false);
+
+  const handleGanttMouseDown = (e: React.MouseEvent) => {
+    // Only capture primary left-clicks and ignore clicks with modifier keys
+    if (e.button !== 0 || e.ctrlKey || e.metaKey || window.matchMedia('(pointer: coarse)').matches) return;
+
+    const target = e.target as HTMLElement;
+    // Don't hijack interaction if clicking interactive controls like inputs or buttons inside modals
+    if (target.closest('input, select, textarea, [role="dialog"]')) return;
+
+    const container = ganttScrollRef.current;
+    if (!container) return;
+
+    dragStartX.current = e.pageX - container.offsetLeft;
+    dragStartY.current = e.pageY - container.offsetTop;
+    scrollLeftRef.current = container.scrollLeft;
+    scrollTopRef.current = container.scrollTop;
+    hasDragged.current = false;
+
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      const x = moveEvent.pageX - container.offsetLeft;
+      const y = moveEvent.pageY - container.offsetTop;
+      const walkX = x - dragStartX.current;
+      const walkY = y - dragStartY.current;
+
+      if (!hasDragged.current && (Math.abs(walkX) > 4 || Math.abs(walkY) > 4)) {
+        hasDragged.current = true;
+        setIsDragging(true);
+      }
+
+      if (hasDragged.current) {
+        moveEvent.preventDefault();
+        container.scrollLeft = scrollLeftRef.current - walkX;
+        container.scrollTop = scrollTopRef.current - walkY;
+      }
+    };
+
+    const onMouseUp = () => {
+      setTimeout(() => {
+        setIsDragging(false);
+        hasDragged.current = false;
+      }, 50);
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+    };
+
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+  };
 
   // Escape key handler for full page mode
   useEffect(() => {
@@ -128,51 +191,98 @@ export function SiteGanttStoryboard({ site }: Props) {
   // Unique machines on this site
   const machineOptions = useMemo(() => {
     const set = new Set<string>();
+    (sitePumpDates || []).filter(p => p.siteId === site.id).forEach(p => {
+      const assetObj = assets.find(a => a.id === p.assetId) || maintenanceAssets.find(ma => ma.id === p.assetId);
+      if (assetObj?.name) set.add(assetObj.name);
+    });
     siteLogs.forEach(l => {
       if (l.assetName) set.add(l.assetName);
     });
     return Array.from(set);
-  }, [siteLogs]);
+  }, [sitePumpDates, site.id, assets, maintenanceAssets, siteLogs]);
 
   // 2. Synthesize Multi-Track Timeline Bars
   const timelineBars = useMemo(() => {
     const bars: TimelineBar[] = [];
 
-    // ── Track 1: Mobilisation ──
+    // ── Track 1: Mobilisation & Setup ──
     const mobWaybills = siteWaybills.filter(w => w.type === 'waybill');
+    const mobJournals = siteJournals.filter(j => 
+      j.dewateringStage === 'mobilization' || 
+      /mobilis|mobiliz|site setup|convoy/i.test(j.narration || '')
+    );
+    const mobLogs = siteLogs.filter(l => 
+      (l as any).operationalStage === 'Initial Setup' || 
+      /setup|mobilis|mobiliz/i.test(l.issuesOnSite || '')
+    );
+
     if (mobWaybills.length > 0) {
-      const firstMob = mobWaybills[0];
-      const start = parseISO(firstMob.sentToSiteDate || firstMob.issueDate);
-      const end = mobWaybills.length > 1 
-        ? parseISO(mobWaybills[mobWaybills.length - 1].issueDate) 
-        : addDays(start, 2);
-      bars.push({
-        id: `mob-${firstMob.id}`,
-        lane: 'mobilisation',
-        title: 'Site Mobilisation & Setup',
-        subtitle: `${mobWaybills.length} waybill(s) sent`,
-        startDate: start,
-        endDate: end < start ? start : end,
-        flatBgClass: 'bg-blue-600 text-white',
-        flatBorderClass: 'border-blue-700',
-        badgeClass: 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700',
-        status: 'completed',
-        details: {
-          durationDays: Math.max(1, differenceInDays(end, start) + 1),
-          narration: firstMob.purpose || 'Equipment dispatched and staging on site',
-          source: 'waybill',
-          rawId: firstMob.id,
+      let currentMobGroup: typeof mobWaybills = [];
+      let mobBatchIndex = 1;
+
+      const flushMobGroup = () => {
+        if (currentMobGroup.length === 0) return;
+        const firstWb = currentMobGroup[0];
+        const lastWb = currentMobGroup[currentMobGroup.length - 1];
+        const start = parseISO(firstWb.sentToSiteDate || firstWb.issueDate);
+        const end = parseISO(lastWb.sentToSiteDate || lastWb.issueDate);
+        const isInitial = mobBatchIndex === 1;
+        const isSwapDelivery = currentMobGroup.some(w => /swap|replace/i.test(w.purpose || ''));
+        const spanDays = Math.max(1, differenceInDays(end, start) + 1);
+
+        bars.push({
+          id: `mob-group-${firstWb.id}`,
+          lane: 'mobilisation',
+          title: isInitial 
+            ? `Site Mobilisation & Setup` 
+            : isSwapDelivery
+            ? `Machine Swap Delivery`
+            : `Equipment Delivery #${mobBatchIndex}`,
+          subtitle: `${currentMobGroup.length} waybill(s) • ${format(start, 'dd MMM')}`,
+          startDate: start,
+          endDate: end < start ? start : end,
+          flatBgClass: isInitial ? 'bg-blue-600 text-white' : 'bg-blue-500 text-white',
+          flatBorderClass: isInitial ? 'border-blue-700' : 'border-blue-600',
+          badgeClass: 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700',
+          status: 'completed',
+          details: {
+            durationDays: spanDays,
+            narration: currentMobGroup.map(w => w.purpose || `Waybill #${(w as any).waybillNumber || w.id.slice(0, 6)}`).join(' | '),
+            source: 'waybill',
+            rawId: firstWb.id,
+          }
+        });
+
+        mobBatchIndex++;
+        currentMobGroup = [];
+      };
+
+      mobWaybills.forEach(wb => {
+        if (currentMobGroup.length === 0) {
+          currentMobGroup.push(wb);
+        } else {
+          const lastDate = parseISO(currentMobGroup[currentMobGroup.length - 1].sentToSiteDate || currentMobGroup[currentMobGroup.length - 1].issueDate);
+          const thisDate = parseISO(wb.sentToSiteDate || wb.issueDate);
+          if (differenceInDays(thisDate, lastDate) > 2) {
+            flushMobGroup();
+          }
+          currentMobGroup.push(wb);
         }
       });
-    } else {
-      const mobJournals = siteJournals.filter(j => j.dewateringStage === 'mobilization');
-      if (mobJournals.length > 0) {
-        const start = parseISO(mobJournals[0].journalDate);
-        const end = parseISO(mobJournals[mobJournals.length - 1].journalDate);
+      flushMobGroup();
+    } else if (mobJournals.length > 0 || mobLogs.length > 0) {
+      const dates = [
+        ...mobJournals.map(j => parseISO(j.journalDate)),
+        ...mobLogs.map(l => parseISO(l.date))
+      ].sort((a, b) => a.getTime() - b.getTime());
+
+      if (dates.length > 0) {
+        const start = dates[0];
+        const end = dates[dates.length - 1];
         bars.push({
-          id: `mob-journal-${mobJournals[0].id}`,
+          id: `mob-log-${start.getTime()}`,
           lane: 'mobilisation',
-          title: 'Site Mobilisation',
+          title: 'Site Setup & Mobilisation',
           startDate: start,
           endDate: end < start ? start : end,
           flatBgClass: 'bg-blue-600 text-white',
@@ -181,7 +291,7 @@ export function SiteGanttStoryboard({ site }: Props) {
           status: 'completed',
           details: {
             durationDays: Math.max(1, differenceInDays(end, start) + 1),
-            narration: mobJournals[0].narration,
+            narration: 'Site mobilization recorded in daily records',
             source: 'journal',
           }
         });
@@ -243,86 +353,197 @@ export function SiteGanttStoryboard({ site }: Props) {
     });
     flushJetGroup();
 
-    // ── Track 3: Machine Operations (Continuous Running vs Stoppages) ──
-    const filteredLogs = selectedMachine === 'all' 
-      ? siteLogs 
-      : siteLogs.filter(l => l.assetName === selectedMachine);
+    // ── Track 3: Machine Operations (Unified Continuous Operational Bar) ──
+    interface MachineSlot {
+      assetId: string;
+      assetName: string;
+      configured?: (typeof sitePumpDates)[0];
+    }
+    const machinesOnSite = new Map<string, MachineSlot>();
 
-    let activeRun: typeof filteredLogs = [];
-    let downtimeRun: typeof filteredLogs = [];
-
-    const flushActiveRun = () => {
-      if (activeRun.length === 0) return;
-      const start = parseISO(activeRun[0].date);
-      const end = parseISO(activeRun[activeRun.length - 1].date);
-      const totalDiesel = activeRun.reduce((sum, l) => sum + (l.dieselUsage || 0), 0);
-      const machineNames = Array.from(new Set(activeRun.map(l => l.assetName))).join(', ');
-
-      bars.push({
-        id: `pumping-${activeRun[0].id}`,
-        lane: 'pumping',
-        title: `Active Pumping (${activeRun.length}d)`,
-        subtitle: `${machineNames} • ${totalDiesel.toLocaleString()}L`,
-        startDate: start,
-        endDate: end < start ? start : end,
-        flatBgClass: 'bg-emerald-600 text-white',
-        flatBorderClass: 'border-emerald-700',
-        badgeClass: 'bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-700',
-        status: isWithinInterval(new Date(), { start, end }) ? 'active' : 'completed',
-        details: {
-          durationDays: Math.max(1, differenceInDays(end, start) + 1),
-          machineName: machineNames,
-          dieselLitres: totalDiesel,
-          loggedBy: activeRun[0].supervisorOnSite,
-          source: 'machinelog',
-        }
+    // 1. Load from configured sitePumpDates
+    (sitePumpDates || []).filter(p => p.siteId === site.id).forEach(p => {
+      const assetObj = assets.find(a => a.id === p.assetId) || maintenanceAssets.find(ma => ma.id === p.assetId);
+      const name = assetObj?.name || 'Equipment';
+      machinesOnSite.set(p.assetId, {
+        assetId: p.assetId,
+        assetName: name,
+        configured: p,
       });
-      activeRun = [];
-    };
+    });
 
-    const flushDowntimeRun = () => {
-      if (downtimeRun.length === 0) return;
-      const start = parseISO(downtimeRun[0].date);
-      const end = parseISO(downtimeRun[downtimeRun.length - 1].date);
-      const reasons = downtimeRun
-        .map(l => l.downtimeEntries?.map(d => d.reason).join(', ') || l.issuesOnSite || 'Machine Stoppage')
-        .filter(Boolean)
-        .join('; ');
-
-      bars.push({
-        id: `downtime-${downtimeRun[0].id}`,
-        lane: 'downtime',
-        title: `Machine Stoppage (${downtimeRun.length}d)`,
-        subtitle: reasons.slice(0, 35) + (reasons.length > 35 ? '...' : ''),
-        startDate: start,
-        endDate: end < start ? start : end,
-        flatBgClass: 'bg-rose-500 text-white',
-        flatBorderClass: 'border-rose-600',
-        badgeClass: 'bg-rose-100 text-rose-800 border-rose-200 dark:bg-rose-900/30 dark:text-rose-300 dark:border-rose-700',
-        status: 'interrupted',
-        details: {
-          durationDays: Math.max(1, differenceInDays(end, start) + 1),
-          reason: reasons,
-          source: 'machinelog',
-        }
-      });
-      downtimeRun = [];
-    };
-
-    filteredLogs.forEach((log) => {
-      const isRunning = log.isActive && log.operationalDay !== 'none';
-      if (isRunning) {
-        flushDowntimeRun();
-        activeRun.push(log);
-      } else {
-        flushActiveRun();
-        downtimeRun.push(log);
+    // 2. Add machines that have daily logs
+    siteLogs.forEach(l => {
+      const aId = l.assetId || l.assetName || 'Equipment';
+      if (!machinesOnSite.has(aId)) {
+        const matchingAsset = assets.find(a => a.name === l.assetName) || maintenanceAssets.find(ma => ma.name === l.assetName);
+        const configuredMatch = matchingAsset ? (sitePumpDates || []).find(p => p.siteId === site.id && p.assetId === matchingAsset.id) : undefined;
+        machinesOnSite.set(aId, {
+          assetId: matchingAsset?.id || aId,
+          assetName: l.assetName || 'Equipment',
+          configured: configuredMatch,
+        });
       }
     });
-    flushActiveRun();
-    flushDowntimeRun();
 
-    // ── Track 4: Site Holds / Suspensions ──
+    // Filter by selected machine if not 'all'
+    const targetMachines = Array.from(machinesOnSite.values()).filter(m => {
+      if (selectedMachine === 'all') return true;
+      return m.assetName === selectedMachine || m.assetId === selectedMachine;
+    });
+
+    targetMachines.forEach((machine) => {
+      const { assetId, assetName, configured } = machine;
+      const mLogs = siteLogs
+        .filter(l => (l.assetId && l.assetId === assetId) || l.assetName === assetName)
+        .sort((a, b) => a.date.localeCompare(b.date));
+
+      // Determine Master Start Date
+      let start: Date | null = null;
+      if (configured?.pumpStartDate) {
+        start = parseISO(configured.pumpStartDate);
+      } else if (mLogs.length > 0) {
+        start = parseISO(mLogs[0].date);
+      }
+
+      if (!start) return;
+
+      // Determine Master End Date
+      let end: Date | null = null;
+      if (configured?.pumpStopDate) {
+        end = parseISO(configured.pumpStopDate);
+      } else if (site.status === 'Ended' && site.endDate) {
+        end = parseISO(site.endDate);
+      } else if (mLogs.length > 0) {
+        const lastLogDate = parseISO(mLogs[mLogs.length - 1].date);
+        end = lastLogDate;
+      } else {
+        end = addDays(start, 7);
+      }
+
+      if (end < start) end = start;
+
+      // Calculate Net Running Stats over this machine's tenure
+      const activeDays = mLogs.reduce((acc, l) => {
+        const day = l.operationalDay ?? (l.isActive ? 'full' : 'none');
+        return acc + (day === 'full' ? 1 : day === 'half' ? 0.5 : 0);
+      }, 0);
+
+      const offDays = mLogs.filter(l => {
+        const day = l.operationalDay ?? (l.isActive ? 'full' : 'none');
+        return day === 'none';
+      }).length;
+
+      const totalDiesel = mLogs.reduce((sum, l) => sum + (Number(l.dieselUsage) || 0), 0);
+      const totalSpanDays = Math.max(1, differenceInDays(end, start) + 1);
+
+      // Check Machine Swap / Lineage Relationships
+      const predecessorId = configured?.replacedAssetId;
+      const immediatePredecessor = predecessorId
+        ? assets.find(a => a.id === predecessorId) || maintenanceAssets.find(ma => ma.id === predecessorId)
+        : null;
+
+      const successorRecord = (sitePumpDates || []).find(p => p.siteId === site.id && p.replacedAssetId === assetId);
+      const successorMachine = successorRecord
+        ? assets.find(a => a.id === successorRecord.assetId) || maintenanceAssets.find(ma => ma.id === successorRecord.assetId)
+        : null;
+
+      const isSwapped = !!immediatePredecessor;
+      const isReplaced = !!successorRecord;
+
+      // Build Subtitle
+      const subtitleParts: string[] = [assetName];
+      if (totalDiesel > 0) subtitleParts.push(`${totalDiesel.toLocaleString()}L`);
+      if (isSwapped) subtitleParts.push(`🔄 Swapped in (Replaced ${immediatePredecessor?.name || 'Unit'})`);
+      if (isReplaced) subtitleParts.push(`➡️ Swapped out (Replaced by ${successorMachine?.name || 'New Unit'})`);
+
+      // ── Continuous Operational Pumping Bar ──
+      bars.push({
+        id: `pumping-${assetId}`,
+        lane: 'pumping',
+        title: `Active Pumping (${totalSpanDays}d Span · ${activeDays}d Active${offDays > 0 ? ` · ${offDays}d Off` : ''})`,
+        subtitle: subtitleParts.join(' • '),
+        startDate: start,
+        endDate: end,
+        flatBgClass: 'bg-emerald-600 hover:bg-emerald-700 text-white',
+        flatBorderClass: 'border-emerald-700 shadow-xs',
+        badgeClass: 'bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-700',
+        status: (site.status !== 'Ended' && (!configured?.pumpStopDate || isWithinInterval(new Date(), { start, end }))) ? 'active' : 'completed',
+        details: {
+          durationDays: totalSpanDays,
+          activeDays,
+          offDays,
+          machineName: assetName,
+          dieselLitres: totalDiesel,
+          loggedBy: mLogs[0]?.supervisorOnSite,
+          source: 'machinelog',
+          rawId: mLogs[0]?.id,
+          isSwapped,
+          swapReason: configured?.swapReason,
+          predecessorName: immediatePredecessor?.name,
+          successorName: successorMachine?.name,
+          narration: isSwapped 
+            ? `Swapped into operation (replacing ${immediatePredecessor?.name || 'previous unit'})${configured?.swapReason ? `: ${configured.swapReason}` : ''}`
+            : isReplaced
+            ? `Swapped out of operation on ${successorRecord?.pumpStartDate ? format(parseISO(successorRecord.pumpStartDate), 'dd MMM yyyy') : 'site'} (replaced by ${successorMachine?.name || 'next unit'})`
+            : undefined,
+        }
+      });
+
+      // ── Track 4: Stoppage & Off-Days (Event Overlays) ──
+      let downtimeGroup: typeof mLogs = [];
+      const flushDowntimeGroup = () => {
+        if (downtimeGroup.length === 0) return;
+        const dStart = parseISO(downtimeGroup[0].date);
+        const dEnd = parseISO(downtimeGroup[downtimeGroup.length - 1].date);
+        const reasons = Array.from(new Set(
+          downtimeGroup
+            .map(l => l.downtimeEntries?.map(d => d.reason).join(', ') || l.issuesOnSite || 'Machine Stoppage')
+            .filter(Boolean)
+        )).join('; ');
+
+        bars.push({
+          id: `downtime-${assetId}-${downtimeGroup[0].id}`,
+          lane: 'downtime',
+          title: `Machine Stoppage (${downtimeGroup.length}d)`,
+          subtitle: `${assetName}${reasons ? `: ${reasons.slice(0, 35)}` : ''}`,
+          startDate: dStart,
+          endDate: dEnd < dStart ? dStart : dEnd,
+          flatBgClass: 'bg-rose-600 hover:bg-rose-700 text-white',
+          flatBorderClass: 'border-rose-700 shadow-xs',
+          badgeClass: 'bg-rose-100 text-rose-800 border-rose-200 dark:bg-rose-900/30 dark:text-rose-300 dark:border-rose-700',
+          status: 'interrupted',
+          details: {
+            durationDays: Math.max(1, differenceInDays(dEnd, dStart) + 1),
+            machineName: assetName,
+            reason: reasons || 'Turned off / Stoppage',
+            source: 'machinelog',
+            rawId: downtimeGroup[0].id,
+            loggedBy: downtimeGroup[0].supervisorOnSite,
+          }
+        });
+        downtimeGroup = [];
+      };
+
+      mLogs.forEach(log => {
+        const isOff = !log.isActive || log.operationalDay === 'none';
+        if (isOff) {
+          if (downtimeGroup.length > 0) {
+            const prevDate = parseISO(downtimeGroup[downtimeGroup.length - 1].date);
+            const currDate = parseISO(log.date);
+            if (differenceInDays(currDate, prevDate) > 2) {
+              flushDowntimeGroup();
+            }
+          }
+          downtimeGroup.push(log);
+        } else {
+          flushDowntimeGroup();
+        }
+      });
+      flushDowntimeGroup();
+    });
+
+    // ── Track 5: Site Holds / Suspensions ──
     siteHolds.forEach((hold) => {
       const start = parseISO(hold.holdStart);
       const end = hold.holdEnd ? parseISO(hold.holdEnd) : new Date();
@@ -348,28 +569,118 @@ export function SiteGanttStoryboard({ site }: Props) {
       });
     });
 
-    // ── Track 5: Demobilisation ──
+    // ── Track 6: Demobilisation & Recovery ──
     const returnWaybills = siteWaybills.filter(w => w.type === 'return');
+    const demobLogs = siteLogs.filter(l => 
+      (l as any).operationalStage === 'Completion / Demobilization'
+    );
+    const demobJournals = siteJournals.filter(j => 
+      (j.dewateringStage as any) === 'demobilization' || (j.dewateringStage as any) === 'Completion / Demobilization'
+    );
+
+    // 1. Group return waybills by clustered dates (gap <= 2 days)
     if (returnWaybills.length > 0) {
-      const start = parseISO(returnWaybills[0].issueDate);
-      const end = parseISO(returnWaybills[returnWaybills.length - 1].issueDate);
-      bars.push({
-        id: `demob-${returnWaybills[0].id}`,
-        lane: 'demob',
-        title: `Demobilisation & Recovery`,
-        subtitle: `${returnWaybills.length} return waybill(s)`,
-        startDate: start,
-        endDate: end < start ? start : end,
-        flatBgClass: 'bg-indigo-600 text-white',
-        flatBorderClass: 'border-indigo-700',
-        badgeClass: 'bg-indigo-100 text-indigo-800 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-300 dark:border-indigo-700',
-        status: site.status === 'Ended' ? 'completed' : 'active',
-        details: {
-          durationDays: Math.max(1, differenceInDays(end, start) + 1),
-          narration: 'Equipment retrieved and returned from site',
-          source: 'waybill',
+      let currentReturnGroup: typeof returnWaybills = [];
+      let returnBatchIndex = 1;
+
+      const flushReturnGroup = () => {
+        if (currentReturnGroup.length === 0) return;
+        const firstWb = currentReturnGroup[0];
+        const lastWb = currentReturnGroup[currentReturnGroup.length - 1];
+        const start = parseISO(firstWb.sentToSiteDate || firstWb.issueDate);
+        const end = parseISO(lastWb.sentToSiteDate || lastWb.issueDate);
+        const isSwapReturn = currentReturnGroup.some(w => /swap|replac/i.test(w.purpose || ''));
+        const spanDays = Math.max(1, differenceInDays(end, start) + 1);
+
+        bars.push({
+          id: `demob-group-${firstWb.id}`,
+          lane: 'demob',
+          title: isSwapReturn
+            ? `Swapped Machine Return (${firstWb.items?.[0]?.assetName || 'Equipment'})`
+            : returnWaybills.length === currentReturnGroup.length && site.status === 'Ended'
+            ? `Site Demobilisation & Recovery`
+            : `Equipment Return / Retrieval #${returnBatchIndex}`,
+          subtitle: `${currentReturnGroup.length} return waybill(s) • ${format(start, 'dd MMM')}`,
+          startDate: start,
+          endDate: end < start ? start : end,
+          flatBgClass: isSwapReturn ? 'bg-indigo-500 text-white' : 'bg-indigo-600 text-white',
+          flatBorderClass: isSwapReturn ? 'border-indigo-600' : 'border-indigo-700',
+          badgeClass: 'bg-indigo-100 text-indigo-800 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-300 dark:border-indigo-700',
+          status: site.status === 'Ended' ? 'completed' : 'active',
+          details: {
+            durationDays: spanDays,
+            narration: currentReturnGroup.map(w => w.purpose || `Return Waybill #${(w as any).waybillNumber || w.id.slice(0, 6)}`).join(' | '),
+            source: 'waybill',
+            rawId: firstWb.id,
+          }
+        });
+
+        returnBatchIndex++;
+        currentReturnGroup = [];
+      };
+
+      returnWaybills.forEach(wb => {
+        if (currentReturnGroup.length === 0) {
+          currentReturnGroup.push(wb);
+        } else {
+          const lastDate = parseISO(currentReturnGroup[currentReturnGroup.length - 1].sentToSiteDate || currentReturnGroup[currentReturnGroup.length - 1].issueDate);
+          const thisDate = parseISO(wb.sentToSiteDate || wb.issueDate);
+          if (differenceInDays(thisDate, lastDate) > 2) {
+            flushReturnGroup();
+          }
+          currentReturnGroup.push(wb);
         }
       });
+      flushReturnGroup();
+    }
+
+    // 2. Operational demobilisation stages from daily logs / journals (clustered consecutive days)
+    if (demobLogs.length > 0 || demobJournals.length > 0) {
+      const dates = Array.from(new Set([
+        ...demobLogs.map(l => l.date),
+        ...demobJournals.map(j => j.journalDate)
+      ])).sort();
+
+      let currentStageGroup: string[] = [];
+      const flushStageGroup = () => {
+        if (currentStageGroup.length === 0) return;
+        const start = parseISO(currentStageGroup[0]);
+        const end = parseISO(currentStageGroup[currentStageGroup.length - 1]);
+        const spanDays = Math.max(1, differenceInDays(end, start) + 1);
+
+        bars.push({
+          id: `demob-stage-${currentStageGroup[0]}`,
+          lane: 'demob',
+          title: `Demobilisation Operational Work`,
+          subtitle: `${spanDays} day(s) on-site extraction & packing`,
+          startDate: start,
+          endDate: end < start ? start : end,
+          flatBgClass: 'bg-indigo-700 text-white',
+          flatBorderClass: 'border-indigo-800',
+          badgeClass: 'bg-indigo-100 text-indigo-800 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-300 dark:border-indigo-700',
+          status: 'completed',
+          details: {
+            durationDays: spanDays,
+            narration: 'Wellpoint extraction and equipment packing logged in daily operations',
+            source: 'machinelog',
+          }
+        });
+        currentStageGroup = [];
+      };
+
+      dates.forEach(d => {
+        if (currentStageGroup.length === 0) {
+          currentStageGroup.push(d);
+        } else {
+          const lastDate = parseISO(currentStageGroup[currentStageGroup.length - 1]);
+          const thisDate = parseISO(d);
+          if (differenceInDays(thisDate, lastDate) > 2) {
+            flushStageGroup();
+          }
+          currentStageGroup.push(d);
+        }
+      });
+      flushStageGroup();
     }
 
     // ── Track Manual Events ──
@@ -410,7 +721,7 @@ export function SiteGanttStoryboard({ site }: Props) {
     });
 
     return bars.sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
-  }, [siteWaybills, siteJournals, siteLogs, siteHolds, manualEvents, selectedMachine, site.status]);
+  }, [siteWaybills, siteJournals, siteLogs, siteHolds, manualEvents, selectedMachine, site.status, site.endDate, sitePumpDates, assets, maintenanceAssets]);
 
   // 3. Compute Project Time Bounds
   const { minDate, maxDate, totalDaysSpan } = useMemo(() => {
@@ -515,8 +826,14 @@ export function SiteGanttStoryboard({ site }: Props) {
 
   // 4. Calculate KPIs
   const kpis = useMemo(() => {
-    const totalPumpingDays = siteLogs.filter(l => l.isActive && l.operationalDay !== 'none').length;
-    const totalDowntimeDays = siteLogs.filter(l => !l.isActive || l.operationalDay === 'none').length;
+    const uniquePumpingDates = new Set(
+      siteLogs.filter(l => l.isActive && l.operationalDay !== 'none').map(l => l.date)
+    );
+    const uniqueDowntimeDates = new Set(
+      siteLogs.filter(l => !l.isActive || l.operationalDay === 'none').map(l => l.date)
+    );
+    const totalPumpingDays = uniquePumpingDates.size;
+    const totalDowntimeDays = uniqueDowntimeDates.size;
     const totalDiesel = siteLogs.reduce((sum, l) => sum + (l.dieselUsage || 0), 0);
     const jettingCount = timelineBars.filter(b => b.lane === 'jetting').length;
     const holdCount = siteHolds.length;
@@ -551,13 +868,13 @@ export function SiteGanttStoryboard({ site }: Props) {
       eventType: manualForm.eventType,
       startDate: manualForm.startDate,
       endDate: manualForm.endDate || manualForm.startDate,
-      notes: manualForm.notes.trim(),
+      notes: manualForm.notes,
       loggedBy: currentUser?.name || 'Admin',
       createdAt: new Date().toISOString(),
     };
 
     addSiteTimelineEvent(newEvent);
-    toast.success('Milestone event recorded on Storyboard');
+    toast.success('Milestone event saved');
     setShowAddModal(false);
     setManualForm({
       title: '',
@@ -575,20 +892,148 @@ export function SiteGanttStoryboard({ site }: Props) {
     setActiveBar(null);
   };
 
-  // Helper to compute percentage position on horizontal timeline
+  // Helper to compute percentage and pixel position on horizontal timeline
   const getBarLayout = (barStart: Date, barEnd: Date) => {
     const totalMs = maxDate.getTime() - minDate.getTime();
-    if (totalMs <= 0) return { left: '0%', width: '100%' };
+    if (totalMs <= 0) return { left: '0%', width: '100%', leftPx: 0, approxPx: 100 };
 
     const startOffset = Math.max(0, barStart.getTime() - minDate.getTime());
     const endOffset = Math.min(totalMs, addDays(barEnd, 1).getTime() - minDate.getTime());
 
     const leftPercent = (startOffset / totalMs) * 100;
-    const widthPercent = Math.max(1.8, ((endOffset - startOffset) / totalMs) * 100);
+    const widthPercent = Math.max(0.6, ((endOffset - startOffset) / totalMs) * 100);
+    const leftPx = (startOffset / totalMs) * gridContainerWidth;
+    const approxPx = Math.max(36, (widthPercent / 100) * gridContainerWidth);
 
     return {
-      left: `${leftPercent.toFixed(2)}%`,
-      width: `${widthPercent.toFixed(2)}%`,
+      left: `${leftPercent.toFixed(3)}%`,
+      width: `${widthPercent.toFixed(3)}%`,
+      leftPx,
+      approxPx,
+    };
+  };
+
+  // Sub-track bin-packing helper to eliminate overlapping sibling bars (pixel & time aware)
+  const packLaneBars = (bars: TimelineBar[]) => {
+    if (bars.length === 0) return { barsWithTrack: [], totalTracks: 1 };
+    const sorted = [...bars].sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
+    const trackEndPixels: number[] = [];
+    const barsWithTrack: { bar: TimelineBar; trackIndex: number; left: string; width: string; approxPx: number }[] = [];
+
+    const minBarWidthPx = 38;
+    const gapBufferPx = 6;
+
+    sorted.forEach((b) => {
+      const { left, width, leftPx, approxPx } = getBarLayout(b.startDate, b.endDate);
+      const renderedWidth = Math.max(minBarWidthPx, approxPx);
+      const rightPx = leftPx + renderedWidth;
+
+      let assigned = -1;
+      for (let i = 0; i < trackEndPixels.length; i++) {
+        if (leftPx >= trackEndPixels[i] + gapBufferPx) {
+          assigned = i;
+          trackEndPixels[i] = rightPx;
+          break;
+        }
+      }
+
+      if (assigned === -1) {
+        assigned = trackEndPixels.length;
+        trackEndPixels.push(rightPx);
+      }
+
+      barsWithTrack.push({ bar: b, trackIndex: assigned, left, width, approxPx });
+    });
+
+    return {
+      barsWithTrack,
+      totalTracks: Math.max(1, trackEndPixels.length),
+    };
+  };
+
+  // Machine-aware sub-track packing helper: gives each machine its own dedicated row(s)
+  const packMachineLaneBars = (laneBars: TimelineBar[], availableMachines: string[]) => {
+    if (laneBars.length === 0) return { barsWithTrack: [], totalTracks: 1, machineRows: [] };
+
+    // Get unique machines present in these bars, preserving availableMachines order
+    const machinesInBars = Array.from(new Set(laneBars.map(b => b.details.machineName).filter(Boolean))) as string[];
+    const orderedMachines = availableMachines.filter(m => machinesInBars.includes(m));
+    if (orderedMachines.length === 0 && machinesInBars.length > 0) {
+      orderedMachines.push(...machinesInBars);
+    }
+    const fallbackBars = laneBars.filter(b => !b.details.machineName);
+
+    const barsWithTrack: { bar: TimelineBar; trackIndex: number; left: string; width: string; approxPx: number; machineName?: string }[] = [];
+    const machineRows: { machineName: string; startTrack: number; trackCount: number }[] = [];
+
+    let currentTrackOffset = 0;
+
+    orderedMachines.forEach(machineName => {
+      const machineBars = laneBars.filter(b => b.details.machineName === machineName);
+      if (machineBars.length === 0) return;
+
+      // In downtime/stoppage lane, strictly keep 1 single clean row per machine (no vertical stacking)
+      if (laneBars[0]?.lane === 'downtime') {
+        machineBars.forEach(b => {
+          const { left, width, approxPx } = getBarLayout(b.startDate, b.endDate);
+          barsWithTrack.push({
+            bar: b,
+            trackIndex: currentTrackOffset,
+            left,
+            width,
+            approxPx,
+            machineName,
+          });
+        });
+        machineRows.push({
+          machineName,
+          startTrack: currentTrackOffset,
+          trackCount: 1,
+        });
+        currentTrackOffset += 1;
+        return;
+      }
+
+      const { barsWithTrack: packed, totalTracks } = packLaneBars(machineBars);
+
+      packed.forEach(p => {
+        barsWithTrack.push({
+          ...p,
+          trackIndex: currentTrackOffset + p.trackIndex,
+          machineName,
+        });
+      });
+
+      machineRows.push({
+        machineName,
+        startTrack: currentTrackOffset,
+        trackCount: totalTracks,
+      });
+
+      currentTrackOffset += totalTracks;
+    });
+
+    if (fallbackBars.length > 0) {
+      const { barsWithTrack: packed, totalTracks } = packLaneBars(fallbackBars);
+      packed.forEach(p => {
+        barsWithTrack.push({
+          ...p,
+          trackIndex: currentTrackOffset + p.trackIndex,
+          machineName: 'General',
+        });
+      });
+      machineRows.push({
+        machineName: 'General',
+        startTrack: currentTrackOffset,
+        trackCount: totalTracks,
+      });
+      currentTrackOffset += totalTracks;
+    }
+
+    return {
+      barsWithTrack,
+      totalTracks: Math.max(1, currentTrackOffset),
+      machineRows,
     };
   };
 
@@ -801,12 +1246,17 @@ export function SiteGanttStoryboard({ site }: Props) {
         </div>
       </div>
 
-      {/* ── Main Gantt Chart Grid (Flat Clean UI) ── */}
+      {/* ── Main Gantt Chart Grid (Flat Clean UI with Hand Drag-to-Scroll) ── */}
       {viewMode === 'gantt' ? (
-        <div className={cn(
-          "rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm overflow-auto style-scroll relative",
-          isFullscreen ? "max-h-[calc(100vh-140px)]" : "max-h-[calc(100vh-230px)] min-h-[520px]"
-        )}>
+        <div
+          ref={ganttScrollRef}
+          onMouseDown={handleGanttMouseDown}
+          className={cn(
+            "rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm overflow-auto style-scroll relative",
+            isDragging ? "cursor-grabbing select-none" : "cursor-grab",
+            isFullscreen ? "max-h-[calc(100vh-140px)]" : "max-h-[calc(100vh-230px)] min-h-[520px]"
+          )}
+        >
           <div style={{ minWidth: `${gridContainerWidth + 230}px` }}>
             {/* Timeline Header (Months & Days) */}
             <div className="grid grid-cols-[230px_1fr] border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/80 sticky top-0 z-30 shadow-xs">
@@ -893,7 +1343,12 @@ export function SiteGanttStoryboard({ site }: Props) {
                     style={{ left: `calc(230px + (100% - 230px) * ${parseFloat(todayPercent) / 100})` }}
                     className="absolute top-0 bottom-0 w-[2px] bg-orange-500 z-10 pointer-events-none"
                   >
-                    <div className="sticky top-12 -translate-x-1/2 px-2 py-0.5 rounded bg-orange-500 text-white text-[9px] font-bold uppercase tracking-wider shadow-sm whitespace-nowrap">
+                    <div 
+                      className="sticky top-12 px-2 py-0.5 rounded-md bg-orange-500 text-white text-[9.5px] font-black uppercase tracking-wider shadow-md whitespace-nowrap z-20 flex items-center justify-center pointer-events-auto"
+                      style={{
+                        transform: parseFloat(todayPercent) > 90 ? 'translateX(-85%)' : parseFloat(todayPercent) < 10 ? 'translateX(-15%)' : 'translateX(-50%)'
+                      }}
+                    >
                       TODAY
                     </div>
                   </div>
@@ -901,60 +1356,189 @@ export function SiteGanttStoryboard({ site }: Props) {
 
                 {lanes.map((lane) => {
                   const laneBars = timelineBars.filter(b => b.lane === lane.id);
+                  const isMachineLane = lane.id === 'pumping' || lane.id === 'downtime';
+                  const { barsWithTrack, totalTracks, machineRows } = isMachineLane
+                    ? packMachineLaneBars(laneBars, machineOptions)
+                    : { ...packLaneBars(laneBars), machineRows: [] };
+
+                  const trackRowHeight = 42;
+                  const laneMinHeight = Math.max(64, totalTracks * trackRowHeight + 16);
 
                   return (
                     <div
                       key={lane.id}
-                      className="grid grid-cols-[230px_1fr] min-h-[64px] transition-colors hover:bg-slate-50/50 dark:hover:bg-slate-800/20"
+                      style={{ minHeight: `${laneMinHeight}px` }}
+                      className="grid grid-cols-[230px_1fr] transition-colors hover:bg-slate-50/50 dark:hover:bg-slate-800/20"
                     >
                       {/* Lane Label */}
-                      <div className="p-3 border-r border-slate-200 dark:border-slate-800 flex flex-col justify-center bg-white dark:bg-slate-900">
-                        <div className="flex items-center gap-2 font-semibold text-xs text-slate-800 dark:text-slate-100">
-                          {lane.icon}
-                          <span>{lane.name}</span>
+                      <div className="p-3 border-r border-slate-200 dark:border-slate-800 flex flex-col justify-between bg-white dark:bg-slate-900">
+                        <div>
+                          <div className="flex items-center gap-2 font-semibold text-xs text-slate-800 dark:text-slate-100">
+                            {lane.icon}
+                            <span>{lane.name}</span>
+                          </div>
+                          <span className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5 line-clamp-1">{lane.desc}</span>
                         </div>
-                        <span className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5 line-clamp-1">{lane.desc}</span>
+
+                        {/* Dedicated Machine Row Indicators on the left if multiple machines */}
+                        {isMachineLane && machineRows.length > 1 && (
+                          <div className="mt-2 space-y-1 pt-1.5 border-t border-slate-100 dark:border-slate-800/80">
+                            {machineRows.map(mr => (
+                              <div key={mr.machineName} className="flex items-center gap-1.5 text-[10.5px] text-slate-600 dark:text-slate-300 truncate">
+                                <span className={cn(
+                                  "w-1.5 h-1.5 rounded-full shrink-0",
+                                  lane.id === 'pumping' ? "bg-emerald-500" : "bg-rose-500"
+                                )} />
+                                <span className="truncate font-semibold">{mr.machineName}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
 
                       {/* Lane Timeline Track with vertical day grid guides */}
-                      <div className="relative py-2.5 px-1 flex items-center min-h-[58px]">
-                        {laneBars.length === 0 ? (
+                      <div className="relative p-2 flex items-center" style={{ minHeight: `${laneMinHeight}px` }}>
+                        {/* Sub-row horizontal guidelines if multiple tracks */}
+                        {totalTracks > 1 && (
+                          <div className="absolute inset-0 pointer-events-none">
+                            {Array.from({ length: totalTracks }).map((_, rIdx) => (
+                              <div
+                                key={rIdx}
+                                style={{ top: `${rIdx * trackRowHeight}px`, height: `${trackRowHeight}px` }}
+                                className="absolute left-0 right-0 border-b border-slate-100/80 dark:border-slate-800/40 flex items-center px-3"
+                              >
+                                {isMachineLane && machineRows.length > 1 && (
+                                  <span className="text-[9.5px] font-bold text-slate-300/80 dark:text-slate-600 select-none uppercase tracking-wider">
+                                    {machineRows.find(mr => mr.startTrack === rIdx)?.machineName || ''}
+                                  </span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Background Date Grid Alignment Guides */}
+                        {zoomScale === 'days' && (
+                          <div className="absolute inset-0 flex pointer-events-none opacity-40">
+                            {calendarDays.map((day, idx) => {
+                              const isWk = day.getDay() === 0 || day.getDay() === 6;
+                              return (
+                                <div
+                                  key={idx}
+                                  style={{ width: `${(1 / calendarDays.length) * 100}%` }}
+                                  className={cn(
+                                    "h-full border-r border-slate-100 dark:border-slate-800/40",
+                                    isWk && "bg-slate-50/60 dark:bg-slate-800/20"
+                                  )}
+                                />
+                              );
+                            })}
+                          </div>
+                        )}
+                        {zoomScale === 'weeks' && (
+                          <div className="absolute inset-0 flex pointer-events-none opacity-40">
+                            {calendarWeeks.map((_, idx) => (
+                              <div
+                                key={idx}
+                                style={{ width: `${(7 / calendarDays.length) * 100}%` }}
+                                className="h-full border-r border-slate-200/60 dark:border-slate-800/50"
+                              />
+                            ))}
+                          </div>
+                        )}
+
+                        {barsWithTrack.length === 0 ? (
                           <div className="text-xs text-slate-400 italic pl-3 select-none">
                             No records in this phase
                           </div>
                         ) : (
-                          laneBars.map((bar) => {
-                            const { left, width } = getBarLayout(bar.startDate, bar.endDate);
+                          barsWithTrack.map(({ bar, trackIndex, left, width, approxPx }) => {
+                            const topOffset = trackIndex * trackRowHeight + 6;
+                            const isMicro = approxPx < 44;
+                            const isCompact = approxPx >= 44 && approxPx < 85;
+                            const isMedium = approxPx >= 85 && approxPx < 165;
+
+                            const tooltipText = `${bar.title} (${bar.details.durationDays}d)\n${format(bar.startDate, 'MMM d, yyyy')} – ${format(bar.endDate, 'MMM d, yyyy')}${bar.subtitle ? `\n${bar.subtitle}` : ''}${bar.details.reason ? `\nReason: ${bar.details.reason}` : ''}`;
 
                             return (
                               <button
                                 key={bar.id}
-                                onClick={() => setActiveBar(bar)}
-                                style={{ left, width }}
+                                onClick={(e) => {
+                                  if (hasDragged.current) {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    return;
+                                  }
+                                  setActiveBar(bar);
+                                }}
+                                title={tooltipText}
+                                style={{
+                                  left,
+                                  width,
+                                  top: `${topOffset}px`,
+                                  minWidth: '38px',
+                                  height: '32px'
+                                }}
                                 className={cn(
-                                  "absolute h-9 rounded-lg px-2.5 flex items-center justify-between gap-1.5",
-                                  "border text-left shadow-xs transition-all hover:brightness-105 hover:z-20 cursor-pointer",
+                                  "absolute rounded-lg px-2 flex items-center justify-between gap-1.5 font-sans",
+                                  "border text-left shadow-xs transition-all hover:brightness-105 hover:shadow-md hover:z-20 cursor-pointer overflow-hidden select-none active:scale-[0.98]",
                                   bar.flatBgClass,
                                   bar.flatBorderClass
                                 )}
                               >
-                                <div className="min-w-0 flex-1">
-                                  <div className="text-xs font-bold truncate leading-tight flex items-center gap-1.5">
+                                {isMicro ? (
+                                  /* Micro Pill (< 44px): Clean Centered Duration Badge with Dot */
+                                  <div className="w-full flex items-center justify-center gap-1 font-bold text-[10px] text-white whitespace-nowrap">
                                     {bar.status === 'active' && (
-                                      <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping inline-block" />
+                                      <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping shrink-0" />
                                     )}
-                                    <span className="truncate">{bar.title}</span>
+                                    <span>{bar.details.durationDays}d</span>
                                   </div>
-                                  {bar.subtitle && (
-                                    <div className="text-[10px] opacity-90 truncate leading-tight font-normal">
-                                      {bar.subtitle}
+                                ) : isCompact ? (
+                                  /* Compact Pill (44px - 85px): Short Text or Clean Badge */
+                                  <div className="w-full flex items-center justify-between gap-1 min-w-0">
+                                    <span className="text-[10.5px] font-bold truncate text-white min-w-0">
+                                      {bar.title.replace(/Campaign #\d+/, '').replace('Site ', '').replace('Machine ', '').replace('Initial ', '').trim()}
+                                    </span>
+                                    <span className="text-[9.5px] font-extrabold px-1 py-0.5 rounded bg-black/25 text-white shrink-0 font-mono">
+                                      {bar.details.durationDays}d
+                                    </span>
+                                  </div>
+                                ) : isMedium ? (
+                                  /* Medium Pill (85px - 165px): Title + Duration Badge */
+                                  <>
+                                    <div className="min-w-0 flex-1 flex items-center gap-1.5 text-xs font-bold truncate text-white">
+                                      {bar.status === 'active' && (
+                                        <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping shrink-0" />
+                                      )}
+                                      <span className="truncate whitespace-nowrap">{bar.title}</span>
                                     </div>
-                                  )}
-                                </div>
+                                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-black/25 text-white shrink-0 font-mono">
+                                      {bar.details.durationDays}d
+                                    </span>
+                                  </>
+                                ) : (
+                                  /* Full Pill (> 165px): Title + Subtitle + Duration Badge */
+                                  <>
+                                    <div className="min-w-0 flex-1">
+                                      <div className="text-xs font-bold truncate leading-tight flex items-center gap-1.5 text-white">
+                                        {bar.status === 'active' && (
+                                          <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping inline-block shrink-0" />
+                                        )}
+                                        <span className="truncate whitespace-nowrap">{bar.title}</span>
+                                      </div>
+                                      {bar.subtitle && (
+                                        <div className="text-[10px] opacity-90 truncate leading-tight font-normal text-white/90 whitespace-nowrap mt-0.5">
+                                          {bar.subtitle}
+                                        </div>
+                                      )}
+                                    </div>
 
-                                <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-black/20 text-white whitespace-nowrap">
-                                  {bar.details.durationDays}d
-                                </span>
+                                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-black/25 text-white whitespace-nowrap shrink-0 font-mono">
+                                      {bar.details.durationDays}d
+                                    </span>
+                                  </>
+                                )}
                               </button>
                             );
                           })
@@ -1065,6 +1649,42 @@ export function SiteGanttStoryboard({ site }: Props) {
                   <span className="font-bold text-indigo-600 dark:text-indigo-400 text-sm">{activeBar.details.durationDays} Days</span>
                 </div>
               </div>
+
+              {activeBar.details.activeDays !== undefined && (
+                <div className="grid grid-cols-3 gap-2 p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-center">
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Total Span</span>
+                    <span className="text-xs font-bold text-slate-800 dark:text-slate-100">{activeBar.details.durationDays}d</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-emerald-600 dark:text-emerald-400 block">Active Days</span>
+                    <span className="text-xs font-bold text-emerald-700 dark:text-emerald-300">{activeBar.details.activeDays}d</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-rose-600 dark:text-rose-400 block">Off / Stoppage</span>
+                    <span className="text-xs font-bold text-rose-700 dark:text-rose-300">{activeBar.details.offDays || 0}d</span>
+                  </div>
+                </div>
+              )}
+
+              {activeBar.details.isSwapped && (
+                <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-300">
+                  <span className="text-[10px] uppercase font-bold block mb-0.5">🔄 Machine Swap Record</span>
+                  <p className="text-xs font-medium">
+                    Swapped into site to replace <strong>{activeBar.details.predecessorName || 'previous machine'}</strong>
+                    {activeBar.details.swapReason ? ` (${activeBar.details.swapReason})` : ''}
+                  </p>
+                </div>
+              )}
+
+              {activeBar.details.successorName && (
+                <div className="p-3 rounded-lg bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-800 text-indigo-900 dark:text-indigo-300">
+                  <span className="text-[10px] uppercase font-bold block mb-0.5">➡️ Machine Lineage Notice</span>
+                  <p className="text-xs font-medium">
+                    Later swapped out and replaced by <strong>{activeBar.details.successorName}</strong>
+                  </p>
+                </div>
+              )}
 
               {activeBar.details.machineName && (
                 <div>

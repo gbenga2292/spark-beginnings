@@ -203,6 +203,9 @@ function FormattedAiMessage({ text }: { text: string }) {
   return <div className="space-y-0.5 text-[11.5px]">{renderedElements}</div>;
 }
 
+let cachedApiKeys: any[] | null = null;
+let lastApiKeyFetch = 0;
+
 export function DailyLogsAiModal({ initialSiteId, initialDate, onClose, isEmbedded = false }: Props) {
   const { isDark } = useTheme();
   const { sites, siteJournalEntries = [] } = useAppStore();
@@ -224,14 +227,21 @@ export function DailyLogsAiModal({ initialSiteId, initialDate, onClose, isEmbedd
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Load configured keys on mount
+  // Load configured keys with memory cache (refresh every 5 mins max)
   useEffect(() => {
     async function loadApiKeys() {
       try {
-        let { data: keys } = await supabase.from('api_keys').select('*');
-        if (!keys || keys.length === 0) {
-          const res = await supabase.from('ai_provider_keys').select('*');
-          keys = res.data;
+        const now = Date.now();
+        let keys = cachedApiKeys;
+        if (!keys || (now - lastApiKeyFetch > 5 * 60 * 1000)) {
+          let { data: dbKeys } = await supabase.from('api_keys').select('*');
+          if (!dbKeys || dbKeys.length === 0) {
+            const res = await supabase.from('ai_provider_keys').select('*');
+            dbKeys = res.data;
+          }
+          keys = dbKeys || [];
+          cachedApiKeys = keys;
+          lastApiKeyFetch = now;
         }
 
         if (keys && keys.length > 0) {
@@ -381,21 +391,34 @@ export function DailyLogsAiModal({ initialSiteId, initialDate, onClose, isEmbedd
     setIsLoading(true);
 
     try {
-      // 1. Fetch Key from api_keys (Settings table) with fallback to ai_provider_keys & env
+      // 1. Fetch Key from in-memory cache with fallback to Supabase, localStorage & env
       let apiKey = '';
-      try {
-        const { data: apiKeysData } = await supabase.from('api_keys').select('*');
-        if (apiKeysData && apiKeysData.length > 0) {
-          const match = apiKeysData.find((k: any) => (k.provider || '').toLowerCase() === selectedProvider.toLowerCase());
-          if (match && match.key_value) {
-            apiKey = match.key_value;
-          } else {
-            const def = apiKeysData.find((k: any) => k.is_default) || apiKeysData[0];
-            if (def && def.key_value) apiKey = def.key_value;
-          }
+      const keys = cachedApiKeys;
+      if (keys && keys.length > 0) {
+        const match = keys.find((k: any) => (k.provider || '').toLowerCase() === selectedProvider.toLowerCase());
+        if (match && match.key_value) {
+          apiKey = match.key_value;
+        } else {
+          const def = keys.find((k: any) => k.is_default) || keys[0];
+          if (def && def.key_value) apiKey = def.key_value;
         }
-      } catch (e) {
-        console.error('Error querying api_keys:', e);
+      }
+
+      if (!apiKey) {
+        try {
+          const { data: apiKeysData } = await supabase.from('api_keys').select('*');
+          if (apiKeysData && apiKeysData.length > 0) {
+            cachedApiKeys = apiKeysData;
+            const match = apiKeysData.find((k: any) => (k.provider || '').toLowerCase() === selectedProvider.toLowerCase());
+            if (match && match.key_value) apiKey = match.key_value;
+            else {
+              const def = apiKeysData.find((k: any) => k.is_default) || apiKeysData[0];
+              if (def && def.key_value) apiKey = def.key_value;
+            }
+          }
+        } catch (e) {
+          console.error('Error querying api_keys:', e);
+        }
       }
 
       if (!apiKey) {

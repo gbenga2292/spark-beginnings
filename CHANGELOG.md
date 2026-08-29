@@ -2,6 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.7.14] - 2026-08-26
+
+### Added / Improved
+- **Site 360 & Operations Workflow**:
+  - Implemented `Site360View` comprehensive dashboard with modular tabs, site storyboard, AI chat assistant, and integrated task management.
+  - Enhanced Daily Log Manager with detailed equipment operation logs, pump installation/replacement date tracking (`replaced_asset_id`), and consumable checkout workflows.
+  - Upgraded site inventory view with reconciliation status, pump tracking, and live waybill linkage.
+- **Communications Log (Comm Log)**:
+  - Added new site registration tracking (`registered_new_site`) directly within communication log entries.
+  - Implemented per-user read receipt tracking (`comm_log_reads`) to highlight unread team updates.
+- **Financial & Ledger Management**:
+  - Enhanced Ledger page with automated VAT calculation and tax breakdown for expense line items.
+  - Added financial reporting suite with customizable multi-filter views, data visualization, and export capabilities.
+- **Task Management & Desktop UI**:
+  - Improved Desktop Floating Calendar and task inbox with intuitive filtering, quick-view sheets, and inline subtask handling.
+- **Database Migrations (Supabase)**:
+  - `20260821160000_add_expenses_vat_to_ledger.sql`: Added VAT column and tracking to ledger entries.
+  - `20260824000000_comm_log_reads.sql`: Created `comm_log_reads` table with RLS and indexing.
+  - `20260824100000_add_registered_new_site_to_comm_logs.sql`: Added `registered_new_site` flag to `comm_logs`.
+  - `20260826170000_add_replaced_asset_to_pump_dates.sql`: Added `replaced_asset_id` to `operations_site_pump_dates`.
+- **Version Bump**:
+  - Updated application version to `1.7.14` in [package.json](file:///c:/Users/USER/Desktop/assign/spark-beginnings/package.json) and [version.ts](file:///c:/Users/USER/Desktop/assign/spark-beginnings/src/constants/version.ts).
+
 ## [1.7.13] - 2026-07-31
 
 ### Added / Improved

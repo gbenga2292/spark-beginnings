@@ -31,6 +31,13 @@ interface ElectronAPI {
   fsMkdir: (path: string) => Promise<boolean>;
   shellOpenPath: (path: string) => void;
   notify: (title: string, body: string) => void;
+  checkNasStatus: (path: string) => Promise<{ status: 'online' | 'auth-required' | 'offline'; error?: string }>;
+  authenticateNas: (path: string, user: string, pass: string) => Promise<{ success: boolean; error?: string }>;
+  startUpdateCheck: (source: 'nas' | 'web') => void;
+  quitAndInstall: () => void;
+  onOpenUpdateModal: (callback: () => void) => () => void;
+  onUpdateStatus: (callback: (status: any) => void) => () => void;
+  backupSupabaseDatabase: (opts: any) => Promise<any>;
 }
 
 declare global {

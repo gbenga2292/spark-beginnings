@@ -100,7 +100,7 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
   const [itemMode, setItemMode] = useState<'single' | 'bulk'>('single');
   const [items, setItems] = useState<{ rowId: string; assetId: string; quantity: number }[]>(
     editWaybill
-      ? editWaybill.items.map(i => ({ rowId: `row-${i.assetId}`, assetId: i.assetId, quantity: i.quantity }))
+      ? editWaybill.items.map((i, idx) => ({ rowId: `row-${i.assetId}-${idx}`, assetId: i.assetId, quantity: i.quantity }))
       : []
   );
   const [bulkText, setBulkText] = useState('');

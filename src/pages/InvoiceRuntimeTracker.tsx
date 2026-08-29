@@ -40,7 +40,7 @@ function addDays(dateStr: string, days: number): string {
 }
 
 export function InvoiceRuntimeTracker({ invoice, onSyncDates }: InvoiceRuntimeTrackerProps) {
-  const { maintenanceAssets, dailyMachineLogs: allMachineLogs } = useOperations();
+  const { maintenanceAssets, dailyMachineLogs: allMachineLogs, sitePumpDates } = useOperations();
   const [expanded, setExpanded] = useState(false);
   const [showLinkPanel, setShowLinkPanel] = useState(false);
 
@@ -48,13 +48,26 @@ export function InvoiceRuntimeTracker({ invoice, onSyncDates }: InvoiceRuntimeTr
   const invoiceDuration = invoice.duration ?? 0;
   const invoiceStartDate = invoice.date ?? '';
 
+  /** All effective linked machine IDs including automatic successors from machine swaps */
+  const effectiveLinkedIds = useMemo(() => {
+    const ids = new Set<string>(linkedIds);
+    sitePumpDates.forEach(pd => {
+      if (pd.replacedAssetId && ids.has(pd.replacedAssetId)) {
+        if (!invoice.siteId || pd.siteId === invoice.siteId) {
+          ids.add(pd.assetId);
+        }
+      }
+    });
+    return Array.from(ids);
+  }, [linkedIds, sitePumpDates, invoice.siteId]);
+
   /** Logs for linked machines, on or after invoice start date */
   const relevantLogs = useMemo(() => {
-    if (!linkedIds.length || !invoiceStartDate) return [];
+    if (!effectiveLinkedIds.length || !invoiceStartDate) return [];
     return allMachineLogs.filter(
-      l => linkedIds.includes(l.assetId) && l.date >= invoiceStartDate
+      l => effectiveLinkedIds.includes(l.assetId) && l.date >= invoiceStartDate
     ).sort((a, b) => a.date.localeCompare(b.date));
-  }, [allMachineLogs, linkedIds, invoiceStartDate]);
+  }, [allMachineLogs, effectiveLinkedIds, invoiceStartDate]);
 
   /** Consumed days = sum of day fractions per log */
   const consumedDays = useMemo(() => {

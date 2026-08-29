@@ -110,11 +110,12 @@ export function EmployeeAnalytics() {
       
       const totalReturned = updatingCheckout.returnedQuantity + returnQty;
       const isFullyReturned = totalReturned >= updatingCheckout.quantity;
-      const newStatus = isFullyReturned ? 'returned' : 'partial_returned';
+      const newStatus = isConsumable ? 'consumed' : (isFullyReturned ? 'returned' : 'partial_returned');
 
       await updateCheckoutStatus(updatingCheckout.id, { 
         returnedQuantity: totalReturned, 
-        status: newStatus as any 
+        status: newStatus as any,
+        condition: isConsumable ? 'Consumed completely' : 'Returned (Good)'
       });
 
       toast.success(isConsumable ? 'Marked as consumed/used.' : `Updated return status for ${updatingCheckout.assetName}`);

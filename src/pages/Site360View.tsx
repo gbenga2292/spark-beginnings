@@ -141,7 +141,7 @@ export function Site360View({ site, clientSites, onSiteChange, onBack, onEditSit
   }, [clientProfiles, site.client]);
   const derivedClientId = matchingClient ? matchingClient.id : null;
 
-  const [activeTab, setActiveTab] = useState<SiteTab>('financials');
+  const [activeTab, setActiveTab] = useState<SiteTab>('timeline');
   const [showFilters, setShowFilters] = useState(false);
   const [isContactsCollapsed, setIsContactsCollapsed] = useState(false);
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
@@ -1117,8 +1117,8 @@ Answer site-specific questions and field progress accurately using this context.
 
   return (
     <div className="flex flex-col h-full min-h-0 overflow-hidden bg-slate-50 dark:bg-slate-950 relative">
-      <div ref={containerRef} className="flex-1 overflow-y-auto p-2 sm:p-4 lg:p-5 style-scroll">
-        <div className="max-w-6xl mx-auto space-y-3">
+      <div ref={containerRef} className="flex-1 overflow-y-auto px-2 sm:px-4 lg:px-5 pb-6 style-scroll">
+        <div className="max-w-6xl mx-auto space-y-3 pt-2">
 
           {/* ── Compact Site Identity & Controls Strip ── */}
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md p-3 flex flex-wrap items-center justify-between gap-3 shadow-none">
@@ -1282,8 +1282,8 @@ Answer site-specific questions and field progress accurately using this context.
             </div>
           )}
 
-          {/* ── Flat Main Navigation Tabs (Mobile Optimized Touch Strip) ── */}
-          <div className="flex items-center gap-1 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden touch-pan-x scroll-smooth py-1 border-b border-slate-200 dark:border-slate-800">
+          {/* ── Flat Main Navigation Tabs (Sticky Header Strip) ── */}
+          <div className="sticky top-0 z-20 bg-slate-50/95 dark:bg-slate-950/95 backdrop-blur-md flex items-center gap-1 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden touch-pan-x scroll-smooth py-1.5 border-b border-slate-200 dark:border-slate-800">
             {tabs.map(tab => {
               const isActive = activeTab === tab.id;
               const Icon = tab.icon;

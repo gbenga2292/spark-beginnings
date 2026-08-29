@@ -1,14 +1,16 @@
 import { useState, useMemo } from 'react';
 import { useAppStore, Site } from '@/src/store/appStore';
+import { useOperations } from '../contexts/OperationsContext';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/src/components/ui/dialog';
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Label } from '@/src/components/ui/label';
 import { Textarea } from '@/src/components/ui/textarea';
-import { Calendar, User, Info, AlignLeft, PackageCheck, AlertTriangle } from 'lucide-react';
+import { Calendar, User, Info, AlignLeft, PackageCheck, AlertTriangle, Layers } from 'lucide-react';
 import { toast } from 'sonner';
 import { ConsumableUsageLog } from '@/src/types/operations';
 import { formatUnit } from '@/src/lib/utils';
+import { formatDualUnit, packsToUnits } from '@/src/lib/unitConversions';
 
 interface SiteItem {
   assetId: string;
@@ -26,6 +28,7 @@ interface BulkConsumableLogModalProps {
 
 export function BulkConsumableLogModal({ isOpen, onClose, site, consumables }: BulkConsumableLogModalProps) {
   const { addConsumableLogs, employees, consumableLogs } = useAppStore();
+  const { assets } = useOperations();
 
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
@@ -247,27 +250,34 @@ export function BulkConsumableLogModal({ isOpen, onClose, site, consumables }: B
                 </div>
               ) : (
                 <div className="divide-y divide-slate-100 dark:divide-slate-800 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
-                  {consumables.map(item => (
-                    <div key={item.assetId} className="flex items-center justify-between p-3 sm:px-4 bg-white dark:bg-slate-950 hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors">
-                      <div>
-                        <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">{item.assetName}</p>
-                        <p className="text-xs text-slate-500">Available: {item.quantity} {formatUnit(item.unit)}</p>
+                  {consumables.map(item => {
+                    const matchedAsset = assets.find(a => a.id === item.assetId);
+                    const hasPackaging = Boolean(matchedAsset?.packUnit && matchedAsset?.packSize && matchedAsset.packSize > 1);
+
+                    return (
+                      <div key={item.assetId} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:px-4 bg-white dark:bg-slate-950 hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors gap-2">
+                        <div>
+                          <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">{item.assetName}</p>
+                          <p className="text-xs text-slate-500">
+                            Available: {hasPackaging ? formatDualUnit(item.quantity, item.unit || 'pcs', matchedAsset?.packUnit, matchedAsset?.packSize) : `${item.quantity} ${formatUnit(item.unit)}`}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2 self-end sm:self-auto">
+                          <Label className="text-xs font-medium text-slate-400">Used Qty ({formatUnit(item.unit)}):</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            step="0.1"
+                            max={item.quantity}
+                            value={quantities[item.assetId] || ''}
+                            onChange={(e) => handleQuantityChange(item.assetId, e.target.value)}
+                            placeholder="0"
+                            className="w-28 h-9 text-right font-semibold border-slate-200 dark:border-slate-800"
+                          />
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Label className="text-xs font-medium text-slate-400">Used Qty:</Label>
-                        <Input
-                          type="number"
-                          min="0"
-                          step="0.1"
-                          max={item.quantity}
-                          value={quantities[item.assetId] || ''}
-                          onChange={(e) => handleQuantityChange(item.assetId, e.target.value)}
-                          placeholder="0"
-                          className="w-24 h-9 text-right font-semibold border-slate-200 dark:border-slate-800"
-                        />
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>

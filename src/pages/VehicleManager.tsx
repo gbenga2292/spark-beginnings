@@ -6,7 +6,9 @@ import {
   Edit2, Trash2, History, AlertCircle, ChevronRight,
   MoreHorizontal, MoreVertical, PlusCircle, X, Check, ClipboardList,
   LayoutGrid, List, ChevronLeft, Download, Upload, FileSpreadsheet,
-  Fuel, TrendingUp, BarChart3, Filter, Link as LinkIcon
+  Fuel, TrendingUp, BarChart3, Filter, Link as LinkIcon,
+  Receipt, Sparkles, CheckCircle2, Zap, RotateCcw, FileText,
+  ShieldAlert, ShieldCheck, CalendarPlus, Info
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import {
@@ -15,8 +17,18 @@ import {
 } from 'recharts';
 import { cn } from '@/src/lib/utils';
 import { useTheme } from '@/src/hooks/useTheme';
-import { Vehicle, VehicleTripLeg, VehicleDocumentType, VehicleFuelLog } from '../types/operations';
+import { Vehicle, VehicleTripLeg, VehicleDocumentType, VehicleFuelLog, VehicleDocumentRenewalRecord } from '../types/operations';
 import { formatDisplayDate, normalizeDate } from '@/src/lib/dateUtils';
+
+function parseLitresFromText(text?: string): number | undefined {
+  if (!text) return undefined;
+  const match = text.match(/(\d+(?:\.\d+)?)\s*(?:ltrs?|litres?|liters?|l)\b/i);
+  if (match && match[1]) {
+    const val = parseFloat(match[1]);
+    if (!isNaN(val) && val > 0) return val;
+  }
+  return undefined;
+}
 import { 
   isSameMonth, isBefore, startOfMonth, endOfMonth, 
   startOfWeek, endOfWeek, addDays, isSameDay, 
@@ -186,8 +198,210 @@ export function VehicleManager() {
   const [showTripForm, setShowTripForm] = useState(false);
   const [editingTrip, setEditingTrip] = useState<VehicleTripLeg | null>(null);
   const [editingDocVehicle, setEditingDocVehicle] = useState<Vehicle | null>(null);
-  const [showDocUpdateForm, setShowDocUpdateForm] = useState(false);
-  const [docUpdateForm, setDocUpdateForm] = useState({ type: '', date: '' });
+  const [showDocModal, setShowDocModal] = useState(false);
+  const [docModalTab, setDocModalTab] = useState<'update' | 'history'>('update');
+  const [docFormValues, setDocFormValues] = useState<Record<string, string>>({});
+  const [docFormNotes, setDocFormNotes] = useState<Record<string, string>>({});
+  const [docModalSearch, setDocModalSearch] = useState('');
+
+  const getDocStatusInfo = (dateStr?: string) => {
+    if (!dateStr) return { status: 'not_set', label: 'Not Set', badgeClass: 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700' };
+    const normalized = normalizeDate(dateStr);
+    if (!normalized) return { status: 'not_set', label: 'Not Set', badgeClass: 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700' };
+    
+    const dateValue = new Date(normalized);
+    const today = new Date();
+    const isExpired = isBefore(dateValue, startOfDay(today));
+    const isExpiringThisMonth = isSameMonth(dateValue, today);
+    
+    if (isExpired) {
+      return {
+        status: 'expired',
+        label: 'Expired',
+        badgeClass: 'bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-800/60'
+      };
+    }
+    if (isExpiringThisMonth) {
+      return {
+        status: 'expiring_soon',
+        label: 'Expires this month',
+        badgeClass: 'bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800/60'
+      };
+    }
+    return {
+      status: 'valid',
+      label: 'Valid',
+      badgeClass: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/60'
+    };
+  };
+
+  const calculateRenewalDate = (currentValue: string, months: number): string => {
+    let base: Date;
+    const normalized = normalizeDate(currentValue);
+    if (normalized) {
+      const existing = new Date(normalized);
+      if (!isNaN(existing.getTime()) && !isBefore(existing, startOfDay(new Date()))) {
+        base = existing;
+      } else {
+        base = new Date();
+      }
+    } else {
+      base = new Date();
+    }
+    return format(addMonths(base, months), 'yyyy-MM-dd');
+  };
+
+  const openDocModal = (v: Vehicle, tab: 'update' | 'history' = 'update') => {
+    setEditingDocVehicle(v);
+    setDocModalTab(tab);
+    setDocModalSearch('');
+    
+    const initialValues: Record<string, string> = {};
+    vehicleDocumentTypes.forEach(t => {
+      initialValues[t.name] = normalizeDate(v.documents?.[t.name] || '');
+    });
+    setDocFormValues(initialValues);
+    setDocFormNotes({});
+    setShowDocModal(true);
+  };
+
+  const handleQuickRenew = (typeName: string, months: number) => {
+    const currentVal = docFormValues[typeName] || '';
+    const newDate = calculateRenewalDate(currentVal, months);
+    setDocFormValues(prev => ({ ...prev, [typeName]: newDate }));
+  };
+
+  const handleClearDocDate = (typeName: string) => {
+    setDocFormValues(prev => ({ ...prev, [typeName]: '' }));
+  };
+
+  const handleResetDocDate = (typeName: string) => {
+    if (!editingDocVehicle) return;
+    setDocFormValues(prev => ({ ...prev, [typeName]: normalizeDate(editingDocVehicle.documents?.[typeName] || '') }));
+  };
+
+  const handleRenewAllExpired = () => {
+    if (!editingDocVehicle) return;
+    let renewedCount = 0;
+    const newValues = { ...docFormValues };
+
+    vehicleDocumentTypes.forEach(type => {
+      const val = docFormValues[type.name] || normalizeDate(editingDocVehicle.documents?.[type.name] || '');
+      const statusInfo = getDocStatusInfo(val);
+      if (statusInfo.status === 'expired' || statusInfo.status === 'expiring_soon' || statusInfo.status === 'not_set') {
+        newValues[type.name] = calculateRenewalDate(val, 12);
+        renewedCount++;
+      }
+    });
+
+    setDocFormValues(newValues);
+    if (renewedCount > 0) {
+      toast.success(`Set 1-year renewal for ${renewedCount} document(s). Click "Save Changes" to confirm.`);
+    } else {
+      toast.info('All documents are already valid for more than 1 month.');
+    }
+  };
+
+  const handleResetAllDocChanges = () => {
+    if (!editingDocVehicle) return;
+    const initialValues: Record<string, string> = {};
+    vehicleDocumentTypes.forEach(t => {
+      initialValues[t.name] = normalizeDate(editingDocVehicle.documents?.[t.name] || '');
+    });
+    setDocFormValues(initialValues);
+    setDocFormNotes({});
+  };
+
+  const handleSaveAllDocs = () => {
+    if (!editingDocVehicle) return;
+
+    const previousHistory: VehicleDocumentRenewalRecord[] = (editingDocVehicle.documents?._history || []) as VehicleDocumentRenewalRecord[];
+    const newHistoryEntries = [...previousHistory];
+    let changesCount = 0;
+
+    vehicleDocumentTypes.forEach(type => {
+      const origVal = normalizeDate(editingDocVehicle.documents?.[type.name] || '');
+      const newVal = docFormValues[type.name] || '';
+      if (origVal !== newVal) {
+        changesCount++;
+        newHistoryEntries.unshift({
+          id: crypto.randomUUID(),
+          doc_type: type.name,
+          previous_date: origVal || undefined,
+          new_date: newVal,
+          updated_at: new Date().toISOString(),
+          note: docFormNotes[type.name]?.trim() || undefined
+        });
+      }
+    });
+
+    const updatedDocs: Record<string, any> = {
+      ...(editingDocVehicle.documents || {}),
+      ...docFormValues,
+      _history: newHistoryEntries
+    };
+
+    updateVehicle(editingDocVehicle.id, { documents: updatedDocs });
+    if (changesCount > 0) {
+      toast.success(`Updated ${changesCount} document expiry date${changesCount > 1 ? 's' : ''} for ${editingDocVehicle.name}`);
+    } else {
+      toast.info('No changes made to document dates.');
+    }
+    setShowDocModal(false);
+  };
+
+  const docChangesCount = useMemo(() => {
+    if (!editingDocVehicle) return 0;
+    let count = 0;
+    vehicleDocumentTypes.forEach(type => {
+      const origVal = normalizeDate(editingDocVehicle.documents?.[type.name] || '');
+      const newVal = docFormValues[type.name] || '';
+      if (origVal !== newVal) {
+        count++;
+      }
+    });
+    return count;
+  }, [editingDocVehicle, docFormValues, vehicleDocumentTypes]);
+
+  const docStats = useMemo(() => {
+    if (!editingDocVehicle) return { total: 0, expired: 0, expiringSoon: 0, valid: 0, notSet: 0 };
+    let expired = 0;
+    let expiringSoon = 0;
+    let valid = 0;
+    let notSet = 0;
+
+    vehicleDocumentTypes.forEach(type => {
+      const val = editingDocVehicle.documents?.[type.name];
+      const s = getDocStatusInfo(val);
+      if (s.status === 'expired') expired++;
+      else if (s.status === 'expiring_soon') expiringSoon++;
+      else if (s.status === 'valid') valid++;
+      else notSet++;
+    });
+
+    return {
+      total: vehicleDocumentTypes.length,
+      expired,
+      expiringSoon,
+      valid,
+      notSet
+    };
+  }, [editingDocVehicle, vehicleDocumentTypes]);
+
+  const vehicleDocHistory = useMemo(() => {
+    if (!editingDocVehicle?.documents?._history) return [];
+    const list = editingDocVehicle.documents._history as VehicleDocumentRenewalRecord[];
+    if (!docModalSearch) return list;
+    const q = docModalSearch.toLowerCase();
+    return list.filter(h => h.doc_type.toLowerCase().includes(q) || (h.note && h.note.toLowerCase().includes(q)));
+  }, [editingDocVehicle, docModalSearch]);
+
+  const filteredDocTypesForModal = useMemo(() => {
+    if (!docModalSearch) return vehicleDocumentTypes;
+    const q = docModalSearch.toLowerCase();
+    return vehicleDocumentTypes.filter(t => t.name.toLowerCase().includes(q));
+  }, [vehicleDocumentTypes, docModalSearch]);
+
   const [search, setSearch] = useState('');
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
@@ -210,6 +424,12 @@ export function VehicleManager() {
   // ── Fuel Log State ──
   const fmtCurrency = (n: number) => `₦${n.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
+  const getVehicleName = (reg?: string) => {
+    if (!reg) return '';
+    const v = vehicles.find(x => x.registration_number === reg || x.id === reg);
+    return v ? v.name : reg;
+  };
+
   const [showFuelForm, setShowFuelForm] = useState(false);
   const [editingFuelLog, setEditingFuelLog] = useState<VehicleFuelLog | null>(null);
   const [fuelForm, setFuelForm] = useState({
@@ -225,10 +445,12 @@ export function VehicleManager() {
     linkedLedgerIds: [] as string[],
     lastComputed: '' as 'litres' | 'total_cost' | 'rate_per_litre' | ''
   });
+  const [fuelValidationErrors, setFuelValidationErrors] = useState<Record<string, boolean>>({});
 
   // Standalone Link Ledger Dialog State
   const [selectedFuelLogForLedger, setSelectedFuelLogForLedger] = useState<VehicleFuelLog | null>(null);
   const [standaloneLedgerSearch, setStandaloneLedgerSearch] = useState('');
+  const [standaloneLedgerMonth, setStandaloneLedgerMonth] = useState('');
   const [standaloneAllocations, setStandaloneAllocations] = useState<Record<string, number>>({});
   const [ledgerDateFilterType, setLedgerDateFilterType] = useState<'transaction' | 'voucher'>('transaction');
   const [ledgerStartDate, setLedgerStartDate] = useState('');
@@ -247,6 +469,8 @@ export function VehicleManager() {
   const handleOpenStandaloneLedgerDialog = (log: VehicleFuelLog) => {
     setSelectedFuelLogForLedger(log);
     setStandaloneLedgerSearch('');
+    // Auto-select log's month for instant fast filtering
+    setStandaloneLedgerMonth(log.date ? log.date.substring(0, 7) : '');
     setLedgerStartDate('');
     setLedgerEndDate('');
     const initialAllocations: Record<string, number> = {};
@@ -333,10 +557,32 @@ export function VehicleManager() {
     });
   }, [ledgerEntries]);
 
-  // Filtered by search and date options inside the standalone dialog
+  // Filtered by search, month and date options inside the standalone dialog
   const filteredStandaloneLedgerEntries = useMemo(() => {
-    return eligibleLedgerEntries.filter(e => {
-      // 1. Text Search Filter
+    const vReg = selectedFuelLogForLedger?.vehicle_reg?.toLowerCase() || '';
+    const vName = selectedFuelLogForLedger ? getVehicleName(selectedFuelLogForLedger.vehicle_reg).toLowerCase() : '';
+    const targetLogDate = selectedFuelLogForLedger?.date || '';
+
+    // De-duplicate unique entries by id
+    const seenIds = new Set<string>();
+    const uniqueEligible = eligibleLedgerEntries.filter(e => {
+      if (!e.id || seenIds.has(e.id)) return false;
+      seenIds.add(e.id);
+      return true;
+    });
+
+    const filtered = uniqueEligible.filter(e => {
+      const rem = ledgerRemainingAmounts.get(e.id) ?? Number(e.amount) ?? 0;
+      const isLinked = selectedFuelLogForLedger?.linkedLedgerIds?.includes(e.id) || (standaloneAllocations[e.id] !== undefined && standaloneAllocations[e.id] > 0);
+      if (rem <= 0.01 && !isLinked) return false;
+
+      // 1. Month Filter (allows showing linked vouchers even if from other months)
+      if (standaloneLedgerMonth) {
+        const entryMonth = e.date ? e.date.substring(0, 7) : '';
+        if (entryMonth !== standaloneLedgerMonth && !isLinked) return false;
+      }
+
+      // 2. Text Search Filter
       if (standaloneLedgerSearch.trim()) {
         const query = standaloneLedgerSearch.toLowerCase().trim();
         const desc = e.description?.toLowerCase() || '';
@@ -358,7 +604,7 @@ export function VehicleManager() {
         if (!matchesSearch) return false;
       }
 
-      // 2. Date Filter (Transaction Date vs Voucher Date)
+      // 3. Date Filter (Transaction Date vs Voucher Date)
       const targetDate = ledgerDateFilterType === 'voucher'
         ? (getVoucherDate(e.voucherNo) || e.date)
         : e.date;
@@ -368,7 +614,33 @@ export function VehicleManager() {
 
       return true;
     });
-  }, [eligibleLedgerEntries, standaloneLedgerSearch, ledgerDateFilterType, ledgerStartDate, ledgerEndDate]);
+
+    // Intelligent Sorting:
+    // 1. Linked items first
+    // 2. Entries matching vehicle registration / name
+    // 3. Entries matching fuel log date exactly
+    // 4. Descending by date
+    return filtered.sort((a, b) => {
+      const aLinked = selectedFuelLogForLedger?.linkedLedgerIds?.includes(a.id) || (standaloneAllocations[a.id] !== undefined && standaloneAllocations[a.id] > 0);
+      const bLinked = selectedFuelLogForLedger?.linkedLedgerIds?.includes(b.id) || (standaloneAllocations[b.id] !== undefined && standaloneAllocations[b.id] > 0);
+      if (aLinked && !bLinked) return -1;
+      if (!aLinked && bLinked) return 1;
+
+      const aDesc = (a.description || '').toLowerCase();
+      const bDesc = (b.description || '').toLowerCase();
+      const aMatchesVehicle = (vReg && aDesc.includes(vReg)) || (vName && aDesc.includes(vName));
+      const bMatchesVehicle = (vReg && bDesc.includes(vReg)) || (vName && bDesc.includes(vName));
+      if (aMatchesVehicle && !bMatchesVehicle) return -1;
+      if (!aMatchesVehicle && bMatchesVehicle) return 1;
+
+      const aSameDate = targetLogDate && a.date === targetLogDate;
+      const bSameDate = targetLogDate && b.date === targetLogDate;
+      if (aSameDate && !bSameDate) return -1;
+      if (!aSameDate && bSameDate) return 1;
+
+      return (b.date || '').localeCompare(a.date || '');
+    });
+  }, [eligibleLedgerEntries, standaloneLedgerSearch, standaloneLedgerMonth, ledgerDateFilterType, ledgerStartDate, ledgerEndDate, ledgerRemainingAmounts, selectedFuelLogForLedger, standaloneAllocations]);
 
   const totalAllocatedInStandaloneDialog = useMemo(() => {
     return Object.values(standaloneAllocations).reduce((sum, amt) => sum + (Number(amt) || 0), 0);
@@ -381,8 +653,152 @@ export function VehicleManager() {
   const [fuelFilterMonth, setFuelFilterMonth] = useState<number | null>(null);
   const [fuelFilterWeek, setFuelFilterWeek] = useState<number | null>(null);
 
-  // Bidirectional fuel calculator with priority preservation
+  // Fuel Log Modal - Ledger Linking State & Handlers
+  const [showFuelFormLedgerDialog, setShowFuelFormLedgerDialog] = useState(false);
+  const [fuelFormLedgerSearch, setFuelFormLedgerSearch] = useState('');
+  const [fuelFormLedgerMonth, setFuelFormLedgerMonth] = useState('');
+  const [fuelFormLedgerDateType, setFuelFormLedgerDateType] = useState<'transaction' | 'voucher'>('transaction');
+  const [fuelFormLedgerStartDate, setFuelFormLedgerStartDate] = useState('');
+  const [fuelFormLedgerEndDate, setFuelFormLedgerEndDate] = useState('');
+
+  const availableLedgerMonths = useMemo(() => {
+    const months = new Set<string>();
+    eligibleLedgerEntries.forEach(e => {
+      const rem = ledgerRemainingAmounts.get(e.id) ?? Number(e.amount) ?? 0;
+      const isLinked = (fuelForm.linkedLedgerIds || []).includes(e.id);
+      if ((rem > 0.01 || isLinked) && e.date) {
+        months.add(e.date.substring(0, 7));
+      }
+    });
+    return Array.from(months).sort((a, b) => b.localeCompare(a));
+  }, [eligibleLedgerEntries, ledgerRemainingAmounts, fuelForm.linkedLedgerIds]);
+
+  const filteredFuelFormLedgerEntries = useMemo(() => {
+    return eligibleLedgerEntries.filter(e => {
+      const rem = ledgerRemainingAmounts.get(e.id) ?? Number(e.amount) ?? 0;
+      const isLinked = (fuelForm.linkedLedgerIds || []).includes(e.id);
+      if (rem <= 0.01 && !isLinked) return false;
+
+      if (fuelFormLedgerSearch.trim()) {
+        const query = fuelFormLedgerSearch.toLowerCase().trim();
+        const desc = e.description?.toLowerCase() || '';
+        const siteName = e.site?.toLowerCase() || '';
+        const clientName = e.client?.toLowerCase() || '';
+        const voucher = e.voucherNo?.toLowerCase() || '';
+        const amountStr = e.amount?.toString() || '';
+        const txDate = e.date || '';
+        const vDate = getVoucherDate(e.voucherNo) || '';
+        const matches = desc.includes(query) || siteName.includes(query) || clientName.includes(query) || voucher.includes(query) || amountStr.includes(query) || txDate.includes(query) || vDate.includes(query);
+        if (!matches) return false;
+      }
+      if (fuelFormLedgerMonth) {
+        const entryMonth = e.date ? e.date.substring(0, 7) : '';
+        if (entryMonth !== fuelFormLedgerMonth) return false;
+      }
+      const targetDate = fuelFormLedgerDateType === 'voucher' ? (getVoucherDate(e.voucherNo) || e.date) : e.date;
+      if (fuelFormLedgerStartDate && targetDate < fuelFormLedgerStartDate) return false;
+      if (fuelFormLedgerEndDate && targetDate > fuelFormLedgerEndDate) return false;
+      return true;
+    });
+  }, [eligibleLedgerEntries, fuelFormLedgerSearch, fuelFormLedgerMonth, fuelFormLedgerDateType, fuelFormLedgerStartDate, fuelFormLedgerEndDate, ledgerRemainingAmounts, fuelForm.linkedLedgerIds]);
+
+  const linkedFuelEntries = useMemo(() => {
+    return (ledgerEntries || []).filter(e => (fuelForm.linkedLedgerIds || []).includes(e.id));
+  }, [ledgerEntries, fuelForm.linkedLedgerIds]);
+
+  const totalLinkedFuelAmount = useMemo(() => {
+    return (fuelForm.linkedLedgerIds || []).reduce((sum, id) => {
+      return sum + (ledgerRemainingAmounts.get(id) || 0);
+    }, 0);
+  }, [fuelForm.linkedLedgerIds, ledgerRemainingAmounts]);
+
+  const autoSyncFuelFromLinkedEntries = (customIds?: string[]) => {
+    const ids = customIds || fuelForm.linkedLedgerIds || [];
+    const activeEntries = (ledgerEntries || []).filter(e => ids.includes(e.id));
+    if (activeEntries.length === 0) return;
+
+    let sumLitres = 0;
+    let sumCost = 0;
+    const notesArr: string[] = [];
+    let detectedPayer = '';
+    let earliestDate = '';
+    let matchedVehicle: Vehicle | undefined;
+
+    activeEntries.forEach(entry => {
+      const parsedL = parseLitresFromText(entry.description) || 0;
+      const remCost = ledgerRemainingAmounts.get(entry.id) ?? Number(entry.amount) ?? 0;
+      sumLitres += parsedL;
+      sumCost += remCost;
+
+      if (entry.enteredBy && !detectedPayer) detectedPayer = entry.enteredBy;
+      
+      const vDate = getVoucherDate(entry.voucherNo);
+      const entryDate = vDate || entry.date;
+      if (entryDate && (!earliestDate || entryDate < earliestDate)) earliestDate = entryDate;
+
+      if (!matchedVehicle && entry.description) {
+        const descLower = entry.description.toLowerCase();
+        matchedVehicle = vehicles.find(v => 
+          (v.registration_number && descLower.includes(v.registration_number.toLowerCase())) ||
+          (v.name && v.name.length > 2 && descLower.includes(v.name.toLowerCase()))
+        );
+      }
+
+      const descTag = entry.voucherNo ? `[${entry.voucherNo}] ${entry.description}` : entry.description;
+      if (descTag) notesArr.push(descTag);
+    });
+
+    setFuelForm(prev => {
+      const next = { ...prev, linkedLedgerIds: ids };
+      if (sumCost > 0) next.total_cost = sumCost.toString();
+      if (sumLitres > 0) {
+        next.litres = sumLitres.toString();
+        if (sumCost > 0) {
+          next.rate_per_litre = (sumCost / sumLitres).toFixed(2);
+        }
+      }
+      if (earliestDate) next.date = earliestDate;
+      if (matchedVehicle) {
+        next.vehicle_id = matchedVehicle.id;
+        next.vehicle_reg = matchedVehicle.registration_number;
+      }
+      if (detectedPayer && !prev.filled_by) {
+        const matchedEmp = employees.find(emp => 
+          `${emp.firstname} ${emp.surname}`.toLowerCase().includes(detectedPayer.toLowerCase()) ||
+          detectedPayer.toLowerCase().includes(emp.firstname.toLowerCase())
+        );
+        next.filled_by = matchedEmp ? `${matchedEmp.firstname} ${matchedEmp.surname}` : detectedPayer;
+      }
+      if (notesArr.length > 0) {
+        next.notes = notesArr.join(' • ');
+      }
+      return next;
+    });
+
+    if (fuelValidationErrors.vehicle_id || fuelValidationErrors.date || fuelValidationErrors.total_cost || fuelValidationErrors.litres) {
+      setFuelValidationErrors({});
+    }
+  };
+
+  const handleToggleFuelLedger = (id: string) => {
+    setFuelForm(prev => {
+      const updated = (prev.linkedLedgerIds || []).includes(id)
+        ? (prev.linkedLedgerIds || []).filter(x => x !== id)
+        : [...(prev.linkedLedgerIds || []), id];
+      autoSyncFuelFromLinkedEntries(updated);
+      return { ...prev, linkedLedgerIds: updated };
+    });
+  };
+
+  const handleClearAllFuelLinked = () => {
+    setFuelForm(prev => ({ ...prev, linkedLedgerIds: [] }));
+  };
+
+  // Bidirectional fuel calculator with smart two-way synchronization
   const handleFuelFormChange = (field: string, value: string) => {
+    if (fuelValidationErrors[field]) {
+      setFuelValidationErrors(prev => ({ ...prev, [field]: false }));
+    }
     setFuelForm(prev => {
       const updated = { ...prev, [field]: value };
       
@@ -396,14 +812,13 @@ export function VehicleManager() {
             updated.rate_per_litre = (costNum / litresNum).toFixed(2);
             updated.lastComputed = 'rate_per_litre';
           } else if (rateNum > 0) {
-            updated.litres = (costNum / rateNum).toFixed(4);
+            updated.litres = (costNum / rateNum).toFixed(2);
             updated.lastComputed = 'litres';
           }
         }
       } else if (field === 'litres') {
         if (value !== '' && litresNum > 0) {
           if (costNum > 0) {
-            // Preserve cost (source of truth) and calculate rate
             updated.rate_per_litre = (costNum / litresNum).toFixed(2);
             updated.lastComputed = 'rate_per_litre';
           } else if (rateNum > 0) {
@@ -413,13 +828,12 @@ export function VehicleManager() {
         }
       } else if (field === 'rate_per_litre') {
         if (value !== '' && rateNum > 0) {
-          if (costNum > 0) {
-            // Preserve cost (source of truth) and calculate litres
-            updated.litres = (costNum / rateNum).toFixed(4);
-            updated.lastComputed = 'litres';
-          } else if (litresNum > 0) {
+          if (litresNum > 0) {
             updated.total_cost = (litresNum * rateNum).toFixed(2);
             updated.lastComputed = 'total_cost';
+          } else if (costNum > 0) {
+            updated.litres = (costNum / rateNum).toFixed(2);
+            updated.lastComputed = 'litres';
           }
         }
       }
@@ -428,32 +842,95 @@ export function VehicleManager() {
   };
 
   const handleFuelVehicleSelect = (vehicleId: string) => {
+    if (fuelValidationErrors.vehicle_id) {
+      setFuelValidationErrors(prev => ({ ...prev, vehicle_id: false }));
+    }
     const v = vehicles.find(v => v.id === vehicleId);
     setFuelForm(prev => ({ ...prev, vehicle_id: vehicleId, vehicle_reg: v?.registration_number || '' }));
   };
 
+  // Real-time Duplicate Fuel Log Detection
+  const detectedDuplicateFuelLog = useMemo(() => {
+    if (!fuelForm.vehicle_id || !fuelForm.date) return null;
+    const formCost = Number(fuelForm.total_cost) || 0;
+    const formLitres = Number(fuelForm.litres) || 0;
+
+    return vehicleFuelLogs.find(log => {
+      // Ignore record if currently editing it
+      if (editingFuelLog && log.id === editingFuelLog.id) return false;
+
+      const sameVehicle = log.vehicle_id === fuelForm.vehicle_id || 
+        (Boolean(log.vehicle_reg && fuelForm.vehicle_reg) && log.vehicle_reg.toLowerCase() === fuelForm.vehicle_reg.toLowerCase());
+      const sameDate = log.date === fuelForm.date;
+      if (!sameVehicle || !sameDate) return false;
+
+      // If cost or litres are entered, match when identical/close, or if same vehicle and date
+      const logCost = Number(log.total_cost) || 0;
+      const logLitres = Number(log.litres) || 0;
+      
+      const sameCost = formCost > 0 && Math.abs(logCost - formCost) < 5;
+      const sameLitres = formLitres > 0 && Math.abs(logLitres - formLitres) < 1;
+      
+      return sameCost || sameLitres || (formCost === 0 && formLitres === 0);
+    }) || null;
+  }, [fuelForm.vehicle_id, fuelForm.vehicle_reg, fuelForm.date, fuelForm.total_cost, fuelForm.litres, vehicleFuelLogs, editingFuelLog]);
+
   const handleSaveFuelLog = async () => {
-    if (!fuelForm.vehicle_id || !fuelForm.date || !fuelForm.rate_per_litre || !fuelForm.litres) return;
+    const errs: Record<string, boolean> = {};
+    if (!fuelForm.vehicle_id) errs.vehicle_id = true;
+    if (!fuelForm.date) errs.date = true;
+
+    let litres = Number(fuelForm.litres) || 0;
+    let rate = Number(fuelForm.rate_per_litre) || 0;
+    let cost = Number(fuelForm.total_cost) || 0;
+
+    // Auto-resolve missing calculated fields if at least 2 of 3 are present
+    if (cost > 0 && litres > 0 && rate <= 0) {
+      rate = cost / litres;
+    } else if (cost > 0 && rate > 0 && litres <= 0) {
+      litres = cost / rate;
+    } else if (litres > 0 && rate > 0 && cost <= 0) {
+      cost = litres * rate;
+    }
+
+    if (litres <= 0) errs.litres = true;
+    if (cost <= 0) errs.total_cost = true;
+
+    if (Object.keys(errs).length > 0) {
+      setFuelValidationErrors(errs);
+      if (errs.vehicle_id) toast.error('Vehicle is required', { description: 'Please select a vehicle from the dropdown.' });
+      else if (errs.date) toast.error('Date is required', { description: 'Please select a valid refill date.' });
+      else if (errs.litres || errs.total_cost) toast.error('Fuel quantity and cost required', { description: 'Please enter Total Cost (₦) and Litres (L).' });
+      return;
+    }
+
+    setFuelValidationErrors({});
     const payload = {
       vehicle_id: fuelForm.vehicle_id,
       vehicle_reg: fuelForm.vehicle_reg,
       date: fuelForm.date,
-      rate_per_litre: Number(fuelForm.rate_per_litre),
-      litres: Number(fuelForm.litres),
-      total_cost: Number(fuelForm.total_cost),
+      rate_per_litre: Number(rate.toFixed(2)),
+      litres: Number(litres.toFixed(2)),
+      total_cost: Number(cost.toFixed(2)),
       odometer: fuelForm.odometer !== '' ? Number(fuelForm.odometer) : undefined,
       filled_by: fuelForm.filled_by || undefined,
       notes: fuelForm.notes || undefined,
       linkedLedgerIds: fuelForm.linkedLedgerIds
     };
-    if (editingFuelLog) {
-      await updateVehicleFuelLog(editingFuelLog.id, payload);
-    } else {
-      await addVehicleFuelLog(payload);
+    try {
+      if (editingFuelLog) {
+        await updateVehicleFuelLog(editingFuelLog.id, payload);
+        toast.success('Fuel record updated');
+      } else {
+        await addVehicleFuelLog(payload);
+        toast.success('Fuel refill logged');
+      }
+      setShowFuelForm(false);
+      setEditingFuelLog(null);
+      setFuelForm({ vehicle_id: '', vehicle_reg: '', date: new Date().toISOString().split('T')[0], rate_per_litre: '', litres: '', total_cost: '', odometer: '', filled_by: '', notes: '', linkedLedgerIds: [], lastComputed: '' });
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to save fuel log');
     }
-    setShowFuelForm(false);
-    setEditingFuelLog(null);
-    setFuelForm({ vehicle_id: '', vehicle_reg: '', date: new Date().toISOString().split('T')[0], rate_per_litre: '', litres: '', total_cost: '', odometer: '', filled_by: '', notes: '', linkedLedgerIds: [], lastComputed: '' });
   };
 
   const handleEditFuelLog = (log: VehicleFuelLog) => {
@@ -501,11 +978,6 @@ export function VehicleManager() {
   });
 
   const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-
-  const getVehicleName = (reg: string) => {
-    const v = vehicles.find(x => x.registration_number === reg || x.id === reg);
-    return v ? v.name : reg;
-  };
 
   const monthlyData = MONTH_NAMES.map((name, i) => {
     const logs = vehicleFuelLogs.filter(f => {
@@ -1435,19 +1907,29 @@ export function VehicleManager() {
             <CardContent className="p-6 space-y-4 flex-1 overflow-y-auto sm:max-h-[60vh]">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2 md:col-span-2">
-                  <Label>Vehicle</Label>
+                  <Label>Vehicle *</Label>
                   <select
-                    className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-950"
+                    className={cn(
+                      "flex h-10 w-full rounded-md border bg-white px-3 py-2 text-sm dark:bg-slate-950",
+                      fuelValidationErrors.vehicle_id ? "border-red-500 ring-2 ring-red-500/50 bg-red-50/20" : "border-slate-200 dark:border-slate-800"
+                    )}
                     value={fuelForm.vehicle_id}
                     onChange={e => handleFuelVehicleSelect(e.target.value)}
                   >
                     <option value="">Select Vehicle</option>
                     {vehicles.map(v => <option key={v.id} value={v.id}>{v.name} ({v.registration_number})</option>)}
                   </select>
+                  {fuelValidationErrors.vehicle_id && <p className="text-[11px] text-red-500 font-medium">Please select a vehicle</p>}
                 </div>
                 <div className="space-y-2">
-                  <Label>Date</Label>
-                  <Input type="date" value={fuelForm.date} onChange={e => handleFuelFormChange('date', e.target.value)} />
+                  <Label>Date *</Label>
+                  <Input 
+                    type="date" 
+                    value={fuelForm.date} 
+                    onChange={e => handleFuelFormChange('date', e.target.value)} 
+                    className={cn(fuelValidationErrors.date && "border-red-500 ring-2 ring-red-500/50 bg-red-50/20")}
+                  />
+                  {fuelValidationErrors.date && <p className="text-[11px] text-red-500 font-medium">Date is required</p>}
                 </div>
                 <div className="space-y-2">
                   <Label>Filled By</Label>
@@ -1461,6 +1943,161 @@ export function VehicleManager() {
                     {employees.map(emp => <option key={emp.id} value={`${emp.firstname} ${emp.surname}`} />)}
                   </datalist>
                 </div>
+
+                {/* Duplicate / Existing Fuel Refill Warning Card */}
+                {detectedDuplicateFuelLog && !editingFuelLog && (
+                  <div className="md:col-span-2 p-3.5 rounded-xl border border-amber-300 dark:border-amber-700/80 bg-amber-50/90 dark:bg-amber-950/40 text-amber-950 dark:text-amber-200 space-y-2 text-xs shadow-xs animate-in fade-in duration-200">
+                    <div className="flex items-start gap-2.5">
+                      <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <p className="font-bold text-amber-900 dark:text-amber-300 flex items-center gap-1.5">
+                            <span>Existing Fuel Refill Logged on this Date</span>
+                          </p>
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-200/80 dark:bg-amber-900/60 font-semibold text-amber-900 dark:text-amber-200">
+                            {formatDisplayDate(detectedDuplicateFuelLog.date)}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-amber-800/95 dark:text-amber-300/90 mt-1 leading-relaxed">
+                          A refill record for <strong>{getVehicleName(detectedDuplicateFuelLog.vehicle_reg)}</strong> ({detectedDuplicateFuelLog.vehicle_reg}) is already logged for <strong>{fmtCurrency(detectedDuplicateFuelLog.total_cost)}</strong> ({detectedDuplicateFuelLog.litres} L)
+                          {detectedDuplicateFuelLog.linkedLedgerIds?.length 
+                            ? ` · Linked to ${detectedDuplicateFuelLog.linkedLedgerIds.length} expense voucher(s)` 
+                            : ' · Unlinked'}.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-end gap-2 pt-2 border-t border-amber-200/80 dark:border-amber-800/60">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const mergedLinked = Array.from(new Set([...(detectedDuplicateFuelLog.linkedLedgerIds || []), ...(fuelForm.linkedLedgerIds || [])]));
+                          setEditingFuelLog(detectedDuplicateFuelLog);
+                          setFuelForm({
+                            vehicle_id: detectedDuplicateFuelLog.vehicle_id,
+                            vehicle_reg: detectedDuplicateFuelLog.vehicle_reg,
+                            date: detectedDuplicateFuelLog.date,
+                            rate_per_litre: detectedDuplicateFuelLog.rate_per_litre ? detectedDuplicateFuelLog.rate_per_litre.toString() : '',
+                            litres: detectedDuplicateFuelLog.litres ? detectedDuplicateFuelLog.litres.toString() : '',
+                            total_cost: detectedDuplicateFuelLog.total_cost ? detectedDuplicateFuelLog.total_cost.toString() : '',
+                            odometer: detectedDuplicateFuelLog.odometer ? detectedDuplicateFuelLog.odometer.toString() : '',
+                            filled_by: detectedDuplicateFuelLog.filled_by || '',
+                            notes: detectedDuplicateFuelLog.notes || '',
+                            linkedLedgerIds: mergedLinked,
+                            lastComputed: ''
+                          });
+                          toast.info('Switched to update existing fuel log with linked voucher(s).');
+                        }}
+                        className="px-3 py-1 text-[11px] font-bold rounded-lg bg-amber-600 hover:bg-amber-700 text-white flex items-center gap-1.5 shadow-xs transition-colors"
+                      >
+                        <Edit2 className="w-3 h-3" />
+                        Update Existing Log Instead
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                <div className="md:col-span-2">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <Label className="text-xs font-semibold">Reconcile Costs / Expense Voucher</Label>
+                    {(fuelForm.linkedLedgerIds?.length || 0) > 0 && (
+                      <span className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400">
+                        {fuelForm.linkedLedgerIds.length} Linked ({fmtCurrency(totalLinkedFuelAmount)})
+                      </span>
+                    )}
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setShowFuelFormLedgerDialog(true)}
+                    className={cn(
+                      "w-full h-10 flex items-center justify-between px-3 text-xs font-semibold rounded-xl border transition-all shadow-xs",
+                      (fuelForm.linkedLedgerIds?.length || 0) > 0
+                        ? "bg-indigo-50/70 border-indigo-200 text-indigo-700 dark:bg-indigo-950/30 dark:border-indigo-800 dark:text-indigo-300"
+                        : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50 dark:bg-slate-900 dark:border-slate-800 dark:text-slate-300"
+                    )}
+                  >
+                    <div className="flex items-center gap-2">
+                      <LinkIcon className="h-4 w-4 text-indigo-500" />
+                      <span>{(fuelForm.linkedLedgerIds?.length || 0) > 0 ? 'Manage Linked Vouchers' : 'Link Expense Voucher & Auto-Fill'}</span>
+                    </div>
+                    <span className="text-[11px] text-indigo-600 dark:text-indigo-400 font-medium">Select from Ledger →</span>
+                  </Button>
+                </div>
+
+                {/* Linked Vouchers Breakdown Card */}
+                {(fuelForm.linkedLedgerIds?.length || 0) > 0 && (
+                  <div className="md:col-span-2 p-3.5 rounded-xl border bg-indigo-50/50 dark:bg-indigo-950/20 border-indigo-200/80 dark:border-indigo-900/60 space-y-2.5 shadow-xs">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Receipt className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                        <span className="text-xs font-bold text-indigo-950 dark:text-indigo-200">
+                          Linked Vouchers ({linkedFuelEntries.length}) — {fmtCurrency(totalLinkedFuelAmount)}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={handleClearAllFuelLinked}
+                          className="text-[10px] font-semibold text-red-500 hover:text-red-700 hover:underline px-1.5 py-0.5 rounded transition-colors"
+                          title="Remove all linked vouchers"
+                        >
+                          Deselect All
+                        </button>
+                      </div>
+                      <div className="flex items-center gap-2 self-start sm:self-auto">
+                        <button
+                          type="button"
+                          onClick={() => setShowFuelFormLedgerDialog(true)}
+                          className="text-xs font-semibold px-2.5 py-1 rounded-lg border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100/50 dark:hover:bg-indigo-900/40 transition-colors"
+                        >
+                          + Manage
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => autoSyncFuelFromLinkedEntries()}
+                          className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white flex items-center gap-1 shadow-xs transition-colors"
+                        >
+                          <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                          Re-AutoFill
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {linkedFuelEntries.map(e => {
+                        const rem = ledgerRemainingAmounts.get(e.id) ?? Number(e.amount) ?? 0;
+                        const parsedL = parseLitresFromText(e.description);
+                        return (
+                          <div key={e.id} className="p-2.5 rounded-lg bg-white dark:bg-slate-800/90 border border-indigo-100 dark:border-slate-700/80 text-xs flex flex-col justify-between gap-1 shadow-xs">
+                            <div>
+                              <div className="flex items-center justify-between gap-1 font-semibold text-slate-800 dark:text-slate-200">
+                                <span className="font-mono text-[11px] text-indigo-600 dark:text-indigo-400 font-bold">{e.voucherNo || 'Voucher'}</span>
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">{fmtCurrency(rem)}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleToggleFuelLedger(e.id)}
+                                    title="Deselect this voucher"
+                                    className="p-0.5 rounded text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
+                                  >
+                                    <X className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </div>
+                              <p className="text-[11px] text-slate-600 dark:text-slate-300 line-clamp-2 mt-0.5">{e.description}</p>
+                            </div>
+                            <div className="flex items-center justify-between text-[10px] text-slate-500 border-t border-slate-100 dark:border-slate-700/60 pt-1 mt-1">
+                              <span>{new Date(e.date).toLocaleDateString('en-GB')}</span>
+                              {parsedL && (
+                                <span className="font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-1 rounded">
+                                  ~{parsedL}L
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Fuel Calculator */}
@@ -1471,31 +2108,49 @@ export function VehicleManager() {
                 <div className="grid grid-cols-3 gap-3">
                   <div className="space-y-1">
                     <Label className="text-xs">
-                      Total Cost (₦)
+                      Total Cost (₦) *
                     </Label>
                     <Input
                       type="number"
+                      min="0"
+                      step="any"
                       placeholder="e.g. 25000"
                       value={fuelForm.total_cost}
                       onChange={e => handleFuelFormChange('total_cost', e.target.value)}
+                      onFocus={e => e.target.select()}
+                      className={cn(
+                        "caret-amber-500 font-semibold",
+                        fuelValidationErrors.total_cost && "border-red-500 ring-2 ring-red-500/50 bg-red-50/20"
+                      )}
                     />
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-xs">Litres (L)</Label>
+                    <Label className="text-xs">Litres (L) *</Label>
                     <Input
                       type="number"
+                      min="0"
+                      step="any"
                       placeholder="e.g. 40"
                       value={fuelForm.litres}
                       onChange={e => handleFuelFormChange('litres', e.target.value)}
+                      onFocus={e => e.target.select()}
+                      className={cn(
+                        "caret-amber-500",
+                        fuelValidationErrors.litres && "border-red-500 ring-2 ring-red-500/50 bg-red-50/20"
+                      )}
                     />
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs">Rate (₦/L)</Label>
                     <Input
                       type="number"
+                      min="0"
+                      step="any"
                       placeholder="e.g. 625"
                       value={fuelForm.rate_per_litre}
                       onChange={e => handleFuelFormChange('rate_per_litre', e.target.value)}
+                      onFocus={e => e.target.select()}
+                      className="caret-amber-500"
                     />
                   </div>
                 </div>
@@ -1511,7 +2166,7 @@ export function VehicleManager() {
                   <Label>Odometer Reading (km)</Label>
                   <Input type="number" placeholder="Optional" value={fuelForm.odometer} onChange={e => handleFuelFormChange('odometer', e.target.value)} />
                 </div>
-              <div className="space-y-2">
+                <div className="space-y-2">
                   <Label>Notes</Label>
                   <Input placeholder="Optional notes..." value={fuelForm.notes} onChange={e => handleFuelFormChange('notes', e.target.value)} />
                 </div>
@@ -1527,6 +2182,199 @@ export function VehicleManager() {
           </Card>
         </div>
       )}
+
+      {/* Fuel Log Modal - Ledger Linking Dialog */}
+      <Dialog open={showFuelFormLedgerDialog} onOpenChange={setShowFuelFormLedgerDialog}>
+        <DialogContent className="max-w-2xl w-full max-h-[88vh] flex flex-col p-5 sm:p-6 rounded-2xl shadow-2xl overflow-hidden bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white">
+          <DialogHeader className="pb-3 border-b border-slate-100 dark:border-slate-800 shrink-0">
+            <DialogTitle className="flex items-center gap-2 text-base font-bold">
+              <LinkIcon className="w-4 h-4 text-indigo-500" />
+              Link Vehicle Fuel Expenses (Ledger)
+            </DialogTitle>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+              Select fuel/diesel/PMS vouchers to automatically fill Vehicle, Litres, Price/Litre, Total Cost, and Date.
+            </p>
+          </DialogHeader>
+          
+          <div className="flex flex-col flex-1 min-h-0 pt-3 space-y-3">
+            {Number(fuelForm.total_cost) > 0 && (
+              <div className="p-2.5 rounded-xl border flex items-center justify-between text-xs font-semibold shrink-0 bg-indigo-50/50 dark:bg-indigo-950/30 border-indigo-200 dark:border-indigo-800 text-indigo-900 dark:text-indigo-200">
+                <span>Fuel Cost: {fmtCurrency(Number(fuelForm.total_cost))}</span>
+                <span>Linked: {fmtCurrency(totalLinkedFuelAmount)}</span>
+              </div>
+            )}
+
+            {/* Filter Bar: Text Search + Month / Date Filter */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 shrink-0">
+              <div className="relative flex-1">
+                <input
+                  type="text"
+                  value={fuelFormLedgerSearch}
+                  onChange={e => setFuelFormLedgerSearch(e.target.value)}
+                  placeholder="Search voucher by description, vehicle, driver..."
+                  className="w-full h-9 pl-8 pr-8 rounded-lg text-xs border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/90 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-colors"
+                />
+                <span className="absolute left-2.5 top-2.5 text-slate-400">
+                  <Search className="w-3.5 h-3.5" />
+                </span>
+                {fuelFormLedgerSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setFuelFormLedgerSearch('')}
+                    className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              <div className="flex items-center gap-1.5 shrink-0">
+                <select
+                  value={fuelFormLedgerMonth}
+                  onChange={e => setFuelFormLedgerMonth(e.target.value)}
+                  className="h-9 rounded-lg text-xs px-2.5 border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/90 text-slate-700 dark:text-white outline-none font-medium appearance-none cursor-pointer pr-7"
+                  style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E\")", backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center' }}
+                >
+                  <option value="">All Months</option>
+                  {availableLedgerMonths.map(m => {
+                    const [y, mon] = m.split('-');
+                    const d = new Date(Number(y), Number(mon) - 1, 1);
+                    return (
+                      <option key={m} value={m}>
+                        {d.toLocaleString('en-GB', { month: 'short', year: 'numeric' })}
+                      </option>
+                    );
+                  })}
+                </select>
+
+                {(fuelFormLedgerSearch || fuelFormLedgerMonth || fuelFormLedgerStartDate || fuelFormLedgerEndDate) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFuelFormLedgerSearch('');
+                      setFuelFormLedgerMonth('');
+                      setFuelFormLedgerStartDate('');
+                      setFuelFormLedgerEndDate('');
+                    }}
+                    className="h-9 px-2.5 rounded-lg text-xs border border-slate-200 dark:border-slate-700 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 font-medium transition-colors flex items-center gap-1 shrink-0"
+                  >
+                    <X className="w-3 h-3" />
+                    <span className="hidden sm:inline">Clear</span>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {eligibleLedgerEntries.length === 0 ? (
+              <div className="flex-1 flex flex-col items-center justify-center py-12 text-slate-400 text-center">
+                <Receipt className="w-8 h-8 mb-2 opacity-30" />
+                <p className="text-sm italic">No fuel/diesel/PMS expenses found in ledger.</p>
+              </div>
+            ) : filteredFuelFormLedgerEntries.length === 0 ? (
+              <div className="flex-1 flex flex-col items-center justify-center py-12 text-slate-400 text-center">
+                <Search className="w-8 h-8 mb-2 opacity-30" />
+                <p className="text-sm italic">No matching ledger entries found for selected filter.</p>
+              </div>
+            ) : (
+              <div className="flex-1 overflow-y-auto pr-1.5 space-y-2.5 style-scroll max-h-[380px] my-1">
+                {filteredFuelFormLedgerEntries.map(entry => {
+                  const isLinked = (fuelForm.linkedLedgerIds || []).includes(entry.id);
+                  const rem = ledgerRemainingAmounts.get(entry.id) ?? Number(entry.amount) ?? 0;
+                  const total = Number(entry.amount) || 0;
+                  const isPartial = rem < total && rem > 0;
+                  const parsedL = parseLitresFromText(entry.description);
+
+                  return (
+                    <div
+                      key={entry.id}
+                      onClick={() => handleToggleFuelLedger(entry.id)}
+                      className={cn(
+                        "p-3 rounded-xl border transition-all text-xs flex flex-col gap-2 shadow-xs cursor-pointer select-none",
+                        isLinked
+                          ? "bg-indigo-50/70 dark:bg-indigo-950/30 border-indigo-200 dark:border-indigo-800/60 ring-1 ring-indigo-500/20"
+                          : "bg-white dark:bg-slate-800/80 border-slate-200 dark:border-slate-700/80 hover:bg-slate-50 dark:hover:bg-slate-800"
+                      )}
+                    >
+                      <div className="flex items-start gap-3">
+                        <input
+                          type="checkbox"
+                          checked={isLinked}
+                          onChange={() => handleToggleFuelLedger(entry.id)}
+                          onClick={e => e.stopPropagation()}
+                          className="mt-0.5 rounded border-slate-300 dark:border-slate-600 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-mono text-xs font-bold text-indigo-600 dark:text-indigo-400">
+                              {entry.voucherNo || 'Voucher'}
+                            </span>
+                            <div className="text-right">
+                              <span className="font-extrabold text-xs text-emerald-600 dark:text-emerald-400">
+                                {fmtCurrency(rem)}
+                              </span>
+                              {isPartial && (
+                                <span className="text-[10px] text-slate-400 block">
+                                  of {fmtCurrency(total)}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <p className="text-xs text-slate-700 dark:text-slate-300 font-medium mt-0.5">
+                            {entry.description}
+                          </p>
+                          <div className="flex items-center gap-3 mt-1 text-[11px] text-slate-500 dark:text-slate-400 flex-wrap">
+                            <span>📅 {new Date(entry.date).toLocaleDateString('en-GB')}</span>
+                            {parsedL && (
+                              <span className="font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 rounded">
+                                ⛽ ~{parsedL} L
+                              </span>
+                            )}
+                            {entry.enteredBy && (
+                              <span>👤 {entry.enteredBy}</span>
+                            )}
+                            {entry.site && (
+                              <span>📍 {entry.site}</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800 shrink-0">
+              <span className="text-xs text-slate-500 font-medium">
+                {fuelForm.linkedLedgerIds?.length || 0} selected ({fmtCurrency(totalLinkedFuelAmount)})
+              </span>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowFuelFormLedgerDialog(false)}
+                >
+                  Done
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => {
+                    autoSyncFuelFromLinkedEntries();
+                    setShowFuelFormLedgerDialog(false);
+                    toast.success('Form auto-filled from linked vouchers');
+                  }}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white gap-1.5"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  Auto-Fill & Close
+                </Button>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Standalone Link Ledger Dialog — Vehicle Fuel */}
       <Dialog open={!!selectedFuelLogForLedger} onOpenChange={open => { if (!open) setSelectedFuelLogForLedger(null); }}>
@@ -1551,14 +2399,61 @@ export function VehicleManager() {
           </DialogHeader>
 
           <div className="px-5 py-3 border-b bg-white dark:bg-slate-900 space-y-2.5">
-            <div className="relative">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-              <Input
-                className="pl-9 h-9 text-sm"
-                placeholder="Search ledger entries by description, site, voucher, date..."
-                value={standaloneLedgerSearch}
-                onChange={e => setStandaloneLedgerSearch(e.target.value)}
-              />
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                <Input
+                  className="pl-9 pr-8 h-9 text-sm"
+                  placeholder="Search ledger entries by description, site, voucher, date..."
+                  value={standaloneLedgerSearch}
+                  onChange={e => setStandaloneLedgerSearch(e.target.value)}
+                />
+                {standaloneLedgerSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setStandaloneLedgerSearch('')}
+                    className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              <div className="flex items-center gap-1.5 shrink-0">
+                <select
+                  value={standaloneLedgerMonth}
+                  onChange={e => setStandaloneLedgerMonth(e.target.value)}
+                  className="h-9 rounded-lg text-xs px-2.5 border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-white outline-none font-medium appearance-none cursor-pointer pr-7"
+                  style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E\")", backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center' }}
+                >
+                  <option value="">All Months</option>
+                  {availableLedgerMonths.map(m => {
+                    const [y, mon] = m.split('-');
+                    const d = new Date(Number(y), Number(mon) - 1, 1);
+                    return (
+                      <option key={m} value={m}>
+                        {d.toLocaleString('en-GB', { month: 'short', year: 'numeric' })}
+                      </option>
+                    );
+                  })}
+                </select>
+
+                {(standaloneLedgerSearch || standaloneLedgerMonth || ledgerStartDate || ledgerEndDate) && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setStandaloneLedgerSearch('');
+                      setStandaloneLedgerMonth('');
+                      setLedgerStartDate('');
+                      setLedgerEndDate('');
+                    }}
+                    className="h-9 px-2 text-xs text-rose-500 hover:text-rose-700 font-bold shrink-0"
+                  >
+                    Reset
+                  </Button>
+                )}
+              </div>
             </div>
 
             {/* Date Filtering Bar */}
@@ -1610,16 +2505,6 @@ export function VehicleManager() {
                     className="h-7 text-xs bg-white dark:bg-slate-900 py-0 px-1.5 border-slate-200 dark:border-slate-700"
                   />
                 </div>
-                {(ledgerStartDate || ledgerEndDate) && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => { setLedgerStartDate(''); setLedgerEndDate(''); }}
-                    className="h-7 px-1.5 text-[10px] text-rose-500 hover:text-rose-700 font-bold shrink-0"
-                  >
-                    Clear
-                  </Button>
-                )}
               </div>
             </div>
           </div>
@@ -1639,6 +2524,11 @@ export function VehicleManager() {
                 const totalEntryAmount = Number(entry.amount) || 0;
                 const isFullyUsed = remainingAvailable <= 0 && !isSelected;
                 const vDate = getVoucherDate(entry.voucherNo);
+                const vReg = selectedFuelLogForLedger?.vehicle_reg?.toLowerCase() || '';
+                const vName = selectedFuelLogForLedger ? getVehicleName(selectedFuelLogForLedger.vehicle_reg).toLowerCase() : '';
+                const descLower = (entry.description || '').toLowerCase();
+                const matchesVehicle = Boolean((vReg && descLower.includes(vReg)) || (vName && descLower.includes(vName)));
+                const parsedL = parseLitresFromText(entry.description);
 
                 return (
                   <div
@@ -1648,6 +2538,8 @@ export function VehicleManager() {
                         ? 'border-amber-400 bg-amber-50/40 dark:bg-amber-950/20 dark:border-amber-600 shadow-sm'
                         : isFullyUsed
                         ? 'border-slate-200 dark:border-slate-800 bg-slate-100/50 dark:bg-slate-900/50 opacity-50'
+                        : matchesVehicle
+                        ? 'border-amber-300 dark:border-amber-700/80 bg-amber-50/20 dark:bg-amber-950/10'
                         : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-amber-300'
                     }`}
                   >
@@ -1678,7 +2570,19 @@ export function VehicleManager() {
                           className="mt-1 h-4 w-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500 cursor-pointer"
                         />
                         <div className="flex-1 min-w-0">
-                          <p className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate">{entry.description}</p>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate">{entry.description}</p>
+                            {matchesVehicle && (
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700">
+                                ✨ Matches Vehicle
+                              </span>
+                            )}
+                            {parsedL && (
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300">
+                                ⛽ ~{parsedL} L
+                              </span>
+                            )}
+                          </div>
                           <p className="text-[10px] text-slate-400 mt-0.5 flex flex-wrap items-center gap-x-1.5">
                             <span><strong className="text-slate-600 dark:text-slate-300">Tx:</strong> {entry.date}</span>
                             {vDate && (
@@ -1687,7 +2591,7 @@ export function VehicleManager() {
                               </span>
                             )}
                             {entry.voucherNo ? ` · #${entry.voucherNo}` : ''}
-                            {entry.site ? ` · ${entry.site}` : ''}
+                            {entry.site ? ` · 📍 ${entry.site}` : ''}
                           </p>
                         </div>
                       </div>
@@ -1951,39 +2855,342 @@ export function VehicleManager() {
           </div>
 
 
-          {showDocUpdateForm && editingDocVehicle && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-              <Card className="w-full max-w-sm shadow-2xl animate-in zoom-in-95 duration-200">
-                <CardHeader className="bg-slate-50 dark:bg-slate-800 border-b">
-                  <CardTitle className="text-sm font-bold uppercase tracking-wider">Update Document Date</CardTitle>
-                  <p className="text-xs text-slate-500">{editingDocVehicle.name} ({editingDocVehicle.registration_number})</p>
-                </CardHeader>
-                <CardContent className="p-6 space-y-4">
-                  <div className="space-y-2">
-                    <Label>Document Type</Label>
-                    <select className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-950"
-                      value={docUpdateForm.type} onChange={e => setDocUpdateForm({...docUpdateForm, type: e.target.value})}>
-                      <option value="">Select Document</option>
-                      {vehicleDocumentTypes.map(t => <option key={t.id} value={t.name}>{t.name}</option>)}
-                    </select>
+          {/* Flat UI & Minimalist Vehicle Document Update & History Modal */}
+          <Dialog open={showDocModal} onOpenChange={open => { if (!open) setShowDocModal(false); }}>
+            <DialogContent className="max-w-3xl w-full max-h-[88vh] flex flex-col gap-0 p-0 overflow-hidden border border-slate-200 dark:border-slate-800 shadow-xl rounded-xl">
+              {/* Flat Header */}
+              <div className="px-5 py-3.5 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                <div className="flex items-center gap-2.5">
+                  <div className="h-8 w-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-700 dark:text-slate-200 shrink-0">
+                    <Truck className="h-4 w-4" />
                   </div>
-                  <div className="space-y-2">
-                    <Label>Expiry Date</Label>
-                    <Input type="date" value={docUpdateForm.date} onChange={e => setDocUpdateForm({...docUpdateForm, date: e.target.value})} />
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100">
+                        {editingDocVehicle?.name}
+                      </h3>
+                      <span className="font-mono text-xs font-bold text-blue-600 dark:text-blue-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">
+                        {editingDocVehicle?.registration_number}
+                      </span>
+                      {editingDocVehicle?.type && (
+                        <span className="text-[10px] uppercase font-semibold text-slate-400">
+                          · {editingDocVehicle.type}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex gap-3 pt-2">
-                    <Button className="flex-1 bg-blue-600" onClick={() => {
-                      if (docUpdateForm.type && docUpdateForm.date) {
-                        updateVehicleDocument(editingDocVehicle.id, docUpdateForm.type, docUpdateForm.date);
-                        setShowDocUpdateForm(false);
-                      }
-                    }}>Update</Button>
-                    <Button variant="outline" className="flex-1" onClick={() => setShowDocUpdateForm(false)}>Cancel</Button>
+                </div>
+
+                {/* Flat Stats Chips */}
+                <div className="flex items-center gap-1.5 text-xs font-semibold">
+                  {docStats.expired > 0 && (
+                    <span className="px-2 py-0.5 rounded text-[11px] font-bold text-rose-600 bg-rose-50 dark:bg-rose-950/40 dark:text-rose-400 border border-rose-200 dark:border-rose-900/60">
+                      {docStats.expired} Expired
+                    </span>
+                  )}
+                  {docStats.expiringSoon > 0 && (
+                    <span className="px-2 py-0.5 rounded text-[11px] font-bold text-amber-600 bg-amber-50 dark:bg-amber-950/40 dark:text-amber-400 border border-amber-200 dark:border-amber-900/60">
+                      {docStats.expiringSoon} Expiring Soon
+                    </span>
+                  )}
+                  <span className="px-2 py-0.5 rounded text-[11px] font-medium text-emerald-700 bg-emerald-50 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/60">
+                    {docStats.valid} Valid
+                  </span>
+                  {docStats.notSet > 0 && (
+                    <span className="px-2 py-0.5 rounded text-[11px] font-medium text-slate-500 bg-slate-100 dark:bg-slate-800 dark:text-slate-400">
+                      {docStats.notSet} Not Set
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Flat Tabs & Action Bar */}
+              <div className="px-5 py-2.5 border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/50 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setDocModalTab('update')}
+                    className={cn(
+                      "px-3 py-1 text-xs font-bold rounded-md transition-colors",
+                      docModalTab === 'update'
+                        ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 shadow-2xs"
+                        : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+                    )}
+                  >
+                    Edit Expiry Dates
+                    {docChangesCount > 0 && (
+                      <span className="ml-1.5 px-1 py-0.2 rounded text-[10px] font-extrabold bg-blue-600 text-white">
+                        {docChangesCount}
+                      </span>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setDocModalTab('history')}
+                    className={cn(
+                      "px-3 py-1 text-xs font-bold rounded-md transition-colors flex items-center gap-1",
+                      docModalTab === 'history'
+                        ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 shadow-2xs"
+                        : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+                    )}
+                  >
+                    <span>History</span>
+                    <span className="px-1 py-0.2 rounded text-[10px] text-slate-500 font-semibold">
+                      ({editingDocVehicle?.documents?._history?.length || 0})
+                    </span>
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <div className="relative flex-1 sm:w-52">
+                    <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="Filter documents..."
+                      value={docModalSearch}
+                      onChange={e => setDocModalSearch(e.target.value)}
+                      className="w-full h-7 pl-7 pr-6 text-xs rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
+                    />
+                    {docModalSearch && (
+                      <button
+                        type="button"
+                        onClick={() => setDocModalSearch('')}
+                        className="absolute right-2 top-2 text-slate-400 hover:text-slate-600"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    )}
                   </div>
-                </CardContent>
-              </Card>
-            </div>
-          )}
+
+                  {docModalTab === 'update' && (docStats.expired > 0 || docStats.expiringSoon > 0 || docStats.notSet > 0) && (
+                    <button
+                      type="button"
+                      onClick={handleRenewAllExpired}
+                      className="h-7 px-2.5 text-xs font-bold rounded border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 hover:bg-amber-100 flex items-center gap-1 shrink-0 transition-colors"
+                      title="Set +1 Year renewal for all expired or missing documents"
+                    >
+                      <Sparkles className="w-3 h-3 text-amber-600 dark:text-amber-400" />
+                      Renew Overdue (+1Y)
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Flat Table Body */}
+              <div className="flex-1 overflow-y-auto p-0 bg-white dark:bg-slate-900 max-h-[58vh]">
+                {docModalTab === 'update' ? (
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-slate-100/70 dark:bg-slate-800/60 text-[10px] uppercase font-bold tracking-wider text-slate-500 border-b border-slate-200 dark:border-slate-800">
+                        <th className="px-4 py-2">Document</th>
+                        <th className="px-3 py-2">Status</th>
+                        <th className="px-3 py-2 text-slate-400">Current Expiry</th>
+                        <th className="px-3 py-2 text-center">Presets</th>
+                        <th className="px-3 py-2">New Expiry Date</th>
+                        <th className="px-3 py-2 text-right">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                      {filteredDocTypesForModal.length === 0 ? (
+                        <tr>
+                          <td colSpan={6} className="px-4 py-8 text-center text-slate-400 italic">
+                            No document types match your search.
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredDocTypesForModal.map(type => {
+                          const originalDate = normalizeDate(editingDocVehicle?.documents?.[type.name] || '');
+                          const currentDateVal = docFormValues[type.name] || '';
+                          const isModified = originalDate !== currentDateVal;
+                          const originalStatus = getDocStatusInfo(originalDate);
+
+                          return (
+                            <tr
+                              key={type.id}
+                              className={cn(
+                                "transition-colors group",
+                                isModified
+                                  ? "bg-blue-50/40 dark:bg-blue-950/20"
+                                  : originalStatus.status === 'expired'
+                                  ? "bg-rose-50/20 dark:bg-rose-950/10 hover:bg-rose-50/40"
+                                  : "hover:bg-slate-50 dark:hover:bg-slate-800/40"
+                              )}
+                            >
+                              {/* Document Name */}
+                              <td className="px-4 py-2.5 font-bold text-slate-800 dark:text-slate-200">
+                                <div className="flex items-center gap-1.5">
+                                  <span>{type.name}</span>
+                                  {isModified && (
+                                    <span className="w-1.5 h-1.5 rounded-full bg-blue-600 dark:bg-blue-400" title="Modified" />
+                                  )}
+                                </div>
+                              </td>
+
+                              {/* Status Badge */}
+                              <td className="px-3 py-2.5">
+                                <span className={cn("px-2 py-0.5 rounded text-[10px] font-bold inline-block border", originalStatus.badgeClass)}>
+                                  {originalStatus.label}
+                                </span>
+                              </td>
+
+                              {/* Current Recorded Expiry */}
+                              <td className="px-3 py-2.5 text-slate-600 dark:text-slate-400 font-medium">
+                                {originalDate ? (
+                                  <span className={originalStatus.status === 'expired' ? 'text-rose-600 dark:text-rose-400 font-bold' : ''}>
+                                    {formatDisplayDate(originalDate)}
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-300 dark:text-slate-600 italic">Not set</span>
+                                )}
+                              </td>
+
+                              {/* Quick Presets */}
+                              <td className="px-3 py-2.5 text-center">
+                                <div className="inline-flex items-center rounded border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-0.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleQuickRenew(type.name, 12)}
+                                    className="px-1.5 py-0.5 text-[10px] font-bold text-slate-700 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-white dark:hover:bg-slate-700 rounded transition-colors"
+                                    title="Renew +1 Year"
+                                  >
+                                    +1Y
+                                  </button>
+                                  <span className="text-slate-300 dark:text-slate-600 text-[10px]">|</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleQuickRenew(type.name, 6)}
+                                    className="px-1.5 py-0.5 text-[10px] font-bold text-slate-700 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-white dark:hover:bg-slate-700 rounded transition-colors"
+                                    title="Renew +6 Months"
+                                  >
+                                    +6M
+                                  </button>
+                                </div>
+                              </td>
+
+                              {/* Date Input */}
+                              <td className="px-3 py-2.5">
+                                <input
+                                  type="date"
+                                  value={currentDateVal}
+                                  onChange={e => setDocFormValues(prev => ({ ...prev, [type.name]: e.target.value }))}
+                                  className={cn(
+                                    "h-7 px-2 text-xs font-semibold rounded border bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white transition-colors focus:outline-none focus:bg-white dark:focus:bg-slate-900",
+                                    isModified
+                                      ? "border-blue-500 ring-1 ring-blue-500/20 font-bold"
+                                      : "border-slate-200 dark:border-slate-700 hover:border-slate-300"
+                                  )}
+                                />
+                              </td>
+
+                              {/* Row Actions */}
+                              <td className="px-3 py-2.5 text-right">
+                                <div className="flex items-center justify-end gap-1">
+                                  {currentDateVal && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleClearDocDate(type.name)}
+                                      className="px-1.5 py-0.5 text-[10px] font-semibold text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded transition-colors"
+                                      title="Clear date"
+                                    >
+                                      Clear
+                                    </button>
+                                  )}
+                                  {isModified && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleResetDocDate(type.name)}
+                                      className="p-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded transition-colors"
+                                      title="Reset to original date"
+                                    >
+                                      <RotateCcw className="w-3 h-3" />
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                ) : (
+                  /* Flat History List */
+                  <div className="p-4 space-y-2">
+                    {vehicleDocHistory.length === 0 ? (
+                      <div className="text-center py-10 text-slate-400 text-xs">
+                        <History className="w-6 h-6 mx-auto mb-1.5 opacity-30" />
+                        <p>No document renewals logged yet for this vehicle.</p>
+                      </div>
+                    ) : (
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead>
+                          <tr className="text-[10px] uppercase font-bold tracking-wider text-slate-400 border-b border-slate-200 dark:border-slate-800">
+                            <th className="py-1.5 px-2">Document</th>
+                            <th className="py-1.5 px-2">Previous Expiry</th>
+                            <th className="py-1.5 px-2">New Expiry</th>
+                            <th className="py-1.5 px-2 text-right">Updated At</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                          {vehicleDocHistory.map((h, idx) => (
+                            <tr key={h.id || idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                              <td className="py-2 px-2 font-bold text-slate-800 dark:text-slate-200">
+                                {h.doc_type}
+                              </td>
+                              <td className="py-2 px-2 text-slate-500">
+                                {h.previous_date ? formatDisplayDate(h.previous_date) : 'Not set'}
+                              </td>
+                              <td className="py-2 px-2 font-bold text-emerald-600 dark:text-emerald-400">
+                                {h.new_date ? formatDisplayDate(h.new_date) : 'Cleared'}
+                              </td>
+                              <td className="py-2 px-2 text-right text-slate-400 font-mono text-[11px]">
+                                {format(new Date(h.updated_at), 'dd/MM/yyyy HH:mm')}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Flat Footer */}
+              <div className="px-5 py-3 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center justify-between gap-3">
+                <div className="text-xs text-slate-500">
+                  {docChangesCount > 0 ? (
+                    <span className="font-bold text-blue-600 dark:text-blue-400">
+                      {docChangesCount} document date{docChangesCount > 1 ? 's' : ''} modified
+                    </span>
+                  ) : (
+                    <span className="text-slate-400 italic">No unsaved changes</span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowDocModal(false)}
+                    className="h-8 text-xs font-semibold"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={handleSaveAllDocs}
+                    className="h-8 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs gap-1.5 px-4 shadow-2xs"
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                    Save Changes
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
 
           {filteredVehicles.length === 0 ? (
             <Card className="border-none shadow-sm bg-white dark:bg-slate-900 p-10 text-center text-slate-400 text-sm italic">
@@ -1999,14 +3206,16 @@ export function VehicleManager() {
                       <p className="text-xs font-mono font-bold text-blue-600">{v.registration_number}</p>
                     </div>
                     {priv.canEditDocuments && (
-                      <Button variant="ghost" size="sm" className="h-7 text-[10px] uppercase font-bold text-blue-600 px-2" 
-                        onClick={() => {
-                          setEditingDocVehicle(v);
-                          setDocUpdateForm({ type: '', date: '' });
-                          setShowDocUpdateForm(true);
-                        }}>
-                        Update
-                      </Button>
+                      <div className="flex items-center gap-1">
+                        <Button variant="ghost" size="sm" className="h-7 text-[10px] uppercase font-bold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 px-2" 
+                          onClick={() => openDocModal(v, 'history')}>
+                          <History className="h-3 w-3 mr-1" /> History
+                        </Button>
+                        <Button variant="ghost" size="sm" className="h-7 text-[10px] uppercase font-bold text-blue-600 hover:text-blue-700 dark:text-blue-400 px-2" 
+                          onClick={() => openDocModal(v, 'update')}>
+                          Update
+                        </Button>
+                      </div>
                     )}
                   </div>
                   <div className="flex-1 p-0">

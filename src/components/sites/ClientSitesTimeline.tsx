@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import {
   format, parseISO, differenceInDays, addDays, subDays, startOfMonth, endOfMonth,
   eachDayOfInterval, isToday, isWithinInterval, eachWeekOfInterval
@@ -58,6 +58,63 @@ export function ClientSitesTimeline({ selectedClient, onOpenSite360 }: Props) {
   const [datePreset, setDatePreset] = useState<DatePreset>('all');
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
   const [userZoomSelected, setUserZoomSelected] = useState(false);
+
+  // Drag-to-Scroll (Hand Pan) State & Handlers
+  const timelineScrollRef = useRef<HTMLDivElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStartX = useRef(0);
+  const dragStartY = useRef(0);
+  const scrollLeftRef = useRef(0);
+  const scrollTopRef = useRef(0);
+  const hasDragged = useRef(false);
+
+  const handleTimelineMouseDown = (e: React.MouseEvent) => {
+    // Only capture primary left-clicks and ignore clicks with modifier keys
+    if (e.button !== 0 || e.ctrlKey || e.metaKey || window.matchMedia('(pointer: coarse)').matches) return;
+
+    const target = e.target as HTMLElement;
+    // Don't hijack interaction if clicking interactive controls like inputs or modals
+    if (target.closest('input, select, textarea, [role="dialog"]')) return;
+
+    const container = timelineScrollRef.current;
+    if (!container) return;
+
+    dragStartX.current = e.pageX - container.offsetLeft;
+    dragStartY.current = e.pageY - container.offsetTop;
+    scrollLeftRef.current = container.scrollLeft;
+    scrollTopRef.current = container.scrollTop;
+    hasDragged.current = false;
+
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      const x = moveEvent.pageX - container.offsetLeft;
+      const y = moveEvent.pageY - container.offsetTop;
+      const walkX = x - dragStartX.current;
+      const walkY = y - dragStartY.current;
+
+      if (!hasDragged.current && (Math.abs(walkX) > 4 || Math.abs(walkY) > 4)) {
+        hasDragged.current = true;
+        setIsDragging(true);
+      }
+
+      if (hasDragged.current) {
+        moveEvent.preventDefault();
+        container.scrollLeft = scrollLeftRef.current - walkX;
+        container.scrollTop = scrollTopRef.current - walkY;
+      }
+    };
+
+    const onMouseUp = () => {
+      setTimeout(() => {
+        setIsDragging(false);
+        hasDragged.current = false;
+      }, 50);
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+    };
+
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+  };
 
   // Escape key handler for fullscreen
   useEffect(() => {
@@ -494,10 +551,15 @@ export function ClientSitesTimeline({ selectedClient, onOpenSite360 }: Props) {
       </div>
 
       {/* ── Multi-Site Master Gantt Chart (One Bar Per Site) ── */}
-      <div className={cn(
-        "rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm overflow-auto style-scroll relative",
-        isFullscreen ? "max-h-[calc(100vh-140px)]" : "max-h-[calc(100vh-230px)] min-h-[520px]"
-      )}>
+      <div
+        ref={timelineScrollRef}
+        onMouseDown={handleTimelineMouseDown}
+        className={cn(
+          "rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm overflow-auto style-scroll relative",
+          isDragging ? "cursor-grabbing select-none" : "cursor-grab",
+          isFullscreen ? "max-h-[calc(100vh-140px)]" : "max-h-[calc(100vh-230px)] min-h-[520px]"
+        )}
+      >
         <div style={{ minWidth: `${gridContainerWidth + 240}px` }}>
           
           {/* Sticky Header: Months & Granular Intervals (Fixed at Top) */}
@@ -618,8 +680,15 @@ export function ClientSitesTimeline({ selectedClient, onOpenSite360 }: Props) {
                       <div className="p-3 border-r border-slate-200 dark:border-slate-800 flex flex-col justify-center bg-white dark:bg-slate-900 sticky left-0 z-20 shadow-xs">
                         <div className="flex items-center justify-between gap-1.5">
                           <button
-                            onClick={() => onOpenSite360?.(bar.siteObj)}
-                            className="font-bold text-xs text-slate-900 dark:text-white hover:text-indigo-600 dark:hover:text-indigo-400 text-left truncate flex items-center gap-1"
+                            onClick={(e) => {
+                              if (hasDragged.current) {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                return;
+                              }
+                              onOpenSite360?.(bar.siteObj);
+                            }}
+                            className="font-bold text-xs text-slate-900 dark:text-white hover:text-indigo-600 dark:hover:text-indigo-400 text-left truncate flex items-center gap-1 cursor-pointer"
                           >
                             <span className="truncate">{bar.siteName}</span>
                             <ExternalLink className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 text-indigo-500" />
@@ -647,7 +716,14 @@ export function ClientSitesTimeline({ selectedClient, onOpenSite360 }: Props) {
                       {/* Single Continuous Project Bar (Start Date -> End Date) */}
                       <div className="relative py-2.5 px-1 flex items-center min-h-[52px]">
                         <button
-                          onClick={() => setSelectedBar(bar)}
+                          onClick={(e) => {
+                            if (hasDragged.current) {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              return;
+                            }
+                            setSelectedBar(bar);
+                          }}
                           style={{ left, width }}
                           title={`${bar.siteName} (${bar.durationDays} Days): ${format(bar.startDate, 'MMM d, yyyy')} ➔ ${format(bar.endDate, 'MMM d, yyyy')}`}
                           className={cn(

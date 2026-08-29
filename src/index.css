@@ -981,3 +981,39 @@ html.dark.ui-brutalism {
     print-color-adjust: exact !important;
   }
 }
+
+/* ══════════════════════════════════════════════════════════════════════
+   GLOBAL STICKY TABLE HEADERS
+   Guarantees all table column headers stay visible when scrolling.
+   ══════════════════════════════════════════════════════════════════════ */
+table thead,
+.table-sticky-header thead,
+thead.sticky-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+table thead tr {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+table thead th,
+.table-sticky-header thead th,
+thead.sticky-header th {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background-color: inherit;
+}
+
+/* Default background fallback if thead has no background color */
+table:not([class*="bg-"]) thead:not([class*="bg-"]) th:not([class*="bg-"]) {
+  background-color: var(--color-background, #ffffff);
+}
+.dark table:not([class*="bg-"]) thead:not([class*="bg-"]) th:not([class*="bg-"]) {
+  background-color: #0f172a;
+}
+

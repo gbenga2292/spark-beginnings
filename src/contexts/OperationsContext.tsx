@@ -1,10 +1,11 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import {
   Asset, Waybill, AssetCategory, AssetType, AssetStatus, WaybillStatus, WaybillType, 
   Checkout, MaintenanceAsset, MaintenanceSession, MaintenanceLogType, ServiceStatus,
   OperationalStatus,
   Vehicle, VehicleTripLeg, VehicleDocumentType, DailyMachineLog, AssetPumpDate,
-  MaintenanceCertificate, VehicleFuelLog, DieselRefill, SiteHoldPeriod
+  MaintenanceCertificate, VehicleFuelLog, DieselRefill, SiteHoldPeriod,
+  AssetBatch, AssetMovement, MovementType
 } from '../types/operations';
 import { supabase } from '@/src/integrations/supabase/client';
 import { useAppStore } from '../store/appStore';
@@ -60,13 +61,28 @@ interface OperationsContextType {
   maintenanceAssets: MaintenanceAsset[];
   maintenanceSessions: MaintenanceSession[];
   dailyMachineLogs: DailyMachineLog[];
+  assetMovements: AssetMovement[];
   
   // Asset methods
   addAsset: (asset: Omit<Asset, 'id' | 'availableQuantity'>) => void;
   bulkAddAssets: (assets: Omit<Asset, 'id' | 'availableQuantity'>[]) => void;
   updateAsset: (id: string, updates: Partial<Asset>) => void;
   deleteAsset: (id: string) => void;
-  restockAssets: (items: { assetId: string, quantity: number, totalCost: number }[]) => void;
+  restockAssets: (items: { assetId: string, quantity: number, totalCost: number, batchNumber?: string, expiryDate?: string | null, supplier?: string }[]) => void;
+  logAssetMovement: (movement: Omit<AssetMovement, 'id' | 'createdAt'>) => Promise<void>;
+  backfillHistoricalMovements: () => Promise<number>;
+  consumeAssetStockFIFO: (
+    assetId: string, 
+    quantityToConsume: number, 
+    options?: { 
+      reason?: string; 
+      referenceId?: string; 
+      referenceType?: string; 
+      siteId?: string; 
+      siteName?: string; 
+      notes?: string;
+    }
+  ) => Promise<{ success: boolean; depletedBatches: { batchId: string; batchNumber: string; qty: number; unitCost: number }[]; totalCost: number; message?: string }>;
   
   // Waybill methods
   createWaybill: (waybill: Omit<Waybill, 'id' | 'status'> & { id?: string; status?: WaybillStatus }) => void;
@@ -76,7 +92,7 @@ interface OperationsContextType {
 
   // Checkout methods
   addCheckout: (checkout: Omit<Checkout, 'id' | 'status' | 'checkoutDate' | 'returnedQuantity'>) => void;
-  updateCheckoutStatus: (id: string, updates: Partial<Checkout>) => void;
+  updateCheckoutStatus: (id: string, updates: Partial<Checkout> & { condition?: string; notes?: string }) => void;
   deleteCheckout: (id: string) => void;
 
   // Maintenance methods
@@ -110,7 +126,21 @@ interface OperationsContextType {
   logDailyActivity: (log: Omit<DailyMachineLog, 'id' | 'created_at'>) => Promise<void>;
   deleteDailyLog: (logId: string) => Promise<void>;
   sitePumpDates: AssetPumpDate[];
-  persistSitePumpDates: (assetId: string, siteId: string, pumpStartDate: string, pumpStopDate: string | null) => Promise<void>;
+  persistSitePumpDates: (assetId: string, siteId: string, pumpStartDate: string, pumpStopDate: string | null, replacedAssetId?: string | null, swapReason?: string | null) => Promise<void>;
+  swapSiteMachine: (params: {
+    siteId: string;
+    siteName: string;
+    outgoingAssetId: string;
+    outgoingAssetName: string;
+    incomingAssetId: string;
+    incomingAssetName: string;
+    swapDate: string;
+    swapReason?: string;
+    driverName?: string;
+    vehicleNo?: string;
+    createWaybills?: boolean;
+    linkInvoices?: boolean;
+  }) => Promise<void>;
 
   // Site Hold Periods
   siteHoldPeriods: SiteHoldPeriod[];
@@ -159,6 +189,7 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
   const [vehicleFuelLogs, setVehicleFuelLogs] = useState<VehicleFuelLog[]>([]);
   const [dieselRefills, setDieselRefills] = useState<DieselRefill[]>([]);
   const [siteHoldPeriods, setSiteHoldPeriods] = useState<SiteHoldPeriod[]>([]);
+  const [assetMovements, setAssetMovements] = useState<AssetMovement[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
 
   const { 
@@ -362,7 +393,8 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
           { data: dbPumpDates },
           { data: dbFuelLogs },
           { data: dbDieselRefills },
-          { data: dbHoldPeriods }
+          { data: dbHoldPeriods },
+          { data: dbMovements }
         ] = await Promise.all([
           supabase.from('operations_assets').select('*'),
           supabase.from('operations_waybills').select('*'),
@@ -372,7 +404,8 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
           supabase.from('operations_site_pump_dates').select('*'),
           supabase.from('vehicle_fuel_logs').select('*').order('date', { ascending: false }),
           supabase.from('diesel_refills').select('*').order('date', { ascending: false }),
-          supabase.from('site_hold_periods').select('*').order('created_at', { ascending: false })
+          supabase.from('site_hold_periods').select('*').order('created_at', { ascending: false }),
+          supabase.from('operations_asset_movements').select('*').order('created_at', { ascending: false })
         ]);
 
         if (dbAssets) {
@@ -396,6 +429,10 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
               missingQuantity,
               damagedQuantity,
               unitOfMeasurement: a.unit,
+              packUnit: a.pack_unit,
+              packSize: a.pack_size ? Number(a.pack_size) : undefined,
+              hasExpiry: a.has_expiry || false,
+              batches: a.batches || [],
               status: a.status,
               operationalStatus: (a.operational_status as OperationalStatus) || 'active',
               location: a.location,
@@ -414,6 +451,31 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
           }));
         }
 
+        if (dbMovements) {
+          setAssetMovements(dbMovements.map((m: any): AssetMovement => ({
+            id: m.id,
+            assetId: m.asset_id,
+            assetName: m.asset_name,
+            movementType: m.movement_type as MovementType,
+            quantityDelta: Number(m.quantity_delta || 0),
+            previousQuantity: Number(m.previous_quantity || 0),
+            newQuantity: Number(m.new_quantity || 0),
+            unitCost: m.unit_cost ? Number(m.unit_cost) : undefined,
+            totalCost: m.total_cost ? Number(m.total_cost) : undefined,
+            reasonCode: m.reason_code,
+            referenceId: m.reference_id,
+            referenceType: m.reference_type,
+            siteId: m.site_id,
+            siteName: m.site_name,
+            batchId: m.batch_id,
+            batchNumber: m.batch_number,
+            actorId: m.actor_id,
+            actorName: m.actor_name,
+            notes: m.notes,
+            createdAt: m.created_at
+          })));
+        }
+
         if (dbPumpDates) {
           setSitePumpDates(dbPumpDates.map((p: any) => ({
             id: p.id,
@@ -421,6 +483,8 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
             siteId: p.site_id,
             pumpStartDate: p.pump_start_date,
             pumpStopDate: p.pump_stop_date,
+            replacedAssetId: p.replaced_asset_id || null,
+            swapReason: p.swap_reason || null,
             created_at: p.created_at
           })));
         }
@@ -468,6 +532,8 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
             assetName: c.asset_name,
             quantity: c.quantity,
             status: c.status,
+            condition: c.condition || undefined,
+            notes: c.notes || undefined,
             checkoutDate: c.checkout_date,
             expectedReturnDate: c.expected_return_date,
             returnedQuantity: c.returned_quantity,
@@ -634,6 +700,10 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
         missingQuantity,
         damagedQuantity,
         unitOfMeasurement: a.unit,
+        packUnit: a.pack_unit,
+        packSize: a.pack_size ? Number(a.pack_size) : undefined,
+        hasExpiry: a.has_expiry || false,
+        batches: a.batches || [],
         status: a.status,
         operationalStatus: (a.operational_status as OperationalStatus) || 'active',
         location: a.location,
@@ -657,6 +727,8 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
       siteId: p.site_id,
       pumpStartDate: p.pump_start_date,
       pumpStopDate: p.pump_stop_date,
+      replacedAssetId: p.replaced_asset_id || null,
+      swapReason: p.swap_reason || null,
       created_at: p.created_at
     });
 
@@ -978,6 +1050,366 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const logAssetMovement = async (movement: Omit<AssetMovement, 'id' | 'createdAt'>) => {
+    const newMovement: AssetMovement = {
+      ...movement,
+      id: crypto.randomUUID(),
+      createdAt: new Date().toISOString(),
+      actorId: movement.actorId || user?.id,
+      actorName: movement.actorName || user?.user_metadata?.full_name || user?.email || 'System User'
+    };
+
+    setAssetMovements(prev => [newMovement, ...prev]);
+
+    try {
+      await supabase.from('operations_asset_movements').insert({
+        id: newMovement.id,
+        asset_id: newMovement.assetId,
+        asset_name: newMovement.assetName,
+        movement_type: newMovement.movementType,
+        quantity_delta: newMovement.quantityDelta,
+        previous_quantity: newMovement.previousQuantity,
+        new_quantity: newMovement.newQuantity,
+        unit_cost: newMovement.unitCost,
+        total_cost: newMovement.totalCost,
+        reason_code: newMovement.reasonCode,
+        reference_id: newMovement.referenceId,
+        reference_type: newMovement.referenceType,
+        site_id: newMovement.siteId,
+        site_name: newMovement.siteName,
+        batch_id: newMovement.batchId,
+        batch_number: newMovement.batchNumber,
+        actor_id: newMovement.actorId,
+        actor_name: newMovement.actorName,
+        notes: newMovement.notes,
+        created_at: newMovement.createdAt
+      });
+    } catch (err) {
+      console.error('Failed to log asset movement to DB:', err);
+    }
+  };
+
+  const backfillHistoricalMovements = async (silent: boolean = false): Promise<number> => {
+    const historicalMovements: AssetMovement[] = [];
+    const existingRefIds = new Set(assetMovements.map(m => `${m.referenceId || ''}-${m.assetId}-${m.movementType}-${m.createdAt}`));
+
+    // 1. Scan Assets for Baseline & Restock History
+    assets.forEach(asset => {
+      // Past restock history
+      if (asset.restockHistory && asset.restockHistory.length > 0) {
+        asset.restockHistory.forEach((rec, idx) => {
+          const dedupeKey = `restock-${asset.id}-${rec.date}-${idx}`;
+          if (!existingRefIds.has(dedupeKey)) {
+            historicalMovements.push({
+              id: crypto.randomUUID(),
+              assetId: asset.id,
+              assetName: asset.name,
+              movementType: 'restock',
+              quantityDelta: rec.quantity,
+              previousQuantity: 0,
+              newQuantity: rec.quantity,
+              unitCost: rec.unitCost,
+              totalCost: rec.totalCost || (rec.unitCost * rec.quantity),
+              batchNumber: rec.batchNumber,
+              reasonCode: 'Historical Restock Delivery',
+              referenceId: rec.id || `RESTOCK-${rec.date}`,
+              referenceType: 'restock',
+              actorName: 'System Backfill',
+              createdAt: rec.date ? new Date(rec.date).toISOString() : new Date().toISOString()
+            });
+          }
+        });
+      } else if (asset.quantity > 0) {
+        // Initial baseline stock
+        const dedupeKey = `initial-${asset.id}`;
+        if (!existingRefIds.has(dedupeKey)) {
+          historicalMovements.push({
+            id: crypto.randomUUID(),
+            assetId: asset.id,
+            assetName: asset.name,
+            movementType: 'initial',
+            quantityDelta: asset.quantity,
+            previousQuantity: 0,
+            newQuantity: asset.quantity,
+            unitCost: asset.cost,
+            totalCost: (asset.cost || 0) * asset.quantity,
+            reasonCode: 'Initial Inventory Baseline',
+            referenceId: `INIT-${asset.id.slice(0, 8)}`,
+            referenceType: 'initial',
+            actorName: 'System Backfill',
+            createdAt: asset.created_at || '2026-01-01T00:00:00.000Z'
+          });
+        }
+      }
+    });
+
+    // 2. Scan Waybills for Dispatches & Returns
+    waybills.forEach(wb => {
+      if (wb.items && wb.items.length > 0) {
+        wb.items.forEach(item => {
+          const itemAsset = assets.find(a => a.id === item.assetId);
+          const assetName = item.assetName || itemAsset?.name || 'Asset Item';
+          const unitCost = itemAsset?.cost;
+          const createdAt = wb.issueDate ? new Date(wb.issueDate).toISOString() : (wb as any).created_at || new Date().toISOString();
+
+          if (wb.type === 'waybill') {
+            const dedupeKey = `${wb.id}-${item.assetId}-waybill_dispatch-${createdAt}`;
+            if (!existingRefIds.has(dedupeKey)) {
+              historicalMovements.push({
+                id: crypto.randomUUID(),
+                assetId: item.assetId,
+                assetName,
+                movementType: 'waybill_dispatch',
+                quantityDelta: -item.quantity,
+                previousQuantity: item.quantity,
+                newQuantity: 0,
+                unitCost,
+                totalCost: unitCost ? unitCost * item.quantity : undefined,
+                siteId: wb.siteId,
+                siteName: wb.siteName,
+                referenceId: wb.id,
+                referenceType: 'waybill',
+                reasonCode: `Dispatch to ${wb.siteName || 'Site'}`,
+                actorName: wb.driverName ? `Driver: ${wb.driverName}` : 'Waybill Dispatch',
+                createdAt
+              });
+            }
+          } else if (wb.type === 'return' || wb.status === 'return_completed') {
+            const dedupeKey = `${wb.id}-${item.assetId}-waybill_return-${createdAt}`;
+            if (!existingRefIds.has(dedupeKey)) {
+              historicalMovements.push({
+                id: crypto.randomUUID(),
+                assetId: item.assetId,
+                assetName,
+                movementType: 'waybill_return',
+                quantityDelta: item.quantity,
+                previousQuantity: 0,
+                newQuantity: item.quantity,
+                unitCost,
+                totalCost: unitCost ? unitCost * item.quantity : undefined,
+                siteId: wb.siteId,
+                siteName: wb.siteName,
+                referenceId: wb.id,
+                referenceType: 'return_waybill',
+                reasonCode: `Return from ${wb.siteName || 'Site'}`,
+                actorName: 'Waybill Return',
+                createdAt
+              });
+            }
+          }
+        });
+      }
+    });
+
+    // 3. Scan Quick Checkouts for Loans & Returns
+    checkouts.forEach(c => {
+      const itemAsset = assets.find(a => a.id === c.assetId);
+      const assetName = c.assetName || itemAsset?.name || 'Asset Item';
+      const unitCost = itemAsset?.cost;
+      const checkoutCreatedAt = c.checkoutDate ? new Date(c.checkoutDate).toISOString() : new Date().toISOString();
+
+      // Loan / Checkout outbound movement
+      const checkoutDedupeKey = `${c.id}-${c.assetId}-checkout-${checkoutCreatedAt}`;
+      if (!existingRefIds.has(checkoutDedupeKey)) {
+        historicalMovements.push({
+          id: crypto.randomUUID(),
+          assetId: c.assetId,
+          assetName,
+          movementType: 'checkout',
+          quantityDelta: -c.quantity,
+          previousQuantity: c.quantity,
+          newQuantity: 0,
+          unitCost,
+          totalCost: unitCost ? unitCost * c.quantity : undefined,
+          referenceId: c.id,
+          referenceType: 'checkout',
+          reasonCode: `Quick Checkout to ${c.employeeName || 'Staff'}`,
+          actorName: c.employeeName || 'Staff Checkout',
+          notes: `Loan duration: ${c.returnInDays || 0} days`,
+          createdAt: checkoutCreatedAt
+        });
+      }
+
+      // Return movement if any returned
+      if (c.returnedQuantity && c.returnedQuantity > 0) {
+        const returnCreatedAt = c.expectedReturnDate ? new Date(c.expectedReturnDate).toISOString() : checkoutCreatedAt;
+        const returnDedupeKey = `${c.id}-${c.assetId}-checkout_return-${returnCreatedAt}`;
+        if (!existingRefIds.has(returnDedupeKey)) {
+          historicalMovements.push({
+            id: crypto.randomUUID(),
+            assetId: c.assetId,
+            assetName,
+            movementType: 'checkout_return',
+            quantityDelta: c.returnedQuantity,
+            previousQuantity: 0,
+            newQuantity: c.returnedQuantity,
+            unitCost,
+            totalCost: unitCost ? unitCost * c.returnedQuantity : undefined,
+            referenceId: c.id,
+            referenceType: 'checkout_return',
+            reasonCode: `Quick Checkout Return from ${c.employeeName || 'Staff'}`,
+            actorName: c.employeeName || 'Staff Return',
+            createdAt: returnCreatedAt
+          });
+        }
+      }
+    });
+
+    if (historicalMovements.length === 0) {
+      if (!silent) toast.info('No unindexed past movements to backfill.');
+      return 0;
+    }
+
+    // Sort chronologically descending
+    historicalMovements.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    // Update in-memory state
+    setAssetMovements(prev => [...historicalMovements, ...prev]);
+
+    // Batch insert into Supabase
+    try {
+      const dbPayload = historicalMovements.map(m => ({
+        id: m.id,
+        asset_id: m.assetId,
+        asset_name: m.assetName,
+        movement_type: m.movementType,
+        quantity_delta: m.quantityDelta,
+        previous_quantity: m.previousQuantity,
+        new_quantity: m.newQuantity,
+        unit_cost: m.unitCost,
+        total_cost: m.totalCost,
+        reason_code: m.reasonCode,
+        reference_id: m.referenceId,
+        reference_type: m.referenceType,
+        site_id: m.siteId,
+        site_name: m.siteName,
+        batch_id: m.batchId,
+        batch_number: m.batchNumber,
+        actor_id: m.actorId,
+        actor_name: m.actorName,
+        notes: m.notes,
+        created_at: m.createdAt
+      }));
+
+      // Insert in chunks of 50
+      for (let i = 0; i < dbPayload.length; i += 50) {
+        const chunk = dbPayload.slice(i, i + 50);
+        await supabase.from('operations_asset_movements').upsert(chunk, { onConflict: 'id' });
+      }
+
+      if (!silent) {
+        toast.success(`Successfully backfilled ${historicalMovements.length} past stock movements!`);
+      }
+    } catch (err: any) {
+      console.error('Failed to backfill historical movements to DB:', err);
+      if (!silent) {
+        toast.warning(`Backfilled ${historicalMovements.length} movements locally (DB sync note: ${err.message || 'error'})`);
+      }
+    }
+
+    return historicalMovements.length;
+  };
+
+  const consumeAssetStockFIFO = async (
+    assetId: string, 
+    quantityToConsume: number, 
+    options?: { 
+      reason?: string; 
+      referenceId?: string; 
+      referenceType?: string; 
+      siteId?: string; 
+      siteName?: string; 
+      notes?: string;
+    }
+  ) => {
+    const asset = assets.find(a => a.id === assetId);
+    if (!asset) {
+      return { success: false, depletedBatches: [], totalCost: 0, message: 'Asset not found' };
+    }
+
+    const qtyToDeduct = Math.max(0, Number(quantityToConsume) || 0);
+    if (qtyToDeduct <= 0) {
+      return { success: true, depletedBatches: [], totalCost: 0 };
+    }
+
+    let remainingToDeduct = qtyToDeduct;
+    const existingBatches: AssetBatch[] = (asset.batches || []).map(b => ({ ...b }));
+    
+    // Sort active batches: earliest expiry date first; if no expiry, earliest received date first
+    const activeBatches = existingBatches
+      .filter(b => b.status === 'active' && b.remainingQuantity > 0)
+      .sort((a, b) => {
+        if (a.expiryDate && b.expiryDate) {
+          return new Date(a.expiryDate).getTime() - new Date(b.expiryDate).getTime();
+        }
+        if (a.expiryDate) return -1;
+        if (b.expiryDate) return 1;
+        return new Date(a.receivedDate).getTime() - new Date(b.receivedDate).getTime();
+      });
+
+    const depletedRecords: { batchId: string; batchNumber: string; qty: number; unitCost: number }[] = [];
+    let totalCost = 0;
+
+    for (const batch of activeBatches) {
+      if (remainingToDeduct <= 0) break;
+      const canTake = Math.min(batch.remainingQuantity, remainingToDeduct);
+      batch.remainingQuantity = Math.max(0, batch.remainingQuantity - canTake);
+      if (batch.remainingQuantity <= 0) {
+        batch.status = 'depleted';
+      }
+      remainingToDeduct -= canTake;
+      const cost = canTake * (batch.unitCost || asset.cost || 0);
+      totalCost += cost;
+      depletedRecords.push({
+        batchId: batch.id,
+        batchNumber: batch.batchNumber,
+        qty: canTake,
+        unitCost: batch.unitCost || asset.cost || 0
+      });
+    }
+
+    if (remainingToDeduct > 0) {
+      totalCost += remainingToDeduct * (asset.cost || 0);
+    }
+
+    const prevQuantity = asset.quantity;
+    const newQuantity = Math.max(0, asset.quantity - qtyToDeduct);
+    const updatedAsset: Asset = {
+      ...asset,
+      quantity: newQuantity,
+      availableQuantity: Math.max(0, newQuantity - ((asset.reservedQuantity || 0) + (asset.missingQuantity || 0) + (asset.damagedQuantity || 0) + (asset.usedQuantity || 0))),
+      batches: existingBatches
+    };
+
+    setAssets(prev => prev.map(a => a.id === assetId ? updatedAsset : a));
+    await persistAsset(updatedAsset);
+
+    // Log to movement ledger
+    await logAssetMovement({
+      assetId: asset.id,
+      assetName: asset.name,
+      movementType: 'consumable_burn',
+      quantityDelta: -qtyToDeduct,
+      previousQuantity: prevQuantity,
+      newQuantity: newQuantity,
+      unitCost: qtyToDeduct > 0 ? (totalCost / qtyToDeduct) : (asset.cost || 0),
+      totalCost,
+      reasonCode: options?.reason || 'Site Consumable Consumption',
+      referenceId: options?.referenceId,
+      referenceType: options?.referenceType || 'site_consumption',
+      siteId: options?.siteId,
+      siteName: options?.siteName,
+      batchNumber: depletedRecords.map(r => r.batchNumber).filter(Boolean).join(', ') || undefined,
+      notes: options?.notes
+    });
+
+    return {
+      success: true,
+      depletedBatches: depletedRecords,
+      totalCost
+    };
+  };
+
   const persistAsset = async (asset: Asset) => {
     try {
       const { error } = await supabase.from('operations_assets').upsert({
@@ -992,6 +1424,10 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
         missing_quantity: asset.missingQuantity || 0,
         damaged_quantity: asset.damagedQuantity || 0,
         unit: asset.unitOfMeasurement,
+        pack_unit: asset.packUnit,
+        pack_size: asset.packSize,
+        has_expiry: asset.hasExpiry || false,
+        batches: asset.batches || [],
         status: asset.status,
         location: asset.location,
         condition: asset.condition,
@@ -1042,6 +1478,8 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
       asset_name: checkout.assetName,
       quantity: checkout.quantity,
       status: checkout.status,
+      condition: checkout.condition,
+      notes: checkout.notes,
       checkout_date: checkout.checkoutDate,
       expected_return_date: checkout.expectedReturnDate,
       returned_quantity: checkout.returnedQuantity,
@@ -1061,20 +1499,48 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const addAsset = async (asset: Omit<Asset, 'id' | 'availableQuantity' | 'reservedQuantity' | 'missingQuantity' | 'damagedQuantity' | 'usedQuantity'>) => {
+    const assetId = crypto.randomUUID();
+    const initialBatch: AssetBatch | undefined = asset.quantity > 0 ? {
+      id: crypto.randomUUID(),
+      assetId,
+      batchNumber: `INIT-${new Date().toISOString().slice(0,10).replace(/-/g,'')}`,
+      receivedDate: new Date().toISOString().split('T')[0],
+      initialQuantity: asset.quantity,
+      remainingQuantity: asset.quantity,
+      unitCost: asset.cost || 0,
+      status: 'active'
+    } : undefined;
+
     const newAsset: Asset = {
       ...asset,
-      id: crypto.randomUUID(),
+      id: assetId,
       availableQuantity: asset.quantity,
       reservedQuantity: 0,
       usedQuantity: 0,
       missingQuantity: 0,
       damagedQuantity: 0,
+      batches: initialBatch ? [initialBatch] : (asset.batches || [])
     };
     
     setAssets(prev => [...prev, newAsset]);
     
     try {
       await persistAsset(newAsset);
+      if (newAsset.quantity > 0) {
+        logAssetMovement({
+          assetId: newAsset.id,
+          assetName: newAsset.name,
+          movementType: 'initial',
+          quantityDelta: newAsset.quantity,
+          previousQuantity: 0,
+          newQuantity: newAsset.quantity,
+          unitCost: newAsset.cost,
+          totalCost: (newAsset.cost || 0) * newAsset.quantity,
+          reasonCode: 'Initial Stock Creation',
+          referenceId: newAsset.id,
+          referenceType: 'asset_creation'
+        });
+      }
       toast.success('Asset added successfully');
     } catch (error) {
       setAssets(prev => prev.filter(a => a.id !== newAsset.id));
@@ -1082,15 +1548,30 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const bulkAddAssets = (newAssetsData: Omit<Asset, 'id' | 'availableQuantity'>[]) => {
-    const newAssets: Asset[] = newAssetsData.map(asset => ({
-      ...asset,
-      id: crypto.randomUUID(),
-      availableQuantity: asset.quantity,
-      reservedQuantity: 0,
-      usedQuantity: 0,
-      missingQuantity: 0,
-      damagedQuantity: 0,
-    }));
+    const newAssets: Asset[] = newAssetsData.map(asset => {
+      const assetId = crypto.randomUUID();
+      const initialBatch: AssetBatch | undefined = asset.quantity > 0 ? {
+        id: crypto.randomUUID(),
+        assetId,
+        batchNumber: `INIT-${new Date().toISOString().slice(0,10).replace(/-/g,'')}`,
+        receivedDate: new Date().toISOString().split('T')[0],
+        initialQuantity: asset.quantity,
+        remainingQuantity: asset.quantity,
+        unitCost: asset.cost || 0,
+        status: 'active'
+      } : undefined;
+
+      return {
+        ...asset,
+        id: assetId,
+        availableQuantity: asset.quantity,
+        reservedQuantity: 0,
+        usedQuantity: 0,
+        missingQuantity: 0,
+        damagedQuantity: 0,
+        batches: initialBatch ? [initialBatch] : (asset.batches || [])
+      };
+    });
     setAssets(prev => [...prev, ...newAssets]);
     
     supabase.from('operations_assets').upsert(newAssets.map(asset => ({
@@ -1105,6 +1586,10 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
       missing_quantity: asset.missingQuantity,
       damaged_quantity: asset.damagedQuantity,
       unit: asset.unitOfMeasurement,
+      pack_unit: asset.packUnit,
+      pack_size: asset.packSize,
+      has_expiry: asset.hasExpiry || false,
+      batches: asset.batches || [],
       status: asset.status,
       location: asset.location,
       condition: asset.condition,
@@ -1123,6 +1608,7 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
   const updateAsset = async (id: string, updates: Partial<Asset>) => {
     const originalAssets = assets;
     let targetAsset: Asset | undefined;
+    const existingAsset = assets.find(a => a.id === id);
 
     setAssets(prev => {
       const updated = prev.map(a => {
@@ -1140,6 +1626,22 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
     if (targetAsset) {
       try {
         await persistAsset(targetAsset);
+        if (existingAsset && existingAsset.quantity !== targetAsset.quantity) {
+          const delta = targetAsset.quantity - existingAsset.quantity;
+          logAssetMovement({
+            assetId: targetAsset.id,
+            assetName: targetAsset.name,
+            movementType: 'adjustment',
+            quantityDelta: delta,
+            previousQuantity: existingAsset.quantity,
+            newQuantity: targetAsset.quantity,
+            unitCost: targetAsset.cost,
+            totalCost: (targetAsset.cost || 0) * Math.abs(delta),
+            reasonCode: 'Manual Inventory Adjustment',
+            referenceId: targetAsset.id,
+            referenceType: 'asset_edit'
+          });
+        }
         toast.success('Asset updated successfully');
       } catch (error) {
         setAssets(originalAssets);
@@ -1148,32 +1650,93 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const deleteAsset = (id: string) => {
+    const asset = assets.find(a => a.id === id);
+    if (asset) {
+      logAssetMovement({
+        assetId: asset.id,
+        assetName: asset.name,
+        movementType: 'adjustment',
+        quantityDelta: -asset.quantity,
+        previousQuantity: asset.quantity,
+        newQuantity: 0,
+        unitCost: asset.cost,
+        totalCost: (asset.cost || 0) * asset.quantity,
+        reasonCode: 'Asset Deleted from Inventory',
+        referenceId: id,
+        referenceType: 'asset_delete'
+      });
+    }
     setAssets(prev => prev.filter(a => a.id !== id));
     supabase.from('operations_assets').delete().eq('id', id).then();
   };
 
-  const restockAssets = (items: { assetId: string, quantity: number, totalCost: number }[]) => {
+  const restockAssets = (items: { 
+    assetId: string; 
+    quantity: number; 
+    totalCost: number;
+    batchNumber?: string;
+    expiryDate?: string | null;
+    supplier?: string;
+  }[]) => {
     setAssets(prev => prev.map(asset => {
       const restockItem = items.find(i => i.assetId === asset.id);
       if (!restockItem) return asset;
 
-      const unitCost = restockItem.totalCost / restockItem.quantity;
+      const unitCost = restockItem.quantity > 0 ? (restockItem.totalCost / restockItem.quantity) : (asset.cost || 0);
       const newRecord = {
-        id: Math.random().toString(36).substr(2, 9),
+        id: crypto.randomUUID(),
         assetId: asset.id,
         quantity: restockItem.quantity,
         totalCost: restockItem.totalCost,
         unitCost,
         date: new Date().toISOString(),
+        batchNumber: restockItem.batchNumber,
+        expiryDate: restockItem.expiryDate,
+        supplier: restockItem.supplier
       };
 
+      const newBatch: AssetBatch = {
+        id: crypto.randomUUID(),
+        assetId: asset.id,
+        batchNumber: restockItem.batchNumber || `BATCH-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-${Math.floor(Math.random()*1000)}`,
+        supplier: restockItem.supplier,
+        receivedDate: new Date().toISOString().split('T')[0],
+        expiryDate: restockItem.expiryDate || null,
+        initialQuantity: restockItem.quantity,
+        remainingQuantity: restockItem.quantity,
+        unitCost,
+        status: 'active'
+      };
+
+      const prevQty = asset.quantity;
+      const newQty = asset.quantity + restockItem.quantity;
       const updated: Asset = {
         ...asset,
-        quantity: asset.quantity + restockItem.quantity,
-        availableQuantity: Math.max(0, (asset.quantity + restockItem.quantity) - ((asset.reservedQuantity || 0) + (asset.missingQuantity || 0) + (asset.damagedQuantity || 0) + (asset.usedQuantity || 0))),
-        restockHistory: [...(asset.restockHistory || []), newRecord]
+        quantity: newQty,
+        availableQuantity: Math.max(0, newQty - ((asset.reservedQuantity || 0) + (asset.missingQuantity || 0) + (asset.damagedQuantity || 0) + (asset.usedQuantity || 0))),
+        cost: unitCost > 0 ? unitCost : asset.cost,
+        restockHistory: [...(asset.restockHistory || []), newRecord],
+        batches: [...(asset.batches || []), newBatch]
       };
       persistAsset(updated);
+
+      logAssetMovement({
+        assetId: asset.id,
+        assetName: asset.name,
+        movementType: 'restock',
+        quantityDelta: restockItem.quantity,
+        previousQuantity: prevQty,
+        newQuantity: newQty,
+        unitCost,
+        totalCost: restockItem.totalCost,
+        reasonCode: 'Stock Delivery Restock',
+        referenceId: newRecord.id,
+        referenceType: 'restock',
+        batchId: newBatch.id,
+        batchNumber: newBatch.batchNumber,
+        notes: restockItem.supplier ? `Supplier: ${restockItem.supplier}` : undefined
+      });
+
       return updated;
     }));
   };
@@ -1196,6 +1759,24 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
             availableQuantity: Math.max(0, asset.quantity - (reservedQuantity + (asset.missingQuantity || 0) + (asset.damagedQuantity || 0) + (asset.usedQuantity || 0))),
           };
           persistAsset(updated);
+
+          logAssetMovement({
+            assetId: asset.id,
+            assetName: asset.name,
+            movementType: 'waybill_dispatch',
+            quantityDelta: -item.quantity,
+            previousQuantity: asset.quantity,
+            newQuantity: asset.quantity,
+            unitCost: asset.cost,
+            totalCost: (asset.cost || 0) * item.quantity,
+            reasonCode: `Dispatch to ${newWaybill.siteName || 'Site'}`,
+            referenceId: newWaybill.id,
+            referenceType: 'waybill',
+            siteId: newWaybill.siteId,
+            siteName: newWaybill.siteName,
+            notes: newWaybill.driverName ? `Driver: ${newWaybill.driverName}` : undefined
+          });
+
           return updated;
         }
         return asset;
@@ -1246,6 +1827,24 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
               availableQuantity: Math.max(0, asset.quantity - (reservedQuantity + damagedQuantity + missingQuantity + usedQuantity)),
             };
             persistAsset(updated);
+
+            logAssetMovement({
+              assetId: asset.id,
+              assetName: asset.name,
+              movementType: 'waybill_return',
+              quantityDelta: cond.good,
+              previousQuantity: asset.quantity,
+              newQuantity: asset.quantity,
+              unitCost: asset.cost,
+              totalCost: (asset.cost || 0) * cond.good,
+              reasonCode: `Return from ${waybill.siteName || 'Site'} (Good: ${cond.good}, Damaged: ${cond.damaged}, Missing: ${cond.missing})`,
+              referenceId: waybill.id,
+              referenceType: 'return_waybill',
+              siteId: waybill.siteId,
+              siteName: waybill.siteName,
+              notes: cond.damaged > 0 || cond.missing > 0 ? `Damaged: ${cond.damaged}, Missing: ${cond.missing}` : undefined
+            });
+
             return updated;
           }
           return asset;
@@ -1401,30 +2000,101 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
           availableQuantity: Math.max(0, asset.quantity - (reservedQuantity + (asset.missingQuantity || 0) + (asset.damagedQuantity || 0) + (asset.usedQuantity || 0))),
         };
         persistAsset(updated);
+
+        // Record outgoing movement to employee loan
+        logAssetMovement({
+          assetId: asset.id,
+          assetName: asset.name,
+          movementType: 'checkout',
+          quantityDelta: -checkout.quantity,
+          previousQuantity: asset.quantity,
+          newQuantity: asset.quantity,
+          unitCost: asset.cost,
+          totalCost: asset.cost ? asset.cost * checkout.quantity : undefined,
+          reasonCode: `Quick Checkout to ${checkout.employeeName || 'Staff'}`,
+          referenceId: newCheckout.id,
+          referenceType: 'checkout',
+          actorName: checkout.employeeName || 'Staff Loan',
+          notes: `Loan duration: ${checkout.returnInDays || 0} days`
+        });
+
         return updated;
       }
       return asset;
     }));
   };
 
-  const updateCheckoutStatus = (id: string, updates: Partial<Checkout>) => {
+  const updateCheckoutStatus = (id: string, updates: Partial<Checkout> & { condition?: string; notes?: string }) => {
     setCheckouts(prev => {
       const checkout = prev.find(c => c.id === id);
       if (!checkout) return prev;
       
-      if (updates.status && ['partial_returned', 'returned', 'outstanding'].includes(updates.status) && updates.returnedQuantity !== undefined) {
-        const delta = updates.returnedQuantity - (checkout.returnedQuantity || 0);
-        
+      const isStatusChange = updates.status && ['partial_returned', 'returned', 'outstanding', 'consumed'].includes(updates.status);
+      const isReturnedChange = updates.returnedQuantity !== undefined;
+
+      if (isStatusChange || isReturnedChange) {
+        const delta = (updates.returnedQuantity !== undefined ? updates.returnedQuantity : checkout.quantity) - (checkout.returnedQuantity || 0);
+        const condition = updates.condition || checkout.condition || '';
+        const isConsumed = condition.toLowerCase().includes('consumed') || updates.status === 'consumed';
+        const isDamaged = condition.toLowerCase().includes('damaged');
+        const isLost = condition.toLowerCase().includes('lost') || condition.toLowerCase().includes('missing');
+
         if (delta !== 0) {
           setAssets(assetsPrev => assetsPrev.map(asset => {
             if (asset.id === checkout.assetId) {
               const reservedQuantity = Math.max(0, (asset.reservedQuantity || 0) - delta);
+              let usedQuantity = asset.usedQuantity || 0;
+              let damagedQuantity = asset.damagedQuantity || 0;
+              let missingQuantity = asset.missingQuantity || 0;
+
+              if (delta > 0) {
+                if (isConsumed) {
+                  usedQuantity += delta;
+                } else if (isDamaged) {
+                  damagedQuantity += delta;
+                } else if (isLost) {
+                  missingQuantity += delta;
+                }
+              }
+
+              const availableQuantity = Math.max(0, asset.quantity - (reservedQuantity + missingQuantity + damagedQuantity + usedQuantity));
               const updated: Asset = {
                 ...asset,
                 reservedQuantity,
-                availableQuantity: Math.max(0, asset.quantity - (reservedQuantity + (asset.missingQuantity || 0) + (asset.damagedQuantity || 0) + (asset.usedQuantity || 0))),
+                usedQuantity,
+                damagedQuantity,
+                missingQuantity,
+                availableQuantity,
               };
               persistAsset(updated);
+
+              if (delta > 0) {
+                const movType: MovementType = isConsumed ? 'consumed' : isDamaged ? 'damage' : isLost ? 'loss' : 'checkout_return';
+                const reason = isConsumed 
+                  ? `Checkout Item Consumed by ${checkout.employeeName || 'Staff'}${updates.notes ? ` - ${updates.notes}` : ''}`
+                  : isDamaged
+                  ? `Checkout Item Returned Damaged by ${checkout.employeeName || 'Staff'}${updates.notes ? ` - ${updates.notes}` : ''}`
+                  : isLost
+                  ? `Checkout Item Lost/Missing by ${checkout.employeeName || 'Staff'}${updates.notes ? ` - ${updates.notes}` : ''}`
+                  : `Quick Checkout Return from ${checkout.employeeName || 'Staff'}${updates.notes ? ` - ${updates.notes}` : ''}`;
+
+                logAssetMovement({
+                  assetId: asset.id,
+                  assetName: asset.name,
+                  movementType: movType,
+                  quantityDelta: isConsumed ? -delta : delta,
+                  previousQuantity: asset.quantity,
+                  newQuantity: asset.quantity,
+                  unitCost: asset.cost,
+                  totalCost: asset.cost ? asset.cost * delta : undefined,
+                  reasonCode: reason,
+                  referenceId: checkout.id,
+                  referenceType: 'checkout_return',
+                  actorName: checkout.employeeName || 'Staff Return',
+                  notes: updates.notes
+                });
+              }
+
               return updated;
             }
             return asset;
@@ -1432,7 +2102,18 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
         }
       }
       
-      const updatedCheckout = { ...checkout, ...updates } as Checkout;
+      const computedStatus = (updates.condition?.toLowerCase().includes('consumed') || updates.status === 'consumed')
+        ? 'consumed' 
+        : updates.status || checkout.status;
+
+      const updatedCheckout = { 
+        ...checkout, 
+        ...updates, 
+        status: computedStatus,
+        condition: updates.condition || checkout.condition,
+        notes: updates.notes || checkout.notes 
+      } as Checkout;
+
       persistCheckout(updatedCheckout);
       return prev.map(c => c.id === id ? updatedCheckout : c);
     });
@@ -1731,18 +2412,37 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const persistSitePumpDates = async (assetId: string, siteId: string, pumpStartDate: string, pumpStopDate: string | null) => {
+  const persistSitePumpDates = async (
+    assetId: string,
+    siteId: string,
+    pumpStartDate: string,
+    pumpStopDate: string | null,
+    replacedAssetId?: string | null,
+    swapReason?: string | null
+  ) => {
     try {
       const existing = sitePumpDates.find(p => p.assetId === assetId && p.siteId === siteId);
       const id = existing?.id || crypto.randomUUID();
 
-      const payload = {
+      const payload: Record<string, any> = {
         id,
         asset_id: assetId,
         site_id: siteId,
         pump_start_date: pumpStartDate,
         pump_stop_date: pumpStopDate
       };
+
+      if (replacedAssetId !== undefined) {
+        payload.replaced_asset_id = replacedAssetId;
+      } else if (existing?.replacedAssetId) {
+        payload.replaced_asset_id = existing.replacedAssetId;
+      }
+
+      if (swapReason !== undefined) {
+        payload.swap_reason = swapReason;
+      } else if (existing?.swapReason) {
+        payload.swap_reason = existing.swapReason;
+      }
 
       const { data, error } = await supabase
         .from('operations_site_pump_dates')
@@ -1758,6 +2458,8 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
         siteId: data.site_id,
         pumpStartDate: data.pump_start_date,
         pumpStopDate: data.pump_stop_date,
+        replacedAssetId: data.replaced_asset_id || null,
+        swapReason: data.swap_reason || null,
         created_at: data.created_at
       };
 
@@ -1776,6 +2478,118 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
       console.error('Error persisting site pump dates:', error);
       toast.error(`Failed to save pump dates: ${error.message || 'Unknown error'}`);
       throw error;
+    }
+  };
+
+  const swapSiteMachine = async (params: {
+    siteId: string;
+    siteName: string;
+    outgoingAssetId: string;
+    outgoingAssetName: string;
+    incomingAssetId: string;
+    incomingAssetName: string;
+    swapDate: string;
+    swapReason?: string;
+    driverName?: string;
+    vehicleNo?: string;
+    createWaybills?: boolean;
+    linkInvoices?: boolean;
+  }) => {
+    const {
+      siteId,
+      siteName,
+      outgoingAssetId,
+      outgoingAssetName,
+      incomingAssetId,
+      incomingAssetName,
+      swapDate,
+      swapReason = 'Routine Maintenance',
+      driverName = 'Unassigned',
+      vehicleNo = '',
+      createWaybills = true,
+      linkInvoices = true,
+    } = params;
+
+    try {
+      // 1. Find outgoing machine's existing pump record
+      const outgoingExisting = sitePumpDates.find(p => p.assetId === outgoingAssetId && p.siteId === siteId);
+      const outgoingStartDate = outgoingExisting?.pumpStartDate || swapDate;
+
+      // Stop outgoing machine on swap date
+      await persistSitePumpDates(outgoingAssetId, siteId, outgoingStartDate, swapDate);
+
+      // Start incoming machine on swap date, linking to outgoing machine
+      await persistSitePumpDates(incomingAssetId, siteId, swapDate, null, outgoingAssetId, swapReason);
+
+      // 2. Generate waybills if requested
+      if (createWaybills) {
+        // Outbound Waybill for Incoming Machine
+        createWaybill({
+          type: 'waybill',
+          status: 'sent_to_site',
+          siteId,
+          siteName,
+          driverName,
+          vehicle: vehicleNo,
+          issueDate: swapDate,
+          sentToSiteDate: swapDate,
+          purpose: `Machine Swap: Replaces ${outgoingAssetName}`,
+          items: [{
+            assetId: incomingAssetId,
+            assetName: incomingAssetName,
+            quantity: 1
+          }]
+        });
+
+        // Return Waybill for Outgoing Machine
+        createWaybill({
+          type: 'return',
+          status: 'sent_to_site',
+          siteId,
+          siteName,
+          driverName,
+          vehicle: vehicleNo,
+          issueDate: swapDate,
+          sentToSiteDate: swapDate,
+          purpose: `Machine Swap: Replaced by ${incomingAssetName} (${swapReason})`,
+          items: [{
+            assetId: outgoingAssetId,
+            assetName: outgoingAssetName,
+            quantity: 1
+          }]
+        });
+      }
+
+      // 3. Auto-link to active invoices if requested
+      if (linkInvoices) {
+        try {
+          const { data: activeInvoices, error: invFetchErr } = await supabase
+            .from('billing_invoices')
+            .select('id, linked_asset_ids')
+            .or(`site_id.eq.${siteId},site_name.ilike.${siteName}`);
+
+          if (!invFetchErr && activeInvoices && activeInvoices.length > 0) {
+            for (const inv of activeInvoices) {
+              const currentLinked: string[] = Array.isArray(inv.linked_asset_ids) ? inv.linked_asset_ids : [];
+              if (currentLinked.includes(outgoingAssetId) && !currentLinked.includes(incomingAssetId)) {
+                const updatedLinked = [...currentLinked, incomingAssetId];
+                await supabase
+                  .from('billing_invoices')
+                  .update({ linked_asset_ids: updatedLinked })
+                  .eq('id', inv.id);
+              }
+            }
+          }
+        } catch (linkErr) {
+          console.warn('Could not auto-link invoices for swapped machine:', linkErr);
+        }
+      }
+
+      toast.success(`Successfully swapped ${outgoingAssetName} with ${incomingAssetName}`);
+    } catch (err: any) {
+      console.error('Error during machine swap:', err);
+      toast.error(`Machine swap failed: ${err.message || 'Unknown error'}`);
+      throw err;
     }
   };
 
@@ -1813,6 +2627,18 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
     ));
   };
 
+  // Automatic one-time background indexing of historical movements
+  const hasAutoBackfilledRef = useRef(false);
+  useEffect(() => {
+    if (!hasAutoBackfilledRef.current && assets.length > 0 && (waybills.length > 0 || checkouts.length > 0)) {
+      hasAutoBackfilledRef.current = true;
+      // Run silent backfill in background once data is ready
+      setTimeout(() => {
+        backfillHistoricalMovements(true).catch(e => console.error('Auto backfill error:', e));
+      }, 500);
+    }
+  }, [assets.length, waybills.length, checkouts.length]);
+
   return (
     <OperationsContext.Provider value={{
       assets,
@@ -1821,8 +2647,13 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
       maintenanceAssets,
       maintenanceSessions,
       dailyMachineLogs,
+      assetMovements,
+      logAssetMovement,
+      backfillHistoricalMovements,
+      consumeAssetStockFIFO,
       sitePumpDates,
       persistSitePumpDates,
+      swapSiteMachine,
       siteHoldPeriods,
       addSiteHold,
       endSiteHold,
@@ -2117,6 +2948,74 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
 
 export const useOperations = () => {
   const context = useContext(OperationsContext);
-  if (!context) throw new Error('useOperations must be used within an OperationsProvider');
+  if (!context) {
+    console.warn('[OperationsContext] useOperations accessed outside OperationsProvider, providing safe default fallback.');
+    return {
+      assets: [],
+      waybills: [],
+      checkouts: [],
+      dailyMachineLogs: [],
+      dieselRefills: [],
+      maintenanceSessions: [],
+      vehicles: [],
+      vehicleLogs: [],
+      vehicleIncidents: [],
+      sitePumpDates: [],
+      siteHoldPeriods: [],
+      assetMovements: [],
+      customFields: [],
+      maintenanceCertificates: [],
+      isLoaded: false,
+      addAsset: async () => {},
+      updateAsset: () => {},
+      deleteAsset: () => {},
+      restockAsset: () => {},
+      addBatch: () => {},
+      depleteBatch: () => {},
+      logAssetMovement: () => {},
+      addWaybill: () => {},
+      updateWaybill: () => {},
+      updateWaybillStatus: () => {},
+      deleteWaybill: () => {},
+      addCheckout: () => {},
+      updateCheckoutStatus: () => {},
+      deleteCheckout: () => {},
+      logMaintenance: () => {},
+      updateMaintenance: () => {},
+      updateAssetOperationalStatus: async () => {},
+      getAssetAnalytics: () => ({}),
+      getSiteAnalytics: () => ({}),
+      addDailyMachineLog: () => {},
+      updateDailyMachineLog: () => {},
+      deleteDailyMachineLog: () => {},
+      bulkAddDailyMachineLogs: () => {},
+      addDieselRefill: () => {},
+      updateDieselRefill: () => {},
+      deleteDieselRefill: () => {},
+      addVehicle: () => {},
+      updateVehicle: () => {},
+      deleteVehicle: () => {},
+      logVehicleService: () => {},
+      updateVehicleService: () => {},
+      deleteVehicleService: () => {},
+      logVehicleIncident: () => {},
+      updateVehicleIncident: () => {},
+      deleteVehicleIncident: () => {},
+      updateVehicleOdometer: () => {},
+      addSitePumpDate: () => {},
+      updateSitePumpDate: () => {},
+      deleteSitePumpDate: () => {},
+      addSiteHoldPeriod: async () => {},
+      updateSiteHoldPeriod: async () => {},
+      deleteSiteHoldPeriod: async () => {},
+      addCustomField: () => {},
+      deleteCustomField: () => {},
+      addMaintenanceCertificate: () => {},
+      updateMaintenanceCertificate: () => {},
+      deleteMaintenanceCertificate: () => {},
+      exportOperationsData: () => '',
+      importOperationsData: () => {}
+    } as unknown as OperationsContextType;
+  }
   return context;
 };

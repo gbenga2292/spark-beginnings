@@ -2532,6 +2532,7 @@ export const db = {
     if (v.registration_number !== undefined) update.registration_number = v.registration_number;
     if (v.status !== undefined) update.status = v.status;
     if (v.operationalStatus !== undefined) update.operational_status = v.operationalStatus;
+    if (v.documents !== undefined) update.documents = v.documents;
     const { error } = await supabase.from('vehicles').update(update).eq('id', id);
     if (error) { console.error('Database error:', error); throw error; }
   },
