@@ -48,6 +48,17 @@ export function SiteCopilotDrawer({ isOpen, onClose }: Props) {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Auto-resize textarea as content changes so text isn't hidden and no scrolling is required for normal messages
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    textarea.style.height = 'auto';
+    const nextHeight = Math.min(Math.max(textarea.scrollHeight, 42), 180);
+    textarea.style.height = `${nextHeight}px`;
+  }, [inputPrompt]);
 
   const isSiteModule = Boolean(
     currentRoute?.path.includes('/sites') || 
@@ -467,6 +478,7 @@ export function SiteCopilotDrawer({ isOpen, onClose }: Props) {
             )}
 
             <Textarea
+              ref={textareaRef}
               value={inputPrompt}
               onChange={(e) => setInputPrompt(e.target.value)}
               onKeyDown={(e) => {
@@ -479,7 +491,7 @@ export function SiteCopilotDrawer({ isOpen, onClose }: Props) {
               disabled={isProcessing}
               rows={1}
               className={cn(
-                "flex-1 text-xs min-h-[38px] max-h-[140px] resize-y py-2 px-3 rounded-xl shadow-2xs border transition-colors leading-relaxed",
+                "flex-1 text-xs min-h-[42px] max-h-[180px] resize-none py-2.5 px-3.5 rounded-xl shadow-2xs border transition-[border-color,box-shadow] leading-relaxed overflow-y-auto",
                 isDark 
                   ? "bg-slate-950 border-slate-800 text-white placeholder:text-slate-500 focus-visible:ring-indigo-500" 
                   : "bg-slate-50/80 border-slate-300 text-slate-900 placeholder:text-slate-400 focus-visible:ring-indigo-500"
