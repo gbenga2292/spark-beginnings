@@ -380,7 +380,7 @@ export function FinancialReports() {
   const currentYear = new Date().getFullYear();
   const years = [currentYear, currentYear - 1, currentYear - 2];
 
-  const { calculatePayrollForMonth, MONTHS } = usePayrollCalculator();
+  const { calculatePayrollForMonth, getPayrollForMonth, MONTHS } = usePayrollCalculator();
 
 
 
@@ -401,10 +401,10 @@ export function FinancialReports() {
     const yearToCalculate = filterYear === 'All' ? new Date().getFullYear() : parseInt(filterYear, 10);
 
     return monthsToProcess.reduce((acc, monthKey) => {
-      acc[monthKey] = calculatePayrollForMonth(monthKey, yearToCalculate);
+      acc[monthKey] = getPayrollForMonth(monthKey, yearToCalculate);
       return acc;
     }, {} as Record<string, any[]>);
-  }, [calculatePayrollForMonth, MONTHS, mainTab, accountsTab, filterMonth, filterYear]);
+  }, [getPayrollForMonth, MONTHS, mainTab, accountsTab, filterMonth, filterYear]);
 
   const proratedMonthsPayroll = useMemo(() => {
     const today = new Date();

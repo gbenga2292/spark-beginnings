@@ -93,6 +93,19 @@ export type SiteTimelineEventType =
   | 'milestone'
   | 'custom';
 
+export interface MilestoneHistoryItem {
+  id: string;
+  timestamp: string; // ISO
+  changedBy: string;
+  action: 'auto_extrapolated' | 'manual_override' | 'date_updated' | 'reset_to_auto';
+  startDate: string;
+  endDate?: string;
+  prevStartDate?: string;
+  prevEndDate?: string;
+  notes?: string;
+  source?: string;
+}
+
 export interface SiteTimelineEvent {
   id: string;
   siteId: string;
@@ -104,6 +117,8 @@ export interface SiteTimelineEvent {
   notes?: string;
   loggedBy?: string;
   createdAt?: string;
+  updatedAt?: string;
+  history?: MilestoneHistoryItem[];
 }
 
 export interface SiteJournalEntry {
@@ -587,12 +602,25 @@ export interface AttendanceRecord {
   day2?: number;
 }
 
+export interface InvoiceVatableSections {
+  equipment: boolean;
+  technicians: boolean;
+  diesel: boolean;
+  mobDemob: boolean;
+  installation: boolean;
+  damages: boolean;
+}
+
 export interface PendingInvoice {
   id: string;
   invoiceNo: string;
   client: string;
   site: string;
   vatInc: 'Yes' | 'No' | 'Add';
+  vatScope?: 'overall' | 'per_section';
+  vatableSections?: InvoiceVatableSections;
+  vatableAmount?: number;
+  nonVatableAmount?: number;
   noOfMachine: number;
   dailyRentalCost: number;
   dieselCostPerLtr: number;
@@ -642,6 +670,10 @@ export interface Invoice {
   reminderDate: string;
   status: 'Paid' | 'Overdue' | 'Sent' | 'Draft';
   vatInc?: 'Yes' | 'No' | 'Add';
+  vatScope?: 'overall' | 'per_section';
+  vatableSections?: InvoiceVatableSections;
+  vatableAmount?: number;
+  nonVatableAmount?: number;
   noOfMachine?: number;
   dailyRentalCost?: number;
   dieselCostPerLtr?: number;
@@ -722,6 +754,7 @@ export interface Payment {
   payVat: 'Yes' | 'No' | 'Add';
   vat?: number;
   amountForVat?: number;
+  paidTo?: string;
 }
 
 export interface VatPayment {
@@ -750,6 +783,32 @@ export interface ExpenseVatRemittance {
 export interface MonthValue {
   workDays: number;
   overtimeRate: number;
+}
+
+export interface PayrollSnapshot {
+  id: string;
+  workspaceId: string;
+  month: string;
+  year: number;
+  version: number;
+  isActive: boolean;
+  changeReason?: string;
+  createdBy: string;
+  createdByName?: string;
+  createdAt: string;
+  totals: {
+    totalSalary: number;
+    totalOvertime: number;
+    totalGross: number;
+    totalPAYE: number;
+    totalLoans: number;
+    totalPension: number;
+    totalWithholding: number;
+    totalDeductions: number;
+    totalNet: number;
+    employeeCount: number;
+  };
+  records: any[];
 }
 
 // BudgetItem is defined at the top of this file — no duplicate needed here.
@@ -964,6 +1023,7 @@ interface AppState {
     withholdingTaxRate: number;
     periodStartDay: number;
     departmentWorkDays?: Record<string, number>;
+    defaultVatableSections?: InvoiceVatableSections;
   };
   updatePayrollVariables: (variables: Partial<AppState['payrollVariables']>) => void;
   payeTaxVariables: {
@@ -1033,6 +1093,12 @@ interface AppState {
   addCommLogRead: (read: CommLogRead) => void;
   setCommLogReads: (reads: CommLogRead[]) => void;
   markCommLogsAsRead: (logIds: string[], userId: string, userName: string) => Promise<void>;
+  payrollSnapshots: PayrollSnapshot[];
+  setPayrollSnapshots: (snapshots: PayrollSnapshot[]) => void;
+  fetchPayrollSnapshots: (year?: number) => Promise<PayrollSnapshot[]>;
+  savePayrollSnapshot: (snapshot: Omit<PayrollSnapshot, 'id' | 'createdAt'>) => Promise<PayrollSnapshot | null>;
+  setActivePayrollSnapshot: (month: string, year: number, version: number) => Promise<void>;
+  deletePayrollSnapshot: (id: string) => Promise<void>;
 }
 
 export const useAppStore = create<AppState>()(
@@ -1045,6 +1111,7 @@ export const useAppStore = create<AppState>()(
       siteJournalEntries: [],
       siteTimelineEvents: [],
       leaves: [],
+      payrollSnapshots: [],
       isVariablesDirty: false,
       setVariablesDirty: (val) => set({ isVariablesDirty: val }),
       isLedgerDirty: false,
@@ -1100,6 +1167,14 @@ export const useAppStore = create<AppState>()(
         employeePensionRate: 8, employerPensionRate: 10,
         nsitfRate: 1, vatRate: 7.5, withholdingTaxRate: 5,
         periodStartDay: 1,
+        defaultVatableSections: {
+          equipment: true,
+          technicians: false,
+          diesel: true,
+          mobDemob: true,
+          installation: true,
+          damages: false,
+        },
       },
       payeTaxVariables: {
         craBase: 800000, rentReliefRate: 0.20,
@@ -1785,6 +1860,78 @@ export const useAppStore = create<AppState>()(
           db.updateSettings({ onboardingTemplates: updated });
           return { onboardingTemplates: updated };
         });
+      },
+
+      // Payroll Snapshots
+      setPayrollSnapshots: (snapshots) => set({ payrollSnapshots: snapshots }),
+      fetchPayrollSnapshots: async (year) => {
+        try {
+          const snapshots = await db.fetchPayrollSnapshots(year);
+          set(s => {
+            const map = new Map<string, PayrollSnapshot>();
+            s.payrollSnapshots.forEach(snap => map.set(snap.id, snap));
+            snapshots.forEach(snap => map.set(snap.id, snap));
+            const merged = Array.from(map.values());
+            
+            // Check if snapshot IDs, versions, and active flags actually changed
+            const currentSign = s.payrollSnapshots.map(x => `${x.id}-${x.version}-${x.isActive}`).join('|');
+            const newSign = merged.map(x => `${x.id}-${x.version}-${x.isActive}`).join('|');
+            if (currentSign === newSign && s.payrollSnapshots.length === merged.length) {
+              return s;
+            }
+            return { payrollSnapshots: merged };
+          });
+          return snapshots;
+        } catch (e) {
+          console.error('Failed to fetch payroll snapshots:', e);
+          return [];
+        }
+      },
+      savePayrollSnapshot: async (snapshotData) => {
+        try {
+          const saved = await db.insertPayrollSnapshot(snapshotData as any);
+          set(s => {
+            const updated = s.payrollSnapshots.map(snap => {
+              if (snap.month === saved.month && snap.year === saved.year && saved.isActive) {
+                return { ...snap, isActive: snap.id === saved.id };
+              }
+              return snap;
+            });
+            const exists = updated.some(snap => snap.id === saved.id);
+            return { payrollSnapshots: exists ? updated : [saved, ...updated] };
+          });
+          return saved;
+        } catch (e) {
+          console.error('Failed to save payroll snapshot:', e);
+          throw e;
+        }
+      },
+      setActivePayrollSnapshot: async (month, year, version) => {
+        try {
+          await db.setActivePayrollSnapshot(month, year, version);
+          set(s => ({
+            payrollSnapshots: s.payrollSnapshots.map(snap => {
+              if (snap.month === month && snap.year === year) {
+                return { ...snap, isActive: snap.version === version };
+              }
+              return snap;
+            })
+          }));
+        } catch (e) {
+          console.error('Failed to set active payroll snapshot:', e);
+          throw e;
+        }
+      },
+      deletePayrollSnapshot: async (id) => {
+        try {
+          await db.deletePayrollSnapshot(id);
+          set(s => ({
+            payrollSnapshots: s.payrollSnapshots.filter(snap => snap.id !== id)
+          }));
+        } catch (e) {
+          console.error('Failed to delete payroll snapshot:', e);
+          throw e;
+        }
       },
 
     }),

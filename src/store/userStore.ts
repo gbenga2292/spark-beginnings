@@ -139,6 +139,11 @@ export interface SimulatorPriv {
   canExport: boolean;
 }
 
+// ─── AI Co-Pilot ─────────────────────────────────────────────
+export interface AiCopilotPriv {
+  canAccess: boolean;
+}
+
 // ─── Master interface ─────────────────────────────────────────
 export interface UserPrivileges {
   dashboard:         DashboardPriv;
@@ -179,6 +184,7 @@ export interface UserPrivileges {
   interviews:        InterviewsPriv;
   simulator:         SimulatorPriv;
   budget:            BudgetPriv;
+  aiCopilot?:        AiCopilotPriv;
 }
 
 export interface AppUser {
@@ -251,6 +257,7 @@ export const FULL_ACCESS: UserPrivileges = {
   interviews:       { canView: true, canAdd: true, canEdit: true, canDelete: true, canConductInterview: true, canRecordVerdict: true, canForwardToOnboarding: true },
   simulator:        { canView: true, canSave: true, canDelete: true, canExport: true },
   budget:           { canView: true, canAdd: true, canEdit: true, canDelete: true, canSetBudgeted: true, canLinkLedger: true },
+  aiCopilot:        { canAccess: true },
 };
 
 // ─── NO ACCESS ───────────────────────────────────────────────
@@ -301,6 +308,7 @@ export const NO_ACCESS: UserPrivileges = {
   interviews:       { canView: false, canAdd: false, canEdit: false, canDelete: false, canConductInterview: false, canRecordVerdict: false, canForwardToOnboarding: false },
   simulator:        { canView: false, canSave: false, canDelete: false, canExport: false },
   budget:           { canView: false, canAdd: false, canEdit: false, canDelete: false, canSetBudgeted: false, canLinkLedger: false },
+  aiCopilot:        { canAccess: false },
 };
 
 // ─── DEFAULT PRESETS ─────────────────────────────────────────

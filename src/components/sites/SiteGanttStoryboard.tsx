@@ -699,6 +699,56 @@ export function SiteGanttStoryboard({ site }: Props) {
         custom: 'jetting',
       };
 
+      const styleMap: Record<SiteTimelineEventType, { bg: string; border: string; badge: string }> = {
+        mobilisation: {
+          bg: 'bg-blue-600 text-white',
+          border: 'border-blue-700',
+          badge: 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700',
+        },
+        jetting: {
+          bg: 'bg-sky-600 text-white',
+          border: 'border-sky-700',
+          badge: 'bg-sky-100 text-sky-800 border-sky-200 dark:bg-sky-900/30 dark:text-sky-300 dark:border-sky-700',
+        },
+        rejetting: {
+          bg: 'bg-teal-600 text-white',
+          border: 'border-teal-700',
+          badge: 'bg-teal-100 text-teal-800 border-teal-200 dark:bg-teal-900/30 dark:text-teal-300 dark:border-teal-700',
+        },
+        machine_operation: {
+          bg: 'bg-emerald-600 text-white',
+          border: 'border-emerald-700',
+          badge: 'bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-700',
+        },
+        machine_downtime: {
+          bg: 'bg-rose-600 text-white',
+          border: 'border-rose-700',
+          badge: 'bg-rose-100 text-rose-800 border-rose-200 dark:bg-rose-900/30 dark:text-rose-300 dark:border-rose-700',
+        },
+        hold: {
+          bg: 'bg-amber-500 text-white',
+          border: 'border-amber-600',
+          badge: 'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700',
+        },
+        demobilisation: {
+          bg: 'bg-indigo-600 text-white',
+          border: 'border-indigo-700',
+          badge: 'bg-indigo-100 text-indigo-800 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-300 dark:border-indigo-700',
+        },
+        milestone: {
+          bg: 'bg-slate-700 text-white',
+          border: 'border-slate-800',
+          badge: 'bg-slate-100 text-slate-800 border-slate-200 dark:bg-slate-800 dark:text-slate-200',
+        },
+        custom: {
+          bg: 'bg-slate-700 text-white',
+          border: 'border-slate-800',
+          badge: 'bg-slate-100 text-slate-800 border-slate-200 dark:bg-slate-800 dark:text-slate-200',
+        },
+      };
+
+      const style = styleMap[ev.eventType] || styleMap.milestone;
+
       bars.push({
         id: `manual-${ev.id}`,
         lane: laneMap[ev.eventType] || 'jetting',
@@ -706,9 +756,9 @@ export function SiteGanttStoryboard({ site }: Props) {
         subtitle: ev.notes?.slice(0, 30),
         startDate: start,
         endDate: end < start ? start : end,
-        flatBgClass: ev.eventType === 'rejetting' ? 'bg-teal-600 text-white' : 'bg-slate-700 text-white',
-        flatBorderClass: 'border-slate-800',
-        badgeClass: 'bg-slate-100 text-slate-800 border-slate-200 dark:bg-slate-800 dark:text-slate-200',
+        flatBgClass: style.bg,
+        flatBorderClass: style.border,
+        badgeClass: style.badge,
         status: 'completed',
         details: {
           durationDays: Math.max(1, differenceInDays(end, start) + 1),

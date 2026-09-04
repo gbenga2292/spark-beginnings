@@ -5,7 +5,7 @@ import { Badge } from '@/src/components/ui/badge';
 import {
   Users as UsersIcon, Plus, Trash2, Eye, EyeOff, Shield, Search,
   LayoutDashboard, Building2, Landmark, Settings as SettingsIcon,
-  UserPlus, ChevronRight, ListTodo, Package,
+  UserPlus, ChevronRight, ListTodo, Package, Bot
 } from 'lucide-react';
 import { useUserStore, AppUser, UserPrivileges } from '@/src/store/userStore';
 import { supabase } from '@/src/integrations/supabase/client';
@@ -14,34 +14,37 @@ import { toast, showConfirm } from '@/src/components/ui/toast';
 
 /* ── Color map for module badges ──────────────────────────────── */
 const MODULE_COLORS: Record<string, string> = {
-  Dashboard:   'bg-indigo-100 text-indigo-700',
-  HR:          'bg-teal-100 text-teal-700',
-  Clients:     'bg-indigo-100 text-indigo-700',
-  Account:     'bg-amber-100 text-amber-700',
-  Tasks:       'bg-blue-100 text-blue-700',
-  Operations:  'bg-orange-100 text-orange-700',
-  Settings:    'bg-slate-200 text-slate-700',
+  Dashboard:     'bg-indigo-100 text-indigo-700',
+  HR:            'bg-teal-100 text-teal-700',
+  Clients:       'bg-indigo-100 text-indigo-700',
+  Account:       'bg-amber-100 text-amber-700',
+  Tasks:         'bg-blue-100 text-blue-700',
+  Operations:    'bg-orange-100 text-orange-700',
+  Settings:      'bg-slate-200 text-slate-700',
+  'AI Co-Pilot': 'bg-sky-100 text-sky-700',
 };
 
 const MODULE_ICONS: Record<string, any> = {
-  Dashboard: LayoutDashboard,
-  HR:        UsersIcon,
-  Clients:   Building2,
-  Account:   Landmark,
-  Tasks:     ListTodo,
-  Operations: Package,
-  Settings:  SettingsIcon,
+  Dashboard:     LayoutDashboard,
+  HR:            UsersIcon,
+  Clients:       Building2,
+  Account:       Landmark,
+  Tasks:         ListTodo,
+  Operations:    Package,
+  Settings:      SettingsIcon,
+  'AI Co-Pilot': Bot,
 };
 
 /* Quick check which groups the user has access to */
 const GROUP_CHECK: { name: string; keys: (keyof UserPrivileges)[]; field: string }[] = [
-  { name: 'Dashboard',  keys: ['dashboard'], field: 'canView' },
-  { name: 'HR',         keys: ['employees', 'onboarding', 'attendance', 'leaves', 'salaryLoans', 'evaluations', 'interviews', 'disciplinary', 'reports'], field: 'canView' },
-  { name: 'Operations', keys: ['operations', 'simulator'], field: 'canView' },
-  { name: 'Clients',      keys: ['sites'], field: 'canView' },
-  { name: 'Tasks',      keys: ['tasks'], field: 'canView' },
-  { name: 'Account',    keys: ['billing', 'payments', 'payroll', 'financialReports', 'ledger'], field: 'canView' },
-  { name: 'Settings',   keys: ['variables', 'users'], field: 'canView' },
+  { name: 'Dashboard',   keys: ['dashboard'], field: 'canView' },
+  { name: 'HR',          keys: ['employees', 'onboarding', 'attendance', 'leaves', 'salaryLoans', 'evaluations', 'interviews', 'disciplinary', 'reports'], field: 'canView' },
+  { name: 'Operations',  keys: ['operations', 'simulator'], field: 'canView' },
+  { name: 'Clients',     keys: ['sites'], field: 'canView' },
+  { name: 'Tasks',       keys: ['tasks'], field: 'canView' },
+  { name: 'Account',     keys: ['billing', 'payments', 'payroll', 'financialReports', 'ledger'], field: 'canView' },
+  { name: 'Settings',    keys: ['variables', 'users'], field: 'canView' },
+  { name: 'AI Co-Pilot', keys: ['aiCopilot'], field: 'canAccess' },
 ];
 
 function getActiveModules(p: UserPrivileges): string[] {

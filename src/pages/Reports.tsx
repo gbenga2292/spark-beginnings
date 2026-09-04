@@ -1382,13 +1382,20 @@ export function Reports() {
           <CardContent className="pt-6">
             <div className="h-[300px] w-full">
               <ResponsiveContainer minWidth={1} minHeight={1} width="100%" height="100%">
-                <BarChart data={departmentData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <BarChart data={departmentData} margin={{ top: 20, right: 10, left: -20, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                   <XAxis dataKey="name" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
-                  <YAxis stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} allowDecimals={false} />
+                  <YAxis 
+                    stroke="#64748b" 
+                    fontSize={12} 
+                    tickLine={false} 
+                    axisLine={false} 
+                    allowDecimals={false} 
+                    domain={[0, (dataMax: number) => (dataMax <= 5 ? dataMax + 2 : Math.ceil(dataMax * 1.2))]}
+                  />
                   <RechartsTooltip cursor={{ fill: 'transparent' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
                   <Bar dataKey="count" fill="#4f46e5" radius={[4, 4, 0, 0]} name="Employees">
-                    <LabelList dataKey="count" position="top" style={{ fontSize: 11, fontWeight: 700, fill: '#4f46e5' }} formatter={(v: any) => v > 0 ? v : ''} />
+                    <LabelList dataKey="count" position="top" offset={4} style={{ fontSize: 11, fontWeight: 700, fill: '#4f46e5' }} formatter={(v: any) => v > 0 ? v : ''} />
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>

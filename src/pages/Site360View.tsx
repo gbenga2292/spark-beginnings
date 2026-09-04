@@ -17,7 +17,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { cn } from '@/src/lib/utils';
 import { useTheme } from '@/src/hooks/useTheme';
 import { toast } from 'sonner';
-import { useAppStore, Site } from '@/src/store/appStore';
+import { useAppStore, Site, Invoice } from '@/src/store/appStore';
 import { supabase } from '@/src/integrations/supabase/client';
 import { useOperations } from '@/src/contexts/OperationsContext';
 import { useAppData, deriveMainTaskStatus } from '@/src/contexts/AppDataContext';
@@ -25,11 +25,11 @@ import { useAuth } from '@/src/hooks/useAuth';
 import { useUserStore } from '@/src/store/userStore';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { InvoiceDetailDialog } from './InvoiceDetailDialog';
-import { Invoice } from '@/src/store/appStore';
 import { ClientContactsPanel } from './ClientContactsPanel';
 import { TaskDetailSheet } from '@/src/components/tasks/TaskDetailSheet';
 import { AddSubtaskInline } from './Tasks/AddSubtaskInline';
 import { SiteGanttStoryboard } from '@/src/components/sites/SiteGanttStoryboard';
+import { SiteMilestonesCard } from '@/src/components/sites/SiteMilestonesCard';
 
 
 type SiteTab = 'timeline' | 'financials' | 'operations' | 'maintenance' | 'comms' | 'tasks' | 'contacts';
@@ -1316,9 +1316,10 @@ Answer site-specific questions and field progress accurately using this context.
           {/* Tab Content */}
           <div className="space-y-4">
 
-            {/* TIMELINE STORYBOARD */}
+            {/* TIMELINE & MILESTONES */}
             {activeTab === 'timeline' && (
               <div className="space-y-4 transition-opacity duration-150">
+                <SiteMilestonesCard site={site} />
                 <SiteGanttStoryboard site={site} />
               </div>
             )}

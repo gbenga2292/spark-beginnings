@@ -35,7 +35,7 @@ function SiteLogCard({
   formDate: string;
   onOpenMachineLog: (machine: { id: string; name: string }, siteId: string, siteName: string) => void;
 }) {
-  const { waybills, assets } = useOperations();
+  const { waybills, assets, dailyMachineLogs } = useOperations();
   const { siteJournalEntries: allEntries, sites } = useAppStore();
   const [activeTab, setActiveTab] = useState<'general' | 'machines'>('general');
   const [mediaPreviews, setMediaPreviews] = useState<{ url: string; type: 'image' | 'video'; name: string }[]>([]);
@@ -93,9 +93,48 @@ function SiteLogCard({
 
   const machineItems = useMemo(() => {
     if (!entry.siteId) return [];
-    const siteWaybills = waybills.filter(w => w.siteId === entry.siteId && w.type === 'waybill' && w.status !== 'outstanding');
-    return assets.filter(a => a.type === 'equipment' && a.requiresLogging && siteWaybills.some(w => w.items.some(i => i.assetId === a.id)));
-  }, [waybills, assets, entry.siteId]);
+    const siteWaybills = waybills.filter(w => w.siteId === entry.siteId);
+    
+    const inventoryMap = new Map<string, number>();
+
+    // 1. Outbound deliveries on or before formDate
+    siteWaybills
+      .filter(w => w.type === 'waybill' && w.status !== 'outstanding')
+      .forEach(wb => {
+        const wbDate = wb.sentToSiteDate ? wb.sentToSiteDate.substring(0, 10) : (wb.issueDate ? wb.issueDate.substring(0, 10) : '');
+        if (!formDate || !wbDate || wbDate <= formDate) {
+          wb.items.forEach(item => {
+            inventoryMap.set(item.assetId, (inventoryMap.get(item.assetId) || 0) + (item.quantity || 1));
+          });
+        }
+      });
+
+    // 2. Return waybills on or before formDate
+    siteWaybills
+      .filter(w => w.type === 'return')
+      .forEach(wb => {
+        const wbDate = wb.sentToSiteDate ? wb.sentToSiteDate.substring(0, 10) : (wb.issueDate ? wb.issueDate.substring(0, 10) : '');
+        if (!formDate || !wbDate || wbDate <= formDate) {
+          wb.items.forEach(item => {
+            const cur = inventoryMap.get(item.assetId) || 0;
+            inventoryMap.set(item.assetId, Math.max(0, cur - (item.quantity || 1)));
+          });
+        }
+      });
+
+    // 3. Keep machines that already have logs recorded for this site on formDate
+    const loggedMachineIds = new Set(
+      (dailyMachineLogs || [])
+        .filter(l => l.siteId === entry.siteId && (!formDate || l.date === formDate))
+        .map(l => l.assetId)
+    );
+
+    return assets.filter(a => 
+      a.type === 'equipment' && 
+      a.requiresLogging && 
+      ((inventoryMap.get(a.id) || 0) > 0 || loggedMachineIds.has(a.id))
+    );
+  }, [waybills, assets, entry.siteId, formDate, dailyMachineLogs]);
 
   return (
     <div className="bg-[#141622] border border-[#2a2e3d] rounded-xl p-4 shadow-sm relative overflow-hidden text-white">

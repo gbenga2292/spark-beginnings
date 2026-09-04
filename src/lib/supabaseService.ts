@@ -8,7 +8,8 @@ import type {
   SalaryAdvance, Loan, Payment, VatPayment, LeaveRecord, DepartmentTasks,
   DisciplinaryRecord, EvaluationRecord, Department, Position,
   LedgerCategory, LedgerVendor, LedgerBank, LedgerBeneficiaryBank, LedgerEntry, CommLog, CommLogRead,
-  CompanyExpense, StaffMeritRecord, LeaveType, DailyJournal, SiteJournalEntry, ClientContact, BudgetItem
+  CompanyExpense, StaffMeritRecord, LeaveType, DailyJournal, SiteJournalEntry, ClientContact, BudgetItem,
+  PayrollSnapshot
 } from '@/src/store/appStore';
 import { useUserStore, type AppUser, type PrivilegePreset } from '@/src/store/userStore';
 import type { InterviewCandidate } from '@/src/types/interviews';
@@ -107,7 +108,13 @@ export function dbToInvoice(r: any): Invoice {
     project: r.project, siteId: r.site_id, siteName: r.site_name,
     amount: Number(r.amount), date: r.date, dueDate: r.due_date,
     billingCycle: r.billing_cycle, reminderDate: r.reminder_date,
-    status: r.status, vatInc: r.vat_inc, noOfMachine: r.no_of_machine,
+    status: r.status, vatInc: r.vat_inc,
+    vatScope: r.vat_scope || 'overall',
+    vatableSections: r.vatable_sections || undefined,
+    vatableAmount: r.vatable_amount != null ? Number(r.vatable_amount) : undefined,
+    nonVatableAmount: r.non_vatable_amount != null ? Number(r.non_vatable_amount) : undefined,
+    discount: r.discount != null ? Number(r.discount) : undefined,
+    noOfMachine: r.no_of_machine,
     dailyRentalCost: Number(r.daily_rental_cost), dieselCostPerLtr: Number(r.diesel_cost_per_ltr),
     dailyUsage: Number(r.daily_usage), noOfTechnician: r.no_of_technician,
     techniciansDailyRate: Number(r.technicians_daily_rate), mobDemob: Number(r.mob_demob),
@@ -134,7 +141,13 @@ export function dbToInvoice(r: any): Invoice {
 export function dbToPendingInvoice(r: any): PendingInvoice {
   return {
     id: r.id, invoiceNo: r.invoice_no, client: r.client, site: r.site,
-    vatInc: r.vat_inc, noOfMachine: r.no_of_machine,
+    vatInc: r.vat_inc,
+    vatScope: r.vat_scope || 'overall',
+    vatableSections: r.vatable_sections || undefined,
+    vatableAmount: r.vatable_amount != null ? Number(r.vatable_amount) : undefined,
+    nonVatableAmount: r.non_vatable_amount != null ? Number(r.non_vatable_amount) : undefined,
+    discount: r.discount != null ? Number(r.discount) : undefined,
+    noOfMachine: r.no_of_machine,
     dailyRentalCost: Number(r.daily_rental_cost), dieselCostPerLtr: Number(r.diesel_cost_per_ltr),
     dailyUsage: Number(r.daily_usage), noOfTechnician: r.no_of_technician,
     techniciansDailyRate: Number(r.technicians_daily_rate),
@@ -193,6 +206,7 @@ export function dbToPayment(r: any): Payment {
     discount: Number(r.discount), payVat: r.pay_vat,
     vat: Number(r.vat), amountForVat: Number(r.amount_for_vat),
     damages: r.damages != null ? Number(r.damages) : undefined,
+    paidTo: r.paid_to || undefined,
   };
 }
 
@@ -622,6 +636,18 @@ export function dailyJournalToDb(j: DailyJournal): any {
   };
 }
 
+export function sanitizeDewateringStage(stage?: string | null): 'mobilization' | 'installation' | 'operation' | 'demobilisation' | null {
+  if (!stage) return null;
+  const s = stage.toLowerCase().trim();
+  if (s === 'mobilization' || s === 'installation' || s === 'operation' || s === 'demobilisation') {
+    return s;
+  }
+  if (s === 'jetting' || s === 'rejetting' || s === 'setup') {
+    return 'installation';
+  }
+  return 'operation';
+}
+
 export function siteJournalEntryToDb(e: SiteJournalEntry): any {
   return {
     id: e.id,
@@ -631,7 +657,7 @@ export function siteJournalEntryToDb(e: SiteJournalEntry): any {
     client_name: e.clientName,
     narration: e.narration,
     progress_percentage: e.progressPercentage ?? null,
-    dewatering_stage: e.dewateringStage ?? null,
+    dewatering_stage: sanitizeDewateringStage(e.dewateringStage),
     created_at: e.createdAt,
     logged_by: e.loggedBy,
     workspace_id: getWS(),
@@ -666,7 +692,7 @@ function siteToDb(s: Site) {
     phone: s.contactPhone || null,
     position: s.position || null,
     current_progress_percentage: s.currentProgressPercentage ?? null,
-    current_dewatering_stage: s.currentDewateringStage ?? null,
+    current_dewatering_stage: sanitizeDewateringStage(s.currentDewateringStage),
   };
 }
 
@@ -727,7 +753,13 @@ function invoiceToDb(i: Invoice) {
     project: i.project, site_id: i.siteId, site_name: i.siteName,
     amount: i.amount, date: i.date, due_date: i.dueDate,
     billing_cycle: i.billingCycle, reminder_date: i.reminderDate,
-    status: i.status, vat_inc: i.vatInc, no_of_machine: i.noOfMachine,
+    status: i.status, vat_inc: i.vatInc,
+    vat_scope: i.vatScope || 'overall',
+    vatable_sections: i.vatableSections || null,
+    vatable_amount: i.vatableAmount != null ? i.vatableAmount : null,
+    non_vatable_amount: i.nonVatableAmount != null ? i.nonVatableAmount : null,
+    discount: i.discount != null ? i.discount : null,
+    noOfMachine: i.noOfMachine,
     daily_rental_cost: i.dailyRentalCost, diesel_cost_per_ltr: i.dieselCostPerLtr,
     daily_usage: i.dailyUsage, no_of_technician: i.noOfTechnician,
     technicians_daily_rate: i.techniciansDailyRate, mob_demob: i.mobDemob,
@@ -754,7 +786,13 @@ function invoiceToDb(i: Invoice) {
 function pendingInvoiceToDb(p: PendingInvoice) {
   return {
     id: p.id, invoice_no: p.invoiceNo, client: p.client, site: p.site,
-    vat_inc: p.vatInc, no_of_machine: p.noOfMachine,
+    vat_inc: p.vatInc,
+    vat_scope: p.vatScope || 'overall',
+    vatable_sections: p.vatableSections || null,
+    vatable_amount: p.vatableAmount != null ? p.vatableAmount : null,
+    non_vatable_amount: p.nonVatableAmount != null ? p.nonVatableAmount : null,
+    discount: p.discount != null ? p.discount : null,
+    noOfMachine: p.noOfMachine,
     daily_rental_cost: p.dailyRentalCost, diesel_cost_per_ltr: p.dieselCostPerLtr,
     daily_usage: p.dailyUsage, no_of_technician: p.noOfTechnician,
     technicians_daily_rate: p.techniciansDailyRate, mob_demob: p.mobDemob,
@@ -772,7 +810,7 @@ function pendingInvoiceToDb(p: PendingInvoice) {
     technician_accommodation: p.technicianAccommodation,
     technician_night_duration: p.technicianNightDuration,
     technician_night_duration_same_as_machine: p.technicianNightDurationSameAsMachine ?? true,
-    no_of_technician_night: p.noOfTechnicianNight,
+    no_of_technician_night: p.noOfTechnicianNight != null ? p.noOfTechnicianNight : null,
     technician_night_count_same_as_day: p.technicianNightCountSameAsDay ?? true,
     technician_accommodation_use_night_count: p.technicianAccommodationUseNightCount ?? false,
   };
@@ -812,6 +850,7 @@ function paymentToDb(p: Payment) {
     discount: p.discount, pay_vat: p.payVat,
     vat: p.vat, amount_for_vat: p.amountForVat,
     damages: p.damages || 0,
+    paid_to: p.paidTo || null,
   };
 }
 
@@ -1777,6 +1816,11 @@ export const db = {
       reminderDate: 'reminder_date',
       status: 'status',
       vatInc: 'vat_inc',
+      vatScope: 'vat_scope',
+      vatableSections: 'vatable_sections',
+      vatableAmount: 'vatable_amount',
+      nonVatableAmount: 'non_vatable_amount',
+      discount: 'discount',
       noOfMachine: 'no_of_machine',
       dailyRentalCost: 'daily_rental_cost',
       dieselCostPerLtr: 'diesel_cost_per_ltr',
@@ -1836,6 +1880,11 @@ export const db = {
       client: 'client',
       site: 'site',
       vatInc: 'vat_inc',
+      vatScope: 'vat_scope',
+      vatableSections: 'vatable_sections',
+      vatableAmount: 'vatable_amount',
+      nonVatableAmount: 'non_vatable_amount',
+      discount: 'discount',
       noOfMachine: 'no_of_machine',
       dailyRentalCost: 'daily_rental_cost',
       dieselCostPerLtr: 'diesel_cost_per_ltr',
@@ -1958,6 +2007,7 @@ export const db = {
     if (p.payVat !== undefined) update.pay_vat = p.payVat;
     if (p.vat !== undefined) update.vat = p.vat;
     if (p.amountForVat !== undefined) update.amount_for_vat = p.amountForVat;
+    if (p.paidTo !== undefined) update.paid_to = p.paidTo;
     const { error } = await supabase.from('payments').update(update).eq('id', id);
     if (error) { console.error('Database error:', error); throw error; }
   },
@@ -2717,7 +2767,81 @@ export const db = {
     const { error } = await supabase.from('budget_items').delete().eq('id', id);
     if (error) { console.error('deleteBudgetItem:', error); throw error; }
   },
+
+  // Payroll Snapshots
+  async fetchPayrollSnapshots(year?: number): Promise<PayrollSnapshot[]> {
+    let q = supabase.from('payroll_snapshots').select('*').order('version', { ascending: true });
+    if (year) q = q.eq('year', year);
+    const { data, error } = await q;
+    if (error) { console.error('fetchPayrollSnapshots:', error); throw error; }
+    return (data || []).map(dbToPayrollSnapshot);
+  },
+  async insertPayrollSnapshot(s: PayrollSnapshot): Promise<PayrollSnapshot> {
+    // If saving as active, mark all other snapshots of same month & year as inactive first
+    if (s.isActive) {
+      await supabase.from('payroll_snapshots')
+        .update({ is_active: false })
+        .eq('month', s.month)
+        .eq('year', s.year);
+    }
+    const payload = payrollSnapshotToDb(s);
+    // Remove undefined id so Supabase generates UUID
+    if (!payload.id) delete payload.id;
+    const { data, error } = await supabase.from('payroll_snapshots').insert(payload).select().single();
+    if (error) { console.error('insertPayrollSnapshot:', error); throw error; }
+    return dbToPayrollSnapshot(data);
+  },
+  async setActivePayrollSnapshot(month: string, year: number, version: number) {
+    await supabase.from('payroll_snapshots')
+      .update({ is_active: false })
+      .eq('month', month)
+      .eq('year', year);
+    const { error } = await supabase.from('payroll_snapshots')
+      .update({ is_active: true })
+      .eq('month', month)
+      .eq('year', year)
+      .eq('version', version);
+    if (error) { console.error('setActivePayrollSnapshot:', error); throw error; }
+  },
+  async deletePayrollSnapshot(id: string) {
+    const { error } = await supabase.from('payroll_snapshots').delete().eq('id', id);
+    if (error) { console.error('deletePayrollSnapshot:', error); throw error; }
+  },
 };
+
+// ─── Payroll Snapshot Mappers ────────────────────────────────
+export function dbToPayrollSnapshot(r: any): PayrollSnapshot {
+  return {
+    id: r.id,
+    workspaceId: r.workspace_id || 'dcel-team',
+    month: r.month,
+    year: r.year,
+    version: r.version,
+    isActive: r.is_active ?? true,
+    changeReason: r.change_reason || undefined,
+    createdBy: r.created_by,
+    createdByName: r.created_by_name || undefined,
+    createdAt: r.created_at,
+    totals: r.totals || {},
+    records: r.records || [],
+  };
+}
+
+export function payrollSnapshotToDb(s: any): any {
+  return {
+    ...(s.id ? { id: s.id } : {}),
+    workspace_id: s.workspaceId || getWS(),
+    month: s.month,
+    year: s.year,
+    version: s.version,
+    is_active: s.isActive ?? true,
+    change_reason: s.changeReason || null,
+    created_by: s.createdBy,
+    created_by_name: s.createdByName || null,
+    totals: s.totals || {},
+    records: s.records || [],
+  };
+}
 
 
 

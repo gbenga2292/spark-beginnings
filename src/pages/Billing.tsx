@@ -3,7 +3,7 @@ import React, { useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import InvoiceLogo from '../../logo/logo-2.png';
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction, AlertDialogCancel } from '@/src/components/task_ui/alert-dialog';
-import { useAppStore, PendingInvoice, Invoice } from '@/src/store/appStore';
+import { useAppStore, PendingInvoice, Invoice, InvoiceVatableSections } from '@/src/store/appStore';
 import { toast, showConfirm } from '@/src/components/ui/toast';
 import { Trash2, Edit, CheckCircle, Plus, X, ArrowRightCircle, Upload, Download, Mail, ChevronUp, ChevronDown, ChevronRight, Printer, PlusCircle, ArrowLeft, Save, FileText, Layers, Users, Settings, Truck, Info, Calculator, History, Calendar } from 'lucide-react';
 import { Input } from '@/src/components/ui/input';
@@ -35,6 +35,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
   const updateInvoice = useAppStore(state => state.updateInvoice);
   const deleteInvoice = useAppStore(state => state.deleteInvoice);
   const vatRate = useAppStore(state => state.payrollVariables.vatRate);
+  const defaultVatableSections = useAppStore(state => state.payrollVariables?.defaultVatableSections);
 
   const handleSyncInvoiceDates = async (invoiceId: string, newEndDate: string) => {
     const inv = invoices.find(i => i.id === invoiceId);
@@ -140,6 +141,15 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
     sendEmailNotification: true,
     vatInc: 'No' as 'Yes' | 'No' | 'Add',
     countOffDays: true,
+    vatScope: 'per_section' as 'overall' | 'per_section',
+    vatableSections: {
+      equipment: true,
+      technicians: false,
+      diesel: true,
+      mobDemob: true,
+      installation: true,
+      damages: false,
+    } as InvoiceVatableSections,
   };
   const [form, setForm] = useState(initialForm);
 
@@ -326,9 +336,29 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
   };
 
   const handleClear = () => {
-    setForm(initialForm);
+    setForm({
+      ...initialForm,
+      vatableSections: defaultVatableSections || initialForm.vatableSections,
+    });
     setMachineConfigs([]);
     setSelectedId(null);
+  };
+
+  const handleVatableSectionToggle = (key: keyof InvoiceVatableSections, value: boolean) => {
+    setForm(prev => ({
+      ...prev,
+      vatableSections: {
+        ...(prev.vatableSections || {
+          equipment: true,
+          technicians: false,
+          diesel: true,
+          mobDemob: true,
+          installation: true,
+          damages: false,
+        }),
+        [key]: value,
+      }
+    }));
   };
 
   const livePreview = useMemo(() => {
@@ -388,19 +418,105 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
     }
     const vatInc = siteRecord ? siteRecord.vat : 'No';
 
+    const vatScope: 'overall' | 'per_section' = form.vatScope || 'per_section';
+    const vatableSections = form.vatableSections || {
+      equipment: true,
+      technicians: false,
+      diesel: true,
+      mobDemob: true,
+      installation: true,
+      damages: false,
+    };
+
     let vat = 0;
-    if (vatInc === 'Yes') {
-      vat = (totalCost / (100 + vatRate)) * vatRate;
-    } else if (vatInc === 'Add') {
-      vat = totalCost * (vatRate / 100);
-    }
-
+    let vatableAmount = 0;
+    let nonVatableAmount = 0;
     let totalCharge = totalCost;
-    if (vatInc === 'Add') {
-      totalCharge = totalCost + vat;
+
+    if (vatScope === 'per_section') {
+      const eqVal = (vatableSections.equipment ?? true) ? rentalCost : 0;
+      const techVal = (vatableSections.technicians ?? false) ? techniciansCost : 0;
+      const dieselVal = (vatableSections.diesel ?? true) ? dieselCost : 0;
+      const mobVal = (vatableSections.mobDemob ?? true) ? mobDemob : 0;
+      const instVal = (vatableSections.installation ?? true) ? installation : 0;
+      const damVal = (vatableSections.damages ?? false) ? damages : 0;
+
+      const grossVatable = eqVal + techVal + dieselVal + mobVal + instVal + damVal;
+      const grossNonVatable = Math.max(0, subtotalCost - grossVatable);
+
+      let netVatable = grossVatable;
+      let netNonVatable = grossNonVatable;
+
+      if (discount > 0 && subtotalCost > 0) {
+        const vatableRatio = grossVatable / subtotalCost;
+        const vatableDiscount = discount * vatableRatio;
+        const nonVatableDiscount = discount - vatableDiscount;
+        netVatable = Math.max(0, grossVatable - vatableDiscount);
+        netNonVatable = Math.max(0, grossNonVatable - nonVatableDiscount);
+      }
+
+      vatableAmount = netVatable;
+      nonVatableAmount = netNonVatable;
+
+      if (vatInc === 'Yes') {
+        vat = (netVatable / (100 + vatRate)) * vatRate;
+        totalCharge = totalCost;
+      } else if (vatInc === 'Add') {
+        vat = netVatable * (vatRate / 100);
+        totalCharge = totalCost + vat;
+      } else {
+        vat = 0;
+        totalCharge = totalCost;
+      }
+    } else {
+      vatableAmount = totalCost;
+      nonVatableAmount = 0;
+
+      if (vatInc === 'Yes') {
+        vat = (totalCost / (100 + vatRate)) * vatRate;
+        totalCharge = totalCost;
+      } else if (vatInc === 'Add') {
+        vat = totalCost * (vatRate / 100);
+        totalCharge = totalCost + vat;
+      } else {
+        vat = 0;
+        totalCharge = totalCost;
+      }
     }
 
-    return { totalCost, subtotalCost, discount, vat, totalCharge, vatInc, maxDuration, actualTechDuration, actualNightDuration, techniciansCost, effectiveTechDailyRate, noOfTechnicianNight, accomCrewCount, dieselCost, rentalCost, mobDemob, installation, damages };
+    // Helper to calculate exact VAT attributable to any specific section
+    const calcSectionVat = (amount: number, isVatable: boolean) => {
+      if (!isVatable || amount <= 0 || vatInc === 'No') return 0;
+      let netAmt = amount;
+      if (discount > 0 && subtotalCost > 0) {
+        const secDiscount = discount * (amount / subtotalCost);
+        netAmt = Math.max(0, amount - secDiscount);
+      }
+      if (vatInc === 'Yes') {
+        return (netAmt / (100 + vatRate)) * vatRate;
+      }
+      if (vatInc === 'Add') {
+        return netAmt * (vatRate / 100);
+      }
+      return 0;
+    };
+
+    const equipmentVat = calcSectionVat(rentalCost, vatScope === 'overall' ? true : (vatableSections.equipment ?? true));
+    const techniciansVat = calcSectionVat(techniciansCost, vatScope === 'overall' ? true : (vatableSections.technicians ?? false));
+    const dieselVat = calcSectionVat(dieselCost, vatScope === 'overall' ? true : (vatableSections.diesel ?? true));
+    const mobDemobVat = calcSectionVat(mobDemob, vatScope === 'overall' ? true : (vatableSections.mobDemob ?? true));
+    const installationVat = calcSectionVat(installation, vatScope === 'overall' ? true : (vatableSections.installation ?? true));
+    const damagesVat = calcSectionVat(damages, vatScope === 'overall' ? true : (vatableSections.damages ?? false));
+    const otherChargesVat = mobDemobVat + installationVat + damagesVat;
+
+    return { 
+      totalCost, subtotalCost, discount, vat, totalCharge, vatInc, 
+      vatScope, vatableSections, vatableAmount, nonVatableAmount,
+      equipmentVat, techniciansVat, dieselVat, mobDemobVat, installationVat, damagesVat, otherChargesVat,
+      maxDuration, actualTechDuration, actualNightDuration, 
+      techniciansCost, effectiveTechDailyRate, noOfTechnicianNight, 
+      accomCrewCount, dieselCost, rentalCost, mobDemob, installation, damages 
+    };
   }, [form, machineConfigs, siteRegistry, vatRate]);
 
   const calculateFullInvoiceData = (input: any, configs?: { rate: string; duration: string }[]) => {
@@ -531,16 +647,70 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
 
     const vatInc = siteObj ? siteObj.vat : (input.vatInc || 'No');
 
-    let vat = 0;
-    if (vatInc === 'Yes') {
-      vat = (totalCost / (100 + vatRate)) * vatRate;
-    } else if (vatInc === 'Add') {
-      vat = totalCost * (vatRate / 100);
-    }
+    const vatScope: 'overall' | 'per_section' = input.vatScope || 'per_section';
+    const vatableSections: InvoiceVatableSections = input.vatableSections || {
+      equipment: true,
+      technicians: false,
+      diesel: true,
+      mobDemob: true,
+      installation: true,
+      damages: false,
+    };
 
+    let vat = 0;
+    let vatableAmount = 0;
+    let nonVatableAmount = 0;
     let totalCharge = totalCost;
-    if (vatInc === 'Add') {
-      totalCharge = totalCost + vat;
+
+    if (vatScope === 'per_section') {
+      const eqVal = (vatableSections.equipment ?? true) ? rentalCost : 0;
+      const techVal = (vatableSections.technicians ?? false) ? techniciansCost : 0;
+      const dieselVal = (vatableSections.diesel ?? true) ? dieselCost : 0;
+      const mobVal = (vatableSections.mobDemob ?? true) ? mobDemob : 0;
+      const instVal = (vatableSections.installation ?? true) ? installation : 0;
+      const damVal = (vatableSections.damages ?? false) ? damages : 0;
+
+      const grossVatable = eqVal + techVal + dieselVal + mobVal + instVal + damVal;
+      const grossNonVatable = Math.max(0, subtotalCost - grossVatable);
+
+      let netVatable = grossVatable;
+      let netNonVatable = grossNonVatable;
+
+      if (discount > 0 && subtotalCost > 0) {
+        const vatableRatio = grossVatable / subtotalCost;
+        const vatableDiscount = discount * vatableRatio;
+        const nonVatableDiscount = discount - vatableDiscount;
+        netVatable = Math.max(0, grossVatable - vatableDiscount);
+        netNonVatable = Math.max(0, grossNonVatable - nonVatableDiscount);
+      }
+
+      vatableAmount = netVatable;
+      nonVatableAmount = netNonVatable;
+
+      if (vatInc === 'Yes') {
+        vat = (netVatable / (100 + vatRate)) * vatRate;
+        totalCharge = totalCost;
+      } else if (vatInc === 'Add') {
+        vat = netVatable * (vatRate / 100);
+        totalCharge = totalCost + vat;
+      } else {
+        vat = 0;
+        totalCharge = totalCost;
+      }
+    } else {
+      vatableAmount = totalCost;
+      nonVatableAmount = 0;
+
+      if (vatInc === 'Yes') {
+        vat = (totalCost / (100 + vatRate)) * vatRate;
+        totalCharge = totalCost;
+      } else if (vatInc === 'Add') {
+        vat = totalCost * (vatRate / 100);
+        totalCharge = totalCost + vat;
+      } else {
+        vat = 0;
+        totalCharge = totalCost;
+      }
     }
 
     const machineConfigsOut = activeCfgs
@@ -559,6 +729,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
       dieselCostPerLtr, dailyUsage, mobDemob, installation, damages, discount,
       startDate, endDate, rentalCost, dieselCost, techniciansCost,
       subtotalCost, totalCost, vat, totalCharge, vatInc,
+      vatScope, vatableSections, vatableAmount, nonVatableAmount,
       totalExclusiveOfVat: totalCharge - vat,
       invoiceNo: input.invoiceNo || input.invoiceNumber || '',
       client: clientName, site: siteName,
@@ -635,6 +806,10 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
         vat: data.vat,
         totalCharge: data.totalCharge,
         totalExclusiveOfVat: data.totalExclusiveOfVat,
+        vatScope: data.vatScope,
+        vatableSections: data.vatableSections,
+        vatableAmount: data.vatableAmount,
+        nonVatableAmount: data.nonVatableAmount,
         machineConfigs: data.machineConfigs,
         countOffDays: data.countOffDays,
         technicianDuration: data.technicianDuration,
@@ -761,6 +936,15 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
       damages: 'damages' in inv ? String(inv.damages ?? 0) : '0',
       discount: 'discount' in inv ? String(inv.discount ?? 0) : '0',
       countOffDays: 'countOffDays' in inv ? (inv.countOffDays ?? true) : true,
+      vatScope: inv.vatScope || 'per_section',
+      vatableSections: inv.vatableSections || defaultVatableSections || {
+        equipment: true,
+        technicians: false,
+        diesel: true,
+        mobDemob: true,
+        installation: true,
+        damages: false,
+      },
       createReminder: false,
       sendEmailNotification: true,
     });
@@ -917,6 +1101,15 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
       installation: '0',
       damages: '0',
       countOffDays: inv.countOffDays ?? true,
+      vatScope: inv.vatScope || 'per_section',
+      vatableSections: inv.vatableSections || defaultVatableSections || {
+        equipment: true,
+        technicians: false,
+        diesel: true,
+        mobDemob: true,
+        installation: true,
+        damages: false,
+      },
       createReminder: true,
       sendEmailNotification: true,
     });
@@ -1869,7 +2062,12 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                         <TableCell className="px-4 py-3 font-mono font-bold text-slate-700">{inv.invoiceNo || inv.invoiceNumber}</TableCell>
                         <TableCell className="px-4 py-3 text-slate-700">
                           <div className="font-semibold">{inv.client}</div>
-                          <div className="text-slate-500 text-xs">{inv.site || inv.siteName} <span className="ml-1 px-1 rounded bg-slate-100 border text-[10px]">{inv.vatInc || 'No VAT'}</span></div>
+                          <div className="text-slate-500 text-xs">
+                            {inv.site || inv.siteName}{' '}
+                            <span className="ml-1 px-1 rounded bg-slate-100 dark:bg-slate-850 border border-slate-200 dark:border-slate-800 text-[10px]">
+                              {inv.vatInc || 'No VAT'}{inv.vatScope === 'per_section' ? ' (Itemized)' : ''}
+                            </span>
+                          </div>
                         </TableCell>
                         <TableCell className="px-4 py-3 text-right text-slate-600">
                           {/* ── Machine column: use machineConfigs when rates differ ── */}
@@ -2251,40 +2449,40 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
 
         {/* ── Full-page Invoice Form (rendered as portal to cover layout header but keep sidebar) ── */}
         {isModalOpen && document.getElementById('layout-content-wrapper') && createPortal(
-          <div className="absolute inset-0 z-50 bg-slate-100 dark:bg-slate-950 overflow-y-auto animate-in fade-in slide-in-from-bottom-2 duration-300 flex flex-col w-full">
-            {/* Page header — sticky */}
-            <div className="sticky top-0 z-10 bg-slate-100 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 shadow-sm px-6 md:px-8 py-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div className="flex items-center gap-4">
-                <Button variant="ghost" size="sm" className="gap-2 h-9 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/50 dark:hover:bg-slate-800 -ml-1 shrink-0 transition-colors" onClick={() => setIsModalOpen(false)}>
-                  <ArrowLeft className="w-4 h-4" />
-                  <span>Back to Invoices</span>
-                </Button>
-                <div className="h-5 w-px bg-slate-300 dark:bg-slate-800" />
-                <div>
-                  <h2 className="text-lg font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
-                    {selectedId ? 'Edit' : 'Create'} {form.destination === 'Active' ? 'Active Invoice' : 'Quotation'}
-                  </h2>
-                  <p className="text-[11px] text-slate-550 dark:text-slate-400">Manage billing rates, crew accommodation, machinery configs, and auto-reminders.</p>
+          <div className="absolute inset-0 z-50 bg-slate-100 dark:bg-slate-950 overflow-hidden flex flex-col w-full h-full animate-in fade-in slide-in-from-bottom-2 duration-300">
+            {/* Page header — fixed top bar */}
+            <div className="shrink-0 z-10 bg-slate-100 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 px-6 md:px-8 py-2.5 shadow-2xs">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <Button variant="ghost" size="sm" className="gap-1.5 h-8 px-2.5 text-xs text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/50 dark:hover:bg-slate-800 -ml-1 shrink-0 transition-colors font-semibold" onClick={() => setIsModalOpen(false)}>
+                    <ArrowLeft className="w-3.5 h-3.5" />
+                    <span>Back to Invoices</span>
+                  </Button>
+                  <div className="h-4 w-px bg-slate-300 dark:bg-slate-800" />
+                  <div>
+                    <h2 className="text-base font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2 leading-none">
+                      {selectedId ? 'Edit' : 'Create'} {form.destination === 'Active' ? 'Active Invoice' : 'Quotation'}
+                    </h2>
+                    <p className="text-[10.5px] text-slate-500 dark:text-slate-400 mt-0.5 leading-none">Manage billing rates, crew accommodation, machinery configs, and auto-reminders.</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-2.5">
+                  <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Destination:</span>
+                  <select
+                    value={form.destination}
+                    onChange={e => handleChange('destination', e.target.value)}
+                    className="flex h-8 w-36 rounded-lg border border-slate-350 dark:border-slate-800 bg-white dark:bg-slate-900 px-2.5 py-0.5 text-xs outline-none font-bold text-slate-800 dark:text-white shadow-xs focus:ring-2 focus:ring-indigo-500/20"
+                  >
+                    <option value="Pending">Quotation</option>
+                    <option value="Active">Active Invoice</option>
+                  </select>
                 </div>
               </div>
-              
-              <div className="flex items-center gap-3">
-                <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Destination:</span>
-                <select
-                  value={form.destination}
-                  onChange={e => handleChange('destination', e.target.value)}
-                  className="flex h-9 w-40 rounded-lg border border-slate-350 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-1 text-xs outline-none font-bold text-slate-800 dark:text-white shadow-sm focus:ring-2 focus:ring-indigo-500/20"
-                >
-                  <option value="Pending">Quotation</option>
-                  <option value="Active">Active Invoice</option>
-                </select>
-              </div>
-            </div>
             </div>
 
-            {/* Two-column layout: form left, live preview right */}
-            <div className="p-6 md:p-8 pt-6 flex flex-col gap-6">
+            {/* Scrollable container starting immediately below the header */}
+            <div className="flex-1 overflow-y-auto p-6 md:p-8 pt-5 flex flex-col gap-6">
             <div className="grid grid-cols-1 xl:grid-cols-[1fr_340px] gap-6 items-start">
               {/* Main form column */}
               <div className="space-y-6">
@@ -2480,7 +2678,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                       </div>
                     </div>
 
-                    <div className="pt-3 border-t border-slate-100 dark:border-slate-850 flex items-center">
+                    <div className="pt-3 border-t border-slate-100 dark:border-slate-850 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                       <label className="flex items-start gap-3.5 cursor-pointer select-none">
                         <input 
                           type="checkbox" 
@@ -2493,26 +2691,69 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                           <span className="text-[10px] text-slate-450 block">Billed duration will accrue continuously without pausing on client holidays or non-working days.</span>
                         </div>
                       </label>
+
+                      <div className="flex flex-col sm:items-end gap-1 shrink-0">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">VAT Scope</span>
+                        <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-lg border border-slate-200 dark:border-slate-700">
+                          <button
+                            type="button"
+                            onClick={() => handleChange('vatScope', 'overall')}
+                            className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${
+                              form.vatScope !== 'per_section'
+                                ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
+                                : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'
+                            }`}
+                          >
+                            Full Invoice (Standard)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleChange('vatScope', 'per_section')}
+                            className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${
+                              form.vatScope === 'per_section'
+                                ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
+                                : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'
+                            }`}
+                          >
+                            Per-Section (Itemized)
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
 
                 {/* Section 2: Equipment & Machinery */}
                 <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-850 overflow-hidden">
-                  <div className="bg-slate-50/50 dark:bg-slate-900/50 px-6 py-4 border-b border-slate-155 dark:border-slate-850 flex items-center gap-3">
-                    <div className="p-2 bg-blue-50 dark:bg-blue-950/40 rounded-lg text-blue-650 dark:text-blue-400">
-                      <Layers className="w-4 h-4" />
+                  <div className="bg-slate-50/50 dark:bg-slate-900/50 px-6 py-4 border-b border-slate-155 dark:border-slate-850 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-blue-50 dark:bg-blue-950/40 rounded-lg text-blue-650 dark:text-blue-400">
+                        <Layers className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wide">Equipment &amp; Machinery Lease</h3>
+                        <p className="text-[10px] text-slate-400">Lease pump quantities, config rates and durations.</p>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wide">Equipment &amp; Machinery Lease</h3>
-                      <p className="text-[10px] text-slate-400">Lease pump quantities, config rates and durations.</p>
-                    </div>
+                    {form.vatScope === 'per_section' && (
+                      <span
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold select-none border ${
+                          (form.vatableSections?.equipment ?? true)
+                            ? 'bg-blue-50 dark:bg-blue-950/50 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300'
+                            : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500'
+                        }`}
+                        title="Configured in Settings > Invoice & Tax Variables"
+                      >
+                        <span className={`w-1.5 h-1.5 rounded-full ${(form.vatableSections?.equipment ?? true) ? 'bg-blue-500' : 'bg-slate-400'}`} />
+                        {(form.vatableSections?.equipment ?? true) ? `VAT Applied (${vatRate}%)` : 'Tax Exempt'}
+                      </span>
+                    )}
                   </div>
 
                   <div className="p-6 space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-slate-500 dark:text-slate-450 uppercase tracking-wider">Number of Dewatering Pumps</label>
+                        <label className="text-xs font-bold text-slate-500 dark:text-slate-455 uppercase tracking-wider">Number of Dewatering Pumps</label>
                         <Input
                           type="number" 
                           min="0" 
@@ -2643,21 +2884,36 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
 
                 {/* Section 3: Crew / Dewatering Staff */}
                 <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-850 overflow-hidden">
-                  <div className="bg-slate-50/50 dark:bg-slate-900/50 px-6 py-4 border-b border-slate-155 dark:border-slate-850 flex items-center gap-3">
-                    <div className="p-2 bg-amber-50 dark:bg-amber-950/40 rounded-lg text-amber-600 dark:text-amber-400">
-                      <Users className="w-4 h-4" />
+                  <div className="bg-slate-50/50 dark:bg-slate-900/50 px-6 py-4 border-b border-slate-155 dark:border-slate-850 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-amber-50 dark:bg-amber-950/40 rounded-lg text-amber-600 dark:text-amber-400">
+                        <Users className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wide">Dewatering Crew &amp; Personnel</h3>
+                        <p className="text-[10px] text-slate-400">Manage technician count, day/night shift rates, and durations.</p>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wide">Dewatering Crew &amp; Personnel</h3>
-                      <p className="text-[10px] text-slate-400">Manage technician count, day/night shift rates, and durations.</p>
-                    </div>
+                    {form.vatScope === 'per_section' && (
+                      <span
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold select-none border ${
+                          (form.vatableSections?.technicians ?? false)
+                            ? 'bg-amber-50 dark:bg-amber-950/50 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300'
+                            : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500'
+                        }`}
+                        title="Configured in Settings > Invoice & Tax Variables"
+                      >
+                        <span className={`w-1.5 h-1.5 rounded-full ${(form.vatableSections?.technicians ?? false) ? 'bg-amber-500' : 'bg-slate-400'}`} />
+                        {(form.vatableSections?.technicians ?? false) ? `VAT Applied (${vatRate}%)` : 'Tax Exempt'}
+                      </span>
+                    )}
                   </div>
 
                   <div className="p-6 space-y-5">
                     {/* Main technician count */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-1.5 col-span-2">
-                        <label className="text-xs font-bold text-slate-500 dark:text-slate-450 uppercase tracking-wider">Number of Technicians On Site</label>
+                        <label className="text-xs font-bold text-slate-500 dark:text-slate-455 uppercase tracking-wider">Number of Technicians On Site</label>
                         <Input 
                           type="number" 
                           min="0" 
@@ -2852,68 +3108,136 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                   </div>
 
                   <div className="p-6 space-y-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
                       <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-slate-500 dark:text-slate-455 uppercase tracking-wider">Diesel Price (₦ / Liter)</label>
+                        <div className="flex items-center justify-between h-6">
+                          <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider truncate" title="Diesel Price (₦/L)">
+                            Diesel (₦/L)
+                          </label>
+                          {form.vatScope === 'per_section' && (
+                            <span 
+                              className={`text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0 ml-1 border ${
+                                (form.vatableSections?.diesel ?? true)
+                                  ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 border-indigo-200 dark:border-indigo-800/60'
+                                  : 'text-slate-400 bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700'
+                              }`}
+                              title="Tax status configured in Settings"
+                            >
+                              {(form.vatableSections?.diesel ?? true) ? `VAT ${vatRate}%` : 'Exempt'}
+                            </span>
+                          )}
+                        </div>
                         <NumericFormat 
                           customInput={Input} 
                           thousandSeparator 
                           decimalScale={2} 
                           value={form.dieselCostPerLtr} 
                           onValueChange={(v) => handleChange('dieselCostPerLtr', v.value || '')} 
-                          className="bg-white dark:bg-slate-900 border-slate-205 dark:border-slate-800 h-11 font-mono font-semibold text-slate-800 dark:text-white" 
+                          className="bg-white dark:bg-slate-900 border-slate-205 dark:border-slate-800 h-11 font-mono font-semibold text-slate-800 dark:text-white w-full" 
                           placeholder="0.00" 
                         />
                       </div>
 
                       <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-slate-500 dark:text-slate-450 uppercase tracking-wider">Mobilization / Demob (₦)</label>
+                        <div className="flex items-center justify-between h-6">
+                          <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider truncate" title="Mob / Demob (₦)">
+                            Mob / Demob (₦)
+                          </label>
+                          {form.vatScope === 'per_section' && (
+                            <span 
+                              className={`text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0 ml-1 border ${
+                                (form.vatableSections?.mobDemob ?? true)
+                                  ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 border-indigo-200 dark:border-indigo-800/60'
+                                  : 'text-slate-400 bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700'
+                              }`}
+                              title="Tax status configured in Settings"
+                            >
+                              {(form.vatableSections?.mobDemob ?? true) ? `VAT ${vatRate}%` : 'Exempt'}
+                            </span>
+                          )}
+                        </div>
                         <NumericFormat 
                           customInput={Input} 
                           thousandSeparator 
                           decimalScale={2} 
                           value={form.mobDemob} 
                           onValueChange={(v) => handleChange('mobDemob', v.value || '')} 
-                          className="bg-white dark:bg-slate-900 border-slate-205 dark:border-slate-800 h-11 font-mono font-semibold text-slate-800 dark:text-white" 
+                          className="bg-white dark:bg-slate-900 border-slate-205 dark:border-slate-800 h-11 font-mono font-semibold text-slate-800 dark:text-white w-full" 
                           placeholder="0.00" 
                         />
                       </div>
 
                       <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-slate-500 dark:text-slate-450 uppercase tracking-wider">Installation Fee (₦)</label>
+                        <div className="flex items-center justify-between h-6">
+                          <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider truncate" title="Installation (₦)">
+                            Installation (₦)
+                          </label>
+                          {form.vatScope === 'per_section' && (
+                            <span 
+                              className={`text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0 ml-1 border ${
+                                (form.vatableSections?.installation ?? true)
+                                  ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 border-indigo-200 dark:border-indigo-800/60'
+                                  : 'text-slate-400 bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700'
+                              }`}
+                              title="Tax status configured in Settings"
+                            >
+                              {(form.vatableSections?.installation ?? true) ? `VAT ${vatRate}%` : 'Exempt'}
+                            </span>
+                          )}
+                        </div>
                         <NumericFormat 
                           customInput={Input} 
                           thousandSeparator 
                           decimalScale={2} 
                           value={form.installation} 
                           onValueChange={(v) => handleChange('installation', v.value || '')} 
-                          className="bg-white dark:bg-slate-900 border-slate-205 dark:border-slate-800 h-11 font-mono font-semibold text-slate-800 dark:text-white" 
+                          className="bg-white dark:bg-slate-900 border-slate-205 dark:border-slate-800 h-11 font-mono font-semibold text-slate-800 dark:text-white w-full" 
                           placeholder="0.00" 
                         />
                       </div>
 
                       <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-slate-500 dark:text-slate-455 uppercase tracking-wider">Damages / Repairs (₦)</label>
+                        <div className="flex items-center justify-between h-6">
+                          <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider truncate" title="Damages (₦)">
+                            Damages (₦)
+                          </label>
+                          {form.vatScope === 'per_section' && (
+                            <span 
+                              className={`text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0 ml-1 border ${
+                                (form.vatableSections?.damages ?? false)
+                                  ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 border-indigo-200 dark:border-indigo-800/60'
+                                  : 'text-slate-400 bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700'
+                              }`}
+                              title="Tax status configured in Settings"
+                            >
+                              {(form.vatableSections?.damages ?? false) ? `VAT ${vatRate}%` : 'Exempt'}
+                            </span>
+                          )}
+                        </div>
                         <NumericFormat 
                           customInput={Input} 
                           thousandSeparator 
                           decimalScale={2} 
                           value={form.damages} 
                           onValueChange={(v) => handleChange('damages', v.value || '')} 
-                          className="bg-white dark:bg-slate-900 border-slate-205 dark:border-slate-800 h-11 font-mono font-semibold text-slate-800 dark:text-white" 
+                          className="bg-white dark:bg-slate-900 border-slate-205 dark:border-slate-800 h-11 font-mono font-semibold text-slate-800 dark:text-white w-full" 
                           placeholder="0.00" 
                         />
                       </div>
 
                       <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Discount (₦)</label>
+                        <div className="flex items-center justify-between h-6">
+                          <label className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider truncate" title="Discount (₦)">
+                            Discount (₦)
+                          </label>
+                        </div>
                         <NumericFormat 
                           customInput={Input} 
                           thousandSeparator 
                           decimalScale={2} 
                           value={form.discount} 
                           onValueChange={(v) => handleChange('discount', v.value || '')} 
-                          className="bg-white dark:bg-slate-900 border-emerald-300 dark:border-emerald-800 focus:border-emerald-500 h-11 font-mono font-semibold text-emerald-600 dark:text-emerald-400" 
+                          className="bg-white dark:bg-slate-900 border-emerald-300 dark:border-emerald-800 focus:border-emerald-500 h-11 font-mono font-semibold text-emerald-600 dark:text-emerald-400 w-full" 
                           placeholder="0.00" 
                         />
                       </div>
@@ -2999,28 +3323,92 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                       </span>
                     </div>
 
-                    {livePreview.discount > 0 && (
+                    {livePreview.vatScope === 'per_section' ? (
                       <>
                         <div className="h-px bg-slate-800" />
-                        <div className="flex flex-col">
-                          <span className="text-emerald-400 text-[10px] uppercase font-black tracking-wider mb-1">Discount Subtraction</span>
-                          <span className="font-mono text-emerald-400 font-bold text-lg">
-                            -₦{priv?.canViewAmounts === false ? '***' : livePreview.discount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                          </span>
-                        </div>
-                        <div className="h-px bg-slate-800" />
-                        <div className="flex flex-col">
-                          <span className="text-slate-400 text-[10px] uppercase font-black tracking-wider mb-1">Net Subtotal (Vatable)</span>
-                          <span className="font-mono text-slate-100 font-bold text-lg">
-                            ₦{priv?.canViewAmounts === false ? '***' : livePreview.totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                          </span>
+                        <div className="space-y-2">
+                          <div className="flex justify-between items-center">
+                            <span className="text-slate-400 text-[10px] uppercase font-black tracking-wider">Vatable Base</span>
+                            <span className="font-mono text-indigo-300 font-bold text-base">
+                              ₦{priv?.canViewAmounts === false ? '***' : (livePreview.vatableAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-slate-500 text-[10px] uppercase font-black tracking-wider">Non-Vatable Base</span>
+                            <span className="font-mono text-slate-400 font-bold text-base">
+                              ₦{priv?.canViewAmounts === false ? '***' : (livePreview.nonVatableAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
+                          </div>
+
+                          {/* Accumulated Section VAT Breakdown */}
+                          <div className="mt-3 pt-2.5 border-t border-slate-800 space-y-1.5">
+                            <span className="text-[10px] text-slate-400 font-black uppercase tracking-wider block">Accumulated Section VAT</span>
+                            {livePreview.equipmentVat > 0 && (
+                              <div className="flex justify-between text-xs text-slate-350">
+                                <span>• Machine Lease VAT:</span>
+                                <span className="font-mono font-bold text-emerald-400">₦{livePreview.equipmentVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                              </div>
+                            )}
+                            {livePreview.dieselVat > 0 && (
+                              <div className="flex justify-between text-xs text-slate-350">
+                                <span>• Diesel Fuel VAT:</span>
+                                <span className="font-mono font-bold text-orange-400">₦{livePreview.dieselVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                              </div>
+                            )}
+                            {livePreview.techniciansVat > 0 && (
+                              <div className="flex justify-between text-xs text-slate-350">
+                                <span>• Crew Personnel VAT:</span>
+                                <span className="font-mono font-bold text-amber-400">₦{livePreview.techniciansVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                              </div>
+                            )}
+                            {livePreview.mobDemobVat > 0 && (
+                              <div className="flex justify-between text-xs text-slate-350">
+                                <span>• Mob / Demob VAT:</span>
+                                <span className="font-mono font-bold text-indigo-300">₦{livePreview.mobDemobVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                              </div>
+                            )}
+                            {livePreview.installationVat > 0 && (
+                              <div className="flex justify-between text-xs text-slate-350">
+                                <span>• Installation VAT:</span>
+                                <span className="font-mono font-bold text-indigo-300">₦{livePreview.installationVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                              </div>
+                            )}
+                            {livePreview.damagesVat > 0 && (
+                              <div className="flex justify-between text-xs text-slate-350">
+                                <span>• Damages VAT:</span>
+                                <span className="font-mono font-bold text-rose-400">₦{livePreview.damagesVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                              </div>
+                            )}
+                            {livePreview.vat === 0 && (
+                              <div className="text-xs text-slate-500 italic">No vatable sections active</div>
+                            )}
+                          </div>
                         </div>
                       </>
+                    ) : (
+                      livePreview.discount > 0 && (
+                        <>
+                          <div className="h-px bg-slate-800" />
+                          <div className="flex flex-col">
+                            <span className="text-emerald-400 text-[10px] uppercase font-black tracking-wider mb-1">Discount Subtraction</span>
+                            <span className="font-mono text-emerald-400 font-bold text-lg">
+                              -₦{priv?.canViewAmounts === false ? '***' : livePreview.discount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                          <div className="h-px bg-slate-800" />
+                          <div className="flex flex-col">
+                            <span className="text-slate-400 text-[10px] uppercase font-black tracking-wider mb-1">Net Subtotal (Vatable)</span>
+                            <span className="font-mono text-slate-100 font-bold text-lg">
+                              ₦{priv?.canViewAmounts === false ? '***' : livePreview.totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                        </>
+                      )
                     )}
 
                     <div className="h-px bg-slate-800" />
                     <div className="flex flex-col">
-                      <span className="text-slate-500 text-[10px] uppercase font-black tracking-wider mb-1">Tax (VAT {livePreview.vatInc})</span>
+                      <span className="text-slate-500 text-[10px] uppercase font-black tracking-wider mb-1">Tax (VAT {livePreview.vatInc}{livePreview.vatScope === 'per_section' ? ' • Itemized' : ''})</span>
                       <span className="font-mono text-indigo-400 font-bold text-lg">
                         ₦{priv?.canViewAmounts === false ? '***' : livePreview.vat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </span>
@@ -3038,7 +3426,14 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                 {/* Tech cost breakdown card */}
                 {(parseFloat(form.noOfTechnician) > 0) && (
                   <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-850 p-5 shadow-sm space-y-4">
-                    <p className="text-[10px] font-black uppercase tracking-wider text-indigo-650 dark:text-indigo-400 border-b border-slate-100 dark:border-slate-800 pb-2">Crew Cost Formula</p>
+                    <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-2">
+                      <p className="text-[10px] font-black uppercase tracking-wider text-indigo-650 dark:text-indigo-400">Crew Cost Formula</p>
+                      {livePreview.vatScope === 'per_section' && (
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${(livePreview.vatableSections?.technicians ?? false) ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}>
+                          {(livePreview.vatableSections?.technicians ?? false) ? `VAT: ${vatRate}%` : 'Exempt'}
+                        </span>
+                      )}
+                    </div>
                     <div className="space-y-3.5 text-xs">
                       {/* Day shift line */}
                       <div className="flex justify-between items-start text-slate-655 dark:text-slate-400 gap-2">
@@ -3091,6 +3486,17 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                           ₦{livePreview.techniciansCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </span>
                       </div>
+
+                      {livePreview.vatScope === 'per_section' && (
+                        <div className="flex justify-between items-center text-[11px] px-1 text-slate-500 dark:text-slate-400">
+                          <span>Crew Section VAT ({livePreview.vatInc}):</span>
+                          <span className="font-mono font-bold text-amber-600 dark:text-amber-400">
+                            {(livePreview.vatableSections?.technicians ?? false) && livePreview.vatInc !== 'No'
+                              ? `+₦${livePreview.techniciansVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                              : '₦0.00 (Exempt)'}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -3098,7 +3504,14 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                 {/* Diesel Calculation breakdown card */}
                 {(livePreview.dieselCost > 0) && (
                   <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-850 p-5 shadow-sm space-y-4">
-                    <p className="text-[10px] font-black uppercase tracking-wider text-orange-600 dark:text-orange-400 border-b border-slate-100 dark:border-slate-800 pb-2">Diesel Calculation</p>
+                    <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-2">
+                      <p className="text-[10px] font-black uppercase tracking-wider text-orange-600 dark:text-orange-400">Diesel Calculation</p>
+                      {livePreview.vatScope === 'per_section' && (
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${(livePreview.vatableSections?.diesel ?? true) ? 'bg-orange-100 dark:bg-orange-950/60 text-orange-700 dark:text-orange-300' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}>
+                          {(livePreview.vatableSections?.diesel ?? true) ? `VAT: ${vatRate}%` : 'Exempt'}
+                        </span>
+                      )}
+                    </div>
                     <div className="space-y-3.5 text-xs">
                       {machineConfigs.length > 0 ? (
                         machineConfigs.map((row, idx) => {
@@ -3135,6 +3548,17 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                         <span>Total Diesel Cost</span>
                         <span className="font-mono">₦{livePreview.dieselCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                       </div>
+
+                      {livePreview.vatScope === 'per_section' && (
+                        <div className="flex justify-between items-center text-[11px] px-1 text-slate-500 dark:text-slate-400">
+                          <span>Diesel Section VAT ({livePreview.vatInc}):</span>
+                          <span className="font-mono font-bold text-orange-600 dark:text-orange-400">
+                            {(livePreview.vatableSections?.diesel ?? true) && livePreview.vatInc !== 'No'
+                              ? `+₦${livePreview.dieselVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                              : '₦0.00 (Exempt)'}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -3142,7 +3566,14 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                 {/* Machine Rental breakdown card */}
                 {(livePreview.rentalCost > 0) && (
                   <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-850 p-5 shadow-sm space-y-4">
-                    <p className="text-[10px] font-black uppercase tracking-wider text-emerald-700 dark:text-emerald-400 border-b border-slate-100 dark:border-slate-800 pb-2">Machine Calculation</p>
+                    <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-2">
+                      <p className="text-[10px] font-black uppercase tracking-wider text-emerald-700 dark:text-emerald-400">Machine Calculation</p>
+                      {livePreview.vatScope === 'per_section' && (
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${(livePreview.vatableSections?.equipment ?? true) ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}>
+                          {(livePreview.vatableSections?.equipment ?? true) ? `VAT: ${vatRate}%` : 'Exempt'}
+                        </span>
+                      )}
+                    </div>
                     <div className="space-y-3.5 text-xs">
                       {machineConfigs.length > 0 ? (
                         machineConfigs.map((row, idx) => (
@@ -3176,6 +3607,17 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                         <span>Total Machine Cost</span>
                         <span className="font-mono">₦{livePreview.rentalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                       </div>
+
+                      {livePreview.vatScope === 'per_section' && (
+                        <div className="flex justify-between items-center text-[11px] px-1 text-slate-500 dark:text-slate-400">
+                          <span>Machine Section VAT ({livePreview.vatInc}):</span>
+                          <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                            {(livePreview.vatableSections?.equipment ?? true) && livePreview.vatInc !== 'No'
+                              ? `+₦${livePreview.equipmentVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                              : '₦0.00 (Exempt)'}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -3183,12 +3625,26 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                 {/* Other Charges breakdown card (Mob/Demob, Installation, Damages) */}
                 {(livePreview.mobDemob > 0 || livePreview.installation > 0 || livePreview.damages > 0) && (
                   <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-850 p-5 shadow-sm space-y-4">
-                    <p className="text-[10px] font-black uppercase tracking-wider text-rose-600 dark:text-rose-400 border-b border-slate-100 dark:border-slate-800 pb-2">Other Charges</p>
+                    <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-2">
+                      <p className="text-[10px] font-black uppercase tracking-wider text-rose-600 dark:text-rose-400">Other Charges</p>
+                      {livePreview.vatScope === 'per_section' && (
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${livePreview.otherChargesVat > 0 ? 'bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}>
+                          {livePreview.otherChargesVat > 0 ? `VAT Active` : 'Exempt'}
+                        </span>
+                      )}
+                    </div>
                     <div className="space-y-3.5 text-xs">
                       {livePreview.mobDemob > 0 && (
                         <div className="flex justify-between items-start text-slate-655 dark:text-slate-400 gap-2">
                           <span className="flex flex-col">
-                            <span className="font-bold text-slate-705 dark:text-slate-350">Mob / Demob</span>
+                            <span className="font-bold text-slate-705 dark:text-slate-350 flex items-center gap-1.5">
+                              Mob / Demob
+                              {livePreview.vatScope === 'per_section' && (
+                                <span className={`text-[9px] px-1 rounded font-semibold ${(livePreview.vatableSections?.mobDemob ?? true) ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50' : 'text-slate-400 bg-slate-100 dark:bg-slate-800'}`}>
+                                  {(livePreview.vatableSections?.mobDemob ?? true) ? 'VAT' : 'Exempt'}
+                                </span>
+                              )}
+                            </span>
                             <span className="text-[10px] text-slate-400 font-medium">Mobilisation &amp; demobilisation fee</span>
                           </span>
                           <span className="font-mono font-bold text-slate-850 dark:text-slate-205 shrink-0">
@@ -3199,7 +3655,14 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                       {livePreview.installation > 0 && (
                         <div className="flex justify-between items-start text-slate-655 dark:text-slate-400 pt-2.5 border-t border-slate-100 dark:border-slate-850 gap-2">
                           <span className="flex flex-col">
-                            <span className="font-bold text-slate-705 dark:text-slate-350">Installation</span>
+                            <span className="font-bold text-slate-705 dark:text-slate-350 flex items-center gap-1.5">
+                              Installation
+                              {livePreview.vatScope === 'per_section' && (
+                                <span className={`text-[9px] px-1 rounded font-semibold ${(livePreview.vatableSections?.installation ?? true) ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50' : 'text-slate-400 bg-slate-100 dark:bg-slate-800'}`}>
+                                  {(livePreview.vatableSections?.installation ?? true) ? 'VAT' : 'Exempt'}
+                                </span>
+                              )}
+                            </span>
                             <span className="text-[10px] text-slate-400 font-medium">Installation &amp; setup charges</span>
                           </span>
                           <span className="font-mono font-bold text-slate-850 dark:text-slate-205 shrink-0">
@@ -3210,7 +3673,14 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                       {livePreview.damages > 0 && (
                         <div className="flex justify-between items-start text-slate-655 dark:text-slate-400 pt-2.5 border-t border-slate-100 dark:border-slate-850 gap-2">
                           <span className="flex flex-col">
-                            <span className="font-bold text-slate-705 dark:text-slate-350">Damages</span>
+                            <span className="font-bold text-slate-705 dark:text-slate-350 flex items-center gap-1.5">
+                              Damages
+                              {livePreview.vatScope === 'per_section' && (
+                                <span className={`text-[9px] px-1 rounded font-semibold ${(livePreview.vatableSections?.damages ?? false) ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50' : 'text-slate-400 bg-slate-100 dark:bg-slate-800'}`}>
+                                  {(livePreview.vatableSections?.damages ?? false) ? 'VAT' : 'Exempt'}
+                                </span>
+                              )}
+                            </span>
                             <span className="text-[10px] text-slate-400 font-medium">Damage &amp; repair charges</span>
                           </span>
                           <span className="font-mono font-bold text-slate-850 dark:text-slate-205 shrink-0">
@@ -3223,6 +3693,17 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                         <span>Total Other Charges</span>
                         <span className="font-mono">₦{(livePreview.mobDemob + livePreview.installation + livePreview.damages).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                       </div>
+
+                      {livePreview.vatScope === 'per_section' && (
+                        <div className="flex justify-between items-center text-[11px] px-1 text-slate-500 dark:text-slate-400">
+                          <span>Other Charges VAT ({livePreview.vatInc}):</span>
+                          <span className="font-mono font-bold text-rose-600 dark:text-rose-400">
+                            {livePreview.otherChargesVat > 0 && livePreview.vatInc !== 'No'
+                              ? `+₦${livePreview.otherChargesVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                              : '₦0.00 (Exempt)'}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -4680,7 +5161,9 @@ export function InvoicePrintModal({ invoice, onClose, ledgerBanks, ledgerBenefic
                       {vat > 0 && (
                         <tr className="summary-row">
                           <td className="hide-on-print" style={{ background: '#f8fafc' }}></td>
-                          <td colSpan={4} style={{ textAlign: 'right', paddingRight: 8 }}>VAT {vatRate}%{vatIncSetting === 'Yes' ? ' (Incl.)' : ''}</td>
+                          <td colSpan={4} style={{ textAlign: 'right', paddingRight: 8 }}>
+                            VAT {vatRate}%{vatIncSetting === 'Yes' ? ' (Incl.)' : ''}{invoice.vatScope === 'per_section' ? ' (Itemized)' : ''}
+                          </td>
                           <td className="amt-col">{fmt(vat)}</td>
                         </tr>
                       )}

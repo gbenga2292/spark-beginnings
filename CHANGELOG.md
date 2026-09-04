@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.7.17] - 2026-09-03
+
+### Added / Improved
+- **AI Agent Intelligence & Automation Suite**:
+  - Integrated full Agent Execution runtime (`agentExecutor.ts`, `agentTools.ts`, `useAgentContext.ts`) with function calling and contextual application tools.
+  - Added embedded AI assistant in Site 360 and Operations workflows for automated report generation, milestone extraction, and task orchestration.
+- **Payroll Snapshots & Version Audit System**:
+  - Added historical payroll snapshots table (`payroll_snapshots`) allowing accounting to freeze, archive, and audit closed payroll cycles.
+  - Updated `usePayrollCalculator` and `PayrollVersionModal` to support version comparisons, adjustments, and automated ledger synchronization.
+- **Vehicle Logistics & Fuel Ledger Linking**:
+  - Added direct financial reconciliation linking vehicle refueling logs to general ledger expenses (`linked_ledger_ids`).
+  - Improved expense categorization across fleet operations in `VehicleManager.tsx`.
+- **Site Milestones & Storyboard UX**:
+  - Added `SiteMilestonesCard` with phase progress markers, target completion dates, and stage health metrics.
+  - Enhanced `SiteGanttStoryboard` with real-time milestone sync and phase transitions.
+- **Database Migrations (Supabase)**:
+  - `20260827120000_add_inventory_ledger_batches_packaging.sql`: Added inventory ledger batches and packaging support.
+  - `20260831120000_create_payroll_snapshots.sql`: Created `payroll_snapshots` with JSON breakdown payload and RLS policies.
+  - `20260903120000_add_linked_ledger_ids_to_vehicle_fuel_logs.sql`: Added `linked_ledger_ids` tracking array to `vehicle_fuel_logs`.
+- **Version Bump**:
+  - Updated application version to `1.7.17` in [package.json](file:///c:/Users/USER/Desktop/assign/spark-beginnings/package.json) and [version.ts](file:///c:/Users/USER/Desktop/assign/spark-beginnings/src/constants/version.ts).
+
 ## [1.7.14] - 2026-08-26
 
 ### Added / Improved

@@ -2806,7 +2806,8 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
             odometer: newLog.odometer ?? null,
             filled_by: newLog.filled_by ?? null,
             notes: newLog.notes ?? null,
-            linked_ledger_ids: serializedLinks.length > 0 ? serializedLinks : null,
+            linked_ledger_ids: serializedLinks.length > 0 ? serializedLinks : [],
+            linked_ledger_amounts: newLog.linkedLedgerAmounts ?? {},
             created_at: newLog.created_at
           });
           if (error) throw error;
@@ -2826,22 +2827,23 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
           return f;
         }));
         try {
-          const dbUpdates: any = {
-            vehicle_id: updates.vehicle_id,
-            vehicle_reg: updates.vehicle_reg,
-            date: updates.date,
-            rate_per_litre: updates.rate_per_litre,
-            litres: updates.litres,
-            total_cost: updates.total_cost,
-            odometer: updates.odometer ?? null,
-            filled_by: updates.filled_by ?? null,
-            notes: updates.notes ?? null,
-          };
+          const dbUpdates: any = {};
+          if (updates.vehicle_id !== undefined) dbUpdates.vehicle_id = updates.vehicle_id;
+          if (updates.vehicle_reg !== undefined) dbUpdates.vehicle_reg = updates.vehicle_reg;
+          if (updates.date !== undefined) dbUpdates.date = updates.date;
+          if (updates.rate_per_litre !== undefined) dbUpdates.rate_per_litre = updates.rate_per_litre;
+          if (updates.litres !== undefined) dbUpdates.litres = updates.litres;
+          if (updates.total_cost !== undefined) dbUpdates.total_cost = updates.total_cost;
+          if (updates.odometer !== undefined) dbUpdates.odometer = updates.odometer ?? null;
+          if (updates.filled_by !== undefined) dbUpdates.filled_by = updates.filled_by ?? null;
+          if (updates.notes !== undefined) dbUpdates.notes = updates.notes ?? null;
           if (updates.linkedLedgerIds !== undefined || updates.linkedLedgerAmounts !== undefined) {
             const currentItem = updatedLogItem || vehicleFuelLogs.find(f => f.id === id);
             const targetIds = updates.linkedLedgerIds ?? currentItem?.linkedLedgerIds ?? [];
             const targetAmounts = updates.linkedLedgerAmounts ?? currentItem?.linkedLedgerAmounts ?? {};
-            dbUpdates.linked_ledger_ids = serializeLedgerLinks(targetIds, targetAmounts);
+            const serialized = serializeLedgerLinks(targetIds, targetAmounts);
+            dbUpdates.linked_ledger_ids = serialized.length > 0 ? serialized : [];
+            dbUpdates.linked_ledger_amounts = targetAmounts;
           }
           const { error } = await supabase.from('vehicle_fuel_logs').update(dbUpdates).eq('id', id);
           if (error) throw error;

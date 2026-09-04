@@ -6,8 +6,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/src/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
 import { Input } from '@/src/components/ui/input';
-import { Download, Upload, CreditCard, ChevronDown, X, Printer } from 'lucide-react';
-import { useAppStore, Employee } from '@/src/store/appStore';
+import { Download, Upload, CreditCard, ChevronDown, X, Printer, Lock, Unlock, History, GitCommit, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { useAppStore, Employee, PayrollSnapshot } from '@/src/store/appStore';
+import { useUserStore } from '@/src/store/userStore';
+import { toast, showConfirm } from '@/src/components/ui/toast';
+import { PayrollVersionModal } from '@/src/components/payroll/PayrollVersionModal';
 import { computeWorkDays, computeWorkDaysInRange, MONTH_INDEX } from '@/src/lib/workdays';
 import logoSrc from '../../logo/logo-2.png';
 import { usePriv } from '@/src/hooks/usePriv';
@@ -64,6 +67,58 @@ const YEAR_RANGE_START = 2020;
 const fm = (v: number) => typeof v === 'number' ? v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0';
 const fmT = fm;
 
+const AVAILABLE_COLUMNS: Array<{ id: string; label: string; summable: boolean; types: string[] }> = [
+  { id: 'sn',               label: 'S/N',               summable: false, types: ['all'] },
+  { id: 'employee_name',    label: 'Employee Name',     summable: false, types: ['all'] },
+  { id: 'month',            label: 'Month',             summable: false, types: ['all'] },
+  { id: 'bank_name',        label: 'Bank Name',         summable: false, types: ['all'] },
+  { id: 'account_number',   label: 'Account No',        summable: false, types: ['all'] },
+  { id: 'paye_id',          label: 'PAYE ID',           summable: false, types: ['PAYE', 'PAYSLIPS'] },
+  { id: 'pension_pin',      label: 'Pension Number',    summable: false, types: ['PENSION', 'PAYSLIPS'] },
+  { id: 'main_salary',      label: 'Main Salary',       summable: true,  types: ['PAYSLIPS'] },
+  { id: 'basic',            label: 'Basic Salary',      summable: true,  types: ['PAYE', 'PAYSLIPS'] },
+  { id: 'housing',          label: 'Housing',           summable: true,  types: ['PAYE', 'PAYSLIPS'] },
+  { id: 'transport',        label: 'Transport',         summable: true,  types: ['PAYE', 'PAYSLIPS'] },
+  { id: 'other',            label: 'Other Allowances',  summable: true,  types: ['PAYE', 'PAYSLIPS'] },
+  { id: 'overtime',         label: 'Overtime Pay',      summable: true,  types: ['PAYSLIPS'] },
+  { id: 'gross',            label: 'Gross Pay',         summable: true,  types: ['PAYE', 'NSITF', 'PAYSLIPS'] },
+  { id: 'paye',             label: 'PAYE Tax',          summable: true,  types: ['PAYE', 'PAYSLIPS'] },
+  { id: 'loan',             label: 'Loan Repayment',    summable: true,  types: ['PAYSLIPS'] },
+  { id: 'net_pay',          label: 'Net (Take-Home)',   summable: true,  types: ['PAYE', 'PAYSLIPS'] },
+  { id: 'pensionable',      label: 'Pensionable Sum',   summable: true,  types: ['PENSION'] },
+  { id: 'employee_pension', label: 'Employee Pension',  summable: true,  types: ['PENSION', 'PAYSLIPS'] },
+  { id: 'employer_pension', label: 'Employer Pension',  summable: true,  types: ['PENSION'] },
+  { id: 'total_pension',    label: 'Total Pension',     summable: true,  types: ['PENSION'] },
+  { id: 'nsitf_rate',       label: 'NSITF Ratio',       summable: false, types: ['NSITF'] },
+  { id: 'nsitf_amount',     label: 'NSITF Amount',      summable: true,  types: ['NSITF'] },
+  { id: 'withholding_rate',  label: 'WHT Rate (%)',      summable: false, types: ['WITHHOLDING'] },
+  { id: 'tin',               label: 'TIN',               summable: false, types: ['WITHHOLDING'] },
+  { id: 'withholding',      label: 'Withholding Tax',   summable: true,  types: ['WITHHOLDING', 'PAYSLIPS'] },
+];
+
+const DEFAULT_COLUMNS: Record<string, string[]> = {
+  PAYSLIPS: ['employee_name', 'month', 'bank_name', 'account_number', 'main_salary', 'basic', 'housing', 'transport', 'other', 'overtime', 'gross', 'paye', 'loan', 'employee_pension', 'net_pay'],
+  PAYE:    ['sn', 'employee_name', 'paye_id', 'month', 'bank_name', 'account_number', 'basic', 'housing', 'transport', 'other', 'gross', 'paye'],
+  PENSION: ['sn', 'employee_name', 'pension_pin', 'month', 'bank_name', 'account_number', 'pensionable', 'employee_pension', 'employer_pension', 'total_pension'],
+  NSITF:   ['sn', 'employee_name', 'month', 'bank_name', 'account_number', 'gross', 'nsitf_rate', 'nsitf_amount'],
+  WITHHOLDING: ['sn', 'employee_name', 'tin', 'month', 'bank_name', 'account_number', 'gross', 'withholding_rate', 'withholding'],
+};
+
+const MONTHS = [
+  { key: 'jan', label: 'January' },
+  { key: 'feb', label: 'February' },
+  { key: 'mar', label: 'March' },
+  { key: 'apr', label: 'April' },
+  { key: 'may', label: 'May' },
+  { key: 'jun', label: 'June' },
+  { key: 'jul', label: 'July' },
+  { key: 'aug', label: 'August' },
+  { key: 'sep', label: 'September' },
+  { key: 'oct', label: 'October' },
+  { key: 'nov', label: 'November' },
+  { key: 'dec', label: 'December' },
+] as const;
+
 export function Payroll() {
   const rawEmployees = useAppStore((state) => state.employees);
   const employees = rawEmployees;
@@ -76,6 +131,12 @@ export function Payroll() {
   const fetchAttendanceYearIfNeeded = useAppStore((state) => state.fetchAttendanceYearIfNeeded);
   const publicHolidays = useAppStore((state) => state.publicHolidays);
   const departments = useAppStore((state) => state.departments);
+  const payrollSnapshots = useAppStore((state) => state.payrollSnapshots);
+  const fetchPayrollSnapshots = useAppStore((state) => state.fetchPayrollSnapshots);
+  const savePayrollSnapshot = useAppStore((state) => state.savePayrollSnapshot);
+
+  const currentUser = useUserStore((state) => state.users.find((u) => u.id === state.currentUserId) ?? null);
+  const isAdmin = currentUser?.role === 'Admin' || currentUser?.role === 'SuperAdmin' || currentUser?.role === 'admin' || currentUser?.role === 'co-admin' || !!currentUser?.privileges?.users?.canManage;
 
   useEffect(() => {
     if (rawEmployees.length === 0) {
@@ -93,9 +154,14 @@ export function Payroll() {
 
   useEffect(() => {
     fetchAttendanceYearIfNeeded(selectedYear);
-  }, [selectedYear, fetchAttendanceYearIfNeeded]);
+    fetchPayrollSnapshots(selectedYear);
+  }, [selectedYear]);
+
   const [activeTab, setActiveTab] = useState('processing');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isFinalizing, setIsFinalizing] = useState(false);
+  const [versionModalOpen, setVersionModalOpen] = useState(false);
+  const [versionModalMode, setVersionModalMode] = useState<'CREATE_REVISION' | 'AUDIT_HISTORY'>('AUDIT_HISTORY');
   const [printDialogOpen, setPrintDialogOpen] = useState(false);
   const [printSidebarOpen, setPrintSidebarOpen] = useState(false);
   const [printType, setPrintType] = useState<'PAYSLIPS' | 'PAYE' | 'PENSION' | 'NSITF' | 'WITHHOLDING'>('PAYSLIPS');
@@ -128,7 +194,7 @@ export function Payroll() {
     fetchCompanyInfo();
   }, []);
 
-  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Permissions Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+  // ── Permissions ─────────────────────────────────────────────────────────────
   const priv = usePriv('payroll');
   const finRepPriv = usePriv('financialReports');
 
@@ -161,60 +227,8 @@ export function Payroll() {
     tableContainerRef.current.scrollLeft = scrollLeft - walk;
   };
 
-  // Each column: id, label, summable (can be totalled), types it applies to ('all' or specific)
-  const AVAILABLE_COLUMNS: Array<{ id: string; label: string; summable: boolean; types: string[] }> = [
-    { id: 'sn',               label: 'S/N',               summable: false, types: ['all'] },
-    { id: 'employee_name',    label: 'Employee Name',     summable: false, types: ['all'] },
-    { id: 'month',            label: 'Month',             summable: false, types: ['all'] },
-    { id: 'bank_name',        label: 'Bank Name',         summable: false, types: ['all'] },
-    { id: 'account_number',   label: 'Account No',        summable: false, types: ['all'] },
-    { id: 'paye_id',          label: 'PAYE ID',           summable: false, types: ['PAYE', 'PAYSLIPS'] },
-    { id: 'pension_pin',      label: 'Pension Number',    summable: false, types: ['PENSION', 'PAYSLIPS'] },
-    { id: 'main_salary',      label: 'Main Salary',       summable: true,  types: ['PAYSLIPS'] },
-    { id: 'basic',            label: 'Basic Salary',      summable: true,  types: ['PAYE', 'PAYSLIPS'] },
-    { id: 'housing',          label: 'Housing',           summable: true,  types: ['PAYE', 'PAYSLIPS'] },
-    { id: 'transport',        label: 'Transport',         summable: true,  types: ['PAYE', 'PAYSLIPS'] },
-    { id: 'other',            label: 'Other Allowances',  summable: true,  types: ['PAYE', 'PAYSLIPS'] },
-    { id: 'overtime',         label: 'Overtime Pay',      summable: true,  types: ['PAYSLIPS'] },
-    { id: 'gross',            label: 'Gross Pay',         summable: true,  types: ['PAYE', 'NSITF', 'PAYSLIPS'] },
-    { id: 'paye',             label: 'PAYE Tax',          summable: true,  types: ['PAYE', 'PAYSLIPS'] },
-    { id: 'loan',             label: 'Loan Repayment',    summable: true,  types: ['PAYSLIPS'] },
-    { id: 'net_pay',          label: 'Net (Take-Home)',   summable: true,  types: ['PAYE', 'PAYSLIPS'] },
-    { id: 'pensionable',      label: 'Pensionable Sum',   summable: true,  types: ['PENSION'] },
-    { id: 'employee_pension', label: 'Employee Pension',  summable: true,  types: ['PENSION', 'PAYSLIPS'] },
-    { id: 'employer_pension', label: 'Employer Pension',  summable: true,  types: ['PENSION'] },
-    { id: 'total_pension',    label: 'Total Pension',     summable: true,  types: ['PENSION'] },
-    { id: 'nsitf_rate',       label: 'NSITF Ratio',       summable: false, types: ['NSITF'] },
-    { id: 'nsitf_amount',     label: 'NSITF Amount',      summable: true,  types: ['NSITF'] },
-    { id: 'withholding_rate',  label: 'WHT Rate (%)',      summable: false, types: ['WITHHOLDING'] },
-    { id: 'tin',               label: 'TIN',               summable: false, types: ['WITHHOLDING'] },
-    { id: 'withholding',      label: 'Withholding Tax',   summable: true,  types: ['WITHHOLDING', 'PAYSLIPS'] },
-  ];
-
-  const DEFAULT_COLUMNS: Record<string, string[]> = {
-    PAYSLIPS: ['employee_name', 'month', 'bank_name', 'account_number', 'main_salary', 'basic', 'housing', 'transport', 'other', 'overtime', 'gross', 'paye', 'loan', 'employee_pension', 'net_pay'],
-    PAYE:    ['sn', 'employee_name', 'paye_id', 'month', 'bank_name', 'account_number', 'basic', 'housing', 'transport', 'other', 'gross', 'paye'],
-    PENSION: ['sn', 'employee_name', 'pension_pin', 'month', 'bank_name', 'account_number', 'pensionable', 'employee_pension', 'employer_pension', 'total_pension'],
-    NSITF:   ['sn', 'employee_name', 'month', 'bank_name', 'account_number', 'gross', 'nsitf_rate', 'nsitf_amount'],
-    WITHHOLDING: ['sn', 'employee_name', 'tin', 'month', 'bank_name', 'account_number', 'gross', 'withholding_rate', 'withholding'],
-  };
-
-  const months = [
-    { key: 'jan', label: 'January' },
-    { key: 'feb', label: 'February' },
-    { key: 'mar', label: 'March' },
-    { key: 'apr', label: 'April' },
-    { key: 'may', label: 'May' },
-    { key: 'jun', label: 'June' },
-    { key: 'jul', label: 'July' },
-    { key: 'aug', label: 'August' },
-    { key: 'sep', label: 'September' },
-    { key: 'oct', label: 'October' },
-    { key: 'nov', label: 'November' },
-    { key: 'dec', label: 'December' },
-  ];
-
-  const selectedMonthLabel = useMemo(() => months.find(m => m.key === selectedMonth)?.label || '', [selectedMonth, months]);
+  const months = MONTHS;
+  const selectedMonthLabel = useMemo(() => MONTHS.find(m => m.key === selectedMonth)?.label || '', [selectedMonth]);
 
 
     // Calculate payroll logic extracted for multi-month generation capabilities
@@ -510,10 +524,68 @@ export function Payroll() {
             status: 'Pending' as const,
           };
         });
-    }, [employees, salaryAdvances, loans, payrollVariables, monthValues, attendanceRecords, months, selectedYear, payeTaxVariables, publicHolidays]);
+    }, [employees, salaryAdvances, loans, payrollVariables, monthValues, attendanceRecords, selectedYear, payeTaxVariables, publicHolidays]);
 
-    // Derive standard display payload
-    const payrollData = useMemo(() => calculatePayrollForMonth(selectedMonth), [calculatePayrollForMonth, selectedMonth]);
+    // Snapshot resolution for selected month/year
+    const monthSnapshots = useMemo(() => {
+      return payrollSnapshots.filter((s) => s.month === selectedMonth && s.year === selectedYear);
+    }, [payrollSnapshots, selectedMonth, selectedYear]);
+
+    const activeSnapshot = useMemo(() => {
+      return monthSnapshots.find((s) => s.isActive) || monthSnapshots[0] || null;
+    }, [monthSnapshots]);
+
+    const nextVersionNumber = useMemo(() => {
+      if (monthSnapshots.length === 0) return 1;
+      const maxV = Math.max(...monthSnapshots.map((s) => s.version));
+      return maxV + 1;
+    }, [monthSnapshots]);
+
+    // Derive live calculation payload
+    const livePayrollData = useMemo(() => calculatePayrollForMonth(selectedMonth, selectedYear), [calculatePayrollForMonth, selectedMonth, selectedYear]);
+
+    // Live totals
+    const liveTotals = useMemo(() => {
+      const totalSalary = livePayrollData.reduce((sum, p) => sum + p.salary, 0);
+      const totalOvertime = livePayrollData.reduce((sum, p) => sum + p.overtime, 0);
+      const totalGross = livePayrollData.reduce((sum, p) => sum + p.grossPay, 0);
+      const totalPAYE = livePayrollData.reduce((sum, p) => sum + p.paye, 0);
+      const totalLoans = livePayrollData.reduce((sum, p) => sum + p.loanRepayment, 0);
+      const totalPension = livePayrollData.reduce((sum, p) => sum + p.pension, 0);
+      const totalWithholding = livePayrollData.filter((p) => p.staffType === 'NON-EMPLOYEE').reduce((sum, p) => sum + p.paye, 0);
+      const totalDeductions = totalPAYE + totalLoans + totalPension;
+      const totalNet = livePayrollData.reduce((sum, p) => sum + p.takeHomePay, 0);
+      return { totalSalary, totalOvertime, totalGross, totalPAYE, totalLoans, totalPension, totalWithholding, totalDeductions, totalNet, employeeCount: livePayrollData.length };
+    }, [livePayrollData]);
+
+    // Effective display payload: bound to locked active snapshot if finalized, else live
+    const payrollData: PayrollRecord[] = useMemo(() => {
+      if (activeSnapshot && activeSnapshot.records && activeSnapshot.records.length > 0) {
+        return activeSnapshot.records as PayrollRecord[];
+      }
+      return livePayrollData;
+    }, [activeSnapshot, livePayrollData]);
+
+    // Effective totals
+    const totals = useMemo(() => {
+      if (activeSnapshot && activeSnapshot.totals && typeof activeSnapshot.totals.totalGross === 'number') {
+        return activeSnapshot.totals;
+      }
+      return liveTotals;
+    }, [activeSnapshot, liveTotals]);
+
+    // Drift Detection between locked snapshot and background live changes
+    const hasDrift = useMemo(() => {
+      if (!activeSnapshot || !activeSnapshot.totals) return false;
+      const snapTotalNet = activeSnapshot.totals.totalNet ?? 0;
+      const snapTotalGross = activeSnapshot.totals.totalGross ?? 0;
+      const snapCount = activeSnapshot.totals.employeeCount ?? activeSnapshot.records?.length ?? 0;
+      return (
+        Math.abs(liveTotals.totalNet - snapTotalNet) > 0.01 ||
+        Math.abs(liveTotals.totalGross - snapTotalGross) > 0.01 ||
+        liveTotals.employeeCount !== snapCount
+      );
+    }, [activeSnapshot, liveTotals]);
 
     // Derived filtered print dataset
     const payslipsToPrint = useMemo(() => {
@@ -523,34 +595,67 @@ export function Payroll() {
 
       monthsToUse.forEach(mKey => {
         const mLabel = months.find(m => m.key === mKey)?.label || mKey;
-        const data = calculatePayrollForMonth(mKey, printSelectedYear);
+        const snap = payrollSnapshots.find(s => s.month === mKey && s.year === printSelectedYear && s.isActive);
+        const data = (snap && snap.records && snap.records.length > 0)
+          ? (snap.records as PayrollRecord[])
+          : calculatePayrollForMonth(mKey, printSelectedYear);
+
         data.forEach(record => {
-          // Now empty printSelectedEmployees means NONE (explicit list always used)
           if (printSelectedEmployees.length > 0 && printSelectedEmployees.includes(record.id)) {
             slips.push({ monthLabel: mLabel, monthKey: mKey, record });
           }
         });
       });
       return slips;
-    }, [printType, printSelectedMonths, printSelectedEmployees, calculatePayrollForMonth, selectedMonth, months]);
+    }, [printType, printSelectedMonths, printSelectedEmployees, calculatePayrollForMonth, selectedMonth, payrollSnapshots, printSelectedYear]);
 
-    // Calculate totals
-    const totals = useMemo(() => {
-      const totalSalary = payrollData.reduce((sum, p) => sum + p.salary, 0);
-      const totalOvertime = payrollData.reduce((sum, p) => sum + p.overtime, 0);
-      const totalGross = payrollData.reduce((sum, p) => sum + p.grossPay, 0);
-      const totalPAYE = payrollData.reduce((sum, p) => sum + p.paye, 0);
-      const totalLoans = payrollData.reduce((sum, p) => sum + p.loanRepayment, 0);
-      const totalPension = payrollData.reduce((sum, p) => sum + p.pension, 0);
-      const totalWithholding = payrollData.filter(p => p.staffType === 'NON-EMPLOYEE').reduce((sum, p) => sum + p.paye, 0);
-      const totalDeductions = totalPAYE + totalLoans + totalPension;
-      const totalNet = payrollData.reduce((sum, p) => sum + p.takeHomePay, 0);
-      return { totalSalary, totalOvertime, totalGross, totalPAYE, totalLoans, totalPension, totalWithholding, totalDeductions, totalNet, employeeCount: payrollData.length };
-    }, [payrollData]);
+    const handleFinalizePayroll = async () => {
+      if (!priv.canGenerate) {
+        toast.error('You do not have permission to finalize payroll.');
+        return;
+      }
+      const ok = await showConfirm(
+        `Are you sure you want to finalize and lock the payroll state for ${selectedMonthLabel} ${selectedYear}?\n\nThis will freeze the current payroll records for all ${livePayrollData.length} staff (Total Net Pay: ₦${fm(liveTotals.totalNet)}) so that future changes to attendance or employee salaries will NOT alter historical records.`,
+        { title: 'Finalize & Lock Payroll', confirmLabel: 'Finalize & Lock' }
+      );
+      if (!ok) return;
 
-    const handleProcess = () => {
-      setIsProcessing(true);
-      setTimeout(() => setIsProcessing(false), 2000);
+      setIsFinalizing(true);
+      try {
+        const user = currentUser?.email || currentUser?.name || 'Administrator';
+        const userName = currentUser?.name || 'Administrator';
+
+        await savePayrollSnapshot({
+          workspaceId: 'dcel-team',
+          month: selectedMonth,
+          year: selectedYear,
+          version: 1,
+          isActive: true,
+          changeReason: 'Initial payroll finalization and state lock.',
+          createdBy: user,
+          createdByName: userName,
+          totals: {
+            totalSalary: liveTotals.totalSalary,
+            totalOvertime: liveTotals.totalOvertime,
+            totalGross: liveTotals.totalGross,
+            totalPAYE: liveTotals.totalPAYE,
+            totalLoans: liveTotals.totalLoans,
+            totalPension: liveTotals.totalPension,
+            totalWithholding: liveTotals.totalWithholding,
+            totalDeductions: liveTotals.totalDeductions,
+            totalNet: liveTotals.totalNet,
+            employeeCount: liveTotals.employeeCount,
+          },
+          records: livePayrollData,
+        });
+
+        toast.success(`Payroll for ${selectedMonthLabel} ${selectedYear} has been finalized and locked as v1.`);
+      } catch (e: any) {
+        console.error('Finalize payroll error:', e);
+        toast.error('Failed to finalize payroll: ' + (e?.message || 'Unknown error'));
+      } finally {
+        setIsFinalizing(false);
+      }
     };
 
     const handleOpenPrintDialog = (type: 'PAYSLIPS' | 'PAYE' | 'PENSION' | 'NSITF' | 'WITHHOLDING') => {
@@ -972,9 +1077,7 @@ export function Payroll() {
       activeTab === 'nsitf' ? 'NSITF Schedule' :
       'Withholding Schedule';
 
-    useSetPageTitle(
-      activeTabTitle,
-      'Manage salaries, taxes, generate payslips, and handle staff advances and loans',
+    const pageHeaderButtons = useMemo(() => (
       <>
         {/* Desktop Controls */}
         <div className="hidden md:flex items-center gap-2">
@@ -989,7 +1092,7 @@ export function Payroll() {
           </select>
 
           <select
-            className="h-9 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1 text-sm font-medium text-slate-700 dark:text-slate-200 shadow-sm outline-none focus:ring-2 focus:ring-indigo-500/20 mr-2"
+            className="h-9 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1 text-sm font-medium text-slate-700 dark:text-slate-200 shadow-sm outline-none focus:ring-2 focus:ring-indigo-500/20 mr-1"
             value={selectedYear}
             onChange={(e) => setSelectedYear(Number(e.target.value))}
           >
@@ -997,6 +1100,59 @@ export function Payroll() {
               <option key={yr} value={yr}>{yr}</option>
             ))}
           </select>
+
+          {/* Version / Finalize Controls */}
+          {activeSnapshot ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-9 gap-1.5 border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:border-emerald-800 dark:text-emerald-300 text-xs font-semibold shadow-sm"
+                >
+                  <Lock className="h-3.5 w-3.5 text-emerald-600" />
+                  <span>Finalized (v{activeSnapshot.version})</span>
+                  <ChevronDown className="h-3.5 w-3.5 opacity-60" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-60">
+                <DropdownMenuLabel className="text-xs">Payroll Version Control</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => {
+                    setVersionModalMode('AUDIT_HISTORY');
+                    setVersionModalOpen(true);
+                  }}
+                  className="gap-2 text-xs cursor-pointer"
+                >
+                  <History className="h-4 w-4 text-indigo-500" /> View Version History & Diffs
+                </DropdownMenuItem>
+                {isAdmin && (
+                  <DropdownMenuItem
+                    onClick={() => {
+                      setVersionModalMode('CREATE_REVISION');
+                      setVersionModalOpen(true);
+                    }}
+                    className="gap-2 text-xs cursor-pointer text-indigo-600 font-semibold"
+                  >
+                    <GitCommit className="h-4 w-4 text-indigo-600" /> Create Revision (v{nextVersionNumber})
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            priv.canGenerate && (
+              <Button
+                size="sm"
+                onClick={handleFinalizePayroll}
+                disabled={isFinalizing}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs gap-1.5 shadow-sm h-9"
+              >
+                <Lock className="h-3.5 w-3.5 text-indigo-200" />
+                {isFinalizing ? 'Finalizing...' : 'Finalize & Lock'}
+              </Button>
+            )
+          )}
           
           {priv.canGenerate && (
             <Button variant="outline" size="sm" className="h-9 w-9 border-indigo-200 text-indigo-700 hover:bg-indigo-50 shadow-sm" onClick={() => handleOpenPrintDialog(activeTab === 'processing' ? 'PAYSLIPS' : activeTab.toUpperCase() as any)} title={`Print ${activeTab === 'processing' ? 'Payslips' : 'Schedule'}`}>
@@ -1058,6 +1214,42 @@ export function Payroll() {
             </select>
           </div>
 
+          {/* Finalize / Version Mobile */}
+          {activeSnapshot ? (
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  setVersionModalMode('AUDIT_HISTORY');
+                  setVersionModalOpen(true);
+                }}
+                className="flex-1 flex items-center justify-center gap-2 px-3 h-10 rounded-lg border border-emerald-300 bg-emerald-50 text-emerald-800 text-xs font-bold"
+              >
+                <Lock className="h-4 w-4 text-emerald-600" /> Finalized (v{activeSnapshot.version})
+              </button>
+              {isAdmin && (
+                <button
+                  onClick={() => {
+                    setVersionModalMode('CREATE_REVISION');
+                    setVersionModalOpen(true);
+                  }}
+                  className="px-3 h-10 rounded-lg bg-indigo-600 text-white text-xs font-semibold"
+                >
+                  Revise
+                </button>
+              )}
+            </div>
+          ) : (
+            priv.canGenerate && (
+              <button
+                onClick={handleFinalizePayroll}
+                disabled={isFinalizing}
+                className="flex items-center justify-center gap-2 w-full px-3 h-10 rounded-lg bg-indigo-600 text-white text-sm font-semibold shadow-sm"
+              >
+                <Lock className="h-4 w-4" /> {isFinalizing ? 'Finalizing...' : 'Finalize & Lock Payroll'}
+              </button>
+            )
+          )}
+
           {/* Print */}
           {priv.canGenerate && (
             <button
@@ -1092,8 +1284,14 @@ export function Payroll() {
             </div>
           )}
         </div>
-      </>,
-      [selectedMonth, selectedYear, activeTab]
+      </>
+    ), [selectedMonth, selectedYear, activeSnapshot, isFinalizing, priv.canGenerate, finRepPriv?.canExport, activeTab, nextVersionNumber, isAdmin]);
+
+    useSetPageTitle(
+      activeTabTitle,
+      'Manage salaries, taxes, generate payslips, and handle staff advances and loans',
+      pageHeaderButtons,
+      [activeTabTitle, selectedMonth, selectedYear, activeSnapshot?.version, isFinalizing, priv.canGenerate, finRepPriv?.canExport, activeTab, nextVersionNumber, isAdmin]
     );
 
     return (
@@ -1130,6 +1328,31 @@ export function Payroll() {
 
         <Tabs>
           <TabsContent active={activeTab === 'processing'} className="space-y-6 mt-0">
+
+            {/* LIVE DRIFT WARNING BANNER */}
+            {hasDrift && activeSnapshot && (
+              <div className="bg-amber-50/90 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 rounded-xl p-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-amber-900 dark:text-amber-300 shadow-sm animate-in fade-in duration-300">
+                <div className="flex items-center gap-2.5 text-xs">
+                  <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                  <div>
+                    <span className="font-bold">Live Data Discrepancy Detected: </span>
+                    <span>Subsequent changes to employee salaries or attendance differ from locked <strong>v{activeSnapshot.version}</strong> snapshot.</span>
+                  </div>
+                </div>
+                {isAdmin && (
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      setVersionModalMode('CREATE_REVISION');
+                      setVersionModalOpen(true);
+                    }}
+                    className="bg-amber-600 hover:bg-amber-700 text-white text-xs h-7 gap-1 shrink-0 font-medium ml-auto"
+                  >
+                    <GitCommit className="h-3.5 w-3.5" /> Review & Create Revision
+                  </Button>
+                )}
+              </div>
+            )}
 
              {/* COMPACT METRICS BAR FOR PROCESSING */}
              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -2283,6 +2506,24 @@ export function Payroll() {
             </div>
           </div>
         )}
+
+        {/* PAYROLL VERSION CONTROL & AUDIT MODAL */}
+        <PayrollVersionModal
+          isOpen={versionModalOpen}
+          onClose={() => setVersionModalOpen(false)}
+          mode={versionModalMode}
+          monthLabel={selectedMonthLabel}
+          monthKey={selectedMonth}
+          year={selectedYear}
+          activeSnapshot={activeSnapshot}
+          allVersions={monthSnapshots}
+          livePayrollData={livePayrollData}
+          liveTotals={liveTotals}
+          currentUserName={currentUser?.name || 'Administrator'}
+          currentUserEmail={currentUser?.email || 'admin@dcel.com'}
+          isAdmin={isAdmin}
+          onSaveRevisionSuccess={() => fetchPayrollSnapshots(selectedYear)}
+        />
       </div>
     );
   }

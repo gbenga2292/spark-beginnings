@@ -119,12 +119,6 @@ export function useSetPageTitle(
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dispatch, title, subtitle, Array.isArray(deps) ? deps.length : 0, ...deps]);
-
-  // Keep header buttons updated synchronously before paint if buttons JSX or click handlers change
-  useLayoutEffect(() => {
-    if (!dispatch || title === null) return;
-    dispatch.setHeaderButtons(buttons);
-  }, [dispatch, buttons, title]);
 }
 
 /**

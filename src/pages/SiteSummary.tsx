@@ -264,7 +264,7 @@ export function SiteSummary({ filterYears = [], filterMonths = [] }: { filterYea
   }, [selectedDepts]);
 
   const priv = usePriv('sites');
-  const { calculatePayrollForMonth } = usePayrollCalculator();
+  const { getPayrollForMonth } = usePayrollCalculator();
   const staffDateWorkedMap = useMemo(() => getStaffDateWorkedMap(attendanceRecords), [attendanceRecords]);
 
   const availableDepts = useMemo(() => {
@@ -359,7 +359,7 @@ export function SiteSummary({ filterYears = [], filterMonths = [] }: { filterYea
       const mValues = monthValues[mKey];
       if (!mValues || mValues.workDays <= 0) return;
 
-      const payrollRows = calculatePayrollForMonth(mKey, parseInt(selectedYear));
+      const payrollRows = getPayrollForMonth(mKey, parseInt(selectedYear));
       const holidayDates = publicHolidays.map(h => h.date);
       const payrollVariables = useAppStore.getState().payrollVariables;
       const mOvertimeRate = mValues.overtimeRate;

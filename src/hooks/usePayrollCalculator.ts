@@ -30,6 +30,7 @@ export function usePayrollCalculator() {
   const attendanceRecords = useAppStore((state) => state.attendanceRecords);
   const publicHolidays = useAppStore((state) => state.publicHolidays);
   const departments = useAppStore((state) => state.departments);
+  const payrollSnapshots = useAppStore((state) => state.payrollSnapshots);
 
   const currentYear = new Date().getFullYear();
 
@@ -284,6 +285,21 @@ export function usePayrollCalculator() {
       });
   }, [employees, salaryAdvances, loans, payrollVariables, payeTaxVariables, monthValues, attendanceRecords, publicHolidays, departments, currentYear]);
 
-  return { calculatePayrollForMonth, MONTHS };
+  /**
+   * Retrieves the payroll records for a given month and year.
+   * Prioritizes the active finalized & locked snapshot version if one exists.
+   * Otherwise falls back to calculating live values.
+   */
+  const getPayrollForMonth = useCallback((monthKey: string, year: number = currentYear) => {
+    const activeSnapshot = payrollSnapshots.find(
+      (s) => s.month === monthKey && s.year === year && s.isActive
+    );
+    if (activeSnapshot && Array.isArray(activeSnapshot.records) && activeSnapshot.records.length > 0) {
+      return activeSnapshot.records;
+    }
+    return calculatePayrollForMonth(monthKey, year);
+  }, [payrollSnapshots, calculatePayrollForMonth, currentYear]);
+
+  return { calculatePayrollForMonth, getPayrollForMonth, MONTHS };
 }
 

@@ -26,10 +26,13 @@ export function Payments({ setPreviewModal, searchTerm = '' }: { setPreviewModal
     const payments = useAppStore((state) => state.payments);
     const clientProfiles = useAppStore((state) => state.clientProfiles);
     const pendingSites = useAppStore((state) => state.pendingSites);
+    const ledgerBanks = useAppStore((state) => state.ledgerBanks);
     const addPayment = useAppStore((state) => state.addPayment);
     const updatePayment = useAppStore((state) => state.updatePayment);
     const deletePayment = useAppStore((state) => state.deletePayment);
     const vatRate = useAppStore((state) => state.payrollVariables.vatRate);
+
+    const sortedBanks = useMemo(() => [...ledgerBanks].sort((a, b) => a.name.localeCompare(b.name)), [ledgerBanks]);
 
     // Memoized TIN lookup map for O(1) rendering lookups
     const tinMap = useMemo(() => {
@@ -83,6 +86,7 @@ export function Payments({ setPreviewModal, searchTerm = '' }: { setPreviewModal
         withholdingTax: '',
         discount: '',
         damages: '',
+        paidTo: '',
     };
     const [form, setForm] = useState(initialForm);
 
@@ -129,6 +133,7 @@ export function Payments({ setPreviewModal, searchTerm = '' }: { setPreviewModal
             discount,
             damages,
             payVat,
+            paidTo: form.paidTo || undefined,
         };
     };
 
@@ -157,6 +162,7 @@ export function Payments({ setPreviewModal, searchTerm = '' }: { setPreviewModal
             withholdingTax: pay.withholdingTax ? pay.withholdingTax.toString() : '',
             discount: pay.discount ? pay.discount.toString() : '',
             damages: pay.damages ? pay.damages.toString() : '',
+            paidTo: pay.paidTo || '',
         });
         setIsModalOpen(true);
     };
@@ -256,6 +262,7 @@ export function Payments({ setPreviewModal, searchTerm = '' }: { setPreviewModal
                             withholdingTax: parseFloat(vals[5]) || 0,
                             discount: parseFloat(vals[6]) || 0,
                             payVat,
+                            paidTo: vals[8]?.trim() || undefined,
                         };
                         const existing = payments.find(e => e.id === parsedPayment.id);
                         if (existing && mode !== 'append') { 
@@ -293,7 +300,7 @@ export function Payments({ setPreviewModal, searchTerm = '' }: { setPreviewModal
                 toast.info('No payments to export');
                 return;
             }
-            const headers = ['id', 'client', 'tin', 'site', 'date', 'amount', 'withholdingTax', 'discount', 'damages', 'payVat', 'vat', 'amountForVat'];
+            const headers = ['id', 'client', 'tin', 'site', 'paidTo', 'date', 'amount', 'withholdingTax', 'discount', 'damages', 'payVat', 'vat', 'amountForVat'];
             const extractCSV = (val: any) => typeof val === 'number' ? String(val) : `"${String(val ?? '').replace(/"/g, '""')}"`;
 
             const rows = payments.map(pay => {
@@ -301,7 +308,7 @@ export function Payments({ setPreviewModal, searchTerm = '' }: { setPreviewModal
                 const tin = getTinForClient(pay.client);
                 
                 const data = [
-                    pay.id, pay.client, tin, pay.site, formatDisplayDate(pay.date), pay.amount, pay.withholdingTax, pay.discount, pay.damages || 0, pay.payVat, vat, amtForVat
+                    pay.id, pay.client, tin, pay.site, pay.paidTo || '', formatDisplayDate(pay.date), pay.amount, pay.withholdingTax, pay.discount, pay.damages || 0, pay.payVat, vat, amtForVat
                 ];
                 return data.map(extractCSV).join(',');
             });
@@ -357,6 +364,7 @@ export function Payments({ setPreviewModal, searchTerm = '' }: { setPreviewModal
             filtered = filtered.filter(p => 
                 (p.client && p.client.toLowerCase().includes(lowerSearch)) ||
                 (p.site && p.site.toLowerCase().includes(lowerSearch)) ||
+                (p.paidTo && p.paidTo.toLowerCase().includes(lowerSearch)) ||
                 (p.id && p.id.toLowerCase().includes(lowerSearch))
             );
         }
@@ -371,6 +379,7 @@ export function Payments({ setPreviewModal, searchTerm = '' }: { setPreviewModal
             }
             else if (sortField === 'client') { valA = (a.client || '').toLowerCase(); valB = (b.client || '').toLowerCase(); }
             else if (sortField === 'site') { valA = (a.site || '').toLowerCase(); valB = (b.site || '').toLowerCase(); }
+            else if (sortField === 'paidTo') { valA = (a.paidTo || '').toLowerCase(); valB = (b.paidTo || '').toLowerCase(); }
             else if (sortField === 'amount') { valA = a.amount || 0; valB = b.amount || 0; }
             else if (sortField === 'withholdingTax') { valA = a.withholdingTax || 0; valB = b.withholdingTax || 0; }
             else if (sortField === 'discount') { valA = a.discount || 0; valB = b.discount || 0; }
@@ -580,7 +589,10 @@ export function Payments({ setPreviewModal, searchTerm = '' }: { setPreviewModal
                                     <div className="flex justify-between items-start mb-2">
                                         <div className="min-w-0">
                                             <h3 className="font-bold text-slate-900 truncate">{p.client}</h3>
-                                            <p className="text-xs text-slate-500">{p.site} | {formatDisplayDate(p.date)}</p>
+                                            <p className="text-xs text-slate-500">
+                                                {p.site} | {formatDisplayDate(p.date)}
+                                                {p.paidTo ? <span className="text-indigo-600 font-medium"> • Paid To: {p.paidTo}</span> : null}
+                                            </p>
                                         </div>
                                         <div className="text-right ml-4 shrink-0">
                                             <p className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Amount</p>
@@ -628,6 +640,7 @@ export function Payments({ setPreviewModal, searchTerm = '' }: { setPreviewModal
                                         </div>
                                     </TableHead>
                                     <TableHead className="px-4 py-2.5" />
+                                    <TableHead className="px-4 py-2.5" />
                                     <TableHead className="px-4 py-2.5 text-right">
                                         <div className="text-[12px] font-mono font-black text-indigo-700 bg-white px-2 py-1 rounded border border-indigo-100 shadow-sm inline-block">
                                             ₦{formatSum(tableSums.amount)}
@@ -667,6 +680,7 @@ export function Payments({ setPreviewModal, searchTerm = '' }: { setPreviewModal
                                         { field: 'client',         label: 'Client',      align: 'left'   },
                                         { field: 'tin',            label: 'TIN',         align: 'left'   },
                                         { field: 'site',           label: 'Site',        align: 'left'   },
+                                        { field: 'paidTo',         label: 'Paid To',     align: 'left'   },
                                         { field: 'amount',         label: 'Amount (₦)',  align: 'right'  },
                                         { field: 'withholdingTax', label: 'WHT',         align: 'right'  },
                                         { field: 'discount',       label: 'Discount',    align: 'right'  },
@@ -700,6 +714,15 @@ export function Payments({ setPreviewModal, searchTerm = '' }: { setPreviewModal
                                             {getTinForClient(p.client) || <span className="text-slate-300">—</span>}
                                         </TableCell>
                                         <TableCell className="px-4 py-3 text-slate-600">{p.site}</TableCell>
+                                        <TableCell className="px-4 py-3 text-slate-700 font-medium">
+                                            {p.paidTo ? (
+                                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-indigo-50/80 text-indigo-700 border border-indigo-100/80">
+                                                    {p.paidTo}
+                                                </span>
+                                            ) : (
+                                                <span className="text-slate-300">—</span>
+                                            )}
+                                        </TableCell>
                                         <TableCell className="px-4 py-3 text-right font-mono font-bold text-slate-900">
                                             {priv?.canViewAmounts === false ? '***' : (p.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                         </TableCell>
@@ -749,7 +772,7 @@ export function Payments({ setPreviewModal, searchTerm = '' }: { setPreviewModal
                                 ))}
                                 {sortedPayments.length === 0 && (
                                     <TableRow>
-                                        <TableCell colSpan={showActions ? 11 : 10} className="px-4 py-12 text-center text-slate-500 font-medium tracking-wide border-b-0">
+                                        <TableCell colSpan={showActions ? 13 : 12} className="px-4 py-12 text-center text-slate-500 font-medium tracking-wide border-b-0">
                                             No payment records found.
                                         </TableCell>
                                     </TableRow>
@@ -813,18 +836,32 @@ export function Payments({ setPreviewModal, searchTerm = '' }: { setPreviewModal
 
                             <div className="grid grid-cols-2 gap-5 pt-3 border-t border-slate-100">
                                 <div className="space-y-1.5">
+                                    <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Paid To (Company Account)</label>
+                                    <select
+                                        value={form.paidTo}
+                                        onChange={e => handleChange('paidTo', e.target.value)}
+                                        className="flex h-11 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-sm"
+                                    >
+                                        <option value="">Select Account...</option>
+                                        {sortedBanks.map(b => (
+                                            <option key={b.id} value={b.name}>{b.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Damages (Not Vatable)</label>
+                                    <NumericFormat customInput={Input} thousandSeparator decimalScale={2} value={form.damages} onValueChange={(v) => handleChange('damages', v.value || '')} className="bg-slate-50 h-11" />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-5 pt-3 border-t border-slate-100">
+                                <div className="space-y-1.5">
                                     <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Withholding Tax</label>
                                     <NumericFormat customInput={Input} thousandSeparator decimalScale={2} value={form.withholdingTax} onValueChange={(v) => handleChange('withholdingTax', v.value || '')} className="bg-slate-50 h-11" />
                                 </div>
                                 <div className="space-y-1.5">
                                     <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Discount</label>
                                     <NumericFormat customInput={Input} thousandSeparator decimalScale={2} value={form.discount} onValueChange={(v) => handleChange('discount', v.value || '')} className="bg-slate-50 h-11" />
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-5 pt-3 border-t border-slate-100">
-                                <div className="space-y-1.5">
-                                    <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Damages (Not Vatable)</label>
-                                    <NumericFormat customInput={Input} thousandSeparator decimalScale={2} value={form.damages} onValueChange={(v) => handleChange('damages', v.value || '')} className="bg-slate-50 h-11" />
                                 </div>
                             </div>
 

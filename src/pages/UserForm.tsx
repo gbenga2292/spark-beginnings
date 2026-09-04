@@ -5,7 +5,7 @@ import { Input } from '@/src/components/ui/input';
 import {
   ArrowLeft, Save, Eye, EyeOff, Shield, ChevronDown, ChevronRight,
   CheckCircle2, X, BookmarkPlus, Trash2,
-  LayoutDashboard, Users as UsersIcon, Building2, Landmark, Settings, Package, Library, History, ListTodo, FileText, MessageSquare, FolderOpen, Sparkles
+  LayoutDashboard, Users as UsersIcon, Building2, Landmark, Settings, Package, Library, History, ListTodo, FileText, MessageSquare, FolderOpen, Sparkles, Bot
 } from 'lucide-react';
 import { useUserStore, AppUser, UserPrivileges, FULL_ACCESS, NO_ACCESS, PrivilegePreset } from '@/src/store/userStore';
 import { useAppStore } from '@/src/store/appStore';
@@ -252,6 +252,15 @@ const PRIV_GROUPS: PG[] = [
         ] },
       { key: 'activityLog', label: 'Activity Log', parentKey: 'activityLog', masterField: 'canView',
         fields: [{ key: 'canView', label: 'View Logs' }, { key: 'canExport', label: 'Export' }] },
+    ],
+  },
+  {
+    name: 'AI Co-Pilot', icon: Bot, color: 'indigo',
+    pages: [
+      { key: 'aiCopilot', label: 'Spark AI Assistant', parentKey: 'aiCopilot', masterField: 'canAccess',
+        fields: [
+          { key: 'canAccess', label: 'Access AI Co-Pilot (⌘J / Floating Trigger & Multi-Module Actions)' },
+        ] },
     ],
   },
 ];

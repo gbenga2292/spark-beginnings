@@ -8,7 +8,7 @@ import {
   LayoutGrid, List, ChevronLeft, Download, Upload, FileSpreadsheet,
   Fuel, TrendingUp, BarChart3, Filter, Link as LinkIcon,
   Receipt, Sparkles, CheckCircle2, Zap, RotateCcw, FileText,
-  ShieldAlert, ShieldCheck, CalendarPlus, Info
+  ShieldAlert, ShieldCheck, CalendarPlus, Info, Scissors, CheckCheck, Layers
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import {
@@ -443,6 +443,7 @@ export function VehicleManager() {
     filled_by: '',
     notes: '',
     linkedLedgerIds: [] as string[],
+    linkedLedgerAmounts: {} as Record<string, number>,
     lastComputed: '' as 'litres' | 'total_cost' | 'rate_per_litre' | ''
   });
   const [fuelValidationErrors, setFuelValidationErrors] = useState<Record<string, boolean>>({});
@@ -645,6 +646,618 @@ export function VehicleManager() {
   const totalAllocatedInStandaloneDialog = useMemo(() => {
     return Object.values(standaloneAllocations).reduce((sum, amt) => sum + (Number(amt) || 0), 0);
   }, [standaloneAllocations]);
+
+  // ── Fuel Backlog Importer & Splitter State & Handlers ──
+  const [showBacklogModal, setShowBacklogModal] = useState(false);
+  const [backlogSearch, setBacklogSearch] = useState('');
+  const [backlogMonth, setBacklogMonth] = useState('');
+  const [backlogTab, setBacklogTab] = useState<'all' | 'ready' | 'multi' | 'unassigned'>('all');
+  const [excludeJettingAndMachinery, setExcludeJettingAndMachineryState] = useState<boolean>(() => {
+    try {
+      const stored = localStorage.getItem('dcel_vehicle_fuel_exclude_jetting');
+      return stored !== null ? stored === 'true' : true;
+    } catch {
+      return true;
+    }
+  });
+
+  const [excludeDieselKeywords, setExcludeDieselKeywordsState] = useState<boolean>(() => {
+    try {
+      const stored = localStorage.getItem('dcel_vehicle_fuel_exclude_diesel');
+      return stored !== null ? stored === 'true' : true;
+    } catch {
+      return true;
+    }
+  });
+
+  const [customExcludePhrases, setCustomExcludePhrasesState] = useState<string[]>(() => {
+    try {
+      const stored = localStorage.getItem('dcel_vehicle_fuel_exclude_phrases');
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const [excludePhraseInput, setExcludePhraseInput] = useState('');
+  const [backlogDefaultRate, setBacklogDefaultRateState] = useState<number | ''>(() => {
+    try {
+      const stored = localStorage.getItem('dcel_vehicle_fuel_default_rate');
+      return stored ? Number(stored) : 1206;
+    } catch {
+      return 1206;
+    }
+  });
+
+  const setExcludeJettingAndMachinery = (val: boolean) => {
+    setExcludeJettingAndMachineryState(val);
+    try { localStorage.setItem('dcel_vehicle_fuel_exclude_jetting', String(val)); } catch {}
+  };
+
+  const setExcludeDieselKeywords = (val: boolean) => {
+    setExcludeDieselKeywordsState(val);
+    try { localStorage.setItem('dcel_vehicle_fuel_exclude_diesel', String(val)); } catch {}
+  };
+
+  const setCustomExcludePhrases = (updater: string[] | ((prev: string[]) => string[])) => {
+    setCustomExcludePhrasesState(prev => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      try { localStorage.setItem('dcel_vehicle_fuel_exclude_phrases', JSON.stringify(next)); } catch {}
+      return next;
+    });
+  };
+
+  const setBacklogDefaultRate = (val: number | '') => {
+    setBacklogDefaultRateState(val);
+    try { localStorage.setItem('dcel_vehicle_fuel_default_rate', String(val)); } catch {}
+  };
+
+  const [candidateOverrides, setCandidateOverrides] = useState<Record<string, {
+    vehicle_id?: string;
+    vehicle_reg?: string;
+    litres?: number | '';
+    rate_per_litre?: number | '';
+    total_cost?: number | '';
+    date?: string;
+    filled_by?: string;
+    notes?: string;
+  }>>({});
+
+  // Multi-vehicle Split Modal State
+  const [selectedSplitEntry, setSelectedSplitEntry] = useState<any | null>(null);
+  const [splitDate, setSplitDate] = useState('');
+  const [splitModalRate, setSplitModalRate] = useState<number | ''>(1200);
+  const [splitRows, setSplitRows] = useState<{
+    id: string;
+    vehicle_id: string;
+    vehicle_reg: string;
+    litres: number | '';
+    rate_per_litre: number | '';
+    total_cost: number | '';
+    filled_by: string;
+    notes: string;
+  }[]>([]);
+
+  // Generate parsed backlog candidates from eligible ledger entries
+  const fuelBacklogCandidates = useMemo(() => {
+    const seenIds = new Set<string>();
+    const uniqueEligible = eligibleLedgerEntries.filter(e => {
+      if (!e.id || seenIds.has(e.id)) return false;
+      seenIds.add(e.id);
+      return true;
+    });
+
+    return uniqueEligible
+      .filter(entry => {
+        const rem = ledgerRemainingAmounts.get(entry.id) ?? Number(entry.amount) ?? 0;
+        if (rem <= 0.01) return false;
+
+        const desc = (entry.description || '').toLowerCase();
+
+        // 1. Filter out jetting and site equipment/machinery
+        if (excludeJettingAndMachinery) {
+          if (
+            desc.includes('jetting') ||
+            desc.includes('rejetting') ||
+            desc.includes('re-jetting') ||
+            desc.includes('generator') ||
+            desc.includes('gen set') ||
+            desc.includes('genset') ||
+            desc.includes('rig ') ||
+            desc.includes('excavator') ||
+            desc.includes('compressor') ||
+            desc.includes('dewatering') ||
+            desc.includes('plant ') ||
+            desc.includes('machine fuel') ||
+            desc.includes('machine diesel') ||
+            desc.includes('pump fuel')
+          ) {
+            return false;
+          }
+        }
+
+        // 2. Filter out general diesel refills (unless a specific fleet vehicle is matched)
+        if (excludeDieselKeywords) {
+          if (desc.includes('diesel')) {
+            const matchesFleetVehicle = vehicles.some(v => {
+              const regClean = v.registration_number ? v.registration_number.toLowerCase().replace(/[^a-z0-9]/g, '') : '';
+              const nameClean = v.name ? v.name.toLowerCase().replace(/[^a-z0-9]/g, '') : '';
+              const descClean = desc.replace(/[^a-z0-9]/g, '');
+              const regMatch = Boolean(regClean && descClean.includes(regClean));
+              const nameMatch = Boolean(
+                (v.name && v.name.length > 2 && desc.includes(v.name.toLowerCase())) ||
+                (nameClean && nameClean.length >= 3 && descClean.includes(nameClean))
+              );
+              return regMatch || nameMatch;
+            });
+            if (!matchesFleetVehicle) return false;
+          }
+        }
+
+        // 3. User-defined custom phrase exclusions
+        if (customExcludePhrases.length > 0) {
+          const hasExcludedPhrase = customExcludePhrases.some(phrase => {
+            const p = phrase.trim().toLowerCase();
+            return p.length > 0 && desc.includes(p);
+          });
+          if (hasExcludedPhrase) return false;
+        }
+
+        return true;
+      })
+      .map(entry => {
+        const rem = ledgerRemainingAmounts.get(entry.id) ?? Number(entry.amount) ?? 0;
+        const desc = (entry.description || '').toLowerCase();
+        const vDate = getVoucherDate(entry.voucherNo);
+        const bestDate = vDate || entry.date || new Date().toISOString().split('T')[0];
+
+        // Match fleet vehicles (e.g. L200, L-200, Sienna, Tundra, Hilux, etc.)
+        const matchedVehicles: Vehicle[] = [];
+        vehicles.forEach(v => {
+          const regClean = v.registration_number ? v.registration_number.toLowerCase().replace(/[^a-z0-9]/g, '') : '';
+          const nameClean = v.name ? v.name.toLowerCase().replace(/[^a-z0-9]/g, '') : '';
+          const descClean = desc.replace(/[^a-z0-9]/g, '');
+          const regMatch = Boolean(regClean && descClean.includes(regClean));
+          const nameMatch = Boolean(
+            (v.name && v.name.length > 2 && desc.includes(v.name.toLowerCase())) ||
+            (nameClean && nameClean.length >= 3 && descClean.includes(nameClean))
+          );
+          if (regMatch || nameMatch) {
+            if (!matchedVehicles.some(m => m.id === v.id)) {
+              matchedVehicles.push(v);
+            }
+          }
+        });
+
+        const isMultiVehicle = matchedVehicles.length > 1;
+        const primaryVehicle = matchedVehicles[0];
+
+        const parsedLitres = parseLitresFromText(entry.description);
+        let defaultLitres: number | '' = parsedLitres || '';
+        let defaultRate: number | '' = '';
+
+        if (parsedLitres && parsedLitres > 0 && rem > 0) {
+          defaultRate = Number((rem / parsedLitres).toFixed(2));
+        } else {
+          const rateMatch = entry.description.match(/@\s*₦?\s*([\d,]+(?:\.\d+)?)/i);
+          if (rateMatch && rateMatch[1]) {
+            const pr = parseFloat(rateMatch[1].replace(/,/g, ''));
+            if (!isNaN(pr) && pr > 0) {
+              defaultRate = pr;
+              defaultLitres = Number((rem / pr).toFixed(2));
+            }
+          } else if (backlogDefaultRate && Number(backlogDefaultRate) > 0 && rem > 0 && primaryVehicle) {
+            // Auto-compute litres with default rate when vehicle is known
+            defaultRate = Number(backlogDefaultRate);
+            defaultLitres = Number((rem / Number(backlogDefaultRate)).toFixed(2));
+          }
+        }
+
+        const overrides = candidateOverrides[entry.id] || {};
+
+        const effectiveVehicleId = overrides.vehicle_id !== undefined ? overrides.vehicle_id : (primaryVehicle?.id || '');
+        const effectiveVehicle = vehicles.find(v => v.id === effectiveVehicleId) || primaryVehicle;
+        const effectiveVehicleReg = effectiveVehicle?.registration_number || overrides.vehicle_reg || '';
+        const effectiveLitres = overrides.litres !== undefined ? overrides.litres : defaultLitres;
+        const effectiveRate = overrides.rate_per_litre !== undefined ? overrides.rate_per_litre : defaultRate;
+        const effectiveCost = overrides.total_cost !== undefined ? overrides.total_cost : rem;
+        const effectiveDate = overrides.date !== undefined ? overrides.date : bestDate;
+        const effectiveFilledBy = overrides.filled_by !== undefined ? overrides.filled_by : '';
+        const effectiveNotes = overrides.notes !== undefined ? overrides.notes : (entry.voucherNo ? `Voucher #${entry.voucherNo}` : '');
+
+        const isReady = Boolean(effectiveVehicleId && Number(effectiveLitres) > 0 && Number(effectiveCost) > 0 && !isMultiVehicle);
+
+        return {
+          id: entry.id,
+          entry,
+          description: entry.description || '',
+          totalAmount: Number(entry.amount) || 0,
+          remainingAmount: rem,
+          voucherNo: entry.voucherNo,
+          voucherDate: vDate || undefined,
+          transactionDate: entry.date || '',
+          site: entry.site,
+          client: entry.client,
+          matchedVehicles,
+          isMultiVehicle,
+          isReady,
+          // Form fields
+          vehicleId: effectiveVehicleId,
+          vehicleReg: effectiveVehicleReg,
+          vehicleName: effectiveVehicle ? effectiveVehicle.name : '',
+          litres: effectiveLitres,
+          rate: effectiveRate,
+          cost: effectiveCost,
+          date: effectiveDate,
+          filledBy: effectiveFilledBy,
+          notes: effectiveNotes,
+        };
+      });
+  }, [eligibleLedgerEntries, ledgerRemainingAmounts, vehicles, candidateOverrides, excludeJettingAndMachinery, excludeDieselKeywords, customExcludePhrases, backlogDefaultRate]);
+
+  const handleAddExcludePhrase = () => {
+    const p = excludePhraseInput.trim();
+    if (!p) return;
+    if (!customExcludePhrases.some(x => x.toLowerCase() === p.toLowerCase())) {
+      setCustomExcludePhrases(prev => [...prev, p]);
+    }
+    setExcludePhraseInput('');
+  };
+
+  const handleRemoveExcludePhrase = (phraseToRemove: string) => {
+    setCustomExcludePhrases(prev => prev.filter(p => p !== phraseToRemove));
+  };
+
+  const filteredFuelBacklogCandidates = useMemo(() => {
+    return fuelBacklogCandidates.filter(cand => {
+      if (backlogMonth) {
+        const candMonth = cand.date ? cand.date.substring(0, 7) : (cand.transactionDate ? cand.transactionDate.substring(0, 7) : '');
+        if (candMonth !== backlogMonth) return false;
+      }
+      if (backlogTab === 'ready' && !cand.isReady) return false;
+      if (backlogTab === 'multi' && !cand.isMultiVehicle) return false;
+      if (backlogTab === 'unassigned' && cand.vehicleId) return false;
+
+      if (backlogSearch.trim()) {
+        const q = backlogSearch.toLowerCase().trim();
+        const matches = cand.description.toLowerCase().includes(q) ||
+          (cand.voucherNo && cand.voucherNo.toLowerCase().includes(q)) ||
+          (cand.site && cand.site.toLowerCase().includes(q)) ||
+          (cand.vehicleName && cand.vehicleName.toLowerCase().includes(q)) ||
+          (cand.vehicleReg && cand.vehicleReg.toLowerCase().includes(q)) ||
+          cand.totalAmount.toString().includes(q);
+        if (!matches) return false;
+      }
+      return true;
+    });
+  }, [fuelBacklogCandidates, backlogMonth, backlogTab, backlogSearch]);
+
+  const handleCandidateChange = (candId: string, field: string, value: any) => {
+    setCandidateOverrides(prev => {
+      const curr = prev[candId] || {};
+      const updated = { ...curr, [field]: value };
+      const cand = fuelBacklogCandidates.find(c => c.id === candId);
+      const ledgerCost = cand?.remainingAmount || 0;
+
+      if (field === 'vehicle_id') {
+        const veh = vehicles.find(v => v.id === value);
+        updated.vehicle_reg = veh?.registration_number || '';
+      } else if (field === 'litres') {
+        const litresVal = parseFloat(value);
+        if (!isNaN(litresVal) && litresVal > 0 && ledgerCost > 0) {
+          // Fixed ledger cost: auto-compute Rate = Cost / Litres
+          updated.rate_per_litre = Number((ledgerCost / litresVal).toFixed(2));
+          updated.total_cost = ledgerCost;
+        }
+      } else if (field === 'rate_per_litre') {
+        const rateVal = parseFloat(value);
+        if (!isNaN(rateVal) && rateVal > 0 && ledgerCost > 0) {
+          // Fixed ledger cost: auto-compute Litres = Cost / Rate
+          updated.litres = Number((ledgerCost / rateVal).toFixed(2));
+          updated.total_cost = ledgerCost;
+        }
+      }
+      return { ...prev, [candId]: updated };
+    });
+  };
+
+  const handleImportSingleCandidate = async (cand: typeof fuelBacklogCandidates[0]) => {
+    if (!cand.vehicleId) {
+      toast.error('Vehicle required', { description: 'Please select a vehicle from the dropdown.' });
+      return;
+    }
+    const litresNum = Number(cand.litres);
+    const costNum = Number(cand.cost);
+    if (!litresNum || litresNum <= 0) {
+      toast.error('Litres required', { description: 'Please enter litres quantity.' });
+      return;
+    }
+    if (!costNum || costNum <= 0) {
+      toast.error('Cost required', { description: 'Please enter cost amount.' });
+      return;
+    }
+    const rateNum = Number(cand.rate) || Number((costNum / litresNum).toFixed(2));
+
+    try {
+      await addVehicleFuelLog({
+        vehicle_id: cand.vehicleId,
+        vehicle_reg: cand.vehicleReg || cand.vehicleId,
+        date: cand.date,
+        rate_per_litre: Number(rateNum.toFixed(2)),
+        litres: Number(litresNum.toFixed(2)),
+        total_cost: Number(costNum.toFixed(2)),
+        filled_by: cand.filledBy || undefined,
+        notes: cand.notes || undefined,
+        linkedLedgerIds: [cand.id],
+        linkedLedgerAmounts: { [cand.id]: Number(costNum.toFixed(2)) }
+      });
+      toast.success(`Fuel log imported for ${cand.vehicleName || cand.vehicleReg}`);
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to import fuel log');
+    }
+  };
+
+  const handleBatchImportReady = async () => {
+    const readyItems = fuelBacklogCandidates.filter(c => c.isReady && !c.isMultiVehicle);
+    if (readyItems.length === 0) {
+      toast.info('No ready single-vehicle entries found to batch import');
+      return;
+    }
+
+    let successCount = 0;
+    for (const cand of readyItems) {
+      const litresNum = Number(cand.litres);
+      const costNum = Number(cand.cost);
+      const rateNum = Number(cand.rate) || Number((costNum / litresNum).toFixed(2));
+      try {
+        await addVehicleFuelLog({
+          vehicle_id: cand.vehicleId,
+          vehicle_reg: cand.vehicleReg || cand.vehicleId,
+          date: cand.date,
+          rate_per_litre: Number(rateNum.toFixed(2)),
+          litres: Number(litresNum.toFixed(2)),
+          total_cost: Number(costNum.toFixed(2)),
+          filled_by: cand.filledBy || undefined,
+          notes: cand.notes || undefined,
+          linkedLedgerIds: [cand.id],
+          linkedLedgerAmounts: { [cand.id]: Number(costNum.toFixed(2)) }
+        });
+        successCount++;
+      } catch (err) {
+        console.error('Failed to batch import cand:', cand.id, err);
+      }
+    }
+    toast.success(`Batch imported ${successCount} fuel logs from ledger`);
+  };
+
+  const handleOpenSplitModal = (cand: typeof fuelBacklogCandidates[0]) => {
+    setSelectedSplitEntry(cand);
+    setSplitDate(cand.date);
+    const defaultRate = Number(cand.rate) || 1200;
+    setSplitModalRate(defaultRate);
+
+    if (cand.matchedVehicles && cand.matchedVehicles.length >= 2) {
+      const count = cand.matchedVehicles.length;
+      const shareCost = Number((cand.remainingAmount / count).toFixed(2));
+      const shareLitres = Number((shareCost / defaultRate).toFixed(2));
+
+      setSplitRows(cand.matchedVehicles.map(v => ({
+        id: crypto.randomUUID(),
+        vehicle_id: v.id,
+        vehicle_reg: v.registration_number || '',
+        litres: shareLitres,
+        rate_per_litre: defaultRate,
+        total_cost: shareCost,
+        filled_by: '',
+        notes: cand.voucherNo ? `Voucher #${cand.voucherNo}` : ''
+      })));
+    } else {
+      const v1 = cand.matchedVehicles[0] || vehicles[0];
+      const v2 = vehicles.find(v => v.id !== v1?.id) || vehicles[1] || v1;
+      const shareCost = Number((cand.remainingAmount / 2).toFixed(2));
+      const shareLitres = Number((shareCost / defaultRate).toFixed(2));
+      const remCost = Number((cand.remainingAmount - shareCost).toFixed(2));
+      const remLitres = Number((remCost / defaultRate).toFixed(2));
+
+      setSplitRows([
+        {
+          id: crypto.randomUUID(),
+          vehicle_id: v1?.id || '',
+          vehicle_reg: v1?.registration_number || '',
+          litres: shareLitres,
+          rate_per_litre: defaultRate,
+          total_cost: shareCost,
+          filled_by: '',
+          notes: cand.voucherNo ? `Voucher #${cand.voucherNo}` : ''
+        },
+        {
+          id: crypto.randomUUID(),
+          vehicle_id: v2?.id || '',
+          vehicle_reg: v2?.registration_number || '',
+          litres: remLitres,
+          rate_per_litre: defaultRate,
+          total_cost: remCost,
+          filled_by: '',
+          notes: cand.voucherNo ? `Voucher #${cand.voucherNo}` : ''
+        }
+      ]);
+    }
+  };
+
+  const handleSplitModalRateChange = (newRate: number | '') => {
+    setSplitModalRate(newRate);
+    if (newRate && Number(newRate) > 0) {
+      const rateNum = Number(newRate);
+      setSplitRows(prev => prev.map(r => {
+        if (r.litres && Number(r.litres) > 0) {
+          return {
+            ...r,
+            rate_per_litre: rateNum,
+            total_cost: Number((Number(r.litres) * rateNum).toFixed(2))
+          };
+        } else if (r.total_cost && Number(r.total_cost) > 0) {
+          return {
+            ...r,
+            rate_per_litre: rateNum,
+            litres: Number((Number(r.total_cost) / rateNum).toFixed(2))
+          };
+        }
+        return { ...r, rate_per_litre: rateNum };
+      }));
+    }
+  };
+
+  const handleAutoFillRemaining = (rowId: string) => {
+    if (!selectedSplitEntry) return;
+    const totalBalance = selectedSplitEntry.remainingAmount || 0;
+    const otherAllocated = splitRows.filter(r => r.id !== rowId).reduce((sum, r) => sum + (Number(r.total_cost) || 0), 0);
+    const remCost = Math.max(0, Number((totalBalance - otherAllocated).toFixed(2)));
+    const targetRow = splitRows.find(r => r.id === rowId);
+    const rate = Number(targetRow?.rate_per_litre) || Number(splitModalRate) || 1200;
+    const remLitres = Number((remCost / rate).toFixed(2));
+
+    setSplitRows(prev => prev.map(r => {
+      if (r.id !== rowId) return r;
+      return {
+        ...r,
+        rate_per_litre: rate,
+        total_cost: remCost,
+        litres: remLitres
+      };
+    }));
+  };
+
+  const handleSplitEquallyByLitres = () => {
+    if (!selectedSplitEntry || splitRows.length === 0) return;
+    const rate = Number(splitModalRate) || 1200;
+    const totalAmount = selectedSplitEntry.remainingAmount || 0;
+    const count = splitRows.length;
+    const shareCost = Number((totalAmount / count).toFixed(2));
+
+    setSplitRows(prev => prev.map((r, idx) => {
+      const isLast = idx === prev.length - 1;
+      const cost = isLast ? Number((totalAmount - (shareCost * (count - 1))).toFixed(2)) : shareCost;
+      const litres = Number((cost / rate).toFixed(2));
+      return {
+        ...r,
+        rate_per_litre: rate,
+        total_cost: cost,
+        litres: litres
+      };
+    }));
+  };
+
+  const handleSplitRowChange = (rowId: string, field: string, value: any) => {
+    setSplitRows(prev => prev.map(r => {
+      if (r.id !== rowId) return r;
+      const updated = { ...r, [field]: value };
+      if (field === 'vehicle_id') {
+        const veh = vehicles.find(v => v.id === value);
+        updated.vehicle_reg = veh?.registration_number || '';
+      } else if (field === 'litres') {
+        const litresVal = parseFloat(value);
+        if (!isNaN(litresVal) && litresVal > 0) {
+          const rateVal = updated.rate_per_litre !== '' ? Number(updated.rate_per_litre) : (Number(splitModalRate) || 1200);
+          updated.rate_per_litre = rateVal;
+          updated.total_cost = Number((litresVal * rateVal).toFixed(2));
+        }
+      } else if (field === 'total_cost') {
+        const costVal = parseFloat(value);
+        if (!isNaN(costVal) && costVal > 0) {
+          const rateVal = updated.rate_per_litre !== '' ? Number(updated.rate_per_litre) : (Number(splitModalRate) || 1200);
+          updated.rate_per_litre = rateVal;
+          updated.litres = Number((costVal / rateVal).toFixed(2));
+        }
+      } else if (field === 'rate_per_litre') {
+        const rateVal = parseFloat(value);
+        if (!isNaN(rateVal) && rateVal > 0) {
+          const litresVal = updated.litres !== '' ? Number(updated.litres) : 0;
+          const costVal = updated.total_cost !== '' ? Number(updated.total_cost) : 0;
+          if (litresVal > 0) {
+            updated.total_cost = Number((litresVal * rateVal).toFixed(2));
+          } else if (costVal > 0) {
+            updated.litres = Number((costVal / rateVal).toFixed(2));
+          }
+        }
+      }
+      return updated;
+    }));
+  };
+
+  const handleAddSplitRow = () => {
+    const defaultRate = Number(splitModalRate) || Number(splitRows[0]?.rate_per_litre) || 1200;
+    const currentAllocated = splitRows.reduce((sum, r) => sum + (Number(r.total_cost) || 0), 0);
+    const unallocated = Math.max(0, Number(((selectedSplitEntry?.remainingAmount || 0) - currentAllocated).toFixed(2)));
+    const initialLitres = unallocated > 0 ? Number((unallocated / defaultRate).toFixed(2)) : '';
+    const initialCost = unallocated > 0 ? unallocated : '';
+
+    setSplitRows(prev => [
+      ...prev,
+      {
+        id: crypto.randomUUID(),
+        vehicle_id: '',
+        vehicle_reg: '',
+        litres: initialLitres,
+        rate_per_litre: defaultRate,
+        total_cost: initialCost,
+        filled_by: '',
+        notes: selectedSplitEntry?.voucherNo ? `Voucher #${selectedSplitEntry.voucherNo}` : ''
+      }
+    ]);
+  };
+
+  const handleRemoveSplitRow = (rowId: string) => {
+    if (splitRows.length <= 1) {
+      toast.info('At least one vehicle row is required');
+      return;
+    }
+    setSplitRows(prev => prev.filter(r => r.id !== rowId));
+  };
+
+  const handleSaveSplitFuelLogs = async () => {
+    if (!selectedSplitEntry) return;
+
+    for (let i = 0; i < splitRows.length; i++) {
+      const r = splitRows[i];
+      if (!r.vehicle_id) {
+        toast.error(`Vehicle required for Row #${i + 1}`);
+        return;
+      }
+      if (!r.litres || Number(r.litres) <= 0) {
+        toast.error(`Litres required for Row #${i + 1}`);
+        return;
+      }
+      if (!r.total_cost || Number(r.total_cost) <= 0) {
+        toast.error(`Cost required for Row #${i + 1}`);
+        return;
+      }
+    }
+
+    try {
+      for (const row of splitRows) {
+        const costNum = Number(row.total_cost);
+        const litresNum = Number(row.litres);
+        const rateNum = Number(row.rate_per_litre) || Number((costNum / litresNum).toFixed(2));
+
+        await addVehicleFuelLog({
+          vehicle_id: row.vehicle_id,
+          vehicle_reg: row.vehicle_reg || row.vehicle_id,
+          date: splitDate,
+          rate_per_litre: Number(rateNum.toFixed(2)),
+          litres: Number(litresNum.toFixed(2)),
+          total_cost: Number(costNum.toFixed(2)),
+          filled_by: row.filled_by || undefined,
+          notes: row.notes || (selectedSplitEntry.voucherNo ? `Split from Voucher #${selectedSplitEntry.voucherNo}` : undefined),
+          linkedLedgerIds: [selectedSplitEntry.id],
+          linkedLedgerAmounts: { [selectedSplitEntry.id]: Number(costNum.toFixed(2)) }
+        });
+      }
+      toast.success(`Created ${splitRows.length} split fuel logs successfully`);
+      setSelectedSplitEntry(null);
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to create split fuel logs');
+    }
+  };
 
   // Fuel Analytics Filter State
   const [showFuelAnalytics, setShowFuelAnalytics] = useState(false);
@@ -915,7 +1528,8 @@ export function VehicleManager() {
       odometer: fuelForm.odometer !== '' ? Number(fuelForm.odometer) : undefined,
       filled_by: fuelForm.filled_by || undefined,
       notes: fuelForm.notes || undefined,
-      linkedLedgerIds: fuelForm.linkedLedgerIds
+      linkedLedgerIds: fuelForm.linkedLedgerIds,
+      linkedLedgerAmounts: fuelForm.linkedLedgerAmounts
     };
     try {
       if (editingFuelLog) {
@@ -927,7 +1541,7 @@ export function VehicleManager() {
       }
       setShowFuelForm(false);
       setEditingFuelLog(null);
-      setFuelForm({ vehicle_id: '', vehicle_reg: '', date: new Date().toISOString().split('T')[0], rate_per_litre: '', litres: '', total_cost: '', odometer: '', filled_by: '', notes: '', linkedLedgerIds: [], lastComputed: '' });
+      setFuelForm({ vehicle_id: '', vehicle_reg: '', date: new Date().toISOString().split('T')[0], rate_per_litre: '', litres: '', total_cost: '', odometer: '', filled_by: '', notes: '', linkedLedgerIds: [], linkedLedgerAmounts: {}, lastComputed: '' });
     } catch (e: any) {
       toast.error(e?.message || 'Failed to save fuel log');
     }
@@ -946,6 +1560,7 @@ export function VehicleManager() {
       filled_by: log.filled_by ?? '',
       notes: log.notes ?? '',
       linkedLedgerIds: log.linkedLedgerIds ?? [],
+      linkedLedgerAmounts: log.linkedLedgerAmounts ?? {},
       lastComputed: ''
     });
     setShowFuelForm(true);
@@ -1266,18 +1881,35 @@ export function VehicleManager() {
           </Button>
         )}
         {priv.canAddFuel && (
-          <Button
-            size="sm"
-            className="h-8 w-8 p-0 bg-amber-500 hover:bg-amber-600 text-white"
-            onClick={() => {
-              setEditingFuelLog(null);
-              setFuelForm({ vehicle_id: '', vehicle_reg: '', date: new Date().toISOString().split('T')[0], rate_per_litre: '', litres: '', total_cost: '', odometer: '', filled_by: '', notes: '', linkedLedgerIds: [], lastComputed: '' });
-              setShowFuelForm(true);
-            }}
-            title="Log Fuel"
-          >
-            <Fuel className="h-3.5 w-3.5" />
-          </Button>
+          <div className="flex items-center gap-1.5">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 px-2.5 text-xs font-bold gap-1 text-amber-700 bg-amber-50/50 hover:bg-amber-100 border-amber-200 dark:border-amber-800 dark:bg-amber-950/20 dark:text-amber-300"
+              onClick={() => setShowBacklogModal(true)}
+              title="Import unlogged fuel from ledger"
+            >
+              <Sparkles className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+              <span>Import Ledger</span>
+              {fuelBacklogCandidates.length > 0 && (
+                <span className="px-1.5 py-0.2 rounded-full bg-amber-500 text-white text-[9px] font-black">
+                  {fuelBacklogCandidates.length}
+                </span>
+              )}
+            </Button>
+            <Button
+              size="sm"
+              className="h-8 w-8 p-0 bg-amber-500 hover:bg-amber-600 text-white"
+              onClick={() => {
+                setEditingFuelLog(null);
+                setFuelForm({ vehicle_id: '', vehicle_reg: '', date: new Date().toISOString().split('T')[0], rate_per_litre: '', litres: '', total_cost: '', odometer: '', filled_by: '', notes: '', linkedLedgerIds: [], linkedLedgerAmounts: {}, lastComputed: '' });
+                setShowFuelForm(true);
+              }}
+              title="Log Fuel"
+            >
+              <Fuel className="h-3.5 w-3.5" />
+            </Button>
+          </div>
         )}
       </div>
     ) : (
@@ -1323,10 +1955,26 @@ export function VehicleManager() {
             {priv.canAddFuel && (
               <Button
                 variant="outline" size="sm"
+                className="flex items-center gap-1.5 h-9 px-2 sm:px-3 text-amber-800 bg-amber-50/60 hover:bg-amber-100 border-amber-300 dark:border-amber-700 dark:bg-amber-950/20 dark:text-amber-300 shadow-xs font-bold"
+                onClick={() => setShowBacklogModal(true)}
+                title="Import unlogged fuel expenses from ledger"
+              >
+                <Sparkles className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                <span className="text-xs">Import from Ledger</span>
+                {fuelBacklogCandidates.length > 0 && (
+                  <span className="px-1.5 py-0.2 rounded-full bg-amber-500 text-white text-[10px] font-black">
+                    {fuelBacklogCandidates.length}
+                  </span>
+                )}
+              </Button>
+            )}
+            {priv.canAddFuel && (
+              <Button
+                variant="outline" size="sm"
                 className="flex items-center gap-1.5 h-9 px-2 sm:px-3 text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
                 onClick={() => {
                   setEditingFuelLog(null);
-                  setFuelForm({ vehicle_id: '', vehicle_reg: '', date: new Date().toISOString().split('T')[0], rate_per_litre: '', litres: '', total_cost: '', odometer: '', filled_by: '', notes: '', linkedLedgerIds: [], lastComputed: '' });
+                  setFuelForm({ vehicle_id: '', vehicle_reg: '', date: new Date().toISOString().split('T')[0], rate_per_litre: '', litres: '', total_cost: '', odometer: '', filled_by: '', notes: '', linkedLedgerIds: [], linkedLedgerAmounts: {}, lastComputed: '' });
                   setShowFuelForm(true);
                 }}
                 title="Log Fuel"
@@ -1983,6 +2631,7 @@ export function VehicleManager() {
                             filled_by: detectedDuplicateFuelLog.filled_by || '',
                             notes: detectedDuplicateFuelLog.notes || '',
                             linkedLedgerIds: mergedLinked,
+                            linkedLedgerAmounts: detectedDuplicateFuelLog.linkedLedgerAmounts || {},
                             lastComputed: ''
                           });
                           toast.info('Switched to update existing fuel log with linked voucher(s).');
@@ -2661,6 +3310,641 @@ export function VehicleManager() {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      {/* ── Ledger Fuel Backlog Importer Modal ── */}
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      <Dialog open={showBacklogModal} onOpenChange={setShowBacklogModal}>
+        <DialogContent className="max-w-4xl w-full max-h-[90vh] flex flex-col gap-0 p-0 overflow-hidden">
+          <DialogHeader className="px-6 pt-5 pb-4 border-b bg-slate-50/70 dark:bg-slate-900 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <DialogTitle className="flex items-center gap-2 text-base font-bold text-slate-800 dark:text-slate-100">
+                <Sparkles className="h-5 w-5 text-amber-500" />
+                Ledger Fuel Backlog Importer
+              </DialogTitle>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                Automatically parse vehicle fuel vouchers from the financial ledger into fleet records
+              </p>
+            </div>
+
+            {/* Quick Action: Batch Import Ready */}
+            {fuelBacklogCandidates.filter(c => c.isReady && !c.isMultiVehicle).length > 0 && (
+              <Button
+                size="sm"
+                onClick={handleBatchImportReady}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold gap-1.5 shadow-sm text-xs"
+              >
+                <CheckCheck className="h-4 w-4" />
+                Batch Import ({fuelBacklogCandidates.filter(c => c.isReady && !c.isMultiVehicle).length}) Ready Records
+              </Button>
+            )}
+          </DialogHeader>
+
+          {/* Filter & Search Bar */}
+          <div className="px-6 py-3 border-b bg-white dark:bg-slate-900 space-y-3">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                <Input
+                  className="pl-9 pr-8 h-9 text-sm bg-slate-50/60 dark:bg-slate-800"
+                  placeholder="Search by description, vehicle, voucher #, site, amount..."
+                  value={backlogSearch}
+                  onChange={e => setBacklogSearch(e.target.value)}
+                />
+                {backlogSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setBacklogSearch('')}
+                    className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              <select
+                value={backlogMonth}
+                onChange={e => setBacklogMonth(e.target.value)}
+                className="h-9 rounded-lg text-xs px-2.5 border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-white outline-none font-medium appearance-none cursor-pointer pr-7 shrink-0"
+                style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E\")", backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center' }}
+              >
+                <option value="">All Months</option>
+                {availableLedgerMonths.map(m => {
+                  const [y, mon] = m.split('-');
+                  const d = new Date(Number(y), Number(mon) - 1, 1);
+                  return (
+                    <option key={m} value={m}>
+                      {d.toLocaleString('en-GB', { month: 'short', year: 'numeric' })}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+
+            {/* Filter Chips / Sub Tabs */}
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => setBacklogTab('all')}
+                  className={`px-2.5 py-1 text-xs font-semibold rounded-lg transition-all ${
+                    backlogTab === 'all'
+                      ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 shadow-xs'
+                      : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 hover:bg-slate-200'
+                  }`}
+                >
+                  All Unlogged ({fuelBacklogCandidates.length})
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setBacklogTab('ready')}
+                  className={`px-2.5 py-1 text-xs font-semibold rounded-lg transition-all flex items-center gap-1 ${
+                    backlogTab === 'ready'
+                      ? 'bg-emerald-600 text-white shadow-xs'
+                      : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 hover:bg-emerald-100'
+                  }`}
+                >
+                  <Check className="w-3 h-3" />
+                  Ready to Import ({fuelBacklogCandidates.filter(c => c.isReady && !c.isMultiVehicle).length})
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setBacklogTab('multi')}
+                  className={`px-2.5 py-1 text-xs font-semibold rounded-lg transition-all flex items-center gap-1 ${
+                    backlogTab === 'multi'
+                      ? 'bg-amber-600 text-white shadow-xs'
+                      : 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 hover:bg-amber-100'
+                  }`}
+                >
+                  <Scissors className="w-3 h-3" />
+                  Multi-Vehicle Split ({fuelBacklogCandidates.filter(c => c.isMultiVehicle).length})
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setBacklogTab('unassigned')}
+                  className={`px-2.5 py-1 text-xs font-semibold rounded-lg transition-all ${
+                    backlogTab === 'unassigned'
+                      ? 'bg-rose-600 text-white shadow-xs'
+                      : 'bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300 hover:bg-rose-100'
+                  }`}
+                >
+                  Unassigned Fleet ({fuelBacklogCandidates.filter(c => !c.vehicleId).length})
+                </button>
+              </div>
+            </div>
+
+            {/* Smart Exclusion Toggles & Default Rate Configuration */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-2.5 border-t border-slate-100 dark:border-slate-800 text-xs">
+              <div className="flex items-center gap-4 flex-wrap">
+                <label className="flex items-center gap-1.5 cursor-pointer text-slate-700 dark:text-slate-300 font-bold select-none text-[11px]">
+                  <input
+                    type="checkbox"
+                    checked={excludeJettingAndMachinery}
+                    onChange={e => setExcludeJettingAndMachinery(e.target.checked)}
+                    className="rounded border-slate-300 text-amber-600 focus:ring-amber-500 h-3.5 w-3.5"
+                  />
+                  <span>🚫 Exclude Jetting & Site Machinery</span>
+                </label>
+
+                <label className="flex items-center gap-1.5 cursor-pointer text-slate-700 dark:text-slate-300 font-bold select-none text-[11px]">
+                  <input
+                    type="checkbox"
+                    checked={excludeDieselKeywords}
+                    onChange={e => setExcludeDieselKeywords(e.target.checked)}
+                    className="rounded border-slate-300 text-amber-600 focus:ring-amber-500 h-3.5 w-3.5"
+                  />
+                  <span>🚫 Exclude Site Diesel</span>
+                </label>
+              </div>
+
+              <div className="flex items-center gap-2 bg-amber-50/70 dark:bg-amber-950/30 px-2.5 py-1 rounded-lg border border-amber-200/80 dark:border-amber-800/60">
+                <span className="text-[11px] font-bold text-amber-800 dark:text-amber-300">Default PMS Rate:</span>
+                <div className="flex items-center gap-1">
+                  <span className="text-xs font-bold text-amber-700 dark:text-amber-400">₦</span>
+                  <Input
+                    type="number"
+                    step="1"
+                    placeholder="1206"
+                    value={backlogDefaultRate === '' ? '' : backlogDefaultRate}
+                    onChange={e => setBacklogDefaultRate(e.target.value === '' ? '' : Number(e.target.value))}
+                    className="h-6 w-20 text-xs font-bold px-1.5 py-0 border-amber-300 bg-white dark:bg-slate-900 text-amber-800 dark:text-amber-200"
+                  />
+                  <span className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold">/L</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Custom Phrase Exclusions Input & Tags */}
+            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center gap-2 text-xs">
+              <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 shrink-0">
+                🚫 Exclude Phrases:
+              </span>
+
+              <div className="flex items-center gap-1.5 flex-1 min-w-[220px] max-w-sm">
+                <Input
+                  type="text"
+                  placeholder="Type phrase to exclude (e.g. 'jetting', 'engine oil')..."
+                  value={excludePhraseInput}
+                  onChange={e => setExcludePhraseInput(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleAddExcludePhrase();
+                    }
+                  }}
+                  className="h-6 text-xs bg-slate-50 dark:bg-slate-800 px-2"
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={handleAddExcludePhrase}
+                  disabled={!excludePhraseInput.trim()}
+                  className="h-6 px-2 text-[11px] font-bold shrink-0 bg-white dark:bg-slate-800"
+                >
+                  + Add
+                </Button>
+              </div>
+
+              {customExcludePhrases.length > 0 && (
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {customExcludePhrases.map(phrase => (
+                    <span
+                      key={phrase}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 shadow-2xs"
+                    >
+                      <span>"{phrase}"</span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveExcludePhrase(phrase)}
+                        className="hover:text-rose-950 dark:hover:text-white"
+                        title={`Remove exclusion '${phrase}'`}
+                      >
+                        <X className="w-2.5 h-2.5" />
+                      </button>
+                    </span>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => setCustomExcludePhrases([])}
+                    className="text-[10px] text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 underline ml-1 font-semibold"
+                  >
+                    Clear all
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Candidates Review List */}
+          <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3 bg-slate-50/40 dark:bg-slate-900/40">
+            {filteredFuelBacklogCandidates.length === 0 ? (
+              <div className="py-12 text-center text-slate-400 italic space-y-2">
+                <CheckCircle2 className="h-10 w-10 text-slate-300 dark:text-slate-700 mx-auto" />
+                <p className="text-sm font-semibold">No unlogged fuel expenses matching current filter.</p>
+                <p className="text-xs text-slate-400">All ledger vouchers for this period have been imported or reconciled!</p>
+              </div>
+            ) : (
+              filteredFuelBacklogCandidates.map(cand => (
+                <div
+                  key={cand.id}
+                  className={cn(
+                    "rounded-xl border p-4 bg-white dark:bg-slate-800 shadow-xs transition-all",
+                    cand.isMultiVehicle
+                      ? "border-amber-300 dark:border-amber-700/80 bg-amber-50/20 dark:bg-amber-950/10"
+                      : cand.isReady
+                      ? "border-emerald-300 dark:border-emerald-700/60"
+                      : "border-slate-200 dark:border-slate-700"
+                  )}
+                >
+                  <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+                    {/* Left: Transaction details */}
+                    <div className="flex-1 min-w-0 space-y-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs font-bold text-slate-800 dark:text-slate-100">
+                          {cand.description}
+                        </span>
+                        {cand.isMultiVehicle && (
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300 border border-amber-300">
+                            ✂️ Multi-Vehicle ({cand.matchedVehicles.map(v => v.name).join(', ')})
+                          </span>
+                        )}
+                        {!cand.isMultiVehicle && cand.vehicleName && (
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-100 dark:bg-blue-900/60 text-blue-800 dark:text-blue-300 border border-blue-200">
+                            🚗 {cand.vehicleName} ({cand.vehicleReg})
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="text-[11px] text-slate-500 dark:text-slate-400 flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                        <span><strong className="text-slate-600 dark:text-slate-300">Date:</strong> {formatDisplayDate(cand.date)}</span>
+                        {cand.voucherNo && (
+                          <span className="text-amber-700 dark:text-amber-300 font-bold">
+                            · #{cand.voucherNo}
+                          </span>
+                        )}
+                        {cand.site && <span>· 📍 {cand.site}</span>}
+                        {cand.client && <span>· 🏢 {cand.client}</span>}
+                        <span className="text-emerald-700 dark:text-emerald-400 font-black">
+                          · Ledger: {fmtCurrency(cand.remainingAmount)}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Middle: Editable quick fields */}
+                    <div className="flex flex-wrap items-center gap-2 shrink-0">
+                      {/* Vehicle select */}
+                      <div className="w-44">
+                        <label className="text-[9px] font-bold uppercase text-slate-400 block mb-0.5">Vehicle</label>
+                        <select
+                          value={cand.vehicleId}
+                          onChange={e => handleCandidateChange(cand.id, 'vehicle_id', e.target.value)}
+                          className="h-8 w-full rounded-lg text-xs px-2 border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-white font-semibold outline-none"
+                        >
+                          <option value="">Select Vehicle...</option>
+                          {vehicles.map(v => (
+                            <option key={v.id} value={v.id}>
+                              {v.name} ({v.registration_number})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Litres input */}
+                      <div className="w-20">
+                        <label className="text-[9px] font-bold uppercase text-slate-400 block mb-0.5">Litres (L)</label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          placeholder="Litres"
+                          value={cand.litres === '' ? '' : cand.litres}
+                          onChange={e => handleCandidateChange(cand.id, 'litres', e.target.value)}
+                          className="h-8 text-xs font-bold px-2 text-amber-700 dark:text-amber-300"
+                        />
+                      </div>
+
+                      {/* Rate input */}
+                      <div className="w-20">
+                        <label className="text-[9px] font-bold uppercase text-slate-400 block mb-0.5">Rate (₦/L)</label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          placeholder="Rate"
+                          value={cand.rate === '' ? '' : cand.rate}
+                          onChange={e => handleCandidateChange(cand.id, 'rate_per_litre', e.target.value)}
+                          className="h-8 text-xs font-semibold px-2"
+                        />
+                      </div>
+
+                      {/* Cost (Locked to exact Ledger voucher amount) */}
+                      <div className="w-28">
+                        <label className="text-[9px] font-bold uppercase text-slate-400 block mb-0.5 flex items-center justify-between">
+                          <span>Cost (₦)</span>
+                          <span className="text-[8px] text-emerald-600 dark:text-emerald-400 font-bold">Ledger</span>
+                        </label>
+                        <Input
+                          type="text"
+                          readOnly
+                          value={fmtCurrency(Number(cand.cost) || 0)}
+                          className="h-8 text-xs font-black text-emerald-700 dark:text-emerald-300 bg-slate-100/80 dark:bg-slate-800/80 cursor-default px-2 border-slate-200 dark:border-slate-700"
+                          title="Cost is locked to the exact ledger voucher amount. Use 'Split' if allocating across multiple vehicles."
+                        />
+                      </div>
+                    </div>
+
+                    {/* Right: Actions */}
+                    <div className="flex items-center gap-2 shrink-0 self-end lg:self-center">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleOpenSplitModal(cand)}
+                        className="h-8 px-2.5 text-xs text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/40 gap-1 font-bold"
+                        title="Split this voucher between 2 or more vehicles"
+                      >
+                        <Scissors className="h-3.5 w-3.5" />
+                        Split
+                      </Button>
+
+                      <Button
+                        size="sm"
+                        disabled={!cand.vehicleId || !cand.litres || !cand.cost}
+                        onClick={() => handleImportSingleCandidate(cand)}
+                        className="h-8 px-3 text-xs bg-amber-500 hover:bg-amber-600 text-white font-bold gap-1 shadow-xs"
+                      >
+                        <Zap className="h-3.5 w-3.5" />
+                        Import
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          <div className="px-6 py-3 border-t bg-white dark:bg-slate-900 flex items-center justify-between">
+            <span className="text-xs text-slate-500">
+              Showing {filteredFuelBacklogCandidates.length} of {fuelBacklogCandidates.length} backlog items
+            </span>
+            <Button variant="outline" size="sm" onClick={() => setShowBacklogModal(false)}>
+              Close
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      {/* ── Multi-Vehicle Ledger Splitter Modal ── */}
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      <Dialog open={!!selectedSplitEntry} onOpenChange={open => { if (!open) setSelectedSplitEntry(null); }}>
+        <DialogContent className="max-w-2xl w-full max-h-[85vh] flex flex-col gap-0 p-0 overflow-hidden">
+          <DialogHeader className="px-6 pt-5 pb-4 border-b bg-amber-50/60 dark:bg-amber-950/20">
+            <div className="flex items-center justify-between">
+              <DialogTitle className="flex items-center gap-2 text-base font-bold text-amber-800 dark:text-amber-200">
+                <Scissors className="h-4 w-4 text-amber-600" />
+                Split Ledger Voucher Across Vehicles
+              </DialogTitle>
+
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleSplitEquallyByLitres}
+                className="h-7 text-xs bg-white dark:bg-slate-800 border-amber-300 dark:border-amber-700 text-amber-800 dark:text-amber-200 font-bold gap-1 shadow-2xs"
+                title="Divide total voucher litres equally across all vehicles"
+              >
+                <Zap className="w-3 h-3 text-amber-500" />
+                Split Litres Equally
+              </Button>
+            </div>
+
+            {selectedSplitEntry && (() => {
+              const currentRate = Number(splitModalRate) || 1200;
+              const totalLitres = currentRate > 0 ? Number(((selectedSplitEntry.remainingAmount || 0) / currentRate).toFixed(2)) : 0;
+
+              return (
+                <div className="mt-3 text-xs text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 p-3 rounded-xl border border-amber-200 dark:border-amber-800 shadow-2xs space-y-2">
+                  <div className="flex flex-wrap justify-between items-start gap-2">
+                    <div className="space-y-0.5">
+                      <p className="font-bold text-slate-900 dark:text-slate-100">{selectedSplitEntry.description}</p>
+                      <p className="text-[10px] text-slate-400">
+                        Voucher: #{selectedSplitEntry.voucherNo || 'N/A'} · Date: {formatDisplayDate(selectedSplitEntry.date)}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[9px] text-slate-400 uppercase font-bold">Total Voucher Balance</p>
+                      <p className="text-sm font-black text-amber-600 dark:text-amber-400">{fmtCurrency(selectedSplitEntry.remainingAmount)}</p>
+                    </div>
+                  </div>
+
+                  {/* Shared Rate & Total Expected Litres Bar */}
+                  <div className="pt-2 border-t border-slate-100 dark:border-slate-700/60 flex flex-wrap items-center justify-between gap-3 text-[11px]">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-slate-500 dark:text-slate-400">Voucher Fuel Rate:</span>
+                      <div className="flex items-center gap-1 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded-lg border border-amber-200 dark:border-amber-800">
+                        <span className="font-bold text-amber-700 dark:text-amber-300">₦</span>
+                        <Input
+                          type="number"
+                          step="1"
+                          placeholder="1200"
+                          value={splitModalRate === '' ? '' : splitModalRate}
+                          onChange={e => handleSplitModalRateChange(e.target.value === '' ? '' : Number(e.target.value))}
+                          className="h-6 w-20 text-xs font-bold px-1.5 py-0 border-amber-300 bg-white dark:bg-slate-900 text-amber-800 dark:text-amber-200"
+                        />
+                        <span className="text-[10px] text-amber-600 font-semibold">/L</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 font-semibold text-slate-600 dark:text-slate-300">
+                      <span>Total Equivalent Litres:</span>
+                      <span className="font-black text-amber-600 dark:text-amber-400 bg-amber-100/60 dark:bg-amber-900/40 px-2 py-0.5 rounded-md">
+                        {totalLitres} L
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+          </DialogHeader>
+
+          {/* Split Rows Editor */}
+          <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3 bg-white dark:bg-slate-900">
+            <div className="flex items-center justify-between pb-2 border-b">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Vehicle Allocations</span>
+                <span className="text-xs text-slate-400">({splitRows.length} vehicles)</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="text-[10px] font-bold text-slate-400 uppercase">Refill Date:</label>
+                <Input
+                  type="date"
+                  value={splitDate}
+                  onChange={e => setSplitDate(e.target.value)}
+                  className="h-7 text-xs w-32 px-1.5"
+                />
+              </div>
+            </div>
+
+            {selectedSplitEntry && splitRows.map((row, idx) => {
+              const currentTotalAllocated = splitRows.reduce((sum, r) => sum + (Number(r.total_cost) || 0), 0);
+              const diff = (selectedSplitEntry.remainingAmount || 0) - currentTotalAllocated;
+              const hasRemainder = diff > 0.01;
+
+              return (
+                <div key={row.id} className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300">
+                      Vehicle #{idx + 1}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      {hasRemainder && (
+                        <button
+                          type="button"
+                          onClick={() => handleAutoFillRemaining(row.id)}
+                          className="text-[10px] font-bold text-amber-700 dark:text-amber-300 bg-amber-100 hover:bg-amber-200 dark:bg-amber-950/60 dark:hover:bg-amber-900/60 px-2 py-0.5 rounded-md border border-amber-300 transition-colors flex items-center gap-1"
+                          title="Fill all remaining unallocated balance into this vehicle"
+                        >
+                          <Zap className="w-2.5 h-2.5 text-amber-600" />
+                          Fill Remainder (+{fmtCurrency(diff)})
+                        </button>
+                      )}
+                      {splitRows.length > 1 && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemoveSplitRow(row.id)}
+                          className="h-6 w-6 p-0 text-rose-500 hover:text-rose-700"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
+                    <div className="sm:col-span-1">
+                      <label className="text-[9px] font-bold text-slate-400 uppercase block mb-0.5">Vehicle</label>
+                      <select
+                        value={row.vehicle_id}
+                        onChange={e => handleSplitRowChange(row.id, 'vehicle_id', e.target.value)}
+                        className="h-8 w-full rounded-md text-xs px-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-semibold text-slate-800 dark:text-slate-100"
+                      >
+                        <option value="">Select vehicle...</option>
+                        {vehicles.map(v => (
+                          <option key={v.id} value={v.id}>
+                            {v.name} ({v.registration_number})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-[9px] font-bold text-slate-400 uppercase block mb-0.5">Litres (L)</label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder="0.00"
+                        value={row.litres === '' ? '' : row.litres}
+                        onChange={e => handleSplitRowChange(row.id, 'litres', e.target.value)}
+                        className="h-8 text-xs font-bold text-amber-700 dark:text-amber-300 bg-white dark:bg-slate-900"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[9px] font-bold text-slate-400 uppercase block mb-0.5">Rate (₦/L)</label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder="Rate"
+                        value={row.rate_per_litre === '' ? '' : row.rate_per_litre}
+                        onChange={e => handleSplitRowChange(row.id, 'rate_per_litre', e.target.value)}
+                        className="h-8 text-xs bg-white dark:bg-slate-900"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[9px] font-bold text-slate-400 uppercase block mb-0.5">Amount (₦)</label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder="Cost"
+                        value={row.total_cost === '' ? '' : row.total_cost}
+                        onChange={e => handleSplitRowChange(row.id, 'total_cost', e.target.value)}
+                        className="h-8 text-xs font-black text-emerald-700 dark:text-emerald-300 bg-white dark:bg-slate-900"
+                      />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleAddSplitRow}
+              className="w-full h-8 text-xs font-bold border-dashed border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 gap-1"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Add Another Vehicle to Split
+            </Button>
+          </div>
+
+          {/* Allocation Validator Footer */}
+          {selectedSplitEntry && (() => {
+            const totalAllocated = splitRows.reduce((sum, r) => sum + (Number(r.total_cost) || 0), 0);
+            const totalLitresAllocated = splitRows.reduce((sum, r) => sum + (Number(r.litres) || 0), 0);
+            const currentRate = Number(splitModalRate) || 1200;
+            const expectedTotalLitres = currentRate > 0 ? Number(((selectedSplitEntry.remainingAmount || 0) / currentRate).toFixed(2)) : 0;
+            const diff = (selectedSplitEntry.remainingAmount || 0) - totalAllocated;
+            const isBalanced = Math.abs(diff) < 0.01;
+
+            return (
+              <div className="px-6 py-4 border-t bg-slate-50 dark:bg-slate-900 flex flex-col sm:flex-row items-center justify-between gap-3">
+                <div className="text-xs space-y-1">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <span className="text-slate-500">
+                      Amount: <strong className="text-slate-700 dark:text-slate-200">{fmtCurrency(totalAllocated)}</strong> / {fmtCurrency(selectedSplitEntry.remainingAmount)}
+                    </span>
+                    <span>·</span>
+                    <span className="text-amber-700 dark:text-amber-300 font-semibold">
+                      Litres: <strong>{totalLitresAllocated.toFixed(2)} L</strong> / {expectedTotalLitres} L
+                    </span>
+                  </div>
+                  {isBalanced ? (
+                    <span className="text-[11px] text-emerald-600 font-bold flex items-center gap-1">
+                      <Check className="h-3 w-3" /> 100% Balanced & Covered
+                    </span>
+                  ) : diff > 0 ? (
+                    <span className="text-[11px] text-amber-600 font-semibold">
+                      Remaining to allocate: {fmtCurrency(diff)} ({((diff / currentRate)).toFixed(2)} L)
+                    </span>
+                  ) : (
+                    <span className="text-[11px] text-rose-500 font-semibold">
+                      Over-allocated by: {fmtCurrency(Math.abs(diff))}
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setSelectedSplitEntry(null)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    size="sm"
+                    disabled={!isBalanced || splitRows.some(r => !r.vehicle_id || !r.litres || !r.total_cost)}
+                    onClick={handleSaveSplitFuelLogs}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs"
+                  >
+                    Create Split Fuel Logs ({splitRows.length})
+                  </Button>
+                </div>
+              </div>
+            );
+          })()}
         </DialogContent>
       </Dialog>
 

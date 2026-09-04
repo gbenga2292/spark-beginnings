@@ -807,20 +807,27 @@ export function Dashboard() {
                     <CardContent className="pt-6">
                         <div className="h-[280px] w-full" style={{ minWidth: 0, minHeight: '280px' }}>
                             <ResponsiveContainer minWidth={1} minHeight={1} width="100%" height="100%">
-                                <BarChart data={attendanceTrend} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                                <BarChart data={attendanceTrend} margin={{ top: 22, right: 10, left: -10, bottom: 0 }}>
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(148,163,184,0.15)" />
                                     <XAxis dataKey="name" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
-                                    <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
+                                    <YAxis 
+                                        stroke="#94a3b8" 
+                                        fontSize={11} 
+                                        tickLine={false} 
+                                        axisLine={false} 
+                                        domain={chartViewMode === 'efficiency' ? [0, 110] : [0, (dataMax: number) => (dataMax <= 5 ? dataMax + 2 : Math.ceil(dataMax * 1.25))]}
+                                        allowDataOverflow={false}
+                                    />
                                     <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid rgba(148,163,184,0.2)', backgroundColor: 'rgba(30,41,59,0.95)', color: '#f1f5f9', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.4)' }} />
                                     <Legend wrapperStyle={{ paddingTop: '10px' }} />
                                     <Bar dataKey="Absent" fill="#ef4444" radius={[4, 4, 0, 0]}>
-                                        <LabelList dataKey="Absent" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#ef4444' }} formatter={(v: any) => v > 0 ? (chartViewMode === 'efficiency' ? `${v}%` : v) : ''} />
+                                        <LabelList dataKey="Absent" position="top" offset={4} style={{ fontSize: 10, fontWeight: 700, fill: '#ef4444' }} formatter={(v: any) => v > 0 ? (chartViewMode === 'efficiency' ? `${v}%` : v) : ''} />
                                     </Bar>
                                     <Bar dataKey="Present" fill="#10b981" radius={[4, 4, 0, 0]}>
-                                        <LabelList dataKey="Present" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#10b981' }} formatter={(v: any) => v > 0 ? (chartViewMode === 'efficiency' ? `${v}%` : v) : ''} />
+                                        <LabelList dataKey="Present" position="top" offset={4} style={{ fontSize: 10, fontWeight: 700, fill: '#10b981' }} formatter={(v: any) => v > 0 ? (chartViewMode === 'efficiency' ? `${v}%` : v) : ''} />
                                     </Bar>
                                     <Bar dataKey="Overtime" fill="#8b5cf6" radius={[4, 4, 0, 0]}>
-                                        <LabelList dataKey="Overtime" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#8b5cf6' }} formatter={(v: any) => v > 0 ? (chartViewMode === 'efficiency' ? `${v}%` : v) : ''} />
+                                        <LabelList dataKey="Overtime" position="top" offset={4} style={{ fontSize: 10, fontWeight: 700, fill: '#8b5cf6' }} formatter={(v: any) => v > 0 ? (chartViewMode === 'efficiency' ? `${v}%` : v) : ''} />
                                     </Bar>
                                 </BarChart>
                             </ResponsiveContainer>
@@ -883,7 +890,7 @@ export function Dashboard() {
                     <CardContent className="pt-6">
                         <div className="h-[220px] w-full" style={{ minWidth: 0, minHeight: '220px' }}>
                             <ResponsiveContainer minWidth={1} minHeight={1} width="100%" height="100%">
-                                <AreaChart data={headcountChartData} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
+                                <AreaChart data={headcountChartData} margin={{ top: 20, right: 10, left: -20, bottom: 0 }}>
                                     <defs>
                                         <linearGradient id="colorHeadcount" x1="0" y1="0" x2="0" y2="1">
                                             <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
@@ -892,10 +899,16 @@ export function Dashboard() {
                                     </defs>
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(148,163,184,0.15)" />
                                     <XAxis dataKey="name" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
-                                    <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
+                                    <YAxis 
+                                        stroke="#94a3b8" 
+                                        fontSize={11} 
+                                        tickLine={false} 
+                                        axisLine={false} 
+                                        domain={[0, (dataMax: number) => (dataMax <= 5 ? dataMax + 2 : Math.ceil(dataMax * 1.15))]}
+                                    />
                                     <Tooltip content={<CustomHeadcountTooltip />} />
                                     <Area type="monotone" name="Headcount" dataKey="Headcount" stroke="#10b981" strokeWidth={2} fill="url(#colorHeadcount)">
-                                        <LabelList dataKey="Headcount" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#10b981' }} />
+                                        <LabelList dataKey="Headcount" position="top" offset={5} style={{ fontSize: 10, fontWeight: 700, fill: '#10b981' }} />
                                     </Area>
                                 </AreaChart>
                             </ResponsiveContainer>

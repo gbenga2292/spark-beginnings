@@ -14,6 +14,8 @@ import { usePage } from '@/src/contexts/PageContext';
 import { useAppStore } from '@/src/store/appStore';
 import { fetchEmployeesData, fetchInvoicesData, fetchLedgerData, fetchOperationsData } from '@/src/lib/supabaseService';
 
+import { CopilotTriggerButton } from '../agent/CopilotTriggerButton';
+
 export function Layout() {
   const { user, loading } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -56,8 +58,6 @@ export function Layout() {
     }, 1000);
     return () => clearTimeout(timer);
   }, [reloadCountdown, privBannerVisible]);
-
-
 
   // Still loading the Supabase session — don't redirect yet
   if (loading) return null;
@@ -125,7 +125,9 @@ export function Layout() {
       {/* Global Features */}
       {canViewCalendar && showFloatingCalendar && <DesktopFloatingCalendar />}
       <TaskPopupNotifications />
+      <CopilotTriggerButton />
     </div>
   );
 }
+
 

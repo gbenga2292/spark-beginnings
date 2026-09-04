@@ -656,15 +656,13 @@ export function Header({ onMenuClick }: HeaderProps) {
         <div ref={profileRef} className="relative">
           <button
             onClick={() => { setIsProfileOpen(!isProfileOpen); setNotifOpen(false); }}
-            className={`flex items-center gap-2.5 rounded-lg px-2 py-1 transition-colors ${
-              isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-50'
+            className={`flex items-center rounded-full p-0.5 transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/30 ${
+              isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'
             }`}
+            title={currentUser?.name || user?.name || 'User Profile'}
+            aria-label="User Profile"
           >
-            <div className="hidden sm:flex flex-col items-end">
-              <span className={`text-xs font-semibold leading-tight ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>{currentUser?.name || user?.name}</span>
-              <span className="text-[10px] text-slate-400 leading-tight">{currentUser?.email || user?.email}</span>
-            </div>
-            <Avatar className="h-8 w-8">
+            <Avatar className="h-8 w-8 ring-1 ring-slate-200 dark:ring-slate-700 hover:ring-indigo-400 transition-all">
               <AvatarImage src={currentUser?.avatar || user?.avatar} alt={currentUser?.name || user?.name} referrerPolicy="no-referrer" />
               <AvatarFallback className="text-xs bg-indigo-100 text-indigo-700 font-bold uppercase">
                 {(currentUser?.name || user?.name || '?').charAt(0)}

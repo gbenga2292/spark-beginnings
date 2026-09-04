@@ -322,7 +322,10 @@ export function InvoiceDetailDialog({ invoice, invoiceList, open, onClose, onNav
               <StatCard label="Billing Cycle" value={invoice.billingCycle ?? '—'} />
             </div>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-3">
-              <StatCard label="VAT Status" value={invoice.vatInc ?? 'No VAT'} />
+              <StatCard 
+                label="VAT Status" 
+                value={invoice.vatScope === 'per_section' ? `${invoice.vatInc ?? 'No VAT'} (Itemized)` : (invoice.vatInc ?? 'No VAT')} 
+              />
               <StatCard label="Reminder Date" value={invoice.reminderDate ? formatDisplayDate(invoice.reminderDate) : '—'} />
               <StatCard label="Status" value={invoice.status} />
             </div>
@@ -574,7 +577,13 @@ export function InvoiceDetailDialog({ invoice, invoiceList, open, onClose, onNav
               {(invoice.discount ?? 0) > 0 && <CostRow label="Discount / Concession" value={-(invoice.discount ?? 0)} />}
               <div className="my-1 border-t border-slate-100" />
               <CostRow label="Gross Total" value={invoice.totalCost ?? 0} muted />
-              <CostRow label={`VAT (${invoice.vatInc === 'Yes' ? 'Inclusive' : invoice.vatInc === 'Add' ? 'Added' : 'Excluded'})`} value={invoice.vat ?? 0} muted />
+              {invoice.vatScope === 'per_section' && (
+                <>
+                  <CostRow label="Vatable Subtotal" value={invoice.vatableAmount ?? 0} muted />
+                  <CostRow label="Exempt Subtotal" value={invoice.nonVatableAmount ?? 0} muted />
+                </>
+              )}
+              <CostRow label={`VAT (${invoice.vatInc === 'Yes' ? 'Inclusive' : invoice.vatInc === 'Add' ? 'Added' : 'Excluded'}${invoice.vatScope === 'per_section' ? ' • Itemized' : ''})`} value={invoice.vat ?? 0} muted />
               <div className="flex items-center justify-between bg-indigo-50 border border-indigo-100 rounded-lg px-4 py-3 mt-2">
                 <span className="text-sm font-bold text-indigo-700">TOTAL CHARGE</span>
                 <span className="font-black text-lg text-indigo-700 font-mono">₦{fmt(totalCharge)}</span>

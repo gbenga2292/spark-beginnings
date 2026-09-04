@@ -2777,6 +2777,61 @@ export function Variables() {
                   <p className="text-xs text-slate-400">Day the payroll cycle begins (default 1)</p>
                 </div>
               </div>
+
+              {/* Default Vatable Sections for New Invoices */}
+              <div className="mt-6 pt-5 border-t border-slate-200/80">
+                <div className="mb-3">
+                  <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Default Vatable Sections (New Invoices)</h4>
+                  <p className="text-xs text-slate-500">Choose which billing components are taxable by default when creating new invoices in Per-Section mode.</p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                  {[
+                    { key: 'equipment', label: 'Equipment & Machinery Lease', desc: 'Pump rental & equipment' },
+                    { key: 'technicians', label: 'Dewatering Crew & Personnel', desc: 'Day/night shift crew & accommodation' },
+                    { key: 'diesel', label: 'Consumables & Diesel', desc: 'Fuel liters & consumption' },
+                    { key: 'mobDemob', label: 'Mobilization & Demob', desc: 'Logistics delivery & transport' },
+                    { key: 'installation', label: 'Installation Fee', desc: 'Rigging & site installation' },
+                    { key: 'damages', label: 'Repairs & Damages', desc: 'Equipment repair & penalty fees' },
+                  ].map((sec) => {
+                    const currentDefaults = localPayrollVars.defaultVatableSections || {
+                      equipment: true,
+                      technicians: false,
+                      diesel: true,
+                      mobDemob: true,
+                      installation: true,
+                      damages: false,
+                    };
+                    const isChecked = !!(currentDefaults as any)[sec.key];
+                    return (
+                      <label
+                        key={sec.key}
+                        className={`flex items-start gap-3 p-3 rounded-xl border transition-all cursor-pointer select-none ${
+                          isChecked
+                            ? 'bg-indigo-50/60 border-indigo-200 text-indigo-900 shadow-xs'
+                            : 'bg-slate-50/70 border-slate-200/80 text-slate-600 hover:bg-slate-100/60'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={(e) => {
+                            const updated = {
+                              ...currentDefaults,
+                              [sec.key]: e.target.checked,
+                            };
+                            updateLocalPayrollVariables({ defaultVatableSections: updated });
+                          }}
+                          className="mt-0.5 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 accent-indigo-600"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <span className="text-xs font-bold block leading-tight">{sec.label}</span>
+                          <span className="text-[10.5px] text-slate-400 block leading-tight mt-0.5">{sec.desc}</span>
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
             </CardContent>
           </Card>
 

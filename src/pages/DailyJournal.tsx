@@ -163,35 +163,92 @@ function SiteLogCard({
 
   const machineItems = useMemo(() => {
     if (!entry.siteId) return [];
-    const siteWaybills = waybills.filter(w => w.siteId === entry.siteId && w.type === 'waybill' && w.status !== 'outstanding');
-    return assets.filter(a => a.type === 'equipment' && a.requiresLogging && siteWaybills.some(w => w.items.some(i => i.assetId === a.id)));
-  }, [waybills, assets, entry.siteId]);
+    const siteWaybills = waybills.filter(w => w.siteId === entry.siteId);
+    
+    const inventoryMap = new Map<string, number>();
+
+    // 1. Outbound deliveries on or before formDate
+    siteWaybills
+      .filter(w => w.type === 'waybill' && w.status !== 'outstanding')
+      .forEach(wb => {
+        const wbDate = wb.sentToSiteDate ? wb.sentToSiteDate.substring(0, 10) : (wb.issueDate ? wb.issueDate.substring(0, 10) : '');
+        if (!formDate || !wbDate || wbDate <= formDate) {
+          wb.items.forEach(item => {
+            inventoryMap.set(item.assetId, (inventoryMap.get(item.assetId) || 0) + (item.quantity || 1));
+          });
+        }
+      });
+
+    // 2. Return waybills on or before formDate
+    siteWaybills
+      .filter(w => w.type === 'return')
+      .forEach(wb => {
+        const wbDate = wb.sentToSiteDate ? wb.sentToSiteDate.substring(0, 10) : (wb.issueDate ? wb.issueDate.substring(0, 10) : '');
+        if (!formDate || !wbDate || wbDate <= formDate) {
+          wb.items.forEach(item => {
+            const cur = inventoryMap.get(item.assetId) || 0;
+            inventoryMap.set(item.assetId, Math.max(0, cur - (item.quantity || 1)));
+          });
+        }
+      });
+
+    // 3. Keep machines that already have logs recorded for this site on formDate
+    const loggedMachineIds = new Set(
+      (dailyMachineLogs || [])
+        .filter(l => l.siteId === entry.siteId && (!formDate || l.date === formDate))
+        .map(l => l.assetId)
+    );
+
+    return assets.filter(a => 
+      a.type === 'equipment' && 
+      a.requiresLogging && 
+      ((inventoryMap.get(a.id) || 0) > 0 || loggedMachineIds.has(a.id))
+    );
+  }, [waybills, assets, entry.siteId, formDate, dailyMachineLogs]);
 
   const consumableItems = useMemo(() => {
     if (!entry.siteId) return [];
-    const siteWaybills = waybills.filter(w => w.siteId === entry.siteId && w.type === 'waybill' && w.status !== 'outstanding');
+    const siteWaybills = waybills.filter(w => w.siteId === entry.siteId);
     
     const itemsMap = new Map();
-    siteWaybills.forEach(w => {
-      w.items.forEach(i => {
-        const asset = assets.find(a => a.id === i.assetId);
-        if (asset && asset.type === 'consumable') {
-          if (itemsMap.has(i.assetId)) {
-            itemsMap.get(i.assetId).quantity += i.quantity;
-          } else {
-            itemsMap.set(i.assetId, {
-              assetId: i.assetId,
-              assetName: asset.name,
-              quantity: i.quantity,
-              unit: asset.unitOfMeasurement || 'pcs'
-            });
-          }
+    siteWaybills
+      .filter(w => w.type === 'waybill' && w.status !== 'outstanding')
+      .forEach(w => {
+        const wbDate = w.sentToSiteDate ? w.sentToSiteDate.substring(0, 10) : (w.issueDate ? w.issueDate.substring(0, 10) : '');
+        if (!formDate || !wbDate || wbDate <= formDate) {
+          w.items.forEach(i => {
+            const asset = assets.find(a => a.id === i.assetId);
+            if (asset && asset.type === 'consumable') {
+              if (itemsMap.has(i.assetId)) {
+                itemsMap.get(i.assetId).quantity += i.quantity;
+              } else {
+                itemsMap.set(i.assetId, {
+                  assetId: i.assetId,
+                  assetName: asset.name,
+                  quantity: i.quantity,
+                  unit: asset.unitOfMeasurement || 'pcs'
+                });
+              }
+            }
+          });
         }
       });
-    });
+
+    siteWaybills
+      .filter(w => w.type === 'return')
+      .forEach(w => {
+        const wbDate = w.sentToSiteDate ? w.sentToSiteDate.substring(0, 10) : (w.issueDate ? w.issueDate.substring(0, 10) : '');
+        if (!formDate || !wbDate || wbDate <= formDate) {
+          w.items.forEach(i => {
+            if (itemsMap.has(i.assetId)) {
+              itemsMap.get(i.assetId).quantity = Math.max(0, itemsMap.get(i.assetId).quantity - i.quantity);
+            }
+          });
+        }
+      });
     
-    return Array.from(itemsMap.values());
-  }, [waybills, assets, entry.siteId]);
+    return Array.from(itemsMap.values()).filter(item => item.quantity > 0);
+  }, [waybills, assets, entry.siteId, formDate]);
 
   return (
     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-sm relative overflow-hidden">

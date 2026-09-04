@@ -107,7 +107,10 @@ const TXN_COLUMNS: ColumnDef[] = [
   { id: 'installation', label: 'Installation Cost', summable: true,  sources: ['INVOICE'] },
   { id: 'damages',      label: 'Damages Cost',      summable: true,  sources: ['INVOICE'] },
   { id: 'invAmount',    label: 'Invoice Amount',    summable: true,  sources: ['INVOICE'] },
+  { id: 'vatScope',     label: 'VAT Scope',         summable: false, sources: ['INVOICE'] },
   { id: 'vatInc',       label: 'VAT Status',        summable: false, sources: ['INVOICE'] },
+  { id: 'vatableAmount',label: 'Vatable Base',      summable: true,  sources: ['INVOICE'] },
+  { id: 'nonVatableAmount',label: 'Non-Vatable Base', summable: true, sources: ['INVOICE'] },
   { id: 'invVat',       label: 'VAT Amount (Inv)',  summable: true,  sources: ['INVOICE'] },
   { id: 'totalCharge',  label: 'Total Charge',      summable: true,  sources: ['INVOICE'] },
   { id: 'status',       label: 'Invoice Status',    summable: false, sources: ['INVOICE'] },
@@ -360,7 +363,7 @@ export function AccountsReportBuilder({
   const vatRate        = useAppStore(s => s.payrollVariables.vatRate);
   
   const employees = useAppStore(state => state.employees);
-  const { calculatePayrollForMonth } = usePayrollCalculator();
+  const { calculatePayrollForMonth, getPayrollForMonth } = usePayrollCalculator();
   const [selectedSources, setSelectedSources] = useState<DataSource[]>(['INVOICE']);
   const [selectedYears,   setSelectedYears]   = useState<number[]>([currentYear]);
   const [selectedMonths,  setSelectedMonths]  = useState<string[]>(MONTHS.map(m => m.key));
@@ -513,11 +516,11 @@ export function AccountsReportBuilder({
     selectedYears.forEach(yr => {
       selectedMonths.forEach(mKey => {
         const key = `${yr}_${mKey}`;
-        if (!cache.has(key)) cache.set(key, calculatePayrollForMonth(mKey, yr));
+        if (!cache.has(key)) cache.set(key, getPayrollForMonth(mKey, yr));
       });
     });
     return cache;
-  }, [selectedYears, selectedMonths, calculatePayrollForMonth, selectedSources]);
+  }, [selectedYears, selectedMonths, getPayrollForMonth, selectedSources]);
 
   // ── Pre-compute which sources are blocked to avoid calling isComboAllowed per-button on every render ──
   const blockedSources = useMemo(() => {
@@ -947,29 +950,32 @@ export function AccountsReportBuilder({
 
     const invOnly = ['project','dueDate','invoiceNo','billingCycle','duration','machines','rentalCost',
       'dieselPerLtr','dailyUsage','technicians','techDailyRate','mobDemob','installation','damages',
-      'invAmount','vatInc','invVat','totalCharge','status'];
+      'invAmount','vatScope','vatInc','vatableAmount','nonVatableAmount','invVat','totalCharge','status'];
     if (invOnly.includes(colId)) {
       if (src !== 'INVOICE') return '—';
       switch (colId) {
-        case 'project':       return r.project || '—';
-        case 'dueDate':       return formatDisplayDate(r.dueDate) || '—';
-        case 'invoiceNo':     return r.invoiceNumber || '—';
-        case 'billingCycle':  return r.billingCycle || '—';
-        case 'duration':      return r.duration || 0;
-        case 'machines':      return r.noOfMachine || 0;
-        case 'rentalCost':    return r.dailyRentalCost || 0;
-        case 'dieselPerLtr':  return r.dieselCostPerLtr || 0;
-        case 'dailyUsage':    return r.dailyUsage || 0;
-        case 'technicians':   return r.noOfTechnician || 0;
-        case 'techDailyRate': return r.techniciansDailyRate || 0;
-        case 'mobDemob':      return r.mobDemob || 0;
-        case 'installation':  return r.installation || 0;
-        case 'damages':       return r.damages || 0;
-        case 'invAmount':     return r.amount || 0;
-        case 'vatInc':        return r.vatInc || '—';
-        case 'invVat':        return r.vat || 0;
-        case 'totalCharge':   return r.totalCharge || 0;
-        case 'status':        return r.status || '—';
+        case 'project':          return r.project || '—';
+        case 'dueDate':          return formatDisplayDate(r.dueDate) || '—';
+        case 'invoiceNo':        return r.invoiceNumber || '—';
+        case 'billingCycle':     return r.billingCycle || '—';
+        case 'duration':         return r.duration || 0;
+        case 'machines':         return r.noOfMachine || 0;
+        case 'rentalCost':       return r.dailyRentalCost || 0;
+        case 'dieselPerLtr':     return r.dieselCostPerLtr || 0;
+        case 'dailyUsage':       return r.dailyUsage || 0;
+        case 'technicians':      return r.noOfTechnician || 0;
+        case 'techDailyRate':    return r.techniciansDailyRate || 0;
+        case 'mobDemob':         return r.mobDemob || 0;
+        case 'installation':     return r.installation || 0;
+        case 'damages':          return r.damages || 0;
+        case 'invAmount':        return r.amount || 0;
+        case 'vatScope':         return r.vatScope === 'per_section' ? 'Per-Section (Itemized)' : 'Full Invoice (Standard)';
+        case 'vatInc':           return r.vatScope === 'per_section' ? `${r.vatInc || '—'} (Itemized)` : (r.vatInc || '—');
+        case 'vatableAmount':    return r.vatableAmount !== undefined ? r.vatableAmount : (r.vatScope === 'per_section' ? 0 : (r.totalCost || r.amount || 0));
+        case 'nonVatableAmount': return r.nonVatableAmount !== undefined ? r.nonVatableAmount : 0;
+        case 'invVat':           return r.vat || 0;
+        case 'totalCharge':      return r.totalCharge || 0;
+        case 'status':           return r.status || '—';
         default: return '—';
       }
     }
