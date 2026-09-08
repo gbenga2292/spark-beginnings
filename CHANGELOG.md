@@ -2,6 +2,52 @@
 
 All notable changes to this project will be documented in this file.
 
+---
+
+## [1.8.0] - 2026-09-08
+
+### Added / Improved
+
+- **Daily Log Management & Asset Tracking**:
+  - Implemented Daily Log Management module with full CRUD for site daily entries.
+  - Added Site Asset View grid (MaintenanceAssetGrid) for equipment tracking per site.
+  - Added Site View modules for asset reporting with filter and export capabilities.
+
+- **Task Calendar & Persistent Operational Data**:
+  - Implemented TaskCalendar page with monthly/weekly task overview visualisation.
+  - Integrated persistent operational data management for tasks, daily journals, and site assets using IndexedDB (idb) for offline-capable caching.
+  - Added bulk task actions bar (TaskBulkActionsBar) for multi-select task operations.
+
+- **AI Agent Runtime & Financial Reporting Upgrades**:
+  - Implemented AI Agent Runtime powered by Google Gemini for in-app co-pilot assistance.
+  - Added Payroll Snapshot Versioning — payroll runs are now snapshotted and stored for historical comparison.
+  - Upgraded Financial Reporting Suite with multi-source aggregation, visual charts, and export.
+  - Implemented usePayrollCalculator hook for consolidated payroll computation.
+  - Added AccountsReportBuilder component for customised multi-source report assembly.
+
+- **Activity Log UX Overhaul**:
+  - Replaced database jargon (INSERT, UPDATE, DELETE) with human-readable business language: Added / Edited / Deleted with colour-coded badges.
+  - Added High-Level Category Filters: All Categories / Finance & Accounts / Staff & HR / Site & Operations.
+  - Added Quick Date Presets: Today, Yesterday, Last 7 Days, This Month, Custom Range.
+  - Smart record identifiers — shows invoice numbers, employee names, client/site combos, and amounts instead of raw UUIDs.
+  - All monetary values formatted with Nigerian Naira symbol and thousands separators.
+  - In-card expandable accordion for entries with many fields.
+  - Feed now flows naturally to display all 20-50 entries without a cramped inner scrollbox.
+
+### Database Migrations (Supabase)
+
+- `20260907153000_add_dipstick_to_daily_logs.sql` — Added `dipstick` field to `daily_logs` table for fuel level measurement tracking.
+- `20260907150000_add_diesel_benchmark_to_assets.sql` — Added `diesel_benchmark` column to `assets` for fuel consumption baseline per asset.
+- `20260904150000_add_auxiliary_equipment_to_invoices.sql` — Added `auxiliary_equipment` field to `invoices` table for secondary equipment line items.
+
+### Build
+
+- Electron v41.0.0 — Windows installer and portable builds regenerated for v1.8.0.
+- Android (Capacitor) — Synced with latest web bundle. Debug APK generated for internal testing.
+- Vite web bundle rebuilt with all feature additions.
+
+---
+
 ## [1.7.17] - 2026-09-03
 
 ### Added / Improved
