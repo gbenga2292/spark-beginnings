@@ -23,7 +23,7 @@ import { useOperations } from '@/src/contexts/OperationsContext';
 import { useAppData, deriveMainTaskStatus } from '@/src/contexts/AppDataContext';
 import { useAuth } from '@/src/hooks/useAuth';
 import { useUserStore } from '@/src/store/userStore';
-import { useSetPageTitle } from '@/src/contexts/PageContext';
+import { useSetPageTitle, useAutoCollapseSidebar } from '@/src/contexts/PageContext';
 import { InvoiceDetailDialog } from './InvoiceDetailDialog';
 import { ClientContactsPanel } from './ClientContactsPanel';
 import { TaskDetailSheet } from '@/src/components/tasks/TaskDetailSheet';
@@ -105,6 +105,7 @@ const renderFormattedChatMessage = (content: string) => {
 };
 
 export function Site360View({ site, clientSites, onSiteChange, onBack, onEditSite }: Props) {
+  useAutoCollapseSidebar();
   const { isDark } = useTheme();
   const { createMainTask, users, addSubtask } = useAppData();
   const { user: authUser } = useAuth();

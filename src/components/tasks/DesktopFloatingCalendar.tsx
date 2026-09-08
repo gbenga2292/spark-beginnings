@@ -144,9 +144,9 @@ export function DesktopFloatingCalendar() {
           ? 'bg-slate-800/90 border-slate-700 text-slate-300 hover:bg-slate-700/90 hover:text-white'
           : 'bg-white/90 border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900'
           }`}
-        animate={{ width: hovered ? 175 : 44, paddingRight: hovered ? 16 : 0 }}
+        animate={{ width: hovered ? 116 : 44, paddingRight: hovered ? 14 : 0 }}
         transition={{ duration: 0.2, ease: 'easeOut' }}
-        title="Drag up/down, click to open Calendar & AI Studio"
+        title="Drag up/down, click to open Calendar"
         style={{ height: 44, touchAction: "none" }}
       >
         <div className="flex items-center justify-center w-[44px] h-[44px] shrink-0">
@@ -162,9 +162,6 @@ export function DesktopFloatingCalendar() {
               className="flex items-center gap-1.5 text-xs font-semibold whitespace-nowrap"
             >
               <span>Calendar</span>
-              <span className="px-1.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-400 text-[10px] font-bold">
-                + AI Studio
-              </span>
             </motion.div>
           )}
         </AnimatePresence>

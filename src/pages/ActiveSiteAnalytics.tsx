@@ -6,10 +6,10 @@ import {
   Download, ExternalLink, ChevronDown, Layers, Filter,
   ShieldAlert, Droplets, Zap, TrendingUp, AlertCircle, HardHat,
   RefreshCw, ArrowRight, X, Globe, Archive, Search, LayoutGrid, List,
-  SlidersHorizontal
+  SlidersHorizontal, Bell, Maximize2, Minimize2
 } from 'lucide-react';
 import { 
-  ResponsiveContainer, AreaChart, Area, BarChart, Bar, 
+  ResponsiveContainer, BarChart, Bar, 
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell,
   ComposedChart, Line, ReferenceLine
 } from 'recharts';
@@ -355,7 +355,6 @@ export function ActiveSiteAnalytics() {
   const [timeRange, setTimeRange] = useState<'30d' | '90d' | 'year' | 'all'>('all');
   const [selectedYear, setSelectedYear] = useState<string>(new Date().getFullYear().toString());
   const [fleetChartFilter, setFleetChartFilter] = useState<'all' | 'active' | 'offsite'>('all');
-  const [dieselChartMode, setDieselChartMode] = useState<'daily' | 'cumulative' | 'variance'>('variance');
   
   // Historical Archive Search, Filter, View Mode, and Pagination States
   const [archiveSearch, setArchiveSearch] = useState('');
@@ -363,6 +362,40 @@ export function ActiveSiteAnalytics() {
   const [archiveViewMode, setArchiveViewMode] = useState<'table' | 'cards'>('table');
   const [archiveVisibleCount, setArchiveVisibleCount] = useState<number>(12);
   const [portfolioTab, setPortfolioTab] = useState<'active' | 'archive' | 'both'>('active');
+
+  // Full Screen Chart Mode
+  const [fullScreenChart, setFullScreenChart] = useState<string | null>(null);
+
+  const toggleFullScreenChart = async (chartId: string) => {
+    if (fullScreenChart === chartId) {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen().catch(() => {});
+      }
+      setFullScreenChart(null);
+    } else {
+      setFullScreenChart(chartId);
+      const el = document.documentElement;
+      if (el.requestFullscreen) {
+        await el.requestFullscreen().catch(() => {});
+      }
+    }
+  };
+
+  React.useEffect(() => {
+    const handleFsChange = () => {
+      if (!document.fullscreenElement) {
+        setFullScreenChart(null);
+      }
+    };
+    document.addEventListener('fullscreenchange', handleFsChange);
+    return () => document.removeEventListener('fullscreenchange', handleFsChange);
+  }, []);
+
+  // Refill Forecast Notification Bell & Modal
+  const [isRefillForecastModalOpen, setIsRefillForecastModalOpen] = useState<boolean>(false);
+  const [refillForecastScope, setRefillForecastScope] = useState<'current' | 'fleet'>('current');
+  const [refillForecastSearch, setRefillForecastSearch] = useState<string>('');
+  const [refillForecastUrgencyFilter, setRefillForecastUrgencyFilter] = useState<'all' | 'urgent' | 'tomorrow' | 'safe'>('all');
 
   // Modal / sub-view for Machine Daily Register
   const [activeRegisterMachine, setActiveRegisterMachine] = useState<{ id: string; name: string } | null>(null);
@@ -1367,11 +1400,13 @@ export function ActiveSiteAnalytics() {
   // Handle open pump dates modal
   const handleOpenEditPumpDates = (m: { id: string; name: string; startDate?: string; stopDate?: string | null; predecessorId?: string | null; swapReason?: string | null }) => {
     const existing = (sitePumpDates || []).find(p => p.assetId === m.id && p.siteId === currentSite?.id);
+    const rawStart = existing?.pumpStartDate || m.startDate || '';
+    const rawStop = existing?.pumpStopDate || m.stopDate || '';
     setEditingPumpDateMachine({
       id: m.id,
       name: m.name,
-      startDate: existing?.pumpStartDate || m.startDate || '',
-      stopDate: existing?.pumpStopDate || m.stopDate || '',
+      startDate: rawStart.includes('T') ? rawStart.split('T')[0] : rawStart,
+      stopDate: rawStop.includes('T') ? rawStop.split('T')[0] : rawStop,
       replacedAssetId: existing?.replacedAssetId || m.predecessorId || '',
       swapReason: existing?.swapReason || m.swapReason || ''
     });
@@ -1594,6 +1629,260 @@ export function ActiveSiteAnalytics() {
     </div>
   ), [selectedSiteId, currentSite, isCurrentlyOnHold, activeSites, historicalSites, showHistoricalSites, allActiveSitesPortfolio]);
 
+  // ── REFILL FORECAST ENGINE: 1-Day Safety Buffer Next Refill Dates ──
+  const fleetRefillForecast = useMemo(() => {
+    const list: Array<{
+      siteId: string;
+      siteName: string;
+      machineId: string;
+      machineName: string;
+      shortName: string;
+      tankCapacityLitres: number;
+      benchmarkBurnRate: number;
+      lastRefillDate: string | null;
+      lastRefillLitres: number;
+      lastDipstickDate: string | null;
+      lastDipstickLitres: number | null;
+      estimatedRemainingLitres: number;
+      fuelPercentage: number;
+      isDipstickVerified: boolean;
+      runwayDays: number;
+      daysUntilRefill: number;
+      targetRefillDate: string | null;
+      targetRefillFormatted: string;
+      urgency: 'critical' | 'today' | 'tomorrow' | 'soon' | 'safe' | 'unbenchmarked';
+      urgencyLabel: string;
+      urgencyBadgeClass: string;
+    }> = [];
+
+    (activeSites || []).forEach(site => {
+      // Waybills & inventory to discover machines on this site
+      const siteWb = (waybills || []).filter(w =>
+        (w.siteName?.toLowerCase() === site.name.toLowerCase() || w.siteId === site.id) &&
+        w.status !== 'outstanding'
+      );
+      const invMap = new Map<string, number>();
+      siteWb.filter(w => w.type === 'waybill').forEach(wb => {
+        wb.items.forEach(item => {
+          invMap.set(item.assetId, (invMap.get(item.assetId) || 0) + item.quantity);
+        });
+      });
+      siteWb.filter(w => w.type === 'return').forEach(wb => {
+        wb.items.forEach(item => {
+          const cur = invMap.get(item.assetId) || 0;
+          invMap.set(item.assetId, Math.max(0, cur - item.quantity));
+        });
+      });
+
+      const pumpConfigs = (sitePumpDates || []).filter(pd => pd.siteId === site.id);
+      const sLogs = (dailyMachineLogs || []).filter(l => l.siteId === site.id);
+
+      const machineIdSet = new Set<string>();
+      (assets || []).filter(a => a.type === 'equipment' && a.requiresLogging && (invMap.get(a.id) || 0) > 0).forEach(a => machineIdSet.add(a.id));
+      pumpConfigs.forEach(pd => machineIdSet.add(pd.assetId));
+      sLogs.forEach(l => machineIdSet.add(l.assetId));
+
+      machineIdSet.forEach(mId => {
+        const pd = pumpConfigs.find(p => p.assetId === mId);
+        const hasExplicitStop = !!pd?.pumpStopDate;
+        const isReplaced = pumpConfigs.some(p => p.replacedAssetId === mId);
+        const isCurrentlyActive = !hasExplicitStop && !isReplaced && (
+          (pd?.pumpStartDate && !pd?.pumpStopDate) ||
+          (invMap.get(mId) || 0) > 0
+        );
+
+        if (!isCurrentlyActive) return;
+
+        const rawAsset = (assets || []).find(a => a.id === mId || a.name?.toLowerCase().trim() === mId.toLowerCase().trim());
+        const maintAsset = (maintenanceAssets || []).find(m => m.id === mId);
+        const machineName = rawAsset?.name || maintAsset?.name || sLogs.find(l => l.assetId === mId)?.assetName || 'Pump Unit';
+        const benchmarkBurnRate = Number(rawAsset?.expectedDailyBurnRate) || 18.0;
+        const tankCapacityLitres = Number(rawAsset?.tankCapacityLitres) || 0;
+
+        const mLogs = sLogs.filter(l => l.assetId === mId).sort((a, b) => b.date.localeCompare(a.date));
+        const lastDipstickLog = mLogs.find(l => l.dipstickLevelLitres != null && Number(l.dipstickLevelLitres) >= 0);
+        const lastDipstickDate = lastDipstickLog?.date || null;
+        const lastDipstickLitres = lastDipstickLog?.dipstickLevelLitres != null ? Number(lastDipstickLog.dipstickLevelLitres) : null;
+
+        const lastRefillLog = mLogs.find(l => (Number(l.dieselUsage) || 0) > 0);
+        const lastRefillDate = lastRefillLog?.date || null;
+        const lastRefillLitres = Number(lastRefillLog?.dieselUsage) || 0;
+        const wasLastRefillFull = !!lastRefillLog?.isTankFilledToFull;
+
+        const effectiveTankCapacity = tankCapacityLitres > 0 
+          ? tankCapacityLitres 
+          : (lastRefillLitres > 0 ? lastRefillLitres : (lastDipstickLitres || 120));
+
+        let estimatedRemainingLitres = 0;
+        let isDipstickVerified = false;
+        const hasTelemetryAnchor = (lastRefillLog != null || lastDipstickLog != null);
+
+        if (hasTelemetryAnchor && effectiveTankCapacity > 0) {
+          if (lastDipstickDate && (!lastRefillDate || lastDipstickDate >= lastRefillDate)) {
+            let activeDaysSinceDip = 0;
+            mLogs.forEach(l => {
+              if (l.date > lastDipstickDate) {
+                const opDay = l.operationalDay ?? (l.isActive ? 'full' : 'none');
+                if (opDay === 'full') activeDaysSinceDip += 1;
+                else if (opDay === 'half') activeDaysSinceDip += 0.5;
+              }
+            });
+            const burnedSinceDip = activeDaysSinceDip * benchmarkBurnRate;
+            estimatedRemainingLitres = Math.max(0, Math.min(effectiveTankCapacity, Math.round((lastDipstickLitres || 0) - burnedSinceDip)));
+            isDipstickVerified = (activeDaysSinceDip === 0);
+          } else if (lastRefillDate) {
+            let activeDaysSinceRefill = 0;
+            mLogs.forEach(l => {
+              if (l.date > lastRefillDate) {
+                const opDay = l.operationalDay ?? (l.isActive ? 'full' : 'none');
+                if (opDay === 'full') activeDaysSinceRefill += 1;
+                else if (opDay === 'half') activeDaysSinceRefill += 0.5;
+              }
+            });
+            const burnedSinceRefill = activeDaysSinceRefill * benchmarkBurnRate;
+            const baseline = wasLastRefillFull 
+              ? effectiveTankCapacity 
+              : (lastDipstickLitres != null 
+                  ? Math.min(effectiveTankCapacity, lastDipstickLitres + lastRefillLitres)
+                  : (tankCapacityLitres > 0 ? Math.min(effectiveTankCapacity, lastRefillLitres) : effectiveTankCapacity));
+            estimatedRemainingLitres = Math.max(0, Math.round(baseline - burnedSinceRefill));
+          }
+        }
+
+        const fuelPercentage = (hasTelemetryAnchor && effectiveTankCapacity > 0)
+          ? Math.min(100, Math.max(0, Math.round((estimatedRemainingLitres / effectiveTankCapacity) * 100)))
+          : 0;
+
+        const runwayDays = (hasTelemetryAnchor && benchmarkBurnRate > 0 && estimatedRemainingLitres > 0)
+          ? (estimatedRemainingLitres / benchmarkBurnRate)
+          : 0;
+
+        let urgency: 'critical' | 'today' | 'tomorrow' | 'soon' | 'safe' | 'unbenchmarked' = 'safe';
+        let urgencyLabel = '';
+        let urgencyBadgeClass = '';
+        let targetRefillDate: string | null = null;
+        let targetRefillFormatted = 'No telemetry';
+        let daysUntilRefill = 0;
+
+        if (!hasTelemetryAnchor) {
+          urgency = 'unbenchmarked';
+          urgencyLabel = 'No Logs';
+          urgencyBadgeClass = 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border-slate-200 dark:border-slate-700';
+          targetRefillFormatted = 'Check Dipstick';
+        } else if (runwayDays <= 0) {
+          urgency = 'critical';
+          urgencyLabel = 'Overdue / Empty';
+          urgencyBadgeClass = 'bg-rose-100 text-rose-800 dark:bg-rose-950/70 dark:text-rose-300 border-rose-300 dark:border-rose-800';
+          targetRefillFormatted = 'Immediate Refill';
+          daysUntilRefill = 0;
+          targetRefillDate = new Date().toISOString().split('T')[0];
+        } else {
+          // 1-Day safety buffer: scheduled when runway reaches 1 day remaining
+          daysUntilRefill = Math.max(0, Math.floor(runwayDays - 1.0));
+          const target = new Date();
+          target.setDate(target.getDate() + daysUntilRefill);
+          targetRefillDate = target.toISOString().split('T')[0];
+          targetRefillFormatted = formatDisplayDate(targetRefillDate);
+
+          if (runwayDays <= 1.0) {
+            urgency = 'today';
+            urgencyLabel = 'Refill Today';
+            urgencyBadgeClass = 'bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border-rose-300 dark:border-rose-800';
+          } else if (daysUntilRefill === 1) {
+            urgency = 'tomorrow';
+            urgencyLabel = 'Tomorrow';
+            urgencyBadgeClass = 'bg-amber-50 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border-amber-300 dark:border-amber-800';
+          } else if (daysUntilRefill <= 3) {
+            urgency = 'soon';
+            urgencyLabel = `In ${daysUntilRefill} days`;
+            urgencyBadgeClass = 'bg-cyan-50 text-cyan-800 dark:bg-cyan-950/60 dark:text-cyan-300 border-cyan-300 dark:border-cyan-800';
+          } else {
+            urgency = 'safe';
+            urgencyLabel = `In ${daysUntilRefill} days`;
+            urgencyBadgeClass = 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800';
+          }
+        }
+
+        const shortName = formatMachineShortName(machineName);
+
+        list.push({
+          siteId: site.id,
+          siteName: site.name,
+          machineId: mId,
+          machineName,
+          shortName,
+          tankCapacityLitres: effectiveTankCapacity,
+          benchmarkBurnRate,
+          lastRefillDate,
+          lastRefillLitres,
+          lastDipstickDate,
+          lastDipstickLitres,
+          estimatedRemainingLitres,
+          fuelPercentage,
+          isDipstickVerified,
+          runwayDays: Number(runwayDays.toFixed(1)),
+          daysUntilRefill,
+          targetRefillDate,
+          targetRefillFormatted,
+          urgency,
+          urgencyLabel,
+          urgencyBadgeClass,
+        });
+      });
+    });
+
+    const urgencyRank: Record<string, number> = {
+      critical: 0,
+      today: 1,
+      tomorrow: 2,
+      soon: 3,
+      safe: 4,
+      unbenchmarked: 5,
+    };
+
+    return list.sort((a, b) => {
+      const rankDiff = (urgencyRank[a.urgency] ?? 99) - (urgencyRank[b.urgency] ?? 99);
+      if (rankDiff !== 0) return rankDiff;
+      if (a.daysUntilRefill !== b.daysUntilRefill) return a.daysUntilRefill - b.daysUntilRefill;
+      return a.fuelPercentage - b.fuelPercentage;
+    });
+  }, [activeSites, sitePumpDates, dailyMachineLogs, waybills, assets, maintenanceAssets]);
+
+  const currentSiteRefillForecast = useMemo(() => {
+    if (!currentSite) return [];
+    return fleetRefillForecast.filter(item => item.siteId === currentSite.id);
+  }, [fleetRefillForecast, currentSite]);
+
+  const urgentRefillCount = useMemo(() => {
+    const activeList = currentSite ? currentSiteRefillForecast : fleetRefillForecast;
+    return activeList.filter(item => item.urgency === 'critical' || item.urgency === 'today' || item.urgency === 'tomorrow').length;
+  }, [currentSite, currentSiteRefillForecast, fleetRefillForecast]);
+
+  const displayedRefillForecast = useMemo(() => {
+    const baseList = (refillForecastScope === 'current' && currentSite) 
+      ? currentSiteRefillForecast 
+      : fleetRefillForecast;
+
+    return baseList.filter(item => {
+      if (refillForecastUrgencyFilter === 'urgent') {
+        if (item.urgency !== 'critical' && item.urgency !== 'today') return false;
+      } else if (refillForecastUrgencyFilter === 'tomorrow') {
+        if (item.urgency !== 'tomorrow') return false;
+      } else if (refillForecastUrgencyFilter === 'safe') {
+        if (item.urgency !== 'soon' && item.urgency !== 'safe') return false;
+      }
+
+      if (refillForecastSearch.trim()) {
+        const query = refillForecastSearch.toLowerCase().trim();
+        const matchesMachine = item.machineName.toLowerCase().includes(query) || item.shortName.toLowerCase().includes(query);
+        const matchesSite = item.siteName.toLowerCase().includes(query);
+        if (!matchesMachine && !matchesSite) return false;
+      }
+
+      return true;
+    });
+  }, [refillForecastScope, currentSite, currentSiteRefillForecast, fleetRefillForecast, refillForecastUrgencyFilter, refillForecastSearch]);
+
   const headerActionsNode = useMemo(() => (
     <div className="flex items-center gap-1.5 sm:gap-2">
       {/* Machine Filter Dropdown: Only when viewing single site */}
@@ -1665,44 +1954,6 @@ export function ActiveSiteAnalytics() {
         </div>
       )}
 
-      {/* Historical Sites Quick Toggle */}
-      <Button
-        variant={(showHistoricalSites && portfolioTab !== 'active') ? "secondary" : "outline"}
-        size="sm"
-        onClick={() => {
-          if (isPortfolioMode) {
-            if (portfolioTab === 'archive' || portfolioTab === 'both') {
-              setPortfolioTab('active');
-              setShowHistoricalSites(false);
-            } else {
-              setShowHistoricalSites(true);
-              setPortfolioTab('archive');
-            }
-          } else {
-            setShowHistoricalSites(prev => !prev);
-          }
-        }}
-        className={cn(
-          "h-8 px-2 sm:px-2.5 gap-1.5 text-xs font-semibold rounded-lg transition-all border shrink-0",
-          (showHistoricalSites && portfolioTab !== 'active')
-            ? "bg-slate-200 dark:bg-slate-800 text-slate-900 dark:text-slate-100 border-slate-300 dark:border-slate-600 shadow-inner" 
-            : "text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/60"
-        )}
-        title={(showHistoricalSites && portfolioTab !== 'active') ? "Switch to Active Sites" : "View Ended & Inactive Sites Archive"}
-      >
-        <Archive className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-        <span className="hidden md:inline">{(showHistoricalSites && portfolioTab !== 'active') ? 'Archive Active' : 'Historical'}</span>
-        {historicalSites.length > 0 && (
-          <span className={cn(
-            "text-[10px] px-1.5 py-0.2 rounded-full font-bold leading-none",
-            (showHistoricalSites && portfolioTab !== 'active') 
-              ? "bg-slate-300 dark:bg-slate-700 text-slate-800 dark:text-slate-200" 
-              : "bg-slate-100 dark:bg-slate-800 text-slate-500"
-          )}>
-            {historicalSites.length}
-          </span>
-        )}
-      </Button>
 
       {/* Time Range Filter Pills */}
       <div className="hidden sm:flex items-center bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs">
@@ -1722,16 +1973,29 @@ export function ActiveSiteAnalytics() {
         ))}
       </div>
 
-      {/* Export Report */}
+      {/* Refill Forecast Notification Bell */}
       <Button 
         variant="outline" 
         size="sm" 
-        onClick={handleExportCSV}
-        className="h-8 px-2.5 gap-1.5 text-xs font-semibold rounded-lg border-slate-200 dark:border-slate-700"
-        title="Export CSV"
+        onClick={() => {
+          setRefillForecastScope(isPortfolioMode ? 'fleet' : 'current');
+          setIsRefillForecastModalOpen(true);
+        }}
+        className={cn(
+          "relative h-8 px-2 sm:px-2.5 gap-1.5 text-xs font-semibold rounded-lg border transition-all shrink-0",
+          urgentRefillCount > 0
+            ? "border-rose-300 dark:border-rose-800 bg-rose-50/70 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 hover:bg-rose-100/80 shadow-xs"
+            : "border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/60"
+        )}
+        title="View Estimated Next Refill Dates (1-Day Safety Buffer)"
       >
-        <Download className="w-3.5 h-3.5 text-slate-500" />
-        <span className="hidden sm:inline">{selectedSiteId === 'all' ? 'Export Portfolio' : 'Export'}</span>
+        <Bell className={cn("w-3.5 h-3.5 shrink-0", urgentRefillCount > 0 ? "text-rose-600 dark:text-rose-400 animate-bounce" : "text-amber-500")} />
+        <span className="hidden md:inline">Refill Forecast</span>
+        {urgentRefillCount > 0 && (
+          <span className="flex h-4 min-w-[16px] px-1 items-center justify-center rounded-full bg-rose-500 text-[10px] font-bold text-white shadow-xs leading-none">
+            {urgentRefillCount}
+          </span>
+        )}
       </Button>
 
       {/* Site 360 */}
@@ -1748,7 +2012,7 @@ export function ActiveSiteAnalytics() {
         </Button>
       )}
     </div>
-  ), [selectedSiteId, selectedMachineId, siteMachines, activeSiteMachines, takenOutSiteMachines, timeRange, selectedYear, currentSite, navigate, handleExportCSV, showHistoricalSites, historicalSites, portfolioTab, isPortfolioMode]);
+  ), [selectedSiteId, selectedMachineId, siteMachines, activeSiteMachines, takenOutSiteMachines, timeRange, selectedYear, currentSite, navigate, handleExportCSV, showHistoricalSites, historicalSites, portfolioTab, isPortfolioMode, urgentRefillCount]);
 
   useSetPageTitle(
     activeRegisterMachine ? null : headerTitleNode,
@@ -1757,64 +2021,6 @@ export function ActiveSiteAnalytics() {
     [selectedSiteId, currentSite?.name, selectedMachineId, timeRange, selectedYear, isCurrentlyOnHold, activeSites.length, siteMachines.length, activeRegisterMachine]
   );
 
-  // ── Chart 1: Diesel Consumption Trend Over Time ──
-  const dieselTimelineChartData = useMemo(() => {
-    if (!filteredLogs.length) return [];
-
-    // Group logs by date
-    const dateMap = new Map<string, { date: string; refilled: number; dailyBurn: number; dipstickSum: number; activeLogs: number }>();
-
-    filteredLogs.forEach(log => {
-      const existing = dateMap.get(log.date);
-      const refillUsage = Number(log.dieselUsage) || 0;
-      const dipstick = log.dipstickLevelLitres != null ? Number(log.dipstickLevelLitres) : 0;
-      const isActive = log.isActive || log.operationalDay === 'full' || log.operationalDay === 'half';
-
-      const rawAsset = (assets || []).find(a => a.id === log.assetId);
-      const burnRate = Number(rawAsset?.expectedDailyBurnRate) || 0;
-      const dayWeight = log.operationalDay === 'full' ? 1.0 : log.operationalDay === 'half' ? 0.5 : (log.isActive ? 1.0 : 0);
-      const expectedBurnForLog = burnRate * dayWeight;
-
-      if (existing) {
-        existing.refilled += refillUsage;
-        existing.dailyBurn += expectedBurnForLog;
-        if (dipstick > 0) existing.dipstickSum += dipstick;
-        if (isActive) existing.activeLogs += 1;
-      } else {
-        dateMap.set(log.date, {
-          date: log.date,
-          refilled: refillUsage,
-          dailyBurn: expectedBurnForLog,
-          dipstickSum: dipstick,
-          activeLogs: isActive ? 1 : 0
-        });
-      }
-    });
-
-    const sortedEntries = Array.from(dateMap.values()).sort((a, b) => a.date.localeCompare(b.date));
-
-    let runningRefill = 0;
-    let runningBurn = 0;
-
-    return sortedEntries.map(entry => {
-      runningRefill += entry.refilled;
-      runningBurn += entry.dailyBurn;
-
-      return {
-        dateFormatted: formatDisplayDate(entry.date),
-        rawDate: entry.date,
-        refilled: Number(entry.refilled.toFixed(1)),
-        dailyBurn: Number(entry.dailyBurn.toFixed(1)),
-        cumulativeRefilled: Number(runningRefill.toFixed(1)),
-        cumulativeBurn: Number(runningBurn.toFixed(1)),
-        dipstickSum: Number(entry.dipstickSum.toFixed(1)),
-        activeLogs: entry.activeLogs,
-        // Legacy aliases
-        diesel: Number(entry.refilled.toFixed(1)),
-        expectedBurn: Number(entry.dailyBurn.toFixed(1)),
-      };
-    });
-  }, [filteredLogs, assets, inventoryMap]);
 
   // ── Chart 1B: Refill Interval Cycles & Variance (Diff) Engine ──
   const refillIntervalCycles = useMemo(() => {
@@ -2561,21 +2767,40 @@ export function ActiveSiteAnalytics() {
             {/* Cross-Site Comparative Visualizations (Charts 1 & 2 in 2-column grid) */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Chart 1: Diesel Telemetry by Site */}
-              <Card className="border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm rounded-2xl overflow-hidden">
+              <Card className={cn(
+                "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm rounded-2xl overflow-hidden transition-all",
+                fullScreenChart === 'portfolio-diesel' && "fixed inset-0 z-[120] m-0 rounded-none border-none w-screen h-screen flex flex-col p-4 sm:p-6 overflow-auto bg-white dark:bg-slate-900"
+              )}>
+                {fullScreenChart === 'portfolio-diesel' && (
+                  <Button
+                    variant="default"
+                    size="icon"
+                    className="fixed top-4 right-4 z-[130] rounded-full shadow-2xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-900 w-11 h-11"
+                    onClick={() => toggleFullScreenChart('portfolio-diesel')}
+                    title="Exit Full Screen"
+                  >
+                    <Minimize2 className="h-5 w-5" />
+                  </Button>
+                )}
                 <CardHeader className="p-5 pb-2 border-b border-slate-100 dark:border-slate-800 flex flex-row items-center justify-between flex-wrap gap-2">
-                  <div>
-                    <CardTitle className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
-                      <Fuel className="h-4 w-4 text-amber-500" />
-                      Cross-Site Diesel Refilled vs. Expected Burn (Litres)
-                    </CardTitle>
-                    <p className="text-xs text-slate-400 mt-0.5">
-                      Side-by-side fuel volume refilled compared to rated benchmark requirements by site
-                    </p>
-                  </div>
+                  <CardTitle className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                    <Fuel className="h-4 w-4 text-amber-500" />
+                    Cross-Site Diesel Refilled vs. Expected Burn (Litres)
+                  </CardTitle>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8 rounded-lg border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shrink-0"
+                    onClick={() => toggleFullScreenChart('portfolio-diesel')}
+                    title="Full Screen"
+                    aria-label="Full Screen"
+                  >
+                    <Maximize2 className="h-3.5 w-3.5" />
+                  </Button>
                 </CardHeader>
-                <CardContent className="p-5 pt-6">
+                <CardContent className={cn("p-5 pt-6", fullScreenChart === 'portfolio-diesel' && "flex-1 flex flex-col min-h-0")}>
                   {allActiveSitesPortfolio.comparativeChartData.length > 0 ? (
-                    <div className="h-72 w-full min-w-0">
+                    <div className={cn("w-full min-w-0", fullScreenChart === 'portfolio-diesel' ? "flex-1 min-h-[500px]" : "h-72")}>
                       <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                         <BarChart data={allActiveSitesPortfolio.comparativeChartData} margin={{ top: 10, right: 10, left: -15, bottom: 20 }}>
                           <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#334155' : '#f1f5f9'} vertical={false} />
@@ -2622,21 +2847,40 @@ export function ActiveSiteAnalytics() {
               </Card>
 
               {/* Chart 2: Deployed Pumps & Operating Days by Site */}
-              <Card className="border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm rounded-2xl overflow-hidden">
+              <Card className={cn(
+                "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm rounded-2xl overflow-hidden transition-all",
+                fullScreenChart === 'portfolio-pumps' && "fixed inset-0 z-[120] m-0 rounded-none border-none w-screen h-screen flex flex-col p-4 sm:p-6 overflow-auto bg-white dark:bg-slate-900"
+              )}>
+                {fullScreenChart === 'portfolio-pumps' && (
+                  <Button
+                    variant="default"
+                    size="icon"
+                    className="fixed top-4 right-4 z-[130] rounded-full shadow-2xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-900 w-11 h-11"
+                    onClick={() => toggleFullScreenChart('portfolio-pumps')}
+                    title="Exit Full Screen"
+                  >
+                    <Minimize2 className="h-5 w-5" />
+                  </Button>
+                )}
                 <CardHeader className="p-5 pb-2 border-b border-slate-100 dark:border-slate-800 flex flex-row items-center justify-between flex-wrap gap-2">
-                  <div>
-                    <CardTitle className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
-                      <Clock className="h-4 w-4 text-emerald-500" />
-                      Active Pumps & Operational Days by Site
-                    </CardTitle>
-                    <p className="text-xs text-slate-400 mt-0.5">
-                      Deployment capacity and cumulative active pumping duty across active locations
-                    </p>
-                  </div>
+                  <CardTitle className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-emerald-500" />
+                    Active Pumps & Operational Days by Site
+                  </CardTitle>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8 rounded-lg border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shrink-0"
+                    onClick={() => toggleFullScreenChart('portfolio-pumps')}
+                    title="Full Screen"
+                    aria-label="Full Screen"
+                  >
+                    <Maximize2 className="h-3.5 w-3.5" />
+                  </Button>
                 </CardHeader>
-                <CardContent className="p-5 pt-6">
+                <CardContent className={cn("p-5 pt-6", fullScreenChart === 'portfolio-pumps' && "flex-1 flex flex-col min-h-0")}>
                   {allActiveSitesPortfolio.comparativeChartData.length > 0 ? (
-                    <div className="h-72 w-full min-w-0">
+                    <div className={cn("w-full min-w-0", fullScreenChart === 'portfolio-pumps' ? "flex-1 min-h-[500px]" : "h-72")}>
                       <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                         <BarChart data={allActiveSitesPortfolio.comparativeChartData} margin={{ top: 10, right: 10, left: -15, bottom: 20 }}>
                           <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#334155' : '#f1f5f9'} vertical={false} />
@@ -2676,6 +2920,137 @@ export function ActiveSiteAnalytics() {
                   )}
                 </CardContent>
               </Card>
+            </div>
+
+            {/* Active Sites Performance & Telemetry Summary Table */}
+            <div className="space-y-3 pt-2">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                    <List className="w-4 h-4 text-cyan-600" />
+                    Active Sites Performance & Telemetry Summary
+                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-cyan-100 dark:bg-cyan-950 text-cyan-700 dark:text-cyan-300">
+                      {allActiveSitesPortfolio.siteMetricsList.length} Sites
+                    </span>
+                  </h3>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-x-auto shadow-xs">
+                <Table className="min-w-[760px] w-full">
+                  <TableHeader className="bg-slate-50/80 dark:bg-slate-800/60">
+                    <TableRow className="border-b border-slate-200 dark:border-slate-800 hover:bg-transparent">
+                      <TableHead className="font-bold text-slate-700 dark:text-slate-300 text-xs py-3">Site & Client</TableHead>
+                      <TableHead className="font-bold text-slate-700 dark:text-slate-300 text-xs py-3">Status & Stage</TableHead>
+                      <TableHead className="font-bold text-slate-700 dark:text-slate-300 text-xs text-right py-3">Equipment & Days</TableHead>
+                      <TableHead className="font-bold text-slate-700 dark:text-slate-300 text-xs text-right py-3">Total Diesel</TableHead>
+                      <TableHead className="font-bold text-slate-700 dark:text-slate-300 text-xs text-right py-3">Daily Avg Burn</TableHead>
+                      <TableHead className="font-bold text-slate-700 dark:text-slate-300 text-xs text-right py-3">Variance</TableHead>
+                      <TableHead className="font-bold text-slate-700 dark:text-slate-300 text-xs py-3">Last Refilled</TableHead>
+                      <TableHead className="font-bold text-slate-700 dark:text-slate-300 text-xs text-center py-3">Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {allActiveSitesPortfolio.siteMetricsList.map(site => (
+                      <TableRow 
+                        key={site.id} 
+                        className="border-b border-slate-100 dark:border-slate-800/80 hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors"
+                      >
+                        <TableCell className="py-3 font-medium">
+                          <div className="font-bold text-sm text-slate-900 dark:text-slate-100">
+                            {site.name}
+                          </div>
+                          {site.client && (
+                            <span className="text-xs text-slate-500 dark:text-slate-400 block mt-0.5">
+                              Client: {site.client}
+                            </span>
+                          )}
+                        </TableCell>
+
+                        <TableCell className="py-3">
+                          <div className="flex flex-col gap-1 items-start">
+                            <Badge variant="outline" className={cn(
+                              "text-[9px] font-bold uppercase",
+                              site.isOnHold 
+                                ? "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border-amber-300 dark:border-amber-700"
+                                : "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700"
+                            )}>
+                              {site.isOnHold ? 'On Hold' : 'Active'}
+                            </Badge>
+                            <span className="text-[10px] text-slate-400">
+                              {site.stage}
+                              {site.startDate && ` • Started ${formatDisplayDate(site.startDate)}`}
+                            </span>
+                          </div>
+                        </TableCell>
+
+                        <TableCell className="py-3 text-right">
+                          <span className="font-bold text-xs text-slate-800 dark:text-slate-200 block">
+                            {site.totalMachinesCount} Units
+                          </span>
+                          <span className="text-[10px] text-slate-400">
+                            {site.activeDays} operating days
+                          </span>
+                        </TableCell>
+
+                        <TableCell className="py-3 text-right">
+                          <span className="font-extrabold text-sm text-amber-600 dark:text-amber-400 block">
+                            {site.totalDiesel} L
+                          </span>
+                          <span className="text-[10px] text-slate-400">
+                            Target: {site.expectedDiesel} L
+                          </span>
+                        </TableCell>
+
+                        <TableCell className="py-3 text-right">
+                          <span className="font-bold text-xs text-slate-800 dark:text-slate-200 block">
+                            {site.dailyAvgBurn} L/d
+                          </span>
+                          <span className="text-[10px] text-slate-400">
+                            {site.logCount} logs
+                          </span>
+                        </TableCell>
+
+                        <TableCell className="py-3 text-right">
+                          <span className={cn(
+                            "font-bold text-xs block",
+                            site.varianceLitres > 0 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"
+                          )}>
+                            {site.varianceLitres > 0 ? `+${site.varianceLitres}` : site.varianceLitres} L
+                          </span>
+                          <span className="text-[10px] text-slate-400">
+                            {site.varianceLitres > 0 ? 'Over target' : 'Fuel saved'}
+                          </span>
+                        </TableCell>
+
+                        <TableCell className="py-3">
+                          <div className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-300">
+                            <Clock className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                            <span className="truncate max-w-[160px]" title={site.lastRefilledFormatted || 'No refill recorded'}>
+                              {site.lastRefilledFormatted || 'No refill'}
+                            </span>
+                          </div>
+                        </TableCell>
+
+                        <TableCell className="py-3 text-center">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setSelectedSiteId(site.id);
+                              setSearchParams({ siteId: site.id });
+                            }}
+                            className="h-7 px-2.5 text-xs font-semibold text-cyan-700 dark:text-cyan-300 border-cyan-200 dark:border-cyan-800 hover:bg-cyan-50 dark:hover:bg-cyan-950/50 rounded-lg"
+                          >
+                            <span>Inspect</span>
+                            <ArrowRight className="w-3 h-3 ml-1" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             </div>
           </div>
         )}
@@ -3289,9 +3664,6 @@ export function ActiveSiteAnalytics() {
                 <Fuel className="h-4 w-4 text-amber-500" />
                 Live Machine Fuel Tank Telemetry
               </CardTitle>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Full-to-full estimated tank levels, remaining burn runway, and refill status per unit
-              </p>
             </div>
             <div className="flex items-center gap-2 text-xs">
               <span className="text-slate-400 font-medium">Site Status:</span>
@@ -3465,13 +3837,7 @@ export function ActiveSiteAnalytics() {
             <div className="flex items-center gap-2 flex-wrap">
               <CardTitle className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
                 <Fuel className="h-4 w-4 text-amber-500" />
-                Diesel Telemetry: {
-                  dieselChartMode === 'daily' 
-                    ? 'Refilled Volume vs. Operational Burn (Litres)' 
-                    : dieselChartMode === 'cumulative'
-                    ? 'Cumulative Inflow vs. Consumption Trajectory (Litres)'
-                    : 'Refill Interval Variance & Daily Average Diesel Usage (L/Day)'
-                }
+                Diesel Telemetry: Refill Interval Variance & Daily Average Diesel Usage (L/Day)
               </CardTitle>
               {siteAggregates.lastRefilledFormatted && siteAggregates.lastRefilledFormatted !== 'No refill recorded' && (
                 <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800/80 px-2 py-0.5 rounded-full">
@@ -3484,215 +3850,94 @@ export function ActiveSiteAnalytics() {
           </div>
 
           <div className="flex items-center gap-3 flex-wrap">
-            {/* View Switcher: Variance vs Daily vs Cumulative */}
-            <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs">
-              <button
-                type="button"
-                onClick={() => setDieselChartMode('variance')}
-                className={cn(
-                  'px-2.5 py-1 rounded-md font-semibold text-[11px] transition-all flex items-center gap-1',
-                  dieselChartMode === 'variance'
-                    ? 'bg-white dark:bg-slate-900 text-cyan-700 dark:text-cyan-300 shadow-xs'
-                    : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
-                )}
-              >
-                <span>Refill Variance & Avg Burn</span>
-                <span className="h-1.5 w-1.5 rounded-full bg-cyan-500 inline-block" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setDieselChartMode('daily')}
-                className={cn(
-                  'px-2.5 py-1 rounded-md font-semibold text-[11px] transition-all',
-                  dieselChartMode === 'daily'
-                    ? 'bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 shadow-xs'
-                    : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
-                )}
-              >
-                Daily Inflow vs. Burn
-              </button>
-              <button
-                type="button"
-                onClick={() => setDieselChartMode('cumulative')}
-                className={cn(
-                  'px-2.5 py-1 rounded-md font-semibold text-[11px] transition-all',
-                  dieselChartMode === 'cumulative'
-                    ? 'bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 shadow-xs'
-                    : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
-                )}
-              >
-                Cumulative Trajectory
-              </button>
-            </div>
-
             {/* Legend */}
             <div className="flex items-center gap-3 text-xs text-slate-500">
-              {dieselChartMode !== 'variance' ? (
-                <>
-                  <div className="flex items-center gap-1.5">
-                    <span className="h-2.5 w-2.5 rounded-full bg-amber-500 inline-block" />
-                    <span>{dieselChartMode === 'daily' ? 'Diesel Refilled (Inflow)' : 'Total Refilled'}</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="h-2.5 w-2.5 rounded-full bg-cyan-500 inline-block" />
-                    <span>{dieselChartMode === 'daily' ? 'Daily Operational Burn' : 'Total Burned'}</span>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="flex items-center gap-1.5">
-                    <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 inline-block" />
-                    <span>Daily Avg Burn (L/Day)</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="h-2 w-4 border-t-2 border-dashed border-cyan-500 inline-block" />
-                    <span>Rated Benchmark (18 L/d)</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="h-2.5 w-2.5 rounded-full bg-blue-500 inline-block" />
-                    <span>Variance (Diff)</span>
-                  </div>
-                </>
-              )}
+              <div className="flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 inline-block" />
+                <span>Daily Avg Burn (L/Day)</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="h-2 w-4 border-t-2 border-dashed border-cyan-500 inline-block" />
+                <span>Rated Benchmark (18 L/d)</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-full bg-blue-500 inline-block" />
+                <span>Variance (Diff)</span>
+              </div>
             </div>
+
+            {/* Next Refill Forecast Trigger Button */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setRefillForecastScope(isPortfolioMode ? 'fleet' : 'current');
+                setIsRefillForecastModalOpen(true);
+              }}
+              className="h-7 px-2.5 text-xs font-semibold rounded-lg border-amber-200 dark:border-amber-800/70 text-amber-800 dark:text-amber-300 bg-amber-50/70 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-all flex items-center gap-1.5 shrink-0"
+              title="Open Next Refill Forecast (1-Day Safety Buffer)"
+            >
+              <Bell className="w-3 h-3 text-amber-500" />
+              <span>Refill Forecast</span>
+              {urgentRefillCount > 0 && (
+                <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-rose-500 text-white leading-none">
+                  {urgentRefillCount}
+                </span>
+              )}
+            </Button>
           </div>
         </CardHeader>
 
         <CardContent className="p-5 pt-6 space-y-6">
           {/* Variance Mode Summary Bar */}
-          {dieselChartMode === 'variance' && (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 text-xs">
-              <div className="space-y-0.5">
-                <span className="text-[10px] uppercase font-bold text-slate-400">Refill Cycles</span>
-                <p className="text-sm font-bold text-slate-800 dark:text-slate-100">
-                  {refillCyclesSummary.totalCycles} <span className="text-[10px] font-normal text-slate-400">refills</span>
-                </p>
-              </div>
-              <div className="space-y-0.5">
-                <span className="text-[10px] uppercase font-bold text-slate-400">Avg Refill Interval</span>
-                <p className="text-sm font-bold text-slate-800 dark:text-slate-100">
-                  {refillCyclesSummary.avgActiveIntervalDays} <span className="text-[10px] font-normal text-slate-400">active days</span>
-                </p>
-              </div>
-              <div className="space-y-0.5">
-                <span className="text-[10px] uppercase font-bold text-slate-400">Total Refilled</span>
-                <p className="text-sm font-bold text-amber-600 dark:text-amber-400">
-                  {refillCyclesSummary.totalRefilled} <span className="text-[10px] font-normal text-slate-400">Litres</span>
-                </p>
-              </div>
-              <div className="space-y-0.5">
-                <span className="text-[10px] uppercase font-bold text-slate-400">Daily Avg Burn Rate</span>
-                <p className="text-sm font-bold text-slate-800 dark:text-slate-100">
-                  {refillCyclesSummary.avgDailyUsage} <span className="text-[10px] font-normal text-slate-400">L/day</span>
-                </p>
-              </div>
-              <div className="space-y-0.5">
-                <span className="text-[10px] uppercase font-bold text-slate-400">Net Variance (Diff)</span>
-                <p className={cn(
-                  "text-sm font-bold",
-                  refillCyclesSummary.netDiff > 0 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"
-                )}>
-                  {refillCyclesSummary.netDiff > 0 ? `+${refillCyclesSummary.netDiff}` : refillCyclesSummary.netDiff} L
-                  <span className="text-[10px] font-normal text-slate-400 ml-1">
-                    {refillCyclesSummary.netDiff > 0 ? '(overburn)' : '(saved)'}
-                  </span>
-                </p>
-              </div>
-              <div className="space-y-0.5">
-                <span className="text-[10px] uppercase font-bold text-slate-400">Dipstick Verified</span>
-                <p className="text-sm font-bold text-cyan-600 dark:text-cyan-400">
-                  {refillCyclesSummary.dipstickVerifiedCount} / {refillCyclesSummary.totalCycles}
-                  <span className="text-[10px] font-normal text-slate-400 ml-1">cycles</span>
-                </p>
-              </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 text-xs">
+            <div className="space-y-0.5">
+              <span className="text-[10px] uppercase font-bold text-slate-400">Refill Cycles</span>
+              <p className="text-sm font-bold text-slate-800 dark:text-slate-100">
+                {refillCyclesSummary.totalCycles} <span className="text-[10px] font-normal text-slate-400">refills</span>
+              </p>
             </div>
-          )}
+            <div className="space-y-0.5">
+              <span className="text-[10px] uppercase font-bold text-slate-400">Avg Refill Interval</span>
+              <p className="text-sm font-bold text-slate-800 dark:text-slate-100">
+                {refillCyclesSummary.avgActiveIntervalDays} <span className="text-[10px] font-normal text-slate-400">active days</span>
+              </p>
+            </div>
+            <div className="space-y-0.5">
+              <span className="text-[10px] uppercase font-bold text-slate-400">Total Refilled</span>
+              <p className="text-sm font-bold text-amber-600 dark:text-amber-400">
+                {refillCyclesSummary.totalRefilled} <span className="text-[10px] font-normal text-slate-400">Litres</span>
+              </p>
+            </div>
+            <div className="space-y-0.5">
+              <span className="text-[10px] uppercase font-bold text-slate-400">Daily Avg Burn Rate</span>
+              <p className="text-sm font-bold text-slate-800 dark:text-slate-100">
+                {refillCyclesSummary.avgDailyUsage} <span className="text-[10px] font-normal text-slate-400">L/day</span>
+              </p>
+            </div>
+            <div className="space-y-0.5">
+              <span className="text-[10px] uppercase font-bold text-slate-400">Net Variance (Diff)</span>
+              <p className={cn(
+                "text-sm font-bold",
+                refillCyclesSummary.netDiff > 0 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"
+              )}>
+                {refillCyclesSummary.netDiff > 0 ? `+${refillCyclesSummary.netDiff}` : refillCyclesSummary.netDiff} L
+                <span className="text-[10px] font-normal text-slate-400 ml-1">
+                  {refillCyclesSummary.netDiff > 0 ? '(overburn)' : '(saved)'}
+                </span>
+              </p>
+            </div>
+            <div className="space-y-0.5">
+              <span className="text-[10px] uppercase font-bold text-slate-400">Dipstick Verified</span>
+              <p className="text-sm font-bold text-cyan-600 dark:text-cyan-400">
+                {refillCyclesSummary.dipstickVerifiedCount} / {refillCyclesSummary.totalCycles}
+                <span className="text-[10px] font-normal text-slate-400 ml-1">cycles</span>
+              </p>
+            </div>
+          </div>
 
-          {/* Chart Rendering */}
-          {dieselChartMode !== 'variance' ? (
-            dieselTimelineChartData.length > 0 ? (
-              <div className="h-72 w-full min-w-0">
-                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-                  <AreaChart data={dieselTimelineChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="dieselFill" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.4} />
-                        <stop offset="95%" stopColor="#f59e0b" stopOpacity={0.0} />
-                      </linearGradient>
-                      <linearGradient id="expectedFill" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.25} />
-                        <stop offset="95%" stopColor="#06b6d4" stopOpacity={0.0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#334155' : '#f1f5f9'} vertical={false} />
-                    <XAxis 
-                      dataKey="dateFormatted" 
-                      stroke={isDark ? '#94a3b8' : '#64748b'} 
-                      fontSize={11}
-                      tickLine={false}
-                    />
-                    <YAxis 
-                      stroke={isDark ? '#94a3b8' : '#64748b'} 
-                      fontSize={11}
-                      tickLine={false}
-                      tickFormatter={v => `${v}L`}
-                    />
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: isDark ? '#0f172a' : '#ffffff', 
-                        borderColor: isDark ? '#334155' : '#e2e8f0',
-                        borderRadius: '0.75rem',
-                        fontSize: '12px',
-                        color: isDark ? '#ffffff' : '#0f172a'
-                      }}
-                      formatter={(val: any, name: string) => [
-                        `${val} Litres`,
-                        name === 'refilled' || name === 'diesel'
-                          ? (dieselChartMode === 'daily' ? 'Diesel Refilled (Inflow)' : 'Total Refilled')
-                          : name === 'dailyBurn' || name === 'expectedBurn'
-                          ? (dieselChartMode === 'daily' ? 'Operational Burn (Daily Usage)' : 'Total Burned')
-                          : name === 'cumulativeRefilled'
-                          ? 'Total Refilled'
-                          : 'Total Consumed'
-                      ]}
-                      labelFormatter={(label, items) => {
-                        const item = items?.[0]?.payload;
-                        if (!item) return label;
-                        const dipstickPart = item.dipstickSum > 0 ? ` • Dipstick sum: ${item.dipstickSum}L` : '';
-                        return `${item.dateFormatted} (${item.activeLogs} machine logs${dipstickPart})`;
-                      }}
-                    />
-                    <Area 
-                      type={dieselChartMode === 'cumulative' ? 'monotone' : 'monotone'} 
-                      dataKey={dieselChartMode === 'daily' ? 'refilled' : 'cumulativeRefilled'} 
-                      name={dieselChartMode === 'daily' ? 'refilled' : 'cumulativeRefilled'}
-                      stroke="#f59e0b" 
-                      strokeWidth={2.5} 
-                      fillOpacity={1} 
-                      fill="url(#dieselFill)" 
-                    />
-                    <Area 
-                      type="monotone" 
-                      dataKey={dieselChartMode === 'daily' ? 'dailyBurn' : 'cumulativeBurn'} 
-                      name={dieselChartMode === 'daily' ? 'dailyBurn' : 'cumulativeBurn'}
-                      stroke="#06b6d4" 
-                      strokeWidth={2} 
-                      strokeDasharray={dieselChartMode === 'daily' ? '4 4' : undefined}
-                      fillOpacity={1} 
-                      fill="url(#expectedFill)" 
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            ) : (
-              <div className="h-48 flex flex-col items-center justify-center text-slate-400 gap-2">
-                <Fuel className="h-8 w-8 text-slate-300 dark:text-slate-700" />
-                <p className="text-xs font-medium">No diesel consumption logs recorded for this selection.</p>
-              </div>
-            )
-          ) : (
-            /* Variance & Avg Burn Mode: ComposedChart with Daily Avg Burn Bars & Benchmark Line */
-            <div className="space-y-6">
+          {/* Variance & Avg Burn Mode: ComposedChart with Daily Avg Burn Bars & Benchmark Line */}
+          <div className="space-y-6">
               {/* Interactive Machine / Pump Checkbox & Filter Bar */}
               {scopedFilterMachines.length > 0 && (
                 <div className="flex flex-wrap items-center justify-between gap-2.5 p-3 bg-slate-50/90 dark:bg-slate-800/50 rounded-xl border border-slate-200/80 dark:border-slate-700/80">
@@ -4064,7 +4309,6 @@ export function ActiveSiteAnalytics() {
                 </div>
               )}
             </div>
-          )}
         </CardContent>
       </Card>
 
@@ -4072,61 +4316,85 @@ export function ActiveSiteAnalytics() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
         {/* Graph 2A: Days on Site & Running Status per Machine */}
-        <Card className="border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm rounded-2xl overflow-hidden">
+        <Card className={cn(
+          "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm rounded-2xl overflow-hidden transition-all",
+          fullScreenChart === 'site-operational-days' && "fixed inset-0 z-[120] m-0 rounded-none border-none w-screen h-screen flex flex-col p-4 sm:p-6 overflow-auto bg-white dark:bg-slate-900"
+        )}>
+          {fullScreenChart === 'site-operational-days' && (
+            <Button
+              variant="default"
+              size="icon"
+              className="fixed top-4 right-4 z-[130] rounded-full shadow-2xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-900 w-11 h-11"
+              onClick={() => toggleFullScreenChart('site-operational-days')}
+              title="Exit Full Screen"
+            >
+              <Minimize2 className="h-5 w-5" />
+            </Button>
+          )}
           <CardHeader className="p-5 pb-2 border-b border-slate-100 dark:border-slate-800 flex flex-row items-center justify-between flex-wrap gap-2">
             <div>
               <CardTitle className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
                 <Clock className="h-4 w-4 text-emerald-500" />
                 Operational Days by Machine (Full vs Half vs Off)
               </CardTitle>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Stacked active duty breakdown noting deployment dates and active vs offsite status
-              </p>
             </div>
 
-            {/* Quick Fleet Status Toggle */}
-            <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg text-xs">
-              <button
-                type="button"
-                onClick={() => setFleetChartFilter('all')}
-                className={cn(
-                  'px-2 py-0.5 rounded text-[10px] font-semibold transition-all',
-                  fleetChartFilter === 'all' 
-                    ? 'bg-white dark:bg-slate-700 text-cyan-700 dark:text-cyan-300 shadow-xs' 
-                    : 'text-slate-500 hover:text-slate-700'
-                )}
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* Quick Fleet Status Toggle */}
+              <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg text-xs">
+                <button
+                  type="button"
+                  onClick={() => setFleetChartFilter('all')}
+                  className={cn(
+                    'px-2 py-0.5 rounded text-[10px] font-semibold transition-all',
+                    fleetChartFilter === 'all' 
+                      ? 'bg-white dark:bg-slate-700 text-cyan-700 dark:text-cyan-300 shadow-xs' 
+                      : 'text-slate-500 hover:text-slate-700'
+                  )}
+                >
+                  All ({machineFleetStats.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFleetChartFilter('active')}
+                  className={cn(
+                    'px-2 py-0.5 rounded text-[10px] font-semibold transition-all',
+                    fleetChartFilter === 'active' 
+                      ? 'bg-emerald-600 text-white shadow-xs' 
+                      : 'text-slate-500 hover:text-emerald-600'
+                  )}
+                >
+                  Active ({siteAggregates.activeFleetCount})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFleetChartFilter('offsite')}
+                  className={cn(
+                    'px-2 py-0.5 rounded text-[10px] font-semibold transition-all',
+                    fleetChartFilter === 'offsite' 
+                      ? 'bg-slate-600 text-white shadow-xs' 
+                      : 'text-slate-500 hover:text-slate-700'
+                  )}
+                >
+                  Taken Out ({siteAggregates.takenOutFleetCount})
+                </button>
+              </div>
+
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8 rounded-lg border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shrink-0"
+                onClick={() => toggleFullScreenChart('site-operational-days')}
+                title="Full Screen"
+                aria-label="Full Screen"
               >
-                All ({machineFleetStats.length})
-              </button>
-              <button
-                type="button"
-                onClick={() => setFleetChartFilter('active')}
-                className={cn(
-                  'px-2 py-0.5 rounded text-[10px] font-semibold transition-all',
-                  fleetChartFilter === 'active' 
-                    ? 'bg-emerald-600 text-white shadow-xs' 
-                    : 'text-slate-500 hover:text-emerald-600'
-                )}
-              >
-                Active ({siteAggregates.activeFleetCount})
-              </button>
-              <button
-                type="button"
-                onClick={() => setFleetChartFilter('offsite')}
-                className={cn(
-                  'px-2 py-0.5 rounded text-[10px] font-semibold transition-all',
-                  fleetChartFilter === 'offsite' 
-                    ? 'bg-slate-600 text-white shadow-xs' 
-                    : 'text-slate-500 hover:text-slate-700'
-                )}
-              >
-                Taken Out ({siteAggregates.takenOutFleetCount})
-              </button>
+                <Maximize2 className="h-3.5 w-3.5" />
+              </Button>
             </div>
           </CardHeader>
-          <CardContent className="p-5 pt-6">
+          <CardContent className={cn("p-5 pt-6", fullScreenChart === 'site-operational-days' && "flex-1 flex flex-col min-h-0")}>
             {machineDaysChartData.length > 0 ? (
-              <div className="h-80 w-full min-w-0">
+              <div className={cn("w-full min-w-0", fullScreenChart === 'site-operational-days' ? "flex-1 min-h-[500px]" : "h-80")}>
                 <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                   <BarChart data={machineDaysChartData} margin={{ top: 10, right: 10, left: -20, bottom: 25 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#334155' : '#f1f5f9'} vertical={false} />
@@ -4221,21 +4489,42 @@ export function ActiveSiteAnalytics() {
         </Card>
 
         {/* Graph 2B: Machine Downtime & Halts (Incidents & Lost Hours) */}
-        <Card className="border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm rounded-2xl overflow-hidden">
-          <CardHeader className="p-5 pb-2 border-b border-slate-100 dark:border-slate-800 flex flex-row items-center justify-between">
+        <Card className={cn(
+          "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm rounded-2xl overflow-hidden transition-all",
+          fullScreenChart === 'site-downtime' && "fixed inset-0 z-[120] m-0 rounded-none border-none w-screen h-screen flex flex-col p-4 sm:p-6 overflow-auto bg-white dark:bg-slate-900"
+        )}>
+          {fullScreenChart === 'site-downtime' && (
+            <Button
+              variant="default"
+              size="icon"
+              className="fixed top-4 right-4 z-[130] rounded-full shadow-2xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-900 w-11 h-11"
+              onClick={() => toggleFullScreenChart('site-downtime')}
+              title="Exit Full Screen"
+            >
+              <Minimize2 className="h-5 w-5" />
+            </Button>
+          )}
+          <CardHeader className="p-5 pb-2 border-b border-slate-100 dark:border-slate-800 flex flex-row items-center justify-between flex-wrap gap-2">
             <div>
               <CardTitle className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
                 <AlertTriangle className="h-4 w-4 text-rose-500" />
                 Downtime Incidents & Lost Hours
               </CardTitle>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Frequency and duration of disruptions by machine unit
-              </p>
             </div>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8 rounded-lg border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shrink-0"
+              onClick={() => toggleFullScreenChart('site-downtime')}
+              title="Full Screen"
+              aria-label="Full Screen"
+            >
+              <Maximize2 className="h-3.5 w-3.5" />
+            </Button>
           </CardHeader>
-          <CardContent className="p-5 pt-6">
+          <CardContent className={cn("p-5 pt-6", fullScreenChart === 'site-downtime' && "flex-1 flex flex-col min-h-0")}>
             {machineDowntimeChartData.length > 0 ? (
-              <div className="h-80 w-full min-w-0">
+              <div className={cn("w-full min-w-0", fullScreenChart === 'site-downtime' ? "flex-1 min-h-[500px]" : "h-80")}>
                 <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                   <BarChart data={machineDowntimeChartData} margin={{ top: 10, right: 10, left: -20, bottom: 25 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#334155' : '#f1f5f9'} vertical={false} />
@@ -4316,17 +4605,41 @@ export function ActiveSiteAnalytics() {
       {/* ── VISUAL SECTION 3: Donut Distributions ── */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Donut 3A: Operational Status Breakdown */}
-        <Card className="border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm rounded-2xl overflow-hidden">
-          <CardHeader className="p-5 pb-2 border-b border-slate-100 dark:border-slate-800">
+        <Card className={cn(
+          "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm rounded-2xl overflow-hidden transition-all",
+          fullScreenChart === 'site-duty-pie' && "fixed inset-0 z-[120] m-0 rounded-none border-none w-screen h-screen flex flex-col p-4 sm:p-6 overflow-auto bg-white dark:bg-slate-900"
+        )}>
+          {fullScreenChart === 'site-duty-pie' && (
+            <Button
+              variant="default"
+              size="icon"
+              className="fixed top-4 right-4 z-[130] rounded-full shadow-2xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-900 w-11 h-11"
+              onClick={() => toggleFullScreenChart('site-duty-pie')}
+              title="Exit Full Screen"
+            >
+              <Minimize2 className="h-5 w-5" />
+            </Button>
+          )}
+          <CardHeader className="p-5 pb-2 border-b border-slate-100 dark:border-slate-800 flex flex-row items-center justify-between flex-wrap gap-2">
             <CardTitle className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
               <Activity className="h-4 w-4 text-emerald-500" />
               Fleet Duty Cycle & Running Distribution
             </CardTitle>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8 rounded-lg border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shrink-0"
+              onClick={() => toggleFullScreenChart('site-duty-pie')}
+              title="Full Screen"
+              aria-label="Full Screen"
+            >
+              <Maximize2 className="h-3.5 w-3.5" />
+            </Button>
           </CardHeader>
-          <CardContent className="p-5 flex flex-col sm:flex-row items-center justify-around gap-4">
+          <CardContent className={cn("p-5 flex flex-col sm:flex-row items-center justify-around gap-4", fullScreenChart === 'site-duty-pie' && "flex-1 min-h-0")}>
             {operationalStatusDonutData.length > 0 ? (
               <>
-                <div className="h-52 w-52 shrink-0 min-w-0">
+                <div className={cn("shrink-0 min-w-0", fullScreenChart === 'site-duty-pie' ? "h-96 w-96" : "h-52 w-52")}>
                   <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                     <PieChart>
                       <Pie
@@ -4376,17 +4689,41 @@ export function ActiveSiteAnalytics() {
         </Card>
 
         {/* Donut 3B: Downtime Severity Breakdown */}
-        <Card className="border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm rounded-2xl overflow-hidden">
-          <CardHeader className="p-5 pb-2 border-b border-slate-100 dark:border-slate-800">
+        <Card className={cn(
+          "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm rounded-2xl overflow-hidden transition-all",
+          fullScreenChart === 'site-severity-pie' && "fixed inset-0 z-[120] m-0 rounded-none border-none w-screen h-screen flex flex-col p-4 sm:p-6 overflow-auto bg-white dark:bg-slate-900"
+        )}>
+          {fullScreenChart === 'site-severity-pie' && (
+            <Button
+              variant="default"
+              size="icon"
+              className="fixed top-4 right-4 z-[130] rounded-full shadow-2xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-900 w-11 h-11"
+              onClick={() => toggleFullScreenChart('site-severity-pie')}
+              title="Exit Full Screen"
+            >
+              <Minimize2 className="h-5 w-5" />
+            </Button>
+          )}
+          <CardHeader className="p-5 pb-2 border-b border-slate-100 dark:border-slate-800 flex flex-row items-center justify-between flex-wrap gap-2">
             <CardTitle className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
               <ShieldAlert className="h-4 w-4 text-rose-500" />
               Downtime Severity Categorization
             </CardTitle>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8 rounded-lg border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shrink-0"
+              onClick={() => toggleFullScreenChart('site-severity-pie')}
+              title="Full Screen"
+              aria-label="Full Screen"
+            >
+              <Maximize2 className="h-3.5 w-3.5" />
+            </Button>
           </CardHeader>
-          <CardContent className="p-5 flex flex-col sm:flex-row items-center justify-around gap-4">
+          <CardContent className={cn("p-5 flex flex-col sm:flex-row items-center justify-around gap-4", fullScreenChart === 'site-severity-pie' && "flex-1 min-h-0")}>
             {downtimeSeverityDonutData.length > 0 ? (
               <>
-                <div className="h-52 w-52 shrink-0 min-w-0">
+                <div className={cn("shrink-0 min-w-0", fullScreenChart === 'site-severity-pie' ? "h-96 w-96" : "h-52 w-52")}>
                   <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                     <PieChart>
                       <Pie
@@ -4444,9 +4781,6 @@ export function ActiveSiteAnalytics() {
               <Clock className="h-4 w-4 text-emerald-500" />
               Site Machine Deployments, Pump Dates & Swap Lineage
             </CardTitle>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Record of active pumping machines vs demobilized and swapped units on {currentSite?.name}
-            </p>
           </div>
           <div className="flex items-center gap-2">
             <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
@@ -4638,9 +4972,6 @@ export function ActiveSiteAnalytics() {
               <Wrench className="h-4 w-4 text-cyan-600 dark:text-cyan-400" />
               Machine Fleet Performance & Daily Register Access
             </CardTitle>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Click "Open Register" on any unit to log daily hours, fuel refills, or view detailed logs
-            </p>
           </div>
           <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
             {machineFleetStats.length} Unit{machineFleetStats.length !== 1 ? 's' : ''} on Record
@@ -4835,9 +5166,6 @@ export function ActiveSiteAnalytics() {
                 <AlertTriangle className="h-4 w-4 text-rose-500" />
                 Downtime Events Log & Failure Reasons
               </CardTitle>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Itemized register of interruptions recorded from machine logs
-              </p>
             </div>
             <Badge variant="destructive" className="text-xs">
               {siteAggregates.allDowntimesList.length} Incident{siteAggregates.allDowntimesList.length !== 1 ? 's' : ''}
@@ -4892,7 +5220,7 @@ export function ActiveSiteAnalytics() {
 
       {/* ── MODAL: Configure Pump Dates & Replacement Lineage ── */}
       {editingPumpDateMachine && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[120] flex items-center justify-center p-4">
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
               <div>
@@ -4900,9 +5228,6 @@ export function ActiveSiteAnalytics() {
                   <Calendar className="w-4 h-4 text-cyan-500" />
                   Configure Pump Dates & Swaps
                 </h3>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Set deployment start, demobilization stop date, and machine replacement
-                </p>
               </div>
               <button
                 onClick={() => setEditingPumpDateMachine(null)}
@@ -4938,12 +5263,11 @@ export function ActiveSiteAnalytics() {
                 </label>
                 <input
                   type="date"
-                  value={editingPumpDateMachine.startDate}
+                  value={(editingPumpDateMachine.startDate || '').split('T')[0]}
                   onChange={e => setEditingPumpDateMachine({ ...editingPumpDateMachine, startDate: e.target.value })}
                   className="w-full px-3 py-2 text-xs border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-cyan-500 focus:outline-hidden"
                   required
                 />
-                <p className="text-[10px] text-slate-400 mt-1">The calendar date this machine commenced pumping operations on site.</p>
               </div>
 
               {/* Pump Stop Date */}
@@ -4953,11 +5277,10 @@ export function ActiveSiteAnalytics() {
                 </label>
                 <input
                   type="date"
-                  value={editingPumpDateMachine.stopDate}
+                  value={(editingPumpDateMachine.stopDate || '').split('T')[0]}
                   onChange={e => setEditingPumpDateMachine({ ...editingPumpDateMachine, stopDate: e.target.value })}
                   className="w-full px-3 py-2 text-xs border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-cyan-500 focus:outline-hidden"
                 />
-                <p className="text-[10px] text-slate-400 mt-1">Leave blank if this pump is currently active on site.</p>
               </div>
 
               {/* Replaced Predecessor Machine */}
@@ -4979,7 +5302,6 @@ export function ActiveSiteAnalytics() {
                       </option>
                     ))}
                 </select>
-                <p className="text-[10px] text-slate-400 mt-1">Indicate if this pump was mobilized to replace another pump that was taken out.</p>
               </div>
 
               {/* Swap Reason */}
@@ -5017,6 +5339,352 @@ export function ActiveSiteAnalytics() {
                 </Button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL: Next Refill Forecast ── */}
+      {isRefillForecastModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[120] flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-150">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-5xl w-full max-h-[92vh] sm:max-h-[90vh] shadow-2xl overflow-hidden flex flex-col">
+            {/* Modal Header */}
+            <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between gap-3 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="h-9 w-9 rounded-xl bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800/80 flex items-center justify-center shrink-0">
+                  <Bell className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900 dark:text-white text-base">
+                    Next Refill Date Forecast
+                  </h3>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsRefillForecastModalOpen(false)}
+                className="h-8 w-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shrink-0"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal Controls Bar */}
+            <div className="p-3 sm:p-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shrink-0">
+              {/* Scope Switcher */}
+              <div className="flex items-center bg-slate-200/80 dark:bg-slate-800 p-0.5 rounded-lg border border-slate-300/80 dark:border-slate-700 text-xs overflow-x-auto w-full sm:w-auto">
+                {currentSite && (
+                  <button
+                    type="button"
+                    onClick={() => setRefillForecastScope('current')}
+                    className={cn(
+                      "px-3 py-1.5 rounded-md font-semibold text-xs transition-all flex items-center gap-1.5 shrink-0",
+                      refillForecastScope === 'current'
+                        ? "bg-white dark:bg-slate-900 text-cyan-700 dark:text-cyan-300 shadow-xs"
+                        : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                    )}
+                  >
+                    <span>Current Site: {currentSite.name}</span>
+                    <span className={cn(
+                      "text-[10px] px-1.5 py-0.2 rounded-full font-bold",
+                      refillForecastScope === 'current'
+                        ? "bg-cyan-100 dark:bg-cyan-900/60 text-cyan-800 dark:text-cyan-200"
+                        : "bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
+                    )}>
+                      {currentSiteRefillForecast.length}
+                    </span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setRefillForecastScope('fleet')}
+                  className={cn(
+                    "px-3 py-1.5 rounded-md font-semibold text-xs transition-all flex items-center gap-1.5 shrink-0",
+                    refillForecastScope === 'fleet' || !currentSite
+                      ? "bg-white dark:bg-slate-900 text-cyan-700 dark:text-cyan-300 shadow-xs"
+                      : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                  )}
+                >
+                  <span>All Ongoing Sites (Fleet-Wide)</span>
+                  <span className={cn(
+                    "text-[10px] px-1.5 py-0.2 rounded-full font-bold",
+                    refillForecastScope === 'fleet' || !currentSite
+                      ? "bg-cyan-100 dark:bg-cyan-900/60 text-cyan-800 dark:text-cyan-200"
+                      : "bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
+                  )}>
+                    {fleetRefillForecast.length}
+                  </span>
+                </button>
+              </div>
+
+              {/* Filters: Search and Urgency Tabs */}
+              <div className="flex items-center gap-2 flex-wrap">
+                {/* Search */}
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <input
+                    type="text"
+                    placeholder="Search machine or site..."
+                    value={refillForecastSearch}
+                    onChange={e => setRefillForecastSearch(e.target.value)}
+                    className="h-8 pl-8 pr-3 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:outline-hidden focus:ring-1 focus:ring-cyan-500 w-44 sm:w-56"
+                  />
+                  {refillForecastSearch && (
+                    <button
+                      onClick={() => setRefillForecastSearch('')}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Urgency Filter Pills */}
+                <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setRefillForecastUrgencyFilter('all')}
+                    className={cn(
+                      "px-2 py-1 rounded-md text-[11px] font-semibold transition-all",
+                      refillForecastUrgencyFilter === 'all'
+                        ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-xs"
+                        : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                    )}
+                  >
+                    All
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRefillForecastUrgencyFilter('urgent')}
+                    className={cn(
+                      "px-2 py-1 rounded-md text-[11px] font-semibold transition-all flex items-center gap-1",
+                      refillForecastUrgencyFilter === 'urgent'
+                        ? "bg-rose-500 text-white shadow-xs"
+                        : "text-rose-600 dark:text-rose-400 hover:text-rose-700"
+                    )}
+                  >
+                    <span>🚨 Today</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRefillForecastUrgencyFilter('tomorrow')}
+                    className={cn(
+                      "px-2 py-1 rounded-md text-[11px] font-semibold transition-all flex items-center gap-1",
+                      refillForecastUrgencyFilter === 'tomorrow'
+                        ? "bg-amber-500 text-white shadow-xs"
+                        : "text-amber-600 dark:text-amber-400 hover:text-amber-700"
+                    )}
+                  >
+                    <span>⚠️ Tomorrow</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRefillForecastUrgencyFilter('safe')}
+                    className={cn(
+                      "px-2 py-1 rounded-md text-[11px] font-semibold transition-all",
+                      refillForecastUrgencyFilter === 'safe'
+                        ? "bg-white dark:bg-slate-900 text-emerald-700 dark:text-emerald-300 shadow-xs"
+                        : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                    )}
+                  >
+                    Safe
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Forecast Table List */}
+            <div className="overflow-y-auto flex-1 p-3 sm:p-5">
+              {displayedRefillForecast.length === 0 ? (
+                <div className="h-56 flex flex-col items-center justify-center text-slate-400 gap-2 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl">
+                  <Fuel className="h-8 w-8 text-slate-300 dark:text-slate-700" />
+                  <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                    No machine refill forecasts found matching this filter.
+                  </p>
+                  {(refillForecastSearch || refillForecastUrgencyFilter !== 'all') && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setRefillForecastSearch('');
+                        setRefillForecastUrgencyFilter('all');
+                      }}
+                      className="text-xs h-7 mt-1 font-semibold text-cyan-600"
+                    >
+                      Clear Filters
+                    </Button>
+                  )}
+                </div>
+              ) : (
+                <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-x-auto bg-white dark:bg-slate-900 shadow-xs">
+                  <Table className="min-w-[760px] w-full">
+                    <TableHeader className="bg-slate-50/80 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800">
+                      <TableRow>
+                        <TableHead className="text-[11px] font-bold uppercase tracking-wider text-slate-500 py-3">Site</TableHead>
+                        <TableHead className="text-[11px] font-bold uppercase tracking-wider text-slate-500 py-3">Machine / Unit</TableHead>
+                        <TableHead className="text-[11px] font-bold uppercase tracking-wider text-slate-500 py-3">Fuel Level & Remaining</TableHead>
+                        <TableHead className="text-[11px] font-bold uppercase tracking-wider text-slate-500 py-3">Rated Burn</TableHead>
+                        <TableHead className="text-[11px] font-bold uppercase tracking-wider text-slate-500 py-3">Last Refill Date</TableHead>
+                        <TableHead className="text-[11px] font-bold uppercase tracking-wider text-slate-500 py-3">Estimated Next Refill</TableHead>
+                        <TableHead className="text-[11px] font-bold uppercase tracking-wider text-slate-500 py-3 text-right">Action</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody className="divide-y divide-slate-100 dark:divide-slate-800/80 text-xs">
+                      {displayedRefillForecast.map(item => {
+                        const isCurrentSelectedSite = currentSite?.id === item.siteId;
+                        return (
+                          <TableRow 
+                            key={`${item.siteId}-${item.machineId}`}
+                            className={cn(
+                              "transition-colors hover:bg-slate-50/60 dark:hover:bg-slate-800/40",
+                              item.urgency === 'critical' || item.urgency === 'today' ? "bg-rose-50/25 dark:bg-rose-950/15" : ""
+                            )}
+                          >
+                            {/* Site Column */}
+                            <TableCell className="py-3 font-semibold text-slate-800 dark:text-slate-100">
+                              <div className="flex items-center gap-1.5">
+                                <span className="h-2 w-2 rounded-full bg-cyan-500 shrink-0" />
+                                <span className="truncate max-w-[160px] sm:max-w-[200px]" title={item.siteName}>
+                                  {item.siteName}
+                                </span>
+                              </div>
+                            </TableCell>
+
+                            {/* Machine Column */}
+                            <TableCell className="py-3">
+                              <div className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
+                                <span>{item.shortName}</span>
+                              </div>
+                              <div className="text-[10px] text-slate-400 truncate max-w-[150px]" title={item.machineName}>
+                                {item.machineName}
+                              </div>
+                            </TableCell>
+
+                            {/* Fuel Level & Gauge Column */}
+                            <TableCell className="py-3 min-w-[180px]">
+                              <div className="space-y-1">
+                                <div className="flex items-center justify-between text-[11px]">
+                                  <span className="font-bold text-slate-800 dark:text-slate-200">
+                                    {item.estimatedRemainingLitres}L <span className="text-slate-400 font-normal">/ {item.tankCapacityLitres}L</span>
+                                  </span>
+                                  <span className={cn(
+                                    "font-bold text-[10px]",
+                                    item.fuelPercentage <= 15 
+                                      ? "text-rose-600 dark:text-rose-400" 
+                                      : item.fuelPercentage <= 35 
+                                      ? "text-amber-600 dark:text-amber-400" 
+                                      : "text-emerald-600 dark:text-emerald-400"
+                                  )}>
+                                    {item.fuelPercentage}%
+                                  </span>
+                                </div>
+                                <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                                  <div 
+                                    className={cn(
+                                      "h-full rounded-full transition-all duration-300",
+                                      item.fuelPercentage <= 15 
+                                        ? "bg-rose-500" 
+                                        : item.fuelPercentage <= 35 
+                                        ? "bg-amber-500" 
+                                        : "bg-emerald-500"
+                                    )}
+                                    style={{ width: `${Math.min(100, Math.max(3, item.fuelPercentage))}%` }}
+                                  />
+                                </div>
+                                <div className="flex items-center justify-between text-[10px] text-slate-400">
+                                  <span>
+                                    {item.isDipstickVerified ? '✓ Dipstick verified' : (item.lastRefillDate ? 'Refill calculated' : 'No anchor')}
+                                  </span>
+                                  <span>Runway: {item.runwayDays}d</span>
+                                </div>
+                              </div>
+                            </TableCell>
+
+                            {/* Benchmark Rate Column */}
+                            <TableCell className="py-3 text-slate-700 dark:text-slate-300">
+                              <div className="font-semibold">{item.benchmarkBurnRate} L/day</div>
+                              <div className="text-[10px] text-slate-400">Rated Benchmark</div>
+                            </TableCell>
+
+                            {/* Last Refill Date Column */}
+                            <TableCell className="py-3">
+                              {item.lastRefillDate ? (
+                                <div>
+                                  <div className="font-semibold text-slate-800 dark:text-slate-200 text-xs">
+                                    {formatLastRefilledDate(item.lastRefillDate)}
+                                  </div>
+                                  {item.lastRefillLitres > 0 && (
+                                    <div className="text-[10px] text-slate-400 mt-0.5">
+                                      {item.lastRefillLitres}L refilled
+                                    </div>
+                                  )}
+                                </div>
+                              ) : (
+                                <span className="text-xs text-slate-400 italic">No refill recorded</span>
+                              )}
+                            </TableCell>
+
+                            {/* Estimated Next Refill Date Column */}
+                            <TableCell className="py-3">
+                              <div className="font-bold text-slate-900 dark:text-white text-xs">
+                                {item.targetRefillFormatted}
+                              </div>
+                              <div className="mt-1 flex items-center gap-1">
+                                <span className={cn(
+                                  "text-[10px] font-bold px-2 py-0.5 rounded-md border inline-flex items-center gap-1 leading-tight",
+                                  item.urgencyBadgeClass
+                                )}>
+                                  {item.urgencyLabel}
+                                </span>
+                                {item.daysUntilRefill > 0 && (
+                                  <span className="text-[10px] text-slate-400">
+                                    (-1d safety buffer)
+                                  </span>
+                                )}
+                              </div>
+                            </TableCell>
+
+                            {/* Action Column */}
+                            <TableCell className="py-3 text-right">
+                              {isCurrentSelectedSite ? (
+                                <span className="inline-block text-[11px] font-semibold text-cyan-600 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-950/50 px-2 py-1 rounded-md border border-cyan-200 dark:border-cyan-800">
+                                  Current Site
+                                </span>
+                              ) : (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    setSelectedSiteId(item.siteId);
+                                    setIsRefillForecastModalOpen(false);
+                                  }}
+                                  className="h-7 text-xs px-2.5 font-semibold text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-cyan-50 hover:text-cyan-700 dark:hover:bg-cyan-950/40 dark:hover:text-cyan-300 transition-all"
+                                  title={`Switch view to ${item.siteName}`}
+                                >
+                                  <span>View Site</span>
+                                  <ArrowRight className="w-3 h-3 ml-1 text-slate-400" />
+                                </Button>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-3 sm:p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 flex items-center justify-end shrink-0">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsRefillForecastModalOpen(false)}
+                className="h-8 text-xs font-semibold px-4 rounded-lg"
+              >
+                Close
+              </Button>
+            </div>
           </div>
         </div>
       )}

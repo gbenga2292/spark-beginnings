@@ -223,8 +223,8 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
   const [showCamera, setShowCamera] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
-  // Constants - Replace with your actual deployment URL
-  const MEDIA_SERVER_URL = 'https://media.dcel-suite.com'; 
+  // Constants - Media Server URL
+  const MEDIA_SERVER_URL = import.meta.env.VITE_MEDIA_SERVER_URL || 'https://dewaterconstruct.com/dcel-media';
 
   // ── Dirty Form Tracking & Navigation Guard ──
   const initialSnapshotRef = React.useRef<{
@@ -729,14 +729,15 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
   };
 
   const fetchUploadedMedia = async (sId: string, aId: string, lDate: string) => {
+    if (!sId || !aId || !lDate) return;
     try {
       const response = await fetch(`${MEDIA_SERVER_URL}/list.php?site_id=${sId}&asset_id=${aId}&log_date=${lDate}`);
       if (response.ok) {
         const data = await response.json();
         setUploadedMedia(Array.isArray(data) ? data : []);
       }
-    } catch (err) {
-      console.error('Failed to fetch media:', err);
+    } catch {
+      setUploadedMedia([]);
     }
   };
 
