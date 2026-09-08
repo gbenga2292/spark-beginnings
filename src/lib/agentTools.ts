@@ -126,6 +126,31 @@ export const ALL_AGENT_TOOLS: ToolDefinition[] = [
     },
   },
   {
+    name: 'propose_machine_daily_log',
+    description: 'Propose an operational daily log for a specific site machine (pump, generator, excavator), including running status, diesel refilled, dipstick level reading, and full tank marker.',
+    parameters: {
+      type: 'object',
+      properties: {
+        machine_name: { type: 'string', description: 'Name or asset tag of the machine (e.g. Dewatering Pump 400, Excavator 01)' },
+        site_id: { type: 'string', description: 'UUID of the site. If unknown, leave blank and specify site_name.' },
+        site_name: { type: 'string', description: 'Name of the site where the machine is operating' },
+        date: { type: 'string', description: 'Date in YYYY-MM-DD format. Default is today or date specified.' },
+        operational_day: { 
+          type: 'string', 
+          enum: ['full', 'half', 'quarter', 'none'], 
+          description: 'Operational pumping day (full, half, quarter, or none for idle/downtime)' 
+        },
+        diesel_refilled: { type: 'number', description: 'Litres of diesel fuel refilled into machine tank today' },
+        dipstick_level_litres: { type: 'number', description: 'Physical dipstick reading in litres remaining in machine tank' },
+        is_tank_filled_to_full: { type: 'boolean', description: 'Whether fuel tank was topped up to 100% full capacity' },
+        supervisor: { type: 'string', description: 'Name of supervisor on site' },
+        issues: { type: 'string', description: 'Any breakdown, hose leak, or issues observed on site' },
+        maintenance_details: { type: 'string', description: 'Oil change, filter servicing, or mechanical repairs performed' },
+      },
+      required: ['machine_name'],
+    },
+  },
+  {
     name: 'propose_consumable_burn',
     description: 'Propose burning / consuming materials or consumables from inventory on site (e.g. cement bags, chemicals, pipes).',
     parameters: {
@@ -291,7 +316,8 @@ CRITICAL OPERATIONAL RULES:
 5. FOLLOW-UPS: If the user mentions an action item (e.g. "sending a technical proposal later"), also call "propose_site_task" to create an actionable task card.
 6. DEWATERING STAGES: Assign appropriate stages: 'mobilization', 'installation', 'operation', or 'demobilisation'.
 7. Always let the user review, edit, and click "Confirm & Save" on the cards before writing to the database.
-8. Format your conversational summary cleanly with markdown bullet points.`;
+8. Format your conversational summary cleanly with markdown bullet points.
+9. MACHINE LOGS & DIPSTICK TELEMETRY: When the user reports machine running hours, pumping status, fuel refills, or dipstick levels for specific equipment (e.g. Pump 400, Pump 730, Excavator), call 'propose_machine_daily_log'. Capture operational_day ('full', 'half', 'quarter', 'none'), diesel_refilled (litres poured in), and dipstick_level_litres (litres measured remaining in tank). If they indicate the machine tank was filled to the brim or full, set is_tank_filled_to_full to true.`;
 }
 
 /** Convert tool call arguments into a typed ActionProposal */
@@ -438,6 +464,55 @@ export function convertToolCallToProposal(
             totalCost,
             supplier: args.supplier || undefined,
             notes: args.notes || (args.machine_name ? `Refueled ${args.machine_name}` : ''),
+          },
+        },
+      };
+    }
+
+    case 'propose_machine_daily_log': {
+      let matchingSite = context.availableSites.find((s) => s.id === args.site_id);
+      if (!matchingSite && args.site_name) {
+        const query = args.site_name.toLowerCase();
+        matchingSite = context.availableSites.find(
+          (s) => s.name.toLowerCase().includes(query) || (s.clientName && s.clientName.toLowerCase().includes(query))
+        );
+      }
+      const siteId = matchingSite?.id || args.site_id || defaultSiteId;
+      const siteName = matchingSite?.name || args.site_name || defaultSiteName;
+      const machineName = args.machine_name || 'Site Equipment';
+      const opDay = (['full', 'half', 'quarter', 'none'].includes(args.operational_day) ? args.operational_day : 'full') as 'full' | 'half' | 'quarter' | 'none';
+      const refillLitres = args.diesel_refilled != null ? Number(args.diesel_refilled) : undefined;
+      const dipstick = args.dipstick_level_litres != null ? Number(args.dipstick_level_litres) : undefined;
+      const isFull = Boolean(args.is_tank_filled_to_full);
+
+      const parts: string[] = [];
+      parts.push(`${opDay.toUpperCase()} run`);
+      if (refillLitres != null && refillLitres > 0) parts.push(`Refill: ${refillLitres}L`);
+      if (dipstick != null) parts.push(`Dipstick: ${dipstick}L`);
+      if (isFull) parts.push(`100% Full`);
+
+      return {
+        id: proposalId,
+        type: 'LOG_MACHINE_DAILY',
+        title: `Machine Log: ${machineName} (${parts.join(', ')})`,
+        summary: `Log daily run for ${machineName} at ${siteName} on ${args.date || defaultDate}. Status: ${opDay}${refillLitres ? `, refilled ${refillLitres}L` : ''}${dipstick != null ? `, dipstick ${dipstick}L` : ''}${isFull ? ', topped full' : ''}.`,
+        status: 'pending',
+        createdAt: new Date().toISOString(),
+        targetPath: `/operations/daily-logs`,
+        payload: {
+          type: 'LOG_MACHINE_DAILY',
+          data: {
+            date: args.date || defaultDate,
+            siteId,
+            siteName,
+            assetName: machineName,
+            operationalDay: opDay,
+            dieselRefilled: refillLitres,
+            dipstickLevelLitres: dipstick,
+            isTankFilledToFull: isFull,
+            supervisorOnSite: args.supervisor || undefined,
+            issuesOnSite: args.issues || undefined,
+            maintenanceDetails: args.maintenance_details || undefined,
           },
         },
       };

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { 
   ArrowLeft, Calendar, Clock, AlertTriangle, 
   CheckCircle2, Fuel, User, MessageSquare, 
@@ -10,7 +10,7 @@ import {
 import { useOperations } from '../contexts/OperationsContext';
 import { useAppStore, AttendanceRecord, DewateringStage } from '../store/appStore';
 import { useUserStore } from '../store/userStore';
-import { DailyMachineLog, DowntimeEntry, OperationalDay } from '../types/operations';
+import { DailyMachineLog, DowntimeEntry, DowntimeCategory, OperationalDay } from '../types/operations';
 import { Button } from '@/src/components/ui/button';
 import { Badge } from '@/src/components/ui/badge';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
@@ -24,6 +24,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription 
 } from '@/src/components/ui/dialog';
 import { toast } from 'sonner';
+import { showConfirm } from '@/src/components/ui/toast';
 import { CustomCamera } from '../components/ui/CustomCamera';
 import { POSITION_HIERARCHY } from '@/src/lib/hierarchy';
 
@@ -39,7 +40,7 @@ interface DailyLogManagerProps {
 
 export function DailyLogManager({ assetId, assetName, siteId, siteName, initialDate, isEmbedded, onBack }: DailyLogManagerProps) {
   const { dailyMachineLogs, logDailyActivity, deleteDailyLog, waybills, sitePumpDates, assets, maintenanceAssets } = useOperations();
-  const { employees, attendanceRecords, sites, siteJournalEntries, dailyJournals, updateSite, addDailyJournal, updateDailyJournal } = useAppStore();
+  const { employees, attendanceRecords, sites, siteJournalEntries, dailyJournals, updateSite, addDailyJournal, updateDailyJournal, setDailyLogFormDirty } = useAppStore();
   const currentSite = useMemo(() => sites.find(s => s.id === siteId || s.name.toLowerCase().trim() === siteName.toLowerCase().trim()), [sites, siteId, siteName]);
   const currentUser = useUserStore(s => s.users.find(u => u.id === s.currentUserId));
   
@@ -59,6 +60,12 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
     e.staffType === 'FIELD'
   );
   
+  // Asset telemetry benchmark matching
+  const currentAsset = useMemo(() => {
+    return (assets || []).find(a => a.id === assetId);
+  }, [assets, assetId]);
+  const ratedTankCapacity = Number(currentAsset?.tankCapacityLitres) || 0;
+
   // Calendar State
   const [currentMonth, setCurrentMonth] = useState(new Date());
   
@@ -76,6 +83,8 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
   // isActive is derived from operationalDay
   const isActive = operationalDay !== 'none';
   const [dieselUsage, setDieselUsage] = useState<string>(selectedLog ? selectedLog.dieselUsage.toString() : '0');
+  const [dipstickLevel, setDipstickLevel] = useState<string>(selectedLog?.dipstickLevelLitres != null ? selectedLog.dipstickLevelLitres.toString() : '');
+  const [isTankFilledToFull, setIsTankFilledToFull] = useState<boolean>(!!selectedLog?.isTankFilledToFull);
   const [supervisorOnSite, setSupervisorOnSite] = useState(selectedLog?.supervisorOnSite || '');
   const [siteStage, setSiteStage] = useState<DewateringStage | ''>('');
 
@@ -197,8 +206,14 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
   
   // Downtime Form State
   const [dtReason, setDtReason] = useState('');
-  const [dtDuration, setDtDuration] = useState('1');
+  const [dtStartTime, setDtStartTime] = useState('10:00');
+  const [dtEndTime, setDtEndTime] = useState('12:00');
+  const [dtIsStillDown, setDtIsStillDown] = useState(false);
+  const [dtDuration, setDtDuration] = useState('2.0');
   const [dtSeverity, setDtSeverity] = useState<'low' | 'medium' | 'high'>('medium');
+  const [dtCategory, setDtCategory] = useState<DowntimeCategory>('mechanical');
+  const [dtNotes, setDtNotes] = useState('');
+  const [dtUseManualDuration, setDtUseManualDuration] = useState(false);
   
   // Media State
   const [mediaFiles, setMediaFiles] = useState<File[]>([]);
@@ -211,6 +226,120 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
   // Constants - Replace with your actual deployment URL
   const MEDIA_SERVER_URL = 'https://media.dcel-suite.com'; 
 
+  // ── Dirty Form Tracking & Navigation Guard ──
+  const initialSnapshotRef = React.useRef<{
+    date: string;
+    endDate: string;
+    operationalDay: OperationalDay;
+    dieselUsage: string;
+    dipstickLevel: string;
+    isTankFilledToFull: boolean;
+    supervisorOnSite: string;
+    siteStage: string;
+    clientFeedback: string;
+    maintenanceDetails: string;
+    issuesOnSite: string;
+    downtimeEntriesHash: string;
+  } | null>(null);
+
+  const takeSnapshot = React.useCallback((log: DailyMachineLog | null, explicitDate?: string, explicitStage?: string) => {
+    const opDay = deriveOpDay(log);
+    initialSnapshotRef.current = {
+      date: explicitDate || log?.date || initialDate || new Date().toISOString().split('T')[0],
+      endDate: '',
+      operationalDay: opDay,
+      dieselUsage: log ? log.dieselUsage.toString() : '0',
+      dipstickLevel: log?.dipstickLevelLitres != null ? log.dipstickLevelLitres.toString() : '',
+      isTankFilledToFull: !!log?.isTankFilledToFull,
+      supervisorOnSite: log?.supervisorOnSite || '',
+      siteStage: explicitStage !== undefined ? explicitStage : (siteStage || ''),
+      clientFeedback: log?.clientFeedback || '',
+      maintenanceDetails: log?.maintenanceDetails || '',
+      issuesOnSite: log?.issuesOnSite || '',
+      downtimeEntriesHash: JSON.stringify(log?.downtimeEntries || [])
+    };
+  }, [initialDate, siteStage]);
+
+  // Initial snapshot on mount if starting in form mode
+  React.useEffect(() => {
+    if (view === 'form' && !initialSnapshotRef.current) {
+      takeSnapshot(selectedLog, date, siteStage);
+    }
+  }, [view, selectedLog, date, siteStage, takeSnapshot]);
+
+  const isFormDirty = useMemo(() => {
+    if (view !== 'form' || !initialSnapshotRef.current) return false;
+    const snap = initialSnapshotRef.current;
+    if (mediaFiles.length > 0) return true;
+    if (date !== snap.date) return true;
+    if (endDate !== snap.endDate) return true;
+    if (operationalDay !== snap.operationalDay) return true;
+    if (dieselUsage !== snap.dieselUsage) return true;
+    if (dipstickLevel !== snap.dipstickLevel) return true;
+    if (isTankFilledToFull !== snap.isTankFilledToFull) return true;
+    if (supervisorOnSite !== snap.supervisorOnSite) return true;
+    if (siteStage !== snap.siteStage) return true;
+    if (clientFeedback.trim() !== snap.clientFeedback.trim()) return true;
+    if (maintenanceDetails.trim() !== snap.maintenanceDetails.trim()) return true;
+    if (issuesOnSite.trim() !== snap.issuesOnSite.trim()) return true;
+    if (JSON.stringify(downtimeEntries) !== snap.downtimeEntriesHash) return true;
+    return false;
+  }, [
+    view, date, endDate, operationalDay, dieselUsage, dipstickLevel,
+    isTankFilledToFull, supervisorOnSite, siteStage, clientFeedback,
+    maintenanceDetails, issuesOnSite, downtimeEntries, mediaFiles.length
+  ]);
+
+  // Sync with global store so sidebar and other navigations can intercept
+  React.useEffect(() => {
+    setDailyLogFormDirty(isFormDirty);
+    return () => {
+      setDailyLogFormDirty(false);
+    };
+  }, [isFormDirty, setDailyLogFormDirty]);
+
+  // Browser reload / tab close guard
+  React.useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (view === 'form' && isFormDirty) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [view, isFormDirty]);
+
+  const handleCancel = async () => {
+    if (isFormDirty) {
+      const ok = await showConfirm('You have unsaved changes in this log. Are you sure you want to discard them?', {
+        title: 'Discard Changes',
+        confirmLabel: 'Discard Changes',
+        cancelLabel: 'Keep Editing',
+        variant: 'danger'
+      });
+      if (!ok) return;
+    }
+    setDailyLogFormDirty(false);
+    resetForm();
+    if (isEmbedded) {
+      onBack();
+    } else {
+      setView('history');
+    }
+  };
+
+  const handleBack = async () => {
+    if (view === 'form') {
+      await handleCancel();
+    } else if (view === 'detail') {
+      setView('history');
+    } else if (view !== 'history' && !isEmbedded) {
+      setView('history');
+    } else {
+      onBack();
+    }
+  };
 
   const logs = useMemo(() => {
     return dailyMachineLogs
@@ -321,19 +450,98 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
       .map(([label, value]) => ({ label, value, isAvg: false }));
   }, [filteredLogs, analyticsMonth]);
 
+  // Helper to calculate downtime duration between start and restart timestamps
+  const calculateDowntimeDuration = useCallback((start: string, end: string, isStillDown: boolean): { hours: number; formatted: string } => {
+    if (isStillDown) {
+      if (!start) return { hours: 0, formatted: '0h 0m' };
+      const [sH, sM] = start.split(':').map(Number);
+      const startMins = (sH || 0) * 60 + (sM || 0);
+      const endMins = 24 * 60; // Until end of 24h operational day
+      const diff = Math.max(0, endMins - startMins);
+      const hrs = diff / 60;
+      const h = Math.floor(diff / 60);
+      const m = diff % 60;
+      return { hours: Number(hrs.toFixed(2)), formatted: `${h}h ${m}m (Ongoing until shift end)` };
+    }
+
+    if (!start || !end) return { hours: 0, formatted: '0h 0m' };
+    const [sH, sM] = start.split(':').map(Number);
+    const [eH, eM] = end.split(':').map(Number);
+    const startMins = (sH || 0) * 60 + (sM || 0);
+    let endMins = (eH || 0) * 60 + (eM || 0);
+
+    // Handle cross-midnight (e.g. 23:00 to 02:00)
+    if (endMins < startMins) {
+      endMins += 24 * 60;
+    }
+
+    const diff = endMins - startMins;
+    const hrs = diff / 60;
+    const h = Math.floor(diff / 60);
+    const m = diff % 60;
+    return { hours: Number(hrs.toFixed(2)), formatted: `${h}h ${m > 0 ? `${m}m` : ''} (${hrs.toFixed(1)} hrs)` };
+  }, []);
+
   const handleAddDowntime = () => {
-    if (!dtReason) return;
+    if (!dtReason.trim()) {
+      toast.error('Please specify a reason for the downtime.');
+      return;
+    }
+    const duration = Number(dtDuration);
+    if (isNaN(duration) || duration <= 0) {
+      toast.error('Duration must be greater than 0.');
+      return;
+    }
+
     const newEntry: DowntimeEntry = {
       id: crypto.randomUUID(),
-      reason: dtReason,
-      durationHours: Number(dtDuration),
+      reason: dtReason.trim(),
+      durationHours: Number(duration.toFixed(2)),
       severity: dtSeverity,
+      category: dtCategory,
+      startTime: dtStartTime || undefined,
+      endTime: dtIsStillDown ? undefined : (dtEndTime || undefined),
+      isStillDown: dtIsStillDown,
+      notes: dtNotes.trim() || undefined,
       timestamp: new Date().toISOString()
     };
-    setDowntimeEntries([...downtimeEntries, newEntry]);
+
+    const nextEntries = [...downtimeEntries, newEntry];
+    setDowntimeEntries(nextEntries);
+
+    // Calculate new total downtime
+    const totalLostHrs = nextEntries.reduce((sum, d) => sum + d.durationHours, 0);
+
+    // Smart suggestion for operational day billing:
+    if (totalLostHrs >= 12 && operationalDay !== 'none') {
+      toast.info(`Total downtime is now ${totalLostHrs.toFixed(1)} hrs (≥ 12 hrs). You may want to set Operational Day to OFF.`, {
+        action: {
+          label: 'Set to OFF',
+          onClick: () => setOperationalDay('none')
+        },
+        duration: 7000,
+      });
+    } else if (totalLostHrs >= 4 && operationalDay === 'full') {
+      toast.info(`Total downtime is now ${totalLostHrs.toFixed(1)} hrs (≥ 4 hrs). Consider switching Operational Day to HALF DAY.`, {
+        action: {
+          label: 'Set to HALF DAY',
+          onClick: () => setOperationalDay('half')
+        },
+        duration: 7000,
+      });
+    }
+
+    // Reset dialog inputs
     setDtReason('');
-    setDtDuration('1');
+    setDtNotes('');
+    setDtIsStillDown(false);
     setShowDowntimeDialog(false);
+    toast.success(`Downtime incident recorded (${duration} hrs).`);
+  };
+
+  const handleRemoveDowntime = (id: string) => {
+    setDowntimeEntries(prev => prev.filter(d => d.id !== id));
+    toast.success('Downtime incident removed.');
   };
 
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
@@ -607,6 +815,25 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
         return;
       }
 
+      // If editing an existing log and changing the date:
+      if (selectedLog && date !== selectedLog.date) {
+        const conflictLog = logs.find(l => l.date === date && l.id !== selectedLog.id);
+        if (conflictLog) {
+          const ok = await showConfirm(
+            `A log already exists for ${assetName} on ${formatDisplayDate(date)}. Do you want to overwrite it with this log?`,
+            {
+              title: 'Overwrite Existing Log?',
+              confirmLabel: 'Overwrite Log',
+              cancelLabel: 'Cancel',
+              variant: 'danger'
+            }
+          );
+          if (!ok) return;
+        }
+        // Delete previous date record so the log moves to the new date without duplicate records
+        await deleteDailyLog(selectedLog.id);
+      }
+
       for (const logDate of newDates) {
         await logDailyActivity({
           assetId,
@@ -616,7 +843,9 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
           date: logDate,
           isActive,
           operationalDay,
-          dieselUsage: Number(dieselUsage),
+          dieselUsage: Number(dieselUsage) || 0,
+          dipstickLevelLitres: dipstickLevel.trim() !== '' ? Number(dipstickLevel) : undefined,
+          isTankFilledToFull,
           supervisorOnSite,
           clientFeedback,
           maintenanceDetails,
@@ -714,6 +943,7 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
       } else {
         toast.success(`${newDates.length} log${newDates.length !== 1 ? 's' : ''} saved successfully`);
       }
+      setDailyLogFormDirty(false);
       if (isEmbedded) {
         onBack();
       } else {
@@ -726,17 +956,24 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
   };
 
   const resetForm = () => {
-    setDate(initialDate || new Date().toISOString().split('T')[0]);
+    const resetDate = initialDate || new Date().toISOString().split('T')[0];
+    setDate(resetDate);
     setEndDate('');
     setOperationalDay('full');
     setDieselUsage('0');
+    setDipstickLevel('');
+    setIsTankFilledToFull(false);
     setSupervisorOnSite('');
     setClientFeedback('');
     setMaintenanceDetails('');
     setIssuesOnSite('');
     setDowntimeEntries([]);
     setSelectedLog(null);
-    setSiteStage(currentSite?.currentDewateringStage || '');
+    const resetStage = currentSite?.currentDewateringStage || '';
+    setSiteStage(resetStage);
+    setMediaFiles([]);
+    setMediaPreviews([]);
+    takeSnapshot(null, resetDate, resetStage);
   };
 
   const editLog = (log: DailyMachineLog) => {
@@ -745,11 +982,15 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
     setEndDate('');
     setOperationalDay(deriveOpDay(log));
     setDieselUsage(log.dieselUsage.toString());
+    setDipstickLevel(log.dipstickLevelLitres != null ? log.dipstickLevelLitres.toString() : '');
+    setIsTankFilledToFull(!!log.isTankFilledToFull);
     setSupervisorOnSite(log.supervisorOnSite || '');
     setClientFeedback(log.clientFeedback || '');
     setMaintenanceDetails(log.maintenanceDetails || '');
     setIssuesOnSite(log.issuesOnSite || '');
     setDowntimeEntries(log.downtimeEntries || []);
+    setMediaFiles([]);
+    setMediaPreviews([]);
     fetchUploadedMedia(log.siteId, log.assetId, log.date);
     
     // Look up stage for this log date
@@ -757,8 +998,10 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
     const journalEntry = journalForDate 
       ? siteJournalEntries.find(e => e.journalId === journalForDate.id && e.siteId === log.siteId)
       : null;
-    setSiteStage(journalEntry?.dewateringStage || currentSite?.currentDewateringStage || '');
+    const stage = journalEntry?.dewateringStage || currentSite?.currentDewateringStage || '';
+    setSiteStage(stage);
 
+    takeSnapshot(log, log.date, stage);
     setView('form');
   };
 
@@ -770,120 +1013,167 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
 
   // inside component, right before return:
   useSetPageTitle(
-    assetName,
-    <div className="flex items-center gap-2 flex-wrap text-xs text-slate-500 font-medium mt-0.5">
-      <span>{siteName}</span>
-      {currentSite && (
-        <>
-          <span className="text-slate-300 dark:text-slate-700">•</span>
-          <span className="font-semibold text-slate-700 dark:text-slate-300">{currentSite.currentProgressPercentage ?? 0}% Progress</span>
-          {currentSite.currentDewateringStage && (
-            <>
-              <span className="text-slate-300 dark:text-slate-700">•</span>
-              <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full ${
-                currentSite.currentDewateringStage === 'mobilization' ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 border border-blue-200/50' :
-                currentSite.currentDewateringStage === 'installation' ? 'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 border border-amber-200/50' :
-                currentSite.currentDewateringStage === 'operation' ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300 border border-emerald-200/50' :
-                'bg-rose-50 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300 border border-rose-200/50'
-              }`}>
-                {currentSite.currentDewateringStage === 'mobilization' && '🚚'}
-                {currentSite.currentDewateringStage === 'installation' && '🔧'}
-                {currentSite.currentDewateringStage === 'operation' && '⚙️'}
-                {currentSite.currentDewateringStage === 'demobilisation' && '📦'}
-                <span className="capitalize">{currentSite.currentDewateringStage}</span>
-              </span>
-            </>
-          )}
-        </>
-      )}
-    </div>,
-    <div className="flex items-center gap-1.5 sm:gap-3">
-      {!isEmbedded && (
-        <div className="flex bg-slate-100 dark:bg-slate-800/50 p-1 rounded-lg">
-          <button 
-            className={cn(
-              "px-3 py-1.5 text-xs font-bold rounded-md transition-all", 
-              view === 'history' 
-                ? 'bg-white dark:bg-slate-700 text-blue-700 dark:text-blue-300 shadow-sm' 
-                : 'text-slate-500 hover:text-slate-700'
+    view === 'form'
+      ? (selectedLog ? `Edit Log — ${assetName}` : `Log Activity — ${assetName}`)
+      : assetName,
+    view === 'form' ? (
+      <div className="flex items-center gap-2 flex-wrap text-xs text-slate-500 font-medium mt-0.5">
+        <span className="font-semibold text-slate-700 dark:text-slate-300">
+          Date: {date ? formatDisplayDate(date) : 'No date'}
+        </span>
+        <span className="text-slate-300 dark:text-slate-700">•</span>
+        <span>{siteName}</span>
+        {currentSite?.currentDewateringStage && (
+          <>
+            <span className="text-slate-300 dark:text-slate-700">•</span>
+            <span className="capitalize text-slate-600 dark:text-slate-400 font-medium">
+              {currentSite.currentDewateringStage}
+            </span>
+          </>
+        )}
+      </div>
+    ) : (
+      <div className="flex items-center gap-2 flex-wrap text-xs text-slate-500 font-medium mt-0.5">
+        <span>{siteName}</span>
+        {currentSite && (
+          <>
+            <span className="text-slate-300 dark:text-slate-700">•</span>
+            <span className="font-semibold text-slate-700 dark:text-slate-300">{currentSite.currentProgressPercentage ?? 0}% Progress</span>
+            {currentSite.currentDewateringStage && (
+              <>
+                <span className="text-slate-300 dark:text-slate-700">•</span>
+                <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full ${
+                  currentSite.currentDewateringStage === 'mobilization' ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 border border-blue-200/50' :
+                  currentSite.currentDewateringStage === 'installation' ? 'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 border border-amber-200/50' :
+                  currentSite.currentDewateringStage === 'operation' ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300 border border-emerald-200/50' :
+                  'bg-rose-50 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300 border border-rose-200/50'
+                }`}>
+                  {currentSite.currentDewateringStage === 'mobilization' && '🚚'}
+                  {currentSite.currentDewateringStage === 'installation' && '🔧'}
+                  {currentSite.currentDewateringStage === 'operation' && '⚙️'}
+                  {currentSite.currentDewateringStage === 'demobilisation' && '📦'}
+                  <span className="capitalize">{currentSite.currentDewateringStage}</span>
+                </span>
+              </>
             )}
-            onClick={() => setView('history')}
-          >
-            History
-          </button>
-          <button 
-            className={cn(
-              "px-3 py-1.5 text-xs font-bold rounded-md transition-all", 
-              view === 'analytics' 
-                ? 'bg-white dark:bg-slate-700 text-blue-700 dark:text-blue-300 shadow-sm' 
-                : 'text-slate-500 hover:text-slate-700'
-            )}
-            onClick={() => setView('analytics')}
-          >
-            Analytics
-          </button>
-          <button 
-            className={cn(
-              "px-3 py-1.5 text-xs font-bold rounded-md transition-all", 
-              view === 'calendar' 
-                ? 'bg-white dark:bg-slate-700 text-blue-700 dark:text-blue-300 shadow-sm' 
-                : 'text-slate-500 hover:text-slate-700'
-            )}
-            onClick={() => setView('calendar')}
-          >
-            Calendar
-          </button>
-        </div>
-      )}
-      {!isEmbedded && view !== 'form' && view !== 'detail' && (
-        <Button 
+          </>
+        )}
+      </div>
+    ),
+    view === 'form' ? (
+      <div className="flex items-center gap-2">
+        <Button
+          variant="outline"
           size="sm"
-          className="gap-1.5 bg-blue-600 hover:bg-blue-700 text-white h-8 px-3 rounded-lg shadow-sm font-bold text-xs"
-          onClick={() => {
-            resetForm();
-            setView('form');
-          }}
+          className="h-8 px-3 text-xs font-semibold rounded-lg border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800"
+          onClick={handleCancel}
         >
-          <Plus className="h-3.5 w-3.5" /> <span>File Log</span>
+          Cancel
         </Button>
-      )}
-    </div>,
-    [view, assetName, siteName, isEmbedded, currentSite],
-    onBack
+        <Button
+          size="sm"
+          className="h-8 px-3.5 text-xs font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 text-white gap-1.5 shadow-sm"
+          onClick={handleSaveLog}
+          disabled={isUploading}
+        >
+          {isUploading ? (
+            <div className="h-3.5 w-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+          ) : (
+            <Save className="h-3.5 w-3.5" />
+          )}
+          <span>{isUploading ? 'Uploading...' : (selectedLog ? 'Update Log' : 'Save Daily Log')}</span>
+        </Button>
+      </div>
+    ) : (
+      <div className="flex items-center gap-1.5 sm:gap-3">
+        {!isEmbedded && (
+          <div className="flex bg-slate-100 dark:bg-slate-800/50 p-1 rounded-lg">
+            <button 
+              className={cn(
+                "px-3 py-1.5 text-xs font-bold rounded-md transition-all", 
+                view === 'history' 
+                  ? 'bg-white dark:bg-slate-700 text-blue-700 dark:text-blue-300 shadow-sm' 
+                  : 'text-slate-500 hover:text-slate-700'
+              )}
+              onClick={() => setView('history')}
+            >
+              History
+            </button>
+            <button 
+              className={cn(
+                "px-3 py-1.5 text-xs font-bold rounded-md transition-all", 
+                view === 'analytics' 
+                  ? 'bg-white dark:bg-slate-700 text-blue-700 dark:text-blue-300 shadow-sm' 
+                  : 'text-slate-500 hover:text-slate-700'
+              )}
+              onClick={() => setView('analytics')}
+            >
+              Analytics
+            </button>
+            <button 
+              className={cn(
+                "px-3 py-1.5 text-xs font-bold rounded-md transition-all", 
+                view === 'calendar' 
+                  ? 'bg-white dark:bg-slate-700 text-blue-700 dark:text-blue-300 shadow-sm' 
+                  : 'text-slate-500 hover:text-slate-700'
+              )}
+              onClick={() => setView('calendar')}
+            >
+              Calendar
+            </button>
+          </div>
+        )}
+        {!isEmbedded && view !== 'detail' && (
+          <Button 
+            size="sm"
+            className="gap-1.5 bg-blue-600 hover:bg-blue-700 text-white h-8 px-3 rounded-lg shadow-sm font-bold text-xs"
+            onClick={() => {
+              resetForm();
+              setView('form');
+            }}
+          >
+            <Plus className="h-3.5 w-3.5" /> <span>File Log</span>
+          </Button>
+        )}
+      </div>
+    ),
+    [view, assetName, siteName, isEmbedded, currentSite, date, selectedLog, isUploading, isFormDirty],
+    handleBack
   );
 
   return (
     <div className="flex flex-col h-full bg-slate-50 dark:bg-slate-950 overflow-hidden animate-in fade-in slide-in-from-right-4 duration-300">
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-6">
+      <div className="flex-1 overflow-y-auto p-3 sm:p-5">
         {view === 'history' && (
-          <div className="max-w-4xl mx-auto space-y-4 pb-12">
+          <div className="max-w-4xl mx-auto space-y-2.5 pb-12">
             {/* Lineage Info Banner */}
             {lineageInfo && (
-              <div className="flex items-center justify-between p-3.5 px-4 bg-indigo-50/80 dark:bg-indigo-950/40 border border-indigo-200/80 dark:border-indigo-900/60 rounded-xl text-xs text-indigo-900 dark:text-indigo-200 shadow-sm">
-                <div className="flex items-center gap-2">
-                  <ArrowRightLeft className="h-4 w-4 text-indigo-600 shrink-0" />
-                  <span>
-                    Replaced <span className="font-bold text-indigo-700 dark:text-indigo-300">{lineageInfo.predName}</span> on {formatDisplayDate(lineageInfo.swapDate)} ({lineageInfo.predActiveDays} earlier days on this slot).
+              <div className="flex items-center justify-between p-2.5 px-3.5 bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200/80 dark:border-blue-900/60 rounded-lg text-xs text-blue-900 dark:text-blue-200 shadow-2xs">
+                <div className="flex items-center gap-2 min-w-0">
+                  <ArrowRightLeft className="h-3.5 w-3.5 text-blue-600 shrink-0" />
+                  <span className="truncate">
+                    Replaced <span className="font-bold text-blue-700 dark:text-blue-300">{lineageInfo.predName}</span> on {formatDisplayDate(lineageInfo.swapDate)} ({lineageInfo.predActiveDays} earlier days on this slot).
                   </span>
                 </div>
-                <span className="hidden sm:inline-block font-semibold text-[10px] bg-white/80 dark:bg-indigo-900/60 px-2 py-0.5 rounded-md border border-indigo-200 dark:border-indigo-800 uppercase tracking-wider text-indigo-600 dark:text-indigo-300">
-                  Slot History Linked
+                <span className="hidden sm:inline-block font-semibold text-[10px] bg-white/80 dark:bg-blue-900/60 px-2 py-0.5 rounded-md border border-blue-200 dark:border-blue-800 uppercase tracking-wider text-blue-600 dark:text-blue-300 shrink-0 ml-2">
+                  Slot Linked
                 </span>
               </div>
             )}
 
             {logs.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-24 text-slate-300 bg-white dark:bg-slate-900 rounded-3xl border-2 border-dashed border-slate-100 dark:border-slate-800 shadow-sm">
-                <div className="h-20 w-20 rounded-full bg-slate-50 dark:bg-slate-800/50 flex items-center justify-center mb-6">
-                  <History className="h-10 w-10 text-slate-200" />
+              <div className="flex flex-col items-center justify-center py-20 text-slate-300 bg-white dark:bg-slate-900 rounded-2xl border-2 border-dashed border-slate-100 dark:border-slate-800 shadow-xs">
+                <div className="h-16 w-16 rounded-full bg-slate-50 dark:bg-slate-800/50 flex items-center justify-center mb-4">
+                  <History className="h-8 w-8 text-slate-300 dark:text-slate-600" />
                 </div>
-                <p className="text-base font-semibold text-slate-500 dark:text-slate-400">No logs found for this machine</p>
-                <p className="text-sm text-slate-300 mt-2 max-w-xs text-center">Start logging daily operations to track performance and maintenance trends on this site.</p>
+                <p className="text-sm font-semibold text-slate-600 dark:text-slate-300">No logs found for this machine</p>
+                <p className="text-xs text-slate-400 mt-1 max-w-xs text-center">Start logging daily operations to track performance and maintenance trends on this site.</p>
                 <Button 
                   variant="outline" 
-                  className="mt-8 gap-2 rounded-2xl border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
+                  size="sm"
+                  className="mt-6 gap-2 rounded-xl border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-xs font-semibold"
                   onClick={() => setView('form')}
                 >
                   Create First Log
@@ -892,25 +1182,25 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
             ) : (
               <>
                 {/* Multi-Select Action Toolbar */}
-                <div className="flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-slate-900 p-3 px-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm transition-all">
-                  <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center justify-between gap-2.5 bg-white dark:bg-slate-900 p-2.5 px-3.5 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-2xs transition-all">
+                  <div className="flex items-center gap-2.5">
                     <button
                       type="button"
                       onClick={toggleSelectAll}
-                      className="flex items-center gap-2.5 text-xs font-bold text-slate-700 dark:text-slate-200 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                      className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-200 hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer"
                     >
                       <div className={cn(
-                        "h-5 w-5 rounded-md border flex items-center justify-center transition-all cursor-pointer",
+                        "h-4 w-4 rounded border flex items-center justify-center transition-all cursor-pointer",
                         selectedLogIds.size === logs.length && logs.length > 0
-                          ? "bg-blue-600 border-blue-600 text-white shadow-sm"
+                          ? "bg-blue-600 border-blue-600 text-white shadow-2xs"
                           : selectedLogIds.size > 0
                             ? "bg-blue-50 border-blue-400 text-blue-600 dark:bg-blue-900/30"
                             : "border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 hover:border-slate-400"
                       )}>
                         {selectedLogIds.size === logs.length && logs.length > 0 ? (
-                          <Check className="h-3.5 w-3.5 stroke-[3]" />
+                          <Check className="h-3 w-3 stroke-[3]" />
                         ) : selectedLogIds.size > 0 ? (
-                          <div className="h-2 w-2 rounded-sm bg-blue-600" />
+                          <div className="h-1.5 w-1.5 rounded-xs bg-blue-600" />
                         ) : null}
                       </div>
                       <span>
@@ -922,17 +1212,17 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
                   </div>
 
                   {selectedLogIds.size > 0 ? (
-                    <div className="flex items-center gap-2 animate-in fade-in zoom-in-95 duration-150">
+                    <div className="flex items-center gap-1.5 animate-in fade-in zoom-in-95 duration-150">
                       <Button
                         size="sm"
                         variant="outline"
-                        className="h-8 gap-1.5 text-xs font-bold border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 dark:border-blue-900/40 dark:bg-blue-950/30 dark:text-blue-300 rounded-lg shadow-sm"
+                        className="h-7 px-2.5 gap-1 text-xs font-bold border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 dark:border-blue-900/40 dark:bg-blue-950/30 dark:text-blue-300 rounded-lg shadow-2xs"
                         onClick={() => {
                           resetBulkEditForm();
                           setShowBulkEditDialog(true);
                         }}
                       >
-                        <Edit2 className="h-3.5 w-3.5" />
+                        <Edit2 className="h-3 w-3" />
                         <span>Bulk Edit ({selectedLogIds.size})</span>
                       </Button>
 
@@ -940,10 +1230,10 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
                         <Button
                           size="sm"
                           variant="outline"
-                          className="h-8 gap-1.5 text-xs font-bold border-rose-200 text-rose-700 bg-rose-50 hover:bg-rose-100 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-300 rounded-lg shadow-sm"
+                          className="h-7 px-2.5 gap-1 text-xs font-bold border-rose-200 text-rose-700 bg-rose-50 hover:bg-rose-100 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-300 rounded-lg shadow-2xs"
                           onClick={() => setShowBulkDeleteDialog(true)}
                         >
-                          <Trash2 className="h-3.5 w-3.5" />
+                          <Trash2 className="h-3 w-3" />
                           <span>Delete ({selectedLogIds.size})</span>
                         </Button>
                       )}
@@ -951,35 +1241,49 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
                       <Button
                         size="sm"
                         variant="ghost"
-                        className="h-8 px-2 text-xs font-bold text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 rounded-lg"
+                        className="h-7 px-1.5 text-xs font-bold text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-lg"
                         onClick={clearSelection}
                         title="Clear Selection"
                       >
-                        <X className="h-4 w-4" />
+                        <X className="h-3.5 w-3.5" />
                       </Button>
                     </div>
                   ) : (
-                    <span className="text-xs text-slate-400 font-medium">
+                    <span className="text-[11px] text-slate-400 font-medium">
                       Select logs to bulk edit or delete
                     </span>
                   )}
                 </div>
 
-                {/* Log Cards */}
+                {/* Sleek, Minimal & High-Density Log Cards */}
                 {logs.map(log => {
                   const isSelected = selectedLogIds.has(log.id);
+                  const hasIssues = !!log.issuesOnSite?.trim();
+                  const hasMaintenance = !!log.maintenanceDetails?.trim();
+                  const hasFeedback = !!log.clientFeedback?.trim();
+                  const hasSubDetails = hasIssues || hasMaintenance || hasFeedback;
+
+                  const opDay = log.operationalDay ?? (log.isActive ? 'full' : 'none');
+                  const dieselNum = Number(log.dieselUsage) || 0;
+                  const hasDowntime = log.downtimeEntries && log.downtimeEntries.length > 0;
+                  const totalDowntimeHours = hasDowntime 
+                    ? log.downtimeEntries.reduce((s, d) => s + (Number(d.durationHours) || 0), 0)
+                    : 0;
+
                   return (
-                    <Card 
+                    <div 
                       key={log.id} 
                       className={cn(
-                        "border bg-white dark:bg-slate-900 shadow-sm hover:shadow-md transition-all rounded-xl group overflow-hidden",
+                        "flex flex-col border bg-white dark:bg-slate-900 rounded-xl transition-all overflow-hidden",
                         isSelected
-                          ? "border-blue-400 dark:border-blue-600 ring-2 ring-blue-500/20 bg-blue-50/[0.03]"
-                          : "border-slate-200 dark:border-slate-800"
+                          ? "border-blue-400 dark:border-blue-600 ring-1 ring-blue-500/20 bg-blue-50/[0.03]"
+                          : "border-slate-200/80 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 shadow-2xs"
                       )}
                     >
-                      <div className="flex justify-between items-start p-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
-                        <div className="flex items-center gap-3">
+                      {/* Main Compact Row */}
+                      <div className="flex items-center justify-between gap-2.5 p-2.5 sm:px-3.5">
+                        {/* Left Side: Checkbox + Date + Status + Fuel + Downtime + Supervisor */}
+                        <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 flex-1 flex-wrap sm:flex-nowrap">
                           {/* Checkbox */}
                           <div
                             onClick={(e) => {
@@ -987,103 +1291,117 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
                               toggleSelectLog(log.id);
                             }}
                             className={cn(
-                              "h-6 w-6 rounded-lg border flex items-center justify-center transition-all cursor-pointer shrink-0",
+                              "h-4 w-4 rounded border flex items-center justify-center transition-all cursor-pointer shrink-0",
                               isSelected
-                                ? "bg-blue-600 border-blue-600 text-white shadow-sm"
-                                : "border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 hover:border-blue-400 group-hover:border-slate-400"
+                                ? "bg-blue-600 border-blue-600 text-white shadow-2xs"
+                                : "border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 hover:border-blue-400"
                             )}
                           >
-                            {isSelected && <Check className="h-3.5 w-3.5 stroke-[3]" />}
+                            {isSelected && <Check className="h-3 w-3 stroke-[3]" />}
                           </div>
 
-                          <div className="h-10 w-10 rounded-lg bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0">
-                            <Calendar className="h-5 w-5" />
+                          {/* Date */}
+                          <div className="font-bold text-xs sm:text-sm text-slate-800 dark:text-slate-100 shrink-0">
+                            {formatDisplayDate(log.date)}
                           </div>
-                          <div>
-                            <p className="text-base font-bold text-slate-800 dark:text-white">{formatDisplayDate(log.date)}</p>
-                            <div className="flex items-center gap-2 mt-0.5">
-                                {(() => {
-                                  const day = log.operationalDay ?? (log.isActive ? 'full' : 'none');
-                                  return (
-                                    <Badge className={cn(
-                                      "text-[10px] font-bold px-2 py-0 rounded-full",
-                                      day === 'full' ? "bg-emerald-50 text-emerald-700 border-emerald-100" :
-                                      day === 'half' ? "bg-amber-50 text-amber-700 border-amber-100" :
-                                      "bg-rose-50 text-rose-700 border-rose-100"
-                                    )}>
-                                      {day === 'full' ? 'FULL DAY' : day === 'half' ? 'HALF DAY' : 'OFF'}
-                                    </Badge>
-                                  );
-                                })()}
-                                {log.downtimeEntries.length > 0 && (
-                                  <Badge variant="outline" className="text-[10px] font-bold px-2 py-0 rounded-full bg-amber-50 text-amber-700 border-amber-100">
-                                    {log.downtimeEntries.length} DOWNTIME INCIDENTS
-                                  </Badge>
-                                )}
-                              </div>
-                          </div>
+
+                          {/* Operational Day Badge */}
+                          <span className={cn(
+                            "text-[10px] font-extrabold px-2 py-0.5 rounded-full inline-flex items-center gap-1 shrink-0 uppercase tracking-wider",
+                            opDay === 'full' 
+                              ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200/70 dark:border-emerald-800/60" 
+                              : opDay === 'half' 
+                              ? "bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200/70 dark:border-amber-800/60" 
+                              : "bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-200/70 dark:border-rose-800/60"
+                          )}>
+                            <span className={cn("w-1.5 h-1.5 rounded-full", opDay === 'full' ? "bg-emerald-500" : opDay === 'half' ? "bg-amber-500" : "bg-rose-500")} />
+                            {opDay === 'full' ? 'Full Day' : opDay === 'half' ? 'Half Day' : 'Off'}
+                          </span>
+
+                          {/* Diesel Refill Pill */}
+                          {dieselNum > 0 && (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border border-amber-200/60 dark:border-amber-800/60 shrink-0">
+                              <Fuel className="h-3 w-3 text-amber-600 dark:text-amber-400" />
+                              <span>{log.dieselUsage} L</span>
+                              {log.isTankFilledToFull && <span className="text-[9px] font-normal text-amber-700 dark:text-amber-400">(Full)</span>}
+                            </span>
+                          )}
+
+                          {/* Dipstick Reading */}
+                          {log.dipstickLevelLitres != null && Number(log.dipstickLevelLitres) >= 0 && (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-md bg-cyan-50 dark:bg-cyan-950/40 text-cyan-800 dark:text-cyan-300 border border-cyan-200/60 dark:border-cyan-800/60 shrink-0">
+                              <span className="text-[10px] text-cyan-600 dark:text-cyan-400 font-bold">Dip:</span>
+                              <span>{log.dipstickLevelLitres} L</span>
+                            </span>
+                          )}
+
+                          {/* Downtime Badge */}
+                          {hasDowntime && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-200/60 dark:border-rose-800/60 shrink-0">
+                              <Clock className="h-3 w-3 text-rose-500" />
+                              <span>
+                                {totalDowntimeHours.toFixed(1)}h lost ({log.downtimeEntries.length})
+                              </span>
+                            </span>
+                          )}
+
+                          {/* Supervisor */}
+                          {log.supervisorOnSite && (
+                            <span className="hidden md:inline-flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                              <User className="h-3 w-3 text-slate-400 shrink-0" />
+                              <span className="truncate max-w-[130px]">{log.supervisorOnSite}</span>
+                            </span>
+                          )}
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800" onClick={() => editLog(log)}>
-                            <Edit2 className="h-4 w-4" />
+
+                        {/* Right Side: Quick Actions */}
+                        <div className="flex items-center gap-1 shrink-0">
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-7 w-7 text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg" 
+                            onClick={() => editLog(log)}
+                            title="Edit Log"
+                          >
+                            <Edit2 className="h-3.5 w-3.5" />
                           </Button>
                           {currentUser?.privileges?.operations?.canDeleteLogs && (
                             <Button 
                               variant="ghost" 
                               size="icon" 
-                              className="h-8 w-8 text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-900/20" 
+                              className="h-7 w-7 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg" 
                               onClick={() => setDeleteConfirmId(log.id)}
+                              title="Delete Log"
                             >
-                              <Trash2 className="h-4 w-4" />
+                              <Trash2 className="h-3.5 w-3.5" />
                             </Button>
                           )}
                         </div>
                       </div>
 
-                      <div className="p-4 grid grid-cols-2 md:grid-cols-4 gap-6">
-                        <div className="space-y-1">
-                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Supervisor</p>
-                          <p className="text-sm font-medium text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
-                            <User className="h-3.5 w-3.5 text-slate-400" /> {log.supervisorOnSite || '—'}
-                          </p>
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Diesel Usage</p>
-                          <p className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                            <Fuel className="h-3.5 w-3.5 text-slate-400" /> {log.dieselUsage} L
-                          </p>
-                        </div>
-                        <div className="space-y-1 col-span-2">
-                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Client Feedback</p>
-                          <p className="text-sm text-slate-500 dark:text-slate-400 italic line-clamp-1">
-                            "{log.clientFeedback || 'No feedback provided'}"
-                          </p>
-                        </div>
-                      </div>
-
-                      {(log.issuesOnSite || log.maintenanceDetails) && (
-                        <div className="px-4 pb-4">
-                          <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/40 space-y-2 border border-slate-100 dark:border-slate-800">
-                            {log.issuesOnSite && (
-                            <div className="flex gap-3">
-                              <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
-                              <p className="text-xs text-slate-600 dark:text-slate-400">
-                                <span className="font-bold text-slate-700 dark:text-slate-200">Site Issues:</span> {log.issuesOnSite}
-                              </p>
-                            </div>
+                      {/* Optional Sub-Details (Issues, Maintenance, Client Feedback) */}
+                      {hasSubDetails && (
+                        <div className="px-3.5 py-1.5 flex flex-wrap items-center gap-3 text-[11px] text-slate-600 dark:text-slate-400 border-t border-slate-100 dark:border-slate-800/70 bg-slate-50/50 dark:bg-slate-850/40">
+                          {hasIssues && (
+                            <span className="inline-flex items-center gap-1 text-amber-700 dark:text-amber-400 font-medium">
+                              <AlertTriangle className="h-3 w-3 shrink-0" />
+                              <span className="font-semibold">Issue:</span> {log.issuesOnSite}
+                            </span>
                           )}
-                          {log.maintenanceDetails && (
-                            <div className="flex gap-3">
-                              <Wrench className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
-                              <p className="text-xs text-slate-600 dark:text-slate-400">
-                                <span className="font-semibold text-slate-700 dark:text-slate-200">Maintenance:</span> {log.maintenanceDetails}
-                              </p>
-                            </div>
+                          {hasMaintenance && (
+                            <span className="inline-flex items-center gap-1 text-blue-700 dark:text-blue-400 font-medium">
+                              <Wrench className="h-3 w-3 shrink-0" />
+                              <span className="font-semibold">Maintenance:</span> {log.maintenanceDetails}
+                            </span>
                           )}
-                        </div>
+                          {hasFeedback && (
+                            <span className="italic text-slate-500 dark:text-slate-400 truncate max-w-md">
+                              "{log.clientFeedback}"
+                            </span>
+                          )}
                         </div>
                       )}
-                    </Card>
+                    </div>
                   );
                 })}
               </>
@@ -1221,21 +1539,191 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
                     </div>
                   </div>
 
-                  {/* Diesel */}
-                  {isActive && (
-                    <div className="space-y-2">
-                      <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider ml-1">Diesel Usage (L)</label>
-                      <div className="relative">
-                        <Fuel className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-                        <Input 
-                          type="number" 
-                          value={dieselUsage} 
-                          onChange={e => setDieselUsage(e.target.value)}
-                          className="pl-9 h-10 border-slate-200 dark:border-slate-700 rounded-md focus:ring-2 focus:ring-blue-500"
-                          placeholder="0.00"
-                        />
-                        <p className="text-[10px] text-slate-400 mt-1 font-medium text-center italic">diesel filled</p>
+                  {/* Machine Downtime Records Section */}
+                  <div className="col-span-full space-y-3 bg-slate-50/70 dark:bg-slate-800/50 p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-700/80">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+                          <Clock className="h-3.5 w-3.5 text-rose-500" />
+                          Machine Downtime Records
+                        </span>
+                        {downtimeEntries.length > 0 && (
+                          <Badge className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 dark:bg-rose-950/70 dark:text-rose-300 border-rose-200">
+                            {downtimeEntries.reduce((s, d) => s + d.durationHours, 0).toFixed(1)} hrs total ({downtimeEntries.length} incident{downtimeEntries.length > 1 ? 's' : ''})
+                          </Badge>
+                        )}
                       </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setDtReason('');
+                          setDtStartTime('10:00');
+                          setDtEndTime('12:00');
+                          setDtIsStillDown(false);
+                          setDtDuration('2.0');
+                          setDtCategory('mechanical');
+                          setDtSeverity('medium');
+                          setDtNotes('');
+                          setDtUseManualDuration(false);
+                          setShowDowntimeDialog(true);
+                        }}
+                        className="h-7 text-xs font-bold text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-900/40 hover:bg-rose-50 dark:hover:bg-rose-950/30 gap-1.5"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                        Record Downtime
+                      </Button>
+                    </div>
+
+                    {downtimeEntries.length === 0 ? (
+                      <p className="text-xs text-slate-400 italic py-1">
+                        No downtime incidents recorded for this shift (Continuous operation).
+                      </p>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                        {downtimeEntries.map((entry) => (
+                          <div
+                            key={entry.id}
+                            className="flex items-start justify-between gap-2 p-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs"
+                          >
+                            <div className="space-y-1 min-w-0 flex-1">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                {entry.startTime && (
+                                  <span className="font-mono text-xs font-bold text-slate-800 dark:text-slate-100">
+                                    {entry.startTime} → {entry.isStillDown ? 'Still Down' : (entry.endTime || '—')}
+                                  </span>
+                                )}
+                                <span className="text-xs font-bold text-rose-600 dark:text-rose-400">
+                                  ({entry.durationHours}h)
+                                </span>
+                                <span className={cn(
+                                  "text-[9px] px-1.5 py-0.2 rounded font-bold uppercase",
+                                  entry.category === 'mechanical' ? "bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300" :
+                                  entry.category === 'client_standby' ? "bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300" :
+                                  entry.category === 'weather' ? "bg-cyan-100 text-cyan-800 dark:bg-cyan-950/60 dark:text-cyan-300" :
+                                  entry.category === 'routine_service' ? "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300" :
+                                  "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                                )}>
+                                  {entry.category === 'mechanical' ? 'Mechanical (DCEL)' :
+                                   entry.category === 'client_standby' ? 'Client Standby' :
+                                   entry.category === 'weather' ? 'Weather / Rain' :
+                                   entry.category === 'routine_service' ? 'Routine Service' : 'Other'}
+                                </span>
+                              </div>
+                              <p className="text-xs text-slate-700 dark:text-slate-200 font-medium truncate">
+                                {entry.reason}
+                              </p>
+                              {entry.notes && (
+                                <p className="text-[10px] text-slate-400 italic truncate">
+                                  {entry.notes}
+                                </p>
+                              )}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveDowntime(entry.id)}
+                              className="text-slate-400 hover:text-rose-600 p-1 rounded transition-colors shrink-0"
+                              title="Remove incident"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Fuel Telemetry & Dipstick */}
+                  {isActive && (
+                    <div className="space-y-3 col-span-full bg-slate-50/70 dark:bg-slate-800/50 p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-700/80">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+                          <Fuel className="h-3.5 w-3.5 text-amber-500" />
+                          Fuel Telemetry & Dipstick
+                        </span>
+                        {ratedTankCapacity > 0 && (
+                          <span className="text-[10px] font-medium text-slate-500 bg-white dark:bg-slate-900 px-2 py-0.5 rounded-full border border-slate-200 dark:border-slate-700">
+                            Rated Tank: {ratedTankCapacity}L
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {/* Refill Inflow */}
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                            Diesel Refilled Today (L)
+                          </label>
+                          <div className="relative">
+                            <Fuel className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                            <Input 
+                              type="number" 
+                              value={dieselUsage} 
+                              onChange={e => setDieselUsage(e.target.value)}
+                              className="pl-9 h-10 border-slate-200 dark:border-slate-700 rounded-md focus:ring-2 focus:ring-amber-500 bg-white dark:bg-slate-900 text-xs"
+                              placeholder="0.00"
+                            />
+                          </div>
+                          <p className="text-[10px] text-slate-400 font-medium italic">volume physically pumped into machine</p>
+                        </div>
+
+                        {/* Dipstick Reading */}
+                        <div className="space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                              Dipstick Reading (L Remaining)
+                            </label>
+                            {ratedTankCapacity > 0 && dipstickLevel && !isNaN(Number(dipstickLevel)) && (
+                              <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400">
+                                {Math.round((Number(dipstickLevel) / ratedTankCapacity) * 100)}% Tank
+                              </span>
+                            )}
+                          </div>
+                          <Input 
+                            type="number" 
+                            value={dipstickLevel} 
+                            onChange={e => {
+                              setDipstickLevel(e.target.value);
+                              if (ratedTankCapacity > 0 && Number(e.target.value) >= ratedTankCapacity) {
+                                setIsTankFilledToFull(true);
+                              } else {
+                                setIsTankFilledToFull(false);
+                              }
+                            }}
+                            className="h-10 border-slate-200 dark:border-slate-700 rounded-md focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-900 text-xs"
+                            placeholder={ratedTankCapacity > 0 ? `e.g. ${ratedTankCapacity * 0.5} (optional)` : 'e.g. 45 (optional)'}
+                          />
+                          <p className="text-[10px] text-slate-400 font-medium italic">ground-truth level dipped at end of day</p>
+                        </div>
+                      </div>
+
+                      {/* Full tank toggle shortcut */}
+                      {ratedTankCapacity > 0 && (
+                        <div className="flex items-center justify-between pt-1 border-t border-slate-200/60 dark:border-slate-700/60 text-xs">
+                          <span className="text-[11px] text-slate-600 dark:text-slate-300 font-medium">
+                            Was machine filled to full capacity ({ratedTankCapacity}L)?
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const nextState = !isTankFilledToFull;
+                              setIsTankFilledToFull(nextState);
+                              if (nextState) {
+                                setDipstickLevel(ratedTankCapacity.toString());
+                              }
+                            }}
+                            className={cn(
+                              'px-2.5 py-1 rounded-md text-[11px] font-bold transition-all border',
+                              isTankFilledToFull
+                                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300 border-emerald-300'
+                                : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border-slate-300 dark:border-slate-700 hover:bg-slate-200'
+                            )}
+                          >
+                            {isTankFilledToFull ? '✓ Filled 100% Full' : 'Partial / Not Full'}
+                          </button>
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -1442,35 +1930,37 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
                 </div>
               </div>
 
-              <div className="bg-slate-50/50 dark:bg-slate-800/50 p-4 sm:p-5 flex flex-col sm:flex-row items-center justify-end gap-3 border-t border-slate-100 dark:border-slate-800 rounded-b-lg">
-                {selectedLog && currentUser?.privileges?.operations?.canDeleteLogs && (
+              <div className="bg-slate-50/50 dark:bg-slate-800/50 p-4 sm:p-5 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-slate-100 dark:border-slate-800 rounded-b-lg">
+                {selectedLog && currentUser?.privileges?.operations?.canDeleteLogs ? (
                   <Button 
                     variant="ghost" 
-                    className="text-rose-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20 gap-2 w-full sm:w-auto sm:mr-auto font-bold text-xs"
+                    className="text-rose-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20 gap-2 w-full sm:w-auto font-bold text-xs"
                     onClick={() => setDeleteConfirmId(selectedLog.id)}
                   >
                     <Trash2 className="h-4 w-4" /> Delete This Log
                   </Button>
-                )}
-                <Button 
-                  variant="outline" 
-                  className="rounded-md border-slate-200 w-full sm:w-auto"
-                  onClick={() => isEmbedded ? onBack() : setView('history')}
-                >
-                  Cancel
-                </Button>
-                <Button 
-                  className="rounded-md bg-blue-600 hover:bg-blue-700 text-white gap-2 w-full sm:w-auto"
-                  onClick={handleSaveLog}
-                  disabled={isUploading}
-                >
-                  {isUploading ? (
-                    <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  ) : (
-                    <Save className="h-4 w-4" />
-                  )}
-                  {isUploading ? 'Uploading Media...' : (selectedLog ? 'Update Log' : 'Save Daily Log')}
-                </Button>
+                ) : <div />}
+                <div className="flex items-center gap-2.5 w-full sm:w-auto">
+                  <Button 
+                    variant="outline" 
+                    className="rounded-md border-slate-200 w-full sm:w-auto text-xs"
+                    onClick={handleCancel}
+                  >
+                    Cancel
+                  </Button>
+                  <Button 
+                    className="rounded-md bg-blue-600 hover:bg-blue-700 text-white gap-2 w-full sm:w-auto text-xs font-semibold"
+                    onClick={handleSaveLog}
+                    disabled={isUploading}
+                  >
+                    {isUploading ? (
+                      <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    ) : (
+                      <Save className="h-4 w-4" />
+                    )}
+                    {isUploading ? 'Uploading Media...' : (selectedLog ? 'Update Log' : 'Save Daily Log')}
+                  </Button>
+                </div>
               </div>
             </Card>
           </div>
@@ -1842,55 +2332,210 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
 
       {/* Downtime Dialog */}
       <Dialog open={showDowntimeDialog} onOpenChange={setShowDowntimeDialog}>
-        <DialogContent className="sm:max-w-[425px] p-6 rounded-3xl border-none shadow-2xl">
+        <DialogContent className="sm:max-w-[480px] p-6 rounded-2xl border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xl">
           <DialogHeader>
-            <DialogTitle className="text-xl font-bold flex items-center gap-2">
-              <Clock className="h-5 w-5 text-rose-500" /> Record Downtime
+            <DialogTitle className="text-lg font-bold flex items-center gap-2 text-slate-800 dark:text-slate-100">
+              <Clock className="h-5 w-5 text-rose-500" /> Record Machine Downtime
             </DialogTitle>
-            <DialogDescription className="text-slate-400">
-              Specify the reason and duration for machine downtime.
+            <DialogDescription className="text-xs text-slate-400">
+              Set machine stop time and restart time. Duration will be calculated automatically.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-6 py-6">
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Reason for Downtime</label>
-              <Input 
-                value={dtReason} 
-                onChange={e => setDtReason(e.target.value)}
-                className="h-11 bg-slate-50 dark:bg-slate-800 border-none rounded-xl focus:ring-2 focus:ring-blue-500"
-                placeholder="e.g. Engine Overheating, Hose Burst"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Duration (Hours)</label>
-                <Input 
-                  type="number" 
-                  value={dtDuration} 
-                  onChange={e => setDtDuration(e.target.value)}
-                  className="h-11 bg-slate-50 dark:bg-slate-800 border-none rounded-xl focus:ring-2 focus:ring-blue-500"
+
+          <div className="space-y-4 py-3">
+            {/* Time Interval Inputs */}
+            <div className="grid grid-cols-2 gap-3 bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl border border-slate-200 dark:border-slate-700/70">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider">
+                  Stop Time (Off)
+                </label>
+                <Input
+                  type="time"
+                  value={dtStartTime}
+                  onChange={e => {
+                    const newStart = e.target.value;
+                    setDtStartTime(newStart);
+                    if (!dtUseManualDuration) {
+                      const res = calculateDowntimeDuration(newStart, dtEndTime, dtIsStillDown);
+                      setDtDuration(res.hours.toString());
+                    }
+                  }}
+                  className="h-10 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm font-semibold rounded-lg"
                 />
               </div>
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Severity</label>
-                <select 
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider">
+                  Restart Time (On)
+                </label>
+                <Input
+                  type="time"
+                  value={dtEndTime}
+                  disabled={dtIsStillDown}
+                  onChange={e => {
+                    const newEnd = e.target.value;
+                    setDtEndTime(newEnd);
+                    if (!dtUseManualDuration) {
+                      const res = calculateDowntimeDuration(dtStartTime, newEnd, dtIsStillDown);
+                      setDtDuration(res.hours.toString());
+                    }
+                  }}
+                  className={cn(
+                    "h-10 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm font-semibold rounded-lg",
+                    dtIsStillDown && "opacity-40 cursor-not-allowed"
+                  )}
+                />
+              </div>
+
+              {/* Ongoing / Still Down Checkbox */}
+              <div className="col-span-2 flex items-center justify-between pt-1 border-t border-slate-200/60 dark:border-slate-700/60">
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={dtIsStillDown}
+                    onChange={e => {
+                      const checked = e.target.checked;
+                      setDtIsStillDown(checked);
+                      if (!dtUseManualDuration) {
+                        const res = calculateDowntimeDuration(dtStartTime, dtEndTime, checked);
+                        setDtDuration(res.hours.toString());
+                      }
+                    }}
+                    className="h-4 w-4 rounded border-slate-300 text-rose-600 focus:ring-rose-500 cursor-pointer"
+                  />
+                  <span className="text-xs font-semibold text-rose-600 dark:text-rose-400">
+                    Machine is still down (Did not restart today)
+                  </span>
+                </label>
+              </div>
+            </div>
+
+            {/* Calculated Duration Banner */}
+            <div className="flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50">
+              <div>
+                <span className="text-[11px] font-bold text-rose-800 dark:text-rose-300 uppercase tracking-wider">
+                  Calculated Duration
+                </span>
+                <p className="text-sm font-extrabold text-rose-700 dark:text-rose-300">
+                  {calculateDowntimeDuration(dtStartTime, dtEndTime, dtIsStillDown).formatted}
+                </p>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-slate-500">Override (hrs):</span>
+                <Input
+                  type="number"
+                  step="0.25"
+                  min="0.1"
+                  max="24"
+                  value={dtDuration}
+                  onChange={e => {
+                    setDtDuration(e.target.value);
+                    setDtUseManualDuration(true);
+                  }}
+                  className="h-8 w-20 bg-white dark:bg-slate-900 text-center font-bold text-xs"
+                />
+              </div>
+            </div>
+
+            {/* Category / Responsibility */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider">
+                  Responsibility / Type
+                </label>
+                <select
+                  value={dtCategory}
+                  onChange={e => setDtCategory(e.target.value as any)}
+                  className="w-full h-10 px-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-medium focus:ring-2 focus:ring-cyan-500"
+                >
+                  <option value="mechanical">🔧 Mechanical (DCEL Breakdown)</option>
+                  <option value="client_standby">⏸️ Client Standby (Site Request)</option>
+                  <option value="weather">🌧️ Weather / Rain Stoppage</option>
+                  <option value="routine_service">🛢️ Routine Service / Oil Change</option>
+                  <option value="other">❓ Other Reason</option>
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider">
+                  Severity
+                </label>
+                <select
                   value={dtSeverity}
                   onChange={e => setDtSeverity(e.target.value as any)}
-                  className="w-full h-11 px-3 bg-slate-50 dark:bg-slate-800 border-none rounded-xl focus:ring-2 focus:ring-blue-500 text-sm"
+                  className="w-full h-10 px-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-medium focus:ring-2 focus:ring-cyan-500"
                 >
-                  <option value="low">Low</option>
-                  <option value="medium">Medium</option>
-                  <option value="high">High</option>
+                  <option value="low">🟢 Low (Minor delay / check)</option>
+                  <option value="medium">🟡 Medium (Component repair)</option>
+                  <option value="high">🔴 High (Major failure / stoppage)</option>
                 </select>
               </div>
             </div>
+
+            {/* Reason Input */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider">
+                Reason for Downtime *
+              </label>
+              <Input
+                value={dtReason}
+                onChange={e => setDtReason(e.target.value)}
+                className="h-10 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs"
+                placeholder="e.g. Impeller jammed with sand, Alternator belt snapped..."
+              />
+              {/* Quick suggestions */}
+              <div className="flex items-center gap-1.5 flex-wrap pt-1">
+                <span className="text-[10px] text-slate-400">Quick suggestions:</span>
+                {[
+                  'Engine Overheating',
+                  'Hose Burst / Leak',
+                  'Impeller Jammed (Sand)',
+                  'Client Excavation Halted',
+                  'Rain / Site Flooded',
+                  'Waiting for Client Fuel',
+                ].map((sug) => (
+                  <button
+                    key={sug}
+                    type="button"
+                    onClick={() => setDtReason(sug)}
+                    className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors"
+                  >
+                    {sug}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Additional Notes (Optional) */}
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider">
+                Action Taken / Notes (Optional)
+              </label>
+              <Input
+                value={dtNotes}
+                onChange={e => setDtNotes(e.target.value)}
+                className="h-9 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs"
+                placeholder="e.g. Opened pump casing, cleared stones, tested suction..."
+              />
+            </div>
           </div>
-          <DialogFooter>
-            <Button 
-              className="w-full h-11 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg shadow-blue-500/20"
-              onClick={handleAddDowntime}
+
+          <DialogFooter className="gap-2 sm:gap-0 pt-2 border-t border-slate-100 dark:border-slate-800">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setShowDowntimeDialog(false)}
+              className="h-10 rounded-xl text-xs font-semibold"
             >
-              Add Incident
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={handleAddDowntime}
+              className="h-10 px-5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl shadow-md text-xs gap-1.5"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Add Downtime Record
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -3,6 +3,7 @@ export type ActionProposalType =
   | 'LOG_ATTENDANCE_BATCH'
   | 'CREATE_INCIDENT_REPORT'
   | 'LOG_DIESEL_REFILL'
+  | 'LOG_MACHINE_DAILY'
   | 'LOG_CONSUMABLE_BURN'
   | 'LOG_MAINTENANCE_TICKET'
   | 'CREATE_SITE_TASK'
@@ -67,6 +68,22 @@ export interface DieselRefillPayload {
     machineName: string;
     litres: number;
   }[];
+}
+
+export interface MachineDailyLogPayload {
+  date: string; // YYYY-MM-DD
+  siteId: string;
+  siteName: string;
+  assetId?: string;
+  assetName: string;
+  operationalDay: 'full' | 'half' | 'quarter' | 'none';
+  dieselRefilled?: number;
+  dipstickLevelLitres?: number;
+  isTankFilledToFull?: boolean;
+  supervisorOnSite?: string;
+  issuesOnSite?: string;
+  maintenanceDetails?: string;
+  notes?: string;
 }
 
 export interface ConsumableBurnPayload {
@@ -152,6 +169,7 @@ export type ActionPayload =
   | { type: 'LOG_ATTENDANCE_BATCH'; data: AttendanceBatchPayload }
   | { type: 'CREATE_INCIDENT_REPORT'; data: IncidentReportPayload }
   | { type: 'LOG_DIESEL_REFILL'; data: DieselRefillPayload }
+  | { type: 'LOG_MACHINE_DAILY'; data: MachineDailyLogPayload }
   | { type: 'LOG_CONSUMABLE_BURN'; data: ConsumableBurnPayload }
   | { type: 'LOG_MAINTENANCE_TICKET'; data: MaintenanceTicketPayload }
   | { type: 'CREATE_SITE_TASK'; data: SiteTaskPayload }

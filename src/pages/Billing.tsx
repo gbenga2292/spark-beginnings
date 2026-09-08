@@ -3,7 +3,7 @@ import React, { useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import InvoiceLogo from '../../logo/logo-2.png';
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction, AlertDialogCancel } from '@/src/components/task_ui/alert-dialog';
-import { useAppStore, PendingInvoice, Invoice, InvoiceVatableSections } from '@/src/store/appStore';
+import { useAppStore, PendingInvoice, Invoice, InvoiceVatableSections, AuxiliaryEquipmentItem } from '@/src/store/appStore';
 import { toast, showConfirm } from '@/src/components/ui/toast';
 import { Trash2, Edit, CheckCircle, Plus, X, ArrowRightCircle, Upload, Download, Mail, ChevronUp, ChevronDown, ChevronRight, Printer, PlusCircle, ArrowLeft, Save, FileText, Layers, Users, Settings, Truck, Info, Calculator, History, Calendar } from 'lucide-react';
 import { Input } from '@/src/components/ui/input';
@@ -142,6 +142,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
     vatInc: 'No' as 'Yes' | 'No' | 'Add',
     countOffDays: true,
     vatScope: 'per_section' as 'overall' | 'per_section',
+    auxiliaryEquipment: [] as AuxiliaryEquipmentItem[],
     vatableSections: {
       equipment: true,
       technicians: false,
@@ -331,8 +332,108 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
     };
   }, [form.client, form.site, invoices, pendingInvoices, selectedId]);
 
-  const handleChange = (field: string, value: string | boolean) => {
-    setForm(prev => ({ ...prev, [field]: value }));
+  const handleChange = (field: string, value: any) => {
+    setForm(prev => {
+      let nextAux = prev.auxiliaryEquipment;
+      if (field === 'duration') {
+        const newDur = parseFloat(value) || 0;
+        nextAux = (prev.auxiliaryEquipment || []).map(item => {
+          if (item.sameDurationAsInvoice) {
+            const q = item.quantity || 1;
+            const r = item.rate || 0;
+            return {
+              ...item,
+              duration: newDur,
+              totalCost: q * r * newDur,
+            };
+          }
+          return item;
+        });
+      }
+      return { ...prev, [field]: value, auxiliaryEquipment: nextAux };
+    });
+  };
+
+  const handleAddAuxiliaryItem = () => {
+    const defaultDur = parseFloat(form.duration) || 0;
+    const newItem: AuxiliaryEquipmentItem = {
+      id: generateId(),
+      name: '',
+      quantity: 1,
+      rate: 0,
+      duration: defaultDur,
+      sameDurationAsInvoice: true,
+      totalCost: 0,
+      note: '',
+    };
+    setForm(prev => ({
+      ...prev,
+      auxiliaryEquipment: [...(prev.auxiliaryEquipment || []), newItem],
+    }));
+  };
+
+  const handleUpdateAuxiliaryItem = (id: string, updates: Partial<AuxiliaryEquipmentItem>) => {
+    setForm(prev => {
+      const list = (prev.auxiliaryEquipment || []).map(item => {
+        if (item.id !== id) return item;
+        const updated = { ...item, ...updates };
+        const q = updated.quantity !== undefined ? updated.quantity : 1;
+        const r = updated.rate !== undefined ? updated.rate : 0;
+        const d = updated.duration !== undefined ? updated.duration : 0;
+        updated.totalCost = q * r * d;
+        return updated;
+      });
+      return { ...prev, auxiliaryEquipment: list };
+    });
+  };
+
+  const handleRemoveAuxiliaryItem = (id: string) => {
+    setForm(prev => ({
+      ...prev,
+      auxiliaryEquipment: (prev.auxiliaryEquipment || []).filter(item => item.id !== id),
+    }));
+  };
+
+  // Compute whether the invoice form has unsaved modifications
+  const isFormDirty = useMemo(() => {
+    if (!isModalOpen) return false;
+    if (selectedId) return true; // Editing existing invoice
+    const hasClientOrSite = !!form.client || !!form.site;
+    const hasPumps = (parseInt(form.noOfMachine) || 0) > 0;
+    const hasAuxiliary = (form.auxiliaryEquipment?.length || 0) > 0;
+    const hasTechnicians = (parseFloat(form.noOfTechnician) || 0) > 0;
+    const hasDailyRental = (parseFloat(form.dailyRentalCost) || 0) > 0;
+    const hasMobOrInst = (parseFloat(form.mobDemob) || 0) > 0 || (parseFloat(form.installation) || 0) > 0 || (parseFloat(form.damages) || 0) > 0;
+    const hasMachineConfig = machineConfigs.some(m => (parseFloat(m.rate) || 0) > 0);
+    return hasClientOrSite || hasPumps || hasAuxiliary || hasTechnicians || hasDailyRental || hasMobOrInst || hasMachineConfig;
+  }, [isModalOpen, selectedId, form, machineConfigs]);
+
+  // Prevent accidental tab/browser reload while filling form
+  React.useEffect(() => {
+    if (!isModalOpen || !isFormDirty) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [isModalOpen, isFormDirty]);
+
+  const handleRequestCloseModal = async () => {
+    if (isFormDirty) {
+      const discard = await showConfirm(
+        'You have unsaved changes on this invoice. Do you want to stay and save your invoice, or discard your changes and leave?',
+        {
+          title: 'Unsaved Invoice Changes',
+          confirmLabel: 'Discard Changes',
+          cancelLabel: 'Stay & Save',
+          variant: 'danger'
+        }
+      );
+      if (!discard) return; // User chose "Stay & Save"
+    }
+    handleClear();
+    setIsModalOpen(false);
   };
 
   const handleClear = () => {
@@ -376,14 +477,28 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
     const damages = parseFloat(form.damages) || 0;
     const discount = parseFloat(form.discount) || 0;
 
-    // Max duration across all machine rows — used for technicians, diesel, end-date
-    const maxDuration = machineConfigs.length > 0
-      ? Math.max(...machineConfigs.map(r => parseFloat(r.duration) || 0))
+    const auxiliaryEquipment = form.auxiliaryEquipment || [];
+    const maxAuxDuration = auxiliaryEquipment.length > 0
+      ? Math.max(...auxiliaryEquipment.map(a => parseFloat(String(a.duration)) || 0))
       : 0;
+
+    const pumpDuration = machineConfigs.length > 0
+      ? Math.max(...machineConfigs.map(r => parseFloat(r.duration) || 0))
+      : (parseFloat(form.duration) || 0);
+
+    // Max duration across all pumps and auxiliary assets
+    const maxDuration = Math.max(pumpDuration, maxAuxDuration);
 
     // Rental cost = sum of (rate × duration) per machine
     const rentalCost = machineConfigs.reduce((sum, row) => {
       return sum + (parseFloat(row.rate) || 0) * (parseFloat(row.duration) || 0);
+    }, 0);
+
+    const auxiliaryCost = auxiliaryEquipment.reduce((sum, item) => {
+      const q = parseFloat(String(item.quantity)) || 1;
+      const r = parseFloat(String(item.rate)) || 0;
+      const d = parseFloat(String(item.duration)) || 0;
+      return sum + (q * r * d);
     }, 0);
 
     const actualTechDuration = form.technicianDurationSameAsMachine ? maxDuration : (parseFloat(form.technicianDuration) || 0);
@@ -409,7 +524,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
 
     const instMobDemob = mobDemob + installation;
     const otherCosts = damages;
-    const subtotalCost = rentalCost + dieselCost + techniciansCost + instMobDemob + otherCosts;
+    const subtotalCost = rentalCost + auxiliaryCost + dieselCost + techniciansCost + instMobDemob + otherCosts;
     const totalCost = Math.max(0, subtotalCost - discount);
 
     let siteRecord = siteRegistry.find(s => s.name === form.site && s.client === form.client);
@@ -434,7 +549,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
     let totalCharge = totalCost;
 
     if (vatScope === 'per_section') {
-      const eqVal = (vatableSections.equipment ?? true) ? rentalCost : 0;
+      const eqVal = (vatableSections.equipment ?? true) ? (rentalCost + auxiliaryCost) : 0;
       const techVal = (vatableSections.technicians ?? false) ? techniciansCost : 0;
       const dieselVal = (vatableSections.diesel ?? true) ? dieselCost : 0;
       const mobVal = (vatableSections.mobDemob ?? true) ? mobDemob : 0;
@@ -469,17 +584,20 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
         totalCharge = totalCost;
       }
     } else {
-      vatableAmount = totalCost;
-      nonVatableAmount = 0;
-
       if (vatInc === 'Yes') {
         vat = (totalCost / (100 + vatRate)) * vatRate;
+        vatableAmount = totalCost;
+        nonVatableAmount = 0;
         totalCharge = totalCost;
       } else if (vatInc === 'Add') {
         vat = totalCost * (vatRate / 100);
+        vatableAmount = totalCost;
+        nonVatableAmount = 0;
         totalCharge = totalCost + vat;
       } else {
         vat = 0;
+        vatableAmount = 0;
+        nonVatableAmount = totalCost;
         totalCharge = totalCost;
       }
     }
@@ -501,7 +619,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
       return 0;
     };
 
-    const equipmentVat = calcSectionVat(rentalCost, vatScope === 'overall' ? true : (vatableSections.equipment ?? true));
+    const equipmentVat = calcSectionVat(rentalCost + auxiliaryCost, vatScope === 'overall' ? true : (vatableSections.equipment ?? true));
     const techniciansVat = calcSectionVat(techniciansCost, vatScope === 'overall' ? true : (vatableSections.technicians ?? false));
     const dieselVat = calcSectionVat(dieselCost, vatScope === 'overall' ? true : (vatableSections.diesel ?? true));
     const mobDemobVat = calcSectionVat(mobDemob, vatScope === 'overall' ? true : (vatableSections.mobDemob ?? true));
@@ -515,7 +633,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
       equipmentVat, techniciansVat, dieselVat, mobDemobVat, installationVat, damagesVat, otherChargesVat,
       maxDuration, actualTechDuration, actualNightDuration, 
       techniciansCost, effectiveTechDailyRate, noOfTechnicianNight, 
-      accomCrewCount, dieselCost, rentalCost, mobDemob, installation, damages 
+      accomCrewCount, dieselCost, rentalCost, auxiliaryCost, auxiliaryEquipment, mobDemob, installation, damages 
     };
   }, [form, machineConfigs, siteRegistry, vatRate]);
 
@@ -535,10 +653,17 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
 
     const activeCfgs = configs && configs.length > 0 ? configs : null;
 
-    // Max duration drives end-date, technicians, and diesel
-    const maxDuration = activeCfgs
+    const auxiliaryEquipment = input.auxiliaryEquipment || [];
+    const maxAuxDuration = auxiliaryEquipment.length > 0
+      ? Math.max(...auxiliaryEquipment.map((a: any) => parseFloat(a.duration) || 0))
+      : 0;
+
+    const pumpDuration = activeCfgs
       ? Math.max(...activeCfgs.map(r => parseFloat(r.duration) || 0))
       : (parseFloat(input.duration) || 0);
+
+    // Max duration drives end-date (takes whichever is higher: pumps or auxiliary assets)
+    const maxDuration = Math.max(pumpDuration, maxAuxDuration);
 
     const isTechSame = input.technicianDurationSameAsMachine ?? true;
     const actualTechDuration = isTechSame ? maxDuration : (parseFloat(input.technicianDuration) || 0);
@@ -642,7 +767,15 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
     const instMobDemob = mobDemob + installation;
     const otherCosts = damages;
     const discount = parseFloat(input.discount) || 0;
-    const subtotalCost = rentalCost + dieselCost + techniciansCost + instMobDemob + otherCosts;
+
+    const auxiliaryCost = auxiliaryEquipment.reduce((sum: number, item: any) => {
+      const q = parseFloat(item.quantity) || 1;
+      const r = parseFloat(item.rate) || 0;
+      const d = parseFloat(item.duration) || 0;
+      return sum + (q * r * d);
+    }, 0);
+
+    const subtotalCost = rentalCost + auxiliaryCost + dieselCost + techniciansCost + instMobDemob + otherCosts;
     const totalCost = Math.max(0, subtotalCost - discount);
 
     const vatInc = siteObj ? siteObj.vat : (input.vatInc || 'No');
@@ -663,7 +796,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
     let totalCharge = totalCost;
 
     if (vatScope === 'per_section') {
-      const eqVal = (vatableSections.equipment ?? true) ? rentalCost : 0;
+      const eqVal = (vatableSections.equipment ?? true) ? (rentalCost + auxiliaryCost) : 0;
       const techVal = (vatableSections.technicians ?? false) ? techniciansCost : 0;
       const dieselVal = (vatableSections.diesel ?? true) ? dieselCost : 0;
       const mobVal = (vatableSections.mobDemob ?? true) ? mobDemob : 0;
@@ -727,7 +860,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
       dailyRentalCost: parseFloat(input.dailyRentalCost) || 0,
       noOfTechnician, techniciansDailyRate,
       dieselCostPerLtr, dailyUsage, mobDemob, installation, damages, discount,
-      startDate, endDate, rentalCost, dieselCost, techniciansCost,
+      startDate, endDate, rentalCost, auxiliaryCost, auxiliaryEquipment, dieselCost, techniciansCost,
       subtotalCost, totalCost, vat, totalCharge, vatInc,
       vatScope, vatableSections, vatableAmount, nonVatableAmount,
       totalExclusiveOfVat: totalCharge - vat,
@@ -800,6 +933,8 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
         discount: data.discount,
         duration: data.duration,
         rentalCost: data.rentalCost,
+        auxiliaryCost: data.auxiliaryCost,
+        auxiliaryEquipment: data.auxiliaryEquipment,
         dieselCost: data.dieselCost,
         techniciansCost: data.techniciansCost,
         totalCost: data.totalCost,
@@ -871,8 +1006,30 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
         const isCountingOffDays = data.countOffDays !== false;
         const endDateLabel = isCountingOffDays ? 'projected end date' : 'actual end date (off-days excluded)';
 
+        // Itemize auxiliary assets if any for inclusion in reminder
+        const auxList: string[] = [];
+        const auxItems: AuxiliaryEquipmentItem[] = data.auxiliaryEquipment || [];
+        const invoiceStartDate = normalizeDate(data.startDate || (data as any).date);
+
+        auxItems.forEach((aux) => {
+          const auxDur = parseFloat(String(aux.duration)) || 0;
+          let auxEndStr = '';
+          if (invoiceStartDate && auxDur > 0) {
+            const aStart = new Date(invoiceStartDate);
+            if (!isNaN(aStart.getTime())) {
+              aStart.setDate(aStart.getDate() + auxDur - 1);
+              auxEndStr = ` (Lease expires: ${formatDisplayDate(aStart.toISOString().split('T')[0])})`;
+            }
+          }
+          auxList.push(`• ${aux.name || 'Auxiliary Asset'}: ${aux.quantity || 1} unit(s) for ${auxDur}d${auxEndStr}`);
+        });
+
+        const auxSectionText = auxList.length > 0
+          ? `\n\nLeased Auxiliary Assets:\n${auxList.join('\n')}`
+          : '';
+
         const title = `[Invoice] ${form.client} – ${form.site} ending soon`;
-        const body = `Invoice ${form.invoiceNo} reaches its ${endDateLabel} on ${actualEndDate.toLocaleDateString()}. Confirm with the client to extend or prepare the next invoice.`;
+        const body = `Invoice ${form.invoiceNo} reaches its ${endDateLabel} on ${actualEndDate.toLocaleDateString()}.${auxSectionText}\n\nConfirm with the client to extend lease or prepare return.`;
 
         if (existingReminder) {
           updateReminder(existingReminder.id, {
@@ -894,6 +1051,48 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
             isActive: true,
             createdBy: currentUser.id,
             sourceRef: 'invoice_' + invoiceIdToUse
+          });
+        }
+
+        // Dedicated reminders for auxiliary assets with custom duration shorter than the main invoice
+        if (invoiceStartDate) {
+          auxItems.forEach((aux, idx) => {
+            const auxDur = parseFloat(String(aux.duration)) || 0;
+            const mainDur = parseFloat(String(data.duration)) || 0;
+            if (auxDur > 0 && (auxDur < mainDur || mainDur === 0)) {
+              const aStart = new Date(invoiceStartDate);
+              if (!isNaN(aStart.getTime())) {
+                aStart.setDate(aStart.getDate() + auxDur - 1);
+                const auxEndDate = aStart;
+                const auxSourceRef = `aux_lease_${invoiceIdToUse}_${aux.id || idx}`;
+                const existingAuxReminder = reminders?.find(r => r.sourceRef === auxSourceRef);
+                const auxTitle = `[Auxiliary Lease Expiry] ${aux.name || 'Asset'} – ${form.client} (${form.site})`;
+                const auxBody = `The lease for ${aux.name || 'Auxiliary Asset'} (${aux.quantity || 1} units) under Invoice ${form.invoiceNo} expires on ${auxEndDate.toLocaleDateString()}. Confirm return or extend lease billing with the client.`;
+
+                if (existingAuxReminder) {
+                  updateReminder(existingAuxReminder.id, {
+                    title: auxTitle,
+                    body: auxBody,
+                    remindAt: auxEndDate.toISOString(),
+                    endAt: auxEndDate.toISOString(),
+                    sourceRef: auxSourceRef,
+                  });
+                } else if (form.createReminder) {
+                  addReminder({
+                    title: auxTitle,
+                    body: auxBody,
+                    remindAt: auxEndDate.toISOString(),
+                    endAt: auxEndDate.toISOString(),
+                    frequency: 'daily',
+                    recipientIds: [currentUser.id],
+                    sendEmail: !!form.sendEmailNotification,
+                    isActive: true,
+                    createdBy: currentUser.id,
+                    sourceRef: auxSourceRef,
+                  });
+                }
+              }
+            }
           });
         }
       }
@@ -937,6 +1136,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
       discount: 'discount' in inv ? String(inv.discount ?? 0) : '0',
       countOffDays: 'countOffDays' in inv ? (inv.countOffDays ?? true) : true,
       vatScope: inv.vatScope || 'per_section',
+      auxiliaryEquipment: inv.auxiliaryEquipment ? [...inv.auxiliaryEquipment] : [],
       vatableSections: inv.vatableSections || defaultVatableSections || {
         equipment: true,
         technicians: false,
@@ -1102,6 +1302,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
       damages: '0',
       countOffDays: inv.countOffDays ?? true,
       vatScope: inv.vatScope || 'per_section',
+      auxiliaryEquipment: inv.auxiliaryEquipment ? [...inv.auxiliaryEquipment] : [],
       vatableSections: inv.vatableSections || defaultVatableSections || {
         equipment: true,
         technicians: false,
@@ -1365,10 +1566,10 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
             return data.map(extractCSV).join(',');
           });
         } else {
-          headers = ['id', 'invoiceNumber', 'client', 'siteName', 'project', 'amount', 'date', 'dueDate', 'billingCycle', 'vatInc', 'totalCharge', 'duration', 'noOfMachine', 'dailyRentalCost', 'dieselCostPerLtr', 'dailyUsage', 'noOfTechnician', 'techniciansDailyRate', 'mobDemob', 'installation', 'damages', 'rentalCost', 'dieselCost', 'techniciansCost', 'totalCost', 'vat', 'totalExclusiveOfVat'];
+          headers = ['id', 'invoiceNumber', 'client', 'siteName', 'project', 'amount', 'date', 'dueDate', 'billingCycle', 'vatInc', 'totalCharge', 'duration', 'noOfMachine', 'dailyRentalCost', 'dieselCostPerLtr', 'dailyUsage', 'noOfTechnician', 'techniciansDailyRate', 'mobDemob', 'installation', 'damages', 'rentalCost', 'auxiliaryCost', 'dieselCost', 'techniciansCost', 'totalCost', 'vat', 'totalExclusiveOfVat'];
           rows = (currentListForExport as Invoice[]).map(inv => {
             const data = [
-              inv.id, inv.invoiceNumber, inv.client, inv.siteName, inv.project, inv.amount, formatDisplayDate(inv.date), formatDisplayDate(inv.dueDate), inv.billingCycle, inv.vatInc, inv.totalCharge, inv.duration || 0, inv.noOfMachine || 0, inv.dailyRentalCost || 0, inv.dieselCostPerLtr || 0, inv.dailyUsage || 0, inv.noOfTechnician || 0, inv.techniciansDailyRate || 0, inv.mobDemob || 0, inv.installation || 0, inv.damages || 0, inv.rentalCost || 0, inv.dieselCost || 0, inv.techniciansCost || 0, inv.totalCost || 0, inv.vat || 0, inv.totalExclusiveOfVat || 0
+              inv.id, inv.invoiceNumber, inv.client, inv.siteName, inv.project, inv.amount, formatDisplayDate(inv.date), formatDisplayDate(inv.dueDate), inv.billingCycle, inv.vatInc, inv.totalCharge, inv.duration || 0, inv.noOfMachine || 0, inv.dailyRentalCost || 0, inv.dieselCostPerLtr || 0, inv.dailyUsage || 0, inv.noOfTechnician || 0, inv.techniciansDailyRate || 0, inv.mobDemob || 0, inv.installation || 0, inv.damages || 0, inv.rentalCost || 0, inv.auxiliaryCost || 0, inv.dieselCost || 0, inv.techniciansCost || 0, inv.totalCost || 0, inv.vat || 0, inv.totalExclusiveOfVat || 0
             ];
             return data.map(extractCSV).join(',');
           });
@@ -1383,10 +1584,10 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
             return data.map(extractCSV).join(',');
           });
         } else {
-          headers = ['id', 'invoiceNo', 'client', 'site', 'startDate', 'duration', 'noOfMachine', 'dailyRentalCost', 'dieselCostPerLtr', 'dailyUsage', 'noOfTechnician', 'techniciansDailyRate', 'mobDemob', 'installation', 'damages'];
+          headers = ['id', 'invoiceNo', 'client', 'site', 'startDate', 'duration', 'noOfMachine', 'dailyRentalCost', 'dieselCostPerLtr', 'dailyUsage', 'noOfTechnician', 'techniciansDailyRate', 'mobDemob', 'installation', 'damages', 'auxiliaryCost'];
           rows = (currentListForExport as PendingInvoice[]).map(inv => {
             const data = [
-              inv.id, inv.invoiceNo, inv.client, inv.site, formatDisplayDate(inv.startDate), inv.duration || 0, inv.noOfMachine || 0, inv.dailyRentalCost || 0, inv.dieselCostPerLtr || 0, inv.dailyUsage || 0, inv.noOfTechnician || 0, inv.techniciansDailyRate || 0, inv.mobDemob || 0, inv.installation || 0, inv.damages || 0
+              inv.id, inv.invoiceNo, inv.client, inv.site, formatDisplayDate(inv.startDate), inv.duration || 0, inv.noOfMachine || 0, inv.dailyRentalCost || 0, inv.dieselCostPerLtr || 0, inv.dailyUsage || 0, inv.noOfTechnician || 0, inv.techniciansDailyRate || 0, inv.mobDemob || 0, inv.installation || 0, inv.damages || 0, inv.auxiliaryCost || 0
             ];
             return data.map(extractCSV).join(',');
           });
@@ -2150,6 +2351,9 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                         </TableCell>
                         <TableCell className="px-4 py-3 text-right text-slate-600">
                           <div><span className="text-slate-400">Rent:</span> {priv?.canViewAmounts === false ? '***' : (inv.rentalCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                          {(inv.auxiliaryCost ?? 0) > 0 && (
+                            <div><span className="text-indigo-500 font-medium">Aux:</span> {priv?.canViewAmounts === false ? '***' : (inv.auxiliaryCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                          )}
                           <div><span className="text-slate-400">Fuel:</span> {priv?.canViewAmounts === false ? '***' : (inv.dieselCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                           <div><span className="text-slate-400">Other:</span> {priv?.canViewAmounts === false ? '***' : ((inv.techniciansCost || 0) + (inv.installation || 0) + (inv.mobDemob || 0) + (inv.damages || 0)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                         </TableCell>
@@ -2382,6 +2586,9 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                       {/* Cost Breakdown */}
                       <div className="col-span-2 mt-2 pt-2 border-t border-slate-50 flex flex-wrap gap-x-4 gap-y-1">
                         <span className="text-[10px] text-slate-500"><b className="text-slate-400 font-normal">Rent:</b> ₦{formatSum(inv.rentalCost || 0)}</span>
+                        {(inv.auxiliaryCost ?? 0) > 0 && (
+                          <span className="text-[10px] text-indigo-600 dark:text-indigo-400"><b className="text-slate-400 font-normal">Aux:</b> ₦{formatSum(inv.auxiliaryCost || 0)}</span>
+                        )}
                         <span className="text-[10px] text-slate-500"><b className="text-slate-400 font-normal">Fuel:</b> ₦{formatSum(inv.dieselCost || 0)}</span>
                         <span className="text-[10px] text-slate-500"><b className="text-slate-400 font-normal">Other:</b> ₦{formatSum((inv.techniciansCost || 0) + (inv.installation || 0) + (inv.mobDemob || 0) + (inv.damages || 0))}</span>
                         <span className="text-[10px] text-slate-500"><b className="text-slate-400 font-normal">VAT:</b> ₦{formatSum(inv.vat || 0)}</span>
@@ -2447,14 +2654,14 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
           </div>
         </div>
 
-        {/* ── Full-page Invoice Form (rendered as portal to cover layout header but keep sidebar) ── */}
-        {isModalOpen && document.getElementById('layout-content-wrapper') && createPortal(
-          <div className="absolute inset-0 z-50 bg-slate-100 dark:bg-slate-950 overflow-hidden flex flex-col w-full h-full animate-in fade-in slide-in-from-bottom-2 duration-300">
+        {/* ── Full-page Invoice Form (covers full window to prevent accidental sidebar clicks) ── */}
+        {isModalOpen && createPortal(
+          <div className="fixed inset-0 z-[99] bg-slate-100 dark:bg-slate-950 overflow-hidden flex flex-col w-full h-full animate-in fade-in duration-200">
             {/* Page header — fixed top bar */}
             <div className="shrink-0 z-10 bg-slate-100 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 px-6 md:px-8 py-2.5 shadow-2xs">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
-                  <Button variant="ghost" size="sm" className="gap-1.5 h-8 px-2.5 text-xs text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/50 dark:hover:bg-slate-800 -ml-1 shrink-0 transition-colors font-semibold" onClick={() => setIsModalOpen(false)}>
+                  <Button variant="ghost" size="sm" className="gap-1.5 h-8 px-2.5 text-xs text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/50 dark:hover:bg-slate-800 -ml-1 shrink-0 transition-colors font-semibold" onClick={handleRequestCloseModal}>
                     <ArrowLeft className="w-3.5 h-3.5" />
                     <span>Back to Invoices</span>
                   </Button>
@@ -2483,6 +2690,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
 
             {/* Scrollable container starting immediately below the header */}
             <div className="flex-1 overflow-y-auto p-6 md:p-8 pt-5 flex flex-col gap-6">
+
             <div className="grid grid-cols-1 xl:grid-cols-[1fr_340px] gap-6 items-start">
               {/* Main form column */}
               <div className="space-y-6">
@@ -2879,6 +3087,182 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                         </div>
                       </div>
                     )}
+                    {/* Auxiliary Equipment & Non-Fuel Assets */}
+                    <div className="pt-4 border-t border-slate-100 dark:border-slate-800 space-y-3">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wide">Auxiliary Equipment &amp; Non-Fuel Assets</span>
+                            {(form.auxiliaryEquipment?.length || 0) > 0 && (
+                              <span className="text-[10px] bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 rounded-full font-bold">
+                                {form.auxiliaryEquipment.length} {form.auxiliaryEquipment.length === 1 ? 'Asset' : 'Assets'}
+                              </span>
+                            )}
+                            {form.vatScope === 'per_section' && (
+                              <span
+                                className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold select-none border ${
+                                  (form.vatableSections?.equipment ?? true)
+                                    ? 'bg-blue-50 dark:bg-blue-950/50 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300'
+                                    : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500'
+                                }`}
+                                title="Auxiliary assets are leased equipment and inherit the Equipment & Machinery Lease VAT rule"
+                              >
+                                <span className={`w-1.5 h-1.5 rounded-full ${(form.vatableSections?.equipment ?? true) ? 'bg-blue-500' : 'bg-slate-400'}`} />
+                                {(form.vatableSections?.equipment ?? true) ? `Lease VAT (${vatRate}%)` : 'Lease Tax Exempt'}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-slate-400">Add duration &amp; rate items that don&apos;t consume diesel (e.g. sedimentation tanks, booster pumps). Follows Equipment Lease VAT.</p>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={handleAddAuxiliaryItem}
+                          className="h-8 px-3 text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 border-dashed border-indigo-300 dark:border-indigo-800 rounded-lg flex items-center gap-1.5 shrink-0"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          Add Auxiliary Asset
+                        </Button>
+                      </div>
+
+                      {(!form.auxiliaryEquipment || form.auxiliaryEquipment.length === 0) ? (
+                        <div className="border border-dashed border-slate-200 dark:border-slate-800 rounded-xl p-4 text-center bg-slate-50/50 dark:bg-slate-900/30">
+                          <p className="text-xs text-slate-400">No auxiliary assets attached to this invoice.</p>
+                          <p className="text-[10px] text-slate-400 mt-0.5">Click &ldquo;Add Auxiliary Asset&rdquo; to include tanks, hoses, or other non-fuel machinery.</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          {form.auxiliaryEquipment.map((item, idx) => {
+                            const lineTotal = (parseFloat(String(item.quantity)) || 1) * (parseFloat(String(item.rate)) || 0) * (parseFloat(String(item.duration)) || 0);
+                            return (
+                              <div
+                                key={item.id || idx}
+                                className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/40 dark:bg-slate-900/40 p-3.5 space-y-3 shadow-xs"
+                              >
+                                <div className="flex items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-2">
+                                  <div className="flex items-center gap-2">
+                                    <span className="w-2 h-2 rounded-full bg-indigo-500" />
+                                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Auxiliary Item #{idx + 1}</span>
+                                    {lineTotal > 0 && (
+                                      <span className="text-[11px] font-mono font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-2 py-0.5 rounded-md">
+                                        Total: ₦{lineTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleRemoveAuxiliaryItem(item.id)}
+                                    className="h-7 px-2 text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg text-xs"
+                                    title="Remove this auxiliary asset"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5 mr-1" />
+                                    Remove
+                                  </Button>
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                                  {/* Asset Name */}
+                                  <div className="space-y-1 sm:col-span-2 lg:col-span-1">
+                                    <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                                      Asset / Item Name
+                                    </label>
+                                    <Input
+                                      type="text"
+                                      value={item.name}
+                                      onChange={e => handleUpdateAuxiliaryItem(item.id, { name: e.target.value })}
+                                      placeholder="e.g. Sedimentation Tank"
+                                      className="bg-white dark:bg-slate-900 border-slate-205 dark:border-slate-800 h-10 text-xs font-semibold text-slate-800 dark:text-white"
+                                    />
+                                  </div>
+
+                                  {/* Quantity */}
+                                  <div className="space-y-1">
+                                    <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                                      Quantity
+                                    </label>
+                                    <Input
+                                      type="number"
+                                      min="1"
+                                      value={item.quantity}
+                                      onChange={e => handleUpdateAuxiliaryItem(item.id, { quantity: parseFloat(e.target.value) || 1 })}
+                                      placeholder="1"
+                                      className="bg-white dark:bg-slate-900 border-slate-205 dark:border-slate-800 h-10 text-xs font-semibold text-slate-800 dark:text-white"
+                                    />
+                                  </div>
+
+                                  {/* Daily Rate */}
+                                  <div className="space-y-1">
+                                    <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                                      Daily Rate (₦ / unit)
+                                    </label>
+                                    <NumericFormat
+                                      customInput={Input}
+                                      thousandSeparator
+                                      decimalScale={2}
+                                      value={item.rate || ''}
+                                      onValueChange={v => handleUpdateAuxiliaryItem(item.id, { rate: parseFloat(v.value || '0') || 0 })}
+                                      placeholder="0.00"
+                                      className="bg-white dark:bg-slate-900 border-slate-205 dark:border-slate-800 h-10 font-mono text-xs text-slate-800 dark:text-white"
+                                    />
+                                  </div>
+
+                                  {/* Duration */}
+                                  <div className="space-y-1">
+                                    <div className="flex items-center justify-between">
+                                      <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                                        Duration (Days)
+                                      </label>
+                                      <label className="flex items-center gap-1 text-[10px] text-indigo-655 dark:text-indigo-400 cursor-pointer select-none font-bold">
+                                        <input
+                                          type="checkbox"
+                                          checked={!!item.sameDurationAsInvoice}
+                                          onChange={e => {
+                                            const isChecked = e.target.checked;
+                                            const invoiceDur = parseFloat(form.duration) || 0;
+                                            handleUpdateAuxiliaryItem(item.id, {
+                                              sameDurationAsInvoice: isChecked,
+                                              duration: isChecked ? invoiceDur : item.duration,
+                                            });
+                                          }}
+                                          className="accent-indigo-650 w-3 h-3 rounded"
+                                        />
+                                        Same as Invoice
+                                      </label>
+                                    </div>
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      disabled={!!item.sameDurationAsInvoice}
+                                      value={item.duration}
+                                      onChange={e => handleUpdateAuxiliaryItem(item.id, { duration: parseFloat(e.target.value) || 0 })}
+                                      placeholder="0"
+                                      className={item.sameDurationAsInvoice ? "bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed h-10 text-xs font-semibold" : "bg-white dark:bg-slate-900 border-slate-205 dark:border-slate-800 h-10 text-xs font-semibold text-slate-800 dark:text-white"}
+                                    />
+                                  </div>
+                                </div>
+
+                                {/* Line Note / Specifications */}
+                                <div className="space-y-1">
+                                  <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                                    Note / Specification (Displayed on Invoice Details &amp; PDF)
+                                  </label>
+                                  <Input
+                                    type="text"
+                                    value={item.note || ''}
+                                    onChange={e => handleUpdateAuxiliaryItem(item.id, { note: e.target.value })}
+                                    placeholder="e.g. 30m³ baffle sedimentation tank installed on site"
+                                    className="bg-white dark:bg-slate-900 border-slate-205 dark:border-slate-800 h-9 text-xs text-slate-700 dark:text-slate-300 placeholder:text-slate-400"
+                                  />
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
 
@@ -3291,8 +3675,8 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
 
                 {/* Form Footer Action Bar */}
                 <div className="bg-slate-200/50 dark:bg-slate-900 border border-slate-250 dark:border-slate-800 p-4 rounded-2xl flex gap-4 shadow-sm">
-                  <Button variant="outline" className="flex-1 bg-white dark:bg-slate-950 border-slate-300 dark:border-slate-800 h-12 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-900 font-bold" onClick={() => setIsModalOpen(false)}>
-                    Discard
+                  <Button variant="outline" className="flex-1 bg-white dark:bg-slate-950 border-slate-300 dark:border-slate-800 h-12 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-900 font-bold" onClick={handleRequestCloseModal}>
+                    Leave / Close
                   </Button>
                   <Button onClick={handleSubmit} className="flex-1 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-600 dark:hover:bg-indigo-700 text-white gap-2 h-12 shadow-md font-bold text-sm">
                     <CheckCircle className="w-5 h-5" /> {selectedId ? 'Update & Save Changes' : 'Publish Document'}
@@ -3618,6 +4002,48 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                           </span>
                         </div>
                       )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Auxiliary Assets breakdown card */}
+                {(livePreview.auxiliaryCost > 0) && (
+                  <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-850 p-5 shadow-sm space-y-4">
+                    <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-2">
+                      <p className="text-[10px] font-black uppercase tracking-wider text-indigo-650 dark:text-indigo-400">Auxiliary Equipment Lease</p>
+                      {livePreview.vatScope === 'per_section' && (
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${(livePreview.vatableSections?.equipment ?? true) ? 'bg-indigo-100 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}>
+                          {(livePreview.vatableSections?.equipment ?? true) ? `VAT: ${vatRate}%` : 'Exempt'}
+                        </span>
+                      )}
+                    </div>
+                    <div className="space-y-3.5 text-xs">
+                      {livePreview.auxiliaryEquipment.map((item, idx) => {
+                        const q = parseFloat(String(item.quantity)) || 1;
+                        const r = parseFloat(String(item.rate)) || 0;
+                        const d = parseFloat(String(item.duration)) || 0;
+                        const total = q * r * d;
+                        if (total <= 0 && !item.name) return null;
+                        return (
+                          <div key={item.id || idx} className="flex justify-between items-start text-slate-655 dark:text-slate-400 gap-2">
+                            <span className="flex flex-col">
+                              <span className="font-bold text-slate-705 dark:text-slate-350">{item.name || `Auxiliary #${idx + 1}`}</span>
+                              <span className="text-[10px] text-slate-400 font-medium">
+                                {q > 1 ? `${q} units × ` : ''}₦{r.toLocaleString()}/d × {d}d
+                              </span>
+                              {item.note && <span className="text-[9px] text-slate-450 italic mt-0.5">{item.note}</span>}
+                            </span>
+                            <span className="font-mono font-bold text-slate-850 dark:text-slate-205 shrink-0">
+                              ₦{total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                        );
+                      })}
+                      <div className="h-px bg-slate-200 dark:bg-slate-800 my-2" />
+                      <div className="flex justify-between font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-50/50 dark:bg-indigo-950/20 p-2.5 rounded-lg border border-indigo-100 dark:border-indigo-900">
+                        <span>Total Auxiliary Cost</span>
+                        <span className="font-mono">₦{livePreview.auxiliaryCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -4383,6 +4809,27 @@ export function InvoicePrintModal({ invoice, onClose, ledgerBanks, ledgerBenefic
       list.push(...dieselItems);
     }
     
+    if (invoice.auxiliaryEquipment && invoice.auxiliaryEquipment.length > 0) {
+      invoice.auxiliaryEquipment.forEach((item: any) => {
+        const q = parseFloat(item.quantity) || 1;
+        const r = parseFloat(item.rate) || 0;
+        const d = parseFloat(item.duration) || 0;
+        const lineTotal = q * r * d;
+        if (lineTotal > 0 || item.name) {
+          const noteSuffix = item.note ? `\nNote: ${item.note}` : '';
+          list.push({
+            id: generateId(),
+            selected: true,
+            type: 'auxiliary',
+            desc: `Lease of ${item.name || 'Auxiliary Asset'}${noteSuffix}\n${q > 1 ? `${q} units` : '1 unit'} @ ₦${r.toLocaleString()}/day for ${d} day${d !== 1 ? 's' : ''}.`,
+            qty: q,
+            unitRate: r * d,
+            amount: lineTotal,
+          });
+        }
+      });
+    }
+
     if (invoice.mobDemob && invoice.mobDemob > 0) {
       list.push({ id: generateId(), selected: true, type: 'mobDemob', desc: `Mobilization / Demobilization`, qty: 1, unitRate: invoice.mobDemob, amount: invoice.mobDemob });
     }
@@ -4405,13 +4852,69 @@ export function InvoicePrintModal({ invoice, onClose, ledgerBanks, ledgerBenefic
   const discountedSubtotal = Math.max(0, subtotal - discountAmount);
 
   const vatIncSetting = invoice.vatInc;
+  const vatScope = invoice.vatScope || 'per_section';
+  const vatableSections = invoice.vatableSections || {
+    equipment: true,
+    technicians: false,
+    diesel: true,
+    mobDemob: true,
+    installation: true,
+    damages: false,
+  };
+
+  const isItemVatable = (item: any) => {
+    if (vatScope !== 'per_section') return true;
+    switch (item.type) {
+      case 'rental':
+      case 'auxiliary': // Auxiliary is also a lease, so it is governed by equipment lease VAT!
+        return vatableSections.equipment ?? true;
+      case 'diesel':
+        return vatableSections.diesel ?? true;
+      case 'technicians':
+      case 'technician':
+        return vatableSections.technicians ?? false;
+      case 'mobDemob':
+        return vatableSections.mobDemob ?? true;
+      case 'installation':
+        return vatableSections.installation ?? true;
+      case 'damages':
+        return vatableSections.damages ?? false;
+      default:
+        return true;
+    }
+  };
+
   let totalCharge = discountedSubtotal;
   let vat = 0;
-  if (vatIncSetting === 'Yes') {
-    vat = (discountedSubtotal / (100 + vatRate)) * vatRate;
-  } else if (vatIncSetting === 'Add') {
-    vat = discountedSubtotal * (vatRate / 100);
-    totalCharge = discountedSubtotal + vat;
+
+  if (vatScope === 'per_section') {
+    const grossVatable = items.reduce((acc, curr) => {
+      const amt = parseFloat(curr.amount) || 0;
+      return isItemVatable(curr) ? acc + amt : acc;
+    }, 0);
+
+    let netVatable = grossVatable;
+    if (discountAmount > 0 && subtotal > 0) {
+      const vatableRatio = grossVatable / subtotal;
+      const vatableDiscount = discountAmount * vatableRatio;
+      netVatable = Math.max(0, grossVatable - vatableDiscount);
+    }
+
+    if (vatIncSetting === 'Yes') {
+      vat = (netVatable / (100 + vatRate)) * vatRate;
+      totalCharge = discountedSubtotal;
+    } else if (vatIncSetting === 'Add') {
+      vat = netVatable * (vatRate / 100);
+      totalCharge = discountedSubtotal + vat;
+    }
+  } else {
+    if (vatIncSetting === 'Yes') {
+      vat = (discountedSubtotal / (100 + vatRate)) * vatRate;
+      totalCharge = discountedSubtotal;
+    } else if (vatIncSetting === 'Add') {
+      vat = discountedSubtotal * (vatRate / 100);
+      totalCharge = discountedSubtotal + vat;
+    }
   }
   
   const calcBalanceDue = totalCharge;

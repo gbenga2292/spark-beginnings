@@ -2341,6 +2341,10 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
       startDate,
       endDate,
       status: computedStatus,
+      ...(endDate ? {
+        currentProgressPercentage: 100,
+        currentDewateringStage: 'demobilisation',
+      } : {})
     };
 
     updateSite(siteEditTarget.id, updatedFields);

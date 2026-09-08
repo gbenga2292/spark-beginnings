@@ -424,6 +424,52 @@ export async function executeActionProposal(
         return { success: true, recordId };
       }
 
+      case 'LOG_MACHINE_DAILY': {
+        const data = proposal.payload.data;
+        let assetId = data.assetId;
+        if (!assetId) {
+          const { data: assetMatches } = await supabase
+            .from('operations_assets')
+            .select('id, name')
+            .ilike('name', `%${data.assetName}%`)
+            .limit(1);
+          if (assetMatches && assetMatches.length > 0) {
+            assetId = assetMatches[0].id;
+          } else {
+            assetId = crypto.randomUUID();
+          }
+        }
+
+        const isActive = data.operationalDay !== 'none';
+        const payload = {
+          asset_id: assetId,
+          asset_name: data.assetName,
+          site_id: data.siteId,
+          site_name: data.siteName,
+          date: data.date,
+          is_active: isActive,
+          operational_day: data.operationalDay,
+          downtime_entries: [],
+          maintenance_details: data.maintenanceDetails || null,
+          client_feedback: null,
+          issues_on_site: data.issuesOnSite || null,
+          diesel_usage: data.dieselRefilled || 0,
+          dipstick_level_litres: data.dipstickLevelLitres ?? null,
+          is_tank_filled_to_full: !!data.isTankFilledToFull,
+          supervisor_on_site: data.supervisorOnSite || null,
+          logged_by: authorName ? `[AI] ${authorName}` : 'AI Co-Pilot',
+        };
+
+        const { data: logRow, error } = await supabase
+          .from('operations_daily_logs')
+          .upsert(payload, { onConflict: 'asset_id,date' })
+          .select()
+          .single();
+
+        if (error) throw error;
+        return { success: true, recordId: logRow?.id || assetId };
+      }
+
       case 'LOG_CONSUMABLE_BURN': {
         const data = proposal.payload.data;
         const recordId = crypto.randomUUID();

@@ -40,15 +40,15 @@ export function dbToSite(r: any): Site {
     name: r.name, 
     client: r.client, 
     vat: r.vat, 
-    status: r.status, 
+    status: (r.end_date && r.end_date.trim() !== '') ? 'Ended' : r.status, 
     startDate: r.start_date, 
     endDate: r.end_date,
     address: r.location || undefined,
     mainContactPerson: r.contact_person || undefined,
     contactPhone: r.phone || undefined,
     position: r.position || undefined,
-    currentProgressPercentage: r.current_progress_percentage ?? undefined,
-    currentDewateringStage: r.current_dewatering_stage ?? undefined,
+    currentProgressPercentage: (r.end_date && r.end_date.trim() !== '') ? 100 : (r.current_progress_percentage ?? undefined),
+    currentDewateringStage: (r.end_date && r.end_date.trim() !== '') ? 'demobilisation' : (r.current_dewatering_stage ?? undefined),
   };
 }
 
@@ -120,6 +120,8 @@ export function dbToInvoice(r: any): Invoice {
     techniciansDailyRate: Number(r.technicians_daily_rate), mobDemob: Number(r.mob_demob),
     installation: Number(r.installation), damages: Number(r.damages),
     duration: r.duration, rentalCost: Number(r.rental_cost),
+    auxiliaryCost: r.auxiliary_cost != null ? Number(r.auxiliary_cost) : 0,
+    auxiliaryEquipment: r.auxiliary_equipment || [],
     dieselCost: Number(r.diesel_cost), techniciansCost: Number(r.technicians_cost),
     totalCost: Number(r.total_cost), vat: Number(r.vat),
     totalCharge: Number(r.total_charge), totalExclusiveOfVat: Number(r.total_exclusive_of_vat),
@@ -154,6 +156,8 @@ export function dbToPendingInvoice(r: any): PendingInvoice {
     mobDemob: Number(r.mob_demob), installation: Number(r.installation),
     damages: Number(r.damages), startDate: r.start_date, duration: r.duration,
     endDate: r.end_date, rentalCost: Number(r.rental_cost),
+    auxiliaryCost: r.auxiliary_cost != null ? Number(r.auxiliary_cost) : 0,
+    auxiliaryEquipment: r.auxiliary_equipment || [],
     dieselCost: Number(r.diesel_cost), techniciansCost: Number(r.technicians_cost),
     totalCost: Number(r.total_cost), vat: Number(r.vat),
     totalCharge: Number(r.total_charge), totalExclusiveOfVat: Number(r.total_exclusive_of_vat),
@@ -679,20 +683,21 @@ function clientProfileToDb(c: any) {
 }
 
 function siteToDb(s: Site) {
+  const hasEndDate = !!(s.endDate && s.endDate.trim() !== '');
   return { 
     id: s.id, 
     name: s.name, 
     client: s.client, 
     vat: s.vat, 
-    status: s.status, 
+    status: hasEndDate ? 'Ended' : s.status, 
     start_date: s.startDate, 
     end_date: s.endDate,
     location: s.address || null,
     contact_person: s.mainContactPerson || null,
     phone: s.contactPhone || null,
     position: s.position || null,
-    current_progress_percentage: s.currentProgressPercentage ?? null,
-    current_dewatering_stage: sanitizeDewateringStage(s.currentDewateringStage),
+    current_progress_percentage: hasEndDate ? 100 : (s.currentProgressPercentage ?? null),
+    current_dewatering_stage: hasEndDate ? 'demobilisation' : sanitizeDewateringStage(s.currentDewateringStage),
   };
 }
 
@@ -764,7 +769,10 @@ function invoiceToDb(i: Invoice) {
     daily_usage: i.dailyUsage, no_of_technician: i.noOfTechnician,
     technicians_daily_rate: i.techniciansDailyRate, mob_demob: i.mobDemob,
     installation: i.installation, damages: i.damages, duration: i.duration,
-    rental_cost: i.rentalCost, diesel_cost: i.dieselCost,
+    rental_cost: i.rentalCost,
+    auxiliary_cost: i.auxiliaryCost ?? 0,
+    auxiliary_equipment: i.auxiliaryEquipment || [],
+    diesel_cost: i.dieselCost,
     technicians_cost: i.techniciansCost, total_cost: i.totalCost,
     vat: i.vat, total_charge: i.totalCharge,
     total_exclusive_of_vat: i.totalExclusiveOfVat,
@@ -797,7 +805,10 @@ function pendingInvoiceToDb(p: PendingInvoice) {
     daily_usage: p.dailyUsage, no_of_technician: p.noOfTechnician,
     technicians_daily_rate: p.techniciansDailyRate, mob_demob: p.mobDemob,
     installation: p.installation, damages: p.damages, start_date: p.startDate,
-    duration: p.duration, end_date: p.endDate, rental_cost: p.rentalCost,
+    duration: p.duration, end_date: p.endDate,
+    rental_cost: p.rentalCost,
+    auxiliary_cost: p.auxiliaryCost ?? 0,
+    auxiliary_equipment: p.auxiliaryEquipment || [],
     diesel_cost: p.dieselCost, technicians_cost: p.techniciansCost,
     total_cost: p.totalCost, vat: p.vat, total_charge: p.totalCharge,
     total_exclusive_of_vat: p.totalExclusiveOfVat,
@@ -1540,13 +1551,24 @@ export const db = {
     if (s.vat !== undefined) update.vat = s.vat;
     if (s.status !== undefined) update.status = s.status;
     if (s.startDate !== undefined) update.start_date = s.startDate;
-    if (s.endDate !== undefined) update.end_date = s.endDate;
+    if (s.endDate !== undefined) {
+      update.end_date = s.endDate;
+      if (s.endDate && s.endDate.trim() !== '') {
+        update.status = 'Ended';
+        update.current_progress_percentage = 100;
+        update.current_dewatering_stage = 'demobilisation';
+      }
+    }
     if (s.address !== undefined) update.location = s.address || null;
     if (s.mainContactPerson !== undefined) update.contact_person = s.mainContactPerson || null;
     if (s.contactPhone !== undefined) update.phone = s.contactPhone || null;
     if (s.position !== undefined) update.position = s.position || null;
-    if (s.currentProgressPercentage !== undefined) update.current_progress_percentage = s.currentProgressPercentage;
-    if (s.currentDewateringStage !== undefined) update.current_dewatering_stage = s.currentDewateringStage ?? null;
+    if (s.currentProgressPercentage !== undefined && !(update.end_date && update.end_date.trim() !== '')) {
+      update.current_progress_percentage = s.currentProgressPercentage;
+    }
+    if (s.currentDewateringStage !== undefined && !(update.end_date && update.end_date.trim() !== '')) {
+      update.current_dewatering_stage = s.currentDewateringStage ?? null;
+    }
     const { error } = await supabase.from('sites').update(update).eq('id', id);
     if (error) { console.error('updateSite:', error); throw error; }
   },
@@ -1850,7 +1872,9 @@ export const db = {
       technicianNightDurationSameAsMachine: 'technician_night_duration_same_as_machine',
       noOfTechnicianNight: 'no_of_technician_night',
       technicianNightCountSameAsDay: 'technician_night_count_same_as_day',
-      technicianAccommodationUseNightCount: 'technician_accommodation_use_night_count'
+      technicianAccommodationUseNightCount: 'technician_accommodation_use_night_count',
+      auxiliaryCost: 'auxiliary_cost',
+      auxiliaryEquipment: 'auxiliary_equipment'
     };
     const validDbColumns = new Set(Object.values(map));
     const update: any = {};
@@ -1898,6 +1922,8 @@ export const db = {
       duration: 'duration',
       endDate: 'end_date',
       rentalCost: 'rental_cost',
+      auxiliaryCost: 'auxiliary_cost',
+      auxiliaryEquipment: 'auxiliary_equipment',
       dieselCost: 'diesel_cost',
       techniciansCost: 'technicians_cost',
       totalCost: 'total_cost',

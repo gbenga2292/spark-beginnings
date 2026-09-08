@@ -78,6 +78,7 @@ const Simulator = lazy(() => import('./pages/Simulator').then(m => ({ default: m
 const MachineReconciliation = lazy(() => import('./pages/MachineReconciliation').then(m => ({ default: m.MachineReconciliation })));
 const Estimator = lazy(() => import('./pages/Estimator').then(m => ({ default: m.default })));
 const Budget = lazy(() => import('./pages/Budget').then(m => ({ default: m.Budget })));
+const ActiveSiteAnalytics = lazy(() => import('./pages/ActiveSiteAnalytics').then(m => ({ default: m.ActiveSiteAnalytics })));
 import { OperationsProvider } from './contexts/OperationsContext';
 
 // ── Suspense fallback ─────────────────────────────────────────────────────────
@@ -176,7 +177,7 @@ function AppContent() {
           '/operations/checkout', '/operations/maintenance', '/operations/vehicles', '/operations/sites',
           '/client-accounts', '/payroll', '/beneficiaries', '/ledger', '/company-expenses',
           '/reports', '/financial-reports', '/tasks/reports', '/weekly-report', '/users',
-          '/settings', '/activity-log', '/profile'
+          '/settings', '/activity-log', '/profile', '/operations/site-analytics', '/site-analytics'
         ];
         
         if (rootPaths.includes(path) || path === '') {
@@ -260,6 +261,7 @@ function AppContent() {
                       <Route path="simulator" element={<ProtectedRoute requiredModule="simulator"><Simulator /></ProtectedRoute>} />
                       <Route path="estimator" element={<ProtectedRoute requiredModule="simulator"><Estimator /></ProtectedRoute>} />
                       <Route path="machine-reconciliation" element={<ProtectedRoute requiredModule={['opsMachineRecon']}><MachineReconciliation /></ProtectedRoute>} />
+                      <Route path="site-analytics" element={<ProtectedRoute requiredModule={['operations', 'opsSites', 'sites']}><ActiveSiteAnalytics /></ProtectedRoute>} />
                       <Route path="*" element={<Navigate to="/operations" replace />} />
                     </Routes>
                   </>
@@ -267,6 +269,7 @@ function AppContent() {
               </Page>
             } />
             <Route path="activity-log" element={<Page label="Activity Log"><ProtectedRoute requiredModule="activityLog"><ActivityLog /></ProtectedRoute></Page>} />
+            <Route path="site-analytics" element={<Page label="Site Analytics"><ProtectedRoute requiredModule={['operations', 'opsSites', 'sites']}><ActiveSiteAnalytics /></ProtectedRoute></Page>} />
           </>
         )}
 

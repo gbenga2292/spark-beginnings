@@ -518,7 +518,20 @@ export function Header({ onMenuClick }: HeaderProps) {
 
         {/* Home Button */}
         <button
-          onClick={() => navigate('/home')}
+          onClick={async () => {
+            const { isDailyLogFormDirty, setDailyLogFormDirty } = useAppStore.getState();
+            if (isDailyLogFormDirty) {
+              const ok = await showConfirm('You have unsaved changes in this machine log. Do you want to discard them and leave?', {
+                title: 'Unsaved Changes',
+                confirmLabel: 'Discard & Leave',
+                cancelLabel: 'Keep Editing',
+                variant: 'danger'
+              });
+              if (!ok) return;
+              setDailyLogFormDirty(false);
+            }
+            navigate('/home');
+          }}
           className={`h-8 w-8 rounded-lg flex items-center justify-center transition-colors ${
             isDark ? 'text-slate-400 hover:bg-slate-800' : 'text-slate-500 hover:bg-slate-100'
           }`}

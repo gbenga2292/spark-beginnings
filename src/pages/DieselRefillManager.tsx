@@ -816,6 +816,8 @@ function RefillForm({ editing, initialLedgerEntry, onClose, onSave }: RefillForm
             clientFeedback: existingLog?.clientFeedback,
             issuesOnSite: existingLog?.issuesOnSite,
             dieselUsage: Number(alloc.actualUsed) || 0,
+            dipstickLevelLitres: existingLog?.dipstickLevelLitres,
+            isTankFilledToFull: existingLog?.isTankFilledToFull,
             supervisorOnSite: existingLog?.supervisorOnSite,
             loggedBy: existingLog?.loggedBy,
           });

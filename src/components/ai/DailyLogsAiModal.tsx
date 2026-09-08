@@ -4,7 +4,7 @@ import {
 } from 'date-fns';
 import {
   Sparkles, Send, Bot, User, RefreshCw, Copy, Check, Calendar,
-  Building2, Trash2, Cpu
+  Building2, Trash2
 } from 'lucide-react';
 import { useAppStore } from '@/src/store/appStore';
 import { useOperations } from '@/src/contexts/OperationsContext';
@@ -14,6 +14,7 @@ import { Input } from '@/src/components/ui/input';
 import { cn } from '@/src/lib/utils';
 import { toast } from '@/src/components/ui/toast';
 import { supabase } from '@/src/integrations/supabase/client';
+import { getActiveAiConfig } from '@/src/lib/agentExecutor';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -203,9 +204,6 @@ function FormattedAiMessage({ text }: { text: string }) {
   return <div className="space-y-0.5 text-[11.5px]">{renderedElements}</div>;
 }
 
-let cachedApiKeys: any[] | null = null;
-let lastApiKeyFetch = 0;
-
 export function DailyLogsAiModal({ initialSiteId, initialDate, onClose, isEmbedded = false }: Props) {
   const { isDark } = useTheme();
   const { sites, siteJournalEntries = [] } = useAppStore();
@@ -217,52 +215,13 @@ export function DailyLogsAiModal({ initialSiteId, initialDate, onClose, isEmbedd
   const [customStart, setCustomStart] = useState<string>('');
   const [customEnd, setCustomEnd] = useState<string>('');
 
-  // AI Provider & Chat State
-  const [selectedProvider, setSelectedProvider] = useState<'gemini' | 'groq'>('gemini');
-  const [selectedModel, setSelectedModel] = useState<string>('gemini-2.0-flash');
+  // AI Chat State
   const [messages, setMessages] = useState<Message[]>([]);
   const [chatInput, setChatInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  // Load configured keys with memory cache (refresh every 5 mins max)
-  useEffect(() => {
-    async function loadApiKeys() {
-      try {
-        const now = Date.now();
-        let keys = cachedApiKeys;
-        if (!keys || (now - lastApiKeyFetch > 5 * 60 * 1000)) {
-          let { data: dbKeys } = await supabase.from('api_keys').select('*');
-          if (!dbKeys || dbKeys.length === 0) {
-            const res = await supabase.from('ai_provider_keys').select('*');
-            dbKeys = res.data;
-          }
-          keys = dbKeys || [];
-          cachedApiKeys = keys;
-          lastApiKeyFetch = now;
-        }
-
-        if (keys && keys.length > 0) {
-          const defaultKey = keys.find((k: any) => k.is_default) || keys[0];
-          if (defaultKey) {
-            const rawProv = (defaultKey.provider || '').toLowerCase();
-            const prov = rawProv === 'gemini' || rawProv === 'groq' ? rawProv : (rawProv === 'openai' ? 'groq' : 'gemini');
-            setSelectedProvider(prov);
-            if (defaultKey.default_model) {
-              setSelectedModel(defaultKey.default_model);
-            } else {
-              setSelectedModel(prov === 'gemini' ? 'gemini-2.0-flash' : 'llama-3.3-70b-versatile');
-            }
-          }
-        }
-      } catch (err) {
-        console.error('Error loading AI keys from settings:', err);
-      }
-    }
-    loadApiKeys();
-  }, []);
 
   // Compute Active Date Range
   const { startDate, endDate, rangeLabel, startStr, endStr } = useMemo(() => {
@@ -278,23 +237,22 @@ export function DailyLogsAiModal({ initialSiteId, initialDate, onClose, isEmbedd
     } else if (datePreset === 'today') {
       s = now;
       e = now;
-      label = 'Today (' + format(now, 'MMM d') + ')';
     } else if (datePreset === 'yesterday') {
       s = subDays(now, 1);
       e = subDays(now, 1);
       label = 'Yesterday (' + format(s, 'MMM d') + ')';
     } else if (datePreset === 'last7') {
-      s = subDays(now, 7);
+      s = subDays(now, 6);
       e = now;
       label = 'Last 7 Days';
     } else if (datePreset === 'last30') {
-      s = subDays(now, 30);
+      s = subDays(now, 29);
       e = now;
       label = 'Last 30 Days';
     } else if (datePreset === 'thisMonth') {
       s = startOfMonth(now);
       e = endOfMonth(now);
-      label = 'This Month (' + format(now, 'MMMM') + ')';
+      label = format(now, 'MMMM yyyy');
     } else if (customStart && customEnd) {
       s = parseISO(customStart);
       e = parseISO(customEnd);
@@ -391,61 +349,15 @@ export function DailyLogsAiModal({ initialSiteId, initialDate, onClose, isEmbedd
     setIsLoading(true);
 
     try {
-      // 1. Fetch Key from in-memory cache with fallback to Supabase, localStorage & env
-      let apiKey = '';
-      const keys = cachedApiKeys;
-      if (keys && keys.length > 0) {
-        const match = keys.find((k: any) => (k.provider || '').toLowerCase() === selectedProvider.toLowerCase());
-        if (match && match.key_value) {
-          apiKey = match.key_value;
-        } else {
-          const def = keys.find((k: any) => k.is_default) || keys[0];
-          if (def && def.key_value) apiKey = def.key_value;
-        }
+      // 1. Fetch AI Configuration configured in Settings
+      const config = await getActiveAiConfig();
+      if (!config.apiKey) {
+        throw new Error('No AI API Key found. Please add an API key in Settings -> AI Keys.');
       }
 
-      if (!apiKey) {
-        try {
-          const { data: apiKeysData } = await supabase.from('api_keys').select('*');
-          if (apiKeysData && apiKeysData.length > 0) {
-            cachedApiKeys = apiKeysData;
-            const match = apiKeysData.find((k: any) => (k.provider || '').toLowerCase() === selectedProvider.toLowerCase());
-            if (match && match.key_value) apiKey = match.key_value;
-            else {
-              const def = apiKeysData.find((k: any) => k.is_default) || apiKeysData[0];
-              if (def && def.key_value) apiKey = def.key_value;
-            }
-          }
-        } catch (e) {
-          console.error('Error querying api_keys:', e);
-        }
-      }
-
-      if (!apiKey) {
-        try {
-          const { data: providerKeys } = await supabase.from('ai_provider_keys').select('*');
-          const match = providerKeys?.find((k: any) => (k.provider || '').toLowerCase() === selectedProvider.toLowerCase());
-          if (match && match.key_value) apiKey = match.key_value;
-        } catch (e) {
-          console.error(e);
-        }
-      }
-
-      if (!apiKey) {
-        apiKey = localStorage.getItem(`${selectedProvider.toUpperCase()}_API_KEY`) || 
-                 localStorage.getItem('GROQ_API_KEY') || 
-                 localStorage.getItem('GEMINI_API_KEY') || 
-                 (import.meta as any).env?.[`VITE_${selectedProvider.toUpperCase()}_API_KEY`] || '';
-      }
-
-      if (!apiKey) {
-        apiKey = window.prompt(`Enter your ${selectedProvider === 'gemini' ? 'Gemini' : 'Groq'} API key:`) || '';
-        if (!apiKey) {
-          setIsLoading(false);
-          return;
-        }
-        localStorage.setItem(`${selectedProvider.toUpperCase()}_API_KEY`, apiKey);
-      }
+      const apiKey = config.apiKey;
+      const provider = config.provider;
+      const model = config.model;
 
       // 2. Build Structured Grounding Prompt Context with complete logs
       const siteSummaryContext = filteredSites.map(s => {
@@ -470,7 +382,9 @@ export function DailyLogsAiModal({ initialSiteId, initialDate, onClose, isEmbedd
           downtime ? `Downtime: ${downtime}` : ''
         ].filter(Boolean).join(' | ') || 'None';
 
-        return `[${l.date}] Site: "${l.siteName}" | Machine: "${l.assetName}" | Status: ${l.isActive ? 'Active Pumping' : 'Idle/Downtime'} (${l.operationalDay || 'full'} day) | Diesel: ${l.dieselUsage || 0}L | Supervisor: ${l.supervisorOnSite || 'N/A'} | Details: ${notes}`;
+        const dipstickInfo = l.dipstickLevelLitres != null ? ` | Dipstick Level: ${l.dipstickLevelLitres}L` : '';
+        const fullInfo = l.isTankFilledToFull ? ' (Topped to 100% Full)' : '';
+        return `[${l.date}] Site: "${l.siteName}" | Machine: "${l.assetName}" | Status: ${l.isActive ? 'Active Pumping' : 'Idle/Downtime'} (${l.operationalDay || 'full'} day) | Diesel Refilled: ${l.dieselUsage || 0}L${fullInfo}${dipstickInfo} | Supervisor: ${l.supervisorOnSite || 'N/A'} | Details: ${notes}`;
       }).join('\n');
 
       const journalSnippet = inScopeSiteJournals.slice(0, 200).map(j => {
@@ -505,18 +419,19 @@ INSTRUCTIONS:
 1. Answer the user's operational question with complete, fully articulated facts, exact numbers, and cross-referenced parameters from the provided data.
 2. Structure your briefing using clean Markdown section headers (### Header), bold key statistics, and bullet points.
 3. NEVER truncate or leave your response incomplete mid-sentence. Ensure all sections and sentences are completely finished.
-4. If citing fuel, pump hours, downtime, or holds, mention the exact site and machine names.`;
+4. If citing fuel, pump hours, downtime, or holds, mention the exact site and machine names.
+5. FUEL & DIPSTICK RECONCILIATION: Distinguish clearly between "Diesel Refilled / Inflow" (fuel poured into machine tanks) and "Dipstick / Tank Level" (remaining physical fuel in tank). Recognize that machines burn diesel during active pumping days even when no refill was made on that date.`;
 
       let aiReply = '';
 
-      if (selectedProvider === 'gemini') {
+      if (provider === 'gemini') {
         const contents = messages.map(m => ({
           role: m.role === 'assistant' ? 'model' : 'user',
           parts: [{ text: m.content }]
         }));
         contents.push({ role: 'user', parts: [{ text }] });
 
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent?key=${apiKey}`, {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model || 'gemini-2.0-flash'}:generateContent?key=${apiKey}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -532,8 +447,7 @@ INSTRUCTIONS:
         }
         const data = await res.json();
         aiReply = data?.candidates?.[0]?.content?.parts?.[0]?.text || 'No response generated.';
-      } else {
-        // Groq
+      } else if (provider === 'groq') {
         const groqMessages = [
           { role: 'system', content: systemPrompt },
           ...messages.map(m => ({ role: m.role, content: m.content })),
@@ -547,7 +461,7 @@ INSTRUCTIONS:
             Authorization: `Bearer ${apiKey}`
           },
           body: JSON.stringify({
-            model: selectedModel || 'llama-3.3-70b-versatile',
+            model: model || 'llama-3.3-70b-versatile',
             messages: groqMessages,
             temperature: 0.2,
             max_tokens: 4096
@@ -557,6 +471,34 @@ INSTRUCTIONS:
         if (!res.ok) {
           const errData = await res.json().catch(() => ({}));
           throw new Error(errData?.error?.message || 'Groq API Error');
+        }
+        const data = await res.json();
+        aiReply = data?.choices?.[0]?.message?.content || 'No response generated.';
+      } else {
+        // OpenAI / other compatible
+        const openaiMessages = [
+          { role: 'system', content: systemPrompt },
+          ...messages.map(m => ({ role: m.role, content: m.content })),
+          { role: 'user', content: text }
+        ];
+
+        const res = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${apiKey}`
+          },
+          body: JSON.stringify({
+            model: model || 'gpt-4o',
+            messages: openaiMessages,
+            temperature: 0.2,
+            max_tokens: 4096
+          })
+        });
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData?.error?.message || 'OpenAI API Error');
         }
         const data = await res.json();
         aiReply = data?.choices?.[0]?.message?.content || 'No response generated.';
@@ -577,7 +519,7 @@ INSTRUCTIONS:
         ...prev,
         {
           role: 'assistant',
-          content: `⚠️ **Error generating response:** ${err.message}\n\nPlease verify your API key in Settings or try selecting another provider/model.`,
+          content: `⚠️ **Error generating response:** ${err.message}\n\nPlease verify your API key and default model in Settings -> AI Keys.`,
           timestamp: format(new Date(), 'HH:mm')
         }
       ]);
@@ -589,14 +531,13 @@ INSTRUCTIONS:
   const copyToClipboard = (text: string, idx: number) => {
     navigator.clipboard.writeText(text);
     setCopiedIdx(idx);
-    toast.success('Copied to clipboard');
+    toast.success('Briefing copied to clipboard');
     setTimeout(() => setCopiedIdx(null), 2000);
   };
 
-  // Quick Action Chips
   const quickActions = [
-    { label: "📋 Today's Operations Brief", prompt: "Provide a comprehensive executive summary of all operations, pumping activities, and issues logged across all sites today." },
-    { label: "⛽ Fuel & Efficiency Audit", prompt: "Analyze diesel fuel consumption across all active machines. Identify any high fuel usage anomalies relative to pumping hours." },
+    { label: "📊 Today's Operations Briefing", prompt: "Provide a high-level operational briefing of all active sites today, including total active pumping units, downtime reasons, and fuel consumption." },
+    { label: "⛽ Fuel Consumption & Efficiency", prompt: "Analyze total diesel consumed across all sites. Which sites and machines had the highest fuel consumption rate?" },
     { label: "🚨 Downtime & Stoppage Analysis", prompt: "List all machines that experienced downtime or stoppages in this period. Detail the root causes, remarks, and any ongoing site holds." },
     { label: "🌊 Jetting & Mobilisation Check", prompt: "Review all jetting activities and mobilisation waybills in this period. Are there any sites requiring re-jetting or pending demobilisation?" }
   ];
@@ -662,28 +603,8 @@ INSTRUCTIONS:
           </div>
         </div>
 
-        {/* Right: AI Provider & Clear */}
+        {/* Right: Actions */}
         <div className="flex items-center gap-1.5 shrink-0">
-          {/* Provider / Model */}
-          <div className={cn(
-            "flex items-center gap-1 px-1.5 py-0.5 rounded-lg border text-[11px]",
-            isEmbedded ? "bg-white/5 border-white/10 text-white" : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700"
-          )}>
-            <Cpu className="w-3 h-3 text-indigo-400" />
-            <select
-              value={selectedProvider}
-              onChange={e => {
-                const p = e.target.value as 'gemini' | 'groq';
-                setSelectedProvider(p);
-                setSelectedModel(p === 'gemini' ? 'gemini-2.0-flash' : 'llama-3.3-70b-versatile');
-              }}
-              className="bg-transparent font-bold focus:outline-none cursor-pointer text-[11px] uppercase"
-            >
-              <option value="gemini" className="bg-slate-900 text-white">Gemini</option>
-              <option value="groq" className="bg-slate-900 text-white">Groq</option>
-            </select>
-          </div>
-
           {messages.length > 0 && (
             <button
               onClick={() => setMessages([])}

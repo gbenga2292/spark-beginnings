@@ -72,6 +72,8 @@ export function ActionProposalCard({ proposal, context, onUpdateProposal, onClos
         return <AlertTriangle className="w-4 h-4 text-amber-500" />;
       case 'LOG_DIESEL_REFILL':
         return <Fuel className="w-4 h-4 text-orange-500" />;
+      case 'LOG_MACHINE_DAILY':
+        return <Wrench className="w-4 h-4 text-cyan-500" />;
       case 'LOG_CONSUMABLE_BURN':
         return <Package className="w-4 h-4 text-purple-500" />;
       case 'LOG_MAINTENANCE_TICKET':
@@ -99,6 +101,8 @@ export function ActionProposalCard({ proposal, context, onUpdateProposal, onClos
         return isDark ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' : 'bg-amber-50 text-amber-700 border-amber-200';
       case 'LOG_DIESEL_REFILL':
         return isDark ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' : 'bg-orange-50 text-orange-700 border-orange-200';
+      case 'LOG_MACHINE_DAILY':
+        return isDark ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20' : 'bg-cyan-50 text-cyan-700 border-cyan-200';
       case 'LOG_CONSUMABLE_BURN':
         return isDark ? 'bg-purple-500/10 text-purple-400 border-purple-500/20' : 'bg-purple-50 text-purple-700 border-purple-200';
       case 'LOG_MAINTENANCE_TICKET':
@@ -735,6 +739,58 @@ export function ActionProposalCard({ proposal, context, onUpdateProposal, onClos
                 <p className={textValueClass}>{payload.data.date}</p>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Machine Daily Log Fields */}
+        {payload.type === 'LOG_MACHINE_DAILY' && (
+          <div className={cn("space-y-2.5 p-2.5 rounded-lg border", innerBoxClass)}>
+            <div className="flex items-center justify-between">
+              <span className={cn("font-bold text-xs", isDark ? "text-cyan-300" : "text-cyan-800")}>
+                {payload.data.assetName}
+              </span>
+              <span className={cn("text-[10px] uppercase font-bold px-2 py-0.5 rounded-full border",
+                payload.data.operationalDay === 'full' ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" :
+                payload.data.operationalDay === 'none' ? "bg-red-500/10 text-red-400 border-red-500/30" :
+                "bg-amber-500/10 text-amber-400 border-amber-500/30"
+              )}>
+                {payload.data.operationalDay} day run
+              </span>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2 text-center pt-1 border-t border-dashed border-slate-500/20">
+              <div className="bg-slate-500/5 rounded p-1.5">
+                <label className={cn("text-[9px] uppercase tracking-wider font-semibold block", labelClass)}>Refill</label>
+                <p className={cn("font-bold text-xs", isDark ? "text-orange-400" : "text-orange-600")}>
+                  {payload.data.dieselRefilled != null ? `${payload.data.dieselRefilled}L` : '0L'}
+                </p>
+              </div>
+              <div className="bg-slate-500/5 rounded p-1.5">
+                <label className={cn("text-[9px] uppercase tracking-wider font-semibold block", labelClass)}>Dipstick</label>
+                <p className={cn("font-bold text-xs", isDark ? "text-cyan-400" : "text-cyan-600")}>
+                  {payload.data.dipstickLevelLitres != null ? `${payload.data.dipstickLevelLitres}L` : '—'}
+                </p>
+              </div>
+              <div className="bg-slate-500/5 rounded p-1.5 flex flex-col justify-center items-center">
+                <label className={cn("text-[9px] uppercase tracking-wider font-semibold block", labelClass)}>Tank Status</label>
+                {payload.data.isTankFilledToFull ? (
+                  <span className="text-[10px] font-black text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">100% Full</span>
+                ) : (
+                  <span className="text-[10px] text-slate-400">Partial</span>
+                )}
+              </div>
+            </div>
+
+            {payload.data.supervisorOnSite && (
+              <div className="text-[10px] text-slate-400 pt-0.5">
+                Supervisor: <span className="font-semibold text-slate-200">{payload.data.supervisorOnSite}</span>
+              </div>
+            )}
+            {payload.data.issuesOnSite && (
+              <div className="text-[10px] text-amber-400 bg-amber-500/10 p-1.5 rounded border border-amber-500/20">
+                ⚠️ Issues: {payload.data.issuesOnSite}
+              </div>
+            )}
           </div>
         )}
 

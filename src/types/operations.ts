@@ -93,6 +93,8 @@ export interface Asset {
   condition: AssetCondition;
   location: string;
   powerSource?: string;
+  tankCapacityLitres?: number;
+  expectedDailyBurnRate?: number;
   requiresLogging?: boolean;
   serialNumber?: string;
   serviceIntervalMonths?: number;
@@ -322,12 +324,19 @@ export interface VehicleFuelLog {
   linkedLedgerAmounts?: Record<string, number>;
   created_at?: string;
 }
+export type DowntimeCategory = 'mechanical' | 'client_standby' | 'weather' | 'routine_service' | 'other';
+
 export interface DowntimeEntry {
   id: string;
   reason: string;
   durationHours: number;
   severity: 'low' | 'medium' | 'high';
   timestamp: string;
+  startTime?: string;      // 24h format "HH:mm" e.g. "10:15"
+  endTime?: string;        // 24h format "HH:mm" e.g. "12:45"
+  isStillDown?: boolean;   // true if machine did not restart by end of shift/day
+  category?: DowntimeCategory;
+  notes?: string;
 }
 
 export type OperationalDay = 'full' | 'half' | 'none';
@@ -347,6 +356,10 @@ export interface DailyMachineLog {
   clientFeedback?: string;
   issuesOnSite?: string;
   dieselUsage: number;
+  /** Physical fuel remaining in tank measured by dipstick at end of shift (Litres) */
+  dipstickLevelLitres?: number;
+  /** True if the diesel refill topped the machine tank to 100% capacity */
+  isTankFilledToFull?: boolean;
   supervisorOnSite?: string;
   loggedBy?: string;
   /** Site construction progress % as recorded on this specific date */

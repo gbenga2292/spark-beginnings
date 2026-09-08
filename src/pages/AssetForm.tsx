@@ -40,6 +40,8 @@ export function AssetForm({ onClose, assetToEdit }: AssetFormProps) {
   const [packUnit, setPackUnit]             = useState(assetToEdit?.packUnit || 'Box');
   const [packSize, setPackSize]             = useState(assetToEdit?.packSize || 10);
   const [hasExpiry, setHasExpiry]           = useState(assetToEdit?.hasExpiry || false);
+  const [tankCapacity, setTankCapacity]     = useState<string | number>(assetToEdit?.tankCapacityLitres ?? '');
+  const [expectedDailyBurn, setExpectedDailyBurn] = useState<string | number>(assetToEdit?.expectedDailyBurnRate ?? '');
 
   const handleSubmit = (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -52,6 +54,8 @@ export function AssetForm({ onClose, assetToEdit }: AssetFormProps) {
       packSize: enablePackaging ? Number(packSize) : undefined,
       hasExpiry: assetType === 'consumable' ? hasExpiry : false,
       powerSource: assetType === 'equipment' ? powerSource : undefined,
+      tankCapacityLitres: assetType === 'equipment' && powerSource === 'Diesel' ? (Number(tankCapacity) || undefined) : undefined,
+      expectedDailyBurnRate: assetType === 'equipment' && powerSource === 'Diesel' ? (Number(expectedDailyBurn) || undefined) : undefined,
       requiresLogging: assetType === 'equipment' ? requiresLogging : undefined,
       serialNumber: assetType === 'equipment' ? serialNumber : undefined,
       serviceIntervalMonths: assetType === 'equipment' ? serviceInterval : undefined,
@@ -383,6 +387,47 @@ export function AssetForm({ onClose, assetToEdit }: AssetFormProps) {
                     className={inputCls}
                   />
                 </div>
+                {powerSource === 'Diesel' && (
+                  <>
+                    <div>
+                      <label className={labelCls}>Tank Capacity (Litres)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="any"
+                        value={tankCapacity}
+                        onChange={e => setTankCapacity(e.target.value)}
+                        placeholder="e.g. 250"
+                        className={inputCls}
+                      />
+                      <p className="text-[10px] text-muted-foreground mt-1">
+                        Full machine fuel tank volume
+                      </p>
+                    </div>
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <label className={labelCls}>Expected Daily Burn (L / 24h Day)</label>
+                        {Number(expectedDailyBurn) > 0 && (
+                          <span className="text-[10px] font-bold text-cyan-600 dark:text-cyan-400">
+                            ~{(Number(expectedDailyBurn) / 24).toFixed(1)} L/hr
+                          </span>
+                        )}
+                      </div>
+                      <input
+                        type="number"
+                        min="0"
+                        step="any"
+                        value={expectedDailyBurn}
+                        onChange={e => setExpectedDailyBurn(e.target.value)}
+                        placeholder="e.g. 120"
+                        className={inputCls}
+                      />
+                      <p className="text-[10px] text-muted-foreground mt-1">
+                        Benchmark burn for a full 24h operational day
+                      </p>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           )}

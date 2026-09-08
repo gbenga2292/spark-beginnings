@@ -730,6 +730,10 @@ export function Sites() {
       status: calcStatus,
       startDate: normalizeDate(addForm.startDate),
       endDate: normalizeDate(addForm.endDate),
+      ...(addForm.endDate ? {
+        currentProgressPercentage: 100,
+        currentDewateringStage: 'demobilisation',
+      } : {})
     });
     setAddForm({ ...EMPTY_FORM });
     setAddError('');
@@ -768,7 +772,11 @@ export function Sites() {
 
     updateSite(editingId, {
       ...editForm,
-      status: submitStatus
+      status: submitStatus,
+      ...(editForm.endDate ? {
+        currentProgressPercentage: 100,
+        currentDewateringStage: 'demobilisation',
+      } : {})
     });
 
     // Synchronize changes to the linked questionnaire if it exists
@@ -956,7 +964,11 @@ export function Sites() {
                 startDate: startDate,
                 endDate: endDate,
                 vat: vat === 'Yes' ? 'Yes' : (vat === 'Add' ? 'Add' : 'No'),
-                status: endDate ? 'Ended' : (status === 'Inactive' ? 'Inactive' : 'Active')
+                status: endDate ? 'Ended' : (status === 'Inactive' ? 'Inactive' : 'Active'),
+                ...(endDate ? {
+                  currentProgressPercentage: 100,
+                  currentDewateringStage: 'demobilisation',
+                } : {})
               });
             }
             

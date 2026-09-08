@@ -117,6 +117,16 @@ const navigation: NavCategory[] = [
       { name: 'Client 360', href: '/client-360', icon: Sparkles, privKey: 'sites', privField: 'canView' },
     ],
   },
+  // ── Site Analytics — standalone direct link ──────────────────────────────
+  {
+    name: 'Site Analytics',
+    icon: BarChart3,
+    standalone: true,
+    standaloneHref: '/operations/site-analytics',
+    items: [
+      { name: 'Site Analytics', href: '/operations/site-analytics', icon: BarChart3, privKey: 'operations', privField: 'canView' },
+    ],
+  },
   // ── Simulator — standalone direct link ──────────────────────────────────
   {
     name: 'Simulator',
@@ -195,6 +205,7 @@ const navigation: NavCategory[] = [
       { name: 'Diesel Refill', href: '/operations/diesel', icon: Fuel, privKey: 'opsDiesel', privField: 'canView' },
       { name: 'Vehicles', href: '/operations/vehicles', icon: Truck, privKey: 'opsVehicles', privField: 'canView' },
       { name: 'Sites', href: '/operations/sites', icon: MapPin, privKey: 'opsSites', privField: 'canView' },
+      { name: 'Site Analytics', href: '/operations/site-analytics', icon: BarChart3, privKey: 'operations', privField: 'canView' },
     ],
   },
   // ── Account ───────────────────────────────────────────────────────────────
@@ -400,7 +411,23 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
   }, [isAndroidNative, isElectron]);
 
   const handleLinkClick = async (e: React.MouseEvent, href: string) => {
-    const { isVariablesDirty, setVariablesDirty, isLedgerDirty, setLedgerDirty, isEmployeeFormDirty, setEmployeeFormDirty, isSimulatorDirty, setSimulatorDirty } = useAppStore.getState();
+    const { isVariablesDirty, setVariablesDirty, isLedgerDirty, setLedgerDirty, isEmployeeFormDirty, setEmployeeFormDirty, isDailyLogFormDirty, setDailyLogFormDirty, isSimulatorDirty, setSimulatorDirty } = useAppStore.getState();
+
+    if (isDailyLogFormDirty) {
+      e.preventDefault();
+      const ok = await showConfirm('You have unsaved changes in this machine log. Do you want to discard them and leave?', {
+        title: 'Unsaved Changes',
+        confirmLabel: 'Discard & Leave',
+        cancelLabel: 'Keep Editing',
+        variant: 'danger'
+      });
+      if (ok) {
+        setDailyLogFormDirty(false);
+        setIsOpen?.(false);
+        navigate(href);
+      }
+      return;
+    }
 
     if (location.pathname === '/operations/simulator' && isSimulatorDirty && href !== '/operations/simulator') {
       e.preventDefault();

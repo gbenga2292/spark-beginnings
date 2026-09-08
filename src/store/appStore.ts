@@ -602,6 +602,17 @@ export interface AttendanceRecord {
   day2?: number;
 }
 
+export interface AuxiliaryEquipmentItem {
+  id: string;
+  name: string;
+  quantity: number;
+  rate: number;
+  duration: number;
+  sameDurationAsInvoice?: boolean;
+  totalCost: number;
+  note?: string;
+}
+
 export interface InvoiceVatableSections {
   equipment: boolean;
   technicians: boolean;
@@ -635,6 +646,8 @@ export interface PendingInvoice {
   duration: number;
   endDate: string;
   rentalCost: number;
+  auxiliaryCost?: number;
+  auxiliaryEquipment?: AuxiliaryEquipmentItem[];
   dieselCost: number;
   techniciansCost: number;
   totalCost: number;
@@ -686,6 +699,8 @@ export interface Invoice {
   discount?: number;
   duration?: number;
   rentalCost?: number;
+  auxiliaryCost?: number;
+  auxiliaryEquipment?: AuxiliaryEquipmentItem[];
   dieselCost?: number;
   techniciansCost?: number;
   totalCost?: number;
@@ -1087,6 +1102,8 @@ interface AppState {
   setLedgerDirty: (val: boolean) => void;
   isEmployeeFormDirty: boolean;
   setEmployeeFormDirty: (val: boolean) => void;
+  isDailyLogFormDirty: boolean;
+  setDailyLogFormDirty: (val: boolean) => void;
   isSimulatorDirty: boolean;
   setSimulatorDirty: (val: boolean) => void;
   commLogReads: CommLogRead[];
@@ -1118,6 +1135,8 @@ export const useAppStore = create<AppState>()(
       setLedgerDirty: (val) => set({ isLedgerDirty: val }),
       isEmployeeFormDirty: false,
       setEmployeeFormDirty: (val) => set({ isEmployeeFormDirty: val }),
+      isDailyLogFormDirty: false,
+      setDailyLogFormDirty: (val) => set({ isDailyLogFormDirty: val }),
       isSimulatorDirty: false,
       setSimulatorDirty: (val) => set({ isSimulatorDirty: val }),
       sites: [],
@@ -1330,9 +1349,53 @@ export const useAppStore = create<AppState>()(
       deleteLeave: (id) => { set((s) => ({ leaves: s.leaves.filter(l => l.id !== id) })); db.deleteLeave(id); },
 
       // Sites
-      addSite: (site) => { set((s) => ({ sites: [...s.sites, site] })); db.insertSite(site); },
-      setSites: (sites) => { set({ sites }); db.setSites(sites); },
-      updateSite: (id, updatedSite) => { set((s) => ({ sites: s.sites.map(site => site.id === id ? { ...site, ...updatedSite } : site) })); db.updateSite(id, updatedSite); },
+      addSite: (site) => {
+        const enriched: Site = { ...site };
+        if (enriched.endDate && enriched.endDate.trim() !== '') {
+          enriched.status = 'Ended';
+          enriched.currentProgressPercentage = 100;
+          enriched.currentDewateringStage = 'demobilisation';
+        }
+        set((s) => ({ sites: [...s.sites, enriched] }));
+        db.insertSite(enriched);
+      },
+      setSites: (sites) => {
+        const enrichedList = (sites || []).map(site => {
+          if (site.endDate && site.endDate.trim() !== '') {
+            return {
+              ...site,
+              status: 'Ended' as const,
+              currentProgressPercentage: 100,
+              currentDewateringStage: 'demobilisation' as const,
+            };
+          }
+          return site;
+        });
+        set({ sites: enrichedList });
+        db.setSites(enrichedList);
+      },
+      updateSite: (id, updatedSite) => {
+        let dbPayload = { ...updatedSite };
+        set((s) => ({
+          sites: s.sites.map(site => {
+            if (site.id !== id) return site;
+            const merged: Site = { ...site, ...updatedSite };
+            if (merged.endDate && merged.endDate.trim() !== '') {
+              merged.status = 'Ended';
+              merged.currentProgressPercentage = 100;
+              merged.currentDewateringStage = 'demobilisation';
+              dbPayload = {
+                ...dbPayload,
+                status: 'Ended',
+                currentProgressPercentage: 100,
+                currentDewateringStage: 'demobilisation',
+              };
+            }
+            return merged;
+          })
+        }));
+        db.updateSite(id, dbPayload);
+      },
       deleteSite: (id) => { set((s) => ({ sites: s.sites.filter(site => site.id !== id) })); db.deleteSite(id); },
 
       // Pending Sites

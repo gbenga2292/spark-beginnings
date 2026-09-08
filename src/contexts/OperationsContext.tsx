@@ -442,6 +442,8 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
               serialNumber: a.serial_number,
               serviceIntervalMonths: a.service_interval_months || 2,
               powerSource: a.power_source,
+              tankCapacityLitres: a.tank_capacity_litres ? Number(a.tank_capacity_litres) : undefined,
+              expectedDailyBurnRate: a.expected_daily_burn_rate ? Number(a.expected_daily_burn_rate) : undefined,
               cost: a.cost,
               lowStockLevel: a.low_stock_level,
               criticalStockLevel: a.critical_stock_level,
@@ -556,6 +558,8 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
             clientFeedback: log.client_feedback,
             issuesOnSite: log.issues_on_site,
             dieselUsage: Number(log.diesel_usage || 0),
+            dipstickLevelLitres: log.dipstick_level_litres != null ? Number(log.dipstick_level_litres) : undefined,
+            isTankFilledToFull: !!log.is_tank_filled_to_full,
             supervisorOnSite: log.supervisor_on_site,
             loggedBy: log.logged_by,
             created_at: log.created_at
@@ -713,6 +717,8 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
         serialNumber: a.serial_number,
         serviceIntervalMonths: a.service_interval_months || 2,
         powerSource: a.power_source,
+        tankCapacityLitres: a.tank_capacity_litres ? Number(a.tank_capacity_litres) : undefined,
+        expectedDailyBurnRate: a.expected_daily_burn_rate ? Number(a.expected_daily_burn_rate) : undefined,
         cost: a.cost,
         lowStockLevel: a.low_stock_level,
         criticalStockLevel: a.critical_stock_level,
@@ -1436,6 +1442,8 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
         serial_number: asset.serialNumber,
         service_interval_months: asset.serviceIntervalMonths,
         power_source: asset.powerSource,
+        tank_capacity_litres: asset.tankCapacityLitres || 0,
+        expected_daily_burn_rate: asset.expectedDailyBurnRate || 0,
         cost: asset.cost,
         low_stock_level: asset.lowStockLevel,
         critical_stock_level: asset.criticalStockLevel,
@@ -1598,6 +1606,8 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
       serial_number: asset.serialNumber,
       service_interval_months: asset.serviceIntervalMonths,
       power_source: asset.powerSource,
+      tank_capacity_litres: asset.tankCapacityLitres || 0,
+      expected_daily_burn_rate: asset.expectedDailyBurnRate || 0,
       cost: asset.cost,
       low_stock_level: asset.lowStockLevel,
       critical_stock_level: asset.criticalStockLevel,
@@ -2711,6 +2721,14 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
       updateVehicleDocument: storeUpdateVehicleDocument,
       logDailyActivity: async (logData: Omit<DailyMachineLog, 'id' | 'created_at'>) => {
         try {
+          const existingLog = dailyMachineLogs.find(l => l.assetId === logData.assetId && l.date === logData.date);
+          const resolvedDipstick = logData.dipstickLevelLitres !== undefined
+            ? (logData.dipstickLevelLitres != null ? Number(logData.dipstickLevelLitres) : null)
+            : (existingLog?.dipstickLevelLitres != null ? Number(existingLog.dipstickLevelLitres) : null);
+          const resolvedIsFull = logData.isTankFilledToFull !== undefined
+            ? !!logData.isTankFilledToFull
+            : (existingLog?.isTankFilledToFull ?? false);
+
           const payload = {
             asset_id: logData.assetId,
             asset_name: logData.assetName,
@@ -2724,6 +2742,8 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
             client_feedback: logData.clientFeedback,
             issues_on_site: logData.issuesOnSite,
             diesel_usage: logData.dieselUsage,
+            dipstick_level_litres: resolvedDipstick,
+            is_tank_filled_to_full: resolvedIsFull,
             supervisor_on_site: logData.supervisorOnSite,
             logged_by: logData.loggedBy,
             site_progress_percentage: logData.siteProgressPercentage ?? null,
@@ -2751,6 +2771,8 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
             clientFeedback: data.client_feedback,
             issuesOnSite: data.issues_on_site,
             dieselUsage: Number(data.diesel_usage || 0),
+            dipstickLevelLitres: data.dipstick_level_litres != null ? Number(data.dipstick_level_litres) : undefined,
+            isTankFilledToFull: !!data.is_tank_filled_to_full,
             supervisorOnSite: data.supervisor_on_site,
             loggedBy: data.logged_by,
             siteProgressPercentage: data.site_progress_percentage ?? undefined,

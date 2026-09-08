@@ -224,6 +224,7 @@ export function useAgentContext() {
     // Fuel & Machine logging permission
     if (currentUser?.role === 'superadmin' || privs.opsMaintenance?.canAdd || privs.operations?.canView) {
       tools.push('propose_diesel_refill');
+      tools.push('propose_machine_daily_log');
     }
 
     // Material & Consumable Burn permission

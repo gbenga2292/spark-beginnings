@@ -441,6 +441,44 @@ export function InvoiceDetailDialog({ invoice, invoiceList, open, onClose, onNav
                   </div>
                 </div>
               )}
+
+              {invoice.auxiliaryEquipment && invoice.auxiliaryEquipment.length > 0 && (
+                <div className="space-y-2 pt-2 border-t border-slate-100">
+                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                    Auxiliary Leased Assets (No Fuel)
+                  </div>
+                  {invoice.auxiliaryEquipment.map((item, idx) => {
+                    const q = item.quantity || 1;
+                    const r = item.rate || 0;
+                    const d = item.duration || 0;
+                    const total = q * r * d;
+                    return (
+                      <div key={item.id || idx} className="bg-slate-50 border border-slate-100 rounded-lg p-3 space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className="h-7 w-7 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 text-xs font-black">
+                              A
+                            </div>
+                            <div>
+                              <span className="text-sm font-semibold text-slate-800">{item.name || `Auxiliary Item #${idx + 1}`}</span>
+                              <span className="text-xs text-slate-400 ml-1.5">({q} unit{q !== 1 ? 's' : ''})</span>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="font-mono font-bold text-slate-800 text-sm">₦{fmt(total)}</div>
+                            <div className="text-[11px] text-slate-400">₦{fmt(r)}/day × {d} days</div>
+                          </div>
+                        </div>
+                        {item.note && (
+                          <div className="pl-9 text-xs text-slate-500 bg-white/70 p-1.5 rounded border border-slate-100">
+                            <span className="font-semibold text-slate-600">Note:</span> {item.note}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
 
@@ -569,6 +607,7 @@ export function InvoiceDetailDialog({ invoice, invoiceList, open, onClose, onNav
             <SectionTitle icon={<DollarSign className="h-4 w-4" />} title="Cost Breakdown" />
             <div className="mt-3 space-y-2">
               <CostRow label="Rental Cost" value={invoice.rentalCost ?? 0} />
+              {(invoice.auxiliaryCost ?? 0) > 0 && <CostRow label="Auxiliary Equipment Lease" value={invoice.auxiliaryCost ?? 0} />}
               <CostRow label="Diesel Cost" value={invoice.dieselCost ?? 0} />
               <CostRow label="Technicians Cost" value={invoice.techniciansCost ?? 0} />
               {(invoice.mobDemob ?? 0) > 0 && <CostRow label="Mob / Demob" value={invoice.mobDemob ?? 0} />}

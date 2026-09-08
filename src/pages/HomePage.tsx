@@ -104,6 +104,19 @@ const navigation: NavCategory[] = [
     ],
   },
   {
+    name: 'Site Analytics',
+    icon: BarChart3,
+    color: 'from-emerald-500 to-teal-500',
+    bgLight: 'bg-emerald-50 hover:bg-emerald-100',
+    bgDark: 'dark:bg-emerald-950/40 dark:hover:bg-emerald-900/60',
+    iconColor: 'text-emerald-600 dark:text-emerald-400',
+    standalone: true,
+    standaloneHref: '/operations/site-analytics',
+    items: [
+      { name: 'Site Analytics', href: '/operations/site-analytics', icon: BarChart3, privKey: 'operations', privField: 'canView' },
+    ],
+  },
+  {
     name: 'Simulator',
     icon: HardHat,
     color: 'from-blue-500 to-indigo-500',
@@ -202,6 +215,7 @@ const navigation: NavCategory[] = [
       { name: 'Diesel Refill', href: '/operations/diesel', icon: Fuel, privKey: 'opsDiesel', privField: 'canView' },
       { name: 'Vehicles', href: '/operations/vehicles', icon: Truck, privKey: 'opsVehicles', privField: 'canView' },
       { name: 'Sites', href: '/operations/sites', icon: MapPin, privKey: 'opsSites', privField: 'canView' },
+      { name: 'Site Analytics', href: '/operations/site-analytics', icon: BarChart3, privKey: 'operations', privField: 'canView' },
     ],
   },
   {

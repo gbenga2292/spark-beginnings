@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import {
   format, parseISO, isSameDay, startOfMonth, endOfMonth, eachDayOfInterval,
   startOfWeek, endOfWeek, addMonths, subMonths, isToday, isSameMonth,
-  isBefore, startOfDay
+  isBefore, startOfDay, addDays, subDays
 } from 'date-fns';
 import {
   Bell, ChevronLeft, ChevronRight, ArrowLeft, CheckSquare, BookOpen, Clock
@@ -424,6 +424,30 @@ export default function CalendarPage({ onNavigate, showCompleted: externalShowCo
     setSelectedDate(today);
   };
 
+  const handlePrev = () => {
+    if (viewMode === 'day') {
+      const prevDate = subDays(selectedDate, 1);
+      setSelectedDate(prevDate);
+      if (!isSameMonth(prevDate, calMonth)) {
+        setCalMonth(startOfMonth(prevDate));
+      }
+    } else {
+      setCalMonth(subMonths(calMonth, 1));
+    }
+  };
+
+  const handleNext = () => {
+    if (viewMode === 'day') {
+      const nextDate = addDays(selectedDate, 1);
+      setSelectedDate(nextDate);
+      if (!isSameMonth(nextDate, calMonth)) {
+        setCalMonth(startOfMonth(nextDate));
+      }
+    } else {
+      setCalMonth(addMonths(calMonth, 1));
+    }
+  };
+
   const formatHour = (h: number) => {
     if (h === 0) return '12 AM';
     if (h < 12) return `${h} AM`;
@@ -447,10 +471,10 @@ export default function CalendarPage({ onNavigate, showCompleted: externalShowCo
               <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
           )}
-          <button onClick={() => setCalMonth(subMonths(calMonth, 1))} className="p-1.5 rounded-lg hover:bg-white/10 transition-colors text-white/60">
+          <button onClick={handlePrev} className="p-1.5 rounded-lg hover:bg-white/10 transition-colors text-white/60">
             <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
-          <button onClick={() => setCalMonth(addMonths(calMonth, 1))} className="p-1.5 rounded-lg hover:bg-white/10 transition-colors text-white/60">
+          <button onClick={handleNext} className="p-1.5 rounded-lg hover:bg-white/10 transition-colors text-white/60">
             <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
           <h1 className="text-base sm:text-xl font-heading font-semibold text-white">
