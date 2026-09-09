@@ -413,6 +413,8 @@ export function BulkMachineLogModal({ isOpen, onClose, siteId, siteName, machine
             isActive,
             operationalDay: data.operationalDay,
             dieselUsage: parseFloat(data.dieselUsage) || 0,
+            dipstickLevelLitres: data.dipstickLevel && data.dipstickLevel.trim() !== '' ? Number(data.dipstickLevel) : null,
+            isTankFilledToFull: !!data.isTankFilledToFull,
             issuesOnSite,
             clientFeedback: isActive ? clientFeedback : '',
             maintenanceDetails: isActive ? maintenanceDetails : '',

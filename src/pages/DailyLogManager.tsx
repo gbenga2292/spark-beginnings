@@ -808,8 +808,9 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
 
       // Filter out dates that already have a log (when not editing)
       const existingDates = new Set(logs.map(l => l.date));
-      const newDates = selectedLog ? datesToLog : datesToLog.filter(d => !existingDates.has(d));
-      const skipped = datesToLog.length - newDates.length;
+      const singleExisting = !selectedLog && datesToLog.length === 1 ? logs.find(l => l.date === datesToLog[0]) : null;
+      const newDates = (selectedLog || singleExisting) ? datesToLog : datesToLog.filter(d => !existingDates.has(d));
+      const skipped = (selectedLog || singleExisting) ? 0 : datesToLog.length - newDates.length;
 
       if (newDates.length === 0) {
         toast.error('All dates in this range already have logs. Please change the date range.');
@@ -845,7 +846,7 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
           isActive,
           operationalDay,
           dieselUsage: Number(dieselUsage) || 0,
-          dipstickLevelLitres: dipstickLevel.trim() !== '' ? Number(dipstickLevel) : undefined,
+          dipstickLevelLitres: dipstickLevel.trim() !== '' ? Number(dipstickLevel) : null,
           isTankFilledToFull,
           supervisorOnSite,
           clientFeedback,
@@ -1458,7 +1459,26 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
                         max={pumpDateConfig.effectiveStop
                           ? (pumpDateConfig.effectiveStop < new Date().toISOString().split('T')[0] ? pumpDateConfig.effectiveStop : new Date().toISOString().split('T')[0])
                           : new Date().toISOString().split('T')[0]}
-                        onChange={e => { setDate(e.target.value); if (endDate && e.target.value > endDate) setEndDate(''); }}
+                        onChange={e => {
+                          const newDate = e.target.value;
+                          setDate(newDate);
+                          if (endDate && newDate > endDate) setEndDate('');
+                          const existingForNewDate = logs.find(l => l.date === newDate);
+                          if (existingForNewDate) {
+                            setSelectedLog(existingForNewDate);
+                            setOperationalDay(deriveOpDay(existingForNewDate));
+                            setDieselUsage(existingForNewDate.dieselUsage.toString());
+                            setDipstickLevel(existingForNewDate.dipstickLevelLitres != null ? existingForNewDate.dipstickLevelLitres.toString() : '');
+                            setIsTankFilledToFull(!!existingForNewDate.isTankFilledToFull);
+                            setSupervisorOnSite(existingForNewDate.supervisorOnSite || '');
+                            setClientFeedback(existingForNewDate.clientFeedback || '');
+                            setMaintenanceDetails(existingForNewDate.maintenanceDetails || '');
+                            setIssuesOnSite(existingForNewDate.issuesOnSite || '');
+                            setDowntimeEntries(existingForNewDate.downtimeEntries || []);
+                          } else if (selectedLog) {
+                            setSelectedLog(null);
+                          }
+                        }}
                         className="pl-9 h-10 border-slate-200 dark:border-slate-700 rounded-md focus:ring-2 focus:ring-blue-500"
                       />
                     </div>

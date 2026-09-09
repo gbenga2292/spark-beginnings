@@ -454,28 +454,40 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
         }
 
         if (dbMovements) {
-          setAssetMovements(dbMovements.map((m: any): AssetMovement => ({
-            id: m.id,
-            assetId: m.asset_id,
-            assetName: m.asset_name,
-            movementType: m.movement_type as MovementType,
-            quantityDelta: Number(m.quantity_delta || 0),
-            previousQuantity: Number(m.previous_quantity || 0),
-            newQuantity: Number(m.new_quantity || 0),
-            unitCost: m.unit_cost ? Number(m.unit_cost) : undefined,
-            totalCost: m.total_cost ? Number(m.total_cost) : undefined,
-            reasonCode: m.reason_code,
-            referenceId: m.reference_id,
-            referenceType: m.reference_type,
-            siteId: m.site_id,
-            siteName: m.site_name,
-            batchId: m.batch_id,
-            batchNumber: m.batch_number,
-            actorId: m.actor_id,
-            actorName: m.actor_name,
-            notes: m.notes,
-            createdAt: m.created_at
-          })));
+          const seenIds = new Set<string>();
+          const seenBizKeys = new Set<string>();
+          const dedupedMovements: AssetMovement[] = [];
+
+          for (const m of dbMovements) {
+            const bizKey = `${m.reference_id || m.id}_${m.asset_id}_${m.movement_type}_${m.quantity_delta}_${m.created_at}`;
+            if (seenIds.has(m.id) || seenBizKeys.has(bizKey)) continue;
+            seenIds.add(m.id);
+            seenBizKeys.add(bizKey);
+
+            dedupedMovements.push({
+              id: m.id,
+              assetId: m.asset_id,
+              assetName: m.asset_name,
+              movementType: m.movement_type as MovementType,
+              quantityDelta: Number(m.quantity_delta || 0),
+              previousQuantity: Number(m.previous_quantity || 0),
+              newQuantity: Number(m.new_quantity || 0),
+              unitCost: m.unit_cost ? Number(m.unit_cost) : undefined,
+              totalCost: m.total_cost ? Number(m.total_cost) : undefined,
+              reasonCode: m.reason_code,
+              referenceId: m.reference_id,
+              referenceType: m.reference_type,
+              siteId: m.site_id,
+              siteName: m.site_name,
+              batchId: m.batch_id,
+              batchNumber: m.batch_number,
+              actorId: m.actor_id,
+              actorName: m.actor_name,
+              notes: m.notes,
+              createdAt: m.created_at
+            });
+          }
+          setAssetMovements(dedupedMovements);
         }
 
         if (dbPumpDates) {
@@ -562,6 +574,7 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
             isTankFilledToFull: !!log.is_tank_filled_to_full,
             supervisorOnSite: log.supervisor_on_site,
             loggedBy: log.logged_by,
+            siteProgressPercentage: log.site_progress_percentage ?? undefined,
             created_at: log.created_at
           })));
         }
@@ -768,7 +781,7 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
       returnInDays: c.return_in_days || 0
     });
 
-    const mapDbDailyLog = (log: any) => ({
+    const mapDbDailyLog = (log: any): DailyMachineLog => ({
       id: log.id,
       assetId: log.asset_id,
       assetName: log.asset_name,
@@ -782,8 +795,11 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
       clientFeedback: log.client_feedback,
       issuesOnSite: log.issues_on_site,
       dieselUsage: Number(log.diesel_usage || 0),
+      dipstickLevelLitres: log.dipstick_level_litres != null ? Number(log.dipstick_level_litres) : undefined,
+      isTankFilledToFull: !!log.is_tank_filled_to_full,
       supervisorOnSite: log.supervisor_on_site,
       loggedBy: log.logged_by,
+      siteProgressPercentage: log.site_progress_percentage ?? undefined,
       created_at: log.created_at
     });
 
@@ -1097,17 +1113,21 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
 
   const backfillHistoricalMovements = async (silent: boolean = false): Promise<number> => {
     const historicalMovements: AssetMovement[] = [];
-    const existingRefIds = new Set(assetMovements.map(m => `${m.referenceId || ''}-${m.assetId}-${m.movementType}-${m.createdAt}`));
+    const existingRefIds = new Set(assetMovements.map(m => m.id));
+    const existingBizKeys = new Set(assetMovements.map(m => `${m.referenceId || ''}_${m.assetId}_${m.movementType}`));
 
     // 1. Scan Assets for Baseline & Restock History
     assets.forEach(asset => {
       // Past restock history
       if (asset.restockHistory && asset.restockHistory.length > 0) {
         asset.restockHistory.forEach((rec, idx) => {
-          const dedupeKey = `restock-${asset.id}-${rec.date}-${idx}`;
-          if (!existingRefIds.has(dedupeKey)) {
+          const deterministicId = `restock-${asset.id}-${rec.id || rec.date || idx}`;
+          const bizKey = `${rec.id || `RESTOCK-${rec.date}`}_${asset.id}_restock`;
+          if (!existingRefIds.has(deterministicId) && !existingBizKeys.has(bizKey)) {
+            existingRefIds.add(deterministicId);
+            existingBizKeys.add(bizKey);
             historicalMovements.push({
-              id: crypto.randomUUID(),
+              id: deterministicId,
               assetId: asset.id,
               assetName: asset.name,
               movementType: 'restock',
@@ -1127,10 +1147,13 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
         });
       } else if (asset.quantity > 0) {
         // Initial baseline stock
-        const dedupeKey = `initial-${asset.id}`;
-        if (!existingRefIds.has(dedupeKey)) {
+        const deterministicId = `init-${asset.id}`;
+        const bizKey = `INIT-${asset.id.slice(0, 8)}_${asset.id}_initial`;
+        if (!existingRefIds.has(deterministicId) && !existingBizKeys.has(bizKey)) {
+          existingRefIds.add(deterministicId);
+          existingBizKeys.add(bizKey);
           historicalMovements.push({
-            id: crypto.randomUUID(),
+            id: deterministicId,
             assetId: asset.id,
             assetName: asset.name,
             movementType: 'initial',
@@ -1159,10 +1182,13 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
           const createdAt = wb.issueDate ? new Date(wb.issueDate).toISOString() : (wb as any).created_at || new Date().toISOString();
 
           if (wb.type === 'waybill') {
-            const dedupeKey = `${wb.id}-${item.assetId}-waybill_dispatch-${createdAt}`;
-            if (!existingRefIds.has(dedupeKey)) {
+            const deterministicId = `wb-disp-${wb.id}-${item.assetId}`;
+            const bizKey = `${wb.id}_${item.assetId}_waybill_dispatch`;
+            if (!existingRefIds.has(deterministicId) && !existingBizKeys.has(bizKey)) {
+              existingRefIds.add(deterministicId);
+              existingBizKeys.add(bizKey);
               historicalMovements.push({
-                id: crypto.randomUUID(),
+                id: deterministicId,
                 assetId: item.assetId,
                 assetName,
                 movementType: 'waybill_dispatch',
@@ -1181,10 +1207,13 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
               });
             }
           } else if (wb.type === 'return' || wb.status === 'return_completed') {
-            const dedupeKey = `${wb.id}-${item.assetId}-waybill_return-${createdAt}`;
-            if (!existingRefIds.has(dedupeKey)) {
+            const deterministicId = `wb-ret-${wb.id}-${item.assetId}`;
+            const bizKey = `${wb.id}_${item.assetId}_waybill_return`;
+            if (!existingRefIds.has(deterministicId) && !existingBizKeys.has(bizKey)) {
+              existingRefIds.add(deterministicId);
+              existingBizKeys.add(bizKey);
               historicalMovements.push({
-                id: crypto.randomUUID(),
+                id: deterministicId,
                 assetId: item.assetId,
                 assetName,
                 movementType: 'waybill_return',
@@ -1215,10 +1244,13 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
       const checkoutCreatedAt = c.checkoutDate ? new Date(c.checkoutDate).toISOString() : new Date().toISOString();
 
       // Loan / Checkout outbound movement
-      const checkoutDedupeKey = `${c.id}-${c.assetId}-checkout-${checkoutCreatedAt}`;
-      if (!existingRefIds.has(checkoutDedupeKey)) {
+      const deterministicCheckoutId = `chk-${c.id}-${c.assetId}`;
+      const checkoutBizKey = `${c.id}_${c.assetId}_checkout`;
+      if (!existingRefIds.has(deterministicCheckoutId) && !existingBizKeys.has(checkoutBizKey)) {
+        existingRefIds.add(deterministicCheckoutId);
+        existingBizKeys.add(checkoutBizKey);
         historicalMovements.push({
-          id: crypto.randomUUID(),
+          id: deterministicCheckoutId,
           assetId: c.assetId,
           assetName,
           movementType: 'checkout',
@@ -1239,10 +1271,13 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
       // Return movement if any returned
       if (c.returnedQuantity && c.returnedQuantity > 0) {
         const returnCreatedAt = c.expectedReturnDate ? new Date(c.expectedReturnDate).toISOString() : checkoutCreatedAt;
-        const returnDedupeKey = `${c.id}-${c.assetId}-checkout_return-${returnCreatedAt}`;
-        if (!existingRefIds.has(returnDedupeKey)) {
+        const deterministicReturnId = `chk-ret-${c.id}-${c.assetId}`;
+        const returnBizKey = `${c.id}_${c.assetId}_checkout_return`;
+        if (!existingRefIds.has(deterministicReturnId) && !existingBizKeys.has(returnBizKey)) {
+          existingRefIds.add(deterministicReturnId);
+          existingBizKeys.add(returnBizKey);
           historicalMovements.push({
-            id: crypto.randomUUID(),
+            id: deterministicReturnId,
             assetId: c.assetId,
             assetName,
             movementType: 'checkout_return',
@@ -1269,8 +1304,21 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
     // Sort chronologically descending
     historicalMovements.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-    // Update in-memory state
-    setAssetMovements(prev => [...historicalMovements, ...prev]);
+    // Update in-memory state with deduplication
+    setAssetMovements(prev => {
+      const combined = [...historicalMovements, ...prev];
+      const sIds = new Set<string>();
+      const sKeys = new Set<string>();
+      const deduped: AssetMovement[] = [];
+      for (const m of combined) {
+        const k = `${m.referenceId || m.id}_${m.assetId}_${m.movementType}_${m.quantityDelta}_${m.createdAt}`;
+        if (sIds.has(m.id) || sKeys.has(k)) continue;
+        sIds.add(m.id);
+        sKeys.add(k);
+        deduped.push(m);
+      }
+      return deduped;
+    });
 
     // Batch insert into Supabase
     try {
@@ -2637,17 +2685,6 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
     ));
   };
 
-  // Automatic one-time background indexing of historical movements
-  const hasAutoBackfilledRef = useRef(false);
-  useEffect(() => {
-    if (!hasAutoBackfilledRef.current && assets.length > 0 && (waybills.length > 0 || checkouts.length > 0)) {
-      hasAutoBackfilledRef.current = true;
-      // Run silent backfill in background once data is ready
-      setTimeout(() => {
-        backfillHistoricalMovements(true).catch(e => console.error('Auto backfill error:', e));
-      }, 500);
-    }
-  }, [assets.length, waybills.length, checkouts.length]);
 
   return (
     <OperationsContext.Provider value={{

@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo } from 'react';
+import { useState, useRef, useMemo, useDeferredValue, useTransition } from 'react';
 import * as XLSX from 'xlsx';
 import { motion } from 'framer-motion';
 import { useOperations } from '../contexts/OperationsContext';
@@ -8,7 +8,8 @@ import {
   ChevronsUpDown, ChevronUp, ChevronDown as ChevronDownIcon,
   Download, History, Layers, AlertCircle, CheckCircle, Calendar,
   ArrowUpRight, ArrowDownLeft, ArrowLeft, Filter, Building2, User,
-  ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight
+  ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
+  MapPin, Truck, ExternalLink, RotateCcw, ShieldAlert, Boxes, ArrowUpDown
 } from 'lucide-react';
 import { cn, formatUnit } from '@/src/lib/utils';
 import { Asset, AssetCategory, AssetBatch, AssetMovement, MovementType } from '../types/operations';
@@ -18,7 +19,9 @@ import { RestockModal } from './RestockModal';
 import { AssetAnalyticsDialog } from './AssetAnalyticsDialog';
 import { BulkImportAssetsDialog } from './BulkImportAssetsDialog';
 import { ExportAssetsDialog } from './ExportAssetsDialog';
+import { CreateReturnWaybill } from './CreateReturnWaybill';
 import { usePriv } from '../hooks/usePriv';
+import { useAppStore, Site } from '../store/appStore';
 import { Card } from '@/src/components/ui/card';
 import { Button } from '@/src/components/ui/button';
 import { Badge } from '@/src/components/ui/badge';
@@ -368,13 +371,31 @@ function AssetActionsMenu({
 /* ─────────────────────────────────────────────────────────────── */
 export function AssetManager() {
   useAutoCollapseSidebar();
-  const { assets, deleteAsset, bulkAddAssets, assetMovements } = useOperations();
+  const { assets, deleteAsset, bulkAddAssets, assetMovements, waybills } = useOperations();
+  const sites = useAppStore(s => s.sites);
+  const consumableLogs = useAppStore(s => s.consumableLogs);
   const priv = usePriv('opsInventory');
   const canExport = priv?.canExport ?? false;
   const canImport = priv?.canImport ?? false;
 
-  // View state: 'catalog' or 'ledger'
-  const [activeTab, setActiveTab] = useState<'catalog' | 'ledger'>('catalog');
+  // View state: 'catalog' | 'deployed' | 'ledger'
+  const [activeTab, setActiveTab] = useState<'catalog' | 'deployed' | 'ledger'>('catalog');
+  const [, startTransition] = useTransition();
+  const [returnSite, setReturnSite] = useState<Site | null>(null);
+
+  // Pagination for Catalog
+  const [catalogPage, setCatalogPage] = useState(1);
+  const [catalogPageSize, setCatalogPageSize] = useState(25);
+
+  // Deployed On-Site Filter & Pagination State
+  const [deployedSearch, setDeployedSearch] = useState('');
+  const [deployedSiteFilter, setDeployedSiteFilter] = useState('all');
+  const [deployedCategoryFilter, setDeployedCategoryFilter] = useState<AssetCategory | 'all'>('all');
+  const [deployedViewMode, setDeployedViewMode] = useState<'table' | 'bySite'>('table');
+  const [deployedSortKey, setDeployedSortKey] = useState<'days' | 'name' | 'site' | 'qty' | 'date'>('days');
+  const [deployedSortDir, setDeployedSortDir] = useState<'asc' | 'desc'>('desc');
+  const [deployedPage, setDeployedPage] = useState(1);
+  const [deployedPageSize, setDeployedPageSize] = useState(15);
 
   // Pagination for Movements Ledger
   const [ledgerPage, setLedgerPage] = useState(1);
@@ -387,6 +408,7 @@ export function AssetManager() {
   const [showExportModal, setShowExportModal] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
   const [search, setSearch] = useState('');
+  const deferredSearch = useDeferredValue(search);
   const [filter, setFilter] = useState<AssetCategory | 'all'>('all');
   const [activeAsset, setActiveAsset] = useState<Asset | null>(null);
   const [activeModal, setActiveModal] = useState<ActionModal>(null);
@@ -411,156 +433,269 @@ export function AssetManager() {
       : <ChevronDownIcon className="h-3 w-3 ml-1 inline-block" />;
   };
 
-  // Export Ledger to Excel
-  const handleExportLedger = () => {
-    if (filteredMovements.length === 0) return;
-    const exportData = filteredMovements.map(m => ({
-      'Date & Time': new Date(m.createdAt).toLocaleString('en-NG'),
-      'Asset Name': m.assetName,
-      'Movement Type': m.movementType,
-      'Batch Number': m.batchNumber || 'N/A',
-      'Quantity Delta': m.quantityDelta > 0 ? `+${m.quantityDelta}` : m.quantityDelta,
-      'Previous Qty': m.previousQuantity,
-      'New Qty': m.newQuantity,
-      'Unit Cost (NGN)': m.unitCost || 0,
-      'Total Value (NGN)': m.totalCost || 0,
-      'Site': m.siteName || 'N/A',
-      'Reference ID': m.referenceId || 'N/A',
-      'Actor / Recorded By': m.actorName || 'N/A',
-      'Reason / Notes': m.reasonCode || m.notes || ''
+  // ── Compute Deployed On-Site Inventory across all sites ──────────────
+  const deployedItems = useMemo(() => {
+    interface DeployedMapEntry {
+      key: string;
+      siteId: string;
+      siteName: string;
+      assetId: string;
+      assetName: string;
+      category: AssetCategory;
+      type: string;
+      unit: string;
+      unreturnedQuantity: number;
+      totalDispatched: number;
+      totalReturned: number;
+      firstDispatchDate: string;
+      latestDispatchDate: string;
+      daysOnSite: number;
+      waybillRefs: string[];
+      drivers: string[];
+      unitCost?: number;
+      totalValue?: number;
+    }
+
+    const map = new Map<string, DeployedMapEntry>();
+
+    // 1. Scan outbound waybills
+    (waybills || [])
+      .filter(w => w.type === 'waybill' && w.status !== 'outstanding')
+      .forEach(wb => {
+        const sId = wb.siteId || 'unknown';
+        const sName = wb.siteName || sites.find(s => s.id === sId)?.name || 'Unknown Site';
+        const dateStr = wb.sentToSiteDate || wb.issueDate || '';
+
+        wb.items?.forEach(item => {
+          if (!item.assetId || item.quantity <= 0) return;
+          const key = `${sId}::${item.assetId}`;
+          const assetMeta = assets.find(a => a.id === item.assetId);
+          const existing = map.get(key);
+
+          if (existing) {
+            existing.totalDispatched += item.quantity;
+            existing.unreturnedQuantity += item.quantity;
+            if (wb.id && !existing.waybillRefs.includes(wb.id)) existing.waybillRefs.push(wb.id);
+            if (wb.driverName && !existing.drivers.includes(wb.driverName)) existing.drivers.push(wb.driverName);
+            if (dateStr && (!existing.firstDispatchDate || dateStr < existing.firstDispatchDate)) {
+              existing.firstDispatchDate = dateStr;
+            }
+            if (dateStr && (!existing.latestDispatchDate || dateStr > existing.latestDispatchDate)) {
+              existing.latestDispatchDate = dateStr;
+            }
+          } else {
+            map.set(key, {
+              key,
+              siteId: sId,
+              siteName: sName,
+              assetId: item.assetId,
+              assetName: item.assetName || assetMeta?.name || 'Unknown Asset',
+              category: (assetMeta?.category as AssetCategory) || 'dewatering',
+              type: assetMeta?.type || 'equipment',
+              unit: assetMeta?.unitOfMeasurement || 'pcs',
+              unreturnedQuantity: item.quantity,
+              totalDispatched: item.quantity,
+              totalReturned: 0,
+              firstDispatchDate: dateStr,
+              latestDispatchDate: dateStr,
+              daysOnSite: 0,
+              waybillRefs: wb.id ? [wb.id] : [],
+              drivers: wb.driverName ? [wb.driverName] : [],
+              unitCost: assetMeta?.cost,
+              totalValue: 0
+            });
+          }
+        });
+      });
+
+    // 2. Subtract completed returns
+    (waybills || [])
+      .filter(w => w.type === 'return')
+      .forEach(wb => {
+        const sId = wb.siteId || 'unknown';
+        wb.items?.forEach(item => {
+          if (!item.assetId) return;
+          const key = `${sId}::${item.assetId}`;
+          const existing = map.get(key);
+          if (existing) {
+            if (wb.status === 'return_completed') {
+              existing.totalReturned += item.quantity;
+              existing.unreturnedQuantity = Math.max(0, existing.unreturnedQuantity - item.quantity);
+            }
+          }
+        });
+      });
+
+    // 3. Subtract consumed usages
+    (consumableLogs || []).forEach(log => {
+      const key = `${log.siteId}::${log.assetId}`;
+      const existing = map.get(key);
+      if (existing) {
+        existing.unreturnedQuantity = Math.max(0, existing.unreturnedQuantity - (log.quantityUsed || 0));
+      }
+    });
+
+    const now = new Date();
+    const result: DeployedMapEntry[] = [];
+
+    map.forEach(row => {
+      if (row.unreturnedQuantity > 0) {
+        if (row.firstDispatchDate) {
+          const d = new Date(row.firstDispatchDate);
+          row.daysOnSite = Math.max(0, Math.floor((now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24)));
+        }
+        if (row.unitCost) {
+          row.totalValue = row.unitCost * row.unreturnedQuantity;
+        }
+        result.push(row);
+      }
+    });
+
+    return result;
+  }, [waybills, assets, sites, consumableLogs]);
+
+  // Filtered Deployed Items
+  const filteredDeployedItems = useMemo(() => {
+    const list = deployedItems.filter(item => {
+      if (deployedSiteFilter !== 'all' && item.siteId !== deployedSiteFilter) return false;
+      if (deployedCategoryFilter !== 'all' && item.category !== deployedCategoryFilter) return false;
+      if (deployedSearch.trim()) {
+        const query = deployedSearch.toLowerCase().trim();
+        const matchName = item.assetName.toLowerCase().includes(query);
+        const matchSite = item.siteName.toLowerCase().includes(query);
+        const matchWb = item.waybillRefs.some(ref => ref.toLowerCase().includes(query));
+        const matchDriver = item.drivers.some(d => d.toLowerCase().includes(query));
+        if (!matchName && !matchSite && !matchWb && !matchDriver) return false;
+      }
+      return true;
+    });
+
+    list.sort((a, b) => {
+      let comparison = 0;
+      switch (deployedSortKey) {
+        case 'name':
+          comparison = a.assetName.localeCompare(b.assetName);
+          break;
+        case 'site':
+          comparison = a.siteName.localeCompare(b.siteName);
+          break;
+        case 'qty':
+          comparison = a.unreturnedQuantity - b.unreturnedQuantity;
+          break;
+        case 'date': {
+          const tA = new Date(a.latestDispatchDate || 0).getTime();
+          const tB = new Date(b.latestDispatchDate || 0).getTime();
+          comparison = tA - tB;
+          break;
+        }
+        case 'days':
+        default:
+          comparison = a.daysOnSite - b.daysOnSite;
+          break;
+      }
+      return deployedSortDir === 'asc' ? comparison : -comparison;
+    });
+
+    return list;
+  }, [deployedItems, deployedSiteFilter, deployedCategoryFilter, deployedSearch, deployedSortKey, deployedSortDir]);
+
+  // Summary Metrics for Deployed Items
+  const deployedMetrics = useMemo(() => {
+    const totalUnits = filteredDeployedItems.reduce((acc, row) => acc + row.unreturnedQuantity, 0);
+    const totalVal = filteredDeployedItems.reduce((acc, row) => acc + (row.totalValue || 0), 0);
+    const activeSitesSet = new Set(filteredDeployedItems.map(row => row.siteId));
+    const uniqueAssetsSet = new Set(filteredDeployedItems.map(row => row.assetId));
+
+    return {
+      totalUnits,
+      totalVal,
+      totalSites: activeSitesSet.size,
+      totalUniqueAssets: uniqueAssetsSet.size,
+      totalRows: filteredDeployedItems.length
+    };
+  }, [filteredDeployedItems]);
+
+  // Sites dropdown options for Deployed filter
+  const deployedSitesOptions = useMemo(() => {
+    const siteMap = new Map<string, { id: string; name: string; count: number }>();
+    deployedItems.forEach(item => {
+      const existing = siteMap.get(item.siteId);
+      if (existing) {
+        existing.count += item.unreturnedQuantity;
+      } else {
+        siteMap.set(item.siteId, { id: item.siteId, name: item.siteName, count: item.unreturnedQuantity });
+      }
+    });
+    return Array.from(siteMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [deployedItems]);
+
+  // Grouped by Site view
+  const deployedGroupedBySite = useMemo(() => {
+    const grouped = new Map<string, { siteId: string; siteName: string; siteObj?: Site; items: typeof deployedItems; totalUnits: number }>();
+    filteredDeployedItems.forEach(item => {
+      const existing = grouped.get(item.siteId);
+      if (existing) {
+        existing.items.push(item);
+        existing.totalUnits += item.unreturnedQuantity;
+      } else {
+        const siteObj = sites.find(s => s.id === item.siteId || s.name.toLowerCase() === item.siteName.toLowerCase());
+        grouped.set(item.siteId, {
+          siteId: item.siteId,
+          siteName: item.siteName,
+          siteObj,
+          items: [item],
+          totalUnits: item.unreturnedQuantity
+        });
+      }
+    });
+    return Array.from(grouped.values()).sort((a, b) => b.totalUnits - a.totalUnits);
+  }, [filteredDeployedItems, sites]);
+
+  // Pagination for Deployed Table View
+  const totalDeployedPages = Math.max(1, Math.ceil(filteredDeployedItems.length / deployedPageSize));
+  const paginatedDeployedItems = useMemo(() => {
+    return filteredDeployedItems.slice((deployedPage - 1) * deployedPageSize, deployedPage * deployedPageSize);
+  }, [filteredDeployedItems, deployedPage, deployedPageSize]);
+
+  // Export Deployed to Excel
+  const handleExportDeployed = () => {
+    if (filteredDeployedItems.length === 0) return;
+    const exportData = filteredDeployedItems.map(row => ({
+      'Site Name': row.siteName,
+      'Asset Name': row.assetName,
+      'Category': row.category,
+      'Type': row.type,
+      'Unreturned Qty': `${row.unreturnedQuantity} ${row.unit}`,
+      'Total Dispatched': row.totalDispatched,
+      'Total Returned': row.totalReturned,
+      'Days on Site': `${row.daysOnSite} days`,
+      'First Dispatched': row.firstDispatchDate ? new Date(row.firstDispatchDate).toLocaleDateString('en-GB') : 'N/A',
+      'Latest Dispatched': row.latestDispatchDate ? new Date(row.latestDispatchDate).toLocaleDateString('en-GB') : 'N/A',
+      'Origin Waybill(s)': row.waybillRefs.join(', '),
+      'Driver(s)': row.drivers.join(', '),
+      'Unit Cost (NGN)': row.unitCost || 0,
+      'Total Value on Site (NGN)': row.totalValue || 0
     }));
 
     const ws = XLSX.utils.json_to_sheet(exportData);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Stock Movements');
-    XLSX.writeFile(wb, `Stock_Movements_Ledger_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    XLSX.utils.book_append_sheet(wb, ws, 'Deployed On Site');
+    XLSX.writeFile(wb, `Deployed_Assets_OnSite_${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
-
-  const headerButtons = useMemo(() => (
-    <div className="flex items-center gap-2 md:gap-3 select-none">
-      {/* Top View Toggle Tabs with Spring Sliding Indicator */}
-      <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-0.5 rounded-xl border border-slate-200/80 dark:border-slate-700/80 mr-1 relative">
-        <button
-          type="button"
-          onClick={() => { setActiveTab('catalog'); setLedgerSearch(''); }}
-          className={cn(
-            "relative px-3 py-1.5 rounded-lg text-xs font-bold transition-colors duration-150 flex items-center gap-1.5 cursor-pointer z-10 select-none active:scale-95",
-            activeTab === 'catalog'
-              ? "text-blue-600 dark:text-blue-400"
-              : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
-          )}
-        >
-          {activeTab === 'catalog' && (
-            <motion.div
-              layoutId="inventoryTabIndicator"
-              className="absolute inset-0 bg-white dark:bg-slate-900 rounded-lg shadow-sm -z-10"
-              transition={{ type: "spring", stiffness: 500, damping: 35 }}
-            />
-          )}
-          <Package className="h-3.5 w-3.5" />
-          <span>Catalog</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('ledger')}
-          className={cn(
-            "relative px-3 py-1.5 rounded-lg text-xs font-bold transition-colors duration-150 flex items-center gap-1.5 cursor-pointer z-10 select-none active:scale-95",
-            activeTab === 'ledger'
-              ? "text-blue-600 dark:text-blue-400"
-              : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
-          )}
-        >
-          {activeTab === 'ledger' && (
-            <motion.div
-              layoutId="inventoryTabIndicator"
-              className="absolute inset-0 bg-white dark:bg-slate-900 rounded-lg shadow-sm -z-10"
-              transition={{ type: "spring", stiffness: 500, damping: 35 }}
-            />
-          )}
-          <History className="h-3.5 w-3.5" />
-          <span>Movements Ledger</span>
-        </button>
-      </div>
-
-      {activeTab === 'ledger' ? (
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" className="gap-2 h-9 px-3 text-slate-700 hover:text-slate-900 border-slate-200 font-semibold" onClick={handleExportLedger}>
-            <Download className="h-4 w-4" /> <span className="hidden sm:inline">Export Excel</span>
-          </Button>
-        </div>
-      ) : (
-        <>
-          {canExport && (
-            <Button variant="outline" size="sm" className="gap-2 h-9 px-2 sm:px-3 text-slate-700 hover:text-slate-900 border-slate-200" onClick={() => setShowExportModal(true)}>
-              <Download className="h-4 w-4" /> <span className="hidden sm:inline">Export</span>
-            </Button>
-          )}
-          {canImport && (
-            <Button variant="outline" size="sm" className="gap-2 h-9 px-2 sm:px-3 text-slate-700 hover:text-slate-900 border-slate-200" onClick={() => fileInputRef.current?.click()}>
-              <Upload className="h-4 w-4" /> <span className="hidden sm:inline">Bulk Import</span>
-            </Button>
-          )}
-        </>
-      )}
-    </div>
-  ), [activeTab, canExport, canImport]);
-
-  useSetPageTitle(
-    activeTab === 'ledger' ? 'Stock Movements Ledger' : 'Inventory',
-    activeTab === 'ledger'
-      ? 'Immutable audit history of all stock additions, waybill dispatches, returns, and burns'
-      : 'Track equipment, tools, and consumables across all sites',
-    headerButtons,
-    [activeTab, canExport, canImport]
-  );
-
-  const handleBulkImport = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setImportFile(file);
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  };
-
-  const openModal = (asset: Asset, modal: ActionModal) => {
-    if (modal === 'edit') { setEditingAsset(asset); return; }
-    if (modal === 'movements') {
-      setActiveTab('ledger');
-      setLedgerSearch(asset.name);
-      return;
-    }
-    setActiveAsset(asset);
-    setActiveModal(modal);
-  };
-
-  const closeModal = () => { setActiveAsset(null); setActiveModal(null); };
-
-  // Filtered Assets for Catalog
-  const filtered = useMemo(() => {
-    const base = assets.filter(a => {
-      const matchSearch = a.name.toLowerCase().includes(search.toLowerCase());
-      const matchFilter = filter === 'all' || a.category === filter;
-      return matchSearch && matchFilter;
-    });
-    if (!sortKey) return base;
-    return [...base].sort((a, b) => {
-      let aVal: any, bVal: any;
-      if (sortKey === 'name') { aVal = a.name; bVal = b.name; }
-      else if (sortKey === 'quantity') { aVal = a.quantity; bVal = b.quantity; }
-      else if (sortKey === 'reserved') { aVal = a.reservedQuantity || 0; bVal = b.reservedQuantity || 0; }
-      else if (sortKey === 'available') { aVal = a.availableQuantity || 0; bVal = b.availableQuantity || 0; }
-      else if (sortKey === 'status') { aVal = a.availableQuantity || 0; bVal = b.availableQuantity || 0; }
-      else if (sortKey === 'location') { aVal = a.location || ''; bVal = b.location || ''; }
-      else return 0;
-      if (aVal < bVal) return sortDir === 'asc' ? -1 : 1;
-      if (aVal > bVal) return sortDir === 'asc' ? 1 : -1;
-      return 0;
-    });
-  }, [assets, search, filter, sortKey, sortDir]);
 
   // Filtered Movements for Full-Page Ledger
   const filteredMovements = useMemo(() => {
     const now = new Date();
+    const seenIds = new Set<string>();
+    const seenCompositeKeys = new Set<string>();
+
     return assetMovements.filter(m => {
+      // Deduplication safeguard
+      const compositeKey = `${m.referenceId || m.id}_${m.assetId}_${m.movementType}_${m.quantityDelta}_${m.createdAt}`;
+      if (seenIds.has(m.id) || seenCompositeKeys.has(compositeKey)) return false;
+      seenIds.add(m.id);
+      seenCompositeKeys.add(compositeKey);
+
       if (ledgerTypeFilter !== 'all' && m.movementType !== ledgerTypeFilter) return false;
       
       // Date filter
@@ -612,6 +747,211 @@ export function AssetManager() {
     return { totalInbound, totalDispatched, totalBurned, totalValue, netBalance };
   }, [filteredMovements]);
 
+  // Export Ledger to Excel
+  const handleExportLedger = () => {
+    if (filteredMovements.length === 0) return;
+    const exportData = filteredMovements.map(m => ({
+      'Date & Time': new Date(m.createdAt).toLocaleString('en-NG'),
+      'Asset Name': m.assetName,
+      'Movement Type': m.movementType,
+      'Batch Number': m.batchNumber || 'N/A',
+      'Quantity Delta': m.quantityDelta > 0 ? `+${m.quantityDelta}` : m.quantityDelta,
+      'Previous Qty': m.previousQuantity,
+      'New Qty': m.newQuantity,
+      'Unit Cost (NGN)': m.unitCost || 0,
+      'Total Value (NGN)': m.totalCost || 0,
+      'Site': m.siteName || 'N/A',
+      'Reference ID': m.referenceId || 'N/A',
+      'Actor / Recorded By': m.actorName || 'N/A',
+      'Reason / Notes': m.reasonCode || m.notes || ''
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Stock Movements');
+    XLSX.writeFile(wb, `Stock_Movements_Ledger_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  };
+
+  const headerButtons = useMemo(() => (
+    <div className="flex items-center gap-2 md:gap-3 select-none">
+      {/* Top View Toggle Tabs with Spring Sliding Indicator */}
+      <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-0.5 rounded-xl border border-slate-200/80 dark:border-slate-700/80 mr-1 relative">
+        <button
+          type="button"
+          onClick={() => startTransition(() => { setActiveTab('catalog'); setLedgerSearch(''); })}
+          className={cn(
+            "relative px-3 py-1.5 rounded-lg text-xs font-bold transition-colors duration-150 flex items-center gap-1.5 cursor-pointer z-10 select-none active:scale-95",
+            activeTab === 'catalog'
+              ? "text-blue-600 dark:text-blue-400"
+              : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+          )}
+        >
+          {activeTab === 'catalog' && (
+            <motion.div
+              layoutId="inventoryTabIndicator"
+              className="absolute inset-0 bg-white dark:bg-slate-900 rounded-lg shadow-sm -z-10"
+              transition={{ type: "spring", stiffness: 500, damping: 35 }}
+            />
+          )}
+          <Package className="h-3.5 w-3.5" />
+          <span>Catalog</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => startTransition(() => { setActiveTab('deployed'); })}
+          className={cn(
+            "relative px-3 py-1.5 rounded-lg text-xs font-bold transition-colors duration-150 flex items-center gap-1.5 cursor-pointer z-10 select-none active:scale-95",
+            activeTab === 'deployed'
+              ? "text-blue-600 dark:text-blue-400"
+              : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+          )}
+        >
+          {activeTab === 'deployed' && (
+            <motion.div
+              layoutId="inventoryTabIndicator"
+              className="absolute inset-0 bg-white dark:bg-slate-900 rounded-lg shadow-sm -z-10"
+              transition={{ type: "spring", stiffness: 500, damping: 35 }}
+            />
+          )}
+          <MapPin className="h-3.5 w-3.5" />
+          <span>Deployed on Site</span>
+          {deployedItems.length > 0 && (
+            <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] font-extrabold bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300">
+              {deployedItems.length}
+            </span>
+          )}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => startTransition(() => { setActiveTab('ledger'); })}
+          className={cn(
+            "relative px-3 py-1.5 rounded-lg text-xs font-bold transition-colors duration-150 flex items-center gap-1.5 cursor-pointer z-10 select-none active:scale-95",
+            activeTab === 'ledger'
+              ? "text-blue-600 dark:text-blue-400"
+              : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+          )}
+        >
+          {activeTab === 'ledger' && (
+            <motion.div
+              layoutId="inventoryTabIndicator"
+              className="absolute inset-0 bg-white dark:bg-slate-900 rounded-lg shadow-sm -z-10"
+              transition={{ type: "spring", stiffness: 500, damping: 35 }}
+            />
+          )}
+          <History className="h-3.5 w-3.5" />
+          <span>Movements Ledger</span>
+        </button>
+      </div>
+
+      {activeTab === 'deployed' ? (
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" className="gap-2 h-9 px-3 text-slate-700 hover:text-slate-900 border-slate-200 font-semibold" onClick={handleExportDeployed}>
+            <Download className="h-4 w-4" /> <span className="hidden sm:inline">Export Excel</span>
+          </Button>
+        </div>
+      ) : activeTab === 'ledger' ? (
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" className="gap-2 h-9 px-3 text-slate-700 hover:text-slate-900 border-slate-200 font-semibold" onClick={handleExportLedger}>
+            <Download className="h-4 w-4" /> <span className="hidden sm:inline">Export Excel</span>
+          </Button>
+        </div>
+      ) : (
+        <>
+          {canExport && (
+            <Button variant="outline" size="sm" className="gap-2 h-9 px-2 sm:px-3 text-slate-700 hover:text-slate-900 border-slate-200" onClick={() => setShowExportModal(true)}>
+              <Download className="h-4 w-4" /> <span className="hidden sm:inline">Export</span>
+            </Button>
+          )}
+          {canImport && (
+            <Button variant="outline" size="sm" className="gap-2 h-9 px-2 sm:px-3 text-slate-700 hover:text-slate-900 border-slate-200" onClick={() => fileInputRef.current?.click()}>
+              <Upload className="h-4 w-4" /> <span className="hidden sm:inline">Bulk Import</span>
+            </Button>
+          )}
+        </>
+      )}
+    </div>
+  ), [activeTab, canExport, canImport, deployedItems.length, filteredDeployedItems.length, filteredMovements.length]);
+
+  useSetPageTitle(
+    activeTab === 'deployed'
+      ? 'Deployed Assets (On-Site)'
+      : activeTab === 'ledger'
+      ? 'Stock Movements Ledger'
+      : 'Inventory',
+    activeTab === 'deployed'
+      ? 'Live consolidated registry of all dispatched equipment, tools, and materials currently unreturned across client sites'
+      : activeTab === 'ledger'
+      ? 'Immutable audit history of all stock additions, waybill dispatches, returns, and burns'
+      : 'Track equipment, tools, and consumables across all sites',
+    headerButtons,
+    [activeTab, canExport, canImport, deployedItems.length, filteredDeployedItems.length]
+  );
+
+  const handleBulkImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImportFile(file);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const openModal = (asset: Asset, modal: ActionModal) => {
+    if (modal === 'edit') { setEditingAsset(asset); return; }
+    if (modal === 'movements') {
+      setActiveTab('ledger');
+      setLedgerSearch(asset.name);
+      return;
+    }
+    setActiveAsset(asset);
+    setActiveModal(modal);
+  };
+
+  const closeModal = () => { setActiveAsset(null); setActiveModal(null); };
+
+  // Filtered Assets for Catalog
+  const filtered = useMemo(() => {
+    const term = deferredSearch.toLowerCase().trim();
+    const base = assets.filter(a => {
+      const matchSearch = !term || a.name.toLowerCase().includes(term);
+      const matchFilter = filter === 'all' || a.category === filter;
+      return matchSearch && matchFilter;
+    });
+    if (!sortKey) return base;
+    return [...base].sort((a, b) => {
+      let aVal: any, bVal: any;
+      if (sortKey === 'name') { aVal = a.name; bVal = b.name; }
+      else if (sortKey === 'quantity') { aVal = a.quantity; bVal = b.quantity; }
+      else if (sortKey === 'reserved') { aVal = a.reservedQuantity || 0; bVal = b.reservedQuantity || 0; }
+      else if (sortKey === 'available') { aVal = a.availableQuantity || 0; bVal = b.availableQuantity || 0; }
+      else if (sortKey === 'status') { aVal = a.availableQuantity || 0; bVal = b.availableQuantity || 0; }
+      else if (sortKey === 'location') { aVal = a.location || ''; bVal = b.location || ''; }
+      else return 0;
+      if (aVal < bVal) return sortDir === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [assets, deferredSearch, filter, sortKey, sortDir]);
+
+  // Total Catalog Pages & Paginated Assets
+  const totalCatalogPages = Math.max(1, Math.ceil(filtered.length / catalogPageSize));
+  const paginatedAssets = useMemo(() => {
+    return filtered.slice((catalogPage - 1) * catalogPageSize, catalogPage * catalogPageSize);
+  }, [filtered, catalogPage, catalogPageSize]);
+
+
+
+  if (returnSite) {
+    return (
+      <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10 w-full">
+        <CreateReturnWaybill
+          site={returnSite}
+          onBack={() => setReturnSite(null)}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10 w-full">
       {/* ── Modals ── */}
@@ -633,9 +973,10 @@ export function AssetManager() {
       <input type="file" ref={fileInputRef} onChange={handleBulkImport} className="hidden" accept=".xlsx,.xls,.csv" />
 
       {/* ─────────────────────────────────────────────────────────────── */}
-      {/* TAB 1: ASSETS CATALOG VIEW (INSTANT TOGGLE VIA CSS)             */}
+      {/* TAB 1: ASSETS CATALOG VIEW (CONDITIONAL MOUNT FOR INSTANT 60FPS) */}
       {/* ─────────────────────────────────────────────────────────────── */}
-      <div className={cn("w-full flex-col flex-1", activeTab === 'catalog' ? 'flex' : 'hidden')}>
+      {activeTab === 'catalog' && (
+        <div className="w-full flex-col flex-1 flex">
         <Card className="border-none shadow-sm overflow-hidden bg-white dark:bg-slate-900 flex-1 flex flex-col min-h-[500px]">
           {/* Toolbar */}
           <div className="border-b border-slate-100 dark:border-slate-800 p-4 sm:p-5 flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center bg-slate-50/50 dark:bg-slate-800/30">
@@ -687,7 +1028,7 @@ export function AssetManager() {
                 <select
                   className="appearance-none bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-sm rounded-lg h-9 pl-3 pr-8 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 font-medium capitalize cursor-pointer w-full sm:w-40"
                   value={filter}
-                  onChange={e => setFilter(e.target.value as any)}
+                  onChange={e => { setFilter(e.target.value as any); setCatalogPage(1); }}
                 >
                   {(['all', 'dewatering', 'waterproofing', 'tiling', 'ppe', 'office'] as const).map(opt => (
                     <option key={opt} value={opt} className="capitalize">{opt === 'all' ? 'All Categories' : opt}</option>
@@ -704,7 +1045,7 @@ export function AssetManager() {
                     placeholder="Search assets..."
                     className="pl-9 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 h-9 text-sm focus-visible:ring-blue-500/50 rounded-lg shadow-sm"
                     value={search}
-                    onChange={e => setSearch(e.target.value)}
+                    onChange={e => { setSearch(e.target.value); setCatalogPage(1); }}
                   />
                 </div>
                 <Button
@@ -763,7 +1104,7 @@ export function AssetManager() {
                     </td>
                   </tr>
                 ) : (
-                  filtered.map(asset => {
+                  paginatedAssets.map(asset => {
                     const dualUnit = getDualUnitBreakdown(asset.quantity, asset.unitOfMeasurement, asset.packUnit, asset.packSize);
 
                     return (
@@ -872,7 +1213,7 @@ export function AssetManager() {
                 </div>
               </div>
             ) : (
-              filtered.map(asset => {
+              paginatedAssets.map(asset => {
                 const dualUnit = getDualUnitBreakdown(asset.quantity, asset.unitOfMeasurement, asset.packUnit, asset.packSize);
 
                 return (
@@ -944,13 +1285,501 @@ export function AssetManager() {
               })
             )}
           </div>
+
+          {/* Catalog Pagination Footer */}
+          {filtered.length > 0 && (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 text-xs text-slate-500">
+              <div className="flex items-center gap-2">
+                <span>Rows per page:</span>
+                <select
+                  className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded px-1.5 py-0.5 font-medium cursor-pointer"
+                  value={catalogPageSize}
+                  onChange={e => { setCatalogPageSize(Number(e.target.value)); setCatalogPage(1); }}
+                >
+                  <option value={15}>15</option>
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+                <span className="text-slate-400 ml-2">
+                  Showing {Math.min((catalogPage - 1) * catalogPageSize + 1, filtered.length)} - {Math.min(catalogPage * catalogPageSize, filtered.length)} of {filtered.length} assets
+                </span>
+              </div>
+
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 w-7 p-0"
+                  disabled={catalogPage <= 1}
+                  onClick={() => setCatalogPage(1)}
+                  title="First Page"
+                >
+                  <ChevronsLeft className="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 w-7 p-0"
+                  disabled={catalogPage <= 1}
+                  onClick={() => setCatalogPage(p => Math.max(1, p - 1))}
+                  title="Previous Page"
+                >
+                  <ChevronLeft className="h-3.5 w-3.5" />
+                </Button>
+                <span className="px-2.5 py-0.5 text-xs font-bold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md">
+                  Page {catalogPage} of {totalCatalogPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 w-7 p-0"
+                  disabled={catalogPage >= totalCatalogPages}
+                  onClick={() => setCatalogPage(p => Math.min(totalCatalogPages, p + 1))}
+                  title="Next Page"
+                >
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 w-7 p-0"
+                  disabled={catalogPage >= totalCatalogPages}
+                  onClick={() => setCatalogPage(totalCatalogPages)}
+                  title="Last Page"
+                >
+                  <ChevronsRight className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            </div>
+          )}
         </Card>
       </div>
+    )}
 
-      {/* ─────────────────────────────────────────────────────────────── */}
-      {/* TAB 2: FULL-PAGE MOVEMENTS LEDGER VIEW (FLAT MINIMALIST UI)     */}
-      {/* ─────────────────────────────────────────────────────────────── */}
-      <div className={cn("w-full flex-col flex-1", activeTab === 'ledger' ? 'flex' : 'hidden')}>
+    {/* ─────────────────────────────────────────────────────────────── */}
+    {/* TAB 2: DEPLOYED ASSETS (ON-SITE / UNRETURNED MASTER VIEW)        */}
+    {/* ─────────────────────────────────────────────────────────────── */}
+    {activeTab === 'deployed' && (
+      <div className="w-full flex-col flex-1 flex">
+        <Card className="border-none shadow-sm overflow-hidden bg-white dark:bg-slate-900 flex-1 flex flex-col min-h-[500px]">
+          {/* Flat Compact Toolbar Header */}
+          <div className="border-b border-slate-100 dark:border-slate-800 p-3 sm:p-4 flex flex-col lg:flex-row gap-3 justify-between items-start lg:items-center bg-slate-50/50 dark:bg-slate-800/30">
+            {/* Left: Title + Space-Conserving Flat Stat Chips */}
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-2 mr-1">
+                <div className="h-7 w-7 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600">
+                  <MapPin className="h-3.5 w-3.5" />
+                </div>
+                <p className="font-bold text-slate-800 dark:text-slate-200 text-xs sm:text-sm leading-none whitespace-nowrap">
+                  On-Site Assets
+                </p>
+              </div>
+
+              {/* Ultra-compact Flat Metric Chips */}
+              <div className="flex items-center gap-1.5 flex-wrap select-none">
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-300 shadow-xs">
+                  <span className="text-[10px] uppercase font-bold text-slate-400">Sites:</span>
+                  <span className="font-extrabold text-slate-800 dark:text-slate-100">{deployedMetrics.totalSites}</span>
+                </div>
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 text-xs font-semibold text-blue-700 dark:text-blue-400 shadow-xs">
+                  <span className="text-[10px] uppercase font-bold text-blue-600">Items:</span>
+                  <span className="font-extrabold">{deployedMetrics.totalUniqueAssets}</span>
+                </div>
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-xs font-semibold text-amber-700 dark:text-amber-400 shadow-xs">
+                  <span className="text-[10px] uppercase font-bold text-amber-600">Field Units:</span>
+                  <span className="font-extrabold">{deployedMetrics.totalUnits.toLocaleString()}</span>
+                </div>
+                {deployedMetrics.totalVal > 0 && (
+                  <div className="hidden xl:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800 text-xs font-semibold text-purple-700 dark:text-purple-400 shadow-xs">
+                    <span className="text-[10px] uppercase font-bold text-purple-600">Field Value:</span>
+                    <span className="font-extrabold">₦{deployedMetrics.totalVal.toLocaleString()}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Right: Search & Filters */}
+            <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
+              {/* Search */}
+              <div className="relative flex-1 sm:w-56">
+                <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
+                <Input
+                  placeholder="Search item, site, waybill, driver..."
+                  className="pl-8 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 h-8 text-xs focus-visible:ring-blue-500/50 rounded-lg shadow-none"
+                  value={deployedSearch}
+                  onChange={e => { setDeployedSearch(e.target.value); setDeployedPage(1); }}
+                />
+                {deployedSearch && (
+                  <button
+                    onClick={() => { setDeployedSearch(''); setDeployedPage(1); }}
+                    className="absolute right-2 top-2 text-xs text-slate-400 hover:text-slate-600 font-bold"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+
+              {/* Site Filter */}
+              <div className="relative">
+                <select
+                  className="appearance-none bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs rounded-lg h-8 pl-2.5 pr-7 shadow-none focus:outline-none focus:ring-2 focus:ring-blue-500/50 font-medium cursor-pointer max-w-[170px] truncate"
+                  value={deployedSiteFilter}
+                  onChange={e => { setDeployedSiteFilter(e.target.value); setDeployedPage(1); }}
+                >
+                  <option value="all">All Sites ({deployedItems.length})</option>
+                  {deployedSitesOptions.map(s => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} ({s.count})
+                    </option>
+                  ))}
+                </select>
+                <ChevronDownIcon className="absolute right-2 top-2.5 h-3 w-3 text-slate-400 pointer-events-none" />
+              </div>
+
+              {/* Category Filter */}
+              <div className="relative">
+                <select
+                  className="appearance-none bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs rounded-lg h-8 pl-2.5 pr-7 shadow-none focus:outline-none focus:ring-2 focus:ring-blue-500/50 font-medium cursor-pointer"
+                  value={deployedCategoryFilter}
+                  onChange={e => { setDeployedCategoryFilter(e.target.value as any); setDeployedPage(1); }}
+                >
+                  <option value="all">All Categories</option>
+                  <option value="dewatering">Dewatering</option>
+                  <option value="waterproofing">Waterproofing</option>
+                  <option value="tiling">Tiling</option>
+                  <option value="ppe">PPE</option>
+                  <option value="office">Office</option>
+                </select>
+                <ChevronDownIcon className="absolute right-2 top-2.5 h-3 w-3 text-slate-400 pointer-events-none" />
+              </div>
+
+              {/* View Mode Toggle */}
+              <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg border border-slate-200 dark:border-slate-700">
+                <button
+                  type="button"
+                  onClick={() => setDeployedViewMode('table')}
+                  className={cn(
+                    "px-2.5 py-1 rounded text-xs font-semibold transition-all cursor-pointer",
+                    deployedViewMode === 'table'
+                      ? "bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-xs"
+                      : "text-slate-500 hover:text-slate-900 dark:hover:text-white"
+                  )}
+                >
+                  Table View
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDeployedViewMode('bySite')}
+                  className={cn(
+                    "px-2.5 py-1 rounded text-xs font-semibold transition-all cursor-pointer",
+                    deployedViewMode === 'bySite'
+                      ? "bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-xs"
+                      : "text-slate-500 hover:text-slate-900 dark:hover:text-white"
+                  )}
+                >
+                  By Site
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* VIEW MODE 1: FLAT ITEM TABLE */}
+          {deployedViewMode === 'table' && (
+            <div className="flex-1 flex flex-col justify-between overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/75 dark:bg-slate-800/50 text-[11px] font-bold text-slate-500 uppercase tracking-wider select-none">
+                    <th className="py-2.5 px-3 cursor-pointer hover:bg-slate-100/50" onClick={() => { setDeployedSortKey('name'); setDeployedSortDir(d => d === 'asc' ? 'desc' : 'asc'); }}>
+                      Asset Name & Category {deployedSortKey === 'name' ? (deployedSortDir === 'asc' ? '↑' : '↓') : ''}
+                    </th>
+                    <th className="py-2.5 px-3 cursor-pointer hover:bg-slate-100/50" onClick={() => { setDeployedSortKey('site'); setDeployedSortDir(d => d === 'asc' ? 'desc' : 'asc'); }}>
+                      Current Site / Location {deployedSortKey === 'site' ? (deployedSortDir === 'asc' ? '↑' : '↓') : ''}
+                    </th>
+                    <th className="py-2.5 px-3 cursor-pointer hover:bg-slate-100/50" onClick={() => { setDeployedSortKey('qty'); setDeployedSortDir(d => d === 'asc' ? 'desc' : 'asc'); }}>
+                      Qty on Site {deployedSortKey === 'qty' ? (deployedSortDir === 'asc' ? '↑' : '↓') : ''}
+                    </th>
+                    <th className="py-2.5 px-3">
+                      Origin Waybill & Driver
+                    </th>
+                    <th className="py-2.5 px-3 cursor-pointer hover:bg-slate-100/50" onClick={() => { setDeployedSortKey('date'); setDeployedSortDir(d => d === 'asc' ? 'desc' : 'asc'); }}>
+                      Dispatched {deployedSortKey === 'date' ? (deployedSortDir === 'asc' ? '↑' : '↓') : ''}
+                    </th>
+                    <th className="py-2.5 px-3 cursor-pointer hover:bg-slate-100/50" onClick={() => { setDeployedSortKey('days'); setDeployedSortDir(d => d === 'asc' ? 'desc' : 'asc'); }}>
+                      Days on Site {deployedSortKey === 'days' ? (deployedSortDir === 'asc' ? '↑' : '↓') : ''}
+                    </th>
+                    <th className="py-2.5 px-3 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-medium text-slate-700 dark:text-slate-300">
+                  {paginatedDeployedItems.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="py-16 text-center text-slate-400 dark:text-slate-500">
+                        <div className="flex flex-col items-center justify-center gap-2">
+                          <Package className="h-8 w-8 text-slate-300 dark:text-slate-600" />
+                          <p className="text-sm font-semibold">No dispatched items found on site matching your criteria</p>
+                          <p className="text-xs text-slate-400">All dispatched items may have been fully returned or none match the active filters.</p>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    paginatedDeployedItems.map(item => {
+                      const daysWarning = item.daysOnSite > 30 
+                        ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-400 border-amber-300'
+                        : item.daysOnSite > 14
+                        ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border-blue-200'
+                        : 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border-emerald-200';
+
+                      return (
+                        <tr key={item.key} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors">
+                          {/* Asset Name & Category */}
+                          <td className="py-2.5 px-3">
+                            <div className="flex flex-col">
+                              <span className="font-bold text-slate-900 dark:text-slate-100 text-xs uppercase tracking-tight">
+                                {item.assetName}
+                              </span>
+                              <div className="flex items-center gap-1.5 mt-0.5">
+                                <span className="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 capitalize">
+                                  {item.category}
+                                </span>
+                                <span className="text-[10px] text-slate-400 capitalize">
+                                  {item.type}
+                                </span>
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* Site Name / Location */}
+                          <td className="py-2.5 px-3">
+                            <div className="flex items-center gap-1.5 font-bold text-slate-800 dark:text-slate-200">
+                              <MapPin className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                              <span className="truncate max-w-[200px]" title={item.siteName}>{item.siteName}</span>
+                            </div>
+                          </td>
+
+                          {/* Quantity on Site */}
+                          <td className="py-2.5 px-3">
+                            <div className="flex flex-col">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-extrabold bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300 w-fit">
+                                {item.unreturnedQuantity} {item.unit}
+                              </span>
+                              {item.totalReturned > 0 && (
+                                <span className="text-[10px] text-slate-400 mt-0.5">
+                                  (Disp: {item.totalDispatched} • Ret: {item.totalReturned})
+                                </span>
+                              )}
+                            </div>
+                          </td>
+
+                          {/* Origin Waybills & Drivers */}
+                          <td className="py-2.5 px-3">
+                            <div className="flex flex-col gap-0.5">
+                              <div className="flex items-center gap-1 flex-wrap">
+                                {item.waybillRefs.map(wbRef => (
+                                  <span key={wbRef} className="px-1.5 py-0.2 rounded font-mono text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                                    {wbRef}
+                                  </span>
+                                ))}
+                              </div>
+                              {item.drivers.length > 0 && (
+                                <span className="text-[10px] text-slate-500 dark:text-slate-400 truncate max-w-[180px] flex items-center gap-1">
+                                  <Truck className="h-2.5 w-2.5 opacity-60" />
+                                  {item.drivers.join(', ')}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+
+                          {/* First Dispatched */}
+                          <td className="py-2.5 px-3 text-slate-600 dark:text-slate-400 whitespace-nowrap text-xs">
+                            {item.firstDispatchDate ? new Date(item.firstDispatchDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
+                          </td>
+
+                          {/* Days on Site */}
+                          <td className="py-2.5 px-3 whitespace-nowrap">
+                            <span className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold border", daysWarning)}>
+                              <Clock className="h-3 w-3" />
+                              {item.daysOnSite} {item.daysOnSite === 1 ? 'day' : 'days'}
+                            </span>
+                          </td>
+
+                          {/* Action: Initiate Return */}
+                          <td className="py-2.5 px-3 text-right whitespace-nowrap">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 px-2.5 text-[11px] font-bold text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 gap-1 rounded-md"
+                              onClick={() => {
+                                const siteObj = sites.find(s => s.id === item.siteId || s.name.toLowerCase() === item.siteName.toLowerCase()) || { id: item.siteId, name: item.siteName } as Site;
+                                setReturnSite(siteObj);
+                              }}
+                            >
+                              <RotateCcw className="h-3 w-3" /> Return
+                            </Button>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+
+              {/* Table Pagination Footer */}
+              {filteredDeployedItems.length > 0 && (
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 text-xs text-slate-500">
+                  <div className="flex items-center gap-2">
+                    <span>Rows per page:</span>
+                    <select
+                      className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded px-1.5 py-0.5 font-medium"
+                      value={deployedPageSize}
+                      onChange={e => { setDeployedPageSize(Number(e.target.value)); setDeployedPage(1); }}
+                    >
+                      <option value={10}>10</option>
+                      <option value={15}>15</option>
+                      <option value={25}>25</option>
+                      <option value={50}>50</option>
+                    </select>
+                    <span className="text-slate-400 ml-2">
+                      Showing {Math.min((deployedPage - 1) * deployedPageSize + 1, filteredDeployedItems.length)} - {Math.min(deployedPage * deployedPageSize, filteredDeployedItems.length)} of {filteredDeployedItems.length} items
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 w-7 p-0"
+                      disabled={deployedPage <= 1}
+                      onClick={() => setDeployedPage(p => Math.max(1, p - 1))}
+                    >
+                      <ChevronLeft className="h-3.5 w-3.5" />
+                    </Button>
+                    <span className="px-2 font-semibold text-slate-700 dark:text-slate-300">
+                      Page {deployedPage} of {totalDeployedPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 w-7 p-0"
+                      disabled={deployedPage >= totalDeployedPages}
+                      onClick={() => setDeployedPage(p => Math.min(totalDeployedPages, p + 1))}
+                    >
+                      <ChevronRight className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* VIEW MODE 2: GROUPED BY SITE */}
+          {deployedViewMode === 'bySite' && (
+            <div className="p-4 sm:p-5 flex flex-col gap-4 overflow-y-auto">
+              {deployedGroupedBySite.length === 0 ? (
+                <div className="py-16 text-center text-slate-400">
+                  <Package className="h-8 w-8 mx-auto text-slate-300 mb-2" />
+                  <p className="font-semibold text-sm">No sites with deployed items match the current filters.</p>
+                </div>
+              ) : (
+                deployedGroupedBySite.map(siteGroup => (
+                  <div 
+                    key={siteGroup.siteId} 
+                    className="rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden shadow-xs"
+                  >
+                    {/* Site Card Header */}
+                    <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 sm:p-4 bg-slate-50/80 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800">
+                      <div className="flex items-center gap-2.5">
+                        <div className="h-8 w-8 rounded-lg bg-blue-100 dark:bg-blue-900/40 text-blue-600 flex items-center justify-center shrink-0">
+                          <Building2 className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-slate-900 dark:text-slate-100 text-sm">
+                            {siteGroup.siteName}
+                          </h4>
+                          <p className="text-[11px] text-slate-400">
+                            {siteGroup.items.length} distinct item{siteGroup.items.length === 1 ? '' : 's'} • {siteGroup.totalUnits} total unit{siteGroup.totalUnits === 1 ? '' : 's'} on site
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          className="h-8 px-3 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white gap-1.5 shadow-xs"
+                          onClick={() => {
+                            const siteObj = siteGroup.siteObj || { id: siteGroup.siteId, name: siteGroup.siteName } as Site;
+                            setReturnSite(siteObj);
+                          }}
+                        >
+                          <RotateCcw className="h-3.5 w-3.5" /> Create Return Waybill
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Site Card Items Table */}
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead>
+                          <tr className="border-b border-slate-100 dark:border-slate-800 text-[10px] font-bold text-slate-400 uppercase tracking-wider bg-slate-50/30 dark:bg-slate-800/20">
+                            <th className="py-2 px-3">Item Name</th>
+                            <th className="py-2 px-3">Category</th>
+                            <th className="py-2 px-3">Unreturned Qty</th>
+                            <th className="py-2 px-3">Waybill(s)</th>
+                            <th className="py-2 px-3">First Sent</th>
+                            <th className="py-2 px-3">Days on Site</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
+                          {siteGroup.items.map(item => (
+                            <tr key={item.key} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
+                              <td className="py-2 px-3 font-bold text-slate-800 dark:text-slate-200">
+                                {item.assetName}
+                              </td>
+                              <td className="py-2 px-3 capitalize text-slate-500">
+                                {item.category}
+                              </td>
+                              <td className="py-2 px-3 font-extrabold text-blue-600 dark:text-blue-400">
+                                {item.unreturnedQuantity} {item.unit}
+                              </td>
+                              <td className="py-2 px-3">
+                                <div className="flex gap-1 flex-wrap">
+                                  {item.waybillRefs.map(wb => (
+                                    <span key={wb} className="px-1.5 py-0.2 rounded font-mono text-[10px] bg-slate-100 dark:bg-slate-800 font-bold border dark:border-slate-700">
+                                      {wb}
+                                    </span>
+                                  ))}
+                                </div>
+                              </td>
+                              <td className="py-2 px-3 text-slate-500 whitespace-nowrap">
+                                {item.firstDispatchDate ? new Date(item.firstDispatchDate).toLocaleDateString('en-GB') : '—'}
+                              </td>
+                              <td className="py-2 px-3 whitespace-nowrap">
+                                <span className={cn(
+                                  "px-2 py-0.5 rounded-full text-[10px] font-bold border",
+                                  item.daysOnSite > 30 ? "bg-amber-50 text-amber-700 border-amber-200" : "bg-blue-50 text-blue-700 border-blue-200"
+                                )}>
+                                  {item.daysOnSite} days
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+        </Card>
+      </div>
+    )}
+
+    {/* ─────────────────────────────────────────────────────────────── */}
+    {/* TAB 3: FULL-PAGE MOVEMENTS LEDGER VIEW (FLAT MINIMALIST UI)     */}
+    {/* ─────────────────────────────────────────────────────────────── */}
+    {activeTab === 'ledger' && (
+      <div className="w-full flex-col flex-1 flex">
         <Card className="border-none shadow-sm overflow-hidden bg-white dark:bg-slate-900 flex-1 flex flex-col min-h-[500px]">
           {/* Flat Compact Toolbar Header */}
           <div className="border-b border-slate-100 dark:border-slate-800 p-3 sm:p-4 flex flex-col lg:flex-row gap-3 justify-between items-start lg:items-center bg-slate-50/50 dark:bg-slate-800/30">
@@ -1327,8 +2156,9 @@ export function AssetManager() {
           )}
         </Card>
       </div>
-    </div>
-  );
+    )}
+  </div>
+);
 }
 
 function FlameIcon(props: any) {

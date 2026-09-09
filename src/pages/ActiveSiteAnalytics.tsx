@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useDeferredValue } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   BarChart3, Fuel, Clock, AlertTriangle, Activity, 
@@ -358,6 +358,7 @@ export function ActiveSiteAnalytics() {
   
   // Historical Archive Search, Filter, View Mode, and Pagination States
   const [archiveSearch, setArchiveSearch] = useState('');
+  const deferredArchiveSearch = useDeferredValue(archiveSearch);
   const [archiveStatusFilter, setArchiveStatusFilter] = useState<'all' | 'ended' | 'onhold'>('all');
   const [archiveViewMode, setArchiveViewMode] = useState<'table' | 'cards'>('table');
   const [archiveVisibleCount, setArchiveVisibleCount] = useState<number>(12);
@@ -391,10 +392,31 @@ export function ActiveSiteAnalytics() {
     return () => document.removeEventListener('fullscreenchange', handleFsChange);
   }, []);
 
+  // ── Progressive Chart Rendering ──
+  // Defers SVG/Recharts rendering until after the first paint so the page
+  // header and KPI cards appear instantly when navigating from the sidebar.
+  const [chartsReady, setChartsReady] = React.useState(false);
+  React.useEffect(() => {
+    // Double-RAF ensures the browser has committed the first frame before
+    // we trigger the (heavier) chart mount.
+    let raf1: number;
+    let raf2: number;
+    raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(() => {
+        setChartsReady(true);
+      });
+    });
+    return () => {
+      cancelAnimationFrame(raf1);
+      cancelAnimationFrame(raf2);
+    };
+  }, [selectedSiteId]); // reset on site change so new charts also fade in
+
   // Refill Forecast Notification Bell & Modal
   const [isRefillForecastModalOpen, setIsRefillForecastModalOpen] = useState<boolean>(false);
   const [refillForecastScope, setRefillForecastScope] = useState<'current' | 'fleet'>('current');
   const [refillForecastSearch, setRefillForecastSearch] = useState<string>('');
+  const deferredRefillForecastSearch = useDeferredValue(refillForecastSearch);
   const [refillForecastUrgencyFilter, setRefillForecastUrgencyFilter] = useState<'all' | 'urgent' | 'tomorrow' | 'safe'>('all');
 
   // Modal / sub-view for Machine Daily Register
@@ -588,9 +610,24 @@ export function ActiveSiteAnalytics() {
       pumpConfigs.forEach(pd => machineIdSet.add(pd.assetId));
       sLogs.forEach(l => machineIdSet.add(l.assetId));
 
+      const pumpDurationList: Array<{
+        id: string;
+        name: string;
+        shortName: string;
+        isActive: boolean;
+        startDate: string | null;
+        startDateFormatted: string | null;
+        stopDate: string | null;
+        daysDuration: number;
+        activeLogDays: number;
+      }> = [];
+
+      const allPumpStartDates: string[] = [];
+
       let activePumpsCount = 0;
       machineIdSet.forEach(mId => {
         const pd = pumpConfigs.find(p => p.assetId === mId);
+        const mLogs = sLogs.filter(l => l.assetId === mId);
         const hasExplicitStop = !!pd?.pumpStopDate;
         const isReplaced = pumpConfigs.some(p => p.replacedAssetId === mId);
         const isCurrentlyActive = !hasExplicitStop && !isReplaced && (
@@ -600,7 +637,88 @@ export function ActiveSiteAnalytics() {
         if (isCurrentlyActive) {
           activePumpsCount++;
         }
+
+        const assetObj = (assets || []).find(a => a.id === mId) || (maintenanceAssets || []).find(ma => ma.id === mId);
+        const rawName = assetObj?.name || mLogs[0]?.assetName || 'Pump';
+        const shortName = (assetObj as any)?.shortName || formatMachineShortName(rawName);
+
+        const earliestMLog = mLogs.reduce((earliest, l) => (!earliest || l.date < earliest ? l.date : earliest), '');
+        const startDate = pd?.pumpStartDate || earliestMLog || '';
+        const stopDate = pd?.pumpStopDate || null;
+
+        if (startDate) {
+          allPumpStartDates.push(startDate);
+        }
+
+        const activeLogDays = mLogs.reduce((acc, l) => {
+          const op = l.operationalDay ?? (l.isActive ? 'full' : 'none');
+          if (op === 'full') return acc + 1;
+          if (op === 'half') return acc + 0.5;
+          return acc;
+        }, 0);
+
+        let daysDuration = 0;
+        if (startDate) {
+          const start = new Date(startDate);
+          const end = stopDate ? new Date(stopDate) : now;
+          const diff = Math.max(0, end.getTime() - start.getTime());
+          daysDuration = Math.max(1, Math.ceil(diff / (1000 * 60 * 60 * 24)) + (stopDate ? 1 : 0));
+        } else {
+          daysDuration = activeLogDays || mLogs.length;
+        }
+
+        let startDateFormatted: string | null = null;
+        if (startDate) {
+          const parts = startDate.split('T')[0].split('-');
+          if (parts.length === 3) {
+            startDateFormatted = `${parts[2]}/${parts[1]}/${parts[0]}`;
+          } else {
+            startDateFormatted = startDate;
+          }
+        }
+
+        pumpDurationList.push({
+          id: mId,
+          name: rawName,
+          shortName,
+          isActive: isCurrentlyActive,
+          startDate: startDate || null,
+          startDateFormatted,
+          stopDate,
+          daysDuration,
+          activeLogDays,
+        });
       });
+
+      // Sort: active pumps first, then longest duration
+      pumpDurationList.sort((a, b) => {
+        if (a.isActive && !b.isActive) return -1;
+        if (!a.isActive && b.isActive) return 1;
+        return b.daysDuration - a.daysDuration;
+      });
+
+      // Site-wide earliest pump start date (from logs or configured pump start date)
+      const earliestSiteLog = sLogs.reduce((earliest, l) => (!earliest || l.date < earliest ? l.date : earliest), '');
+      if (earliestSiteLog) {
+        allPumpStartDates.push(earliestSiteLog);
+      }
+      allPumpStartDates.sort();
+
+      const earliestPumpStartDate = allPumpStartDates[0] || site.startDate || null;
+      let earliestPumpDays: number | null = null;
+      let earliestPumpStartDateFormatted: string | null = null;
+
+      if (earliestPumpStartDate) {
+        const start = new Date(earliestPumpStartDate);
+        const diff = Math.max(0, now.getTime() - start.getTime());
+        earliestPumpDays = Math.max(1, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+        const parts = earliestPumpStartDate.split('T')[0].split('-');
+        if (parts.length === 3) {
+          earliestPumpStartDateFormatted = `${parts[2]}/${parts[1]}/${parts[0]}`;
+        } else {
+          earliestPumpStartDateFormatted = earliestPumpStartDate;
+        }
+      }
 
       // Logs filtered by time range
       const siteFilteredLogs = sLogs.filter(log => {
@@ -695,6 +813,10 @@ export function ActiveSiteAnalytics() {
         lastRefillDate,
         lastRefillLitres,
         lastRefilledFormatted,
+        earliestPumpDays,
+        earliestPumpStartDate,
+        earliestPumpStartDateFormatted,
+        pumpDurationList,
       };
     });
 
@@ -791,6 +913,111 @@ export function ActiveSiteAnalytics() {
       pumpConfigs.forEach(pd => machineIdSet.add(pd.assetId));
       sLogs.forEach(l => machineIdSet.add(l.assetId));
 
+      const pumpDurationList: Array<{
+        id: string;
+        name: string;
+        shortName: string;
+        isActive: boolean;
+        startDate: string | null;
+        startDateFormatted: string | null;
+        stopDate: string | null;
+        daysDuration: number;
+        activeLogDays: number;
+      }> = [];
+
+      const allPumpStartDates: string[] = [];
+      const siteEndDateObj = site.endDate ? new Date(site.endDate) : now;
+
+      machineIdSet.forEach(mId => {
+        const pd = pumpConfigs.find(p => p.assetId === mId);
+        const mLogs = sLogs.filter(l => l.assetId === mId);
+        const hasExplicitStop = !!pd?.pumpStopDate;
+        const isReplaced = pumpConfigs.some(p => p.replacedAssetId === mId);
+        const isCurrentlyActive = !hasExplicitStop && !isReplaced && (
+          (pd?.pumpStartDate && !pd?.pumpStopDate) ||
+          (invMap.get(mId) || 0) > 0
+        );
+
+        const assetObj = (assets || []).find(a => a.id === mId) || (maintenanceAssets || []).find(ma => ma.id === mId);
+        const rawName = assetObj?.name || mLogs[0]?.assetName || 'Pump';
+        const shortName = (assetObj as any)?.shortName || formatMachineShortName(rawName);
+
+        const earliestMLog = mLogs.reduce((earliest, l) => (!earliest || l.date < earliest ? l.date : earliest), '');
+        const startDate = pd?.pumpStartDate || earliestMLog || '';
+        const stopDate = pd?.pumpStopDate || null;
+
+        if (startDate) {
+          allPumpStartDates.push(startDate);
+        }
+
+        const activeLogDays = mLogs.reduce((acc, l) => {
+          const op = l.operationalDay ?? (l.isActive ? 'full' : 'none');
+          if (op === 'full') return acc + 1;
+          if (op === 'half') return acc + 0.5;
+          return acc;
+        }, 0);
+
+        let daysDuration = 0;
+        if (startDate) {
+          const start = new Date(startDate);
+          const end = stopDate ? new Date(stopDate) : siteEndDateObj;
+          const diff = Math.max(0, end.getTime() - start.getTime());
+          daysDuration = Math.max(1, Math.ceil(diff / (1000 * 60 * 60 * 24)) + (stopDate ? 1 : 0));
+        } else {
+          daysDuration = activeLogDays || mLogs.length;
+        }
+
+        let startDateFormatted: string | null = null;
+        if (startDate) {
+          const parts = startDate.split('T')[0].split('-');
+          if (parts.length === 3) {
+            startDateFormatted = `${parts[2]}/${parts[1]}/${parts[0]}`;
+          } else {
+            startDateFormatted = startDate;
+          }
+        }
+
+        pumpDurationList.push({
+          id: mId,
+          name: rawName,
+          shortName,
+          isActive: isCurrentlyActive,
+          startDate: startDate || null,
+          startDateFormatted,
+          stopDate,
+          daysDuration,
+          activeLogDays,
+        });
+      });
+
+      pumpDurationList.sort((a, b) => {
+        if (a.isActive && !b.isActive) return -1;
+        if (!a.isActive && b.isActive) return 1;
+        return b.daysDuration - a.daysDuration;
+      });
+
+      const earliestSiteLog = sLogs.reduce((earliest, l) => (!earliest || l.date < earliest ? l.date : earliest), '');
+      if (earliestSiteLog) {
+        allPumpStartDates.push(earliestSiteLog);
+      }
+      allPumpStartDates.sort();
+
+      const earliestPumpStartDate = allPumpStartDates[0] || site.startDate || null;
+      let earliestPumpDays: number | null = null;
+      let earliestPumpStartDateFormatted: string | null = null;
+
+      if (earliestPumpStartDate) {
+        const start = new Date(earliestPumpStartDate);
+        const diff = Math.max(0, siteEndDateObj.getTime() - start.getTime());
+        earliestPumpDays = Math.max(1, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+        const parts = earliestPumpStartDate.split('T')[0].split('-');
+        if (parts.length === 3) {
+          earliestPumpStartDateFormatted = `${parts[2]}/${parts[1]}/${parts[0]}`;
+        } else {
+          earliestPumpStartDateFormatted = earliestPumpStartDate;
+        }
+      }
+
       const siteFilteredLogs = sLogs.filter(log => {
         const logDate = new Date(log.date);
         if (timeRange === '30d') {
@@ -872,6 +1099,10 @@ export function ActiveSiteAnalytics() {
         lastRefillDate,
         lastRefillLitres,
         lastRefilledFormatted,
+        earliestPumpDays,
+        earliestPumpStartDate,
+        earliestPumpStartDateFormatted,
+        pumpDurationList,
       };
     });
   }, [showHistoricalSites, historicalSites, siteHoldPeriods, waybills, sitePumpDates, dailyMachineLogs, assets, timeRange, selectedYear]);
@@ -879,7 +1110,7 @@ export function ActiveSiteAnalytics() {
   // Filtered historical site metrics based on search query and status filter
   const filteredHistoricalSites = useMemo(() => {
     return historicalSiteMetrics.filter(s => {
-      const q = archiveSearch.trim().toLowerCase();
+      const q = deferredArchiveSearch.trim().toLowerCase();
       const matchesSearch = !q ||
         s.name.toLowerCase().includes(q) ||
         (s.client && s.client.toLowerCase().includes(q)) ||
@@ -892,7 +1123,7 @@ export function ActiveSiteAnalytics() {
 
       return matchesSearch && matchesStatus;
     });
-  }, [historicalSiteMetrics, archiveSearch, archiveStatusFilter]);
+  }, [historicalSiteMetrics, deferredArchiveSearch, archiveStatusFilter]);
 
   // Aggregate stats across historical sites for KPI strip when viewing archive
   const historicalTotals = useMemo(() => {
@@ -1117,6 +1348,11 @@ export function ActiveSiteAnalytics() {
               else if (opDay === 'half') activeDaysSinceDip += 0.5;
             }
           });
+          const todayStr = new Date().toISOString().split('T')[0];
+          const hasTodayLog = mLogs.some(l => l.date === todayStr);
+          if (isCurrentlyActive && todayStr > lastDipstickDate && !hasTodayLog) {
+            activeDaysSinceDip += 1;
+          }
           const burnedSinceDip = expectedDailyBurnRate > 0 ? (activeDaysSinceDip * expectedDailyBurnRate) : 0;
           estimatedRemainingLitres = Math.max(0, Math.min(effectiveTankCapacity, Math.round((lastDipstickLitres || 0) - burnedSinceDip)));
           isDipstickVerified = (activeDaysSinceDip === 0);
@@ -1131,14 +1367,33 @@ export function ActiveSiteAnalytics() {
               else if (opDay === 'half') activeDaysSinceRefill += 0.5;
             }
           });
+          const todayStr = new Date().toISOString().split('T')[0];
+          const hasTodayLog = mLogs.some(l => l.date === todayStr);
+          if (isCurrentlyActive && todayStr > lastRefillDate && !hasTodayLog) {
+            activeDaysSinceRefill += 1;
+          }
           const burnedSinceRefill = expectedDailyBurnRate > 0 ? (activeDaysSinceRefill * expectedDailyBurnRate) : 0;
           
+          // Deplete previous dipstick reading by operational days before refill
+          let remainingFromDipstick = 0;
+          if (lastDipstickLitres != null && lastDipstickDate && lastDipstickDate < lastRefillDate) {
+            let daysBetween = 0;
+            mLogs.forEach(l => {
+              if (l.date > lastDipstickDate && l.date < lastRefillDate) {
+                const opDay = l.operationalDay ?? (l.isActive ? 'full' : 'none');
+                if (opDay === 'full') daysBetween += 1;
+                else if (opDay === 'half') daysBetween += 0.5;
+              }
+            });
+            remainingFromDipstick = Math.max(0, lastDipstickLitres - (daysBetween * (expectedDailyBurnRate || 0)));
+          }
+
           // If explicitly marked full tank, start from 100% capacity
-          // Otherwise, if previous dipstick exists, add refill to dipstick
+          // Otherwise, if previous dipstick exists, add refill to depleted dipstick
           const baseline = wasLastRefillFull 
             ? effectiveTankCapacity 
             : (lastDipstickLitres != null 
-                ? Math.min(effectiveTankCapacity, lastDipstickLitres + lastRefillLitres)
+                ? Math.min(effectiveTankCapacity, remainingFromDipstick + lastRefillLitres)
                 : (tankCapacityLitres > 0 ? Math.min(effectiveTankCapacity, lastRefillLitres) : effectiveTankCapacity));
                 
           estimatedRemainingLitres = Math.max(0, Math.round(baseline - burnedSinceRefill));
@@ -1718,6 +1973,9 @@ export function ActiveSiteAnalytics() {
         const hasTelemetryAnchor = (lastRefillLog != null || lastDipstickLog != null);
 
         if (hasTelemetryAnchor && effectiveTankCapacity > 0) {
+          const todayStr = new Date().toISOString().split('T')[0];
+          const hasTodayLog = mLogs.some(l => l.date === todayStr);
+
           if (lastDipstickDate && (!lastRefillDate || lastDipstickDate >= lastRefillDate)) {
             let activeDaysSinceDip = 0;
             mLogs.forEach(l => {
@@ -1727,6 +1985,9 @@ export function ActiveSiteAnalytics() {
                 else if (opDay === 'half') activeDaysSinceDip += 0.5;
               }
             });
+            if (isCurrentlyActive && todayStr > lastDipstickDate && !hasTodayLog) {
+              activeDaysSinceDip += 1;
+            }
             const burnedSinceDip = activeDaysSinceDip * benchmarkBurnRate;
             estimatedRemainingLitres = Math.max(0, Math.min(effectiveTankCapacity, Math.round((lastDipstickLitres || 0) - burnedSinceDip)));
             isDipstickVerified = (activeDaysSinceDip === 0);
@@ -1739,11 +2000,28 @@ export function ActiveSiteAnalytics() {
                 else if (opDay === 'half') activeDaysSinceRefill += 0.5;
               }
             });
+            if (isCurrentlyActive && todayStr > lastRefillDate && !hasTodayLog) {
+              activeDaysSinceRefill += 1;
+            }
             const burnedSinceRefill = activeDaysSinceRefill * benchmarkBurnRate;
+
+            let remainingFromDipstick = 0;
+            if (lastDipstickLitres != null && lastDipstickDate && lastDipstickDate < lastRefillDate) {
+              let daysBetween = 0;
+              mLogs.forEach(l => {
+                if (l.date > lastDipstickDate && l.date < lastRefillDate) {
+                  const opDay = l.operationalDay ?? (l.isActive ? 'full' : 'none');
+                  if (opDay === 'full') daysBetween += 1;
+                  else if (opDay === 'half') daysBetween += 0.5;
+                }
+              });
+              remainingFromDipstick = Math.max(0, lastDipstickLitres - (daysBetween * benchmarkBurnRate));
+            }
+
             const baseline = wasLastRefillFull 
               ? effectiveTankCapacity 
               : (lastDipstickLitres != null 
-                  ? Math.min(effectiveTankCapacity, lastDipstickLitres + lastRefillLitres)
+                  ? Math.min(effectiveTankCapacity, remainingFromDipstick + lastRefillLitres)
                   : (tankCapacityLitres > 0 ? Math.min(effectiveTankCapacity, lastRefillLitres) : effectiveTankCapacity));
             estimatedRemainingLitres = Math.max(0, Math.round(baseline - burnedSinceRefill));
           }
@@ -1784,9 +2062,9 @@ export function ActiveSiteAnalytics() {
           targetRefillDate = target.toISOString().split('T')[0];
           targetRefillFormatted = formatDisplayDate(targetRefillDate);
 
-          if (runwayDays <= 1.0) {
+          if (daysUntilRefill === 0 || runwayDays <= 1.0) {
             urgency = 'today';
-            urgencyLabel = 'Refill Today';
+            urgencyLabel = 'Today';
             urgencyBadgeClass = 'bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border-rose-300 dark:border-rose-800';
           } else if (daysUntilRefill === 1) {
             urgency = 'tomorrow';
@@ -1853,17 +2131,58 @@ export function ActiveSiteAnalytics() {
     return fleetRefillForecast.filter(item => item.siteId === currentSite.id);
   }, [fleetRefillForecast, currentSite]);
 
-  const urgentRefillCount = useMemo(() => {
+  // Counts of immediate refill alerts (Overdue / Today) vs advance warnings (Tomorrow) — single pass O(N)
+  const { urgentRefillCount, tomorrowRefillCount } = useMemo(() => {
     const activeList = currentSite ? currentSiteRefillForecast : fleetRefillForecast;
-    return activeList.filter(item => item.urgency === 'critical' || item.urgency === 'today' || item.urgency === 'tomorrow').length;
+    let urgent = 0;
+    let tomorrow = 0;
+    for (let i = 0; i < activeList.length; i++) {
+      const u = activeList[i].urgency;
+      if (u === 'critical' || u === 'today') {
+        urgent++;
+      } else if (u === 'tomorrow') {
+        tomorrow++;
+      }
+    }
+    return { urgentRefillCount: urgent, tomorrowRefillCount: tomorrow };
   }, [currentSite, currentSiteRefillForecast, fleetRefillForecast]);
 
-  const displayedRefillForecast = useMemo(() => {
-    const baseList = (refillForecastScope === 'current' && currentSite) 
+  const activeForecastList = useMemo(() => {
+    return (refillForecastScope === 'current' && currentSite) 
       ? currentSiteRefillForecast 
       : fleetRefillForecast;
+  }, [refillForecastScope, currentSite, currentSiteRefillForecast, fleetRefillForecast]);
 
-    return baseList.filter(item => {
+  // Gated: zero computation while modal is closed
+  const activeForecastCounts = useMemo(() => {
+    if (!isRefillForecastModalOpen) {
+      return { all: 0, dueToday: 0, dueTomorrow: 0, safe: 0 };
+    }
+    let dueToday = 0;
+    let dueTomorrow = 0;
+    let safe = 0;
+    for (let i = 0; i < activeForecastList.length; i++) {
+      const u = activeForecastList[i].urgency;
+      if (u === 'critical' || u === 'today') {
+        dueToday++;
+      } else if (u === 'tomorrow') {
+        dueTomorrow++;
+      } else if (u === 'soon' || u === 'safe') {
+        safe++;
+      }
+    }
+    return {
+      all: activeForecastList.length,
+      dueToday,
+      dueTomorrow,
+      safe
+    };
+  }, [isRefillForecastModalOpen, activeForecastList]);
+
+  const displayedRefillForecast = useMemo(() => {
+    if (!isRefillForecastModalOpen) return [];
+
+    return activeForecastList.filter(item => {
       if (refillForecastUrgencyFilter === 'urgent') {
         if (item.urgency !== 'critical' && item.urgency !== 'today') return false;
       } else if (refillForecastUrgencyFilter === 'tomorrow') {
@@ -1872,8 +2191,8 @@ export function ActiveSiteAnalytics() {
         if (item.urgency !== 'soon' && item.urgency !== 'safe') return false;
       }
 
-      if (refillForecastSearch.trim()) {
-        const query = refillForecastSearch.toLowerCase().trim();
+      if (deferredRefillForecastSearch.trim()) {
+        const query = deferredRefillForecastSearch.toLowerCase().trim();
         const matchesMachine = item.machineName.toLowerCase().includes(query) || item.shortName.toLowerCase().includes(query);
         const matchesSite = item.siteName.toLowerCase().includes(query);
         if (!matchesMachine && !matchesSite) return false;
@@ -1881,7 +2200,373 @@ export function ActiveSiteAnalytics() {
 
       return true;
     });
-  }, [refillForecastScope, currentSite, currentSiteRefillForecast, fleetRefillForecast, refillForecastUrgencyFilter, refillForecastSearch]);
+  }, [isRefillForecastModalOpen, activeForecastList, refillForecastUrgencyFilter, deferredRefillForecastSearch]);
+
+  const renderRefillForecastModal = () => {
+    if (!isRefillForecastModalOpen) return null;
+    return (
+      <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[120] flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-150">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-5xl w-full max-h-[92vh] sm:max-h-[90vh] shadow-2xl overflow-hidden flex flex-col">
+          {/* Modal Header */}
+          <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between gap-3 shrink-0">
+            <div className="flex items-center gap-2.5">
+              <div className="h-9 w-9 rounded-xl bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800/80 flex items-center justify-center shrink-0">
+                <Bell className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+              </div>
+              <div>
+                <h3 className="font-bold text-slate-900 dark:text-white text-base">
+                  Next Refill Date Forecast
+                </h3>
+              </div>
+            </div>
+            <button
+              onClick={() => setIsRefillForecastModalOpen(false)}
+              className="h-8 w-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shrink-0"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Modal Controls Bar */}
+          <div className="p-3 sm:p-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shrink-0">
+            {/* Scope Switcher */}
+            <div className="flex items-center bg-slate-200/80 dark:bg-slate-800 p-0.5 rounded-lg border border-slate-300/80 dark:border-slate-700 text-xs overflow-x-auto w-full sm:w-auto">
+              {currentSite && (
+                <button
+                  type="button"
+                  onClick={() => setRefillForecastScope('current')}
+                  className={cn(
+                    "px-3 py-1.5 rounded-md font-semibold text-xs transition-all flex items-center gap-1.5 shrink-0",
+                    refillForecastScope === 'current'
+                      ? "bg-white dark:bg-slate-900 text-cyan-700 dark:text-cyan-300 shadow-xs"
+                      : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                  )}
+                >
+                  <span>Current Site: {currentSite.name}</span>
+                  <span className={cn(
+                    "text-[10px] px-1.5 py-0.2 rounded-full font-bold",
+                    refillForecastScope === 'current'
+                      ? "bg-cyan-100 dark:bg-cyan-900/60 text-cyan-800 dark:text-cyan-200"
+                      : "bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
+                  )}>
+                    {currentSiteRefillForecast.length}
+                  </span>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setRefillForecastScope('fleet')}
+                className={cn(
+                  "px-3 py-1.5 rounded-md font-semibold text-xs transition-all flex items-center gap-1.5 shrink-0",
+                  refillForecastScope === 'fleet' || !currentSite
+                    ? "bg-white dark:bg-slate-900 text-cyan-700 dark:text-cyan-300 shadow-xs"
+                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                )}
+              >
+                <span>All Ongoing Sites (Fleet-Wide)</span>
+                <span className={cn(
+                  "text-[10px] px-1.5 py-0.2 rounded-full font-bold",
+                  refillForecastScope === 'fleet' || !currentSite
+                    ? "bg-cyan-100 dark:bg-cyan-900/60 text-cyan-800 dark:text-cyan-200"
+                    : "bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
+                )}>
+                  {fleetRefillForecast.length}
+                </span>
+              </button>
+            </div>
+
+            {/* Filters: Search and Urgency Tabs */}
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* Search */}
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="text"
+                  placeholder="Search machine or site..."
+                  value={refillForecastSearch}
+                  onChange={e => setRefillForecastSearch(e.target.value)}
+                  className="h-8 pl-8 pr-3 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:outline-hidden focus:ring-1 focus:ring-cyan-500 w-44 sm:w-56"
+                />
+                {refillForecastSearch && (
+                  <button
+                    onClick={() => setRefillForecastSearch('')}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+
+              {/* Urgency Filter Pills with Count Badges */}
+              <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setRefillForecastUrgencyFilter('all')}
+                  className={cn(
+                    "px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all flex items-center gap-1.5",
+                    refillForecastUrgencyFilter === 'all'
+                      ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-xs"
+                      : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                  )}
+                >
+                  <span>All</span>
+                  <span className="text-[10px] opacity-70">({activeForecastCounts.all})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRefillForecastUrgencyFilter('urgent')}
+                  className={cn(
+                    "px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all flex items-center gap-1.5",
+                    refillForecastUrgencyFilter === 'urgent'
+                      ? "bg-rose-500 text-white shadow-xs"
+                      : "text-rose-600 dark:text-rose-400 hover:text-rose-700"
+                  )}
+                >
+                  <span>🚨 Today / Overdue</span>
+                  <span className={cn(
+                    "text-[10px] px-1 rounded-full font-bold",
+                    refillForecastUrgencyFilter === 'urgent'
+                      ? "bg-white/20 text-white"
+                      : "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300"
+                  )}>
+                    {activeForecastCounts.dueToday}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRefillForecastUrgencyFilter('tomorrow')}
+                  className={cn(
+                    "px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all flex items-center gap-1.5",
+                    refillForecastUrgencyFilter === 'tomorrow'
+                      ? "bg-amber-500 text-white shadow-xs"
+                      : "text-amber-600 dark:text-amber-400 hover:text-amber-700"
+                  )}
+                >
+                  <span>⚠️ Tomorrow</span>
+                  <span className={cn(
+                    "text-[10px] px-1 rounded-full font-bold",
+                    refillForecastUrgencyFilter === 'tomorrow'
+                      ? "bg-white/20 text-white"
+                      : "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300"
+                  )}>
+                    {activeForecastCounts.dueTomorrow}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRefillForecastUrgencyFilter('safe')}
+                  className={cn(
+                    "px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all flex items-center gap-1.5",
+                    refillForecastUrgencyFilter === 'safe'
+                      ? "bg-white dark:bg-slate-900 text-emerald-700 dark:text-emerald-300 shadow-xs"
+                      : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                  )}
+                >
+                  <span>Safe</span>
+                  <span className="text-[10px] opacity-70">({activeForecastCounts.safe})</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Forecast Table List */}
+          <div className="overflow-y-auto flex-1 p-3 sm:p-5">
+            {displayedRefillForecast.length === 0 ? (
+              <div className="h-56 flex flex-col items-center justify-center text-slate-400 gap-2 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl">
+                <Fuel className="h-8 w-8 text-slate-300 dark:text-slate-700" />
+                <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                  No machine refill forecasts found matching this filter.
+                </p>
+                {(refillForecastSearch || refillForecastUrgencyFilter !== 'all') && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setRefillForecastSearch('');
+                      setRefillForecastUrgencyFilter('all');
+                    }}
+                    className="text-xs h-7 mt-1 font-semibold text-cyan-600"
+                  >
+                    Clear Filters
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-x-auto bg-white dark:bg-slate-900 shadow-xs">
+                <Table className="min-w-[760px] w-full">
+                  <TableHeader className="bg-slate-50/80 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800">
+                    <TableRow>
+                      <TableHead className="text-[11px] font-bold uppercase tracking-wider text-slate-500 py-3">Site</TableHead>
+                      <TableHead className="text-[11px] font-bold uppercase tracking-wider text-slate-500 py-3">Machine / Unit</TableHead>
+                      <TableHead className="text-[11px] font-bold uppercase tracking-wider text-slate-500 py-3">Fuel Level & Remaining</TableHead>
+                      <TableHead className="text-[11px] font-bold uppercase tracking-wider text-slate-500 py-3">Rated Burn</TableHead>
+                      <TableHead className="text-[11px] font-bold uppercase tracking-wider text-slate-500 py-3">Last Refill Date</TableHead>
+                      <TableHead className="text-[11px] font-bold uppercase tracking-wider text-slate-500 py-3">Estimated Next Refill</TableHead>
+                      <TableHead className="text-[11px] font-bold uppercase tracking-wider text-slate-500 py-3 text-right">Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody className="divide-y divide-slate-100 dark:divide-slate-800/80 text-xs">
+                    {displayedRefillForecast.map(item => {
+                      const isCurrentSelectedSite = currentSite?.id === item.siteId;
+                      return (
+                        <TableRow 
+                          key={`${item.siteId}-${item.machineId}`}
+                          className={cn(
+                            "transition-colors hover:bg-slate-50/60 dark:hover:bg-slate-800/40",
+                            item.urgency === 'critical' || item.urgency === 'today' ? "bg-rose-50/25 dark:bg-rose-950/15" : ""
+                          )}
+                        >
+                          {/* Site Column */}
+                          <TableCell className="py-3 font-semibold text-slate-800 dark:text-slate-100">
+                            <div className="flex items-center gap-1.5">
+                              <span className="h-2 w-2 rounded-full bg-cyan-500 shrink-0" />
+                              <span className="truncate max-w-[160px] sm:max-w-[200px]" title={item.siteName}>
+                                {item.siteName}
+                              </span>
+                            </div>
+                          </TableCell>
+
+                          {/* Machine Column */}
+                          <TableCell className="py-3">
+                            <div className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
+                              <span>{item.shortName}</span>
+                            </div>
+                            <div className="text-[10px] text-slate-400 truncate max-w-[150px]" title={item.machineName}>
+                              {item.machineName}
+                            </div>
+                          </TableCell>
+
+                          {/* Fuel Level & Gauge Column */}
+                          <TableCell className="py-3 min-w-[180px]">
+                            <div className="space-y-1">
+                              <div className="flex items-center justify-between text-[11px]">
+                                <span className="font-bold text-slate-800 dark:text-slate-200">
+                                  {item.estimatedRemainingLitres}L <span className="text-slate-400 font-normal">/ {item.tankCapacityLitres}L</span>
+                                </span>
+                                <span className={cn(
+                                  "font-bold text-[10px]",
+                                  item.fuelPercentage <= 15 
+                                    ? "text-rose-600 dark:text-rose-400" 
+                                    : item.fuelPercentage <= 35 
+                                    ? "text-amber-600 dark:text-amber-400" 
+                                    : "text-emerald-600 dark:text-emerald-400"
+                                )}>
+                                  {item.fuelPercentage}%
+                                </span>
+                              </div>
+                              <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                                <div 
+                                  className={cn(
+                                    "h-full rounded-full transition-all duration-300",
+                                    item.fuelPercentage <= 15 
+                                      ? "bg-rose-500" 
+                                      : item.fuelPercentage <= 35 
+                                      ? "bg-amber-500" 
+                                      : "bg-emerald-500"
+                                  )}
+                                  style={{ width: `${Math.min(100, Math.max(3, item.fuelPercentage))}%` }}
+                                />
+                              </div>
+                              <div className="flex items-center justify-between text-[10px] text-slate-400">
+                                <span>
+                                  {item.isDipstickVerified ? '✓ Dipstick verified' : (item.lastRefillDate ? 'Refill calculated' : 'No anchor')}
+                                </span>
+                                <span>Runway: {item.runwayDays}d</span>
+                              </div>
+                            </div>
+                          </TableCell>
+
+                          {/* Benchmark Rate Column */}
+                          <TableCell className="py-3 text-slate-700 dark:text-slate-300">
+                            <div className="font-semibold">{item.benchmarkBurnRate} L/day</div>
+                            <div className="text-[10px] text-slate-400">Rated Benchmark</div>
+                          </TableCell>
+
+                          {/* Last Refill Date Column */}
+                          <TableCell className="py-3">
+                            {item.lastRefillDate ? (
+                              <div>
+                                <div className="font-semibold text-slate-800 dark:text-slate-200 text-xs">
+                                  {formatLastRefilledDate(item.lastRefillDate)}
+                                </div>
+                                {item.lastRefillLitres > 0 && (
+                                  <div className="text-[10px] text-slate-400 mt-0.5">
+                                    {item.lastRefillLitres}L refilled
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-xs text-slate-400 italic">No refill recorded</span>
+                            )}
+                          </TableCell>
+
+                          {/* Estimated Next Refill Date Column */}
+                          <TableCell className="py-3">
+                            <div className="font-bold text-slate-900 dark:text-white text-xs">
+                              {item.targetRefillFormatted}
+                            </div>
+                            <div className="mt-1 flex items-center gap-1">
+                              <span className={cn(
+                                "text-[10px] font-bold px-2 py-0.5 rounded-md border inline-flex items-center gap-1 leading-tight",
+                                item.urgencyBadgeClass
+                              )}>
+                                {item.urgencyLabel}
+                              </span>
+                              {item.daysUntilRefill > 0 && (
+                                <span className="text-[10px] text-slate-400">
+                                  (-1d safety buffer)
+                                </span>
+                              )}
+                            </div>
+                          </TableCell>
+
+                          {/* Action Column */}
+                          <TableCell className="py-3 text-right">
+                            {isCurrentSelectedSite ? (
+                              <span className="inline-block text-[11px] font-semibold text-cyan-600 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-950/50 px-2 py-1 rounded-md border border-cyan-200 dark:border-cyan-800">
+                                Current Site
+                              </span>
+                            ) : (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedSiteId(item.siteId);
+                                  setIsRefillForecastModalOpen(false);
+                                }}
+                                className="h-7 text-xs px-2.5 font-semibold text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-cyan-50 hover:text-cyan-700 dark:hover:bg-cyan-950/40 dark:hover:text-cyan-300 transition-all"
+                                title={`Switch view to ${item.siteName}`}
+                              >
+                                <span>View Site</span>
+                                <ArrowRight className="w-3 h-3 ml-1 text-slate-400" />
+                              </Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </div>
+
+          {/* Modal Footer */}
+          <div className="p-3 sm:p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 flex items-center justify-end shrink-0">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsRefillForecastModalOpen(false)}
+              className="h-8 text-xs font-semibold px-4 rounded-lg"
+            >
+              Close
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   const headerActionsNode = useMemo(() => (
     <div className="flex items-center gap-1.5 sm:gap-2">
@@ -1985,17 +2670,34 @@ export function ActiveSiteAnalytics() {
           "relative h-8 px-2 sm:px-2.5 gap-1.5 text-xs font-semibold rounded-lg border transition-all shrink-0",
           urgentRefillCount > 0
             ? "border-rose-300 dark:border-rose-800 bg-rose-50/70 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 hover:bg-rose-100/80 shadow-xs"
+            : tomorrowRefillCount > 0
+            ? "border-amber-300 dark:border-amber-800 bg-amber-50/70 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 hover:bg-amber-100/80 shadow-xs"
             : "border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/60"
         )}
-        title="View Estimated Next Refill Dates (1-Day Safety Buffer)"
+        title={
+          urgentRefillCount > 0 || tomorrowRefillCount > 0
+            ? `${urgentRefillCount > 0 ? `${urgentRefillCount} refill alert (due today/overdue)` : ''}${urgentRefillCount > 0 && tomorrowRefillCount > 0 ? ', ' : ''}${tomorrowRefillCount > 0 ? `${tomorrowRefillCount} due tomorrow` : ''}`
+            : "View Estimated Next Refill Dates (1-Day Safety Buffer)"
+        }
       >
-        <Bell className={cn("w-3.5 h-3.5 shrink-0", urgentRefillCount > 0 ? "text-rose-600 dark:text-rose-400 animate-bounce" : "text-amber-500")} />
+        <Bell className={cn(
+          "w-3.5 h-3.5 shrink-0", 
+          urgentRefillCount > 0 
+            ? "text-rose-600 dark:text-rose-400 animate-bounce" 
+            : tomorrowRefillCount > 0
+            ? "text-amber-500 dark:text-amber-400"
+            : "text-slate-400 dark:text-slate-500"
+        )} />
         <span className="hidden md:inline">Refill Forecast</span>
-        {urgentRefillCount > 0 && (
+        {urgentRefillCount > 0 ? (
           <span className="flex h-4 min-w-[16px] px-1 items-center justify-center rounded-full bg-rose-500 text-[10px] font-bold text-white shadow-xs leading-none">
             {urgentRefillCount}
           </span>
-        )}
+        ) : tomorrowRefillCount > 0 ? (
+          <span className="flex h-4 min-w-[16px] px-1 items-center justify-center rounded-full bg-amber-500 text-[10px] font-bold text-white shadow-xs leading-none">
+            {tomorrowRefillCount}
+          </span>
+        ) : null}
       </Button>
 
       {/* Site 360 */}
@@ -2012,7 +2714,7 @@ export function ActiveSiteAnalytics() {
         </Button>
       )}
     </div>
-  ), [selectedSiteId, selectedMachineId, siteMachines, activeSiteMachines, takenOutSiteMachines, timeRange, selectedYear, currentSite, navigate, handleExportCSV, showHistoricalSites, historicalSites, portfolioTab, isPortfolioMode, urgentRefillCount]);
+  ), [selectedSiteId, selectedMachineId, siteMachines, activeSiteMachines, takenOutSiteMachines, timeRange, selectedYear, currentSite, navigate, handleExportCSV, showHistoricalSites, historicalSites, portfolioTab, isPortfolioMode, urgentRefillCount, tomorrowRefillCount]);
 
   useSetPageTitle(
     activeRegisterMachine ? null : headerTitleNode,
@@ -2713,19 +3415,26 @@ export function ActiveSiteAnalytics() {
                           <span className="text-base font-extrabold text-slate-800 dark:text-slate-100 block mt-0.5">
                             {site.dailyAvgBurn} L/d
                           </span>
-                          <span className="text-[10px] text-slate-400">{site.activeDays} operating days</span>
+                          <span className="text-[10px] text-slate-400 block">{site.activeDays} operating days</span>
                         </div>
 
                         <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700/60">
-                          <span className="text-[10px] uppercase font-bold text-slate-400 block">Net Variance (Diff)</span>
-                          <span className={cn(
-                            "text-base font-extrabold block mt-0.5",
-                            site.varianceLitres > 0 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"
-                          )}>
-                            {site.varianceLitres > 0 ? `+${site.varianceLitres}` : site.varianceLitres} L
-                          </span>
-                          <span className="text-[10px] text-slate-400">
-                            {site.varianceLitres > 0 ? 'Over benchmark' : 'Fuel saved'}
+                          <span className="text-[10px] uppercase font-bold text-slate-400 block">Pump Active Duration</span>
+                          <div className="flex items-baseline gap-1 mt-0.5">
+                            <span className="text-base font-extrabold text-slate-800 dark:text-slate-100">
+                              {site.earliestPumpDays != null ? `${site.earliestPumpDays} Days` : '—'}
+                            </span>
+                            {site.earliestPumpDays != null && (
+                              <span className="text-[10px] font-semibold text-cyan-600 dark:text-cyan-400">
+                                to date
+                              </span>
+                            )}
+                          </div>
+                          <span 
+                            className="text-[10px] text-slate-400 block truncate"
+                            title={site.earliestPumpStartDateFormatted ? `Earliest pump start date: ${site.earliestPumpStartDateFormatted}` : 'No pump logs on record'}
+                          >
+                            {site.earliestPumpStartDateFormatted ? `Since ${site.earliestPumpStartDateFormatted}` : 'No logs recorded'}
                           </span>
                         </div>
                       </div>
@@ -2765,9 +3474,18 @@ export function ActiveSiteAnalytics() {
             </div>
 
             {/* Cross-Site Comparative Visualizations (Charts 1 & 2 in 2-column grid) */}
+            {!chartsReady ? (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {[0, 1].map(i => (
+                  <div key={i} className="h-80 rounded-2xl bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 animate-pulse" />
+                ))}
+              </div>
+            ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Chart 1: Diesel Telemetry by Site */}
-              <Card className={cn(
+              <Card 
+                style={fullScreenChart === 'portfolio-diesel' ? undefined : { contentVisibility: 'auto', containIntrinsicSize: '0 380px' }}
+                className={cn(
                 "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm rounded-2xl overflow-hidden transition-all",
                 fullScreenChart === 'portfolio-diesel' && "fixed inset-0 z-[120] m-0 rounded-none border-none w-screen h-screen flex flex-col p-4 sm:p-6 overflow-auto bg-white dark:bg-slate-900"
               )}>
@@ -2833,8 +3551,8 @@ export function ActiveSiteAnalytics() {
                             ]}
                           />
                           <Legend verticalAlign="top" height={36} wrapperStyle={{ fontSize: '11px' }} />
-                          <Bar dataKey="dieselRefilled" name="Diesel Refilled (L)" fill="#f59e0b" radius={[4, 4, 0, 0]} maxBarSize={35} />
-                          <Bar dataKey="expectedDiesel" name="Expected Burn (L)" fill="#06b6d4" radius={[4, 4, 0, 0]} maxBarSize={35} />
+                          <Bar dataKey="dieselRefilled" name="Diesel Refilled (L)" fill="#f59e0b" radius={[4, 4, 0, 0]} maxBarSize={35} isAnimationActive={false} />
+                          <Bar dataKey="expectedDiesel" name="Expected Burn (L)" fill="#06b6d4" radius={[4, 4, 0, 0]} maxBarSize={35} isAnimationActive={false} />
                         </BarChart>
                       </ResponsiveContainer>
                     </div>
@@ -2847,7 +3565,9 @@ export function ActiveSiteAnalytics() {
               </Card>
 
               {/* Chart 2: Deployed Pumps & Operating Days by Site */}
-              <Card className={cn(
+              <Card 
+                style={fullScreenChart === 'portfolio-pumps' ? undefined : { contentVisibility: 'auto', containIntrinsicSize: '0 380px' }}
+                className={cn(
                 "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm rounded-2xl overflow-hidden transition-all",
                 fullScreenChart === 'portfolio-pumps' && "fixed inset-0 z-[120] m-0 rounded-none border-none w-screen h-screen flex flex-col p-4 sm:p-6 overflow-auto bg-white dark:bg-slate-900"
               )}>
@@ -2908,8 +3628,8 @@ export function ActiveSiteAnalytics() {
                             }}
                           />
                           <Legend verticalAlign="top" height={36} wrapperStyle={{ fontSize: '11px' }} />
-                          <Bar dataKey="activePumps" name="Active Pumps Count" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={35} />
-                          <Bar dataKey="activeDays" name="Active Operating Days" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={35} />
+                          <Bar dataKey="activePumps" name="Active Pumps Count" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={35} isAnimationActive={false} />
+                          <Bar dataKey="activeDays" name="Active Operating Days" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={35} isAnimationActive={false} />
                         </BarChart>
                       </ResponsiveContainer>
                     </div>
@@ -2921,6 +3641,7 @@ export function ActiveSiteAnalytics() {
                 </CardContent>
               </Card>
             </div>
+            )} {/* end chartsReady ternary */}
 
             {/* Active Sites Performance & Telemetry Summary Table */}
             <div className="space-y-3 pt-2">
@@ -3387,19 +4108,26 @@ export function ActiveSiteAnalytics() {
                           <span className="text-base font-extrabold text-slate-800 dark:text-slate-100 block mt-0.5">
                             {site.dailyAvgBurn} L/d
                           </span>
-                          <span className="text-[10px] text-slate-400">Recorded average</span>
+                          <span className="text-[10px] text-slate-400 block">Recorded average</span>
                         </div>
 
                         <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700/60">
-                          <span className="text-[10px] uppercase font-bold text-slate-400 block">Net Variance</span>
-                          <span className={cn(
-                            "text-base font-extrabold block mt-0.5",
-                            site.varianceLitres > 0 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"
-                          )}>
-                            {site.varianceLitres > 0 ? `+${site.varianceLitres}` : site.varianceLitres} L
-                          </span>
-                          <span className="text-[10px] text-slate-400">
-                            {site.varianceLitres > 0 ? 'Over benchmark' : 'Fuel saved'}
+                          <span className="text-[10px] uppercase font-bold text-slate-400 block">Pump Active Duration</span>
+                          <div className="flex items-baseline gap-1 mt-0.5">
+                            <span className="text-base font-extrabold text-slate-800 dark:text-slate-100">
+                              {site.earliestPumpDays != null ? `${site.earliestPumpDays} Days` : '—'}
+                            </span>
+                            {site.earliestPumpDays != null && (
+                              <span className="text-[10px] font-semibold text-cyan-600 dark:text-cyan-400">
+                                {site.endDate ? 'total' : 'to date'}
+                              </span>
+                            )}
+                          </div>
+                          <span 
+                            className="text-[10px] text-slate-400 block truncate"
+                            title={site.earliestPumpStartDateFormatted ? `Earliest pump start date: ${site.earliestPumpStartDateFormatted}` : 'No pump logs on record'}
+                          >
+                            {site.earliestPumpStartDateFormatted ? `Since ${site.earliestPumpStartDateFormatted}` : 'No logs recorded'}
                           </span>
                         </div>
                       </div>
@@ -3454,6 +4182,8 @@ export function ActiveSiteAnalytics() {
             )}
           </div>
         )}
+
+        {renderRefillForecastModal()}
       </div>
     );
   }
@@ -3830,6 +4560,19 @@ export function ActiveSiteAnalytics() {
         </Card>
       )}
 
+      {/* ── VISUAL SECTION 1+ : Charts (deferred after first paint) ── */}
+      {!chartsReady ? (
+        <div className="space-y-6">
+          {/* Chart skeleton placeholders — shown only for the 2 animation frames before charts mount */}
+          {[0, 1, 2].map(i => (
+            <div
+              key={i}
+              className="h-80 rounded-2xl bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 animate-pulse"
+            />
+          ))}
+        </div>
+      ) : (
+      <>
       {/* ── VISUAL SECTION 1: Diesel Consumption Trend Graph ── */}
       <Card className="border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm rounded-2xl overflow-hidden">
         <CardHeader className="p-5 pb-2 border-b border-slate-100 dark:border-slate-800 flex flex-row items-center justify-between flex-wrap gap-2">
@@ -3879,11 +4622,15 @@ export function ActiveSiteAnalytics() {
             >
               <Bell className="w-3 h-3 text-amber-500" />
               <span>Refill Forecast</span>
-              {urgentRefillCount > 0 && (
+              {urgentRefillCount > 0 ? (
                 <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-rose-500 text-white leading-none">
                   {urgentRefillCount}
                 </span>
-              )}
+              ) : tomorrowRefillCount > 0 ? (
+                <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-amber-500 text-white leading-none">
+                  {tomorrowRefillCount}
+                </span>
+              ) : null}
             </Button>
           </div>
         </CardHeader>
@@ -4142,6 +4889,7 @@ export function ActiveSiteAnalytics() {
                           name="Daily Avg Burn (L/Day)"
                           radius={[6, 6, 0, 0]}
                           maxBarSize={45}
+                          isAnimationActive={false}
                         >
                           {filteredRefillCycles.map((entry, index) => {
                             if (entry.status === 'initial_fill') {
@@ -4160,6 +4908,7 @@ export function ActiveSiteAnalytics() {
                           stroke="#3b82f6" 
                           strokeWidth={2} 
                           dot={{ r: 4, fill: '#3b82f6' }}
+                          isAnimationActive={false}
                         />
                       </ComposedChart>
                     </ResponsiveContainer>
@@ -4316,7 +5065,9 @@ export function ActiveSiteAnalytics() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
         {/* Graph 2A: Days on Site & Running Status per Machine */}
-        <Card className={cn(
+        <Card 
+          style={fullScreenChart === 'site-operational-days' ? undefined : { contentVisibility: 'auto', containIntrinsicSize: '0 400px' }}
+          className={cn(
           "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm rounded-2xl overflow-hidden transition-all",
           fullScreenChart === 'site-operational-days' && "fixed inset-0 z-[120] m-0 rounded-none border-none w-screen h-screen flex flex-col p-4 sm:p-6 overflow-auto bg-white dark:bg-slate-900"
         )}>
@@ -4474,9 +5225,9 @@ export function ActiveSiteAnalytics() {
                       wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }}
                       formatter={(val) => val === 'fullDays' ? 'Full (1.0)' : val === 'halfDays' ? 'Half (0.5)' : 'Off / Standby'}
                     />
-                    <Bar dataKey="fullDays" stackId="a" fill={CHART_COLORS.emerald} radius={[0, 0, 0, 0]} />
-                    <Bar dataKey="halfDays" stackId="a" fill={CHART_COLORS.amber} radius={[0, 0, 0, 0]} />
-                    <Bar dataKey="offDays" stackId="a" fill={CHART_COLORS.slate} radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="fullDays" stackId="a" fill={CHART_COLORS.emerald} radius={[0, 0, 0, 0]} isAnimationActive={false} />
+                    <Bar dataKey="halfDays" stackId="a" fill={CHART_COLORS.amber} radius={[0, 0, 0, 0]} isAnimationActive={false} />
+                    <Bar dataKey="offDays" stackId="a" fill={CHART_COLORS.slate} radius={[4, 4, 0, 0]} isAnimationActive={false} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -4489,7 +5240,9 @@ export function ActiveSiteAnalytics() {
         </Card>
 
         {/* Graph 2B: Machine Downtime & Halts (Incidents & Lost Hours) */}
-        <Card className={cn(
+        <Card 
+          style={fullScreenChart === 'site-downtime' ? undefined : { contentVisibility: 'auto', containIntrinsicSize: '0 400px' }}
+          className={cn(
           "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm rounded-2xl overflow-hidden transition-all",
           fullScreenChart === 'site-downtime' && "fixed inset-0 z-[120] m-0 rounded-none border-none w-screen h-screen flex flex-col p-4 sm:p-6 overflow-auto bg-white dark:bg-slate-900"
         )}>
@@ -4586,8 +5339,8 @@ export function ActiveSiteAnalytics() {
                       wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }}
                       formatter={(val) => val === 'incidents' ? 'Incidents Count' : 'Lost Hours (h)'}
                     />
-                    <Bar dataKey="incidents" fill={CHART_COLORS.rose} radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="lostHours" fill={CHART_COLORS.amber} radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="incidents" fill={CHART_COLORS.rose} radius={[4, 4, 0, 0]} isAnimationActive={false} />
+                    <Bar dataKey="lostHours" fill={CHART_COLORS.amber} radius={[4, 4, 0, 0]} isAnimationActive={false} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -4605,7 +5358,9 @@ export function ActiveSiteAnalytics() {
       {/* ── VISUAL SECTION 3: Donut Distributions ── */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Donut 3A: Operational Status Breakdown */}
-        <Card className={cn(
+        <Card 
+          style={fullScreenChart === 'site-duty-pie' ? undefined : { contentVisibility: 'auto', containIntrinsicSize: '0 320px' }}
+          className={cn(
           "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm rounded-2xl overflow-hidden transition-all",
           fullScreenChart === 'site-duty-pie' && "fixed inset-0 z-[120] m-0 rounded-none border-none w-screen h-screen flex flex-col p-4 sm:p-6 overflow-auto bg-white dark:bg-slate-900"
         )}>
@@ -4648,6 +5403,7 @@ export function ActiveSiteAnalytics() {
                         outerRadius={80}
                         paddingAngle={3}
                         dataKey="value"
+                        isAnimationActive={false}
                       >
                         {operationalStatusDonutData.map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={entry.color} />
@@ -4689,7 +5445,9 @@ export function ActiveSiteAnalytics() {
         </Card>
 
         {/* Donut 3B: Downtime Severity Breakdown */}
-        <Card className={cn(
+        <Card 
+          style={fullScreenChart === 'site-severity-pie' ? undefined : { contentVisibility: 'auto', containIntrinsicSize: '0 320px' }}
+          className={cn(
           "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm rounded-2xl overflow-hidden transition-all",
           fullScreenChart === 'site-severity-pie' && "fixed inset-0 z-[120] m-0 rounded-none border-none w-screen h-screen flex flex-col p-4 sm:p-6 overflow-auto bg-white dark:bg-slate-900"
         )}>
@@ -4732,6 +5490,7 @@ export function ActiveSiteAnalytics() {
                         outerRadius={80}
                         paddingAngle={3}
                         dataKey="value"
+                        isAnimationActive={false}
                       >
                         {downtimeSeverityDonutData.map((entry, index) => (
                           <Cell key={`sev-cell-${index}`} fill={entry.color} />
@@ -5343,352 +6102,10 @@ export function ActiveSiteAnalytics() {
         </div>
       )}
 
-      {/* ── MODAL: Next Refill Forecast ── */}
-      {isRefillForecastModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[120] flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-150">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-5xl w-full max-h-[92vh] sm:max-h-[90vh] shadow-2xl overflow-hidden flex flex-col">
-            {/* Modal Header */}
-            <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between gap-3 shrink-0">
-              <div className="flex items-center gap-2.5">
-                <div className="h-9 w-9 rounded-xl bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800/80 flex items-center justify-center shrink-0">
-                  <Bell className="w-5 h-5 text-amber-600 dark:text-amber-400" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-slate-900 dark:text-white text-base">
-                    Next Refill Date Forecast
-                  </h3>
-                </div>
-              </div>
-              <button
-                onClick={() => setIsRefillForecastModalOpen(false)}
-                className="h-8 w-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shrink-0"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
+      </>
+      )} {/* end chartsReady ternary */}
 
-            {/* Modal Controls Bar */}
-            <div className="p-3 sm:p-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shrink-0">
-              {/* Scope Switcher */}
-              <div className="flex items-center bg-slate-200/80 dark:bg-slate-800 p-0.5 rounded-lg border border-slate-300/80 dark:border-slate-700 text-xs overflow-x-auto w-full sm:w-auto">
-                {currentSite && (
-                  <button
-                    type="button"
-                    onClick={() => setRefillForecastScope('current')}
-                    className={cn(
-                      "px-3 py-1.5 rounded-md font-semibold text-xs transition-all flex items-center gap-1.5 shrink-0",
-                      refillForecastScope === 'current'
-                        ? "bg-white dark:bg-slate-900 text-cyan-700 dark:text-cyan-300 shadow-xs"
-                        : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
-                    )}
-                  >
-                    <span>Current Site: {currentSite.name}</span>
-                    <span className={cn(
-                      "text-[10px] px-1.5 py-0.2 rounded-full font-bold",
-                      refillForecastScope === 'current'
-                        ? "bg-cyan-100 dark:bg-cyan-900/60 text-cyan-800 dark:text-cyan-200"
-                        : "bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
-                    )}>
-                      {currentSiteRefillForecast.length}
-                    </span>
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => setRefillForecastScope('fleet')}
-                  className={cn(
-                    "px-3 py-1.5 rounded-md font-semibold text-xs transition-all flex items-center gap-1.5 shrink-0",
-                    refillForecastScope === 'fleet' || !currentSite
-                      ? "bg-white dark:bg-slate-900 text-cyan-700 dark:text-cyan-300 shadow-xs"
-                      : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
-                  )}
-                >
-                  <span>All Ongoing Sites (Fleet-Wide)</span>
-                  <span className={cn(
-                    "text-[10px] px-1.5 py-0.2 rounded-full font-bold",
-                    refillForecastScope === 'fleet' || !currentSite
-                      ? "bg-cyan-100 dark:bg-cyan-900/60 text-cyan-800 dark:text-cyan-200"
-                      : "bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
-                  )}>
-                    {fleetRefillForecast.length}
-                  </span>
-                </button>
-              </div>
-
-              {/* Filters: Search and Urgency Tabs */}
-              <div className="flex items-center gap-2 flex-wrap">
-                {/* Search */}
-                <div className="relative">
-                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                  <input
-                    type="text"
-                    placeholder="Search machine or site..."
-                    value={refillForecastSearch}
-                    onChange={e => setRefillForecastSearch(e.target.value)}
-                    className="h-8 pl-8 pr-3 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:outline-hidden focus:ring-1 focus:ring-cyan-500 w-44 sm:w-56"
-                  />
-                  {refillForecastSearch && (
-                    <button
-                      onClick={() => setRefillForecastSearch('')}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  )}
-                </div>
-
-                {/* Urgency Filter Pills */}
-                <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs">
-                  <button
-                    type="button"
-                    onClick={() => setRefillForecastUrgencyFilter('all')}
-                    className={cn(
-                      "px-2 py-1 rounded-md text-[11px] font-semibold transition-all",
-                      refillForecastUrgencyFilter === 'all'
-                        ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-xs"
-                        : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
-                    )}
-                  >
-                    All
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setRefillForecastUrgencyFilter('urgent')}
-                    className={cn(
-                      "px-2 py-1 rounded-md text-[11px] font-semibold transition-all flex items-center gap-1",
-                      refillForecastUrgencyFilter === 'urgent'
-                        ? "bg-rose-500 text-white shadow-xs"
-                        : "text-rose-600 dark:text-rose-400 hover:text-rose-700"
-                    )}
-                  >
-                    <span>🚨 Today</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setRefillForecastUrgencyFilter('tomorrow')}
-                    className={cn(
-                      "px-2 py-1 rounded-md text-[11px] font-semibold transition-all flex items-center gap-1",
-                      refillForecastUrgencyFilter === 'tomorrow'
-                        ? "bg-amber-500 text-white shadow-xs"
-                        : "text-amber-600 dark:text-amber-400 hover:text-amber-700"
-                    )}
-                  >
-                    <span>⚠️ Tomorrow</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setRefillForecastUrgencyFilter('safe')}
-                    className={cn(
-                      "px-2 py-1 rounded-md text-[11px] font-semibold transition-all",
-                      refillForecastUrgencyFilter === 'safe'
-                        ? "bg-white dark:bg-slate-900 text-emerald-700 dark:text-emerald-300 shadow-xs"
-                        : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
-                    )}
-                  >
-                    Safe
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Forecast Table List */}
-            <div className="overflow-y-auto flex-1 p-3 sm:p-5">
-              {displayedRefillForecast.length === 0 ? (
-                <div className="h-56 flex flex-col items-center justify-center text-slate-400 gap-2 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl">
-                  <Fuel className="h-8 w-8 text-slate-300 dark:text-slate-700" />
-                  <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                    No machine refill forecasts found matching this filter.
-                  </p>
-                  {(refillForecastSearch || refillForecastUrgencyFilter !== 'all') && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setRefillForecastSearch('');
-                        setRefillForecastUrgencyFilter('all');
-                      }}
-                      className="text-xs h-7 mt-1 font-semibold text-cyan-600"
-                    >
-                      Clear Filters
-                    </Button>
-                  )}
-                </div>
-              ) : (
-                <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-x-auto bg-white dark:bg-slate-900 shadow-xs">
-                  <Table className="min-w-[760px] w-full">
-                    <TableHeader className="bg-slate-50/80 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800">
-                      <TableRow>
-                        <TableHead className="text-[11px] font-bold uppercase tracking-wider text-slate-500 py-3">Site</TableHead>
-                        <TableHead className="text-[11px] font-bold uppercase tracking-wider text-slate-500 py-3">Machine / Unit</TableHead>
-                        <TableHead className="text-[11px] font-bold uppercase tracking-wider text-slate-500 py-3">Fuel Level & Remaining</TableHead>
-                        <TableHead className="text-[11px] font-bold uppercase tracking-wider text-slate-500 py-3">Rated Burn</TableHead>
-                        <TableHead className="text-[11px] font-bold uppercase tracking-wider text-slate-500 py-3">Last Refill Date</TableHead>
-                        <TableHead className="text-[11px] font-bold uppercase tracking-wider text-slate-500 py-3">Estimated Next Refill</TableHead>
-                        <TableHead className="text-[11px] font-bold uppercase tracking-wider text-slate-500 py-3 text-right">Action</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody className="divide-y divide-slate-100 dark:divide-slate-800/80 text-xs">
-                      {displayedRefillForecast.map(item => {
-                        const isCurrentSelectedSite = currentSite?.id === item.siteId;
-                        return (
-                          <TableRow 
-                            key={`${item.siteId}-${item.machineId}`}
-                            className={cn(
-                              "transition-colors hover:bg-slate-50/60 dark:hover:bg-slate-800/40",
-                              item.urgency === 'critical' || item.urgency === 'today' ? "bg-rose-50/25 dark:bg-rose-950/15" : ""
-                            )}
-                          >
-                            {/* Site Column */}
-                            <TableCell className="py-3 font-semibold text-slate-800 dark:text-slate-100">
-                              <div className="flex items-center gap-1.5">
-                                <span className="h-2 w-2 rounded-full bg-cyan-500 shrink-0" />
-                                <span className="truncate max-w-[160px] sm:max-w-[200px]" title={item.siteName}>
-                                  {item.siteName}
-                                </span>
-                              </div>
-                            </TableCell>
-
-                            {/* Machine Column */}
-                            <TableCell className="py-3">
-                              <div className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
-                                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
-                                <span>{item.shortName}</span>
-                              </div>
-                              <div className="text-[10px] text-slate-400 truncate max-w-[150px]" title={item.machineName}>
-                                {item.machineName}
-                              </div>
-                            </TableCell>
-
-                            {/* Fuel Level & Gauge Column */}
-                            <TableCell className="py-3 min-w-[180px]">
-                              <div className="space-y-1">
-                                <div className="flex items-center justify-between text-[11px]">
-                                  <span className="font-bold text-slate-800 dark:text-slate-200">
-                                    {item.estimatedRemainingLitres}L <span className="text-slate-400 font-normal">/ {item.tankCapacityLitres}L</span>
-                                  </span>
-                                  <span className={cn(
-                                    "font-bold text-[10px]",
-                                    item.fuelPercentage <= 15 
-                                      ? "text-rose-600 dark:text-rose-400" 
-                                      : item.fuelPercentage <= 35 
-                                      ? "text-amber-600 dark:text-amber-400" 
-                                      : "text-emerald-600 dark:text-emerald-400"
-                                  )}>
-                                    {item.fuelPercentage}%
-                                  </span>
-                                </div>
-                                <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                                  <div 
-                                    className={cn(
-                                      "h-full rounded-full transition-all duration-300",
-                                      item.fuelPercentage <= 15 
-                                        ? "bg-rose-500" 
-                                        : item.fuelPercentage <= 35 
-                                        ? "bg-amber-500" 
-                                        : "bg-emerald-500"
-                                    )}
-                                    style={{ width: `${Math.min(100, Math.max(3, item.fuelPercentage))}%` }}
-                                  />
-                                </div>
-                                <div className="flex items-center justify-between text-[10px] text-slate-400">
-                                  <span>
-                                    {item.isDipstickVerified ? '✓ Dipstick verified' : (item.lastRefillDate ? 'Refill calculated' : 'No anchor')}
-                                  </span>
-                                  <span>Runway: {item.runwayDays}d</span>
-                                </div>
-                              </div>
-                            </TableCell>
-
-                            {/* Benchmark Rate Column */}
-                            <TableCell className="py-3 text-slate-700 dark:text-slate-300">
-                              <div className="font-semibold">{item.benchmarkBurnRate} L/day</div>
-                              <div className="text-[10px] text-slate-400">Rated Benchmark</div>
-                            </TableCell>
-
-                            {/* Last Refill Date Column */}
-                            <TableCell className="py-3">
-                              {item.lastRefillDate ? (
-                                <div>
-                                  <div className="font-semibold text-slate-800 dark:text-slate-200 text-xs">
-                                    {formatLastRefilledDate(item.lastRefillDate)}
-                                  </div>
-                                  {item.lastRefillLitres > 0 && (
-                                    <div className="text-[10px] text-slate-400 mt-0.5">
-                                      {item.lastRefillLitres}L refilled
-                                    </div>
-                                  )}
-                                </div>
-                              ) : (
-                                <span className="text-xs text-slate-400 italic">No refill recorded</span>
-                              )}
-                            </TableCell>
-
-                            {/* Estimated Next Refill Date Column */}
-                            <TableCell className="py-3">
-                              <div className="font-bold text-slate-900 dark:text-white text-xs">
-                                {item.targetRefillFormatted}
-                              </div>
-                              <div className="mt-1 flex items-center gap-1">
-                                <span className={cn(
-                                  "text-[10px] font-bold px-2 py-0.5 rounded-md border inline-flex items-center gap-1 leading-tight",
-                                  item.urgencyBadgeClass
-                                )}>
-                                  {item.urgencyLabel}
-                                </span>
-                                {item.daysUntilRefill > 0 && (
-                                  <span className="text-[10px] text-slate-400">
-                                    (-1d safety buffer)
-                                  </span>
-                                )}
-                              </div>
-                            </TableCell>
-
-                            {/* Action Column */}
-                            <TableCell className="py-3 text-right">
-                              {isCurrentSelectedSite ? (
-                                <span className="inline-block text-[11px] font-semibold text-cyan-600 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-950/50 px-2 py-1 rounded-md border border-cyan-200 dark:border-cyan-800">
-                                  Current Site
-                                </span>
-                              ) : (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => {
-                                    setSelectedSiteId(item.siteId);
-                                    setIsRefillForecastModalOpen(false);
-                                  }}
-                                  className="h-7 text-xs px-2.5 font-semibold text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-cyan-50 hover:text-cyan-700 dark:hover:bg-cyan-950/40 dark:hover:text-cyan-300 transition-all"
-                                  title={`Switch view to ${item.siteName}`}
-                                >
-                                  <span>View Site</span>
-                                  <ArrowRight className="w-3 h-3 ml-1 text-slate-400" />
-                                </Button>
-                              )}
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </div>
-
-            {/* Modal Footer */}
-            <div className="p-3 sm:p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 flex items-center justify-end shrink-0">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setIsRefillForecastModalOpen(false)}
-                className="h-8 text-xs font-semibold px-4 rounded-lg"
-              >
-                Close
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
+      {renderRefillForecastModal()}
     </div>
   );
 }

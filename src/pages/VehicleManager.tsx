@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useDeferredValue, useCallback } from 'react';
 import { useOperations } from '../contexts/OperationsContext';
 import { useAppStore } from '../store/appStore';
 import { 
@@ -111,7 +111,9 @@ export function VehicleManager() {
     vehicleFuelLogs, addVehicleFuelLog, updateVehicleFuelLog, deleteVehicleFuelLog,
     dieselRefills
   } = useOperations();
-  const { sites, pendingSites, employees } = useAppStore();
+  const sites = useAppStore(s => s.sites);
+  const pendingSites = useAppStore(s => s.pendingSites);
+  const employees = useAppStore(s => s.employees);
   const ledgerEntries = useAppStore(s => s.ledgerEntries);
   const priv = usePriv('opsVehicles');
   
@@ -121,14 +123,6 @@ export function VehicleManager() {
   const [importType, setImportType] = useState<'vehicles' | 'logs'>('vehicles');
   const [importMode, setImportMode] = useState<'append' | 'replace'>('append');
   const [isImporting, setIsImporting] = useState(false);
-
-  useEffect(() => {
-    fetchOperationsData()
-      .then((data) => {
-        useAppStore.setState(data);
-      })
-      .catch(console.error);
-  }, []);
 
   // Ensure user is on a permitted tab
   useEffect(() => {
@@ -408,6 +402,25 @@ export function VehicleManager() {
   // ── Unified Logs State ──
   const [logsSubTab, setLogsSubTab] = useState<'all' | 'movement' | 'fuel'>('all');
   const [logsSearch, setLogsSearch] = useState('');
+  const deferredLogsSearch = useDeferredValue(logsSearch);
+  const [logsVehicleFilter, setLogsVehicleFilter] = useState<string>('all');
+  const [logsPage, setLogsPage] = useState(1);
+  const LOGS_PAGE_SIZE = 30;
+
+  const handleSetLogsSearch = useCallback((val: string) => {
+    setLogsSearch(val);
+    setLogsPage(1);
+  }, []);
+
+  const handleSetLogsVehicleFilter = useCallback((val: string) => {
+    setLogsVehicleFilter(val);
+    setLogsPage(1);
+  }, []);
+
+  const handleSetLogsSubTab = useCallback((val: 'all' | 'movement' | 'fuel') => {
+    setLogsSubTab(val);
+    setLogsPage(1);
+  }, []);
 
   // Synchronize sub-tab selection with permissions
   useEffect(() => {
@@ -424,11 +437,19 @@ export function VehicleManager() {
   // ── Fuel Log State ──
   const fmtCurrency = (n: number) => `₦${n.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-  const getVehicleName = (reg?: string) => {
+  const vehicleNameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    vehicles.forEach(v => {
+      if (v.id) map.set(v.id, v.name);
+      if (v.registration_number) map.set(v.registration_number, v.name);
+    });
+    return map;
+  }, [vehicles]);
+
+  const getVehicleName = useCallback((reg?: string) => {
     if (!reg) return '';
-    const v = vehicles.find(x => x.registration_number === reg || x.id === reg);
-    return v ? v.name : reg;
-  };
+    return vehicleNameMap.get(reg) || reg;
+  }, [vehicleNameMap]);
 
   const [showFuelForm, setShowFuelForm] = useState(false);
   const [editingFuelLog, setEditingFuelLog] = useState<VehicleFuelLog | null>(null);
@@ -738,6 +759,15 @@ export function VehicleManager() {
     notes: string;
   }[]>([]);
 
+  const cleanVehicles = useMemo(() => {
+    return vehicles.map(v => ({
+      vehicle: v,
+      regClean: v.registration_number ? v.registration_number.toLowerCase().replace(/[^a-z0-9]/g, '') : '',
+      nameClean: v.name ? v.name.toLowerCase().replace(/[^a-z0-9]/g, '') : '',
+      nameLower: v.name ? v.name.toLowerCase() : '',
+    }));
+  }, [vehicles]);
+
   // Generate parsed backlog candidates from eligible ledger entries
   const fuelBacklogCandidates = useMemo(() => {
     const seenIds = new Set<string>();
@@ -779,14 +809,12 @@ export function VehicleManager() {
         // 2. Filter out general diesel refills (unless a specific fleet vehicle is matched)
         if (excludeDieselKeywords) {
           if (desc.includes('diesel')) {
-            const matchesFleetVehicle = vehicles.some(v => {
-              const regClean = v.registration_number ? v.registration_number.toLowerCase().replace(/[^a-z0-9]/g, '') : '';
-              const nameClean = v.name ? v.name.toLowerCase().replace(/[^a-z0-9]/g, '') : '';
-              const descClean = desc.replace(/[^a-z0-9]/g, '');
-              const regMatch = Boolean(regClean && descClean.includes(regClean));
+            const descClean = desc.replace(/[^a-z0-9]/g, '');
+            const matchesFleetVehicle = cleanVehicles.some(cv => {
+              const regMatch = Boolean(cv.regClean && descClean.includes(cv.regClean));
               const nameMatch = Boolean(
-                (v.name && v.name.length > 2 && desc.includes(v.name.toLowerCase())) ||
-                (nameClean && nameClean.length >= 3 && descClean.includes(nameClean))
+                (cv.nameLower.length > 2 && desc.includes(cv.nameLower)) ||
+                (cv.nameClean.length >= 3 && descClean.includes(cv.nameClean))
               );
               return regMatch || nameMatch;
             });
@@ -812,20 +840,16 @@ export function VehicleManager() {
         const bestDate = vDate || entry.date || new Date().toISOString().split('T')[0];
 
         // Match fleet vehicles (e.g. L200, L-200, Sienna, Tundra, Hilux, etc.)
+        const descClean = desc.replace(/[^a-z0-9]/g, '');
         const matchedVehicles: Vehicle[] = [];
-        vehicles.forEach(v => {
-          const regClean = v.registration_number ? v.registration_number.toLowerCase().replace(/[^a-z0-9]/g, '') : '';
-          const nameClean = v.name ? v.name.toLowerCase().replace(/[^a-z0-9]/g, '') : '';
-          const descClean = desc.replace(/[^a-z0-9]/g, '');
-          const regMatch = Boolean(regClean && descClean.includes(regClean));
+        cleanVehicles.forEach(cv => {
+          const regMatch = Boolean(cv.regClean && descClean.includes(cv.regClean));
           const nameMatch = Boolean(
-            (v.name && v.name.length > 2 && desc.includes(v.name.toLowerCase())) ||
-            (nameClean && nameClean.length >= 3 && descClean.includes(nameClean))
+            (cv.nameLower.length > 2 && desc.includes(cv.nameLower)) ||
+            (cv.nameClean.length >= 3 && descClean.includes(cv.nameClean))
           );
           if (regMatch || nameMatch) {
-            if (!matchedVehicles.some(m => m.id === v.id)) {
-              matchedVehicles.push(v);
-            }
+            matchedVehicles.push(cv.vehicle);
           }
         });
 
@@ -893,7 +917,7 @@ export function VehicleManager() {
           notes: effectiveNotes,
         };
       });
-  }, [eligibleLedgerEntries, ledgerRemainingAmounts, vehicles, candidateOverrides, excludeJettingAndMachinery, excludeDieselKeywords, customExcludePhrases, backlogDefaultRate]);
+  }, [eligibleLedgerEntries, ledgerRemainingAmounts, cleanVehicles, candidateOverrides, excludeJettingAndMachinery, excludeDieselKeywords, customExcludePhrases, backlogDefaultRate]);
 
   const handleAddExcludePhrase = () => {
     const p = excludePhraseInput.trim();
@@ -1583,18 +1607,18 @@ export function VehicleManager() {
     return Array.from(weeks).sort((a, b) => a - b);
   };
 
-  const filteredFuelLogs = vehicleFuelLogs.filter(f => {
+  const filteredFuelLogs = useMemo(() => vehicleFuelLogs.filter(f => {
     const d = new Date(f.date);
     if (d.getFullYear() !== fuelFilterYear) return false;
     if (fuelFilterMonth !== null && d.getMonth() !== fuelFilterMonth) return false;
     if (fuelFilterWeek !== null && getISOWeek(d) !== fuelFilterWeek) return false;
     if (fuelFilterVehicle !== '' && f.vehicle_id !== fuelFilterVehicle) return false;
     return true;
-  });
+  }), [vehicleFuelLogs, fuelFilterYear, fuelFilterMonth, fuelFilterWeek, fuelFilterVehicle]);
 
   const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
-  const monthlyData = MONTH_NAMES.map((name, i) => {
+  const monthlyData = useMemo(() => MONTH_NAMES.map((name, i) => {
     const logs = vehicleFuelLogs.filter(f => {
       const d = new Date(f.date);
       if (d.getFullYear() !== fuelFilterYear || d.getMonth() !== i) return false;
@@ -1629,9 +1653,10 @@ export function VehicleManager() {
       ...costBreakdown,
       ...rateBreakdown
     };
-  });
+  }), [vehicleFuelLogs, fuelFilterYear, fuelFilterVehicle, vehicles]);
 
-  const weeklyData = fuelFilterMonth !== null ? (() => {
+  const weeklyData = useMemo(() => {
+    if (fuelFilterMonth === null) return [];
     const weeks = getWeeksInMonth(fuelFilterYear, fuelFilterMonth);
     return weeks.map(w => {
       const logs = vehicleFuelLogs.filter(f => {
@@ -1669,11 +1694,13 @@ export function VehicleManager() {
         ...rateBreakdown
       };
     });
-  })() : [];
+  }, [fuelFilterMonth, fuelFilterYear, vehicleFuelLogs, fuelFilterVehicle, vehicles]);
 
-  const chartData = fuelFilterMonth !== null
-    ? weeklyData.map(w => ({ ...w, label: w.label, rate: w.litres > 0 ? w.cost / w.litres : 0 }))
-    : monthlyData.map(m => ({ ...m, label: m.name, rate: m.litres > 0 ? m.cost / m.litres : 0 }));
+  const chartData = useMemo(() => {
+    return fuelFilterMonth !== null
+      ? weeklyData.map(w => ({ ...w, label: w.label, rate: w.litres > 0 ? w.cost / w.litres : 0 }))
+      : monthlyData.map(m => ({ ...m, label: m.name, rate: m.litres > 0 ? m.cost / m.litres : 0 }));
+  }, [fuelFilterMonth, weeklyData, monthlyData]);
 
   const maxLitres = Math.max(...chartData.map(d => d.litres), 1);
   const maxCost = Math.max(...chartData.map(d => d.cost), 1);
@@ -1687,20 +1714,22 @@ export function VehicleManager() {
   const topVehicleName = topVehicle !== '—' ? getVehicleName(topVehicle) : '—';
   const activeVehicleNames = Array.from(new Set(filteredFuelLogs.map(f => getVehicleName(f.vehicle_reg))));
 
-  const topVehiclesData = Object.entries(vehicleFuelCount)
-    .map(([reg, litres]) => {
-      const cost = filteredFuelLogs.filter(f => f.vehicle_reg === reg).reduce((s, f) => s + f.total_cost, 0);
-      return { reg, litres, cost };
-    })
-    .sort((a, b) => b.cost - a.cost)
-    .slice(0, 5);
+  const topVehiclesData = useMemo(() => {
+    return Object.entries(vehicleFuelCount)
+      .map(([reg, litres]) => {
+        const cost = filteredFuelLogs.filter(f => f.vehicle_reg === reg).reduce((s, f) => s + f.total_cost, 0);
+        return { reg, litres, cost };
+      })
+      .sort((a, b) => b.cost - a.cost)
+      .slice(0, 5);
+  }, [vehicleFuelCount, filteredFuelLogs]);
   const maxTopVehicleCost = Math.max(...topVehiclesData.map(v => v.cost), 1);
 
   const fuelYears = Array.from(new Set([new Date().getFullYear(), ...vehicleFuelLogs.map(f => new Date(f.date).getFullYear())])).sort((a, b) => b - a);
   const weeksInSelectedMonth = fuelFilterMonth !== null ? getWeeksInMonth(fuelFilterYear, fuelFilterMonth) : [];
 
   // Fuel Efficiency Helper
-  const getFuelEfficiency = () => {
+  const efficiency = useMemo(() => {
     if (fuelFilterVehicle === '') return null;
     const vehicleLogs = vehicleFuelLogs
       .filter(f => f.vehicle_id === fuelFilterVehicle && f.odometer !== undefined && f.odometer !== null && Number(f.odometer) > 0)
@@ -1725,10 +1754,9 @@ export function VehicleManager() {
       kmPerLitre,
       lPer100km
     };
-  };
-  const efficiency = getFuelEfficiency();
+  }, [fuelFilterVehicle, vehicleFuelLogs]);
 
-  const getFleetEfficiency = () => {
+  const fleetEfficiency = useMemo(() => {
     let totalDistance = 0;
     let totalLitres = 0;
 
@@ -1754,11 +1782,10 @@ export function VehicleManager() {
       kmPerLitre: totalDistance / totalLitres,
       lPer100km: (totalLitres / totalDistance) * 100
     };
-  };
-  const fleetEfficiency = getFleetEfficiency();
+  }, [vehicleFuelLogs]);
 
   // Combined activity log data
-  const combinedLogs = [
+  const combinedLogs = useMemo(() => [
     ...vehicleTrips.map(t => ({
       id: t.id,
       type: 'trip' as const,
@@ -1777,35 +1804,65 @@ export function VehicleManager() {
       person: f.filled_by || '—',
       details: f,
     }))
-  ].sort((a, b) => b.date.getTime() - a.date.getTime());
+  ].sort((a, b) => b.date.getTime() - a.date.getTime()), [vehicleTrips, vehicleFuelLogs]);
 
-  const filteredCombinedLogs = combinedLogs.filter(log => {
-    // 1. Filter by user permission
-    if (log.type === 'fuel' && !priv.canViewFuel) return false;
-    if (log.type === 'trip' && !priv.canViewLogs) return false;
+  const filteredCombinedLogs = useMemo(() => {
+    const q = deferredLogsSearch.trim().toLowerCase();
+    return combinedLogs.filter(log => {
+      // 1. Filter by user permission
+      if (log.type === 'fuel' && !priv.canViewFuel) return false;
+      if (log.type === 'trip' && !priv.canViewLogs) return false;
 
-    // 2. Filter by sub-tab type
-    if (logsSubTab === 'movement' && log.type !== 'trip') return false;
-    if (logsSubTab === 'fuel' && log.type !== 'fuel') return false;
+      // 2. Filter by sub-tab type
+      if (logsSubTab === 'movement' && log.type !== 'trip') return false;
+      if (logsSubTab === 'fuel' && log.type !== 'fuel') return false;
 
-    // 2. Filter by search query
-    if (logsSearch.trim() !== '') {
-      const q = logsSearch.toLowerCase();
-      const matchVehicle = log.vehicleReg.toLowerCase().includes(q);
-      const matchPerson = log.person.toLowerCase().includes(q);
-      
-      if (log.type === 'trip') {
-        const matchSite = log.details.site_name.toLowerCase().includes(q);
-        const matchPurpose = log.details.purpose.toLowerCase().includes(q);
-        const matchRemark = (log.details.remark || '').toLowerCase().includes(q);
-        return matchVehicle || matchPerson || matchSite || matchPurpose || matchRemark;
-      } else {
-        const matchNotes = (log.details.notes || '').toLowerCase().includes(q);
-        return matchVehicle || matchPerson || matchNotes;
+      // 3. Filter by vehicle dropdown
+      if (logsVehicleFilter !== 'all') {
+        const vMatch = log.vehicleReg === logsVehicleFilter || 
+          vehicles.some(v => (v.id === logsVehicleFilter || v.registration_number === logsVehicleFilter) && (v.registration_number === log.vehicleReg || v.id === log.vehicleReg));
+        if (!vMatch) return false;
+      }
+
+      // 4. Filter by search query (including vehicle model/name e.g. Sienna)
+      if (q !== '') {
+        const vName = getVehicleName(log.vehicleReg).toLowerCase();
+        const matchVehicle = log.vehicleReg.toLowerCase().includes(q) || vName.includes(q);
+        const matchPerson = log.person.toLowerCase().includes(q);
+        
+        if (log.type === 'trip') {
+          const matchSite = (log.details.site_name || '').toLowerCase().includes(q);
+          const matchPurpose = (log.details.purpose || '').toLowerCase().includes(q);
+          const matchRemark = (log.details.remark || '').toLowerCase().includes(q);
+          return matchVehicle || matchPerson || matchSite || matchPurpose || matchRemark;
+        } else {
+          const matchNotes = (log.details.notes || '').toLowerCase().includes(q);
+          return matchVehicle || matchPerson || matchNotes;
+        }
+      }
+      return true;
+    });
+  }, [combinedLogs, priv.canViewFuel, priv.canViewLogs, logsSubTab, logsVehicleFilter, deferredLogsSearch, vehicles]);
+
+  const totalLogsCount = filteredCombinedLogs.length;
+  const totalLogsPages = Math.max(1, Math.ceil(totalLogsCount / LOGS_PAGE_SIZE));
+  const paginatedLogs = useMemo(() => {
+    const startIndex = (logsPage - 1) * LOGS_PAGE_SIZE;
+    return filteredCombinedLogs.slice(startIndex, startIndex + LOGS_PAGE_SIZE);
+  }, [filteredCombinedLogs, logsPage]);
+
+  const filteredFuelMetrics = useMemo(() => {
+    let totalLitres = 0;
+    let totalCost = 0;
+    for (const log of filteredCombinedLogs) {
+      if (log.type === 'fuel') {
+        const fl = log.details as VehicleFuelLog;
+        totalLitres += Number(fl.litres) || 0;
+        totalCost += Number(fl.total_cost) || 0;
       }
     }
-    return true;
-  });
+    return { totalLitres, totalCost };
+  }, [filteredCombinedLogs]);
 
 
   // 1. Vehicle Form State
@@ -1826,93 +1883,95 @@ export function VehicleManager() {
     ] as any[]
   });
 
-  const allSites = [
+  const allSites = useMemo(() => [
     ...sites.map(s => ({ id: s.id, name: s.name, type: 'active' })),
     ...pendingSites.map(s => ({ id: s.id, name: s.siteName, type: 'pending' }))
-  ];
+  ], [sites, pendingSites]);
 
-  useSetPageTitle(
-    activeTab === 'fuel' ? 'Fuel Analytics' : 'Vehicle Management',
-    activeTab === 'fuel'
-      ? 'Fuel consumption & cost trends across your fleet'
-      : 'Manage company fleet and track daily movement logs',
-    activeTab === 'fuel' ? (
-      <div className="flex items-center gap-2">
-        <select
-          className="h-8 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 py-1 text-xs font-medium text-slate-700 dark:text-slate-200"
-          value={fuelFilterVehicle}
-          onChange={e => setFuelFilterVehicle(e.target.value)}
-        >
-          <option value="">All Vehicles</option>
-          {vehicles.map(v => <option key={v.id} value={v.id}>{v.name} ({v.registration_number})</option>)}
-        </select>
-        <select
-          className="h-8 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 py-1 text-xs font-medium text-slate-700 dark:text-slate-200"
-          value={fuelFilterYear}
-          onChange={e => { setFuelFilterYear(Number(e.target.value)); setFuelFilterMonth(null); setFuelFilterWeek(null); }}
-        >
-          {fuelYears.map(y => <option key={y} value={y}>{y}</option>)}
-        </select>
-        <select
-          className="h-8 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 py-1 text-xs font-medium text-slate-700 dark:text-slate-200"
-          value={fuelFilterMonth ?? ''}
-          onChange={e => { setFuelFilterMonth(e.target.value === '' ? null : Number(e.target.value)); setFuelFilterWeek(null); }}
-        >
-          <option value="">All Months</option>
-          {MONTH_NAMES.map((m, i) => <option key={i} value={i}>{m}</option>)}
-        </select>
-        {fuelFilterMonth !== null && (
+  const handleBackToLogs = useCallback(() => setActiveTab('logs'), []);
+
+  const headerButtons = useMemo(() => {
+    if (activeTab === 'fuel') {
+      return (
+        <div className="flex items-center gap-2">
           <select
-            className="h-8 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950 dark:border-amber-700 px-2 py-1 text-xs font-medium text-amber-700"
-            value={fuelFilterWeek ?? ''}
-            onChange={e => setFuelFilterWeek(e.target.value === '' ? null : Number(e.target.value))}
+            className="h-8 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 py-1 text-xs font-medium text-slate-700 dark:text-slate-200"
+            value={fuelFilterVehicle}
+            onChange={e => setFuelFilterVehicle(e.target.value)}
           >
-            <option value="">All Weeks</option>
-            {weeksInSelectedMonth.map(w => <option key={w} value={w}>Week {w}</option>)}
+            <option value="">All Vehicles</option>
+            {vehicles.map(v => <option key={v.id} value={v.id}>{v.name} ({v.registration_number})</option>)}
           </select>
-        )}
-        {(fuelFilterMonth !== null || fuelFilterWeek !== null || fuelFilterVehicle !== '') && (
-          <Button
-            variant="ghost" size="sm"
-            className="h-8 px-2 text-xs text-slate-400 hover:text-slate-600"
-            onClick={() => { setFuelFilterMonth(null); setFuelFilterWeek(null); setFuelFilterVehicle(''); }}
+          <select
+            className="h-8 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 py-1 text-xs font-medium text-slate-700 dark:text-slate-200"
+            value={fuelFilterYear}
+            onChange={e => { setFuelFilterYear(Number(e.target.value)); setFuelFilterMonth(null); setFuelFilterWeek(null); }}
           >
-            Reset
-          </Button>
-        )}
-        {priv.canAddFuel && (
-          <div className="flex items-center gap-1.5">
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 px-2.5 text-xs font-bold gap-1 text-amber-700 bg-amber-50/50 hover:bg-amber-100 border-amber-200 dark:border-amber-800 dark:bg-amber-950/20 dark:text-amber-300"
-              onClick={() => setShowBacklogModal(true)}
-              title="Import unlogged fuel from ledger"
+            {fuelYears.map(y => <option key={y} value={y}>{y}</option>)}
+          </select>
+          <select
+            className="h-8 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 py-1 text-xs font-medium text-slate-700 dark:text-slate-200"
+            value={fuelFilterMonth ?? ''}
+            onChange={e => { setFuelFilterMonth(e.target.value === '' ? null : Number(e.target.value)); setFuelFilterWeek(null); }}
+          >
+            <option value="">All Months</option>
+            {MONTH_NAMES.map((m, i) => <option key={i} value={i}>{m}</option>)}
+          </select>
+          {fuelFilterMonth !== null && (
+            <select
+              className="h-8 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950 dark:border-amber-700 px-2 py-1 text-xs font-medium text-amber-700"
+              value={fuelFilterWeek ?? ''}
+              onChange={e => setFuelFilterWeek(e.target.value === '' ? null : Number(e.target.value))}
             >
-              <Sparkles className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
-              <span>Import Ledger</span>
-              {fuelBacklogCandidates.length > 0 && (
-                <span className="px-1.5 py-0.2 rounded-full bg-amber-500 text-white text-[9px] font-black">
-                  {fuelBacklogCandidates.length}
-                </span>
-              )}
-            </Button>
+              <option value="">All Weeks</option>
+              {weeksInSelectedMonth.map(w => <option key={w} value={w}>Week {w}</option>)}
+            </select>
+          )}
+          {(fuelFilterMonth !== null || fuelFilterWeek !== null || fuelFilterVehicle !== '') && (
             <Button
-              size="sm"
-              className="h-8 w-8 p-0 bg-amber-500 hover:bg-amber-600 text-white"
-              onClick={() => {
-                setEditingFuelLog(null);
-                setFuelForm({ vehicle_id: '', vehicle_reg: '', date: new Date().toISOString().split('T')[0], rate_per_litre: '', litres: '', total_cost: '', odometer: '', filled_by: '', notes: '', linkedLedgerIds: [], linkedLedgerAmounts: {}, lastComputed: '' });
-                setShowFuelForm(true);
-              }}
-              title="Log Fuel"
+              variant="ghost" size="sm"
+              className="h-8 px-2 text-xs text-slate-400 hover:text-slate-600"
+              onClick={() => { setFuelFilterMonth(null); setFuelFilterWeek(null); setFuelFilterVehicle(''); }}
             >
-              <Fuel className="h-3.5 w-3.5" />
+              Reset
             </Button>
-          </div>
-        )}
-      </div>
-    ) : (
+          )}
+          {priv.canAddFuel && (
+            <div className="flex items-center gap-1.5">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 px-2.5 text-xs font-bold gap-1 text-amber-700 bg-amber-50/50 hover:bg-amber-100 border-amber-200 dark:border-amber-800 dark:bg-amber-950/20 dark:text-amber-300"
+                onClick={() => setShowBacklogModal(true)}
+                title="Import unlogged fuel from ledger"
+              >
+                <Sparkles className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                <span>Import Ledger</span>
+                {fuelBacklogCandidates.length > 0 && (
+                  <span className="px-1.5 py-0.2 rounded-full bg-amber-500 text-white text-[9px] font-black">
+                    {fuelBacklogCandidates.length}
+                  </span>
+                )}
+              </Button>
+              <Button
+                size="sm"
+                className="h-8 w-8 p-0 bg-amber-500 hover:bg-amber-600 text-white"
+                onClick={() => {
+                  setEditingFuelLog(null);
+                  setFuelForm({ vehicle_id: '', vehicle_reg: '', date: new Date().toISOString().split('T')[0], rate_per_litre: '', litres: '', total_cost: '', odometer: '', filled_by: '', notes: '', linkedLedgerIds: [], linkedLedgerAmounts: {}, lastComputed: '' });
+                  setShowFuelForm(true);
+                }}
+                title="Log Fuel"
+              >
+                <Fuel className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    return (
       <div className="flex items-center gap-2 md:gap-3">
         {priv.canImport && (
           <Button
@@ -2012,9 +2071,29 @@ export function VehicleManager() {
           </Button>
         )}
       </div>
-    ),
-    [activeTab, fuelFilterVehicle, fuelFilterYear, fuelFilterMonth, fuelFilterWeek],
-    activeTab === 'fuel' ? () => setActiveTab('logs') : false
+    );
+  }, [
+    activeTab,
+    fuelFilterVehicle,
+    fuelFilterYear,
+    fuelFilterMonth,
+    fuelFilterWeek,
+    vehicles,
+    fuelYears,
+    MONTH_NAMES,
+    weeksInSelectedMonth,
+    priv,
+    fuelBacklogCandidates.length
+  ]);
+
+  useSetPageTitle(
+    activeTab === 'fuel' ? 'Fuel Analytics' : 'Vehicle Management',
+    activeTab === 'fuel'
+      ? 'Fuel consumption & cost trends across your fleet'
+      : 'Manage company fleet and track daily movement logs',
+    headerButtons,
+    [activeTab, headerButtons],
+    activeTab === 'fuel' ? handleBackToLogs : false
   );
 
   const handleSaveVehicle = () => {
@@ -2228,27 +2307,44 @@ export function VehicleManager() {
     setShowTripForm(true);
   };
 
-  const filteredVehicles = vehicles.filter(v => 
+  const filteredVehicles = useMemo(() => vehicles.filter(v => 
     v.name.toLowerCase().includes(search.toLowerCase()) || 
     v.registration_number.toLowerCase().includes(search.toLowerCase())
-  );
+  ), [vehicles, search]);
 
-  const sortedTrips = [...vehicleTrips].sort((a, b) => 
+  const sortedTrips = useMemo(() => [...vehicleTrips].sort((a, b) => 
     new Date(b.departure_time).getTime() - new Date(a.departure_time).getTime()
-  );
+  ), [vehicleTrips]);
 
   // Calendar Helper Functions
-  const calendarDays = () => {
+  const calendarDays = useMemo(() => {
     const start = startOfWeek(startOfMonth(currentMonth));
     const end = endOfWeek(endOfMonth(currentMonth));
-    const days = [];
+    const days: Date[] = [];
     let day = start;
     while (day <= end) {
       days.push(day);
       day = addDays(day, 1);
     }
     return days;
-  };
+  }, [currentMonth]);
+
+  const tripsByDateMap = useMemo(() => {
+    const map = new Map<string, VehicleTripLeg[]>();
+    for (const t of vehicleTrips) {
+      if (logsVehicleFilter !== 'all') {
+        const matchesVehicle = t.vehicle_reg === logsVehicleFilter || 
+          vehicles.some(v => (v.id === logsVehicleFilter || v.registration_number === logsVehicleFilter) && (v.registration_number === t.vehicle_reg || v.id === t.vehicle_reg));
+        if (!matchesVehicle) continue;
+      }
+      const dateKey = t.departure_time ? t.departure_time.split('T')[0] : '';
+      if (!dateKey) continue;
+      const list = map.get(dateKey);
+      if (list) list.push(t);
+      else map.set(dateKey, [t]);
+    }
+    return map;
+  }, [vehicleTrips, logsVehicleFilter, vehicles]);
 
   return (
     <>
@@ -4553,7 +4649,7 @@ export function VehicleManager() {
                   variant={logsSubTab === 'all' ? 'secondary' : 'ghost'}
                   size="sm"
                   className="h-8 text-[11px] font-bold uppercase tracking-wider px-3"
-                  onClick={() => setLogsSubTab('all')}
+                  onClick={() => handleSetLogsSubTab('all')}
                 >
                   <History className="h-3.5 w-3.5 mr-1" /> All Activity
                 </Button>
@@ -4561,7 +4657,7 @@ export function VehicleManager() {
                   variant={logsSubTab === 'movement' ? 'secondary' : 'ghost'}
                   size="sm"
                   className="h-8 text-[11px] font-bold uppercase tracking-wider px-3"
-                  onClick={() => setLogsSubTab('movement')}
+                  onClick={() => handleSetLogsSubTab('movement')}
                 >
                   <MapPin className="h-3.5 w-3.5 mr-1 text-blue-500" /> Movements
                 </Button>
@@ -4569,7 +4665,7 @@ export function VehicleManager() {
                   variant={logsSubTab === 'fuel' ? 'secondary' : 'ghost'}
                   size="sm"
                   className="h-8 text-[11px] font-bold uppercase tracking-wider px-3"
-                  onClick={() => setLogsSubTab('fuel')}
+                  onClick={() => handleSetLogsSubTab('fuel')}
                 >
                   <Fuel className="h-3.5 w-3.5 mr-1 text-amber-500" /> Fuel Logs
                 </Button>
@@ -4600,7 +4696,7 @@ export function VehicleManager() {
           {/* Render Calendar View for Movement Logs */}
           {logsSubTab !== 'fuel' && viewMode === 'calendar' ? (
             <Card className="border-none shadow-sm bg-white dark:bg-slate-900 overflow-hidden">
-              <div className="p-4 bg-slate-50 dark:bg-slate-800/50 border-b dark:border-slate-800 flex items-center justify-between">
+              <div className="p-4 bg-slate-50 dark:bg-slate-800/50 border-b dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3">
                 <div className="flex items-center gap-4">
                   <h4 className="font-bold text-sm text-slate-700 dark:text-slate-200">{format(currentMonth, 'MMMM yyyy')}</h4>
                   <div className="flex items-center gap-1">
@@ -4615,11 +4711,35 @@ export function VehicleManager() {
                     </Button>
                   </div>
                 </div>
-                <div className="flex gap-4">
-                   <div className="flex items-center gap-2">
-                     <div className="h-2 w-2 rounded-full bg-blue-500"></div>
-                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Site Visit</span>
-                   </div>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <select
+                    className="h-8 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 py-1 text-xs font-medium text-slate-700 dark:text-slate-200 shadow-xs focus:outline-hidden focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                    value={logsVehicleFilter}
+                    onChange={e => handleSetLogsVehicleFilter(e.target.value)}
+                  >
+                    <option value="all">All Vehicles ({vehicles.length})</option>
+                    {vehicles.map(v => (
+                      <option key={v.id} value={v.registration_number || v.id}>
+                        {v.name} ({v.registration_number})
+                      </option>
+                    ))}
+                  </select>
+                  {priv.canViewFuel && logsVehicleFilter !== 'all' && filteredFuelMetrics.totalLitres > 0 && (
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <Badge variant="outline" className="h-6 px-2 text-[10px] font-bold bg-amber-50 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300 border-amber-300 dark:border-amber-700/60 gap-1 shadow-2xs">
+                        <Fuel className="h-3 w-3 text-amber-600 dark:text-amber-400" />
+                        <span>{filteredFuelMetrics.totalLitres.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 2 })} L</span>
+                      </Badge>
+                      <Badge variant="outline" className="h-6 px-2 text-[10px] font-bold bg-emerald-50 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700/60 gap-1 shadow-2xs">
+                        <Receipt className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+                        <span>₦{filteredFuelMetrics.totalCost.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
+                      </Badge>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2">
+                    <div className="h-2 w-2 rounded-full bg-blue-500"></div>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Site Visit</span>
+                  </div>
                 </div>
               </div>
 
@@ -4632,8 +4752,9 @@ export function VehicleManager() {
               </div>
 
               <div className="grid grid-cols-7 auto-rows-[120px]">
-                {calendarDays().map((day, idx) => {
-                  const dayTrips = vehicleTrips.filter(t => isSameDay(new Date(t.departure_time), day));
+                {calendarDays.map((day, idx) => {
+                  const dateKey = format(day, 'yyyy-MM-dd');
+                  const dayTrips = tripsByDateMap.get(dateKey) || [];
                   const isCurrentMonth = isSameMonth(day, currentMonth);
                   const isToday = isSameDay(day, new Date());
 
@@ -4679,22 +4800,77 @@ export function VehicleManager() {
           ) : (
             /* Unified Desktop and Mobile Activity Feed */
             <Card className="border-none shadow-sm overflow-hidden bg-white dark:bg-slate-900">
-              <div className="p-4 bg-slate-50/50 dark:bg-slate-800/30 flex flex-col sm:flex-row gap-4 justify-between items-center border-b dark:border-slate-800">
-                <h3 className="font-bold text-slate-700 dark:text-slate-200 text-sm flex items-center gap-2">
-                  <History className="h-4 w-4 text-blue-500" /> 
-                  {logsSubTab === 'all' && 'All Activity Logs'}
-                  {logsSubTab === 'movement' && 'Movement Logs'}
-                  {logsSubTab === 'fuel' && 'Fuel Logs'}
-                  <span className="ml-1 text-[10px] font-normal text-slate-400">({filteredCombinedLogs.length} entries)</span>
-                </h3>
-                <div className="relative w-full sm:w-64">
-                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-                  <Input 
-                    placeholder="Search logs by vehicle, person, site..." 
-                    className="pl-9 h-9 text-sm" 
-                    value={logsSearch} 
-                    onChange={e => setLogsSearch(e.target.value)} 
-                  />
+              <div className="p-4 bg-slate-50/50 dark:bg-slate-800/30 flex flex-col sm:flex-row gap-3 justify-between items-stretch sm:items-center border-b dark:border-slate-800">
+                <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                  <h3 className="font-bold text-slate-700 dark:text-slate-200 text-sm flex items-center gap-2">
+                    <History className="h-4 w-4 text-blue-500 shrink-0" /> 
+                    <span>
+                      {logsSubTab === 'all' && 'All Activity Logs'}
+                      {logsSubTab === 'movement' && 'Movement Logs'}
+                      {logsSubTab === 'fuel' && 'Fuel Logs'}
+                    </span>
+                    <span className="ml-1 text-[10px] font-normal text-slate-400">({filteredCombinedLogs.length} entries)</span>
+                  </h3>
+
+                  {priv.canViewFuel && logsSubTab !== 'movement' && (filteredFuelMetrics.totalLitres > 0 || logsVehicleFilter !== 'all') && (
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <Badge variant="outline" className="h-6 px-2.5 text-[11px] font-bold bg-amber-50 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300 border-amber-300 dark:border-amber-700/60 gap-1 shadow-2xs">
+                        <Fuel className="h-3 w-3 text-amber-600 dark:text-amber-400" />
+                        <span>{filteredFuelMetrics.totalLitres.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 2 })} L</span>
+                      </Badge>
+                      <Badge variant="outline" className="h-6 px-2.5 text-[11px] font-bold bg-emerald-50 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700/60 gap-1 shadow-2xs">
+                        <Receipt className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+                        <span>₦{filteredFuelMetrics.totalCost.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
+                      </Badge>
+                    </div>
+                  )}
+                </div>
+                <div className="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto">
+                  <select
+                    className="h-9 w-full sm:w-52 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-200 shadow-xs focus:outline-hidden focus:ring-1 focus:ring-blue-500 cursor-pointer shrink-0"
+                    value={logsVehicleFilter}
+                    onChange={e => handleSetLogsVehicleFilter(e.target.value)}
+                    aria-label="Filter by vehicle"
+                  >
+                    <option value="all">All Vehicles ({vehicles.length})</option>
+                    {vehicles.map(v => (
+                      <option key={v.id} value={v.registration_number || v.id}>
+                        {v.name} ({v.registration_number})
+                      </option>
+                    ))}
+                  </select>
+                  <div className="relative w-full sm:w-64">
+                    <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                    <Input 
+                      placeholder="Search logs by vehicle, person, site..." 
+                      className="pl-9 pr-8 h-9 text-sm" 
+                      value={logsSearch} 
+                      onChange={e => handleSetLogsSearch(e.target.value)} 
+                    />
+                    {logsSearch && (
+                      <button
+                        onClick={() => handleSetLogsSearch('')}
+                        className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                        title="Clear search"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                  {(logsVehicleFilter !== 'all' || logsSearch) && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-9 px-2 text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 shrink-0"
+                      onClick={() => {
+                        handleSetLogsVehicleFilter('all');
+                        handleSetLogsSearch('');
+                      }}
+                      title="Reset filters"
+                    >
+                      Reset
+                    </Button>
+                  )}
                 </div>
               </div>
               
@@ -4716,7 +4892,7 @@ export function VehicleManager() {
                         <td colSpan={6} className="px-6 py-10 text-center text-slate-400 text-sm italic">No records found</td>
                       </tr>
                     ) : (
-                      filteredCombinedLogs.map(log => {
+                      paginatedLogs.map(log => {
                         if (log.type === 'trip') {
                           const trip = log.details;
                           return (
@@ -4886,7 +5062,7 @@ export function VehicleManager() {
                 {filteredCombinedLogs.length === 0 ? (
                   <div className="px-6 py-10 text-center text-slate-400 text-sm italic">No records found</div>
                 ) : (
-                  filteredCombinedLogs.map(log => {
+                  paginatedLogs.map(log => {
                     if (log.type === 'trip') {
                       const trip = log.details;
                       return (
@@ -5022,6 +5198,42 @@ export function VehicleManager() {
                   })
                 )}
               </div>
+
+              {/* Pagination Bar */}
+              {totalLogsCount > 0 && (
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-6 py-3 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 text-xs text-slate-500">
+                  <div className="font-medium">
+                    Showing <span className="font-bold text-slate-700 dark:text-slate-200">{((logsPage - 1) * LOGS_PAGE_SIZE) + 1}</span> to{' '}
+                    <span className="font-bold text-slate-700 dark:text-slate-200">{Math.min(logsPage * LOGS_PAGE_SIZE, totalLogsCount)}</span> of{' '}
+                    <span className="font-bold text-slate-700 dark:text-slate-200">{totalLogsCount}</span> entries
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setLogsPage(p => Math.max(1, p - 1))}
+                      disabled={logsPage <= 1}
+                      className="h-8 px-2.5 text-xs font-semibold gap-1 text-slate-600 dark:text-slate-300 disabled:opacity-40"
+                    >
+                      <ChevronLeft className="h-3.5 w-3.5" />
+                      Prev
+                    </Button>
+                    <div className="px-3 py-1 font-semibold text-slate-700 dark:text-slate-300 text-xs">
+                      Page {logsPage} of {totalLogsPages}
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setLogsPage(p => Math.min(totalLogsPages, p + 1))}
+                      disabled={logsPage >= totalLogsPages}
+                      className="h-8 px-2.5 text-xs font-semibold gap-1 text-slate-600 dark:text-slate-300 disabled:opacity-40"
+                    >
+                      Next
+                      <ChevronRight className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              )}
             </Card>
           )}
         </div>
@@ -5131,11 +5343,12 @@ export function VehicleManager() {
                           <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} />
                           <Tooltip content={<CustomTooltip valType="litres" />} cursor={{ fill: 'rgba(0,0,0,0.02)' }} />
                           {fuelFilterVehicle !== '' ? (
-                            <Bar dataKey="litres" name={getVehicleName(fuelFilterVehicle)} fill="#fbbf24" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                            <Bar isAnimationActive={false} dataKey="litres" name={getVehicleName(fuelFilterVehicle)} fill="#fbbf24" radius={[4, 4, 0, 0]} maxBarSize={40} />
                           ) : (
                             <>
                               {activeVehicleNames.map((name, idx) => (
                                 <Bar
+                                  isAnimationActive={false}
                                   key={name}
                                   dataKey={name}
                                   name={name}
@@ -5143,7 +5356,7 @@ export function VehicleManager() {
                                   radius={[0, 0, 0, 0]}
                                 />
                               ))}
-                              <Line type="monotone" dataKey="litres" name="Total Litres" stroke="#06b6d4" strokeWidth={2.5} dot={{ r: 3, strokeWidth: 1 }} activeDot={{ r: 5 }} />
+                              <Line isAnimationActive={false} type="monotone" dataKey="litres" name="Total Litres" stroke="#06b6d4" strokeWidth={2.5} dot={{ r: 3, strokeWidth: 1 }} activeDot={{ r: 5 }} />
                             </>
                           )}
                         </ComposedChart>
@@ -5154,11 +5367,12 @@ export function VehicleManager() {
                           <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} tickFormatter={(value) => `₦${(value/1000)}k`} />
                           <Tooltip content={<CustomTooltip valType="cost" />} cursor={{ fill: 'rgba(0,0,0,0.02)' }} />
                           {fuelFilterVehicle !== '' ? (
-                            <Bar dataKey="cost" name={getVehicleName(fuelFilterVehicle)} fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                            <Bar isAnimationActive={false} dataKey="cost" name={getVehicleName(fuelFilterVehicle)} fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={40} />
                           ) : (
                             <>
                               {activeVehicleNames.map((name, idx) => (
                                 <Bar
+                                  isAnimationActive={false}
                                   key={name}
                                   dataKey={`${name}_cost`}
                                   name={name}
@@ -5166,7 +5380,7 @@ export function VehicleManager() {
                                   radius={[0, 0, 0, 0]}
                                 />
                               ))}
-                              <Line type="monotone" dataKey="cost" name="Total Cost" stroke="#06b6d4" strokeWidth={2.5} dot={{ r: 3, strokeWidth: 1 }} activeDot={{ r: 5 }} />
+                              <Line isAnimationActive={false} type="monotone" dataKey="cost" name="Total Cost" stroke="#06b6d4" strokeWidth={2.5} dot={{ r: 3, strokeWidth: 1 }} activeDot={{ r: 5 }} />
                             </>
                           )}
                         </ComposedChart>
@@ -5177,10 +5391,11 @@ export function VehicleManager() {
                           <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} domain={['auto', 'auto']} />
                           <Tooltip content={<CustomTooltip valType="trend" />} />
                           {fuelFilterVehicle !== '' ? (
-                            <Line type="monotone" dataKey="rate" name={getVehicleName(fuelFilterVehicle)} stroke="#3b82f6" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }} />
+                            <Line isAnimationActive={false} type="monotone" dataKey="rate" name={getVehicleName(fuelFilterVehicle)} stroke="#3b82f6" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }} />
                           ) : (
                             activeVehicleNames.map((name, idx) => (
                               <Line 
+                                isAnimationActive={false}
                                 key={name} 
                                 type="monotone" 
                                 dataKey={`${name}_rate`} 

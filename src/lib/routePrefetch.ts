@@ -31,6 +31,13 @@ const routeImportMap: Record<string, () => Promise<any>> = {
   '/operations/checkout': () => import('@/src/pages/QuickCheckout'),
   '/operations/maintenance': () => import('@/src/pages/MaintenanceManager'),
   '/operations/sites': () => import('@/src/pages/SiteManager'),
+  '/operations/site-analytics': () => import('@/src/pages/ActiveSiteAnalytics'),
+  '/site-analytics': () => import('@/src/pages/ActiveSiteAnalytics'),
+  '/client-360': () => import('@/src/pages/Client360'),
+  '/operations/simulator': () => import('@/src/pages/Simulator'),
+  '/operations/machine-reconciliation': () => import('@/src/pages/MachineReconciliation'),
+  '/operations/diesel': () => import('@/src/pages/DieselRefillManager'),
+  '/operations/vehicles': () => import('@/src/pages/VehicleManager'),
   '/beneficiaries': () => import('@/src/pages/Beneficiaries'),
   '/activity-log': () => import('@/src/pages/ActivityLog'),
   '/profile': () => import('@/src/pages/Profile'),
@@ -51,4 +58,14 @@ export function prefetchRoute(href: string) {
       prefetched.delete(href);
     });
   }
+}
+
+// Eagerly prefetch heavy analytical modules when browser is idle
+if (typeof window !== 'undefined') {
+  const scheduleIdle = (window as any).requestIdleCallback || ((cb: () => void) => setTimeout(cb, 1500));
+  scheduleIdle(() => {
+    prefetchRoute('/operations/site-analytics');
+    prefetchRoute('/site-analytics');
+    prefetchRoute('/client-360');
+  });
 }
