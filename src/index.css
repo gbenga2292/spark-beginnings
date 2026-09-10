@@ -14,6 +14,18 @@
   --color-indigo-800: var(--theme-primary-800, #3730a3);
   --color-indigo-900: var(--theme-primary-900, #312e81);
   --color-indigo-950: var(--theme-primary-950, #1e1b4b);
+
+  --color-blue-50: var(--theme-primary-50, #eff6ff);
+  --color-blue-100: var(--theme-primary-100, #dbeafe);
+  --color-blue-200: var(--theme-primary-200, #bfdbfe);
+  --color-blue-300: var(--theme-primary-300, #93c5fd);
+  --color-blue-400: var(--theme-primary-400, #60a5fa);
+  --color-blue-500: var(--theme-primary-500, #3b82f6);
+  --color-blue-600: var(--theme-primary-600, #2563eb);
+  --color-blue-700: var(--theme-primary-700, #1d4ed8);
+  --color-blue-800: var(--theme-primary-800, #1e40af);
+  --color-blue-900: var(--theme-primary-900, #1e3a8a);
+  --color-blue-950: var(--theme-primary-950, #172554);
 }
 
 :root {
@@ -223,13 +235,53 @@ body, button, input, select, textarea {
 
 /* ══════════════════════════════════════════════════════════════════════
    COLOR THEME SYSTEM
-   Tailwind v4 resolves bg-indigo-600 → var(--theme-primary-600) etc.
-   We simply redefine those CSS variables per theme class on <html>.
+   Explicitly sets CSS variables and overrides Tailwind color tokens
+   so themes INSTANTLY and RELIABLY pop across the entire application!
    ══════════════════════════════════════════════════════════════════════ */
 
-/* ── Ocean (Blue) ─────────────────────────────────────────────────── */
-.theme-ocean {
-  --theme-primary-50:  #eff6ff;
+/* ── Default (Indigo) ── */
+html.theme-default, :root.theme-default, .theme-default {
+  --theme-primary-50: #eef2ff;
+  --theme-primary-100: #e0e7ff;
+  --theme-primary-200: #c7d2fe;
+  --theme-primary-300: #a5b4fc;
+  --theme-primary-400: #818cf8;
+  --theme-primary-500: #6366f1;
+  --theme-primary-600: #4f46e5;
+  --theme-primary-700: #4338ca;
+  --theme-primary-800: #3730a3;
+  --theme-primary-900: #312e81;
+  --theme-primary-950: #1e1b4b;
+  --color-primary: 79 70 229;
+  --color-ring: 99 102 241;
+
+  --color-indigo-50: #eef2ff;
+  --color-indigo-100: #e0e7ff;
+  --color-indigo-200: #c7d2fe;
+  --color-indigo-300: #a5b4fc;
+  --color-indigo-400: #818cf8;
+  --color-indigo-500: #6366f1;
+  --color-indigo-600: #4f46e5;
+  --color-indigo-700: #4338ca;
+  --color-indigo-800: #3730a3;
+  --color-indigo-900: #312e81;
+  --color-indigo-950: #1e1b4b;
+  --color-blue-50: #eef2ff;
+  --color-blue-100: #e0e7ff;
+  --color-blue-200: #c7d2fe;
+  --color-blue-300: #a5b4fc;
+  --color-blue-400: #818cf8;
+  --color-blue-500: #6366f1;
+  --color-blue-600: #4f46e5;
+  --color-blue-700: #4338ca;
+  --color-blue-800: #3730a3;
+  --color-blue-900: #312e81;
+  --color-blue-950: #1e1b4b;
+}
+
+/* ── Ocean (Blue) ── */
+html.theme-ocean, :root.theme-ocean, .theme-ocean {
+  --theme-primary-50: #eff6ff;
   --theme-primary-100: #dbeafe;
   --theme-primary-200: #bfdbfe;
   --theme-primary-300: #93c5fd;
@@ -240,11 +292,36 @@ body, button, input, select, textarea {
   --theme-primary-800: #1e40af;
   --theme-primary-900: #1e3a8a;
   --theme-primary-950: #172554;
+  --color-primary: 37 99 235;
+  --color-ring: 59 130 246;
+
+  --color-indigo-50: #eff6ff;
+  --color-indigo-100: #dbeafe;
+  --color-indigo-200: #bfdbfe;
+  --color-indigo-300: #93c5fd;
+  --color-indigo-400: #60a5fa;
+  --color-indigo-500: #3b82f6;
+  --color-indigo-600: #2563eb;
+  --color-indigo-700: #1d4ed8;
+  --color-indigo-800: #1e40af;
+  --color-indigo-900: #1e3a8a;
+  --color-indigo-950: #172554;
+  --color-blue-50: #eff6ff;
+  --color-blue-100: #dbeafe;
+  --color-blue-200: #bfdbfe;
+  --color-blue-300: #93c5fd;
+  --color-blue-400: #60a5fa;
+  --color-blue-500: #3b82f6;
+  --color-blue-600: #2563eb;
+  --color-blue-700: #1d4ed8;
+  --color-blue-800: #1e40af;
+  --color-blue-900: #1e3a8a;
+  --color-blue-950: #172554;
 }
 
-/* ── Forest (Emerald) ─────────────────────────────────────────────── */
-.theme-forest {
-  --theme-primary-50:  #ecfdf5;
+/* ── Forest (Emerald) ── */
+html.theme-forest, :root.theme-forest, .theme-forest {
+  --theme-primary-50: #ecfdf5;
   --theme-primary-100: #d1fae5;
   --theme-primary-200: #a7f3d0;
   --theme-primary-300: #6ee7b7;
@@ -255,11 +332,36 @@ body, button, input, select, textarea {
   --theme-primary-800: #065f46;
   --theme-primary-900: #064e3b;
   --theme-primary-950: #022c22;
+  --color-primary: 5 150 105;
+  --color-ring: 16 185 129;
+
+  --color-indigo-50: #ecfdf5;
+  --color-indigo-100: #d1fae5;
+  --color-indigo-200: #a7f3d0;
+  --color-indigo-300: #6ee7b7;
+  --color-indigo-400: #34d399;
+  --color-indigo-500: #10b981;
+  --color-indigo-600: #059669;
+  --color-indigo-700: #047857;
+  --color-indigo-800: #065f46;
+  --color-indigo-900: #064e3b;
+  --color-indigo-950: #022c22;
+  --color-blue-50: #ecfdf5;
+  --color-blue-100: #d1fae5;
+  --color-blue-200: #a7f3d0;
+  --color-blue-300: #6ee7b7;
+  --color-blue-400: #34d399;
+  --color-blue-500: #10b981;
+  --color-blue-600: #059669;
+  --color-blue-700: #047857;
+  --color-blue-800: #065f46;
+  --color-blue-900: #064e3b;
+  --color-blue-950: #022c22;
 }
 
-/* ── Sunset (Amber) ───────────────────────────────────────────────── */
-.theme-sunset {
-  --theme-primary-50:  #fffbeb;
+/* ── Sunset (Amber) ── */
+html.theme-sunset, :root.theme-sunset, .theme-sunset {
+  --theme-primary-50: #fffbeb;
   --theme-primary-100: #fef3c7;
   --theme-primary-200: #fde68a;
   --theme-primary-300: #fcd34d;
@@ -270,11 +372,36 @@ body, button, input, select, textarea {
   --theme-primary-800: #92400e;
   --theme-primary-900: #78350f;
   --theme-primary-950: #451a03;
+  --color-primary: 217 119 6;
+  --color-ring: 245 158 11;
+
+  --color-indigo-50: #fffbeb;
+  --color-indigo-100: #fef3c7;
+  --color-indigo-200: #fde68a;
+  --color-indigo-300: #fcd34d;
+  --color-indigo-400: #fbbf24;
+  --color-indigo-500: #f59e0b;
+  --color-indigo-600: #d97706;
+  --color-indigo-700: #b45309;
+  --color-indigo-800: #92400e;
+  --color-indigo-900: #78350f;
+  --color-indigo-950: #451a03;
+  --color-blue-50: #fffbeb;
+  --color-blue-100: #fef3c7;
+  --color-blue-200: #fde68a;
+  --color-blue-300: #fcd34d;
+  --color-blue-400: #fbbf24;
+  --color-blue-500: #f59e0b;
+  --color-blue-600: #d97706;
+  --color-blue-700: #b45309;
+  --color-blue-800: #92400e;
+  --color-blue-900: #78350f;
+  --color-blue-950: #451a03;
 }
 
-/* ── Rose (Pink) ──────────────────────────────────────────────────── */
-.theme-rose {
-  --theme-primary-50:  #fff1f2;
+/* ── Rose (Pink) ── */
+html.theme-rose, :root.theme-rose, .theme-rose {
+  --theme-primary-50: #fff1f2;
   --theme-primary-100: #ffe4e6;
   --theme-primary-200: #fecdd3;
   --theme-primary-300: #fda4af;
@@ -285,11 +412,36 @@ body, button, input, select, textarea {
   --theme-primary-800: #9f1239;
   --theme-primary-900: #881337;
   --theme-primary-950: #4c0519;
+  --color-primary: 225 29 72;
+  --color-ring: 244 63 94;
+
+  --color-indigo-50: #fff1f2;
+  --color-indigo-100: #ffe4e6;
+  --color-indigo-200: #fecdd3;
+  --color-indigo-300: #fda4af;
+  --color-indigo-400: #fb7185;
+  --color-indigo-500: #f43f5e;
+  --color-indigo-600: #e11d48;
+  --color-indigo-700: #be123c;
+  --color-indigo-800: #9f1239;
+  --color-indigo-900: #881337;
+  --color-indigo-950: #4c0519;
+  --color-blue-50: #fff1f2;
+  --color-blue-100: #ffe4e6;
+  --color-blue-200: #fecdd3;
+  --color-blue-300: #fda4af;
+  --color-blue-400: #fb7185;
+  --color-blue-500: #f43f5e;
+  --color-blue-600: #e11d48;
+  --color-blue-700: #be123c;
+  --color-blue-800: #9f1239;
+  --color-blue-900: #881337;
+  --color-blue-950: #4c0519;
 }
 
-/* ── Violet (Purple) ──────────────────────────────────────────────── */
-.theme-violet {
-  --theme-primary-50:  #f5f3ff;
+/* ── Violet (Purple) ── */
+html.theme-violet, :root.theme-violet, .theme-violet {
+  --theme-primary-50: #f5f3ff;
   --theme-primary-100: #ede9fe;
   --theme-primary-200: #ddd6fe;
   --theme-primary-300: #c4b5fd;
@@ -300,11 +452,36 @@ body, button, input, select, textarea {
   --theme-primary-800: #5b21b6;
   --theme-primary-900: #4c1d95;
   --theme-primary-950: #2e1065;
+  --color-primary: 124 58 237;
+  --color-ring: 139 92 246;
+
+  --color-indigo-50: #f5f3ff;
+  --color-indigo-100: #ede9fe;
+  --color-indigo-200: #ddd6fe;
+  --color-indigo-300: #c4b5fd;
+  --color-indigo-400: #a78bfa;
+  --color-indigo-500: #8b5cf6;
+  --color-indigo-600: #7c3aed;
+  --color-indigo-700: #6d28d9;
+  --color-indigo-800: #5b21b6;
+  --color-indigo-900: #4c1d95;
+  --color-indigo-950: #2e1065;
+  --color-blue-50: #f5f3ff;
+  --color-blue-100: #ede9fe;
+  --color-blue-200: #ddd6fe;
+  --color-blue-300: #c4b5fd;
+  --color-blue-400: #a78bfa;
+  --color-blue-500: #8b5cf6;
+  --color-blue-600: #7c3aed;
+  --color-blue-700: #6d28d9;
+  --color-blue-800: #5b21b6;
+  --color-blue-900: #4c1d95;
+  --color-blue-950: #2e1065;
 }
 
-/* ── Slate (Neutral) ──────────────────────────────────────────────── */
-.theme-slate {
-  --theme-primary-50:  #f8fafc;
+/* ── Slate (Neutral) ── */
+html.theme-slate, :root.theme-slate, .theme-slate {
+  --theme-primary-50: #f8fafc;
   --theme-primary-100: #f1f5f9;
   --theme-primary-200: #e2e8f0;
   --theme-primary-300: #cbd5e1;
@@ -315,11 +492,36 @@ body, button, input, select, textarea {
   --theme-primary-800: #1e293b;
   --theme-primary-900: #0f172a;
   --theme-primary-950: #020617;
+  --color-primary: 71 85 105;
+  --color-ring: 100 116 139;
+
+  --color-indigo-50: #f8fafc;
+  --color-indigo-100: #f1f5f9;
+  --color-indigo-200: #e2e8f0;
+  --color-indigo-300: #cbd5e1;
+  --color-indigo-400: #94a3b8;
+  --color-indigo-500: #64748b;
+  --color-indigo-600: #475569;
+  --color-indigo-700: #334155;
+  --color-indigo-800: #1e293b;
+  --color-indigo-900: #0f172a;
+  --color-indigo-950: #020617;
+  --color-blue-50: #f8fafc;
+  --color-blue-100: #f1f5f9;
+  --color-blue-200: #e2e8f0;
+  --color-blue-300: #cbd5e1;
+  --color-blue-400: #94a3b8;
+  --color-blue-500: #64748b;
+  --color-blue-600: #475569;
+  --color-blue-700: #334155;
+  --color-blue-800: #1e293b;
+  --color-blue-900: #0f172a;
+  --color-blue-950: #020617;
 }
 
-/* ── Burgundy (Deep Red IDE) ──────────────────────────────────────── */
-.theme-burgundy {
-  --theme-primary-50:  #fff1f2;
+/* ── Burgundy (Deep Red IDE) ── */
+html.theme-burgundy, :root.theme-burgundy, .theme-burgundy {
+  --theme-primary-50: #fff1f2;
   --theme-primary-100: #ffe4e6;
   --theme-primary-200: #fecdd3;
   --theme-primary-300: #fda4af;
@@ -330,22 +532,38 @@ body, button, input, select, textarea {
   --theme-primary-800: #9f1239;
   --theme-primary-900: #881337;
   --theme-primary-950: #4c0519;
-}
-.theme-burgundy, .dark.theme-burgundy {
-  --color-background:      38   0   0; 
-  --color-foreground:     255 220 220; 
-  --color-card:            58   0   0; 
-  --color-card-foreground: 255 220 220; 
-  --color-muted:           80   0   0;   
-  --color-muted-foreground: 255 180 180;
-  --color-border:         100   0   0; 
-  --color-input:          100   0   0;   
-  --color-ring:           225  29  72;
+  --color-primary: 225 29 72;
+  --color-ring: 225 29 72;
+
+  --color-indigo-50: #fff1f2;
+  --color-indigo-100: #ffe4e6;
+  --color-indigo-200: #fecdd3;
+  --color-indigo-300: #fda4af;
+  --color-indigo-400: #fb7185;
+  --color-indigo-500: #f43f5e;
+  --color-indigo-600: #e11d48;
+  --color-indigo-700: #be123c;
+  --color-indigo-800: #9f1239;
+  --color-indigo-900: #881337;
+  --color-indigo-950: #4c0519;
+  --color-blue-50: #fff1f2;
+  --color-blue-100: #ffe4e6;
+  --color-blue-200: #fecdd3;
+  --color-blue-300: #fda4af;
+  --color-blue-400: #fb7185;
+  --color-blue-500: #f43f5e;
+  --color-blue-600: #e11d48;
+  --color-blue-700: #be123c;
+  --color-blue-800: #9f1239;
+  --color-blue-900: #881337;
+  --color-blue-950: #4c0519;
 }
 
-/* ── Midnight (Navy IDE) ──────────────────────────────────────────── */
-.theme-midnight {
-  --theme-primary-50:  #f0f9ff;
+
+
+/* ── Midnight (Navy IDE) ── */
+html.theme-midnight, :root.theme-midnight, .theme-midnight {
+  --theme-primary-50: #f0f9ff;
   --theme-primary-100: #e0f2fe;
   --theme-primary-200: #bae6fd;
   --theme-primary-300: #7dd3fc;
@@ -356,48 +574,80 @@ body, button, input, select, textarea {
   --theme-primary-800: #075985;
   --theme-primary-900: #0c4a6e;
   --theme-primary-950: #082f49;
-}
-.theme-midnight, .dark.theme-midnight {
-  --color-background:       0  20  40;
-  --color-foreground:     220 235 255;
-  --color-card:             0  35  65;
-  --color-card-foreground: 220 235 255;
-  --color-muted:            0  50  90;
-  --color-muted-foreground: 180 210 255;
-  --color-border:           0  70 120;
-  --color-input:            0  70 120;
-  --color-ring:             2  132 199;
+  --color-primary: 2 132 199;
+  --color-ring: 2 132 199;
+
+  --color-indigo-50: #f0f9ff;
+  --color-indigo-100: #e0f2fe;
+  --color-indigo-200: #bae6fd;
+  --color-indigo-300: #7dd3fc;
+  --color-indigo-400: #38bdf8;
+  --color-indigo-500: #0ea5e9;
+  --color-indigo-600: #0284c7;
+  --color-indigo-700: #0369a1;
+  --color-indigo-800: #075985;
+  --color-indigo-900: #0c4a6e;
+  --color-indigo-950: #082f49;
+  --color-blue-50: #f0f9ff;
+  --color-blue-100: #e0f2fe;
+  --color-blue-200: #bae6fd;
+  --color-blue-300: #7dd3fc;
+  --color-blue-400: #38bdf8;
+  --color-blue-500: #0ea5e9;
+  --color-blue-600: #0284c7;
+  --color-blue-700: #0369a1;
+  --color-blue-800: #075985;
+  --color-blue-900: #0c4a6e;
+  --color-blue-950: #082f49;
 }
 
-/* ── Monokai (Dark IDE) ──────────────────────────────────────────── */
-.theme-monokai {
-  --theme-primary-50:  #f4f5f2;
+
+
+/* ── Monokai (Dark IDE) ── */
+html.theme-monokai, :root.theme-monokai, .theme-monokai {
+  --theme-primary-50: #f4f5f2;
   --theme-primary-100: #e2e4dd;
   --theme-primary-200: #c6c9bc;
   --theme-primary-300: #a1a690;
   --theme-primary-400: #a6e22e;
-  --theme-primary-500: #a6e22e; 
+  --theme-primary-500: #a6e22e;
   --theme-primary-600: #88c010;
   --theme-primary-700: #669900;
   --theme-primary-800: #4a7300;
   --theme-primary-900: #2d4c00;
   --theme-primary-950: #152600;
-}
-.theme-monokai, .dark.theme-monokai {
-  --color-background:      39  40  34; 
-  --color-foreground:     248 248 242; 
-  --color-card:            62  61  50; 
-  --color-card-foreground: 248 248 242;
-  --color-muted:           73  72  62; 
-  --color-muted-foreground: 117 113  94;
-  --color-border:          73  72  62; 
-  --color-input:           73  72  62;
-  --color-ring:           166 226  46;
+  --color-primary: 136 192 16;
+  --color-ring: 166 226 46;
+
+  --color-indigo-50: #f4f5f2;
+  --color-indigo-100: #e2e4dd;
+  --color-indigo-200: #c6c9bc;
+  --color-indigo-300: #a1a690;
+  --color-indigo-400: #a6e22e;
+  --color-indigo-500: #a6e22e;
+  --color-indigo-600: #88c010;
+  --color-indigo-700: #669900;
+  --color-indigo-800: #4a7300;
+  --color-indigo-900: #2d4c00;
+  --color-indigo-950: #152600;
+  --color-blue-50: #f4f5f2;
+  --color-blue-100: #e2e4dd;
+  --color-blue-200: #c6c9bc;
+  --color-blue-300: #a1a690;
+  --color-blue-400: #a6e22e;
+  --color-blue-500: #a6e22e;
+  --color-blue-600: #88c010;
+  --color-blue-700: #669900;
+  --color-blue-800: #4a7300;
+  --color-blue-900: #2d4c00;
+  --color-blue-950: #152600;
 }
 
-/* ── Solarized Dark (Teal IDE) ──────────────────────────────────────────── */
-.theme-solarized {
-  --theme-primary-50:  #e0f2f1;
+
+
+/* ── Solarized Dark (Teal IDE) ── */
+html.theme-solarized, :root.theme-solarized, .theme-solarized {
+  --theme-primary-50: #e0f2f1;
   --theme-primary-100: #b2dfdb;
   --theme-primary-200: #80cbc4;
   --theme-primary-300: #4db6ac;
@@ -408,22 +658,38 @@ body, button, input, select, textarea {
   --theme-primary-800: #14615a;
   --theme-primary-900: #0c423d;
   --theme-primary-950: #062623;
-}
-.theme-solarized, .dark.theme-solarized {
-  --color-background:       0  43  54;
-  --color-foreground:     131 148 150;
-  --color-card:             7  54  66;
-  --color-card-foreground: 147 161 161;
-  --color-muted:            7  54  66;
-  --color-muted-foreground: 88 110 117;
-  --color-border:           7  54  66;
-  --color-input:            7  54  66;
-  --color-ring:            42 161 152;
+  --color-primary: 33 140 131;
+  --color-ring: 42 161 152;
+
+  --color-indigo-50: #e0f2f1;
+  --color-indigo-100: #b2dfdb;
+  --color-indigo-200: #80cbc4;
+  --color-indigo-300: #4db6ac;
+  --color-indigo-400: #26a69a;
+  --color-indigo-500: #2aa198;
+  --color-indigo-600: #218c83;
+  --color-indigo-700: #1b7a70;
+  --color-indigo-800: #14615a;
+  --color-indigo-900: #0c423d;
+  --color-indigo-950: #062623;
+  --color-blue-50: #e0f2f1;
+  --color-blue-100: #b2dfdb;
+  --color-blue-200: #80cbc4;
+  --color-blue-300: #4db6ac;
+  --color-blue-400: #26a69a;
+  --color-blue-500: #2aa198;
+  --color-blue-600: #218c83;
+  --color-blue-700: #1b7a70;
+  --color-blue-800: #14615a;
+  --color-blue-900: #0c423d;
+  --color-blue-950: #062623;
 }
 
-/* ── Tokyo Night (Purple IDE) ──────────────────────────────────────────── */
-.theme-tokyo-night {
-  --theme-primary-50:  #f0f4ff;
+
+
+/* ── Tokyo Night (Purple IDE) ── */
+html.theme-tokyo-night, :root.theme-tokyo-night, .theme-tokyo-night {
+  --theme-primary-50: #f0f4ff;
   --theme-primary-100: #e0ebff;
   --theme-primary-200: #c2d6ff;
   --theme-primary-300: #94b8ff;
@@ -434,18 +700,34 @@ body, button, input, select, textarea {
   --theme-primary-800: #1c326b;
   --theme-primary-900: #0f1d47;
   --theme-primary-950: #060b24;
+  --color-primary: 66 100 179;
+  --color-ring: 122 162 247;
+
+  --color-indigo-50: #f0f4ff;
+  --color-indigo-100: #e0ebff;
+  --color-indigo-200: #c2d6ff;
+  --color-indigo-300: #94b8ff;
+  --color-indigo-400: #7aa2f7;
+  --color-indigo-500: #5d81d9;
+  --color-indigo-600: #4264b3;
+  --color-indigo-700: #2e4a8f;
+  --color-indigo-800: #1c326b;
+  --color-indigo-900: #0f1d47;
+  --color-indigo-950: #060b24;
+  --color-blue-50: #f0f4ff;
+  --color-blue-100: #e0ebff;
+  --color-blue-200: #c2d6ff;
+  --color-blue-300: #94b8ff;
+  --color-blue-400: #7aa2f7;
+  --color-blue-500: #5d81d9;
+  --color-blue-600: #4264b3;
+  --color-blue-700: #2e4a8f;
+  --color-blue-800: #1c326b;
+  --color-blue-900: #0f1d47;
+  --color-blue-950: #060b24;
 }
-.theme-tokyo-night, .dark.theme-tokyo-night {
-  --color-background:      26  27  38; 
-  --color-foreground:     169 177 214; 
-  --color-card:            36  40  59; 
-  --color-card-foreground: 192 202 245; 
-  --color-muted:           65  72 104; 
-  --color-muted-foreground: 86  95 137; 
-  --color-border:          65  72 104;
-  --color-input:           65  72 104;
-  --color-ring:           122 162 247; 
-}
+
+
 
 
 
@@ -466,24 +748,13 @@ body, button, input, select, textarea {
   --color-muted-foreground: 100 116 139;    /* slate-500 */
   --color-border:        226 232 240;       /* slate-200 */
   --color-input:         226 232 240;
-  --color-ring:          37  99  235;       /* blue-600 */
-  --color-primary:       37  99  235;       /* blue-600 */
+  --color-ring:          99 102 241;        /* indigo-500 */
+  --color-primary:       79  70 229;        /* indigo-600 */
   --color-primary-foreground: 255 255 255;
   --color-popover:       255 255 255;
   --color-popover-foreground: 15 23 42;
 
-  /* We map indigo to blue as the base color for the entire app */
-  --theme-primary-50:  #eff6ff;
-  --theme-primary-100: #dbeafe;
-  --theme-primary-200: #bfdbfe;
-  --theme-primary-300: #93c5fd;
-  --theme-primary-400: #60a5fa;
-  --theme-primary-500: #3b82f6;
-  --theme-primary-600: #2563eb;
-  --theme-primary-700: #1d4ed8;
-  --theme-primary-800: #1e40af;
-  --theme-primary-900: #1e3a8a;
-  --theme-primary-950: #172554;
+
   --color-secondary:     241 245 249;
   --color-secondary-foreground: 15 23 42;
   --color-accent:        241 245 249;
@@ -515,7 +786,7 @@ body, button, input, select, textarea {
   --color-card:            30  41  59;        /* slate-800 */
   --color-card-foreground: 226 232 240;
   --color-muted:           30  41  59;        /* slate-800 */
-  --color-muted-foreground: 100 116 139;      /* slate-500 */
+  --color-muted-foreground: 148 163 184;      /* slate-400 */
   --color-border:          51  65  85;        /* slate-700 */
   --color-input:           51  65  85;
   --color-ring:            99 102 241;
@@ -542,7 +813,7 @@ body, button, input, select, textarea {
    without requiring per-page edits.
    ══════════════════════════════════════════════════════════════════════ */
 
-/* ── White & light-grey surfaces → dark slate ──────────────────────── */
+/* ── White & light-grey surfaces → dark slate / active IDE theme ──── */
 .dark .bg-white {
   background-color: rgb(var(--color-card)) !important;
 }
@@ -558,6 +829,22 @@ body, button, input, select, textarea {
 }
 .dark .bg-slate-200 {
   background-color: rgb(var(--color-border)) !important;
+}
+.dark .bg-slate-950,
+.dark.bg-slate-950 {
+  background-color: rgb(var(--color-background)) !important;
+}
+.dark .bg-slate-900,
+.dark.bg-slate-900 {
+  background-color: rgb(var(--color-card)) !important;
+}
+.dark .bg-slate-800,
+.dark.bg-slate-800 {
+  background-color: rgb(var(--color-muted)) !important;
+}
+.dark .border-slate-800,
+.dark .border-slate-700 {
+  border-color: rgb(var(--color-border)) !important;
 }
 
 /* ── Text that would be invisible on dark surfaces ──────────────────── */
@@ -793,13 +1080,255 @@ html.dark.ui-brutalism {
 .dark .ring-slate-200 { --tw-ring-color: rgb(51 65 85) !important; }
 
 /* ══════════════════════════════════════════════════════════════════════
-   UI Layout Theme Systems
+   DARK MODE WORKSPACE THEMES — FULL IDE SURFACE STYLES FOR ALL 12 THEMES
+   Every theme has its own deep workspace background, cards, hovers,
+   and borders matching that theme's unique identity!
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* ── Default (Indigo) (Dark IDE) ── */
+html.dark.theme-default, :root.dark.theme-default, .dark.theme-default {
+  --color-background:       9 11 22;
+  --color-foreground:       226 232 240;
+  --color-card:             16 20 38;
+  --color-card-foreground:  226 232 240;
+  --color-muted:            25 32 60;
+  --color-muted-foreground: 165 180 252;
+  --color-border:           35 45 84;
+  --color-input:            35 45 84;
+  --color-ring:             99 102 241;
+  --color-primary:          99 102 241;
+  --color-popover:          16 20 38;
+  --color-popover-foreground:226 232 240;
+}
+
+/* ── Ocean Blue (Dark IDE) ── */
+html.dark.theme-ocean, :root.dark.theme-ocean, .dark.theme-ocean {
+  --color-background:       3 14 28;
+  --color-foreground:       224 242 254;
+  --color-card:             7 24 48;
+  --color-card-foreground:  224 242 254;
+  --color-muted:            14 38 74;
+  --color-muted-foreground: 147 197 253;
+  --color-border:           22 56 104;
+  --color-input:            22 56 104;
+  --color-ring:             59 130 246;
+  --color-primary:          59 130 246;
+  --color-popover:          7 24 48;
+  --color-popover-foreground:224 242 254;
+}
+
+/* ── Forest Green (Dark IDE) ── */
+html.dark.theme-forest, :root.dark.theme-forest, .dark.theme-forest {
+  --color-background:       2 20 13;
+  --color-foreground:       236 253 245;
+  --color-card:             5 36 24;
+  --color-card-foreground:  236 253 245;
+  --color-muted:            11 56 38;
+  --color-muted-foreground: 167 243 208;
+  --color-border:           18 79 55;
+  --color-input:            18 79 55;
+  --color-ring:             16 185 129;
+  --color-primary:          16 185 129;
+  --color-popover:          5 36 24;
+  --color-popover-foreground:236 253 245;
+}
+
+/* ── Sunset Amber (Dark IDE) ── */
+html.dark.theme-sunset, :root.dark.theme-sunset, .dark.theme-sunset {
+  --color-background:       20 12 3;
+  --color-foreground:       254 243 199;
+  --color-card:             36 21 5;
+  --color-card-foreground:  254 243 199;
+  --color-muted:            59 34 9;
+  --color-muted-foreground: 253 230 138;
+  --color-border:           87 51 13;
+  --color-input:            87 51 13;
+  --color-ring:             245 158 11;
+  --color-primary:          245 158 11;
+  --color-popover:          36 21 5;
+  --color-popover-foreground:254 243 199;
+}
+
+/* ── Rose Pink (Dark IDE) ── */
+html.dark.theme-rose, :root.dark.theme-rose, .dark.theme-rose {
+  --color-background:       23 3 8;
+  --color-foreground:       255 228 230;
+  --color-card:             41 6 16;
+  --color-card-foreground:  255 228 230;
+  --color-muted:            64 10 26;
+  --color-muted-foreground: 254 205 211;
+  --color-border:           92 16 39;
+  --color-input:            92 16 39;
+  --color-ring:             244 63 94;
+  --color-primary:          244 63 94;
+  --color-popover:          41 6 16;
+  --color-popover-foreground:255 228 230;
+}
+
+/* ── Royal Violet (Dark IDE) ── */
+html.dark.theme-violet, :root.dark.theme-violet, .dark.theme-violet {
+  --color-background:       14 4 28;
+  --color-foreground:       245 243 255;
+  --color-card:             27 10 51;
+  --color-card-foreground:  245 243 255;
+  --color-muted:            42 18 78;
+  --color-muted-foreground: 221 214 254;
+  --color-border:           61 27 110;
+  --color-input:            61 27 110;
+  --color-ring:             139 92 246;
+  --color-primary:          139 92 246;
+  --color-popover:          27 10 51;
+  --color-popover-foreground:245 243 255;
+}
+
+/* ── Slate Gray (Dark IDE) ── */
+html.dark.theme-slate, :root.dark.theme-slate, .dark.theme-slate {
+  --color-background:       9 13 20;
+  --color-foreground:       241 245 249;
+  --color-card:             17 24 39;
+  --color-card-foreground:  241 245 249;
+  --color-muted:            31 41 61;
+  --color-muted-foreground: 203 213 225;
+  --color-border:           45 58 82;
+  --color-input:            45 58 82;
+  --color-ring:             100 116 139;
+  --color-primary:          100 116 139;
+  --color-popover:          17 24 39;
+  --color-popover-foreground:241 245 249;
+}
+
+/* ── Burgundy IDE (Dark IDE) ── */
+html.dark.theme-burgundy, :root.dark.theme-burgundy, .dark.theme-burgundy {
+  --color-background:       28 2 6;
+  --color-foreground:       255 220 220;
+  --color-card:             46 4 11;
+  --color-card-foreground:  255 220 220;
+  --color-muted:            71 8 19;
+  --color-muted-foreground: 254 205 211;
+  --color-border:           102 12 29;
+  --color-input:            102 12 29;
+  --color-ring:             225 29 72;
+  --color-primary:          225 29 72;
+  --color-popover:          46 4 11;
+  --color-popover-foreground:255 220 220;
+}
+
+/* ── Midnight IDE (Dark IDE) ── */
+html.dark.theme-midnight, :root.dark.theme-midnight, .dark.theme-midnight {
+  --color-background:       0 16 32;
+  --color-foreground:       220 235 255;
+  --color-card:             0 28 56;
+  --color-card-foreground:  220 235 255;
+  --color-muted:            0 43 84;
+  --color-muted-foreground: 186 230 253;
+  --color-border:           0 61 117;
+  --color-input:            0 61 117;
+  --color-ring:             56 189 248;
+  --color-primary:          56 189 248;
+  --color-popover:          0 28 56;
+  --color-popover-foreground:220 235 255;
+}
+
+/* ── Monokai IDE (Dark IDE) ── */
+html.dark.theme-monokai, :root.dark.theme-monokai, .dark.theme-monokai {
+  --color-background:       30 31 28;
+  --color-foreground:       248 248 242;
+  --color-card:             39 40 34;
+  --color-card-foreground:  248 248 242;
+  --color-muted:            62 61 50;
+  --color-muted-foreground: 198 201 188;
+  --color-border:           84 82 68;
+  --color-input:            84 82 68;
+  --color-ring:             166 226 46;
+  --color-primary:          166 226 46;
+  --color-popover:          39 40 34;
+  --color-popover-foreground:248 248 242;
+}
+
+/* ── Solarized Dark (Dark IDE) ── */
+html.dark.theme-solarized, :root.dark.theme-solarized, .dark.theme-solarized {
+  --color-background:       0 33 43;
+  --color-foreground:       253 246 227;
+  --color-card:             0 43 54;
+  --color-card-foreground:  253 246 227;
+  --color-muted:            7 54 66;
+  --color-muted-foreground: 147 161 161;
+  --color-border:           12 73 89;
+  --color-input:            12 73 89;
+  --color-ring:             42 161 152;
+  --color-primary:          42 161 152;
+  --color-popover:          0 43 54;
+  --color-popover-foreground:253 246 227;
+}
+
+/* ── Tokyo Night (Dark IDE) ── */
+html.dark.theme-tokyo-night, :root.dark.theme-tokyo-night, .dark.theme-tokyo-night {
+  --color-background:       22 22 30;
+  --color-foreground:       169 177 214;
+  --color-card:             26 27 38;
+  --color-card-foreground:  169 177 214;
+  --color-muted:            36 40 59;
+  --color-muted-foreground: 122 162 247;
+  --color-border:           52 59 89;
+  --color-input:            52 59 89;
+  --color-ring:             122 162 247;
+  --color-primary:          122 162 247;
+  --color-popover:          26 27 38;
+  --color-popover-foreground:169 177 214;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   UNIVERSAL DARK WORKSPACE SURFACE OVERRIDES (ALL 12 THEMES)
+   Automatically colors layouts, main containers, cards, sidebars, headers,
+   dialogs, and borders using the active theme's custom dark variables.
+   ══════════════════════════════════════════════════════════════════════ */
+
+.dark {
+  color-scheme: dark;
+}
+
+/* Background surfaces */
+.dark .bg-slate-950,
+.dark.bg-slate-950,
+.dark [class*="bg-slate-950"],
+.dark [class*="dark:bg-slate-950"] {
+  background-color: rgb(var(--color-background)) !important;
+}
+
+/* Card, Sidebar, Header & Modal surfaces */
+.dark .bg-slate-900,
+.dark.bg-slate-900,
+.dark [class*="bg-slate-900"],
+.dark [class*="dark:bg-slate-900"] {
+  background-color: rgb(var(--color-card)) !important;
+}
+
+/* Muted / hover / nested surfaces */
+.dark .bg-slate-800,
+.dark.bg-slate-800,
+.dark [class*="bg-slate-800"],
+.dark [class*="dark:bg-slate-800"] {
+  background-color: rgb(var(--color-muted)) !important;
+}
+
+/* Borders & Dividers */
+.dark .border-slate-800,
+.dark [class*="border-slate-800"],
+.dark [class*="dark:border-slate-800"],
+.dark .border-slate-700,
+.dark [class*="border-slate-700"],
+.dark [class*="dark:border-slate-700"] {
+  border-color: rgb(var(--color-border)) !important;
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════
+   UI INTERACTION STYLES (Classic, Modern, Glass, Neo-Brutalism, Minimalist)
    ══════════════════════════════════════════════════════════════════════ */
 
 /* ── Modern ──────────────────────────────────────────────────────────── */
 .ui-modern .bg-card, .ui-modern [data-radix-popper-content-wrapper] {
-  border-radius: 1.5rem !important;
-  border: 1px solid rgb(0 0 0 / 0.05) !important;
+  border-radius: 1.25rem !important;
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01) !important;
 }
 .dark.ui-modern .bg-card, .dark.ui-modern [data-radix-popper-content-wrapper] {

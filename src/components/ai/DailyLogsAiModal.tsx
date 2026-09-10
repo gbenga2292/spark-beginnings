@@ -545,29 +545,29 @@ INSTRUCTIONS:
   return (
     <div className={cn(
       "flex flex-col h-full text-slate-900 dark:text-white",
-      isEmbedded ? "bg-[#0b0f19] text-white" : "bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xl overflow-hidden"
+      isEmbedded ? "bg-white dark:bg-[#0b0f19] text-slate-800 dark:text-white" : "bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xl overflow-hidden"
     )}>
       {/* ── Compact Flat Studio Toolbar Row ── */}
       <div className={cn(
         "flex flex-wrap items-center justify-between gap-2 p-2.5 text-xs border-b shrink-0",
-        isEmbedded ? "bg-[#0f1422] border-white/10" : "bg-slate-50 dark:bg-slate-800/80 border-slate-200 dark:border-slate-800"
+        isEmbedded ? "bg-slate-50 dark:bg-[#0f1422] border-slate-200 dark:border-white/10" : "bg-slate-50 dark:bg-slate-800/80 border-slate-200 dark:border-slate-800"
       )}>
         {/* Left: Scope Pickers */}
         <div className="flex flex-wrap items-center gap-1.5 min-w-0">
           {/* Site Selector */}
           <div className={cn(
             "flex items-center gap-1 px-2 py-0.5 rounded-lg border text-xs",
-            isEmbedded ? "bg-white/5 border-white/10 text-white" : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700"
+            isEmbedded ? "bg-white dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-800 dark:text-white" : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700"
           )}>
             <Building2 className="w-3 h-3 text-indigo-400 shrink-0" />
             <select
               value={selectedSiteId}
               onChange={e => setSelectedSiteId(e.target.value)}
-              className="bg-transparent font-bold focus:outline-none cursor-pointer text-[11px] max-w-[130px] sm:max-w-[160px] truncate"
+              className="bg-transparent font-bold focus:outline-none cursor-pointer text-[11px] max-w-[130px] sm:max-w-[160px] truncate text-slate-800 dark:text-white"
             >
-              <option value="all" className="bg-slate-900 text-white">All Sites ({sites.length})</option>
+              <option value="all" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">All Sites ({sites.length})</option>
               {sites.map(s => (
-                <option key={s.id} value={s.id} className="bg-slate-900 text-white">{s.name} ({s.client})</option>
+                <option key={s.id} value={s.id} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">{s.name} ({s.client})</option>
               ))}
             </select>
           </div>
@@ -575,29 +575,29 @@ INSTRUCTIONS:
           {/* Date Range Preset */}
           <div className={cn(
             "flex items-center gap-1 px-2 py-0.5 rounded-lg border text-xs",
-            isEmbedded ? "bg-white/5 border-white/10 text-white" : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700"
+            isEmbedded ? "bg-white dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-800 dark:text-white" : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700"
           )}>
             <Calendar className="w-3 h-3 text-slate-400 shrink-0" />
             <select
               value={datePreset}
               onChange={e => setDatePreset(e.target.value as DateRangePreset)}
-              className="bg-transparent font-semibold focus:outline-none cursor-pointer text-[11px]"
+              className="bg-transparent font-semibold focus:outline-none cursor-pointer text-[11px] text-slate-800 dark:text-white"
             >
-              <option value="today" className="bg-slate-900 text-white">Today</option>
-              <option value="yesterday" className="bg-slate-900 text-white">Yesterday</option>
-              <option value="last7" className="bg-slate-900 text-white">Last 7d</option>
-              <option value="last30" className="bg-slate-900 text-white">Last 30d</option>
-              <option value="thisMonth" className="bg-slate-900 text-white">This Month</option>
-              <option value="all" className="bg-slate-900 text-white">All Logs (90d)</option>
+              <option value="today" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">Today</option>
+              <option value="yesterday" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">Yesterday</option>
+              <option value="last7" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">Last 7d</option>
+              <option value="last30" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">Last 30d</option>
+              <option value="thisMonth" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">This Month</option>
+              <option value="all" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">All Logs (90d)</option>
             </select>
           </div>
 
           {/* Compact Grounding Pill Badges */}
-          <div className="hidden xl:flex items-center gap-1 pl-1.5 border-l border-white/10">
-            <span className="px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 font-bold text-[10px]">
+          <div className="hidden xl:flex items-center gap-1 pl-1.5 border-l border-slate-200 dark:border-white/10">
+            <span className="px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-600 dark:text-emerald-300 font-bold text-[10px]">
               {summaryStats.totalPumpingDays}d Pumping
             </span>
-            <span className="px-1.5 py-0.2 rounded bg-indigo-500/20 text-indigo-300 font-bold text-[10px]">
+            <span className="px-1.5 py-0.2 rounded bg-indigo-500/20 text-indigo-600 dark:text-indigo-300 font-bold text-[10px]">
               {summaryStats.totalDiesel.toLocaleString()}L
             </span>
           </div>
@@ -608,7 +608,7 @@ INSTRUCTIONS:
           {messages.length > 0 && (
             <button
               onClick={() => setMessages([])}
-              className="p-1 rounded-lg border border-white/10 text-white/50 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+              className="p-1 rounded-lg border border-slate-200 dark:border-white/10 text-slate-400 dark:text-white/50 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors"
               title="Clear Conversation"
             >
               <Trash2 className="w-3 h-3" />
@@ -631,18 +631,18 @@ INSTRUCTIONS:
       {/* ── Chat Stream Area ── */}
       <div className={cn(
         "flex-1 overflow-y-auto p-3.5 space-y-3.5 style-scroll",
-        isEmbedded ? "bg-[#0b0f19]" : "bg-white dark:bg-slate-900"
+        isEmbedded ? "bg-white dark:bg-[#0b0f19]" : "bg-white dark:bg-slate-900"
       )}>
         {messages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center p-4 max-w-md mx-auto">
-            <div className="w-10 h-10 rounded-xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 mb-2.5 shadow-xs">
+            <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-500/20 border border-indigo-200 dark:border-indigo-500/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400 mb-2.5 shadow-xs">
               <Sparkles className="w-5 h-5" />
             </div>
 
-            <h3 className="text-sm font-bold text-white">
+            <h3 className="text-sm font-bold text-slate-800 dark:text-white">
               Daily Operations Intelligence Copilot
             </h3>
-            <p className="text-[11px] text-white/50 mt-1 mb-4 leading-relaxed">
+            <p className="text-[11px] text-slate-500 dark:text-white/50 mt-1 mb-4 leading-relaxed">
               Ask anything about daily machine runs, fuel burned, stoppages, crew journals, and site history across <strong>{rangeLabel}</strong>.
             </p>
 
@@ -652,12 +652,12 @@ INSTRUCTIONS:
                 <button
                   key={idx}
                   onClick={() => handleSend(action.prompt)}
-                  className="p-2 rounded-xl border border-white/10 bg-white/5 hover:bg-indigo-600/20 hover:border-indigo-500/40 transition-all text-xs group text-left"
+                  className="p-2 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 hover:bg-indigo-50 dark:hover:bg-indigo-600/20 hover:border-indigo-200 dark:hover:border-indigo-500/40 transition-all text-xs group text-left"
                 >
-                  <span className="font-bold text-slate-200 group-hover:text-indigo-400 block text-[11px] mb-0.5">
+                  <span className="font-bold text-slate-700 dark:text-slate-200 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 block text-[11px] mb-0.5">
                     {action.label}
                   </span>
-                  <span className="text-[10px] text-white/40 line-clamp-1">
+                  <span className="text-[10px] text-slate-500 dark:text-white/40 line-clamp-1">
                     {action.prompt}
                   </span>
                 </button>
@@ -683,7 +683,7 @@ INSTRUCTIONS:
                 "rounded-2xl p-3 shadow-xs border relative group",
                 msg.role === 'user'
                   ? "bg-indigo-600 text-white border-indigo-700 rounded-tr-none"
-                  : "bg-white/5 text-slate-200 border-white/10 rounded-tl-none"
+                  : "bg-slate-50 dark:bg-white/5 text-slate-800 dark:text-slate-200 border-slate-200 dark:border-white/10 rounded-tl-none"
               )}>
                 {msg.role === 'assistant' ? (
                   <FormattedAiMessage text={msg.content} />
@@ -693,16 +693,16 @@ INSTRUCTIONS:
                   </div>
                 )}
 
-                <div className="flex items-center justify-between gap-2 mt-2 pt-1 border-t border-white/5 text-[9px] opacity-60">
+                <div className="flex items-center justify-between gap-2 mt-2 pt-1 border-t border-slate-200 dark:border-white/5 text-[9px] opacity-60">
                   <span>{msg.timestamp}</span>
 
                   {msg.role === 'assistant' && (
                     <button
                       onClick={() => copyToClipboard(msg.content, idx)}
-                      className="opacity-0 group-hover:opacity-100 transition-opacity hover:text-indigo-400 p-0.5"
+                      className="opacity-0 group-hover:opacity-100 transition-opacity hover:text-indigo-600 dark:hover:text-indigo-400 p-0.5"
                       title="Copy response"
                     >
-                      {copiedIdx === idx ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                      {copiedIdx === idx ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
                     </button>
                   )}
                 </div>
@@ -722,8 +722,8 @@ INSTRUCTIONS:
             <div className="w-6 h-6 rounded-lg bg-indigo-600 flex items-center justify-center text-white shrink-0 mt-0.5 shadow-xs animate-pulse">
               <Bot className="w-3.5 h-3.5" />
             </div>
-            <div className="rounded-2xl p-3 bg-white/5 border border-white/10 rounded-tl-none flex items-center gap-2 text-slate-400 text-xs">
-              <RefreshCw className="w-3 h-3 animate-spin text-indigo-400" />
+            <div className="rounded-2xl p-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-tl-none flex items-center gap-2 text-slate-500 dark:text-slate-400 text-xs">
+              <RefreshCw className="w-3 h-3 animate-spin text-indigo-500 dark:text-indigo-400" />
               <span>Analyzing machine logs & site parameters across {rangeLabel}...</span>
             </div>
           </div>
@@ -735,7 +735,7 @@ INSTRUCTIONS:
       {/* ── Input Box ── */}
       <div className={cn(
         "p-2.5 border-t shrink-0",
-        isEmbedded ? "bg-[#0f1422] border-white/10" : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800"
+        isEmbedded ? "bg-slate-50 dark:bg-[#0f1422] border-slate-200 dark:border-white/10" : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800"
       )}>
         <form
           onSubmit={e => {
@@ -751,7 +751,7 @@ INSTRUCTIONS:
             disabled={isLoading}
             className={cn(
               "flex-1 h-8 rounded-lg text-xs px-3 focus-visible:ring-indigo-500",
-              isEmbedded ? "bg-white/5 border-white/10 text-white placeholder:text-white/40" : "bg-slate-50 dark:bg-slate-800/60"
+              isEmbedded ? "bg-white dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-800 dark:text-white placeholder:text-slate-400 dark:placeholder:text-white/40" : "bg-slate-50 dark:bg-slate-800/60"
             )}
           />
 

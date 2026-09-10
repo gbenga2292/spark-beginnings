@@ -4,7 +4,7 @@ import { Input } from '@/src/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
 import { useAppStore, AttendanceRecord } from '@/src/store/appStore';
 import { supabase } from '@/src/integrations/supabase/client';
-import { Search, Save, Trash2, Calendar as CalendarIcon, Database, Filter, Users, Download, Upload, ArrowUp, ArrowDown, ArrowUpDown, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Wrench, LineChart, Building2 } from 'lucide-react';
+import { Search, Save, Trash2, Calendar as CalendarIcon, Database, Filter, Users, Download, Upload, ArrowUp, ArrowDown, ArrowUpDown, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Wrench, LineChart, Building2, CheckCheck } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
 import { useOperations } from '@/src/contexts/OperationsContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/src/components/ui/card';
@@ -15,7 +15,7 @@ import { usePriv } from '@/src/hooks/usePriv';
 import { formatDisplayDate, normalizeDate } from '@/src/lib/dateUtils';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { fetchEmployeesData } from '@/src/lib/supabaseService';
-import { generateId, isValidUUID } from '@/src/lib/utils';
+import { cn, generateId, isValidUUID } from '@/src/lib/utils';
 import { useDebounce } from '@/src/hooks/useDebounce';
 import {
   DropdownMenu,
@@ -605,12 +605,22 @@ export function Attendance() {
     }),
   [activeSitesForMachineDate, onSiteMachineIds, machineRegDate]);
 
-  const [activeMachineBySite, setActiveMachineBySite] = useState<Record<string, { activeMachineIds: string[]; machineTypes: Record<string, 'full' | 'half' | 'off'>; dieselUsage: Record<string, number>; notes: string; progressPercentage?: number }>>({}); 
+  interface MachineSiteEntry {
+    activeMachineIds: string[];
+    machineTypes: Record<string, 'full' | 'half' | 'off'>;
+    dieselUsage: Record<string, number>;
+    dipstickLevels: Record<string, number>;
+    fullTanks: Record<string, boolean>;
+    notes: string;
+    progressPercentage?: number;
+  }
+
+  const [activeMachineBySite, setActiveMachineBySite] = useState<Record<string, MachineSiteEntry>>({}); 
 
   // Pre-populate activeMachineBySite from existing daily logs when date changes
   useEffect(() => {
     if (!machineRegDate) return;
-    const initial: Record<string, { activeMachineIds: string[]; machineTypes: Record<string, 'full' | 'half' | 'off'>; dieselUsage: Record<string, number>; notes: string; progressPercentage?: number }> = {};
+    const initial: Record<string, MachineSiteEntry> = {};
 
     activeSitesForMachineDate.forEach(s => {
       // Logs for this site on this date (all — active AND off)
@@ -624,6 +634,9 @@ export function Attendance() {
       // Build machineTypes from operationalDay + isActive
       const machineTypes: Record<string, 'full' | 'half' | 'off'> = {};
       const dieselUsage: Record<string, number> = {};
+      const dipstickLevels: Record<string, number> = {};
+      const fullTanks: Record<string, boolean> = {};
+
       siteLogs.forEach(l => {
         if (!allLoggableMachines.some(m => m.id === l.assetId)) return;
         if (!l.isActive) machineTypes[l.assetId] = 'off';
@@ -631,12 +644,16 @@ export function Attendance() {
         else machineTypes[l.assetId] = 'full';
         
         if (l.dieselUsage) dieselUsage[l.assetId] = l.dieselUsage;
+        if (l.dipstickLevelLitres != null) dipstickLevels[l.assetId] = Number(l.dipstickLevelLitres);
+        if (l.isTankFilledToFull != null) fullTanks[l.assetId] = !!l.isTankFilledToFull;
       });
       const anyLog = siteLogs.find(l => l.maintenanceDetails);
       initial[s.id] = {
         activeMachineIds: selectedIds,
         machineTypes,
         dieselUsage,
+        dipstickLevels,
+        fullTanks,
         notes: anyLog?.maintenanceDetails || '',
         progressPercentage: s.currentProgressPercentage ?? 0,
       };
@@ -647,16 +664,21 @@ export function Attendance() {
 
   const handleToggleMachineSelection = useCallback((siteId: string, machineId: string) => {
     setActiveMachineBySite(prev => {
-      const entry = prev[siteId] ?? { activeMachineIds: [], machineTypes: {}, dieselUsage: {}, notes: '' };
+      const entry = prev[siteId] ?? { activeMachineIds: [], machineTypes: {}, dieselUsage: {}, dipstickLevels: {}, fullTanks: {}, notes: '' };
       const exists = entry.activeMachineIds.includes(machineId);
       const newIds = exists
         ? entry.activeMachineIds.filter(id => id !== machineId)
         : [...entry.activeMachineIds, machineId];
       const newTypes = { ...entry.machineTypes };
       const newDiesel = { ...entry.dieselUsage };
+      const newDipstick = { ...(entry.dipstickLevels ?? {}) };
+      const newFullTanks = { ...(entry.fullTanks ?? {}) };
+
       if (exists) {
         delete newTypes[machineId];
         delete newDiesel[machineId];
+        delete newDipstick[machineId];
+        delete newFullTanks[machineId];
       } else if (!newTypes[machineId]) {
         newTypes[machineId] = 'full'; // default to full day
       }
@@ -667,6 +689,8 @@ export function Attendance() {
           activeMachineIds: newIds,
           machineTypes: newTypes,
           dieselUsage: newDiesel,
+          dipstickLevels: newDipstick,
+          fullTanks: newFullTanks,
         }
       };
     });
@@ -674,7 +698,7 @@ export function Attendance() {
 
   const handleMachineTypeChange = useCallback((siteId: string, machineId: string, dayType: 'full' | 'half' | 'off') => {
     setActiveMachineBySite(prev => {
-      const entry = prev[siteId] ?? { activeMachineIds: [], machineTypes: {}, dieselUsage: {}, notes: '' };
+      const entry = prev[siteId] ?? { activeMachineIds: [], machineTypes: {}, dieselUsage: {}, dipstickLevels: {}, fullTanks: {}, notes: '' };
       return {
         ...prev,
         [siteId]: {
@@ -687,7 +711,7 @@ export function Attendance() {
 
   const handleMachineDieselChange = useCallback((siteId: string, machineId: string, dieselStr: string) => {
     setActiveMachineBySite(prev => {
-      const entry = prev[siteId] ?? { activeMachineIds: [], machineTypes: {}, dieselUsage: {}, notes: '' };
+      const entry = prev[siteId] ?? { activeMachineIds: [], machineTypes: {}, dieselUsage: {}, dipstickLevels: {}, fullTanks: {}, notes: '' };
       const newDiesel = { ...entry.dieselUsage };
       const val = parseFloat(dieselStr);
       if (isNaN(val) || val < 0 || dieselStr === '') {
@@ -705,18 +729,90 @@ export function Attendance() {
     });
   }, []);
 
+  const handleMachineDipstickChange = useCallback((siteId: string, machineId: string, dipstickStr: string) => {
+    setActiveMachineBySite(prev => {
+      const entry = prev[siteId] ?? { activeMachineIds: [], machineTypes: {}, dieselUsage: {}, dipstickLevels: {}, fullTanks: {}, notes: '' };
+      const newDipstick = { ...(entry.dipstickLevels ?? {}) };
+      const val = parseFloat(dipstickStr);
+      if (isNaN(val) || val < 0 || dipstickStr === '') {
+        delete newDipstick[machineId];
+      } else {
+        newDipstick[machineId] = val;
+      }
+      return {
+        ...prev,
+        [siteId]: {
+          ...entry,
+          dipstickLevels: newDipstick,
+        }
+      };
+    });
+  }, []);
+
+  const handleMachineFullTankToggle = useCallback((siteId: string, machineId: string) => {
+    setActiveMachineBySite(prev => {
+      const entry = prev[siteId] ?? { activeMachineIds: [], machineTypes: {}, dieselUsage: {}, dipstickLevels: {}, fullTanks: {}, notes: '' };
+      const current = !!entry.fullTanks?.[machineId];
+      return {
+        ...prev,
+        [siteId]: {
+          ...entry,
+          fullTanks: {
+            ...(entry.fullTanks ?? {}),
+            [machineId]: !current,
+          }
+        }
+      };
+    });
+  }, []);
+
   const handleMachineNotesChange = useCallback((siteId: string, notes: string) => {
     setActiveMachineBySite(prev => ({
       ...prev,
-      [siteId]: { ...(prev[siteId] ?? { activeMachineIds: [], machineTypes: {}, dieselUsage: {}, notes: '' }), notes },
+      [siteId]: { ...(prev[siteId] ?? { activeMachineIds: [], machineTypes: {}, dieselUsage: {}, dipstickLevels: {}, fullTanks: {}, notes: '' }), notes },
     }));
   }, []);
+
+  const handleAutoSelectAllWorking = useCallback(() => {
+    setActiveMachineBySite(prev => {
+      const next: Record<string, MachineSiteEntry> = { ...prev };
+      let machineCount = 0;
+
+      sitesWithMachines.forEach(site => {
+        const assignedIds = Array.from(onSiteMachineIds[site.id] ?? []);
+        const existing = prev[site.id] ?? {
+          activeMachineIds: [],
+          machineTypes: {},
+          dieselUsage: {},
+          dipstickLevels: {},
+          fullTanks: {},
+          notes: '',
+          progressPercentage: site.currentProgressPercentage ?? 0,
+        };
+
+        const updatedMachineTypes = { ...existing.machineTypes };
+        assignedIds.forEach(id => {
+          updatedMachineTypes[id] = 'full';
+        });
+
+        next[site.id] = {
+          ...existing,
+          activeMachineIds: assignedIds,
+          machineTypes: updatedMachineTypes,
+        };
+        machineCount += assignedIds.length;
+      });
+
+      toast.success(`Auto-selected all ${machineCount} on-site machines as Full Day.`);
+      return next;
+    });
+  }, [sitesWithMachines, onSiteMachineIds]);
 
   const handleMachineRegSave = async () => {
     setIsSavingMachines(true);
     try {
       for (const site of sitesWithMachines) {
-        const entry = activeMachineBySite[site.id] ?? { activeMachineIds: [], machineTypes: {}, dieselUsage: {}, notes: '', progressPercentage: site.currentProgressPercentage ?? 0 };
+        const entry = activeMachineBySite[site.id] ?? { activeMachineIds: [], machineTypes: {}, dieselUsage: {}, dipstickLevels: {}, fullTanks: {}, notes: '', progressPercentage: site.currentProgressPercentage ?? 0 };
         const selectedIds = entry.activeMachineIds.filter(id => id && id !== 'none');
         
         // Update site progress in DB if changed
@@ -741,6 +837,8 @@ export function Attendance() {
             downtimeEntries: [],
             maintenanceDetails: entry.notes,
             dieselUsage: entry.dieselUsage[machineId] || 0,
+            dipstickLevelLitres: entry.dipstickLevels?.[machineId] ?? undefined,
+            isTankFilledToFull: entry.fullTanks?.[machineId] ?? false,
           });
         }
 
@@ -2701,12 +2799,22 @@ export function Attendance() {
               <Button
                 variant="outline"
                 size="sm"
+                onClick={handleAutoSelectAllWorking}
+                className="h-7 px-2.5 text-[10px] uppercase font-bold tracking-wider text-emerald-700 bg-emerald-50 hover:bg-emerald-100 hover:text-emerald-800 border-emerald-300 shadow-2xs gap-1.5 cursor-pointer"
+              >
+                <CheckCheck className="h-3.5 w-3.5 text-emerald-600" />
+                Auto-Select All Working
+              </Button>
+
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={() => {
                   if (confirm('Are you sure you want to clear all current machine selections for this date?')) {
                     setActiveMachineBySite({});
                   }
                 }}
-                className="h-7 px-2.5 text-[10px] uppercase font-bold tracking-wider text-slate-500 hover:text-red-600 hover:bg-red-50 border-slate-200"
+                className="h-7 px-2.5 text-[10px] uppercase font-bold tracking-wider text-slate-500 hover:text-red-600 hover:bg-red-50 border-slate-200 cursor-pointer"
               >
                 Clear Selection
               </Button>
@@ -2754,11 +2862,11 @@ export function Attendance() {
                   <table className="w-full text-[11px]">
                     <thead className="bg-slate-50 sticky top-0 shadow-sm z-10 border-b border-slate-200">
                       <tr>
-                        <th className="text-left font-bold text-slate-600 py-2.5 px-4 uppercase tracking-wide w-[20%]">Active Site</th>
-                        <th className="text-left font-bold text-slate-600 py-2.5 px-4 uppercase tracking-wide w-[10%]">Site Progress</th>
-                        <th className="text-left font-bold text-slate-600 py-2.5 px-4 uppercase tracking-wide w-[15%]">Select Equipment</th>
-                        <th className="text-left font-bold text-slate-600 py-2.5 px-4 uppercase tracking-wide w-[35%]">Selected Machines &amp; Day Type</th>
-                        <th className="text-left font-bold text-slate-600 py-2.5 px-4 uppercase tracking-wide w-[20%]">Notes / Remarks</th>
+                        <th className="text-left font-bold text-slate-600 py-2.5 px-4 uppercase tracking-wide w-[18%]">Active Site</th>
+                        <th className="text-left font-bold text-slate-600 py-2.5 px-4 uppercase tracking-wide w-[8%]">Site Progress</th>
+                        <th className="text-left font-bold text-slate-600 py-2.5 px-4 uppercase tracking-wide w-[14%]">Select Equipment</th>
+                        <th className="text-left font-bold text-slate-600 py-2.5 px-4 uppercase tracking-wide w-[42%]">Selected Machines, Fuel &amp; Day Type</th>
+                        <th className="text-left font-bold text-slate-600 py-2.5 px-4 uppercase tracking-wide w-[18%]">Notes / Remarks</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -2767,7 +2875,7 @@ export function Attendance() {
                         const entry = activeMachineBySite[site.id];
                         return entry && entry.activeMachineIds.some(id => (entry.machineTypes[id] ?? 'full') !== 'off');
                       }).map((site, idx) => {
-                        const entry = activeMachineBySite[site.id] ?? { activeMachineIds: [], machineTypes: {}, dieselUsage: {}, notes: '' };
+                        const entry = activeMachineBySite[site.id] ?? { activeMachineIds: [], machineTypes: {}, dieselUsage: {}, dipstickLevels: {}, fullTanks: {}, notes: '' };
                         const nonOffCount = entry.activeMachineIds.filter(id => (entry.machineTypes[id] ?? 'full') !== 'off').length;
                         const isActive = nonOffCount > 0;
                         const { onSite, other } = getDropdownGroups(site.id);
@@ -2799,7 +2907,7 @@ export function Attendance() {
                                       setActiveMachineBySite(prev => ({
                                         ...prev,
                                         [site.id]: {
-                                          ...(prev[site.id] ?? { activeMachineIds: [], machineTypes: {}, dieselUsage: {}, notes: '' }),
+                                          ...(prev[site.id] ?? { activeMachineIds: [], machineTypes: {}, dieselUsage: {}, dipstickLevels: {}, fullTanks: {}, notes: '' }),
                                           progressPercentage: val
                                         }
                                       }));
@@ -2826,10 +2934,12 @@ export function Attendance() {
                                 onClear={() => setActiveMachineBySite(prev => ({
                                   ...prev,
                                   [site.id]: {
-                                    ...(prev[site.id] ?? { activeMachineIds: [], machineTypes: {}, dieselUsage: {}, notes: '' }),
+                                    ...(prev[site.id] ?? { activeMachineIds: [], machineTypes: {}, dieselUsage: {}, dipstickLevels: {}, fullTanks: {}, notes: '' }),
                                     activeMachineIds: [],
                                     machineTypes: {},
                                     dieselUsage: {},
+                                    dipstickLevels: {},
+                                    fullTanks: {},
                                   }
                                 }))}
                               />
@@ -2856,12 +2966,12 @@ export function Attendance() {
                                           <span className={`w-1 h-1 rounded-full flex-shrink-0 ${
                                             dayType === 'off' ? 'bg-red-400' : isOnSite ? 'bg-emerald-500' : 'bg-amber-500'
                                           }`} />
-                                          <span className="truncate">{matched.name}</span>
+                                          <span className="truncate" title={matched.name}>{matched.name}</span>
                                         </span>
                                         <select
                                           value={dayType}
                                           onChange={e => handleMachineTypeChange(site.id, machineId, e.target.value as 'full' | 'half' | 'off')}
-                                          className={`h-6 w-20 text-[9px] font-bold rounded border px-1 outline-none focus:ring-1 cursor-pointer flex-shrink-0 ${
+                                          className={`h-6 w-18 text-[9px] font-bold rounded border px-1 outline-none focus:ring-1 cursor-pointer flex-shrink-0 ${
                                             dayType === 'full'
                                               ? 'border-emerald-300 bg-emerald-50 text-emerald-700 focus:ring-emerald-400'
                                               : dayType === 'half'
@@ -2876,10 +2986,33 @@ export function Attendance() {
                                         <input
                                           type="number"
                                           placeholder="Diesel (L)"
+                                          title="Diesel refilled / added today (Litres)"
                                           value={entry.dieselUsage?.[machineId] || ''}
                                           onChange={e => handleMachineDieselChange(site.id, machineId, e.target.value)}
-                                          className="h-6 w-20 text-[10px] font-medium border border-slate-200 rounded px-1.5 outline-none focus:border-slate-400 placeholder:text-slate-400 flex-shrink-0"
+                                          className="h-6 w-16 text-[10px] font-medium border border-slate-200 rounded px-1.5 outline-none focus:border-slate-400 placeholder:text-slate-400 flex-shrink-0 bg-white"
                                         />
+                                        <input
+                                          type="number"
+                                          placeholder="Dipstick (L)"
+                                          title="Physical fuel remaining measured by dipstick at end of day (Litres)"
+                                          value={entry.dipstickLevels?.[machineId] ?? ''}
+                                          onChange={e => handleMachineDipstickChange(site.id, machineId, e.target.value)}
+                                          className="h-6 w-18 text-[10px] font-medium border border-cyan-200 rounded px-1.5 outline-none focus:border-cyan-500 placeholder:text-slate-400 flex-shrink-0 bg-cyan-50/20"
+                                        />
+                                        <button
+                                          type="button"
+                                          onClick={() => handleMachineFullTankToggle(site.id, machineId)}
+                                          title={entry.fullTanks?.[machineId] ? "Tank topped to full (100% capacity)" : "Click if tank was filled to 100% full"}
+                                          className={cn(
+                                            "h-6 px-1.5 text-[9px] font-bold rounded border flex items-center gap-0.5 shrink-0 transition-all cursor-pointer",
+                                            entry.fullTanks?.[machineId]
+                                              ? "bg-emerald-600 text-white border-emerald-700 shadow-xs"
+                                              : "bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100"
+                                          )}
+                                        >
+                                          <span>Full</span>
+                                          {entry.fullTanks?.[machineId] && <span>✓</span>}
+                                        </button>
                                       </div>
                                     );
                                   })
@@ -2905,7 +3038,7 @@ export function Attendance() {
                 {/* Mobile cards */}
                 <div className="sm:hidden space-y-2 p-2">
                   {sitesWithMachines.map((site, idx) => {
-                    const entry = activeMachineBySite[site.id] ?? { activeMachineIds: [], machineTypes: {}, dieselUsage: {}, notes: '' };
+                    const entry: MachineSiteEntry = activeMachineBySite[site.id] ?? { activeMachineIds: [], machineTypes: {}, dieselUsage: {}, dipstickLevels: {}, fullTanks: {}, notes: '', progressPercentage: site.currentProgressPercentage ?? 0 };
                     const nonOffCount = entry.activeMachineIds.filter(id => (entry.machineTypes[id] ?? 'full') !== 'off').length;
                     const isActive = nonOffCount > 0;
                     const { onSite, other } = getDropdownGroups(site.id);
@@ -2936,7 +3069,7 @@ export function Attendance() {
                                     setActiveMachineBySite(prev => ({
                                       ...prev,
                                       [site.id]: {
-                                        ...(prev[site.id] ?? { activeMachineIds: [], machineTypes: {}, dieselUsage: {}, notes: '' }),
+                                        ...(prev[site.id] ?? { activeMachineIds: [], machineTypes: {}, dieselUsage: {}, dipstickLevels: {}, fullTanks: {}, notes: '' }),
                                         progressPercentage: val
                                       }
                                     }));
@@ -2967,10 +3100,12 @@ export function Attendance() {
                               onClear={() => setActiveMachineBySite(prev => ({
                                 ...prev,
                                 [site.id]: {
-                                  ...(prev[site.id] ?? { activeMachineIds: [], machineTypes: {}, dieselUsage: {}, notes: '' }),
+                                  ...(prev[site.id] ?? { activeMachineIds: [], machineTypes: {}, dieselUsage: {}, dipstickLevels: {}, fullTanks: {}, notes: '' }),
                                   activeMachineIds: [],
                                   machineTypes: {},
                                   dieselUsage: {},
+                                  dipstickLevels: {},
+                                  fullTanks: {},
                                 }
                               }))}
                             />
@@ -2978,14 +3113,14 @@ export function Attendance() {
                           {entry.activeMachineIds.length > 0 && (
                             <div>
                               <label className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-1">Machines &amp; Day Type</label>
-                              <div className="flex flex-col gap-1.5">
+                              <div className="flex flex-col gap-2">
                                 {entry.activeMachineIds.map(machineId => {
                                   const matched = [...onSite, ...other].find(m => m.id === machineId);
                                   if (!matched) return null;
                                   const isOnSite = onSite.some(o => o.id === machineId);
                                   const dayType = entry.machineTypes[machineId] ?? 'full';
                                   return (
-                                    <div key={machineId} className="flex flex-col gap-1.5">
+                                    <div key={machineId} className="flex flex-col gap-1.5 p-2 bg-slate-50/70 rounded-lg border border-slate-200/70">
                                       <div className="flex items-center gap-1.5">
                                         <span className={`px-1.5 py-0.5 rounded text-[9px] font-semibold border flex items-center gap-1 flex-1 min-w-0 ${
                                           dayType === 'off'
@@ -3015,13 +3150,39 @@ export function Attendance() {
                                           <option value="off">Off</option>
                                         </select>
                                       </div>
-                                      <input
-                                        type="number"
-                                        placeholder="Diesel Filled (Litres)"
-                                        value={entry.dieselUsage?.[machineId] || ''}
-                                        onChange={e => handleMachineDieselChange(site.id, machineId, e.target.value)}
-                                        className="h-7 w-full text-[10px] font-medium border border-slate-200 rounded px-2 outline-none focus:border-slate-400 placeholder:text-slate-400"
-                                      />
+                                      <div className="grid grid-cols-2 gap-1.5">
+                                        <input
+                                          type="number"
+                                          placeholder="Diesel Refill (L)"
+                                          title="Diesel refilled / added today (Litres)"
+                                          value={entry.dieselUsage?.[machineId] || ''}
+                                          onChange={e => handleMachineDieselChange(site.id, machineId, e.target.value)}
+                                          className="h-7 w-full text-[10px] font-medium border border-slate-200 rounded px-2 outline-none focus:border-slate-400 placeholder:text-slate-400 bg-white"
+                                        />
+                                        <input
+                                          type="number"
+                                          placeholder="Dipstick Level (L)"
+                                          title="Physical fuel remaining measured by dipstick at end of day (Litres)"
+                                          value={entry.dipstickLevels?.[machineId] ?? ''}
+                                          onChange={e => handleMachineDipstickChange(site.id, machineId, e.target.value)}
+                                          className="h-7 w-full text-[10px] font-medium border border-cyan-200 rounded px-2 outline-none focus:border-cyan-400 placeholder:text-slate-400 bg-cyan-50/20"
+                                        />
+                                      </div>
+                                      <div className="flex items-center justify-end">
+                                        <button
+                                          type="button"
+                                          onClick={() => handleMachineFullTankToggle(site.id, machineId)}
+                                          className={cn(
+                                            "h-6 px-2 text-[9px] font-bold rounded border flex items-center gap-1 transition-all cursor-pointer",
+                                            entry.fullTanks?.[machineId]
+                                              ? "bg-emerald-600 text-white border-emerald-700 shadow-xs"
+                                              : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"
+                                          )}
+                                        >
+                                          <span>Tank Filled to Full (100%)</span>
+                                          {entry.fullTanks?.[machineId] && <span>✓</span>}
+                                        </button>
+                                      </div>
                                     </div>
                                   );
                                 })}

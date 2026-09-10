@@ -532,11 +532,11 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
   // ── Theme tokens (shared across all categories) ────────────────────────────
   const sidebarBg   = isDark ? 'bg-slate-900 border-slate-700/60' : 'bg-white border-slate-200';
   const navBg       = isDark ? 'bg-slate-900' : 'bg-gradient-to-b from-indigo-600 via-indigo-700 to-indigo-800';
-  const catBtnBase  = isDark ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-white hover:bg-white hover:text-indigo-600';
-  const catBtnActive = isDark ? 'bg-indigo-700 text-white shadow-md' : 'bg-white text-indigo-600 shadow-md';
-  const itemBase    = isDark ? 'text-slate-400 hover:bg-slate-800 hover:text-slate-100' : 'text-white/95 hover:bg-white hover:text-indigo-600';
-  const itemActive  = isDark ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-indigo-600 shadow-md';
-  const iconBase    = isDark ? 'text-slate-500 group-hover:text-slate-300' : 'text-white/70 group-hover:text-inherit';
+  const catBtnBase  = isDark ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-white hover:bg-white/10 hover:text-white';
+  const catBtnActive = isDark ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/25 ring-1 ring-white/15 font-bold' : 'bg-white text-indigo-600 shadow-md font-bold';
+  const itemBase    = isDark ? 'text-slate-400 hover:bg-slate-800/80 hover:text-slate-100' : 'text-white/90 hover:bg-white/15 hover:text-white';
+  const itemActive  = isDark ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/30 ring-1 ring-white/20 font-bold' : 'bg-white text-indigo-600 shadow-md font-bold';
+  const iconBase    = isDark ? 'text-slate-500 group-hover:text-slate-300' : 'text-white/80 group-hover:text-inherit';
   const iconActive  = isDark ? 'text-white' : 'text-indigo-600';
 
   return (
@@ -560,13 +560,31 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
       >
         {/* Logo Area */}
         <div className={cn('flex h-16 shrink-0 items-center border-b border-transparent transition-all', isCollapsed ? 'px-0 justify-center' : 'px-6 justify-between')}>
-          <div className={cn('flex items-center gap-2 font-bold text-xl text-blue-600 overflow-hidden transition-all duration-300', isCollapsed ? 'w-0 opacity-0 hidden' : 'w-auto opacity-100')}>
-            <img
-              src={logoSrc}
-              alt="HR System"
-              className="h-10 w-auto min-w-max"
-              style={isDark ? { filter: 'brightness(0) invert(1)', opacity: 0.9 } : {}}
-            />
+          <div className={cn('relative flex items-center gap-2 font-bold text-xl overflow-hidden transition-all duration-300', isCollapsed ? 'w-0 opacity-0 hidden' : 'w-auto opacity-100')}>
+            <div className="relative inline-flex items-center">
+              <img
+                src={logoSrc}
+                alt="DCEL"
+                className="h-10 w-auto min-w-max block transition-all duration-300"
+                style={isDark ? { filter: 'brightness(0) invert(1)', opacity: 0.9 } : undefined}
+              />
+              <div
+                className="absolute inset-0 pointer-events-none transition-all duration-300"
+                style={{
+                  backgroundColor: 'var(--color-indigo-600)',
+                  WebkitMaskImage: `url("${logoSrc}")`,
+                  maskImage: `url("${logoSrc}")`,
+                  WebkitMaskSize: 'contain',
+                  maskSize: 'contain',
+                  WebkitMaskRepeat: 'no-repeat',
+                  maskRepeat: 'no-repeat',
+                  WebkitMaskPosition: 'left center',
+                  maskPosition: 'left center',
+                  mixBlendMode: isDark ? 'screen' : 'color',
+                  opacity: isDark ? 0.75 : 1,
+                }}
+              />
+            </div>
           </div>
           <div className="flex items-center">
             {/* Desktop Collapse Toggle */}
@@ -638,7 +656,7 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
                     }}
                     className={cn(
                       'flex w-full items-center justify-between px-3 py-2 text-xs font-bold uppercase tracking-wider transition-colors relative',
-                      isDark ? 'text-slate-500 hover:text-slate-700' : 'text-white/80 hover:text-white',
+                      isDark ? 'text-slate-400 hover:text-slate-200' : 'text-white/80 hover:text-white',
                       isCollapsed && 'justify-center cursor-default'
                     )}
                   >

@@ -6,6 +6,8 @@ export type UITheme = 'default' | 'modern' | 'glass' | 'brutalism' | 'minimalist
 
 const MODE_KEY = 'dcel-theme';
 const COLOR_KEY = 'dcel-color-theme';
+const COLOR_LIGHT_KEY = 'dcel-color-theme-light';
+const COLOR_DARK_KEY = 'dcel-color-theme-dark';
 const UI_KEY = 'dcel-ui-theme';
 const CALENDAR_KEY = 'dcel-floating-calendar';
 
@@ -21,10 +23,22 @@ function getInitialMode(): Mode {
   return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }
 
-function getInitialColor(): ColorTheme {
+function getInitialLightColor(): ColorTheme {
   try {
-    const stored = localStorage.getItem(COLOR_KEY) as ColorTheme;
-    if (ALL_COLOR_THEMES.includes(stored)) return stored;
+    const stored = localStorage.getItem(COLOR_LIGHT_KEY) as ColorTheme;
+    if (stored && ALL_COLOR_THEMES.includes(stored)) return stored;
+    const legacy = localStorage.getItem(COLOR_KEY) as ColorTheme;
+    if (legacy && ALL_COLOR_THEMES.includes(legacy)) return legacy;
+  } catch {}
+  return 'default';
+}
+
+function getInitialDarkColor(): ColorTheme {
+  try {
+    const stored = localStorage.getItem(COLOR_DARK_KEY) as ColorTheme;
+    if (stored && ALL_COLOR_THEMES.includes(stored)) return stored;
+    const legacy = localStorage.getItem(COLOR_KEY) as ColorTheme;
+    if (legacy && ALL_COLOR_THEMES.includes(legacy)) return legacy;
   } catch {}
   return 'default';
 }
@@ -47,18 +61,23 @@ function getInitialCalendar(): boolean {
 
 // Singleton state shared across components
 let _mode: Mode = getInitialMode();
-let _color: ColorTheme = getInitialColor();
+let _lightColor: ColorTheme = getInitialLightColor();
+let _darkColor: ColorTheme = getInitialDarkColor();
 let _ui: UITheme = getInitialUI();
 let _showCalendar: boolean = getInitialCalendar();
 const _listeners = new Set<() => void>();
 
+function getActiveColor(): ColorTheme {
+  return _mode === 'dark' ? _darkColor : _lightColor;
+}
+
 function updateHtmlClasses() {
-  ALL_COLOR_THEMES.forEach(t => document.documentElement.classList.remove(`theme-${t}`));
-  if (_color !== 'default') {
-    document.documentElement.classList.add(`theme-${_color}`);
-  }
+  const activeColor = getActiveColor();
   
-  if (_mode === 'dark' || IDE_THEMES.includes(_color)) {
+  ALL_COLOR_THEMES.forEach(t => document.documentElement.classList.remove(`theme-${t}`));
+  document.documentElement.classList.add(`theme-${activeColor}`);
+  
+  if (_mode === 'dark') {
     document.documentElement.classList.add('dark');
   } else {
     document.documentElement.classList.remove('dark');
@@ -73,13 +92,22 @@ function updateHtmlClasses() {
 function applyMode(m: Mode) {
   _mode = m;
   try { localStorage.setItem(MODE_KEY, m); } catch {}
+  try { localStorage.setItem(COLOR_KEY, getActiveColor()); } catch {}
   updateHtmlClasses();
   _listeners.forEach(fn => fn());
 }
 
 function applyColor(c: ColorTheme) {
-  _color = c;
-  try { localStorage.setItem(COLOR_KEY, c); } catch {}
+  // All 12 themes have full Light Mode and Dark Mode counterparts.
+  // Update the theme for the currently active mode:
+  if (_mode === 'dark') {
+    _darkColor = c;
+    try { localStorage.setItem(COLOR_DARK_KEY, c); } catch {}
+  } else {
+    _lightColor = c;
+    try { localStorage.setItem(COLOR_LIGHT_KEY, c); } catch {}
+  }
+  try { localStorage.setItem(COLOR_KEY, getActiveColor()); } catch {}
   updateHtmlClasses();
   _listeners.forEach(fn => fn());
 }
@@ -98,9 +126,7 @@ function applyCalendar(show: boolean) {
 }
 
 // Apply immediately on load
-applyMode(_mode);
-applyColor(_color);
-applyUI(_ui);
+updateHtmlClasses();
 
 export function useTheme() {
   const [, rerender] = useState(0);
@@ -115,21 +141,43 @@ export function useTheme() {
   const setLight = () => applyMode('light');
   const setDark = () => applyMode('dark');
   const setColorTheme = (c: ColorTheme) => applyColor(c);
+  const setLightColorTheme = (c: ColorTheme) => {
+    _lightColor = c;
+    try { localStorage.setItem(COLOR_LIGHT_KEY, c); } catch {}
+    if (_mode === 'light') {
+      try { localStorage.setItem(COLOR_KEY, c); } catch {}
+      updateHtmlClasses();
+    }
+    _listeners.forEach(fn => fn());
+  };
+  const setDarkColorTheme = (c: ColorTheme) => {
+    _darkColor = c;
+    try { localStorage.setItem(COLOR_DARK_KEY, c); } catch {}
+    if (_mode === 'dark') {
+      try { localStorage.setItem(COLOR_KEY, c); } catch {}
+      updateHtmlClasses();
+    }
+    _listeners.forEach(fn => fn());
+  };
   const setUITheme = (u: UITheme) => applyUI(u);
   const setShowFloatingCalendar = (show: boolean) => applyCalendar(show);
 
   return {
     theme: _mode,
-    colorTheme: _color,
+    colorTheme: getActiveColor(),
+    lightColorTheme: _lightColor,
+    darkColorTheme: _darkColor,
     uiTheme: _ui,
     showFloatingCalendar: _showCalendar,
     toggle,
     setLight,
     setDark,
     setColorTheme,
+    setLightColorTheme,
+    setDarkColorTheme,
     setUITheme,
     setShowFloatingCalendar,
-    isDark: _mode === 'dark' || IDE_THEMES.includes(_color),
+    isDark: _mode === 'dark',
   };
 }
 

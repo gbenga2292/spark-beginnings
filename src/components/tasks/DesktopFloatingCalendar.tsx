@@ -62,7 +62,11 @@ export function DesktopFloatingCalendar() {
       const height = Math.round(40 * zoom);
 
       if (open) {
-        api.setTitleBarOverlay({ color: '#0b0f19', symbolColor: '#ffffff', height });
+        if (isDark) {
+          api.setTitleBarOverlay({ color: '#0b0f19', symbolColor: '#ffffff', height });
+        } else {
+          api.setTitleBarOverlay({ color: '#ffffff', symbolColor: '#0f172a', height });
+        }
       } else {
         if (isDark) {
           api.setTitleBarOverlay({ color: '#0f172a', symbolColor: '#94a3b8', height });
@@ -170,32 +174,32 @@ export function DesktopFloatingCalendar() {
       <AnimatePresence>
         {open && (
             <div
-              className="fixed inset-0 z-[9999] bg-slate-950/90 backdrop-blur-xs flex flex-col select-none"
+              className="fixed inset-0 z-[9999] bg-slate-950/40 dark:bg-slate-950/90 backdrop-blur-xs flex flex-col select-none"
               onClick={() => setOpen(false)}
             >
             <motion.div
               initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 16 }} transition={{ duration: 0.25, ease: 'easeOut' }}
-              className="flex-1 flex flex-col overflow-hidden bg-[#0b0f19] border border-white/10 text-white select-auto"
+              className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-[#0b0f19] border border-slate-200 dark:border-white/10 text-slate-800 dark:text-white select-auto"
               onClick={e => e.stopPropagation()}
             >
               {/* ── Studio Top Header Bar ── */}
               <div
                 style={{ WebkitAppRegion: 'drag' } as any}
-                className={`relative flex flex-wrap items-center justify-between py-2.5 px-4 flex-shrink-0 bg-[#0b0f19] border-b border-white/10 ${isMac ? 'pl-[90px] pr-20' : 'pl-4 sm:pl-6 pr-36'}`}
+                className={`relative flex flex-wrap items-center justify-between py-2 px-4 flex-shrink-0 bg-slate-50 dark:bg-[#0b0f19] border-b border-slate-200 dark:border-white/10 ${isMac ? 'pl-[90px] pr-20' : 'pl-4 sm:pl-6 pr-36'}`}
               >
                 {/* Left: Studio Identity */}
                 <div
                   className="flex items-center gap-2.5 no-drag select-none"
                   style={{ WebkitAppRegion: 'no-drag' } as any}
                 >
-                  <div className="w-8 h-8 rounded-lg bg-indigo-600/30 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
+                  <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-600/30 border border-indigo-200 dark:border-indigo-500/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
                     <Columns className="w-4 h-4" />
                   </div>
                   <div>
-                    <h2 className="text-sm font-bold text-white flex items-center gap-2">
+                    <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
                       <span>Operations Studio</span>
-                      <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-white/10 text-slate-300">
+                      <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-slate-200/80 dark:bg-white/10 text-slate-600 dark:text-slate-300">
                         {viewMode === 'split' ? `Split View (${Math.round(splitPercent)}% / ${100 - Math.round(splitPercent)}%)` : viewMode === 'calendar' ? 'Calendar Focused' : 'AI Copilot Focused'}
                       </span>
                     </h2>
@@ -209,7 +213,7 @@ export function DesktopFloatingCalendar() {
                 >
                   {/* View Mode Switcher: Calendar first, Split View second, AI Copilot third */}
                   <div
-                    className="flex items-center bg-white/5 p-0.5 rounded-lg border border-white/10 text-xs no-drag"
+                    className="flex items-center bg-slate-200/60 dark:bg-white/5 p-0.5 rounded-lg border border-slate-200 dark:border-white/10 text-xs no-drag"
                     style={{ WebkitAppRegion: 'no-drag' } as any}
                   >
                     {/* 1. Calendar Primary / Default */}
@@ -223,7 +227,7 @@ export function DesktopFloatingCalendar() {
                         "px-2.5 py-1 rounded-md font-semibold transition-all flex items-center gap-1.5 text-xs cursor-pointer select-none no-drag",
                         viewMode === 'calendar'
                           ? "bg-indigo-600 text-white shadow-xs"
-                          : "text-white/60 hover:text-white"
+                          : "text-slate-600 dark:text-white/60 hover:text-slate-900 dark:hover:text-white"
                       )}
                       style={{ WebkitAppRegion: 'no-drag' } as any}
                       title="Calendar & Tasks (Primary Fullscreen)"
@@ -243,7 +247,7 @@ export function DesktopFloatingCalendar() {
                         "px-2.5 py-1 rounded-md font-semibold transition-all flex items-center gap-1.5 text-xs cursor-pointer select-none no-drag",
                         viewMode === 'split'
                           ? "bg-indigo-600 text-white shadow-xs"
-                          : "text-white/60 hover:text-white"
+                          : "text-slate-600 dark:text-white/60 hover:text-slate-900 dark:hover:text-white"
                       )}
                       style={{ WebkitAppRegion: 'no-drag' } as any}
                       title="Split View (Calendar 75% + AI Copilot 25%)"
@@ -263,35 +267,35 @@ export function DesktopFloatingCalendar() {
                         "px-2.5 py-1 rounded-md font-semibold transition-all flex items-center gap-1.5 text-xs cursor-pointer select-none no-drag",
                         viewMode === 'ai'
                           ? "bg-indigo-600 text-white shadow-xs"
-                          : "text-white/60 hover:text-white"
+                          : "text-slate-600 dark:text-white/60 hover:text-slate-900 dark:hover:text-white"
                       )}
                       style={{ WebkitAppRegion: 'no-drag' } as any}
                       title="AI Operations Copilot Fullscreen"
                     >
-                      <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                      <Sparkles className="w-3.5 h-3.5 text-amber-500" />
                       <span className="hidden sm:inline">AI Copilot</span>
                     </button>
                   </div>
 
                   {/* Task Completed Toggle */}
                   <div
-                    className="hidden md:flex items-center gap-2 pl-2 border-l border-white/10 no-drag"
+                    className="hidden md:flex items-center gap-2 pl-2 border-l border-slate-200 dark:border-white/10 no-drag"
                     style={{ WebkitAppRegion: 'no-drag' } as any}
                   >
-                    <span className="text-[11px] text-white/50 select-none">Done Tasks</span>
+                    <span className="text-[11px] text-slate-500 dark:text-white/50 select-none">Done Tasks</span>
                     <button
                       type="button"
                       onClick={() => setShowCompleted(!showCompleted)}
                       className={`relative w-8 h-4 rounded-full transition-all duration-300 border cursor-pointer no-drag ${showCompleted
                         ? 'bg-emerald-500/20 border-emerald-500/40 shadow-[0_0_8px_rgba(16,185,129,0.2)]'
-                        : 'bg-white/5 border-white/10'
+                        : 'bg-slate-200 dark:bg-white/5 border-slate-300 dark:border-white/10'
                         }`}
                       style={{ WebkitAppRegion: 'no-drag' } as any}
                     >
                       <motion.div
                         animate={{ x: showCompleted ? 16 : 2 }}
                         initial={false}
-                        className={`absolute top-0.5 w-2 h-2 rounded-full transition-colors duration-300 ${showCompleted ? 'bg-emerald-400' : 'bg-white/30'
+                        className={`absolute top-0.5 w-2 h-2 rounded-full transition-colors duration-300 ${showCompleted ? 'bg-emerald-600 dark:bg-emerald-400' : 'bg-slate-400 dark:bg-white/30'
                           }`}
                       />
                     </button>
@@ -306,7 +310,7 @@ export function DesktopFloatingCalendar() {
                   <button
                     type="button"
                     onClick={() => setOpen(false)}
-                    className="h-full w-12 flex justify-center items-center transition-colors hover:bg-red-500 hover:text-white text-white/60 cursor-pointer no-drag"
+                    className="h-full w-12 flex justify-center items-center transition-colors hover:bg-red-500 hover:text-white text-slate-400 dark:text-white/60 cursor-pointer no-drag"
                     style={{ WebkitAppRegion: 'no-drag' } as any}
                     title="Close Studio (Esc)"
                   >
@@ -318,7 +322,7 @@ export function DesktopFloatingCalendar() {
               </div>
 
               {/* ── Studio Body: Resizable Split Pane ── */}
-              <div ref={containerRef} className="flex-1 flex overflow-hidden relative bg-[#0b0f19]">
+              <div ref={containerRef} className="flex-1 flex overflow-hidden relative bg-white dark:bg-[#0b0f19]">
                 
                 {/* ── Left Pane: Calendar & Tasks ── */}
                 {(viewMode === 'split' || viewMode === 'calendar') && (
@@ -329,7 +333,7 @@ export function DesktopFloatingCalendar() {
                       pointerEvents: isDraggingDivider ? 'none' : 'auto',
                       willChange: isDraggingDivider ? 'width' : 'auto'
                     }}
-                    className="h-full flex flex-col overflow-hidden bg-[#0b0f19]"
+                    className="h-full flex flex-col overflow-hidden bg-white dark:bg-[#0b0f19]"
                   >
                     <CalendarPage onNavigate={() => setOpen(false)} showCompleted={showCompleted} hideHeaderToggle={true} />
                   </div>
@@ -341,12 +345,12 @@ export function DesktopFloatingCalendar() {
                     onMouseDown={handleMouseDown}
                     onDoubleClick={() => updateSplitPercent(75)}
                     className={cn(
-                      "w-1.5 hover:w-2 bg-white/10 hover:bg-indigo-500 active:bg-indigo-600 transition-colors cursor-col-resize flex items-center justify-center group relative z-20 shrink-0 select-none",
+                      "w-1.5 hover:w-2 bg-slate-200 dark:bg-white/10 hover:bg-indigo-500 active:bg-indigo-600 transition-colors cursor-col-resize flex items-center justify-center group relative z-20 shrink-0 select-none",
                       isDraggingDivider && "bg-indigo-500 w-2"
                     )}
                     title="Drag to resize split panes (Double-click to reset 75/25)"
                   >
-                    <div className="w-1 h-8 rounded-full bg-white/30 group-hover:bg-white flex flex-col items-center justify-center gap-0.5" />
+                    <div className="w-1 h-8 rounded-full bg-slate-400 dark:bg-white/30 group-hover:bg-white flex flex-col items-center justify-center gap-0.5" />
                   </div>
                 )}
 
@@ -359,7 +363,7 @@ export function DesktopFloatingCalendar() {
                       pointerEvents: isDraggingDivider ? 'none' : 'auto',
                       willChange: isDraggingDivider ? 'width' : 'auto'
                     }}
-                    className="h-full flex flex-col overflow-hidden bg-[#0b0f19]"
+                    className="h-full flex flex-col overflow-hidden bg-white dark:bg-[#0b0f19]"
                   >
                     <DailyLogsAiModal isEmbedded={true} onClose={() => setOpen(false)} />
                   </div>

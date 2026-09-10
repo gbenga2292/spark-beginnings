@@ -2263,7 +2263,7 @@ export function ActiveSiteAnalytics() {
                     : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
                 )}
               >
-                <span>All Ongoing Sites (Fleet-Wide)</span>
+                <span>All Active Sites</span>
                 <span className={cn(
                   "text-[10px] px-1.5 py-0.2 rounded-full font-bold",
                   refillForecastScope === 'fleet' || !currentSite
@@ -2394,15 +2394,15 @@ export function ActiveSiteAnalytics() {
             ) : (
               <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-x-auto bg-white dark:bg-slate-900 shadow-xs">
                 <Table className="min-w-[760px] w-full">
-                  <TableHeader className="bg-slate-50/80 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800">
-                    <TableRow>
-                      <TableHead className="text-[11px] font-bold uppercase tracking-wider text-slate-500 py-3">Site</TableHead>
-                      <TableHead className="text-[11px] font-bold uppercase tracking-wider text-slate-500 py-3">Machine / Unit</TableHead>
-                      <TableHead className="text-[11px] font-bold uppercase tracking-wider text-slate-500 py-3">Fuel Level & Remaining</TableHead>
-                      <TableHead className="text-[11px] font-bold uppercase tracking-wider text-slate-500 py-3">Rated Burn</TableHead>
-                      <TableHead className="text-[11px] font-bold uppercase tracking-wider text-slate-500 py-3">Last Refill Date</TableHead>
-                      <TableHead className="text-[11px] font-bold uppercase tracking-wider text-slate-500 py-3">Estimated Next Refill</TableHead>
-                      <TableHead className="text-[11px] font-bold uppercase tracking-wider text-slate-500 py-3 text-right">Action</TableHead>
+                  <TableHeader className="sticky top-0 z-20 bg-slate-100 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 shadow-xs">
+                    <TableRow className="bg-slate-100 dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-900">
+                      <TableHead className="text-[11px] font-bold uppercase tracking-wider text-slate-500 py-3 bg-slate-100 dark:bg-slate-900">Site</TableHead>
+                      <TableHead className="text-[11px] font-bold uppercase tracking-wider text-slate-500 py-3 bg-slate-100 dark:bg-slate-900">Machine / Unit</TableHead>
+                      <TableHead className="text-[11px] font-bold uppercase tracking-wider text-slate-500 py-3 bg-slate-100 dark:bg-slate-900">Fuel Level & Remaining</TableHead>
+                      <TableHead className="text-[11px] font-bold uppercase tracking-wider text-slate-500 py-3 bg-slate-100 dark:bg-slate-900">Rated Burn</TableHead>
+                      <TableHead className="text-[11px] font-bold uppercase tracking-wider text-slate-500 py-3 bg-slate-100 dark:bg-slate-900">Last Refill Date</TableHead>
+                      <TableHead className="text-[11px] font-bold uppercase tracking-wider text-slate-500 py-3 bg-slate-100 dark:bg-slate-900">Estimated Next Refill</TableHead>
+                      <TableHead className="text-[11px] font-bold uppercase tracking-wider text-slate-500 py-3 text-right bg-slate-100 dark:bg-slate-900">Action</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody className="divide-y divide-slate-100 dark:divide-slate-800/80 text-xs">
