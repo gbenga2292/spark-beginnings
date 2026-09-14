@@ -141,7 +141,7 @@ export function GenerateContract() {
       <Button variant="outline" size="sm" onClick={() => navigate('/onboarding')} className="gap-2 border-slate-200 h-9">
         <ArrowLeft className="h-4 w-4" /> Back
       </Button>
-      <Button onClick={handleGenerateContract} className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold gap-2 h-9 px-4 shadow-sm">
+      <Button onClick={handleGenerateContract} className="bg-blue-600 hover:bg-blue-700 text-white font-semibold gap-2 h-9 px-4 shadow-sm">
         <FileText className="h-4 w-4" /> Download
       </Button>
     </div>
@@ -154,22 +154,22 @@ export function GenerateContract() {
         <Button variant="outline" size="sm" onClick={() => navigate('/onboarding')} className="gap-2 border-slate-200 h-9 shrink-0">
           <ArrowLeft className="h-4 w-4" /> Back
         </Button>
-        <Button onClick={handleGenerateContract} size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold gap-2 h-9 px-4 shadow-sm">
+        <Button onClick={handleGenerateContract} size="sm" className="bg-blue-600 hover:bg-blue-700 text-white font-semibold gap-2 h-9 px-4 shadow-sm">
           <FileText className="h-4 w-4" /> Download
         </Button>
       </div>
       <Card className="border-none shadow-xl ring-1 ring-black/5 bg-white relative overflow-hidden">
-        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-indigo-400"></div>
+        <div className="absolute top-0 left-0 w-full h-1 bg-blue-600"></div>
         <CardContent className="p-6 md:p-8">
           <div className="flex gap-2 p-1 bg-slate-100 rounded-lg mb-6 max-w-xs">
             <button
-              className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-colors ${contractTab === 'Active' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500 hover:text-slate-700'}`}
+              className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-colors ${contractTab === 'Active' ? 'bg-white shadow-sm text-blue-700' : 'text-slate-500 hover:text-slate-700'}`}
               onClick={() => { setContractTab('Active'); setContractEmployee(''); }}
             >
               Active Crew
             </button>
             <button
-              className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-colors ${contractTab === 'Onboarding' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500 hover:text-slate-700'}`}
+              className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-colors ${contractTab === 'Onboarding' ? 'bg-white shadow-sm text-blue-700' : 'text-slate-500 hover:text-slate-700'}`}
               onClick={() => { setContractTab('Onboarding'); setContractEmployee(''); }}
             >
               Pending Hire
@@ -179,7 +179,7 @@ export function GenerateContract() {
           <div className="space-y-4 mb-6 max-w-xl">
             <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1">Select Employee <span className="text-rose-500">*</span></label>
-              <select className="flex h-11 w-full rounded-md border border-slate-200 bg-slate-50 focus:bg-white px-3 text-sm transition-colors outline-none focus:ring-2 focus:ring-indigo-500/20"
+              <select className="flex h-11 w-full rounded-md border border-slate-200 bg-slate-50 focus:bg-white px-3 text-sm transition-colors outline-none focus:ring-2 focus:ring-blue-500/20"
                 value={contractEmployee} onChange={(e) => {
                   const id = e.target.value;
                   setContractEmployee(id);
@@ -229,7 +229,7 @@ export function GenerateContract() {
                   </div>
                   <div className="space-y-1.5 sm:col-span-2">
                     <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Candidate Address</label>
-                    <textarea className="w-full text-sm rounded-md border border-slate-200 bg-slate-50 p-2 h-16 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all resize-none" value={contractTempFields.candidateAddress} onChange={e => setContractTempFields({ ...contractTempFields, candidateAddress: e.target.value })} />
+                    <textarea className="w-full text-sm rounded-md border border-slate-200 bg-slate-50 p-2 h-16 focus:bg-white focus:ring-2 focus:ring-blue-500/20 outline-none transition-all resize-none" value={contractTempFields.candidateAddress} onChange={e => setContractTempFields({ ...contractTempFields, candidateAddress: e.target.value })} />
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Salutation</label>
@@ -254,11 +254,11 @@ export function GenerateContract() {
                 <div className="space-y-4 shadow-sm border border-slate-100 p-4 rounded-xl bg-slate-50 mt-4">
                   <div className="space-y-1.5">
                     <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Introduction Paragraphs</label>
-                    <textarea className="w-full text-sm rounded-md border border-slate-200 bg-white p-3 h-32 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all resize-none" value={contractTempFields.introText} onChange={e => setContractTempFields({ ...contractTempFields, introText: e.target.value })} />
+                    <textarea className="w-full text-sm rounded-md border border-slate-200 bg-white p-3 h-32 focus:bg-white focus:ring-2 focus:ring-blue-500/20 outline-none transition-all resize-none" value={contractTempFields.introText} onChange={e => setContractTempFields({ ...contractTempFields, introText: e.target.value })} />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold uppercase tracking-wider text-indigo-500 flex items-center gap-2"><div className="h-2 w-2 rounded-full bg-indigo-500"></div>1. Duties & Responsibilities</label>
-                    <textarea className="w-full text-sm rounded-md border border-slate-200 bg-white p-3 h-24 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all resize-none" value={contractTempFields.dutiesText} onChange={e => setContractTempFields({ ...contractTempFields, dutiesText: e.target.value })} />
+                    <label className="text-xs font-bold uppercase tracking-wider text-blue-500 flex items-center gap-2"><div className="h-2 w-2 rounded-full bg-blue-500"></div>1. Duties & Responsibilities</label>
+                    <textarea className="w-full text-sm rounded-md border border-slate-200 bg-white p-3 h-24 focus:bg-white focus:ring-2 focus:ring-blue-500/20 outline-none transition-all resize-none" value={contractTempFields.dutiesText} onChange={e => setContractTempFields({ ...contractTempFields, dutiesText: e.target.value })} />
                   </div>
                   <div className="space-y-2 bg-emerald-50 p-4 rounded-xl border border-emerald-200 shadow-sm relative overflow-hidden">
                     <div className="absolute top-0 right-0 w-16 h-16 bg-emerald-100 rounded-bl-full -z-0"></div>
@@ -267,16 +267,16 @@ export function GenerateContract() {
                     <textarea className="w-full text-sm rounded-md border border-emerald-300 bg-white p-3 h-20 focus:bg-white focus:ring-2 focus:ring-emerald-500/30 outline-none transition-all resize-none relative z-10 font-semibold text-emerald-900" value={contractTempFields.compensationText} onChange={e => setContractTempFields({ ...contractTempFields, compensationText: e.target.value })} />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold uppercase tracking-wider text-indigo-500 flex items-center gap-2"><div className="h-2 w-2 rounded-full bg-indigo-500"></div>3. Good Faith</label>
-                    <textarea className="w-full text-sm rounded-md border border-slate-200 bg-white p-3 h-16 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all resize-none" value={contractTempFields.goodFaithText} onChange={e => setContractTempFields({ ...contractTempFields, goodFaithText: e.target.value })} />
+                    <label className="text-xs font-bold uppercase tracking-wider text-blue-500 flex items-center gap-2"><div className="h-2 w-2 rounded-full bg-blue-500"></div>3. Good Faith</label>
+                    <textarea className="w-full text-sm rounded-md border border-slate-200 bg-white p-3 h-16 focus:bg-white focus:ring-2 focus:ring-blue-500/20 outline-none transition-all resize-none" value={contractTempFields.goodFaithText} onChange={e => setContractTempFields({ ...contractTempFields, goodFaithText: e.target.value })} />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold uppercase tracking-wider text-indigo-500 flex items-center gap-2"><div className="h-2 w-2 rounded-full bg-indigo-500"></div>4. Confidentiality</label>
-                    <textarea className="w-full text-sm rounded-md border border-slate-200 bg-white p-3 h-16 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all resize-none" value={contractTempFields.confidentialityText} onChange={e => setContractTempFields({ ...contractTempFields, confidentialityText: e.target.value })} />
+                    <label className="text-xs font-bold uppercase tracking-wider text-blue-500 flex items-center gap-2"><div className="h-2 w-2 rounded-full bg-blue-500"></div>4. Confidentiality</label>
+                    <textarea className="w-full text-sm rounded-md border border-slate-200 bg-white p-3 h-16 focus:bg-white focus:ring-2 focus:ring-blue-500/20 outline-none transition-all resize-none" value={contractTempFields.confidentialityText} onChange={e => setContractTempFields({ ...contractTempFields, confidentialityText: e.target.value })} />
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Working Days / Conclusion</label>
-                    <textarea className="w-full text-sm rounded-md border border-slate-200 bg-white p-3 h-24 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all resize-none" value={contractTempFields.workingDaysText} onChange={e => setContractTempFields({ ...contractTempFields, workingDaysText: e.target.value })} />
+                    <textarea className="w-full text-sm rounded-md border border-slate-200 bg-white p-3 h-24 focus:bg-white focus:ring-2 focus:ring-blue-500/20 outline-none transition-all resize-none" value={contractTempFields.workingDaysText} onChange={e => setContractTempFields({ ...contractTempFields, workingDaysText: e.target.value })} />
                   </div>
                 </div>
               </div>
@@ -285,7 +285,7 @@ export function GenerateContract() {
 
           <div className="flex justify-end gap-3 mt-8">
             <Button variant="ghost" className="text-slate-500 hover:text-slate-700 font-medium" onClick={() => navigate('/onboarding')}>Cancel</Button>
-            <Button onClick={handleGenerateContract} className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold gap-2 h-10 px-6 shadow-md shadow-indigo-200">
+            <Button onClick={handleGenerateContract} className="bg-blue-600 hover:bg-blue-700 text-white font-semibold gap-2 h-10 px-6 shadow-md ">
               <FileText className="h-4 w-4" /> Download Document
             </Button>
           </div>

@@ -29,6 +29,7 @@ import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { cn } from '../lib/utils';
 import { ClientSummaryGrid } from './ClientSummaryGrid';
 import { ClientContactsPanel } from './ClientContactsPanel';
+import { buildSettlementMap } from '@/src/lib/settlementUtils';
 
 const EMPTY_FORM = { name: '', client: '', vat: 'No' as 'Yes' | 'No' | 'Add', status: 'Active' as 'Active' | 'Inactive' | 'Ended', startDate: new Date().toISOString().split('T')[0], endDate: '' };
 
@@ -156,11 +157,11 @@ function ClientSummary() {
           <TableBody>
             {results.map((r, idx) => (
               <TableRow key={idx}>
-                <TableCell>{idx + 1}</TableCell>
-                <TableCell className="font-medium text-indigo-900">{r.client}</TableCell>
+                <TableCell className="font-mono">{idx + 1}</TableCell>
+                <TableCell className="font-medium text-slate-900 dark:text-slate-100">{r.client}</TableCell>
                 <TableCell>{r.name}</TableCell>
-                <TableCell className="text-right text-slate-500">{r.teamSize}</TableCell>
-                <TableCell className="text-right font-bold text-slate-700">₦{r.cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
+                <TableCell className="text-right text-slate-500 font-mono tabular-nums">{r.teamSize}</TableCell>
+                <TableCell className="text-right font-bold text-slate-800 dark:text-slate-200 font-mono tabular-nums">₦{r.cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
               </TableRow>
             ))}
             {results.length === 0 && (
@@ -173,10 +174,10 @@ function ClientSummary() {
           </TableBody>
           {results.length > 0 && (
             <tfoot>
-              <tr className="bg-slate-50/80 font-bold border-t-2">
-                <td colSpan={3} className="px-4 py-3 text-right">GRAND TOTAL:</td>
-                <td className="px-4 py-3 text-right text-slate-600">{results.reduce((s, r) => s + r.teamSize, 0)}</td>
-                <td className="px-4 py-3 text-right text-indigo-700 text-lg">₦{grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+              <tr className="bg-slate-50/80 dark:bg-slate-800/40 font-bold border-t-2 border-slate-200 dark:border-slate-800">
+                <td colSpan={3} className="px-4 py-3 text-right text-xs uppercase font-mono tracking-wider text-slate-500">GRAND TOTAL:</td>
+                <td className="px-4 py-3 text-right text-slate-600 dark:text-slate-300 font-mono tabular-nums">{results.reduce((s, r) => s + r.teamSize, 0)}</td>
+                <td className="px-4 py-3 text-right text-blue-600 dark:text-blue-400 text-base font-mono tabular-nums font-bold">₦{grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
               </tr>
             </tfoot>
           )}
@@ -371,6 +372,7 @@ export function Sites() {
   const clientContacts = useAppStore((s) => s.clientContacts);
   const deleteClientContact = useAppStore((s) => s.deleteClientContact);
   const invoices = useAppStore((s) => s.invoices);
+  const payments = useAppStore((s) => s.payments);
   const commLogs = useAppStore((s) => s.commLogs);
   
   const clients = useMemo(() => {
@@ -526,9 +528,14 @@ export function Sites() {
       }
     });
 
+    const settlementMap = buildSettlementMap(invoices, payments);
+
     invoices.forEach(inv => {
-      if (inv.client.trim().toLowerCase() === nameLow && inv.status === 'Paid') {
-        totalRevenue += (inv.totalCharge || 0);
+      if (inv.client.trim().toLowerCase() === nameLow) {
+        const settlement = settlementMap[inv.id];
+        if (settlement ? settlement.isPaid : inv.status === 'Paid') {
+          totalRevenue += (inv.totalCharge || 0);
+        }
       }
     });
 
@@ -545,7 +552,7 @@ export function Sites() {
       startDate,
       stats: { totalSites, activeSites, totalRevenue }
     };
-  }, [selectedClientName, sites, invoices, clientProfiles, pendingSites]);
+  }, [selectedClientName, sites, invoices, payments, clientProfiles, pendingSites]);
 
   const handleSaveTin = async () => {
     if (!selectedClient) return;
@@ -659,8 +666,8 @@ export function Sites() {
   const SortIcon = ({ field }: { field: typeof sortField }) => {
     if (sortField !== field) return <ArrowUpDown className="ml-1 h-3 w-3 opacity-30" />;
     return sortDirection === 'asc' 
-      ? <ChevronUp className="ml-1 h-3 w-3 text-indigo-600" /> 
-      : <ChevronDown className="ml-1 h-3 w-3 text-indigo-600" />;
+      ? <ChevronUp className="ml-1 h-3 w-3 text-blue-600" /> 
+      : <ChevronDown className="ml-1 h-3 w-3 text-blue-600" />;
   };
 
   const filteredPendingSites = pendingSites.filter(site => {
@@ -1055,8 +1062,8 @@ export function Sites() {
     selectedClient ? `Manage sites, view communications and details for ${selectedClient.name}` : 'Manage project sites, clients, and technical onboarding summaries',
     <div className="flex items-center gap-2 md:gap-3">
       {canImport && (
-        <label className="flex items-center gap-2 px-2 sm:px-3 h-9 bg-white rounded-md border border-slate-200 text-slate-600 text-[11px] font-bold uppercase tracking-tight cursor-pointer hover:bg-slate-50 transition-all shadow-sm">
-          <Upload className="h-3.5 w-3.5 text-indigo-500" /> <span className="hidden sm:inline">Import Sites</span>
+        <label className="flex items-center gap-2 px-2.5 h-8 bg-white dark:bg-slate-900 rounded-sm border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 text-[11px] font-bold uppercase tracking-tight cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-all">
+          <Upload className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" /> <span className="hidden sm:inline">Import Sites</span>
           <input type="file" accept=".xlsx, .xls, .csv" className="hidden" onChange={handleImportExcel} />
         </label>
       )}
@@ -1064,10 +1071,10 @@ export function Sites() {
         <Button 
           variant="outline" 
           size="sm" 
-          className="gap-2 h-9 px-2 sm:px-3 border-slate-200 bg-white text-slate-600 hover:bg-slate-50 font-bold text-[11px] uppercase tracking-tight shadow-sm"
+          className="gap-2 h-8 px-2.5 border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 font-bold text-[11px] uppercase tracking-tight rounded-sm"
           onClick={handleExportExcel}
         >
-          <Download className="h-3.5 w-3.5 text-emerald-500" /> <span className="hidden sm:inline">Export Excel</span>
+          <Download className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" /> <span className="hidden sm:inline">Export Excel</span>
         </Button>
       )}
 
@@ -1079,44 +1086,59 @@ export function Sites() {
   );
 
   return (
-    <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
+    <div className="flex flex-col gap-4 max-w-7xl mx-auto pb-10">
       
       {/* ── Mobile Actions Removed ── */}
 
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden flex-1 flex flex-col min-h-[500px]">
+      <div className="bg-white dark:bg-slate-900 rounded-md border border-slate-200 dark:border-slate-800 overflow-hidden flex-1 flex flex-col min-h-[500px]">
         {/* Unified Header with Tabs and Search */}
-        <div className="border-b border-slate-100 p-4 sm:p-5 flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center bg-slate-50/50">
+        <div className="border-b border-slate-200 dark:border-slate-800 p-3 sm:p-4 flex flex-col sm:flex-row gap-3 justify-between items-start sm:items-center bg-slate-50/50 dark:bg-slate-800/20">
           {selectedClient ? (
-            <div className="flex items-center gap-4 flex-wrap">
+            <div className="flex items-center gap-3 flex-wrap">
               <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" onClick={() => navigate('/sites')}>
-                  <ArrowLeft className="w-4 h-4 mr-2" /> Back
+                <Button variant="outline" size="sm" className="h-8 rounded-sm text-xs" onClick={() => navigate('/sites')}>
+                  <ArrowLeft className="w-3.5 h-3.5 mr-1.5" /> Back
                 </Button>
               </div>
-              <div className="flex items-center gap-2 text-sm">
+              <div className="flex items-center gap-2 text-xs">
                  <span className="text-slate-500">Managing sites for:</span>
-                 <Badge variant="secondary" className="px-3 py-1 font-bold bg-indigo-50 text-indigo-700 border-indigo-200">
+                 <Badge variant="secondary" className="px-2.5 py-0.5 font-bold font-mono bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800 rounded-sm">
                    <Building2 className="w-3.5 h-3.5 mr-1.5" />
                    {selectedClient.name}
                  </Badge>
               </div>
             </div>
           ) : (
-            <div className="flex flex-wrap bg-slate-200/50 p-1 rounded-lg w-full sm:w-auto">
+            <div className="flex flex-wrap bg-slate-100 dark:bg-slate-800 p-0.5 rounded-md border border-slate-200 dark:border-slate-800 w-full sm:w-auto">
               <button
-                className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${activeTab === 'clients' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                className={cn(
+                  "px-3 py-1 text-xs font-semibold rounded-sm transition-all font-mono",
+                  activeTab === 'clients'
+                    ? "bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 border border-slate-200 dark:border-slate-700 font-bold"
+                    : "text-slate-500 hover:text-slate-900 dark:hover:text-slate-100"
+                )}
                 onClick={() => { setActiveTab('clients'); setSearchTerm(''); }}
               >
                 Client Summary
               </button>
               <button
-                className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${activeTab === 'active' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                className={cn(
+                  "px-3 py-1 text-xs font-semibold rounded-sm transition-all font-mono",
+                  activeTab === 'active'
+                    ? "bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 border border-slate-200 dark:border-slate-700 font-bold"
+                    : "text-slate-500 hover:text-slate-900 dark:hover:text-slate-100"
+                )}
                 onClick={() => { setActiveTab('active'); setSearchTerm(''); }}
               >
                 All Sites
               </button>
               <button
-                className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${activeTab === 'pending' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                className={cn(
+                  "px-3 py-1 text-xs font-semibold rounded-sm transition-all font-mono",
+                  activeTab === 'pending'
+                    ? "bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 border border-slate-200 dark:border-slate-700 font-bold"
+                    : "text-slate-500 hover:text-slate-900 dark:hover:text-slate-100"
+                )}
                 onClick={() => { setActiveTab('pending'); setSearchTerm(''); }}
               >
                 Pending Onboarding
@@ -1124,13 +1146,13 @@ export function Sites() {
             </div>
           )}
 
-          <div className="flex items-center gap-3 w-full sm:w-auto">
+          <div className="flex items-center gap-2.5 w-full sm:w-auto">
             {activeTab !== 'clients' && !selectedClient && (
               <div className="relative w-full sm:w-64">
-                <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
                 <Input
                   placeholder="Search Client or Site..."
-                  className="pl-9 bg-white border-slate-200 h-9 text-sm focus-visible:ring-indigo-500/50 rounded-lg shadow-sm"
+                  className="pl-8 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 h-8 text-xs focus-visible:ring-1 focus-visible:ring-blue-600 rounded-md"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
@@ -1139,7 +1161,7 @@ export function Sites() {
             {(activeTab === 'active' || activeTab === 'pending' || selectedClient) && (
               <>
                 <select 
-                  className="h-9 px-3 rounded-md border border-slate-200 bg-white text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                  className="h-8 px-2.5 rounded-sm border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-600"
                   value={sortField}
                   onChange={(e) => handleSort(e.target.value as any)}
                 >
@@ -1148,20 +1170,30 @@ export function Sites() {
                   <option value="startDate">Sort By: Start Date</option>
                   <option value="status">Sort By: Status</option>
                 </select>
-                <div className="hidden sm:flex bg-slate-200/50 p-1 rounded-lg">
+                <div className="hidden sm:flex bg-slate-100 dark:bg-slate-800 p-0.5 rounded-md border border-slate-200 dark:border-slate-800">
                   <button
-                    className={`p-1.5 rounded-md transition-all ${viewMode === 'table' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                    className={cn(
+                      "p-1 rounded-sm transition-all",
+                      viewMode === 'table'
+                        ? "bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 border border-slate-200 dark:border-slate-700"
+                        : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+                    )}
                     onClick={() => setViewMode('table')}
                     title="Table View"
                   >
-                    <List className="h-4 w-4" />
+                    <List className="h-3.5 w-3.5" />
                   </button>
                   <button
-                    className={`p-1.5 rounded-md transition-all ${viewMode === 'card' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                    className={cn(
+                      "p-1 rounded-sm transition-all",
+                      viewMode === 'card'
+                        ? "bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 border border-slate-200 dark:border-slate-700"
+                        : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+                    )}
                     onClick={() => setViewMode('card')}
                     title="Card View"
                   >
-                    <LayoutGrid className="h-4 w-4" />
+                    <LayoutGrid className="h-3.5 w-3.5" />
                   </button>
                 </div>
                 
@@ -1169,21 +1201,21 @@ export function Sites() {
                   <>
                     <Button
                       variant="outline"
-                      className="h-9 border-indigo-200 text-indigo-700 bg-indigo-50/50 hover:bg-indigo-100 font-semibold flex items-center gap-2"
+                      className="h-8 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 font-semibold flex items-center gap-1.5 rounded-sm text-xs"
                       onClick={() => setContactsFor(selectedClient.name)}
                     >
-                      <UserCheck className="w-4 h-4" />
-                      <span className="text-xs sm:text-sm">Client Contacts</span>
+                      <UserCheck className="w-3.5 h-3.5 text-blue-600" />
+                      <span>Contacts</span>
                       {(() => {
                         const count = clientContacts.filter(c => c.clientName === selectedClient.name).length;
                         return count > 0 ? (
-                          <span className="bg-indigo-200 text-indigo-800 text-[10px] px-1.5 py-0.5 rounded-full font-bold ml-1">{count}</span>
+                          <span className="bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200 text-[10px] px-1.5 py-0.5 rounded-sm font-mono font-bold ml-1">{count}</span>
                         ) : null;
                       })()}
                     </Button>
                     {currentUser?.privileges?.clients?.canEdit !== false && (
-                      <Button onClick={openClientEdit} variant="outline" className="h-9 border-slate-200 text-slate-700 bg-white hover:bg-slate-50 font-semibold flex items-center gap-2 shadow-sm" title="Edit Client">
-                        <Edit2 className="w-4 h-4 text-indigo-500" /><span className="text-xs sm:text-sm">Edit Client</span>
+                      <Button onClick={openClientEdit} variant="outline" className="h-8 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 font-semibold flex items-center gap-1.5 rounded-sm text-xs" title="Edit Client">
+                        <Edit2 className="w-3.5 h-3.5 text-blue-600" /><span>Edit</span>
                       </Button>
                     )}
                     {(!currentUser || currentUser?.privileges?.clients?.canDelete !== false) && (() => {
@@ -1198,15 +1230,15 @@ export function Sites() {
                           disabled={hasSites}
                           variant="outline"
                           className={cn(
-                            "h-9 font-semibold flex items-center gap-2 shadow-sm transition-colors",
+                            "h-8 font-semibold flex items-center gap-1.5 transition-colors rounded-sm text-xs",
                             hasSites
                               ? "border-slate-200 text-slate-400 bg-slate-100/50 cursor-not-allowed opacity-60 hover:bg-slate-100/50 hover:text-slate-400"
                               : "border-rose-200 text-rose-700 bg-rose-50/50 hover:bg-rose-100 hover:text-rose-800"
                           )}
                           title={hasSites ? `Cannot delete client with ${associatedSitesCount} existing site(s). Delete or reassign all sites first.` : "Delete Client"}
                         >
-                          <Trash2 className={cn("w-4 h-4", hasSites ? "text-slate-400" : "text-rose-600")} />
-                          <span className="text-xs sm:text-sm">Delete Client</span>
+                          <Trash2 className={cn("w-3.5 h-3.5", hasSites ? "text-slate-400" : "text-rose-600")} />
+                          <span>Delete</span>
                         </Button>
                       );
                     })()}
@@ -1218,13 +1250,13 @@ export function Sites() {
         </div>
 
         {selectedClient && (
-          <div className="p-4 sm:p-5 border-b border-slate-100 bg-white">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">
-              <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 shadow-sm relative group">
+          <div className="p-3 sm:p-4 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+              <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-md border border-slate-200 dark:border-slate-800 relative group">
                 <div className="flex justify-between items-center mb-1">
                   <p className="text-xs text-slate-500 flex items-center gap-1.5"><FileText className="w-3.5 h-3.5" /> TIN Number</p>
                   {!editingTin && (
-                    <button onClick={() => { setTinInput(selectedClient.tinNumber === 'Not provided' ? '' : selectedClient.tinNumber); setEditingTin(true); }} className="text-indigo-600 hover:text-indigo-800 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button onClick={() => { setTinInput(selectedClient.tinNumber === 'Not provided' ? '' : selectedClient.tinNumber); setEditingTin(true); }} className="text-blue-600 hover:text-blue-800 opacity-0 group-hover:opacity-100 transition-opacity">
                       <Pencil className="w-3 h-3" />
                     </button>
                   )}
@@ -1247,24 +1279,25 @@ export function Sites() {
                     </Button>
                   </div>
                 ) : (
-                  <p className="text-sm font-bold text-slate-800 truncate" title={selectedClient.tinNumber}>{selectedClient.tinNumber}</p>
+                  <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate font-mono" title={selectedClient.tinNumber}>{selectedClient.tinNumber}</p>
                 )}
               </div>
-              <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 shadow-sm">
+              <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-md border border-slate-200 dark:border-slate-800">
                 <p className="text-xs text-slate-500 mb-1 flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" /> Client Since</p>
-                <p className="text-sm font-bold text-slate-800">{selectedClient.startDate}</p>
+                <p className="text-sm font-bold text-slate-800 dark:text-slate-100 font-mono tabular-nums">{selectedClient.startDate}</p>
               </div>
-              <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 shadow-sm">
+              <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-md border border-slate-200 dark:border-slate-800">
                 <p className="text-xs text-slate-500 mb-1 flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5 text-slate-400" /> Total Sites</p>
-                <p className="text-xl font-black text-slate-800">{selectedClient.stats.totalSites}</p>
+                <p className="text-xl font-black text-slate-800 dark:text-slate-100 font-mono tabular-nums">{selectedClient.stats.totalSites}</p>
               </div>
-              <div className="bg-emerald-50/50 p-3 rounded-lg border border-emerald-100 shadow-sm">
-                <p className="text-xs text-emerald-600/80 mb-1 flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5" /> Active Sites</p>
-                <p className="text-xl font-black text-emerald-700">{selectedClient.stats.activeSites}</p>
+              <div className="bg-emerald-50/50 dark:bg-emerald-950/20 p-3 rounded-md border border-emerald-200 dark:border-emerald-800/50">
+                <p className="text-xs text-emerald-600 dark:text-emerald-400 mb-1 flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5" /> Active Sites</p>
+                <p className="text-xl font-black text-emerald-700 dark:text-emerald-300 font-mono tabular-nums">{selectedClient.stats.activeSites}</p>
               </div>
             </div>
           </div>
         )}
+
 
         {/* --- Render Main Body Based on activeTab --- */}
         {!selectedClient && activeTab === 'clients' ? (
@@ -1280,28 +1313,28 @@ export function Sites() {
                 <TableRow className="hover:bg-transparent">
                   <TableHead className="w-24">ID</TableHead>
                   <TableHead className="cursor-pointer group" onMouseDown={(e) => e.stopPropagation()} onClick={() => handleSort('client')}>
-                    <div className="flex items-center gap-1 group-hover:text-indigo-600 transition-colors">
+                    <div className="flex items-center gap-1 group-hover:text-blue-600 transition-colors">
                       Client <SortIcon field="client" />
                     </div>
                   </TableHead>
                   <TableHead className="cursor-pointer group" onMouseDown={(e) => e.stopPropagation()} onClick={() => handleSort('name')}>
-                    <div className="flex items-center gap-1 group-hover:text-indigo-600 transition-colors">
+                    <div className="flex items-center gap-1 group-hover:text-blue-600 transition-colors">
                       Site Name <SortIcon field="name" />
                     </div>
                   </TableHead>
                   <TableHead className="cursor-pointer group" onMouseDown={(e) => e.stopPropagation()} onClick={() => handleSort('startDate')}>
-                    <div className="flex items-center gap-1 group-hover:text-indigo-600 transition-colors">
+                    <div className="flex items-center gap-1 group-hover:text-blue-600 transition-colors">
                       Start Date <SortIcon field="startDate" />
                     </div>
                   </TableHead>
                   <TableHead className="cursor-pointer group" onMouseDown={(e) => e.stopPropagation()} onClick={() => handleSort('endDate')}>
-                    <div className="flex items-center gap-1 group-hover:text-indigo-600 transition-colors">
+                    <div className="flex items-center gap-1 group-hover:text-blue-600 transition-colors">
                       End Date <SortIcon field="endDate" />
                     </div>
                   </TableHead>
                   <TableHead className="text-center">VAT Status</TableHead>
                   <TableHead className="cursor-pointer group" onMouseDown={(e) => e.stopPropagation()} onClick={() => handleSort('status')}>
-                    <div className="flex items-center gap-1 group-hover:text-indigo-600 transition-colors">
+                    <div className="flex items-center gap-1 group-hover:text-blue-600 transition-colors">
                       Status <SortIcon field="status" />
                     </div>
                   </TableHead>
@@ -1315,7 +1348,7 @@ export function Sites() {
                   return (
                     <TableRow 
                       key={site.id} 
-                      className="hover:bg-slate-50/50 transition-colors cursor-pointer group/row"
+                      className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors cursor-pointer group/row"
                       onClick={() => {
                         // Enter client detail mode when clicking a site if we aren't already grouped
                         if (!selectedClientName) {
@@ -1324,12 +1357,12 @@ export function Sites() {
                       }}
                     >
                       <TableCell className="font-mono text-xs font-semibold text-slate-400" onClick={e => e.stopPropagation()}>{siteCode}</TableCell>
-                      <TableCell className="font-bold text-slate-900" onClick={e => e.stopPropagation()}>
+                      <TableCell className="font-bold text-slate-900 dark:text-slate-100" onClick={e => e.stopPropagation()}>
                         {editingId === site.id ? (
                           <select
                             value={editForm.client}
                             onChange={e => setEditForm({ ...editForm, client: e.target.value })}
-                            className="flex h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-sm"
+                            className="flex h-8 w-full rounded-md border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 text-sm"
                           >
                             <option value="" disabled>Select Client</option>
                             {displayClients.map(c => (
@@ -1345,16 +1378,16 @@ export function Sites() {
                       </TableCell>
                       <TableCell>
                         {editingId === site.id ? (
-                          <Input type="date" value={editForm.startDate} className="h-8 w-32" onChange={e => setEditForm({ ...editForm, startDate: e.target.value })} />
+                          <Input type="date" value={editForm.startDate} className="h-8 w-32 font-mono text-xs" onChange={e => setEditForm({ ...editForm, startDate: e.target.value })} />
                         ) : (
-                          <span className="text-slate-600 font-medium">{toDisplayDate(site.startDate) || <span className="text-slate-300">-</span>}</span>
+                          <span className="text-slate-600 dark:text-slate-400 font-mono text-xs tabular-nums">{toDisplayDate(site.startDate) || <span className="text-slate-300">-</span>}</span>
                         )}
                       </TableCell>
                       <TableCell>
                         {editingId === site.id ? (
-                          <Input type="date" value={editForm.endDate} className="h-8 w-32" onChange={e => setEditForm({ ...editForm, endDate: e.target.value })} />
+                          <Input type="date" value={editForm.endDate} className="h-8 w-32 font-mono text-xs" onChange={e => setEditForm({ ...editForm, endDate: e.target.value })} />
                         ) : (
-                          <span className="text-slate-500">{toDisplayDate(site.endDate) || <span className="text-slate-300">-</span>}</span>
+                          <span className="text-slate-500 dark:text-slate-400 font-mono text-xs tabular-nums">{toDisplayDate(site.endDate) || <span className="text-slate-300">-</span>}</span>
                         )}
                       </TableCell>
                       <TableCell className="text-center">
@@ -1362,7 +1395,7 @@ export function Sites() {
                           <select
                             value={editForm.vat}
                             onChange={e => setEditForm({ ...editForm, vat: e.target.value as 'Yes' | 'No' | 'Add' })}
-                            className="h-8 rounded-md border border-slate-200 bg-white px-2 text-sm"
+                            className="h-8 rounded-md border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 text-sm"
                           >
                             <option value="No">No</option>
                             <option value="Yes">Yes</option>
@@ -1371,7 +1404,7 @@ export function Sites() {
                         ) : (
                           <Badge 
                             variant={site.vat === 'Yes' || site.vat === 'Add' ? 'success' : 'outline'}
-                            className="text-[10px] uppercase font-bold"
+                            className="text-[10px] uppercase font-bold rounded-sm"
                           >
                             {site.vat}
                           </Badge>
@@ -1380,7 +1413,7 @@ export function Sites() {
                       <TableCell>
                         <Badge 
                           variant={site.status === 'Ended' ? 'destructive' : site.status === 'Active' ? 'success' : 'secondary'}
-                          className="text-[10px] font-bold"
+                          className="text-[10px] font-bold rounded-sm"
                         >
                           {site.status}
                         </Badge>
@@ -1402,7 +1435,7 @@ export function Sites() {
                                 <DropdownMenuTrigger asChild>
                                   <Button
                                     variant="ghost" size="icon"
-                                    className="h-8 w-8 text-slate-400 hover:text-indigo-600 hover:bg-slate-50"
+                                    className="h-8 w-8 text-slate-400 hover:text-blue-600 hover:bg-slate-50 dark:hover:bg-slate-800"
                                   >
                                     <MoreVertical className="h-4 w-4" />
                                   </Button>
@@ -1427,9 +1460,9 @@ export function Sites() {
                                     onClick={() => {
                                       navigate(`/client-360?client=${encodeURIComponent(site.client)}&siteId=${site.id}`);
                                     }}
-                                    className="gap-2 text-indigo-600 focus:text-indigo-700 focus:bg-indigo-50"
+                                    className="gap-2 text-blue-600 focus:text-blue-700 focus:bg-blue-50 dark:focus:bg-blue-950/40"
                                   >
-                                    <Sparkles className="h-4 w-4 text-indigo-500" />
+                                    <Sparkles className="h-4 w-4 text-blue-600" />
                                     <span>Site 360</span>
                                   </DropdownMenuItem>
                                   
@@ -1475,7 +1508,7 @@ export function Sites() {
                                   {canEditSite && (
                                     <DropdownMenuItem 
                                       onClick={() => handleEditStart(site)}
-                                      className="gap-2 text-indigo-700 focus:text-indigo-700 focus:bg-indigo-50"
+                                      className="gap-2 text-blue-600 focus:text-blue-700 focus:bg-blue-50 dark:focus:bg-blue-950/40"
                                     >
                                       <Pencil className="h-4 w-4" />
                                       <span>Edit Site</span>
@@ -1487,7 +1520,7 @@ export function Sites() {
                                       <DropdownMenuSeparator />
                                       <DropdownMenuItem 
                                         onClick={() => handleDelete(site.id)}
-                                        className="gap-2 text-red-600 focus:text-red-600 focus:bg-red-50"
+                                        className="gap-2 text-red-600 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-950/40"
                                       >
                                         <Trash2 className="h-4 w-4" />
                                         <span>Delete</span>
@@ -1525,36 +1558,36 @@ export function Sites() {
                   return (
                     <Card 
                       key={site.id} 
-                      className="border-slate-200 shadow-sm hover:shadow-md transition-all bg-white group overflow-hidden cursor-pointer"
+                      className="border border-slate-200 dark:border-slate-800 rounded-md bg-white dark:bg-slate-900 group overflow-hidden cursor-pointer hover:border-blue-500/40 transition-colors"
                       onClick={() => {
                         if (!selectedClientName) {
                           navigate(`/sites?client=${encodeURIComponent(site.client)}`);
                         }
                       }}
                     >
-                      <CardContent className="p-5 sm:p-6 pb-4">
+                      <CardContent className="p-4 sm:p-5 pb-3">
                         <div className="flex items-start justify-between mb-3">
                           <div className="flex gap-3 min-w-0 flex-1">
-                            <div className="h-10 w-10 rounded-lg bg-indigo-50 flex items-center justify-center shrink-0">
-                              <MapPin className="h-5 w-5 text-indigo-500" />
+                            <div className="h-8 w-8 rounded-sm bg-blue-50 dark:bg-blue-950/40 border border-slate-200 dark:border-slate-800 flex items-center justify-center shrink-0">
+                              <MapPin className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                             </div>
                             <div className="min-w-0 flex-1">
-                              <h3 className="text-sm font-bold text-slate-800 uppercase truncate leading-tight mb-1.5" title={site.name}>{site.name}</h3>
-                              <div className="flex items-center gap-2 font-semibold text-slate-500 text-xs">
+                              <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase truncate leading-tight mb-1.5" title={site.name}>{site.name}</h3>
+                              <div className="flex items-center gap-2 font-semibold text-slate-500 dark:text-slate-400 text-xs">
                                 <Badge 
                                   variant={site.status === 'Ended' ? 'destructive' : site.status === 'Active' ? 'success' : 'secondary'} 
-                                  className="text-[9px] uppercase font-bold px-1.5 py-0 shrink-0"
+                                  className="text-[9px] uppercase font-bold px-1.5 py-0 shrink-0 rounded-sm"
                                 >
                                   {site.status}
                                 </Badge>
                                 {site.status === 'Active' && site.currentDewateringStage && (
                                   <>
-                                    <span className="text-slate-300 shrink-0">•</span>
-                                    <span className={`inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0 rounded-full shrink-0 ${
-                                      site.currentDewateringStage === 'mobilization' ? 'bg-blue-100 text-blue-700' :
-                                      site.currentDewateringStage === 'installation' ? 'bg-amber-100 text-amber-700' :
-                                      site.currentDewateringStage === 'operation' ? 'bg-emerald-100 text-emerald-700' :
-                                      'bg-rose-100 text-rose-700'
+                                    <span className="text-slate-300 dark:text-slate-600 shrink-0">•</span>
+                                    <span className={`inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0 rounded-sm shrink-0 border ${
+                                      site.currentDewateringStage === 'mobilization' ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800' :
+                                      site.currentDewateringStage === 'installation' ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800' :
+                                      site.currentDewateringStage === 'operation' ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800' :
+                                      'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800'
                                     }`}>
                                       {site.currentDewateringStage === 'mobilization' && '🚚'}
                                       {site.currentDewateringStage === 'installation' && '🔧'}
@@ -1564,7 +1597,7 @@ export function Sites() {
                                     </span>
                                   </>
                                 )}
-                                <span className="text-slate-300 shrink-0">•</span>
+                                <span className="text-slate-300 dark:text-slate-600 shrink-0">•</span>
                                 <div className="flex items-center gap-1 min-w-0">
                                   <Building2 className="h-3 w-3 text-slate-400 shrink-0" />
                                   <span className="truncate" title={site.client}>{site.client}</span>
@@ -1574,21 +1607,21 @@ export function Sites() {
                           </div>
                         </div>
                         
-                        <div className="grid grid-cols-2 gap-3 mb-4 mt-4 text-xs">
-                          <div className="bg-slate-50 p-2 rounded-md">
-                            <span className="text-slate-400 block mb-0.5">Start Date</span>
-                            <span className="font-semibold text-slate-700">{toDisplayDate(site.startDate) || '-'}</span>
+                        <div className="grid grid-cols-2 gap-2 mb-3 mt-3 text-xs">
+                          <div className="bg-slate-50 dark:bg-slate-800/50 p-2 rounded-sm border border-slate-100 dark:border-slate-800">
+                            <span className="text-slate-400 block mb-0.5 text-[10px] uppercase font-semibold">Start Date</span>
+                            <span className="font-mono tabular-nums font-semibold text-slate-700 dark:text-slate-300">{toDisplayDate(site.startDate) || '-'}</span>
                           </div>
-                          <div className="bg-slate-50 p-2 rounded-md">
-                            <span className="text-slate-400 block mb-0.5">End Date</span>
-                            <span className="font-semibold text-slate-700">{toDisplayDate(site.endDate) || '-'}</span>
+                          <div className="bg-slate-50 dark:bg-slate-800/50 p-2 rounded-sm border border-slate-100 dark:border-slate-800">
+                            <span className="text-slate-400 block mb-0.5 text-[10px] uppercase font-semibold">End Date</span>
+                            <span className="font-mono tabular-nums font-semibold text-slate-700 dark:text-slate-300">{toDisplayDate(site.endDate) || '-'}</span>
                           </div>
                         </div>
 
-                        <div className="flex items-center justify-between pt-3 border-t border-slate-100 mt-3">
+                        <div className="flex items-center justify-between pt-2.5 border-t border-slate-100 dark:border-slate-800 mt-2">
                           <div className="flex items-center gap-2">
                             <span className="text-xs text-slate-500 font-medium">VAT:</span>
-                            <Badge variant={site.vat === 'Yes' || site.vat === 'Add' ? 'success' : 'outline'} className="text-[9px] uppercase font-bold px-1.5 py-0">
+                            <Badge variant={site.vat === 'Yes' || site.vat === 'Add' ? 'success' : 'outline'} className="text-[9px] uppercase font-bold px-1.5 py-0 rounded-sm">
                               {site.vat}
                             </Badge>
                           </div>
@@ -1597,7 +1630,7 @@ export function Sites() {
                             <div className="flex justify-end">
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-indigo-600 hover:bg-slate-50">
+                                  <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-blue-600 hover:bg-slate-50 dark:hover:bg-slate-800">
                                     <MoreVertical className="h-4 w-4" />
                                   </Button>
                                 </DropdownMenuTrigger>
@@ -1610,9 +1643,9 @@ export function Sites() {
                                     onClick={() => {
                                       navigate(`/client-360?client=${encodeURIComponent(site.client)}&siteId=${site.id}`);
                                     }}
-                                    className="gap-2 text-indigo-600 focus:text-indigo-700 focus:bg-indigo-50"
+                                    className="gap-2 text-blue-600 focus:text-blue-700 focus:bg-blue-50 dark:focus:bg-blue-950/40"
                                   >
-                                    <Sparkles className="h-4 w-4 text-indigo-500" />
+                                    <Sparkles className="h-4 w-4 text-blue-600" />
                                     <span>Site 360</span>
                                   </DropdownMenuItem>
                                   {canEditSite && (
@@ -1650,7 +1683,7 @@ export function Sites() {
                                   </DropdownMenuItem>
 
                                   {canEditSite && (
-                                    <DropdownMenuItem onClick={() => { setViewMode('table'); handleEditStart(site); }} className="gap-2 text-indigo-700 focus:text-indigo-700 focus:bg-indigo-50">
+                                    <DropdownMenuItem onClick={() => { setViewMode('table'); handleEditStart(site); }} className="gap-2 text-blue-600 focus:text-blue-700 focus:bg-blue-50 dark:focus:bg-blue-950/40">
                                       <Pencil className="h-4 w-4" />
                                       <span>Edit Site</span>
                                     </DropdownMenuItem>
@@ -1658,7 +1691,7 @@ export function Sites() {
                                   {canDeleteSite && (
                                     <>
                                       <DropdownMenuSeparator />
-                                      <DropdownMenuItem onClick={() => handleDelete(site.id)} className="gap-2 text-red-600 focus:text-red-600 focus:bg-red-50">
+                                      <DropdownMenuItem onClick={() => handleDelete(site.id)} className="gap-2 text-red-600 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-950/40">
                                         <Trash2 className="h-4 w-4" />
                                         <span>Delete</span>
                                       </DropdownMenuItem>
@@ -1715,7 +1748,7 @@ export function Sites() {
                       <TableCell>
                         <Badge 
                           variant={site.status === 'Pending' ? 'outline' : 'success'}
-                          className={`text-[10px] font-bold ${site.status === 'Pending' ? 'bg-slate-50 text-slate-500 border-slate-200' : ''}`}
+                          className={`text-[10px] font-bold rounded-sm ${site.status === 'Pending' ? 'bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700' : ''}`}
                         >
                           {site.status}
                         </Badge>
@@ -1723,12 +1756,12 @@ export function Sites() {
                       <TableCell className="text-right" onClick={e => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-1">
                           {canEditSite && (
-                            <Button variant="ghost" size="sm" className="text-slate-400 hover:text-indigo-600 hover:bg-slate-50" onClick={() => navigate(`/sites/onboarding/${site.id}`)}>
+                            <Button variant="ghost" size="sm" className="text-slate-400 hover:text-blue-600 hover:bg-slate-50 dark:hover:bg-slate-800" onClick={() => navigate(`/sites/onboarding/${site.id}`)}>
                               <Eye className="h-4 w-4 mr-2" /> View Form
                             </Button>
                           )}
                           {canDeleteSite && (
-                            <Button variant="ghost" size="sm" className="text-slate-400 hover:text-rose-600 hover:bg-rose-50" onClick={() => handleDeletePending(site)}>
+                            <Button variant="ghost" size="sm" className="text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40" onClick={() => handleDeletePending(site)}>
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           )}
@@ -1751,24 +1784,24 @@ export function Sites() {
                 {filteredPendingSites.map(site => (
                   <Card 
                     key={site.id} 
-                    className="border-slate-200 shadow-sm hover:shadow-md transition-all bg-white group overflow-hidden"
+                    className="border border-slate-200 dark:border-slate-800 rounded-md bg-white dark:bg-slate-900 group overflow-hidden hover:border-blue-500/40 transition-colors"
                   >
                     <CardContent className="p-4 pb-3">
                       <div className="flex items-start justify-between mb-3">
                         <div className="flex gap-3 min-w-0 flex-1">
-                          <div className="h-8 w-8 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0">
+                          <div className="h-8 w-8 rounded-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center shrink-0">
                             <Clock className="h-4 w-4 text-slate-400" />
                           </div>
                           <div className="min-w-0 flex-1">
-                            <h3 className="text-sm font-bold text-slate-800 uppercase truncate leading-tight mb-1" title={site.siteName}>{site.siteName}</h3>
-                            <div className="flex items-center gap-2 font-semibold text-slate-500 text-xs">
+                            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase truncate leading-tight mb-1" title={site.siteName}>{site.siteName}</h3>
+                            <div className="flex items-center gap-2 font-semibold text-slate-500 dark:text-slate-400 text-xs">
                               <Badge 
                                 variant={site.status === 'Pending' ? 'outline' : 'success'} 
-                                className={cn("text-[9px] font-bold shrink-0 px-1.5 py-0", site.status === 'Pending' ? 'bg-slate-50 text-slate-500 border-slate-200' : '')}
+                                className={cn("text-[9px] font-bold shrink-0 px-1.5 py-0 rounded-sm", site.status === 'Pending' ? 'bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700' : '')}
                               >
                                 {site.status}
                               </Badge>
-                              <span className="text-slate-300 shrink-0">•</span>
+                              <span className="text-slate-300 dark:text-slate-600 shrink-0">•</span>
                               <div className="flex items-center gap-1 min-w-0">
                                 <Building2 className="h-3 w-3 text-slate-400 shrink-0" />
                                 <span className="truncate" title={site.clientName}>{site.clientName}</span>
@@ -1778,26 +1811,26 @@ export function Sites() {
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-5 gap-1 mb-3 bg-slate-50 rounded-md p-2">
+                      <div className="grid grid-cols-5 gap-1 mb-3 bg-slate-50 dark:bg-slate-800/50 rounded-sm border border-slate-100 dark:border-slate-800 p-2">
                         {[1, 2, 3, 4, 5].map(phase => {
                           const isCompleted = (site as any)[`phase${phase}`]?.completed;
                           return (
                             <div key={phase} className="flex flex-col items-center gap-1">
                               <span className="text-[9px] font-bold text-slate-400">P{phase}</span>
-                              {isCompleted ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" /> : <Circle className="h-3.5 w-3.5 text-slate-200" />}
+                              {isCompleted ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" /> : <Circle className="h-3.5 w-3.5 text-slate-200 dark:text-slate-700" />}
                             </div>
                           );
                         })}
                       </div>
 
-                      <div className="pt-2 flex items-center justify-between">
+                      <div className="pt-2 flex items-center justify-between border-t border-slate-100 dark:border-slate-800">
                         {canDeleteSite && (
-                          <Button variant="ghost" size="sm" className="h-7 text-xs text-rose-400 hover:text-rose-600 hover:bg-rose-50 font-semibold" onClick={(e) => { e.stopPropagation(); handleDeletePending(site); }}>
+                          <Button variant="ghost" size="sm" className="h-7 text-xs text-rose-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 font-semibold" onClick={(e) => { e.stopPropagation(); handleDeletePending(site); }}>
                             <Trash2 className="h-3 w-3 mr-1.5" /> Delete
                           </Button>
                         )}
                         {canEditSite && (
-                          <Button variant="ghost" size="sm" className="h-7 text-xs text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 font-semibold" onClick={(e) => { e.stopPropagation(); navigate(`/sites/onboarding/${site.id}`); }}>
+                          <Button variant="ghost" size="sm" className="h-7 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950/40 font-semibold" onClick={(e) => { e.stopPropagation(); navigate(`/sites/onboarding/${site.id}`); }}>
                             <Eye className="h-3 w-3 mr-1.5" /> View Form
                           </Button>
                         )}
@@ -1827,22 +1860,22 @@ export function Sites() {
       {/* ── Site Narrative Info Modal ── */}
       {narrativeSite && (
         <div className="fixed inset-0 bg-slate-900/60 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
-          <div className="bg-white h-full sm:h-auto sm:max-h-[90vh] w-full max-w-xl sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-10 duration-300">
+          <div className="bg-white dark:bg-slate-900 h-full sm:h-auto sm:max-h-[90vh] w-full max-w-xl rounded-md border border-slate-200 dark:border-slate-800 flex flex-col overflow-hidden animate-in fade-in duration-200">
             {/* Header */}
-            <div className="bg-gradient-to-r from-indigo-600 to-indigo-500 px-5 sm:px-6 py-4 sm:py-5 flex items-start justify-between shrink-0">
+            <div className="bg-slate-900 px-5 sm:px-6 py-4 border-b border-slate-800 flex items-start justify-between shrink-0">
               <div className="pr-8">
                 <h2 className="text-white font-bold text-lg leading-tight truncate">{narrativeSite.site.name}</h2>
                 <div className="flex items-center gap-2 mt-1">
-                  <p className="text-indigo-100 text-xs font-medium bg-white/10 px-2 py-0.5 rounded uppercase tracking-wider">{narrativeSite.site.status}</p>
-                  <span className="text-indigo-300 text-xs">•</span>
-                  <p className="text-indigo-100 text-xs truncate max-w-[150px] sm:max-w-none">{narrativeSite.site.client}</p>
+                  <p className="text-slate-300 text-xs font-mono font-medium bg-white/10 px-2 py-0.5 rounded-sm uppercase tracking-wider">{narrativeSite.site.status}</p>
+                  <span className="text-slate-600 text-xs">•</span>
+                  <p className="text-slate-400 text-xs truncate max-w-[150px] sm:max-w-none">{narrativeSite.site.client}</p>
                 </div>
               </div>
               <button 
                 onClick={() => setNarrativeSite(null)} 
-                className="text-white/80 hover:text-white bg-white/10 hover:bg-white/20 p-2 rounded-full transition-colors shrink-0"
+                className="text-white/80 hover:text-white bg-white/10 hover:bg-white/20 p-1.5 rounded-sm transition-colors shrink-0"
               >
-                <X className="h-5 w-5" />
+                <X className="h-4 w-4" />
               </button>
             </div>
 
@@ -1850,63 +1883,63 @@ export function Sites() {
             <div className="p-5 sm:p-6 overflow-y-auto style-scroll flex-1">
               {/* Quick Info Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-6">
-                <div className="bg-slate-50 p-3 sm:p-4 rounded-xl border border-slate-100 group hover:border-indigo-100 transition-colors">
+                <div className="bg-slate-50 dark:bg-slate-800/50 p-3 sm:p-4 rounded-sm border border-slate-200 dark:border-slate-700 transition-colors">
                   <div className="flex items-center gap-2 mb-2">
-                    <div className="p-1.5 bg-indigo-50 rounded-md text-indigo-600">
+                    <div className="p-1.5 bg-blue-50 dark:bg-blue-950/40 rounded-sm text-blue-600 dark:text-blue-400">
                       <MapPin className="h-3.5 w-3.5" />
                     </div>
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Site Address</p>
                   </div>
-                  <p className="text-sm font-semibold text-slate-700">{narrativeSite.q?.address || 'Address not listed'}</p>
+                  <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">{narrativeSite.q?.address || 'Address not listed'}</p>
                 </div>
 
-                <div className="bg-slate-50 p-3 sm:p-4 rounded-xl border border-slate-100 group hover:border-indigo-100 transition-colors">
+                <div className="bg-slate-50 dark:bg-slate-800/50 p-3 sm:p-4 rounded-sm border border-slate-200 dark:border-slate-700 transition-colors">
                   <div className="flex items-center gap-2 mb-2">
-                    <div className="p-1.5 bg-emerald-50 rounded-md text-emerald-600">
+                    <div className="p-1.5 bg-emerald-50 dark:bg-emerald-950/40 rounded-sm text-emerald-600 dark:text-emerald-400">
                       <UserCircle className="h-3.5 w-3.5" />
                     </div>
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Contact Person</p>
                   </div>
-                  <p className="text-sm font-semibold text-slate-700">
+                  <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
                     {narrativeSite.q?.contactPersonName || 'Contact not listed'}
                     {narrativeSite.q?.contactPersonPhone && (
-                      <span className="block text-[11px] text-slate-500 font-medium mt-1 bg-white inline-block px-1.5 py-0.5 rounded border border-slate-100">
+                      <span className="block text-[11px] text-slate-500 font-mono mt-1 bg-white dark:bg-slate-800 inline-block px-1.5 py-0.5 rounded-sm border border-slate-200 dark:border-slate-700">
                         {narrativeSite.q.contactPersonPhone}
                       </span>
                     )}
                   </p>
                 </div>
 
-                <div className="bg-slate-50 p-3 sm:p-4 rounded-xl border border-slate-100 group hover:border-indigo-100 transition-colors">
+                <div className="bg-slate-50 dark:bg-slate-800/50 p-3 sm:p-4 rounded-sm border border-slate-200 dark:border-slate-700 transition-colors">
                   <div className="flex items-center gap-2 mb-2">
-                    <div className="p-1.5 bg-amber-50 rounded-md text-amber-600">
+                    <div className="p-1.5 bg-amber-50 dark:bg-amber-950/40 rounded-sm text-amber-600 dark:text-amber-400">
                       <Briefcase className="h-3.5 w-3.5" />
                     </div>
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Project Name</p>
                   </div>
-                  <p className="text-sm font-semibold text-slate-700 truncate">{narrativeSite.q?.phase1?.whatIsBeingBuilt || 'Dewatering Operations'}</p>
+                  <p className="text-sm font-semibold text-slate-700 dark:text-slate-300 truncate">{narrativeSite.q?.phase1?.whatIsBeingBuilt || 'Dewatering Operations'}</p>
                 </div>
 
-                <div className="bg-slate-50 p-3 sm:p-4 rounded-xl border border-slate-100 group hover:border-indigo-100 transition-colors">
+                <div className="bg-slate-50 dark:bg-slate-800/50 p-3 sm:p-4 rounded-sm border border-slate-200 dark:border-slate-700 transition-colors">
                   <div className="flex items-center gap-2 mb-2">
-                    <div className="p-1.5 bg-blue-50 rounded-md text-blue-600">
+                    <div className="p-1.5 bg-blue-50 dark:bg-blue-950/40 rounded-sm text-blue-600 dark:text-blue-400">
                       <FileText className="h-3.5 w-3.5" />
                     </div>
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tax Status</p>
                   </div>
-                  <p className="text-sm font-semibold text-slate-700">{narrativeSite.q?.phase4?.clientTaxStatus || 'Standard'}</p>
+                  <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">{narrativeSite.q?.phase4?.clientTaxStatus || 'Standard'}</p>
                 </div>
               </div>
 
               {/* Narrative Section */}
               <div className="relative">
-                <div className="absolute left-0 top-0 bottom-0 w-1 bg-indigo-50 rounded-full" />
+                <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-600 rounded-full" />
                 <div className="pl-5">
-                  <h3 className="text-xs font-bold text-indigo-600 uppercase tracking-widest mb-3 flex items-center gap-2">
+                  <h3 className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest mb-3 flex items-center gap-2">
                     <BookOpen className="h-3.5 w-3.5" />
                     Project Narrative
                   </h3>
-                  <div className="text-slate-600 text-sm leading-relaxed whitespace-pre-line font-medium">
+                  <div className="text-slate-600 dark:text-slate-400 text-sm leading-relaxed whitespace-pre-line font-medium">
                     {buildNarrative(narrativeSite.site, narrativeSite.q)}
                   </div>
                 </div>
@@ -1914,10 +1947,10 @@ export function Sites() {
 
               {/* Site Documents Section */}
               {narrativeSite.q?.attachments && narrativeSite.q.attachments.length > 0 && (
-                <div className="relative mt-6 pt-6 border-t border-slate-100">
-                  <div className="absolute left-0 top-6 bottom-0 w-1 bg-indigo-50 rounded-full" />
+                <div className="relative mt-6 pt-6 border-t border-slate-100 dark:border-slate-800">
+                  <div className="absolute left-0 top-6 bottom-0 w-1 bg-blue-600 rounded-full" />
                   <div className="pl-5">
-                    <h3 className="text-xs font-bold text-indigo-600 uppercase tracking-widest mb-3 flex items-center gap-2">
+                    <h3 className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest mb-3 flex items-center gap-2">
                       <Paperclip className="h-3.5 w-3.5" />
                       Site Documents
                     </h3>
@@ -1925,14 +1958,14 @@ export function Sites() {
                         {narrativeSite.q.attachments.map((att, i) => (
                           <div
                             key={att.id || i}
-                            className="flex items-center justify-between p-2.5 rounded-lg border border-slate-100 hover:border-indigo-100 hover:bg-slate-50/50 transition-colors group"
+                            className="flex items-center justify-between p-2.5 rounded-sm border border-slate-200 dark:border-slate-800 hover:border-blue-500/40 hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors group"
                           >
                             <div className="flex items-start gap-2.5 min-w-0 flex-1">
-                              <div className="h-8 w-8 rounded bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0 mt-0.5">
+                              <div className="h-8 w-8 rounded-sm bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 mt-0.5">
                                 <FileText className="h-4 w-4" />
                               </div>
                               <div className="min-w-0 flex-1">
-                                <p className="text-xs font-bold text-slate-700 truncate group-hover:text-indigo-600 transition-colors">
+                                <p className="text-xs font-bold text-slate-700 dark:text-slate-300 truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                                   {att.caption || att.name}
                                 </p>
                                 {att.caption && (
@@ -1952,7 +1985,7 @@ export function Sites() {
                               {att.url && (
                                 <button
                                   onClick={() => setPreviewDoc(att)}
-                                  className="h-7 w-7 rounded-lg flex items-center justify-center text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                                  className="h-7 w-7 rounded-sm flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors"
                                   title="Preview"
                                 >
                                   <Eye className="h-3.5 w-3.5" />
@@ -1963,7 +1996,7 @@ export function Sites() {
                                   href={att.url}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="h-7 w-7 rounded-lg flex items-center justify-center text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                                  className="h-7 w-7 rounded-sm flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors"
                                   title="Open in new tab"
                                 >
                                   <ExternalLink className="h-3.5 w-3.5" />
@@ -1979,10 +2012,10 @@ export function Sites() {
             </div>
 
             {/* Footer */}
-            <div className="px-5 sm:px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end shrink-0">
+            <div className="px-5 sm:px-6 py-3 bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex justify-end shrink-0">
               <Button 
                 onClick={() => setNarrativeSite(null)}
-                className="w-full sm:w-auto bg-white hover:bg-slate-50 text-slate-600 border-slate-200 shadow-sm"
+                className="w-full sm:w-auto bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-md text-xs font-medium"
               >
                 Close Summary
               </Button>
@@ -2005,22 +2038,22 @@ export function Sites() {
       {clientEditOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setClientEditOpen(false)} />
-          <div className="relative z-10 w-full max-w-md rounded-3xl shadow-2xl p-5 sm:p-6 max-h-[90vh] flex flex-col bg-white border border-slate-200">
+          <div className="relative z-10 w-full max-w-md rounded-md p-5 sm:p-6 max-h-[90vh] flex flex-col bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
             <div className="flex justify-between items-center mb-5 shrink-0">
-              <h2 className="text-lg font-black flex items-center gap-2"><Edit2 className="w-5 h-5 text-indigo-600" /> Edit Client</h2>
+              <h2 className="text-lg font-bold flex items-center gap-2"><Edit2 className="w-5 h-5 text-blue-600" /> Edit Client</h2>
               <Button variant="ghost" size="icon" onClick={() => setClientEditOpen(false)} className="h-8 w-8"><X className="w-4 h-4" /></Button>
             </div>
             <div className="space-y-4 overflow-y-auto pr-1 flex-1 style-scroll mb-4 text-left">
-              <div><label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Client Name</label><input value={clientEditForm.name || ''} readOnly disabled className="w-full rounded-xl border px-3 py-2 text-sm focus:outline-none cursor-not-allowed opacity-70 bg-slate-100 border-slate-200 text-slate-500" /></div>
-              <div><label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">TIN Number</label><input value={clientEditForm.tinNumber || ''} readOnly disabled placeholder="Optional" className="w-full rounded-xl border px-3 py-2 text-sm focus:outline-none cursor-not-allowed opacity-70 bg-slate-100 border-slate-200 text-slate-500" /></div>
-              <div><label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Address</label><textarea value={clientEditForm.address || ''} onChange={e => setClientEditForm(f => ({ ...f, address: e.target.value }))} rows={2} placeholder="e.g. 5 Marina Road, Lagos Island" className="w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none bg-slate-50 border-slate-200 text-slate-900" /></div>
-              <div><label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Main Contact Person</label><input value={clientEditForm.mainContactPerson || ''} onChange={e => setClientEditForm(f => ({ ...f, mainContactPerson: e.target.value }))} placeholder="e.g. John Doe" className="w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50 border-slate-200 text-slate-900" /></div>
-              <div><label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Contact Phone Number</label><input value={clientEditForm.contactPhone || ''} onChange={e => setClientEditForm(f => ({ ...f, contactPhone: e.target.value }))} placeholder="e.g. +234 801 234 5678" className="w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50 border-slate-200 text-slate-900" /></div>
-              <div><label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Start Date</label><input type="date" value={clientEditForm.startDate || ''} readOnly disabled className="w-full rounded-xl border px-3 py-2 text-sm focus:outline-none cursor-not-allowed opacity-70 bg-slate-100 border-slate-200 text-slate-500" /></div>
+              <div><label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Client Name</label><input value={clientEditForm.name || ''} readOnly disabled className="w-full rounded-sm border px-3 py-2 text-sm focus:outline-none cursor-not-allowed opacity-70 bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500" /></div>
+              <div><label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">TIN Number</label><input value={clientEditForm.tinNumber || ''} readOnly disabled placeholder="Optional" className="w-full rounded-sm border px-3 py-2 text-sm focus:outline-none cursor-not-allowed opacity-70 bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500" /></div>
+              <div><label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Address</label><textarea value={clientEditForm.address || ''} onChange={e => setClientEditForm(f => ({ ...f, address: e.target.value }))} rows={2} placeholder="e.g. 5 Marina Road, Lagos Island" className="w-full rounded-sm border px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 resize-none bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100" /></div>
+              <div><label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Main Contact Person</label><input value={clientEditForm.mainContactPerson || ''} onChange={e => setClientEditForm(f => ({ ...f, mainContactPerson: e.target.value }))} placeholder="e.g. John Doe" className="w-full rounded-sm border px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100" /></div>
+              <div><label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Contact Phone Number</label><input value={clientEditForm.contactPhone || ''} onChange={e => setClientEditForm(f => ({ ...f, contactPhone: e.target.value }))} placeholder="e.g. +234 801 234 5678" className="w-full rounded-sm border px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100" /></div>
+              <div><label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Start Date</label><input type="date" value={clientEditForm.startDate || ''} readOnly disabled className="w-full rounded-sm border px-3 py-2 text-sm focus:outline-none cursor-not-allowed opacity-70 bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500" /></div>
             </div>
-            <div className="flex gap-3 shrink-0 pt-3 border-t border-slate-100">
-              <Button variant="outline" onClick={() => setClientEditOpen(false)} className="flex-1 rounded-xl">Cancel</Button>
-              <Button onClick={saveClientEdit} className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl">Save Changes</Button>
+            <div className="flex gap-3 shrink-0 pt-3 border-t border-slate-100 dark:border-slate-800">
+              <Button variant="outline" onClick={() => setClientEditOpen(false)} className="flex-1 rounded-md border-slate-200 dark:border-slate-700">Cancel</Button>
+              <Button onClick={saveClientEdit} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white rounded-md">Save Changes</Button>
             </div>
           </div>
         </div>

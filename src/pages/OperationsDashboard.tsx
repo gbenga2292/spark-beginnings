@@ -13,6 +13,7 @@ import { usePriv } from '@/src/hooks/usePriv';
 import { useNavigate } from 'react-router-dom';
 import { format, differenceInDays, parseISO, eachDayOfInterval } from 'date-fns';
 import { BulkMachineLogModal } from './BulkMachineLogModal';
+import { MetricHeroCard } from '@/src/components/ui/MetricHeroCard';
 
 export function Dashboard() {
   const {
@@ -53,7 +54,7 @@ export function Dashboard() {
 
   const cards = [
     { title: 'Total Assets',     value: stats.totalAssets,          icon: Package,       color: 'text-blue-600',   bg: 'bg-blue-100 dark:bg-blue-900/30'   },
-    { title: 'Active Waybills',  value: stats.activeWaybills,       icon: Truck,         color: 'text-indigo-600', bg: 'bg-indigo-100 dark:bg-indigo-900/30'},
+    { title: 'Active Waybills',  value: stats.activeWaybills,       icon: Truck,         color: 'text-blue-600', bg: 'bg-blue-100 dark:bg-blue-900/30'},
     { title: 'Active Checkouts', value: stats.activeCheckouts || 0, icon: HardHat,       color: 'text-teal-600',   bg: 'bg-teal-100 dark:bg-teal-900/30'   },
     { title: 'Pending Returns',  value: pendingReturnsCount,        icon: ArrowRightLeft, color: 'text-amber-600', bg: 'bg-amber-100 dark:bg-amber-900/30'  },
     { title: 'Overdue Maint.',   value: maintenanceStats.overdue,   icon: Wrench,        color: 'text-rose-600',   bg: 'bg-rose-100 dark:bg-rose-900/30'   },
@@ -332,59 +333,74 @@ export function Dashboard() {
   return (
     <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
 
-      {/* 1. At-a-Glance Metrics */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 sm:gap-6">
-        {cards.map((card, i) => (
-          <div
-            key={i}
-            className={cn(
-              'p-4 sm:p-5 rounded-xl border transition-all hover:shadow-md',
-              isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-sm'
-            )}
-          >
-            <div className="flex items-center justify-between mb-3">
-              <div className={cn('p-2 rounded-lg', card.bg)}>
-                <card.icon className={cn('h-4 w-4', card.color)} />
-              </div>
-              <TrendingUp className="h-4 w-4 text-slate-300" />
-            </div>
-            <div>
-              <p className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wider mb-1 truncate">{card.title}</p>
-              <h3 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">{card.value}</h3>
-            </div>
-          </div>
-        ))}
-      </div>
+      {/* 1. Primary Hero + Secondary Companion Metrics */}
+      <MetricHeroCard
+        primary={{
+          label: 'Total Managed Fleet & Assets',
+          value: stats.totalAssets,
+          period: 'Live Roster & Deployed Site Assets',
+          delta: `${stats.activeWaybills} active in transit`,
+          deltaType: 'neutral',
+          sparklineData: [
+            Math.max(1, stats.totalAssets - 8),
+            Math.max(1, stats.totalAssets - 5),
+            Math.max(1, stats.totalAssets - 3),
+            Math.max(1, stats.totalAssets - 1),
+            stats.totalAssets,
+          ],
+        }}
+        secondary={[
+          {
+            label: 'Field Checkouts',
+            value: stats.activeCheckouts || 0,
+            period: 'Active tool dispatches',
+          },
+          {
+            label: 'Pending Returns',
+            value: pendingReturnsCount,
+            period: 'Waybills awaiting return',
+            delta: pendingReturnsCount > 0 ? 'Pending' : 'Cleared',
+            deltaType: pendingReturnsCount > 0 ? 'negative' : 'positive',
+          },
+          {
+            label: 'Overdue Maint.',
+            value: maintenanceStats.overdue,
+            period: `${maintenanceStats.dueSoon || 0} due soon`,
+            delta: maintenanceStats.overdue > 0 ? 'Action Req.' : 'Nominal',
+            deltaType: maintenanceStats.overdue > 0 ? 'negative' : 'positive',
+          },
+        ]}
+      />
 
       {/* 2. Quick Actions */}
       <div className={cn(
-        'flex flex-wrap gap-3 p-4 rounded-xl border shadow-sm items-center',
+        'flex flex-wrap gap-2 p-3 rounded-md border items-center',
         isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
       )}>
-        <span className="text-sm font-semibold text-slate-500 mr-2">Quick Actions:</span>
+        <span className="text-xs font-semibold uppercase tracking-wider text-slate-400 mr-2">Quick Actions:</span>
         {opsWaybills?.canAdd && (
-          <button onClick={() => navigate('/operations/waybills')} className="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 dark:bg-indigo-900/30 dark:text-indigo-300 dark:hover:bg-indigo-900/50 rounded-lg text-sm font-medium transition-colors">
-            <Truck className="h-4 w-4" /> Create Waybill
+          <button onClick={() => navigate('/operations/waybills')} className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-sm text-xs font-medium transition-colors">
+            <Truck className="h-3.5 w-3.5 text-slate-500" /> Create Waybill
           </button>
         )}
         {opsCheckout?.canAdd && (
-          <button onClick={() => navigate('/operations/checkout')} className="flex items-center gap-2 px-4 py-2 bg-teal-50 text-teal-700 hover:bg-teal-100 dark:bg-teal-900/30 dark:text-teal-300 dark:hover:bg-teal-900/50 rounded-lg text-sm font-medium transition-colors">
-            <HardHat className="h-4 w-4" /> Quick Checkout
+          <button onClick={() => navigate('/operations/checkout')} className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-sm text-xs font-medium transition-colors">
+            <HardHat className="h-3.5 w-3.5 text-slate-500" /> Quick Checkout
           </button>
         )}
         {opsMaintenance?.canAdd && (
-          <button onClick={() => navigate('/operations/maintenance')} className="flex items-center gap-2 px-4 py-2 bg-amber-50 text-amber-700 hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-300 dark:hover:bg-amber-900/50 rounded-lg text-sm font-medium transition-colors">
-            <Wrench className="h-4 w-4" /> Log Maintenance
+          <button onClick={() => navigate('/operations/maintenance')} className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-sm text-xs font-medium transition-colors">
+            <Wrench className="h-3.5 w-3.5 text-slate-500" /> Log Maintenance
           </button>
         )}
         {opsDiesel?.canAdd && (
-          <button onClick={() => navigate('/operations/diesel')} className="flex items-center gap-2 px-4 py-2 bg-orange-50 text-orange-700 hover:bg-orange-100 dark:bg-orange-900/30 dark:text-orange-300 dark:hover:bg-orange-900/50 rounded-lg text-sm font-medium transition-colors">
-            <Fuel className="h-4 w-4" /> Diesel Refill
+          <button onClick={() => navigate('/operations/diesel')} className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-sm text-xs font-medium transition-colors">
+            <Fuel className="h-3.5 w-3.5 text-slate-500" /> Diesel Refill
           </button>
         )}
         {opsInventory?.canAdd && (
-          <button onClick={() => setShowAssetForm(true)} className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50 rounded-lg text-sm font-medium transition-colors">
-            <Package className="h-4 w-4" /> Add Asset
+          <button onClick={() => setShowAssetForm(true)} className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-sm text-xs font-medium transition-colors">
+            <Package className="h-3.5 w-3.5" /> Add Asset
           </button>
         )}
       </div>
@@ -394,13 +410,13 @@ export function Dashboard() {
 
         {/* Left: Recent Logistics (2/3) */}
         <div className={cn(
-          'lg:col-span-2 rounded-xl border overflow-hidden shadow-sm flex flex-col',
+          'lg:col-span-2 rounded-md border overflow-hidden flex flex-col',
           isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
         )}>
-          <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/30">
-            <h3 className="font-semibold text-sm text-slate-700 dark:text-slate-200">Recent Logistics Activity</h3>
+          <div className="px-5 py-3.5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/30">
+            <h3 className="font-semibold text-xs uppercase tracking-wider text-slate-600 dark:text-slate-300">Recent Logistics Activity</h3>
             {opsWaybills?.canView && (
-              <button onClick={() => navigate('/operations/waybills')} className="text-xs text-indigo-600 hover:text-indigo-700 font-semibold">View All Waybills</button>
+              <button onClick={() => navigate('/operations/waybills')} className="text-xs text-blue-600 hover:text-blue-700 font-medium">View All Waybills</button>
             )}
           </div>
           <div className="divide-y divide-slate-100 dark:divide-slate-800 flex-1">
@@ -455,7 +471,7 @@ export function Dashboard() {
 
         {/* Right: Attention Required (1/3) */}
         <div className={cn(
-          'rounded-xl border overflow-hidden shadow-sm flex flex-col',
+          'rounded-md border overflow-hidden shadow-none flex flex-col',
           isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
         )}>
           <div className="px-5 py-4 border-b border-rose-100 dark:border-rose-900/30 flex items-center bg-rose-50/30 dark:bg-rose-900/10">
@@ -502,8 +518,8 @@ export function Dashboard() {
             ))}
             {overdueMaintenance.length === 0 && overdueCheckouts.length === 0 && lowStockAssets.length === 0 && (
               <div className="p-8 text-center">
-                <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-green-100 dark:bg-green-900/30 text-green-600 mb-3">
-                  <Package className="h-6 w-6" />
+                <div className="inline-flex items-center justify-center w-10 h-10 rounded-md bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 mb-3">
+                  <Package className="h-5 w-5" />
                 </div>
                 <p className="text-sm font-medium text-slate-900 dark:text-white">All caught up!</p>
                 <p className="text-xs text-slate-500 mt-1">No pending alerts requiring attention.</p>
@@ -515,7 +531,7 @@ export function Dashboard() {
 
       {/* 4. Pending Machine Log Notifications ─────────────────────────────── */}
       <div className={cn(
-        'rounded-xl border overflow-hidden shadow-sm',
+        'rounded-md border overflow-hidden shadow-none',
         isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
       )}>
         {/* Header */}
@@ -527,7 +543,7 @@ export function Dashboard() {
         )}>
           <div className="flex items-center gap-2">
             <div className={cn(
-              'p-1.5 rounded-lg',
+              'p-1.5 rounded-md',
               pendingLogNotifications.length > 0
                 ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400'
                 : 'bg-slate-100 dark:bg-slate-800 text-slate-400'
@@ -543,7 +559,7 @@ export function Dashboard() {
               Pending Machine Log Notifications
             </h3>
             {pendingLogNotifications.length > 0 && (
-              <span className="ml-1 inline-flex items-center justify-center h-5 min-w-5 px-1.5 rounded-full bg-amber-500 text-white text-[10px] font-black">
+              <span className="ml-1 inline-flex items-center justify-center h-5 min-w-5 px-1.5 rounded-sm bg-amber-500 text-white text-[10px] font-mono font-bold">
                 {pendingLogNotifications.length}
               </span>
             )}
@@ -558,15 +574,15 @@ export function Dashboard() {
           <button
             onClick={() => setLogTab('active')}
             className={cn(
-              "px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-2",
+              "px-3 py-1.5 text-xs font-semibold rounded-md transition-all flex items-center gap-2",
               logTab === 'active'
-                ? "bg-emerald-600 text-white shadow-sm font-black"
-                : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 font-bold"
+                ? "bg-emerald-600 text-white shadow-none font-bold"
+                : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
             )}
           >
             <span>Active Sites</span>
             <span className={cn(
-              "px-1.5 py-0.5 text-[10px] rounded-full font-black",
+              "px-1.5 py-0.5 text-[10px] rounded-sm font-mono font-bold",
               logTab === 'active' ? "bg-white/25 text-white" : "bg-slate-100 dark:bg-slate-800 text-slate-500"
             )}>
               {activeNotifications.length}
@@ -575,15 +591,15 @@ export function Dashboard() {
           <button
             onClick={() => setLogTab('pending')}
             className={cn(
-              "px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-2",
+              "px-3 py-1.5 text-xs font-semibold rounded-md transition-all flex items-center gap-2",
               logTab === 'pending'
-                ? "bg-amber-500 text-white shadow-sm font-black"
-                : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 font-bold"
+                ? "bg-amber-500 text-white shadow-none font-bold"
+                : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
             )}
           >
             <span>Inactive Sites</span>
             <span className={cn(
-              "px-1.5 py-0.5 text-[10px] rounded-full font-black",
+              "px-1.5 py-0.5 text-[10px] rounded-sm font-mono font-bold",
               logTab === 'pending' ? "bg-white/25 text-white" : "bg-slate-100 dark:bg-slate-800 text-slate-500"
             )}>
               {pendingNotifications.length}
@@ -688,7 +704,7 @@ export function Dashboard() {
                       >
                         <div className="flex items-center gap-3 min-w-0">
                           {/* Icon */}
-                          <div className={cn('h-9 w-9 rounded-lg flex items-center justify-center shrink-0', urgency.icon)}>
+                          <div className={cn('h-9 w-9 rounded-md flex items-center justify-center shrink-0', urgency.icon)}>
                             <CalendarRange className="h-4 w-4" />
                           </div>
 
@@ -715,11 +731,11 @@ export function Dashboard() {
                         {/* Right badges */}
                         <div className="flex items-center gap-2 ml-4 shrink-0">
                           <div className="text-right hidden sm:block">
-                            <span className={cn('inline-block text-[10px] font-black uppercase px-2.5 py-1 rounded-full', urgency.pill)}>
+                            <span className={cn('inline-block text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded-sm', urgency.pill)}>
                               {urgency.label}
                             </span>
                             <p
-                              className="text-[11px] text-slate-400 mt-1 cursor-help underline decoration-dotted underline-offset-2 decoration-slate-300"
+                              className="text-[11px] font-mono text-slate-400 mt-1 cursor-help underline decoration-dotted underline-offset-2 decoration-slate-300"
                               title={`Missing dates:\n${notif.missingDates.map(d => format(parseISO(d), 'EEE, dd MMM yyyy')).join('\n')}`}
                             >
                               {notif.missingDays} day{notif.missingDays !== 1 ? 's' : ''} missing

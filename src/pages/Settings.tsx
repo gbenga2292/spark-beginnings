@@ -88,7 +88,7 @@ const PROVIDER_MODELS: Record<string, string[]> = {
 };
 
 function detectProvider(key: string): string {
-  if (key.startsWith('AIza')) return 'gemini';
+  if (key.startsWith('AIza') || key.startsWith('AQ.')) return 'gemini';
   if (key.startsWith('gsk_')) return 'groq';
   if (key.startsWith('sk-ant')) return 'anthropic';
   if (key.startsWith('sk-')) return 'openai';
@@ -228,7 +228,15 @@ export function Settings() {
   useEffect(() => {
     (async () => {
       const { data: keysData } = await supabase.from('api_keys').select('*').eq('workspace_id', workspaceId);
-      if (keysData) {
+      if (keysData && keysData.length > 0) {
+        let hasDefault = keysData.some((k: any) => k.is_default);
+        // If there are keys but none is marked default, automatically promote the first one to default in DB and state
+        if (!hasDefault) {
+          const firstKey = keysData[0];
+          await supabase.from('api_keys').update({ is_default: true }).eq('id', firstKey.id);
+          firstKey.is_default = true;
+        }
+
         setApiKeys(keysData.map((k: any) => ({
           id: k.id,
           label: k.label || '',
@@ -237,6 +245,8 @@ export function Settings() {
           isDefault: k.is_default,
           defaultModel: k.default_model || '',
         })));
+      } else {
+        setApiKeys([]);
       }
       const { data: settingsData } = await supabase
         .from('workspace_settings')
@@ -260,17 +270,23 @@ export function Settings() {
     setIsSavingKey(true);
     try {
       const provider = newKeyProvider || detectProvider(newKeyValue);
+      
+      // Preserve isDefault on edit, or mark default if it's the only key / no default exists
+      const currentIsDefault = editKeyId
+        ? (apiKeys.find(k => k.id === editKeyId)?.isDefault ?? false)
+        : (apiKeys.length === 0 || !apiKeys.some(k => k.isDefault));
+
       const payload = {
         label: newKeyLabel || provider,
         provider,
         key_value: newKeyValue,
-        is_default: apiKeys.length === 0,
+        is_default: currentIsDefault,
         workspace_id: workspaceId,
         default_model: newKeyDefaultModel,
       };
       if (editKeyId) {
         await supabase.from('api_keys').update(payload).eq('id', editKeyId);
-        setApiKeys(prev => prev.map(k => k.id === editKeyId ? { ...k, label: payload.label, provider: payload.provider, keyValue: payload.key_value, defaultModel: payload.default_model } : k));
+        setApiKeys(prev => prev.map(k => k.id === editKeyId ? { ...k, label: payload.label, provider: payload.provider, keyValue: payload.key_value, defaultModel: payload.default_model, isDefault: payload.is_default } : k));
         setEditKeyId(null);
         toast.success('API Key updated.');
       } else {
@@ -286,8 +302,18 @@ export function Settings() {
   };
 
   const handleDeleteKey = async (id: string) => {
+    const deletedKey = apiKeys.find(k => k.id === id);
     await supabase.from('api_keys').delete().eq('id', id);
-    setApiKeys(prev => prev.filter(k => k.id !== id));
+    const remaining = apiKeys.filter(k => k.id !== id);
+
+    // If the deleted key was default and other keys exist, promote the first remaining key to default
+    if (deletedKey?.isDefault && remaining.length > 0) {
+      const nextDefaultId = remaining[0].id;
+      await supabase.from('api_keys').update({ is_default: true }).eq('id', nextDefaultId);
+      setApiKeys(remaining.map(k => ({ ...k, isDefault: k.id === nextDefaultId })));
+    } else {
+      setApiKeys(remaining);
+    }
     toast.success('Key deleted.');
   };
 
@@ -828,11 +854,11 @@ export function Settings() {
 
         {/* ─────────── GENERAL TAB ─────────────────────────────────── */}
         <TabsContent active={activeTab === 'general'}>
-          <Card className="border border-slate-200 shadow-sm rounded-2xl overflow-hidden">
-            <CardHeader className="bg-gradient-to-r from-slate-50 to-white border-b border-slate-100 px-6 py-5">
+          <Card className="border border-slate-200 rounded-md overflow-hidden">
+            <CardHeader className="bg-slate-50 dark:bg-slate-800 border-b border-slate-100 px-6 py-5">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 shadow-sm">
+                  <div className="h-10 w-10 rounded-md bg-blue-50 flex items-center justify-center text-blue-600 border border-blue-100">
                     <Building className="h-5 w-5" />
                   </div>
                   <div>
@@ -853,14 +879,14 @@ export function Settings() {
                       <Button variant="ghost" size="sm" onClick={handleCancel} className="gap-1.5 text-slate-500 hover:text-slate-700 hover:bg-slate-100 h-9">
                         <X className="h-4 w-4" /> Cancel
                       </Button>
-                      <Button size="sm" onClick={handleSave} disabled={isSavingDB} className="gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm h-9 px-4">
+                      <Button size="sm" onClick={handleSave} disabled={isSavingDB} className="gap-1.5 bg-blue-600 hover:bg-blue-700 text-white h-9 px-4 rounded-sm">
                         {isSavingDB ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                         {isSavingDB ? 'Saving…' : 'Save Changes'}
                       </Button>
                     </>
                   ) : (
                     priv.canEdit && (
-                      <Button variant="outline" size="sm" onClick={handleEditStart} className="gap-1.5 border-slate-300 hover:border-indigo-400 hover:text-indigo-600 h-9">
+                      <Button variant="outline" size="sm" onClick={handleEditStart} className="gap-1.5 border-slate-300 hover:border-blue-400 hover:text-blue-600 h-9">
                         <Pencil className="h-4 w-4" /> Edit
                       </Button>
                     )
@@ -914,7 +940,7 @@ export function Settings() {
                       <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400 mb-1 flex items-center gap-1.5">
                         <Mail className="h-3.5 w-3.5" /> Primary Email
                       </p>
-                      <a href={`mailto:${saved.email}`} className="text-sm text-indigo-600 hover:text-indigo-700 hover:underline font-medium">
+                      <a href={`mailto:${saved.email}`} className="text-sm text-blue-600 hover:text-blue-700 hover:underline font-medium">
                         {saved.email}
                       </a>
                     </div>
@@ -936,10 +962,10 @@ export function Settings() {
           <div className="flex flex-col gap-6">
 
             {/* Manual Backup & Restore */}
-            <Card className="border border-slate-200 shadow-sm rounded-2xl overflow-hidden">
-              <CardHeader className="bg-gradient-to-r from-indigo-50 to-white border-b border-slate-100 px-6 py-5">
+            <Card className="border border-slate-200 rounded-md overflow-hidden">
+              <CardHeader className="bg-slate-50 dark:bg-slate-800 border-b border-slate-100 px-6 py-5">
                 <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-xl bg-indigo-100 flex items-center justify-center text-indigo-600 shadow-sm">
+                  <div className="h-10 w-10 rounded-md bg-blue-50 flex items-center justify-center text-blue-600 border border-blue-100">
                     <DatabaseBackup className="h-5 w-5" />
                   </div>
                   <div>
@@ -951,9 +977,9 @@ export function Settings() {
               <CardContent className="px-6 py-6">
                 <div className="grid md:grid-cols-2 gap-6">
                   {/* Backup section */}
-                  <div className="flex flex-col gap-4 p-5 bg-indigo-50/50 rounded-2xl border border-indigo-100">
+                  <div className="flex flex-col gap-4 p-5 bg-slate-50 rounded-md border border-slate-200">
                     <div className="flex items-center gap-2">
-                      <Download className="h-5 w-5 text-indigo-600" />
+                      <Download className="h-5 w-5 text-blue-600" />
                       <h3 className="font-bold text-slate-800">Create Backup</h3>
                     </div>
                     <p className="text-sm text-slate-600 leading-relaxed">
@@ -966,7 +992,7 @@ export function Settings() {
                     <Button
                       onClick={() => handleManualBackup()}
                       disabled={isBackingUp || !priv.canBackup}
-                      className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2 h-11 rounded-xl shadow-sm"
+                      className="bg-blue-600 hover:bg-blue-700 text-white gap-2 h-11 rounded-sm"
                     >
                       {isBackingUp
                         ? <><RefreshCw className="h-4 w-4 animate-spin" /> Creating backup…</>
@@ -976,7 +1002,7 @@ export function Settings() {
                   </div>
 
                   {/* Restore section */}
-                  <div className="flex flex-col gap-4 p-5 bg-amber-50/50 rounded-2xl border border-amber-100">
+                  <div className="flex flex-col gap-4 p-5 bg-amber-50/50 rounded-md border border-amber-100">
                     <div className="flex items-center gap-2">
                       <Upload className="h-5 w-5 text-amber-600" />
                       <h3 className="font-bold text-slate-800">Restore from Backup</h3>
@@ -1000,7 +1026,7 @@ export function Settings() {
                       variant="outline"
                       disabled={isRestoring || !priv.canRestore}
                       onClick={() => restoreInputRef.current?.click()}
-                      className="border-amber-300 text-amber-700 hover:bg-amber-50 gap-2 h-11 rounded-xl"
+                      className="border-amber-300 text-amber-700 hover:bg-amber-50 gap-2 h-11 rounded-md"
                     >
                       {isRestoring
                         ? <><RefreshCw className="h-4 w-4 animate-spin" /> Restoring…</>
@@ -1013,10 +1039,10 @@ export function Settings() {
             </Card>
 
             {/* Supabase SQL Database Backup */}
-            <Card className="border border-slate-200 shadow-sm rounded-2xl overflow-hidden">
-              <CardHeader className="bg-gradient-to-r from-blue-50 to-white border-b border-slate-100 px-6 py-5">
+            <Card className="border border-slate-200 rounded-md overflow-hidden">
+              <CardHeader className="bg-slate-50 dark:bg-slate-800 border-b border-slate-100 px-6 py-5">
                 <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-xl bg-blue-100 flex items-center justify-center text-blue-600 shadow-sm">
+                  <div className="h-10 w-10 rounded-md bg-blue-100 flex items-center justify-center text-blue-600">
                     <DatabaseBackup className="h-5 w-5" />
                   </div>
                   <div>
@@ -1026,7 +1052,7 @@ export function Settings() {
                 </div>
               </CardHeader>
               <CardContent className="px-6 py-6">
-                <div className="flex flex-col gap-4 p-5 bg-blue-50/50 rounded-2xl border border-blue-100">
+                <div className="flex flex-col gap-4 p-5 bg-blue-50/50 rounded-md border border-blue-100">
                   <div className="flex items-center gap-2">
                     <Download className="h-5 w-5 text-blue-600" />
                     <h3 className="font-bold text-slate-800">Export Supabase Database (SQL / ZIP)</h3>
@@ -1055,7 +1081,7 @@ export function Settings() {
                   <Button
                     onClick={handleSupabaseBackup}
                     disabled={isBackingUpSupabase || !priv.canBackup}
-                    className="bg-blue-600 hover:bg-blue-700 text-white gap-2 h-11 rounded-xl shadow-sm mt-2"
+                    className="bg-blue-600 hover:bg-blue-700 text-white gap-2 h-11 rounded-md mt-2"
                   >
                     {isBackingUpSupabase
                       ? <><RefreshCw className="h-4 w-4 animate-spin" /> Generating Supabase Backup…</>
@@ -1067,10 +1093,10 @@ export function Settings() {
             </Card>
 
             {/* Excel Manual Backup & Restore */}
-            <Card className="border border-slate-200 shadow-sm rounded-2xl overflow-hidden">
-              <CardHeader className="bg-gradient-to-r from-teal-50 to-white border-b border-slate-100 px-6 py-5">
+            <Card className="border border-slate-200 rounded-md overflow-hidden">
+              <CardHeader className="bg-slate-50 dark:bg-slate-800 border-b border-slate-100 px-6 py-5">
                 <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-xl bg-teal-100 flex items-center justify-center text-teal-600 shadow-sm">
+                  <div className="h-10 w-10 rounded-md bg-teal-100 flex items-center justify-center text-teal-600">
                     <DatabaseBackup className="h-5 w-5" />
                   </div>
                   <div>
@@ -1082,7 +1108,7 @@ export function Settings() {
               <CardContent className="px-6 py-6">
                 <div className="grid md:grid-cols-2 gap-6">
                   {/* Export section */}
-                  <div className="flex flex-col gap-4 p-5 bg-teal-50/50 rounded-2xl border border-teal-100">
+                  <div className="flex flex-col gap-4 p-5 bg-teal-50/50 rounded-md border border-teal-100">
                     <div className="flex items-center gap-2">
                       <Download className="h-5 w-5 text-teal-600" />
                       <h3 className="font-bold text-slate-800">Export to Excel</h3>
@@ -1097,7 +1123,7 @@ export function Settings() {
                     <Button
                       onClick={() => handleExportExcel()}
                       disabled={isExportingExcel || !priv.canBackup}
-                      className="bg-teal-600 hover:bg-teal-700 text-white gap-2 h-11 rounded-xl shadow-sm mt-2"
+                      className="bg-teal-600 hover:bg-teal-700 text-white gap-2 h-11 rounded-md mt-2"
                     >
                       {isExportingExcel
                         ? <><RefreshCw className="h-4 w-4 animate-spin" /> Exporting…</>
@@ -1107,7 +1133,7 @@ export function Settings() {
                   </div>
 
                   {/* Restore section */}
-                  <div className="flex flex-col gap-4 p-5 bg-amber-50/50 rounded-2xl border border-amber-100">
+                  <div className="flex flex-col gap-4 p-5 bg-amber-50/50 rounded-md border border-amber-100">
                     <div className="flex items-center gap-2">
                       <Upload className="h-5 w-5 text-amber-600" />
                       <h3 className="font-bold text-slate-800">Restore from Excel</h3>
@@ -1131,7 +1157,7 @@ export function Settings() {
                       variant="outline"
                       disabled={isRestoringExcel || !priv.canRestore}
                       onClick={() => restoreExcelInputRef.current?.click()}
-                      className="border-amber-300 text-amber-700 hover:bg-amber-50 gap-2 h-11 rounded-xl mt-2"
+                      className="border-amber-300 text-amber-700 hover:bg-amber-50 gap-2 h-11 rounded-md mt-2"
                     >
                       {isRestoringExcel
                         ? <><RefreshCw className="h-4 w-4 animate-spin" /> Syncing from Excel…</>
@@ -1144,11 +1170,11 @@ export function Settings() {
             </Card>
 
             {/* Auto-Backup Settings */}
-            <Card className="border border-slate-200 shadow-sm rounded-2xl overflow-hidden">
-              <CardHeader className="bg-gradient-to-r from-emerald-50 to-white border-b border-slate-100 px-6 py-5">
+            <Card className="border border-slate-200 rounded-md overflow-hidden">
+              <CardHeader className="bg-slate-50 dark:bg-slate-800 border-b border-slate-100 px-6 py-5">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-600 shadow-sm">
+                    <div className="h-10 w-10 rounded-md bg-emerald-100 flex items-center justify-center text-emerald-600">
                       <Clock className="h-5 w-5" />
                     </div>
                     <div>
@@ -1296,10 +1322,10 @@ export function Settings() {
           <div className="flex flex-col gap-6">
 
             {/* Resource Allocation Mode */}
-            <Card className="border border-slate-200 shadow-sm rounded-2xl overflow-hidden">
-              <CardHeader className="bg-gradient-to-r from-indigo-50 to-white border-b border-slate-100 px-6 py-5">
+            <Card className="border border-slate-200 rounded-md overflow-hidden">
+              <CardHeader className="bg-slate-50 dark:bg-slate-800 border-b border-slate-100 px-6 py-5">
                 <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-xl bg-indigo-100 flex items-center justify-center text-indigo-600 shadow-sm">
+                  <div className="h-10 w-10 rounded-md bg-blue-50 flex items-center justify-center text-blue-600 border border-blue-100">
                     <Cpu className="h-5 w-5" />
                   </div>
                   <div>
@@ -1313,18 +1339,18 @@ export function Settings() {
                   {/* Analytic Mode */}
                   <button
                     onClick={() => handleSaveMode('analytic')}
-                    className={`relative flex flex-col gap-3 p-5 rounded-2xl border-2 text-left transition-all ${
+                    className={`relative flex flex-col gap-3 p-5 rounded-md border-2 text-left transition-all ${
                       allocationMode === 'analytic'
-                        ? 'border-indigo-500 bg-indigo-50/50 shadow-md'
-                        : 'border-slate-200 hover:border-indigo-200 hover:bg-slate-50'
+                        ? 'border-blue-500 bg-blue-50/50'
+                        : 'border-slate-200 hover:border-blue-200 hover:bg-slate-50'
                     }`}
                   >
                     {allocationMode === 'analytic' && (
-                      <span className="absolute top-3 right-3 h-5 w-5 rounded-full bg-indigo-500 flex items-center justify-center">
+                      <span className="absolute top-3 right-3 h-5 w-5 rounded-full bg-blue-600 flex items-center justify-center">
                         <CheckCircle2 className="h-3 w-3 text-white" />
                       </span>
                     )}
-                    <div className="h-10 w-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-600">
+                    <div className="h-10 w-10 rounded-md bg-slate-100 flex items-center justify-center text-slate-600">
                       <FlaskConical className="h-5 w-5" />
                     </div>
                     <div>
@@ -1336,9 +1362,9 @@ export function Settings() {
                   {/* Hybrid Mode */}
                   <button
                     onClick={() => handleSaveMode('hybrid')}
-                    className={`relative flex flex-col gap-3 p-5 rounded-2xl border-2 text-left transition-all ${
+                    className={`relative flex flex-col gap-3 p-5 rounded-md border-2 text-left transition-all ${
                       allocationMode === 'hybrid'
-                        ? 'border-emerald-500 bg-emerald-50/50 shadow-md'
+                        ? 'border-emerald-500 bg-emerald-50/50'
                         : 'border-slate-200 hover:border-emerald-200 hover:bg-slate-50'
                     }`}
                   >
@@ -1347,7 +1373,7 @@ export function Settings() {
                         <CheckCircle2 className="h-3 w-3 text-white" />
                       </span>
                     )}
-                    <div className="h-10 w-10 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-600">
+                    <div className="h-10 w-10 rounded-md bg-emerald-100 flex items-center justify-center text-emerald-600">
                       <Bot className="h-5 w-5" />
                     </div>
                     <div>
@@ -1363,10 +1389,10 @@ export function Settings() {
             </Card>
 
             {/* API Key Management */}
-            <Card className="border border-slate-200 shadow-sm rounded-2xl overflow-hidden">
-              <CardHeader className="bg-gradient-to-r from-slate-50 to-white border-b border-slate-100 px-6 py-5">
+            <Card className="border border-slate-200 rounded-md overflow-hidden">
+              <CardHeader className="bg-slate-50 dark:bg-slate-800 border-b border-slate-100 px-6 py-5">
                 <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-600 shadow-sm">
+                  <div className="h-10 w-10 rounded-md bg-slate-100 flex items-center justify-center text-slate-600">
                     <Key className="h-5 w-5" />
                   </div>
                   <div>
@@ -1378,7 +1404,7 @@ export function Settings() {
               <CardContent className="px-6 py-6 space-y-6">
 
                 {/* Add New Key Form */}
-                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-4">
+                <div className="bg-slate-50 border border-slate-200 rounded-md p-5 space-y-4">
                   <h3 className="text-sm font-bold text-slate-700">Add New API Key</h3>
                   <div className="grid md:grid-cols-3 gap-3">
                     <div className="space-y-1.5">
@@ -1395,7 +1421,7 @@ export function Settings() {
                       <select
                         value={newKeyProvider}
                         onChange={e => setNewKeyProvider(e.target.value)}
-                        className="w-full h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none capitalize"
+                        className="w-full h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm focus:ring-2 focus:ring-blue-500/20 outline-none capitalize"
                       >
                         <option value="">Auto-detected</option>
                         {AI_PROVIDERS.map(p => <option key={p} value={p} className="capitalize">{p}</option>)}
@@ -1410,7 +1436,7 @@ export function Settings() {
                         <select
                           value={newKeyDefaultModel}
                           onChange={e => setNewKeyDefaultModel(e.target.value)}
-                          className="w-full h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none capitalize shadow-sm"
+                          className="w-full h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm focus:ring-2 focus:ring-blue-500/20 outline-none capitalize"
                         >
                           <option value="">Default Model...</option>
                           {modelsList.map(m => (
@@ -1447,7 +1473,7 @@ export function Settings() {
                     </div>
                     {newKeyValue && (
                       <p className="text-[10px] text-slate-400">
-                        Detected provider: <strong className="text-indigo-600 capitalize">{newKeyProvider || detectProvider(newKeyValue)}</strong>
+                        Detected provider: <strong className="text-blue-600 capitalize">{newKeyProvider || detectProvider(newKeyValue)}</strong>
                       </p>
                     )}
                   </div>
@@ -1463,7 +1489,7 @@ export function Settings() {
                     <Button
                       onClick={handleSaveApiKey}
                       disabled={isSavingKey || !newKeyValue}
-                      className="flex-1 h-10 bg-indigo-600 hover:bg-indigo-700 text-white"
+                      className="flex-1 h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-sm"
                     >
                       {isSavingKey ? <><RefreshCw className="h-4 w-4 mr-2 animate-spin" />Saving…</> : <><Save className="h-4 w-4 mr-2" />Save Key</>}
                     </Button>
@@ -1475,7 +1501,7 @@ export function Settings() {
                   <div className="space-y-3">
                     <h3 className="text-sm font-bold text-slate-700">Saved Keys ({apiKeys.length})</h3>
                     {apiKeys.map(k => (
-                      <div key={k.id} className="flex items-center justify-between gap-3 p-4 bg-white border border-slate-200 rounded-xl hover:border-indigo-200 transition-colors">
+                      <div key={k.id} className="flex items-center justify-between gap-3 p-4 bg-white border border-slate-200 rounded-md hover:border-blue-200 transition-colors">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-0.5">
                             <p className="font-bold text-slate-800 text-sm">{k.label || k.provider}</p>
@@ -1490,7 +1516,7 @@ export function Settings() {
                             </button>
                             <Badge className="text-[9px] capitalize bg-slate-100 text-slate-650 border border-slate-200">{k.provider}</Badge>
                             {k.defaultModel && (
-                              <Badge variant="outline" className="text-[9px] bg-slate-50 text-indigo-650 border border-indigo-200">
+                              <Badge variant="outline" className="text-[9px] bg-slate-50 text-blue-600 border border-blue-200">
                                 Model: {k.defaultModel}
                               </Badge>
                             )}
@@ -1498,13 +1524,13 @@ export function Settings() {
                         </div>
                         <div className="flex items-center gap-1 shrink-0">
                           {!k.isDefault && (
-                            <Button variant="ghost" size="sm" onClick={() => handleSetDefault(k.id)} className="text-xs h-8 px-2 text-slate-500 hover:text-indigo-650">
+                            <Button variant="ghost" size="sm" onClick={() => handleSetDefault(k.id)} className="text-xs h-8 px-2 text-slate-500 hover:text-blue-600">
                               Set Default
                             </Button>
                           )}
                           <button
                             onClick={() => { setEditKeyId(k.id); setNewKeyLabel(k.label); setNewKeyValue(k.keyValue); setNewKeyProvider(k.provider); setNewKeyDefaultModel(k.defaultModel || ''); setActiveTab('ai'); }}
-                            className="h-8 w-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                            className="h-8 w-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
                           >
                             <Pencil className="h-3.5 w-3.5" />
                           </button>
@@ -1574,7 +1600,7 @@ export function Settings() {
             <CardContent className="space-y-6">
               <div className="flex flex-col md:flex-row md:items-center justify-between p-6 border border-slate-200 rounded-lg bg-slate-50">
                 <div className="flex items-center gap-4 mb-4 md:mb-0">
-                  <div className="h-12 w-12 bg-indigo-100 text-indigo-600 flex items-center justify-center rounded-xl shadow-sm">
+                  <div className="h-12 w-12 bg-blue-50 text-blue-600 flex items-center justify-center rounded-md border border-blue-100">
                     <CloudDownload className="h-6 w-6" />
                   </div>
                   <div>
@@ -1586,7 +1612,7 @@ export function Settings() {
                   <Button
                     onClick={handleCheckForUpdates}
                     disabled={(!isElectron && !isAndroidNative) || isChecking}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white min-w-[160px]"
+                    className="bg-blue-600 hover:bg-blue-700 text-white rounded-sm min-w-[160px]"
                   >
                     {isChecking
                       ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" />

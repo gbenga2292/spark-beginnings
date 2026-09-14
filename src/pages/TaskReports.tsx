@@ -196,7 +196,7 @@ function AnalyticsDashboard() {
         return [
             { name: 'Urgent', value: counts.urgent, color: '#f43f5e' },
             { name: 'High',   value: counts.high,   color: '#f59e0b' },
-            { name: 'Medium', value: counts.medium, color: '#6366f1' },
+            { name: 'Medium', value: counts.medium, color: '#2563eb' },
             { name: 'Low',    value: counts.low,    color: '#94a3b8' },
         ].filter(p => p.value > 0);
     }, [validSubs]);
@@ -308,7 +308,7 @@ function AnalyticsDashboard() {
             {/* Site Selector */}
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm" className="h-9 w-full sm:w-auto sm:min-w-[140px] justify-between gap-2 px-3 text-[11px] font-bold uppercase tracking-tight border-slate-200 bg-white hover:border-indigo-300 transition-colors">
+                    <Button variant="outline" size="sm" className="h-9 w-full sm:w-auto sm:min-w-[140px] justify-between gap-2 px-3 text-[11px] font-bold uppercase tracking-tight border-slate-200 bg-white hover:border-blue-400 transition-colors">
                         <span className="truncate">{currentSiteName}</span>
                         <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
                     </Button>
@@ -409,7 +409,7 @@ function AnalyticsDashboard() {
             <Button 
                 size="sm" 
                 onClick={handleExport}
-                className="h-9 px-2 w-full sm:w-auto sm:px-3 justify-center gap-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 font-bold text-[11px] uppercase tracking-tight shadow-sm transition-all"
+                className="h-9 px-2 w-full sm:w-auto sm:px-3 justify-center gap-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 font-bold text-[11px] uppercase tracking-tight transition-all"
             >
                 <FileSpreadsheet className="h-4 w-4 text-emerald-500" /> <span className="inline">Export Analysis</span>
             </Button>
@@ -430,7 +430,7 @@ function AnalyticsDashboard() {
             >
 
             {/* ── Toolbar (Desktop Only) ── */}
-            <motion.div variants={item} className="hidden sm:flex flex-col sm:flex-row flex-wrap items-start sm:items-center gap-3 bg-white dark:bg-slate-900 p-2 sm:p-3 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+            <motion.div variants={item} className="hidden sm:flex flex-col sm:flex-row flex-wrap items-start sm:items-center gap-3 bg-white dark:bg-slate-900 p-2 sm:p-3 rounded-md border border-slate-200 dark:border-slate-800">
                 <div className="flex flex-wrap items-center gap-2 w-full">
                     {filterControls}
                 </div>
@@ -441,7 +441,7 @@ function AnalyticsDashboard() {
                 {[
                     {
                         icon: <GanttChartSquare className="w-5 h-5" />,
-                        bg: 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600',
+                        bg: 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400',
                         label: 'Total Workload',
                         value: validSubs.length,
                         sub: 'Subtasks in this period',
@@ -473,10 +473,10 @@ function AnalyticsDashboard() {
                     <motion.div 
                         key={card.label} 
                         whileHover={{ y: -2 }}
-                        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all"
+                        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md p-5 hover: transition-all"
                     >
                         <div className="flex items-center gap-3 mb-3">
-                            <div className={`p-2.5 rounded-xl ${card.bg} shadow-inner`}>{card.icon}</div>
+                            <div className={`p-2.5 rounded-md ${card.bg} `}>{card.icon}</div>
                             <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">{card.label}</p>
                         </div>
                         <div className="flex items-baseline gap-2">
@@ -491,7 +491,7 @@ function AnalyticsDashboard() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 flex-1 min-h-0">
 
                 {/* Velocity / Burn Chart */}
-                <motion.div variants={item} className="lg:col-span-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm p-6 flex flex-col hover:shadow-md transition-shadow">
+                <motion.div variants={item} className="lg:col-span-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md p-6 flex flex-col transition-colors">
                     <div className="mb-6 flex justify-between items-start">
                         <div>
                             <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-tight">Task Velocity / Burn Chart</h3>
@@ -505,8 +505,8 @@ function AnalyticsDashboard() {
                                 <span className="text-[10px] font-bold text-slate-400 uppercase">Created</span>
                             </div>
                             <div className="flex items-center gap-2">
-                                <div className="w-2.5 h-2.5 rounded-full bg-indigo-500" />
-                                <span className="text-[10px] font-bold text-indigo-500 uppercase tracking-tighter">Closed</span>
+                                <div className="w-2.5 h-2.5 rounded-full bg-blue-600" />
+                                <span className="text-[10px] font-bold text-blue-600 uppercase tracking-tighter">Closed</span>
                             </div>
                         </div>
                     </div>
@@ -515,8 +515,8 @@ function AnalyticsDashboard() {
                             <AreaChart data={velocityData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                                 <defs>
                                     <linearGradient id="gClosed" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%"  stopColor="#6366f1" stopOpacity={0.35} />
-                                        <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                                        <stop offset="5%"  stopColor="#2563eb" stopOpacity={0.35} />
+                                        <stop offset="95%" stopColor="#2563eb" stopOpacity={0} />
                                     </linearGradient>
                                     <linearGradient id="gCreated" x1="0" y1="0" x2="0" y2="1">
                                         <stop offset="5%"  stopColor="#94a3b8" stopOpacity={0.25} />
@@ -536,14 +536,14 @@ function AnalyticsDashboard() {
                                 <Area type="monotone" dataKey="created" name="New Tasks"
                                     stroke="#94a3b8" strokeWidth={2} fillOpacity={1} fill="url(#gCreated)" />
                                 <Area type="monotone" dataKey="closed" name="Closed Tasks"
-                                    stroke="#6366f1" strokeWidth={2.5} fillOpacity={1} fill="url(#gClosed)" />
+                                    stroke="#2563eb" strokeWidth={2.5} fillOpacity={1} fill="url(#gClosed)" />
                             </AreaChart>
                         </ResponsiveContainer>
                     </div>
                 </motion.div>
 
                 {/* Bottleneck Radar */}
-                <motion.div variants={item} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden flex flex-col hover:shadow-md transition-shadow">
+                <motion.div variants={item} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md overflow-hidden flex flex-col transition-colors">
                     <div className="p-5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40">
                         <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-tight flex items-center gap-2">
                             <Activity className="w-4 h-4 text-rose-500" /> Bottleneck Radar
@@ -557,8 +557,8 @@ function AnalyticsDashboard() {
                                 <p className="text-center text-xs font-medium text-slate-400">No blocked team members — great!</p>
                             </div>
                         ) : bottleneckData.map(u => (
-                            <div key={u.id} className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
-                                <div className={`w-9 h-9 rounded-full ${u.avatarColor} flex-shrink-0 flex items-center justify-center text-white text-[10px] font-black shadow-md`}>
+                            <div key={u.id} className="flex items-center gap-3 p-3 rounded-md hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
+                                <div className={`w-9 h-9 rounded-full ${u.avatarColor} flex-shrink-0 flex items-center justify-center text-white text-[10px] font-black `}>
                                     {u.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2)}
                                 </div>
                                 <div className="flex-1 min-w-0">
@@ -578,7 +578,7 @@ function AnalyticsDashboard() {
                 </motion.div>
 
                 {/* Project Pipeline */}
-                <motion.div variants={item} className="lg:col-span-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm p-6 min-h-64 flex flex-col hover:shadow-md transition-shadow">
+                <motion.div variants={item} className="lg:col-span-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md p-6 min-h-64 flex flex-col transition-colors">
                     <div className="mb-6">
                         <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-tight">Project Pipeline Health</h3>
                         <p className="text-xs text-slate-500 mt-0.5">Completion ratios for active projects · {periodLabel}</p>
@@ -597,22 +597,22 @@ function AnalyticsDashboard() {
                             >
                                 <div className="flex justify-between items-center px-1">
                                     <span className="text-xs font-bold text-slate-700 dark:text-slate-300 truncate tracking-tight">{p.name}</span>
-                                    <span className="text-[10px] font-black text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-1.5 py-0.5 rounded uppercase">{Math.round((p.completed / (p.completed + (p.remaining || 0))) * 100) || 0}%</span>
+                                    <span className="text-[10px] font-black text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 px-1.5 py-0.5 rounded uppercase">{Math.round((p.completed / (p.completed + (p.remaining || 0))) * 100) || 0}%</span>
                                 </div>
-                                <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden shadow-inner">
+                                <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
                                     <motion.div 
                                         initial={{ width: 0 }} 
                                         animate={{ width: `${Math.round((p.completed / (p.completed + (p.remaining || 0))) * 100) || 0}%` }}
                                         transition={{ duration: 1, ease: "easeOut" }}
-                                        className={`h-full rounded-full shadow-sm ${
+                                        className={`h-full rounded-full  ${
                                             (p.completed / (p.completed + (p.remaining || 0))) > 0.8 ? 'bg-emerald-500' : 
-                                            (p.completed / (p.completed + (p.remaining || 0))) > 0.4 ? 'bg-indigo-500' : 'bg-amber-500'
+                                            (p.completed / (p.completed + (p.remaining || 0))) > 0.4 ? 'bg-blue-600' : 'bg-amber-500'
                                         }`} 
                                     />
                                 </div>
                                 <div className="flex justify-between items-center px-1">
                                     <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{p.completed} / {p.completed + (p.remaining || 0)} Units Done</span>
-                                    <span className="text-[9px] font-bold text-indigo-500 sm:text-slate-400 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">Analyze Project →</span>
+                                    <span className="text-[9px] font-bold text-blue-600 sm:text-slate-400 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">Analyze Project →</span>
                                 </div>
                             </div>
                         ))}
@@ -620,7 +620,7 @@ function AnalyticsDashboard() {
                 </motion.div>
 
                 {/* Priority Breakdown */}
-                <motion.div variants={item} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm p-6 flex flex-col items-center justify-center hover:shadow-md transition-shadow">
+                <motion.div variants={item} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md p-6 flex flex-col items-center justify-center transition-colors">
                     <div className="w-full mb-6">
                         <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-tight">Priority Breakdown</h3>
                         <p className="text-xs text-slate-500 mt-0.5">Risk distribution for this period</p>
@@ -657,7 +657,7 @@ function AnalyticsDashboard() {
                         {priorityData.map(p => (
                             <div key={p.name} className="flex items-center justify-between group">
                                 <div className="flex items-center gap-2">
-                                    <div className="w-2.5 h-2.5 rounded-full shadow-sm" style={{ backgroundColor: p.color }} />
+                                    <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: p.color }} />
                                     <span className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-tight group-hover:text-slate-700 dark:group-hover:text-slate-200 transition-colors">{p.name}</span>
                                 </div>
                                 <span className="text-xs font-black text-slate-900 dark:text-white tracking-widest">{p.value}</span>

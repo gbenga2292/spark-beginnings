@@ -16,9 +16,62 @@ export function detectProvider(apiKey: string): AiProvider {
   if (trimmed.startsWith("xai-")) return "grok";
   if (trimmed.startsWith("gsk_")) return "groq";
   if (trimmed.startsWith("sk-ant-")) return "anthropic";
-  if (trimmed.startsWith("AIza")) return "gemini";
+  if (trimmed.startsWith("AIza") || trimmed.startsWith("AQ.")) return "gemini";
   if (trimmed.startsWith("sk-")) return "openai";
   return "unknown";
+}
+
+export interface WorkspaceAiKeyConfig {
+  apiKey: string;
+  provider: string;
+  model: string;
+  label?: string;
+  id?: string;
+}
+
+/** Retrieve active AI API key configuration strictly from Settings with intelligent fallbacks */
+export async function getWorkspaceAiKey(workspaceId: string = 'default'): Promise<WorkspaceAiKeyConfig | null> {
+  try {
+    const { data: dbKeys, error } = await supabase
+      .from('api_keys')
+      .select('*')
+      .order('is_default', { ascending: false });
+
+    if (!error && dbKeys && dbKeys.length > 0) {
+      const wsKeys = dbKeys.filter((k: any) => k.workspace_id === workspaceId || !k.workspace_id || k.workspace_id === 'default');
+      const candidateList = wsKeys.length > 0 ? wsKeys : dbKeys;
+      const activeKey = candidateList.find((k: any) => k.is_default) || candidateList[0];
+
+      if (activeKey?.key_value) {
+        const detected = detectProvider(activeKey.key_value);
+        const provider = activeKey.provider || (detected !== 'unknown' ? detected : 'gemini');
+        const rawModel = (activeKey.default_model || '').trim();
+        const model = rawModel || (provider === 'gemini' ? 'gemini-2.0-flash' : 'llama-3.3-70b-versatile');
+        return {
+          apiKey: activeKey.key_value,
+          provider,
+          model,
+          label: activeKey.label || '',
+          id: activeKey.id,
+        };
+      }
+    }
+  } catch (err) {
+    console.warn('Failed to load workspace AI key from database:', err);
+  }
+
+  // Fallback to local storage or environment
+  const geminiKey = localStorage.getItem('GEMINI_API_KEY') || (import.meta as any).env?.VITE_GEMINI_API_KEY;
+  if (geminiKey) {
+    return { apiKey: geminiKey, provider: 'gemini', model: 'gemini-2.0-flash', label: 'Local Gemini Key' };
+  }
+
+  const groqKey = localStorage.getItem('GROQ_API_KEY') || (import.meta as any).env?.VITE_GROQ_API_KEY;
+  if (groqKey) {
+    return { apiKey: groqKey, provider: 'groq', model: 'llama-3.3-70b-versatile', label: 'Local Groq Key' };
+  }
+
+  return null;
 }
 
 /** Helper to convert File to base64 string */
@@ -217,7 +270,8 @@ export async function parsePdfStatementWithAI(
   categories: string[],
   password?: string,
   model?: string,
-  onProgress?: (status: string, percentage: number) => void
+  onProgress?: (status: string, percentage: number) => void,
+  providedProvider?: string
 ): Promise<ExtractedTransaction[]> {
   onProgress?.("Extracting text contents from statement...", 5);
   const rawText = await extractPdfText(file, password, onProgress);
@@ -226,7 +280,8 @@ export async function parsePdfStatementWithAI(
   }
 
   onProgress?.("Detecting API credentials...", 65);
-  const provider = detectProvider(apiKey);
+  const detected = detectProvider(apiKey);
+  const provider = (providedProvider && providedProvider !== "unknown" ? providedProvider : detected).toLowerCase();
   const prompt = buildStatementPrompt(rawText, categories);
 
   let response = "";

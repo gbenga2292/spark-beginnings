@@ -122,17 +122,17 @@ export function InvoiceRuntimeTracker({ invoice, onSyncDates }: InvoiceRuntimeTr
   }, [maintenanceAssets, invoice.siteName, invoice.siteId]);
 
   return (
-    <div className="border border-indigo-100 dark:border-indigo-900/40 rounded-xl overflow-hidden bg-indigo-50/30 dark:bg-indigo-950/20">
+    <div className="border border-blue-100 dark:border-blue-900/40 rounded-xl overflow-hidden bg-blue-50/30 dark:bg-blue-950/20">
       {/* Header */}
       <button
-        className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-indigo-50/50 dark:hover:bg-indigo-950/30 transition-colors"
+        className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-blue-50/50 dark:hover:bg-blue-950/30 transition-colors"
         onClick={() => setExpanded(v => !v)}
       >
         <div className="flex items-center gap-2">
-          <Clock className="h-4 w-4 text-indigo-500" />
-          <span className="text-sm font-bold text-indigo-700 dark:text-indigo-300">Runtime Tracker</span>
+          <Clock className="h-4 w-4 text-blue-500" />
+          <span className="text-sm font-bold text-blue-700 dark:text-blue-300">Runtime Tracker</span>
           {linkedIds.length > 0 && (
-            <Badge className="bg-indigo-100 text-indigo-700 border-indigo-200 text-[10px] font-bold px-2 py-0">
+            <Badge className="bg-blue-100 text-blue-700 border-blue-200 text-[10px] font-bold px-2 py-0">
               {linkedIds.length} machine{linkedIds.length > 1 ? 's' : ''} linked
             </Badge>
           )}
@@ -144,22 +144,22 @@ export function InvoiceRuntimeTracker({ invoice, onSyncDates }: InvoiceRuntimeTr
         </div>
         <div className="flex items-center gap-3">
           {linkedIds.length > 0 && invoiceDuration > 0 && (
-            <span className="text-xs font-bold text-indigo-500 tabular-nums">
+            <span className="text-xs font-bold text-blue-500 tabular-nums">
               {consumedDays.toFixed(1)} / {invoiceDuration} days
             </span>
           )}
-          {expanded ? <ChevronUp className="h-4 w-4 text-indigo-400" /> : <ChevronDown className="h-4 w-4 text-indigo-400" />}
+          {expanded ? <ChevronUp className="h-4 w-4 text-blue-400" /> : <ChevronDown className="h-4 w-4 text-blue-400" />}
         </div>
       </button>
 
       {expanded && (
-        <div className="px-4 pb-4 space-y-4 border-t border-indigo-100 dark:border-indigo-900/30 pt-4">
+        <div className="px-4 pb-4 space-y-4 border-t border-blue-100 dark:border-blue-900/30 pt-4">
 
           {/* No machines linked yet */}
           {linkedIds.length === 0 && (
             <div className="flex flex-col items-center py-6 text-center gap-3">
-              <div className="h-12 w-12 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center">
-                <Link className="h-5 w-5 text-indigo-400" />
+              <div className="h-12 w-12 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                <Link className="h-5 w-5 text-blue-400" />
               </div>
               <div>
                 <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">No machines linked</p>
@@ -177,7 +177,7 @@ export function InvoiceRuntimeTracker({ invoice, onSyncDates }: InvoiceRuntimeTr
                    {siteMachines.slice(0, 3).map(m => (
                      <div key={m.id} className="flex items-center justify-between p-2 bg-white rounded-lg border border-slate-100 text-xs">
                         <span className="font-medium text-slate-600 truncate">{m.name}</span>
-                        <Button size="sm" variant="ghost" onClick={() => handleToggleLink(m.id)} className="h-6 text-indigo-600">Link</Button>
+                        <Button size="sm" variant="ghost" onClick={() => handleToggleLink(m.id)} className="h-6 text-blue-600">Link</Button>
                      </div>
                    ))}
                 </div>
@@ -186,7 +186,7 @@ export function InvoiceRuntimeTracker({ invoice, onSyncDates }: InvoiceRuntimeTr
               <Button
                 size="sm"
                 variant="outline"
-                className="gap-2 border-indigo-200 text-indigo-600 hover:bg-indigo-50 mt-2"
+                className="gap-2 border-blue-200 text-blue-600 hover:bg-blue-50 mt-2"
                 onClick={() => setShowLinkPanel(v => !v)}
               >
                 {showLinkPanel ? <X className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />} 
@@ -211,7 +211,7 @@ export function InvoiceRuntimeTracker({ invoice, onSyncDates }: InvoiceRuntimeTr
                     className={cn(
                       "h-full rounded-full transition-all duration-500",
                       progressPct >= 100 ? "bg-emerald-500" :
-                      progressPct >= 70 ? "bg-amber-500" : "bg-indigo-500"
+                      progressPct >= 70 ? "bg-amber-500" : "bg-blue-500"
                     )}
                     style={{ width: `${progressPct}%` }}
                   />
@@ -221,7 +221,7 @@ export function InvoiceRuntimeTracker({ invoice, onSyncDates }: InvoiceRuntimeTr
               {/* Stats row */}
               <div className="grid grid-cols-3 gap-3">
                 <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-3 text-center">
-                  <p className="text-lg font-black text-indigo-600">{consumedDays.toFixed(1)}</p>
+                  <p className="text-lg font-black text-blue-600">{consumedDays.toFixed(1)}</p>
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">Used</p>
                 </div>
                 <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-3 text-center">
@@ -268,7 +268,7 @@ export function InvoiceRuntimeTracker({ invoice, onSyncDates }: InvoiceRuntimeTr
               {reminderChanged && (
                 <Button
                   size="sm"
-                  className="w-full gap-2 bg-indigo-600 hover:bg-indigo-700 text-white"
+                  className="w-full gap-2 bg-blue-600 hover:bg-blue-700 text-white"
                   onClick={handleSyncReminder}
                 >
                   <RefreshCw className="h-3.5 w-3.5" />
@@ -281,7 +281,7 @@ export function InvoiceRuntimeTracker({ invoice, onSyncDates }: InvoiceRuntimeTr
           {/* Link panel toggle */}
           {linkedIds.length > 0 && (
             <button
-              className="text-xs font-semibold text-indigo-500 hover:text-indigo-700 flex items-center gap-1 mt-1"
+              className="text-xs font-semibold text-blue-500 hover:text-blue-700 flex items-center gap-1 mt-1"
               onClick={() => setShowLinkPanel(v => !v)}
             >
               <Link className="h-3 w-3" />
@@ -304,8 +304,8 @@ export function InvoiceRuntimeTracker({ invoice, onSyncDates }: InvoiceRuntimeTr
                         className={cn(
                           "flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold transition-all",
                           isLinked
-                            ? "bg-indigo-100 text-indigo-700 hover:bg-rose-100 hover:text-rose-700"
-                            : "bg-slate-100 text-slate-600 hover:bg-indigo-100 hover:text-indigo-700"
+                            ? "bg-blue-100 text-blue-700 hover:bg-rose-100 hover:text-rose-700"
+                            : "bg-slate-100 text-slate-600 hover:bg-blue-100 hover:text-blue-700"
                         )}
                       >
                         {isLinked ? <><X className="h-3 w-3" /> Unlink</> : <><Plus className="h-3 w-3" /> Link</>}

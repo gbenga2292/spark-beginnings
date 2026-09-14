@@ -30,6 +30,7 @@ import { TaskDetailSheet } from '@/src/components/tasks/TaskDetailSheet';
 import { AddSubtaskInline } from './Tasks/AddSubtaskInline';
 import { SiteGanttStoryboard } from '@/src/components/sites/SiteGanttStoryboard';
 import { SiteMilestonesCard } from '@/src/components/sites/SiteMilestonesCard';
+import { buildSettlementMap } from '@/src/lib/settlementUtils';
 
 
 type SiteTab = 'timeline' | 'financials' | 'operations' | 'maintenance' | 'comms' | 'tasks' | 'contacts';
@@ -55,7 +56,7 @@ const renderFormattedChatMessage = (content: string) => {
             return <strong key={i} className="font-extrabold text-slate-900 dark:text-white">{part.slice(2, -2)}</strong>;
           }
           if (part.startsWith('*') && part.endsWith('*') && part.length >= 2 && !part.startsWith('**')) {
-            return <em key={i} className="italic text-indigo-600 dark:text-indigo-200">{part.slice(1, -1)}</em>;
+            return <em key={i} className="italic text-blue-600 dark:text-blue-200">{part.slice(1, -1)}</em>;
           }
           const cleanPart = part.replace(/\*\*/g, '').replace(/#/g, '');
           return <span key={i}>{cleanPart}</span>;
@@ -75,7 +76,7 @@ const renderFormattedChatMessage = (content: string) => {
         if (trimmed.startsWith('#') || (/^\*\*[^*]+\*\*:?$/.test(trimmed) && trimmed.length < 60)) {
           const cleanHeader = trimmed.replace(/^#+\s*/, '').replace(/\*\*/g, '').replace(/#/g, '').trim();
           return (
-            <div key={idx} className="text-xs font-black tracking-wider text-indigo-700 dark:text-indigo-300 uppercase mt-3.5 mb-1.5 border-b border-indigo-200 dark:border-indigo-700/50 pb-1 flex items-center gap-1.5">
+            <div key={idx} className="text-xs font-black tracking-wider text-blue-700 dark:text-blue-300 uppercase mt-3.5 mb-1.5 border-b border-slate-200 dark:border-slate-700/50 pb-1 flex items-center gap-1.5">
               <span>{cleanHeader}</span>
             </div>
           );
@@ -86,7 +87,7 @@ const renderFormattedChatMessage = (content: string) => {
           if (!bulletText) return null;
           return (
             <div key={idx} className="flex items-start gap-2 pl-1.5 my-1 text-slate-800 dark:text-slate-100">
-              <span className="text-indigo-600 dark:text-indigo-400 font-bold text-sm select-none leading-none mt-0.5">•</span>
+              <span className="text-blue-600 dark:text-blue-400 font-bold text-sm select-none leading-none mt-0.5">•</span>
               <div className="flex-1">
                 {renderInlineText(bulletText)}
               </div>
@@ -95,7 +96,7 @@ const renderFormattedChatMessage = (content: string) => {
         }
 
         return (
-          <p key={idx} className="my-1 text-slate-700 dark:text-indigo-50">
+          <p key={idx} className="my-1 text-slate-700 dark:text-slate-100">
             {renderInlineText(trimmed)}
           </p>
         );
@@ -357,26 +358,9 @@ export function Site360View({ site, clientSites, onSiteChange, onBack, onEditSit
   const payments = useAppStore(s => s.payments);
   const vatPayments = useAppStore(s => s.vatPayments);
 
-  const invoicePaymentMap = useMemo(() => {
-    const allSiteInvoices = invoices.filter(i => i.siteId === site.id || i.siteName?.trim() === site.name.trim()).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-    const allSitePayments = payments.filter(p => p.site?.trim() === site.name.trim() || p.client?.trim() === site.name.trim()).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-
-    let totalPaymentAvailable = allSitePayments.reduce((sum, p) => sum + (p.amount || 0), 0);
-
-    const map: Record<string, { paid: number; isPaid: boolean }> = {};
-
-    allSiteInvoices.forEach(inv => {
-      const invAmount = inv.totalCharge || inv.amount || 0;
-      const allocated = Math.min(totalPaymentAvailable, invAmount);
-      totalPaymentAvailable -= allocated;
-      map[inv.id] = {
-        paid: allocated,
-        isPaid: allocated >= invAmount * 0.99
-      };
-    });
-
-    return map;
-  }, [invoices, payments, site]);
+  const settlementMap = useMemo(() => {
+    return buildSettlementMap(invoices, payments);
+  }, [invoices, payments]);
 
   const ledgerEntries = useAppStore(s => s.ledgerEntries);
   const vatRate = useAppStore(s => s.payrollVariables.vatRate);
@@ -791,15 +775,15 @@ export function Site360View({ site, clientSites, onSiteChange, onBack, onEditSit
 
   const card = cn('p-4 sm:p-5 rounded-md border shadow-none', isDark ? 'bg-slate-900/90 border-slate-800' : 'bg-white border-slate-200');
 
-  const tabs: { id: SiteTab; label: string; icon: any; count?: number | string; show?: boolean }[] = [
-    { id: 'timeline', label: 'Timeline', icon: Clock, show: true },
-    { id: 'financials', label: 'Financials', icon: DollarSign, count: currentUser?.privileges?.billing?.canViewAmounts ? `₦${Math.round(data.totalBilled).toLocaleString()}` : undefined, show: currentUser?.privileges?.billing?.canView || currentUser?.privileges?.payments?.canView },
-    { id: 'operations', label: 'Operations', icon: Activity, count: data.machinesOnSiteCount + data.pumpsOnSite.length, show: currentUser?.privileges?.sites?.canView },
-    { id: 'maintenance', label: 'Maintenance', icon: Wrench, count: data.siteMaintAssets.length, show: currentUser?.privileges?.sites?.canView },
-    { id: 'comms', label: 'Comms', icon: MessagesSquare, count: data.siteComms.length, show: currentUser?.privileges?.commLog?.canView },
-    { id: 'tasks', label: 'Tasks', icon: CheckSquare, count: data.pendingSiteTasks.length, show: currentUser?.privileges?.tasks?.canView || currentUser?.privileges?.tasks?.canViewMyTasks },
-    { id: 'contacts', label: 'Contacts', icon: Users, count: data.siteContacts.length, show: currentUser?.privileges?.clients?.canView },
-  ].filter(tab => tab.show !== false) as { id: SiteTab; label: string; icon: any; count?: number | string }[];
+  const tabs: { id: SiteTab; label: string; count?: number | string; show?: boolean }[] = [
+    { id: 'timeline', label: 'Timeline', show: true },
+    { id: 'financials', label: 'Financials', count: currentUser?.privileges?.billing?.canViewAmounts ? `₦${Math.round(data.totalBilled).toLocaleString()}` : undefined, show: currentUser?.privileges?.billing?.canView || currentUser?.privileges?.payments?.canView },
+    { id: 'operations', label: 'Operations', count: data.machinesOnSiteCount + data.pumpsOnSite.length, show: currentUser?.privileges?.sites?.canView },
+    { id: 'maintenance', label: 'Maintenance', count: data.siteMaintAssets.length, show: currentUser?.privileges?.sites?.canView },
+    { id: 'comms', label: 'Comms', count: data.siteComms.length, show: currentUser?.privileges?.commLog?.canView },
+    { id: 'tasks', label: 'Tasks', count: data.pendingSiteTasks.length, show: currentUser?.privileges?.tasks?.canView || currentUser?.privileges?.tasks?.canViewMyTasks },
+    { id: 'contacts', label: 'Contacts', count: data.siteContacts.length, show: currentUser?.privileges?.clients?.canView },
+  ].filter(tab => tab.show !== false) as { id: SiteTab; label: string; count?: number | string }[];
 
   // AI Chat
   const sendChatMessage = async (isInitialBrief = false) => {
@@ -818,7 +802,7 @@ export function Site360View({ site, clientSites, onSiteChange, onBack, onEditSit
         const defaultKey = keys.find(k => k.is_default) || keys.find(k => k.provider === selectedProvider) || keys[0];
         if (defaultKey) {
           apiKey = defaultKey.key_value;
-          provider = (defaultKey.provider === 'gemini' || defaultKey.provider === 'groq') ? defaultKey.provider : (defaultKey.key_value?.startsWith('AIza') ? 'gemini' : 'groq');
+          provider = (defaultKey.provider === 'gemini' || defaultKey.provider === 'groq') ? defaultKey.provider : ((defaultKey.key_value?.startsWith('AIza') || defaultKey.key_value?.startsWith('AQ.')) ? 'gemini' : 'groq');
           if (defaultKey.default_model) model = defaultKey.default_model;
         }
       }
@@ -912,7 +896,7 @@ Answer site-specific questions and field progress accurately using this context.
     <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-1.5 w-full justify-end">
       {/* Site Selector - Order First on Mobile */}
       <div className={cn('flex items-center gap-1.5 px-2 py-1 h-8 rounded-md border transition-colors order-first sm:order-last w-full sm:w-auto', isDark ? 'bg-slate-900 border-slate-700 hover:border-slate-600' : 'bg-white border-slate-300 hover:border-slate-400')}>
-        <Building2 className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
+        <Building2 className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
         <div className="relative flex items-center w-full">
           <select
             value={site.id}
@@ -937,28 +921,24 @@ Answer site-specific questions and field progress accurately using this context.
           className={cn(
             "h-8 px-2.5 text-xs font-semibold flex items-center gap-1.5 rounded-md transition-colors",
             isQuickStatsOpen 
-              ? (isDark ? "bg-slate-800 border-indigo-500 text-indigo-300" : "bg-slate-100 border-indigo-400 text-indigo-700")
+              ? (isDark ? "bg-slate-800 border-blue-500 text-blue-300" : "bg-slate-100 border-blue-400 text-blue-700")
               : (isDark ? "border-slate-700 hover:bg-slate-800 text-slate-300" : "border-slate-300 hover:bg-slate-100 text-slate-700")
           )}
           title="Toggle Site Overview & Key Metrics"
         >
-          <Activity className="w-3.5 h-3.5 text-indigo-500" />
+          <Activity className="w-3.5 h-3.5 text-blue-600" />
           <span className="hidden min-[480px]:inline">Quick Stats</span>
         </Button>
 
         {/* AI Assistant Trigger Button */}
         {currentUser?.privileges?.sites?.canViewDecisionIntelligence && (
           <Button
-            variant="outline"
             size="sm"
             onClick={() => setIsAiDrawerOpen(true)}
-            className={cn(
-              "h-8 px-2.5 text-xs font-semibold flex items-center gap-1.5 rounded-md border transition-all",
-              isDark ? "bg-slate-900 border-indigo-700/60 hover:bg-indigo-950/40 text-indigo-300" : "bg-indigo-50/50 border-indigo-300 hover:bg-indigo-100/60 text-indigo-700"
-            )}
+            className="h-8 px-3 text-xs font-bold flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-white shadow-[0_2px_12px_rgba(14,165,233,0.35)] transition-all border-0"
             title="Open Site Intelligence Assistant"
           >
-            <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
+            <Sparkles className="w-3.5 h-3.5 text-white" />
             <span className="hidden min-[480px]:inline">AI Brief</span>
           </Button>
         )}
@@ -974,7 +954,7 @@ Answer site-specific questions and field progress accurately using this context.
           >
             <Filter className="w-3.5 h-3.5" />
             {(filterMonth !== 'all' || filterYear !== 'all') && (
-              <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-indigo-500 rounded-full border-2 border-white dark:border-slate-950" />
+              <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-blue-500 rounded-full border-2 border-white dark:border-slate-950" />
             )}
           </Button>
 
@@ -982,14 +962,14 @@ Answer site-specific questions and field progress accurately using this context.
             <div className={cn("absolute right-0 top-full mt-2 p-3 rounded-lg border shadow-xl z-50 flex flex-col gap-3 w-56", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
               <div className="flex flex-col gap-1">
                 <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Month</label>
-                <select value={filterMonth} onChange={e => { setFilterMonth(e.target.value); setShowFilters(false); }} className={cn('w-full rounded-md border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500', isDark ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-200')}>
+                <select value={filterMonth} onChange={e => { setFilterMonth(e.target.value); setShowFilters(false); }} className={cn('w-full rounded-md border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500', isDark ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-200')}>
                   <option value="all">All Months</option>
                   {months.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
                 </select>
               </div>
               <div className="flex flex-col gap-1">
                 <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Year</label>
-                <select value={filterYear} onChange={e => { setFilterYear(e.target.value); setShowFilters(false); }} className={cn('w-full rounded-md border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500', isDark ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-200')}>
+                <select value={filterYear} onChange={e => { setFilterYear(e.target.value); setShowFilters(false); }} className={cn('w-full rounded-md border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500', isDark ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-200')}>
                   <option value="all">All Years</option>
                   {years.map(y => <option key={y} value={y}>{y}</option>)}
                 </select>
@@ -1020,17 +1000,17 @@ Answer site-specific questions and field progress accurately using this context.
             setExpandedTasks(next);
           }}
         >
-          <div className="flex-shrink-0 mt-0.5 text-slate-400 group-hover:text-indigo-500 transition-colors">
+          <div className="flex-shrink-0 mt-0.5 text-slate-400 group-hover:text-blue-600 transition-colors">
             {expandedTasks.has(task.id) ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
               <p className={cn(
-                "font-semibold text-sm truncate group-hover:text-indigo-600 transition-colors",
+                "font-semibold text-sm truncate group-hover:text-blue-600 transition-colors",
                 statusType === 'completed' ? "text-slate-500 line-through" : "text-slate-700 dark:text-slate-200"
               )}>{task.title}</p>
               {isTagged && (
-                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-700 flex items-center gap-1 shrink-0">
+                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 border border-blue-200 dark:border-blue-700 flex items-center gap-1 shrink-0">
                   <MapPin className="w-2.5 h-2.5" /> Tagged
                 </span>
               )}
@@ -1041,7 +1021,7 @@ Answer site-specific questions and field progress accurately using this context.
                 <div className="flex-1 max-w-[120px] h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
                   <div className={cn(
                     "h-full rounded-full",
-                    statusType === 'completed' ? "bg-emerald-500" : "bg-indigo-500"
+                    statusType === 'completed' ? "bg-emerald-500" : "bg-blue-500"
                   )} style={{ width: `${Math.round((completed / taskSubs.length) * 100)}%` }} />
                 </div>
                 <span className="text-[10px] text-slate-500 font-medium">{completed}/{taskSubs.length} done</span>
@@ -1061,7 +1041,7 @@ Answer site-specific questions and field progress accurately using this context.
               "text-[9px] sm:text-xs px-1.5 sm:px-2.5 whitespace-nowrap uppercase tracking-wider",
               statusType === 'completed' ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-800/50" :
               statusType === 'approval' ? "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-800/50" :
-              "bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/30 dark:text-indigo-300 dark:border-indigo-800/50"
+              "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-300 dark:border-blue-800/50"
             )}>
               {statusType === 'completed' ? 'Completed' : statusType === 'approval' ? 'Approval' : 'Active'}
             </Badge>
@@ -1087,7 +1067,7 @@ Answer site-specific questions and field progress accurately using this context.
                       className="flex items-start justify-between gap-3 p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer border border-transparent hover:border-slate-200 dark:hover:border-slate-700 transition-all group/sub"
                     >
                       <div className="min-w-0 flex-1">
-                        <p className={`text-[13px] font-medium truncate group-hover/sub:text-indigo-600 transition-colors ${sub.status === 'completed' ? 'line-through text-slate-400' : 'text-slate-700 dark:text-slate-300'}`}>
+                        <p className={`text-[13px] font-medium truncate group-hover/sub:text-blue-600 transition-colors ${sub.status === 'completed' ? 'line-through text-slate-400' : 'text-slate-700 dark:text-slate-300'}`}>
                           {sub.title}
                         </p>
                       </div>
@@ -1117,16 +1097,25 @@ Answer site-specific questions and field progress accurately using this context.
   };
 
   return (
-    <div className="flex flex-col h-full min-h-0 overflow-hidden bg-slate-50 dark:bg-slate-950 relative">
+    <div 
+      className="flex flex-col h-full min-h-0 overflow-hidden relative"
+      style={isDark ? {
+        background: 'radial-gradient(circle at 15% 10%, rgba(14, 165, 233, 0.08) 0%, transparent 40%), radial-gradient(circle at 85% 85%, rgba(13, 148, 136, 0.06) 0%, transparent 40%), #050d1a',
+      } : {
+        background: 'radial-gradient(circle at 10% 10%, rgba(14, 165, 233, 0.06) 0%, transparent 35%), radial-gradient(circle at 90% 90%, rgba(16, 185, 129, 0.05) 0%, transparent 35%), #f0f6ff',
+      }}
+    >
       <div ref={containerRef} className="flex-1 overflow-y-auto px-2 sm:px-4 lg:px-5 pb-6 style-scroll">
         <div className="max-w-6xl mx-auto space-y-3 pt-2">
 
           {/* ── Compact Site Identity & Controls Strip ── */}
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md p-3 flex flex-wrap items-center justify-between gap-3 shadow-none">
+          <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-slate-200/80 dark:border-slate-800/80 rounded-2xl p-3.5 flex flex-wrap items-center justify-between gap-3 shadow-[0_4px_24px_-4px_rgba(0,0,0,0.06)]">
             <div className="flex items-center gap-2.5 flex-wrap min-w-0">
-              <div className="flex items-center gap-1.5 min-w-0">
-                <Building2 className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
-                <h1 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white tracking-tight truncate">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="p-2 rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 text-white shadow-[0_2px_10px_rgba(14,165,233,0.35)] shrink-0">
+                  <Building2 className="w-4 h-4" />
+                </div>
+                <h1 className="text-base sm:text-lg font-extrabold text-slate-900 dark:text-white tracking-tight truncate">
                   {site.name}
                 </h1>
               </div>
@@ -1134,10 +1123,10 @@ Answer site-specific questions and field progress accurately using this context.
               {/* Badges */}
               <div className="flex items-center gap-1.5 flex-wrap">
                 <span className={cn(
-                  'text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border',
-                  (site.status === 'Active' && !site.startDate) ? 'bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800/50' :
-                  site.status === 'Active' ? 'bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800/50' :
-                  site.status === 'Ended' ? 'bg-rose-50 text-rose-700 border-rose-300 dark:bg-rose-950/30 dark:text-rose-400 dark:border-rose-800/50' :
+                  'text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-full border',
+                  (site.status === 'Active' && !site.startDate) ? 'bg-amber-500/15 text-amber-700 border-amber-500/30 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800/50 shadow-[0_1px_8px_rgba(245,158,11,0.15)]' :
+                  site.status === 'Active' ? 'bg-emerald-500/15 text-emerald-700 border-emerald-500/30 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800/50 shadow-[0_1px_8px_rgba(16,185,129,0.15)]' :
+                  site.status === 'Ended' ? 'bg-rose-500/15 text-rose-700 border-rose-500/30 dark:bg-rose-950/30 dark:text-rose-400 dark:border-rose-800/50 shadow-[0_1px_8px_rgba(244,63,94,0.15)]' :
                   'bg-slate-100 text-slate-600 border-slate-300 dark:bg-slate-800 dark:border-slate-700'
                 )}>
                   {(site.status === 'Active' && !site.startDate) ? 'Pending' : site.status}
@@ -1145,7 +1134,7 @@ Answer site-specific questions and field progress accurately using this context.
 
                 {isOnHold && activeHold && (
                   <span
-                    className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border bg-amber-50 text-amber-800 border-amber-300 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800 flex items-center gap-1"
+                    className="text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-full border bg-amber-500/15 text-amber-800 border-amber-500/30 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800 flex items-center gap-1 shadow-[0_1px_8px_rgba(245,158,11,0.15)]"
                     title={`On Hold since ${new Date(activeHold.holdStart).toLocaleDateString('en-GB')}: "${activeHold.holdNote}"`}
                   >
                     <PauseCircle className="w-3 h-3 text-amber-600 shrink-0" />
@@ -1153,19 +1142,19 @@ Answer site-specific questions and field progress accurately using this context.
                   </span>
                 )}
 
-                <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-600 dark:text-slate-400">
+                <span className="text-[10px] font-mono font-semibold uppercase px-2.5 py-0.5 rounded-full border border-slate-200/80 dark:border-slate-700 bg-slate-100/90 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300">
                   VAT: {site.vat}
                 </span>
 
                 {site.client && (
-                  <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-600 dark:text-slate-400 max-w-[150px] truncate">
+                  <span className="text-[10px] font-mono font-semibold uppercase px-2.5 py-0.5 rounded-full border border-slate-200/80 dark:border-slate-700 bg-slate-100/90 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 max-w-[150px] truncate">
                     {site.client}
                   </span>
                 )}
 
                 {/* Date span */}
-                <div className="text-[10px] font-mono text-slate-500 flex items-center gap-1 ml-1">
-                  <Calendar className="w-3 h-3 text-slate-400 shrink-0" />
+                <div className="text-[10px] font-mono font-medium text-slate-600 dark:text-slate-400 bg-slate-100/90 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700 px-2.5 py-0.5 rounded-full flex items-center gap-1.5 ml-1">
+                  <Calendar className="w-3 h-3 text-sky-500 shrink-0" />
                   {site.startDate ? (
                     site.endDate ? (
                       <span>{formatDisplayDate(site.startDate)} – {formatDisplayDate(site.endDate)}</span>
@@ -1197,7 +1186,7 @@ Answer site-specific questions and field progress accurately using this context.
                     variant="outline"
                     size="sm"
                     className={cn(
-                      'h-7.5 text-xs px-2.5 font-medium rounded-md transition-colors flex items-center gap-1',
+                      'h-7.5 text-xs px-2.5 font-bold rounded-xl transition-all flex items-center gap-1 border shadow-xs',
                       isOnHold
                         ? (isDark ? 'bg-slate-900 border-emerald-600 hover:bg-emerald-950/30 text-emerald-400' : 'bg-white border-emerald-500 hover:bg-emerald-50 text-emerald-700')
                         : (isDark ? 'bg-slate-900 border-amber-600 hover:bg-amber-950/30 text-amber-400' : 'bg-white border-amber-400 hover:bg-amber-50 text-amber-700')
@@ -1209,7 +1198,7 @@ Answer site-specific questions and field progress accurately using this context.
                 );
               })()}
               {currentUser?.privileges?.sites?.canEditSite && (
-                <Button onClick={() => onEditSite(site)} variant="outline" size="sm" title="Edit Site" className={cn("h-7.5 text-xs px-2.5 font-medium rounded-md transition-colors flex items-center gap-1", isDark ? "bg-slate-900 border-slate-700 hover:bg-slate-800 text-slate-200" : "bg-white border-slate-300 hover:bg-slate-50 text-slate-700")}>
+                <Button onClick={() => onEditSite(site)} variant="outline" size="sm" title="Edit Site" className={cn("h-7.5 text-xs px-2.5 font-bold rounded-xl transition-all flex items-center gap-1 border shadow-xs", isDark ? "bg-slate-900 border-slate-700 hover:bg-slate-800 text-slate-200" : "bg-white border-slate-300 hover:bg-slate-50 text-slate-700")}>
                   <Settings2 className="w-3.5 h-3.5 shrink-0" /><span>Edit Site</span>
                 </Button>
               )}
@@ -1225,43 +1214,86 @@ Answer site-specific questions and field progress accurately using this context.
                 exit={{ opacity: 0, height: 0 }}
                 className="overflow-hidden"
               >
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md">
-                  <div className="p-2 border border-slate-100 dark:border-slate-800/80 rounded bg-slate-50/50 dark:bg-slate-950/40">
-                    <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500">Total Billed</p>
-                    <p className="text-sm font-bold font-mono text-slate-900 dark:text-white truncate">
-                      {currentUser?.privileges?.billing?.canViewAmounts ? `₦${Math.round(data.totalBilled).toLocaleString()}` : '***'}
-                    </p>
-                    <span className="text-[9px] text-slate-400">{data.siteInvoices.length} Invoices</span>
-                  </div>
-                  <div className="p-2 border border-slate-100 dark:border-slate-800/80 rounded bg-slate-50/50 dark:bg-slate-950/40">
-                    <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500">Unpaid</p>
-                    <p className={cn("text-sm font-bold font-mono truncate", data.outstanding > 0 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400")}>
-                      {currentUser?.privileges?.billing?.canViewAmounts ? `₦${Math.round(data.outstanding).toLocaleString()}` : '***'}
-                    </p>
-                    <span className="text-[9px] text-slate-400">Outstanding</span>
-                  </div>
-                  <div className="p-2 border border-slate-100 dark:border-slate-800/80 rounded bg-slate-50/50 dark:bg-slate-950/40">
-                    <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500">Machine Days</p>
-                    <p className="text-sm font-bold font-mono text-slate-900 dark:text-white">{data.machineDays}d</p>
-                    <span className="text-[9px] text-slate-400">{data.machinesOnSiteCount} Machines</span>
-                  </div>
-                  <div className="p-2 border border-slate-100 dark:border-slate-800/80 rounded bg-slate-50/50 dark:bg-slate-950/40">
-                    <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500">Diesel Used</p>
-                    <p className="text-sm font-bold font-mono text-slate-900 dark:text-white">{Math.round(data.totalDiesel).toLocaleString()}L</p>
-                    <span className="text-[9px] text-slate-400">{data.machineLogs.length} logs</span>
-                  </div>
-                  <div className="p-2 border border-slate-100 dark:border-slate-800/80 rounded bg-slate-50/50 dark:bg-slate-950/40">
-                    <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500">Maintenance</p>
-                    <p className="text-sm font-bold font-mono text-rose-600 dark:text-rose-400 truncate">
-                      {currentUser?.privileges?.billing?.canViewAmounts ? `₦${Math.round(data.totalMaintenanceCost).toLocaleString()}` : '***'}
-                    </p>
-                    <span className="text-[9px] text-slate-400">{data.siteMaintAssets.length} assets</span>
-                  </div>
-                  <div className="p-2 border border-slate-100 dark:border-slate-800/80 rounded bg-slate-50/50 dark:bg-slate-950/40">
-                    <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500">Pumps on Site</p>
-                    <p className="text-sm font-bold font-mono text-cyan-600 dark:text-cyan-400">{data.activePumpsCount} Active</p>
-                    <span className="text-[9px] text-slate-400">{data.pumpsOnSite.length} total</span>
-                  </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 p-1 animate-in fade-in-50 duration-150">
+                  {[
+                    {
+                      label: 'TOTAL BILLED',
+                      value: currentUser?.privileges?.billing?.canViewAmounts ? `₦${Math.round(data.totalBilled).toLocaleString()}` : '₦***',
+                      sub: `${data.siteInvoices.length} Invoices`,
+                      bg: 'linear-gradient(135deg, #047857 0%, #10b981 100%)',
+                      glow: 'rgba(16, 185, 129, 0.35)',
+                    },
+                    {
+                      label: 'UNPAID BALANCE',
+                      value: currentUser?.privileges?.billing?.canViewAmounts ? `₦${Math.round(data.outstanding).toLocaleString()}` : '₦***',
+                      sub: data.outstanding > 0 ? 'Outstanding' : 'Fully Paid',
+                      bg: data.outstanding > 0 ? 'linear-gradient(135deg, #be123c 0%, #f43f5e 100%)' : 'linear-gradient(135deg, #0d9488 0%, #14b8a6 100%)',
+                      glow: data.outstanding > 0 ? 'rgba(244, 63, 94, 0.35)' : 'rgba(20, 184, 166, 0.3)',
+                    },
+                    {
+                      label: 'MACHINE DAYS',
+                      value: `${data.machineDays}d`,
+                      sub: `${data.machinesOnSiteCount} Machines on Site`,
+                      bg: 'linear-gradient(135deg, #0284c7 0%, #38bdf8 100%)',
+                      glow: 'rgba(56, 189, 248, 0.35)',
+                    },
+                    {
+                      label: 'DIESEL USED',
+                      value: `${Math.round(data.totalDiesel).toLocaleString()}L`,
+                      sub: `${data.machineLogs.length} Delivery Logs`,
+                      bg: 'linear-gradient(135deg, #ea580c 0%, #f59e0b 100%)',
+                      glow: 'rgba(245, 158, 11, 0.35)',
+                    },
+                    {
+                      label: 'MAINTENANCE',
+                      value: currentUser?.privileges?.billing?.canViewAmounts ? `₦${Math.round(data.totalMaintenanceCost).toLocaleString()}` : '₦***',
+                      sub: `${data.siteMaintAssets.length} Plant Assets`,
+                      bg: 'linear-gradient(135deg, #b91c1c 0%, #ef4444 100%)',
+                      glow: 'rgba(239, 68, 68, 0.35)',
+                    },
+                    {
+                      label: 'PUMPS ON SITE',
+                      value: `${data.activePumpsCount} Active`,
+                      sub: `${data.pumpsOnSite.length} Total Units`,
+                      bg: 'linear-gradient(135deg, #0891b2 0%, #06b6d4 100%)',
+                      glow: 'rgba(6, 182, 212, 0.35)',
+                    },
+                  ].map((card, idx) => (
+                    <div
+                      key={idx}
+                      className="relative overflow-hidden rounded-2xl p-3.5 text-white transition-all duration-200 hover:-translate-y-0.5 cursor-default flex flex-col justify-between group"
+                      style={{
+                        background: card.bg,
+                        boxShadow: `0 8px 24px -4px ${card.glow}`,
+                      }}
+                    >
+                      <div
+                        className="pointer-events-none absolute inset-0 opacity-25 transition-opacity group-hover:opacity-40"
+                        style={{
+                          background: 'linear-gradient(135deg, rgba(255,255,255,0.4) 0%, transparent 60%)',
+                        }}
+                      />
+                      <div
+                        className="pointer-events-none absolute inset-0 opacity-5"
+                        style={{
+                          backgroundImage: "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")",
+                        }}
+                      />
+
+                      <div className="relative z-10">
+                        <span className="inline-block px-2 py-0.5 rounded-full text-[9px] font-extrabold tracking-wider uppercase mb-1.5" style={{ background: 'rgba(255,255,255,0.22)', color: '#fff' }}>
+                          {card.label}
+                        </span>
+                        <p className="text-base sm:text-lg font-black font-mono tracking-tight text-white truncate drop-shadow-xs">
+                          {card.value}
+                        </p>
+                      </div>
+
+                      <div className="relative z-10 mt-2 pt-1 border-t border-white/15 flex items-center justify-between text-[10px] text-white/80 font-medium">
+                        <span>{card.sub}</span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </motion.div>
             )}
@@ -1271,7 +1303,7 @@ Answer site-specific questions and field progress accurately using this context.
           {data.alerts.length > 0 && (
             <div className="space-y-1.5">
               {data.alerts.map((alert, i) => (
-                <div key={i} className={cn('p-2.5 rounded-md border flex items-center gap-2.5 text-xs',
+                <div key={i} className={cn('p-2.5 rounded-xl border flex items-center gap-2.5 text-xs shadow-xs',
                   alert.type === 'danger'
                     ? (isDark ? 'bg-rose-950/30 border-rose-800 text-rose-300' : 'bg-rose-50 border-rose-200 text-rose-800')
                     : (isDark ? 'bg-amber-950/30 border-amber-800 text-amber-300' : 'bg-amber-50 border-amber-200 text-amber-800')
@@ -1284,27 +1316,25 @@ Answer site-specific questions and field progress accurately using this context.
           )}
 
           {/* ── Flat Main Navigation Tabs (Sticky Header Strip) ── */}
-          <div className="sticky top-0 z-20 bg-slate-50/95 dark:bg-slate-950/95 backdrop-blur-md flex items-center gap-1 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden touch-pan-x scroll-smooth py-1.5 border-b border-slate-200 dark:border-slate-800">
+          <div className="sticky top-0 z-20 bg-slate-50/90 dark:bg-slate-950/90 backdrop-blur-xl flex items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden touch-pan-x scroll-smooth py-2 border-b border-slate-200/80 dark:border-slate-800">
             {tabs.map(tab => {
               const isActive = activeTab === tab.id;
-              const Icon = tab.icon;
               return (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
                   className={cn(
-                    'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold whitespace-nowrap transition-all border shrink-0',
+                    'flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all duration-150 border shrink-0',
                     isActive
-                      ? 'bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 text-indigo-600 dark:text-indigo-400 shadow-xs'
-                      : 'bg-transparent border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-900/60'
+                      ? 'bg-gradient-to-r from-sky-500 to-blue-600 text-white border-transparent shadow-[0_2px_12px_rgba(14,165,233,0.35)] translate-y-[-1px]'
+                      : 'bg-white/70 dark:bg-slate-900/70 border-slate-200/70 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white dark:hover:bg-slate-800'
                   )}
                 >
-                  <Icon className={cn('w-3.5 h-3.5', isActive ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400')} />
                   <span>{tab.label}</span>
                   {tab.count !== undefined && tab.count !== null && (
                     <span className={cn(
-                      'text-[10px] px-1.5 py-0.2 rounded font-mono font-medium',
-                      isActive ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
+                      'text-[10px] px-1.5 py-0.2 rounded-md font-mono font-bold transition-colors',
+                      isActive ? 'bg-white/25 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200/60 dark:border-slate-700'
                     )}>
                       {tab.count}
                     </span>
@@ -1344,7 +1374,7 @@ Answer site-specific questions and field progress accurately using this context.
                         className={cn(
                           "flex items-center gap-2 px-3 py-1.5 rounded text-xs font-semibold transition-all whitespace-nowrap outline-none",
                           isSubActive
-                            ? "bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-xs border border-slate-200/80 dark:border-slate-700 font-bold"
+                            ? "bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-xs border border-slate-200/80 dark:border-slate-700 font-bold"
                             : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
                         )}
                       >
@@ -1361,11 +1391,13 @@ Answer site-specific questions and field progress accurately using this context.
 
                 {finTab === 'invoices' && (
                   <div className={cn(card, "")}>
-                    <h3 className="font-bold mb-4 flex items-center gap-2 text-lg"><FileText className="w-5 h-5 text-indigo-500" /> Invoices ({data.siteInvoices.length})</h3>
+                    <h3 className="font-bold mb-4 flex items-center gap-2 text-lg"><FileText className="w-5 h-5 text-blue-600" /> Invoices ({data.siteInvoices.length})</h3>
                     {data.siteInvoices.length > 0 ? (
                       <div className="divide-y divide-slate-100 dark:divide-slate-800">
                         {data.siteInvoices.map(inv => {
-                          const { isPaid } = invoicePaymentMap[inv.id] || { paid: 0, isPaid: false };
+                          const settlement = settlementMap[inv.id];
+                          const status = settlement?.status ?? (inv.status || 'Sent');
+                          const isPaid = settlement?.isPaid ?? false;
                           return (
                             <div
                               key={inv.id}
@@ -1406,11 +1438,24 @@ Answer site-specific questions and field progress accurately using this context.
                                 })()}
                               </div>
                               <div className="flex items-center justify-between sm:justify-end gap-2.5 shrink-0">
-                                <p className="font-bold text-sm">
-                                  {currentUser?.privileges?.billing?.canViewAmounts ? `₦${(inv.totalCharge || inv.amount || 0).toLocaleString()}` : '***'}
-                                </p>
-                                <Badge className={isPaid ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}>
-                                  {isPaid ? 'Paid' : 'Unpaid'}
+                                <div className="text-right">
+                                  <p className="font-bold text-sm">
+                                    {currentUser?.privileges?.billing?.canViewAmounts ? `₦${(inv.totalCharge || inv.amount || 0).toLocaleString()}` : '***'}
+                                  </p>
+                                  {settlement && settlement.balanceRemaining > 0 && settlement.totalSettled > 0 && (
+                                    <p className="text-[11px] text-amber-600 font-mono">
+                                      Bal: ₦{settlement.balanceRemaining.toLocaleString()}
+                                    </p>
+                                  )}
+                                </div>
+                                <Badge className={cn(
+                                  'text-xs font-semibold',
+                                  status === 'Paid' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300' :
+                                  status === 'Partially Paid' ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300' :
+                                  status === 'Overdue' ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300' :
+                                  'bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300'
+                                )}>
+                                  {status}
                                 </Badge>
                               </div>
                             </div>
@@ -1555,11 +1600,11 @@ Answer site-specific questions and field progress accurately using this context.
                 <div className={card}>
                   <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-100 dark:border-slate-800 flex-wrap gap-2">
                     <h3 className="font-bold text-lg flex items-center gap-2">
-                      <Activity className="w-5 h-5 text-indigo-500" /> Operational Hub
+                      <Activity className="w-5 h-5 text-blue-600" /> Operational Hub
                     </h3>
                     <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800/80 p-0.5 rounded-xl overflow-x-auto style-scroll max-w-full">
                       {[
-                        { id: 'logs', label: 'Machine Logs', count: data.machineLogs.length, icon: ClipboardList, activeColor: 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 font-bold shadow-sm' },
+                        { id: 'logs', label: 'Machine Logs', count: data.machineLogs.length, icon: ClipboardList, activeColor: 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 font-bold shadow-sm' },
                         { id: 'materials', label: 'Materials on Site', count: data.materialsOnSite.length, icon: Package, activeColor: 'bg-white dark:bg-slate-700 text-amber-600 dark:text-amber-400 font-bold shadow-sm' },
                         { id: 'waybills', label: 'Waybills', count: data.siteWaybills.length, icon: Truck, activeColor: 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 font-bold shadow-sm' },
                       ].map(subTab => (
@@ -1579,7 +1624,7 @@ Answer site-specific questions and field progress accurately using this context.
                           <span className={cn(
                             "text-[10px] px-1.5 py-0.5 rounded-full shrink-0 font-extrabold",
                             operationsSubTab === subTab.id
-                              ? (subTab.id === 'logs' ? 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300' :
+                              ? (subTab.id === 'logs' ? 'bg-blue-50 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300' :
                                  subTab.id === 'materials' ? 'bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300' :
                                  'bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300')
                               : "bg-slate-200/60 dark:bg-slate-700 text-slate-600 dark:text-slate-400"
@@ -1663,7 +1708,7 @@ Answer site-specific questions and field progress accurately using this context.
                                   <p className="text-xs text-slate-500">Date: {wb.issueDate ? new Date(wb.issueDate).toLocaleDateString('en-GB') : '—'} · Driver: {wb.driverName || 'Admin'}</p>
                                 </div>
                                 <Badge className={cn('text-xs capitalize', 
-                                  wb.type === 'waybill' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300' : 'bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300'
+                                  wb.type === 'waybill' ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300' : 'bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300'
                                 )}>
                                   {wb.type}
                                 </Badge>
@@ -1698,7 +1743,7 @@ Answer site-specific questions and field progress accurately using this context.
               <div className="space-y-5 transition-opacity duration-150">
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
                   {[
-                    { label: 'Assets Tracked', value: data.siteMaintAssets.length, color: 'text-indigo-600' },
+                    { label: 'Assets Tracked', value: data.siteMaintAssets.length, color: 'text-blue-600' },
                     { label: 'Sessions', value: data.siteMaintSessions.length, color: 'text-amber-600' },
                     { label: 'Total Cost', value: `₦${Math.round(data.totalMaintenanceCost).toLocaleString()}`, color: 'text-rose-500' },
                   ].map(k => (
@@ -1718,7 +1763,7 @@ Answer site-specific questions and field progress accurately using this context.
                         <Button
                           onClick={() => navigate('/operations/maintenance')}
                           size="sm"
-                          className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg h-7 px-2.5 flex items-center gap-1 text-[11px] font-bold cursor-pointer"
+                          className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg h-7 px-2.5 flex items-center gap-1 text-[11px] font-bold cursor-pointer"
                         >
                           <Plus className="w-3 h-3" />
                           <span>Log Maintenance</span>
@@ -1743,7 +1788,7 @@ Answer site-specific questions and field progress accurately using this context.
                           onClick={() => navigate('/operations/maintenance')}
                           size="sm"
                           variant="outline"
-                          className="border-indigo-200 text-indigo-600 hover:bg-indigo-50 dark:border-indigo-900/60 dark:text-indigo-400 dark:hover:bg-indigo-950/30 text-xs font-bold"
+                          className="border-blue-200 text-blue-600 hover:bg-blue-50 dark:border-blue-900/60 dark:text-blue-400 dark:hover:bg-blue-950/30 text-xs font-bold"
                         >
                           Go to Maintenance Manager
                         </Button>
@@ -1758,7 +1803,7 @@ Answer site-specific questions and field progress accurately using this context.
                           onClick={() => navigate('/operations/maintenance')}
                           size="sm"
                           variant="ghost"
-                          className="text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-950/30 text-xs font-bold"
+                          className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950/30 text-xs font-bold"
                         >
                           View All
                         </Button>
@@ -1782,7 +1827,7 @@ Answer site-specific questions and field progress accurately using this context.
                             onClick={() => navigate('/operations/maintenance')}
                             size="sm"
                             variant="outline"
-                            className="border-indigo-200 text-indigo-600 hover:bg-indigo-50 dark:border-indigo-900/60 dark:text-indigo-400 dark:hover:bg-indigo-950/30 text-xs font-bold"
+                            className="border-blue-200 text-blue-600 hover:bg-blue-50 dark:border-blue-900/60 dark:text-blue-400 dark:hover:bg-blue-950/30 text-xs font-bold"
                           >
                             Log Maintenance Session
                           </Button>
@@ -1863,12 +1908,12 @@ Answer site-specific questions and field progress accurately using this context.
                 <div className={card}>
                   <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-100 dark:border-slate-800 flex-wrap gap-2">
                     <h3 className="font-bold text-lg flex items-center gap-2">
-                      <Clock className="w-5 h-5 text-indigo-500" /> Tasks Dashboard
+                      <Clock className="w-5 h-5 text-blue-600" /> Tasks Dashboard
                     </h3>
                     <div className="flex items-center gap-3 flex-wrap min-w-0">
                       <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800/80 p-0.5 rounded-xl overflow-x-auto style-scroll max-w-full">
                         {[
-                          { id: 'pending', label: 'Pending', count: data.pendingSiteTasks.length, icon: CheckSquare, activeColor: 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 font-bold shadow-sm' },
+                          { id: 'pending', label: 'Pending', count: data.pendingSiteTasks.length, icon: CheckSquare, activeColor: 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 font-bold shadow-sm' },
                           { id: 'approval', label: 'Approval', count: data.approvalSiteTasks.length, icon: ShieldAlert, activeColor: 'bg-white dark:bg-slate-700 text-amber-600 dark:text-amber-400 font-bold shadow-sm' },
                           { id: 'completed', label: 'Completed', count: data.completedSiteTasks.length, icon: CheckCircle2, activeColor: 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 font-bold shadow-sm' },
                         ].map(subTab => (
@@ -1888,7 +1933,7 @@ Answer site-specific questions and field progress accurately using this context.
                             <span className={cn(
                               "text-[10px] px-1.5 py-0.5 rounded-full shrink-0 font-extrabold",
                               taskSubTab === subTab.id
-                                ? (subTab.id === 'pending' ? 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300' :
+                                ? (subTab.id === 'pending' ? 'bg-blue-50 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300' :
                                    subTab.id === 'approval' ? 'bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300' :
                                    'bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300')
                                 : "bg-slate-200/60 dark:bg-slate-700 text-slate-600 dark:text-slate-400"
@@ -1902,7 +1947,7 @@ Answer site-specific questions and field progress accurately using this context.
                         <Button
                           onClick={() => setShowAddTaskForm(!showAddTaskForm)}
                           size="sm"
-                          className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg h-7 px-2.5 flex items-center gap-1 text-[11px] font-bold cursor-pointer"
+                          className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg h-7 px-2.5 flex items-center gap-1 text-[11px] font-bold cursor-pointer"
                         >
                           <Plus className="w-3 h-3" />
                           <span>Add Task</span>
@@ -1913,9 +1958,9 @@ Answer site-specific questions and field progress accurately using this context.
 
                   {/* Inline Task Form */}
                   {showAddTaskForm && (
-                    <div className="mb-6 p-4 rounded-xl border border-indigo-100 dark:border-indigo-900/50 bg-indigo-50/30 dark:bg-indigo-950/10 space-y-4 animate-in slide-in-from-top duration-200">
+                    <div className="mb-6 p-4 rounded-xl border border-blue-100 dark:border-blue-900/50 bg-blue-50/30 dark:bg-blue-950/10 space-y-4 animate-in slide-in-from-top duration-200">
                       <div className="flex items-center justify-between">
-                        <h4 className="font-bold text-sm text-indigo-950 dark:text-indigo-200">Create New Site Task</h4>
+                        <h4 className="font-bold text-sm text-blue-950 dark:text-blue-200">Create New Site Task</h4>
                         <button
                           type="button"
                           onClick={() => setShowAddTaskForm(false)}
@@ -1935,7 +1980,7 @@ Answer site-specific questions and field progress accurately using this context.
                             value={taskTitle}
                             onChange={e => setTaskTitle(e.target.value)}
                             className={cn(
-                              "w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500",
+                              "w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500",
                               isDark ? "bg-slate-800 border-slate-600 text-white placeholder:text-slate-500" : "bg-white border-slate-200 text-slate-800 placeholder:text-slate-400"
                             )}
                           />
@@ -1949,7 +1994,7 @@ Answer site-specific questions and field progress accurately using this context.
                             onChange={e => setTaskDesc(e.target.value)}
                             rows={2}
                             className={cn(
-                              "w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none",
+                              "w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none",
                               isDark ? "bg-slate-800 border-slate-600 text-white placeholder:text-slate-500" : "bg-white border-slate-200 text-slate-800 placeholder:text-slate-400"
                             )}
                           />
@@ -1959,7 +2004,7 @@ Answer site-specific questions and field progress accurately using this context.
                           <div>
                             <label className="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1 uppercase tracking-wider">Assignee(s)</label>
                             <div className={cn(
-                              "w-full rounded-lg border p-1.5 overflow-y-auto h-24 space-y-0.5 focus-within:ring-2 focus-within:ring-indigo-500",
+                              "w-full rounded-lg border p-1.5 overflow-y-auto h-24 space-y-0.5 focus-within:ring-2 focus-within:ring-blue-500",
                               isDark ? "bg-slate-800 border-slate-600 text-white" : "bg-white border-slate-200 text-slate-800"
                             )}>
                               {users.filter(u => u.isActive !== false).map(u => {
@@ -1980,7 +2025,7 @@ Answer site-specific questions and field progress accurately using this context.
                                           setTaskAssignees([...taskAssignees, u.id]);
                                         }
                                       }}
-                                      className="h-3.5 w-3.5 rounded border-slate-300 dark:border-slate-600 text-indigo-600 focus:ring-indigo-500 cursor-pointer ml-2"
+                                      className="h-3.5 w-3.5 rounded border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500 cursor-pointer ml-2"
                                     />
                                   </label>
                                 );
@@ -1997,7 +2042,7 @@ Answer site-specific questions and field progress accurately using this context.
                                 value={taskDeadline}
                                 onChange={e => setTaskDeadline(e.target.value)}
                                 className={cn(
-                                  "w-full rounded-lg border px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500",
+                                  "w-full rounded-lg border px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500",
                                   isDark ? "bg-slate-800 border-slate-600 text-white" : "bg-white border-slate-200 text-slate-800"
                                 )}
                               />
@@ -2040,7 +2085,7 @@ Answer site-specific questions and field progress accurately using this context.
                                 id="task-approval-toggle"
                                 checked={taskRequiresApproval}
                                 onChange={e => setTaskRequiresApproval(e.target.checked)}
-                                className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                                className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                               />
                               <label htmlFor="task-approval-toggle" className="text-xs font-semibold text-slate-700 dark:text-slate-300 cursor-pointer">
                                 Requires Completion Approval
@@ -2054,7 +2099,7 @@ Answer site-specific questions and field progress accurately using this context.
                                     value={taskApprover}
                                     onChange={e => setTaskApprover(e.target.value)}
                                     className={cn(
-                                      "rounded-lg border px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500",
+                                      "rounded-lg border px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500",
                                       isDark ? "bg-slate-800 border-slate-600 text-white" : "bg-white border-slate-200 text-slate-800"
                                     )}
                                   >
@@ -2072,7 +2117,7 @@ Answer site-specific questions and field progress accurately using this context.
                           <Button
                             type="submit"
                             disabled={isSubmittingTask}
-                            className="bg-indigo-600 hover:bg-indigo-700 text-white flex-1 rounded-xl h-9 text-xs font-bold"
+                            className="bg-blue-600 hover:bg-blue-700 text-white flex-1 rounded-xl h-9 text-xs font-bold"
                           >
                             {isSubmittingTask ? 'Creating...' : 'Create Task'}
                           </Button>
@@ -2114,7 +2159,7 @@ Answer site-specific questions and field progress accurately using this context.
                         </div>
                       ) : (
                         <div className="text-center py-10 flex flex-col items-center">
-                          <ShieldCheck className="w-10 h-10 text-indigo-500 mb-2 opacity-80" />
+                          <ShieldCheck className="w-10 h-10 text-blue-600 mb-2 opacity-80" />
                           <p className="text-slate-500 font-medium text-sm">No tasks pending approval</p>
                           <p className="text-slate-400 text-xs mt-0.5">Everything is up to date and verified.</p>
                         </div>
@@ -2236,7 +2281,7 @@ Answer site-specific questions and field progress accurately using this context.
                     value={holdModalDate}
                     onChange={e => setHoldModalDate(e.target.value)}
                     required
-                    className="w-full h-10 px-3 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-900 dark:text-white"
+                    className="w-full h-10 px-3 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900 dark:text-white"
                   />
                 </div>
 
@@ -2255,7 +2300,7 @@ Answer site-specific questions and field progress accurately using this context.
                       ? 'E.g., Client approved resumption of works; all site permits active.'
                       : 'E.g., Heavy rainfall / client requested temporary pause during excavation phase.'
                     }
-                    className="w-full p-3 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none text-slate-900 dark:text-white"
+                    className="w-full p-3 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none text-slate-900 dark:text-white"
                   />
                   {holdModalError && (
                     <p className="text-xs font-semibold text-rose-500 mt-1">{holdModalError}</p>
@@ -2342,14 +2387,14 @@ Answer site-specific questions and field progress accurately using this context.
                 <div className="flex items-center gap-2 min-w-0">
                   <div className={cn(
                     "p-1.5 rounded-md shrink-0",
-                    isDark ? "bg-indigo-500/20 text-indigo-400" : "bg-indigo-50 text-indigo-600"
+                    isDark ? "bg-blue-500/20 text-blue-400" : "bg-blue-50 text-blue-600"
                   )}>
                     <Sparkles className="w-4 h-4" />
                   </div>
                   <div className="min-w-0">
                     <h2 className={cn(
                       "text-xs font-bold uppercase tracking-wider truncate",
-                      isDark ? "text-indigo-200" : "text-indigo-900"
+                      isDark ? "text-blue-200" : "text-slate-900"
                     )}>Site Intelligence</h2>
                     <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">{site.name}</p>
                   </div>
@@ -2357,7 +2402,7 @@ Answer site-specific questions and field progress accurately using this context.
 
                 <div className="flex items-center gap-1.5 shrink-0">
                   {selectedModel && (
-                    <span className="hidden sm:inline-block text-[10px] font-bold px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/80">
+                    <span className="hidden sm:inline-block text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800/80">
                       {selectedModel}
                     </span>
                   )}
@@ -2392,7 +2437,7 @@ Answer site-specific questions and field progress accurately using this context.
                   <div className="text-center py-10 space-y-3">
                     <div className={cn(
                       "w-10 h-10 mx-auto rounded-full flex items-center justify-center border",
-                      isDark ? "bg-indigo-500/10 text-indigo-400 border-indigo-500/20" : "bg-indigo-50 text-indigo-600 border-indigo-200"
+                      isDark ? "bg-blue-500/10 text-blue-400 border-blue-500/20" : "bg-blue-50 text-blue-600 border-blue-200"
                     )}>
                       <Sparkles className="w-5 h-5" />
                     </div>
@@ -2404,7 +2449,7 @@ Answer site-specific questions and field progress accurately using this context.
                       onClick={() => sendChatMessage(true)}
                       disabled={isGeneratingBrief}
                       size="sm"
-                      className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs rounded-md shadow-sm h-8 font-semibold"
+                      className="bg-blue-600 hover:bg-blue-500 text-white text-xs rounded-md shadow-sm h-8 font-semibold"
                     >
                       {isGeneratingBrief ? <RefreshCcw className="w-3.5 h-3.5 animate-spin mr-1.5" /> : <Sparkles className="w-3.5 h-3.5 mr-1.5" />}
                       Generate Intelligence Brief
@@ -2417,9 +2462,9 @@ Answer site-specific questions and field progress accurately using this context.
                     <div className={cn(
                       'max-w-[90%] rounded-lg p-3 text-xs shadow-xs',
                       msg.role === 'user'
-                        ? 'bg-indigo-600 text-white'
+                        ? 'bg-blue-600 text-white'
                         : isDark
-                          ? 'bg-slate-950 text-indigo-50 border border-slate-800'
+                          ? 'bg-slate-950 text-blue-50 border border-slate-800'
                           : 'bg-slate-50 text-slate-800 border border-slate-200'
                     )}>
                       {msg.role === 'user' ? <p className="whitespace-pre-wrap">{msg.content}</p> : renderFormattedChatMessage(msg.content)}
@@ -2431,9 +2476,9 @@ Answer site-specific questions and field progress accurately using this context.
                   <div className="flex justify-start">
                     <div className={cn(
                       "rounded-lg border p-2.5 text-xs flex items-center gap-2",
-                      isDark ? "bg-slate-950 text-indigo-200 border-slate-800" : "bg-slate-50 text-indigo-900 border-slate-200"
+                      isDark ? "bg-slate-950 text-blue-200 border-slate-800" : "bg-slate-50 text-slate-900 border-slate-200"
                     )}>
-                      <RefreshCcw className="w-3.5 h-3.5 animate-spin text-indigo-600 dark:text-indigo-400" /> Analyzing site telemetry...
+                      <RefreshCcw className="w-3.5 h-3.5 animate-spin text-blue-600 dark:text-blue-400" /> Analyzing site telemetry...
                     </div>
                   </div>
                 )}
@@ -2452,7 +2497,7 @@ Answer site-specific questions and field progress accurately using this context.
                   onKeyDown={e => e.key === 'Enter' && sendChatMessage()}
                   placeholder="Ask about invoices, machines, pumps..."
                   className={cn(
-                    "flex-1 text-xs rounded-md h-8.5 px-3 focus:outline-none focus:ring-1 focus:ring-indigo-500 border transition-colors",
+                    "flex-1 text-xs rounded-md h-8.5 px-3 focus:outline-none focus:ring-1 focus:ring-blue-500 border transition-colors",
                     isDark ? "bg-slate-900 border-slate-700 text-white placeholder:text-slate-500" : "bg-white border-slate-300 text-slate-900 placeholder:text-slate-400"
                   )}
                 />
@@ -2460,7 +2505,7 @@ Answer site-specific questions and field progress accurately using this context.
                   size="icon"
                   onClick={() => sendChatMessage()}
                   disabled={!chatInput.trim() || isGeneratingBrief}
-                  className="h-8.5 w-8.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-md shrink-0"
+                  className="h-8.5 w-8.5 bg-blue-600 hover:bg-blue-500 text-white rounded-md shrink-0"
                 >
                   <Send className="w-3.5 h-3.5" />
                 </Button>
@@ -2564,7 +2609,7 @@ function ExternalCommDialog({ open, onClose, site, contacts = [], onSave }: { op
               <select
                 value={form.direction}
                 onChange={e => setForm({ ...form, direction: e.target.value as any })}
-                className="w-full h-10 px-3 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full h-10 px-3 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="Outgoing">Outgoing</option>
                 <option value="Incoming">Incoming</option>
@@ -2575,7 +2620,7 @@ function ExternalCommDialog({ open, onClose, site, contacts = [], onSave }: { op
               <select
                 value={form.channel}
                 onChange={e => setForm({ ...form, channel: e.target.value as any })}
-                className="w-full h-10 px-3 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full h-10 px-3 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="Email">Email</option>
                 <option value="Phone">Phone</option>
@@ -2593,7 +2638,7 @@ function ExternalCommDialog({ open, onClose, site, contacts = [], onSave }: { op
               placeholder="E.g. Quotation sent, Site inspection meeting..."
               value={form.subject}
               onChange={e => setForm({ ...form, subject: e.target.value })}
-              className="w-full h-10 px-3 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full h-10 px-3 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
@@ -2612,7 +2657,7 @@ function ExternalCommDialog({ open, onClose, site, contacts = [], onSave }: { op
                   setForm(f => ({ ...f, contactPerson: val }));
                 }
               }}
-              className="w-full h-10 px-3 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full h-10 px-3 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Select Existing Contact...</option>
               {contacts.map((c: any) => (
@@ -2620,7 +2665,7 @@ function ExternalCommDialog({ open, onClose, site, contacts = [], onSave }: { op
                   {c.name} {c.position ? `(${c.position})` : ''}
                 </option>
               ))}
-              <option value="ADD_NEW" className="text-indigo-600 font-bold dark:text-indigo-400">+ Add New Contact</option>
+              <option value="ADD_NEW" className="text-blue-600 font-bold dark:text-blue-400">+ Add New Contact</option>
             </select>
 
             {isAddingNewContact && (
@@ -2632,7 +2677,7 @@ function ExternalCommDialog({ open, onClose, site, contacts = [], onSave }: { op
                   placeholder="Enter contact name..."
                   value={form.contactPerson}
                   onChange={e => setForm({ ...form, contactPerson: e.target.value })}
-                  className="w-full h-10 px-3 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full h-10 px-3 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
             )}
@@ -2646,7 +2691,7 @@ function ExternalCommDialog({ open, onClose, site, contacts = [], onSave }: { op
               placeholder="Details of the conversation or interaction..."
               value={form.notes}
               onChange={e => setForm({ ...form, notes: e.target.value })}
-              className="w-full p-3 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+              className="w-full p-3 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
             />
           </div>
 
@@ -2657,7 +2702,7 @@ function ExternalCommDialog({ open, onClose, site, contacts = [], onSave }: { op
               placeholder="E.g. Client to approve quotation by Friday"
               value={form.outcome}
               onChange={e => setForm({ ...form, outcome: e.target.value })}
-              className="w-full h-10 px-3 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full h-10 px-3 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
@@ -2667,13 +2712,13 @@ function ExternalCommDialog({ open, onClose, site, contacts = [], onSave }: { op
               type="date"
               value={form.followUpDate}
               onChange={e => setForm({ ...form, followUpDate: e.target.value })}
-              className="w-full h-10 px-3 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full h-10 px-3 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
           <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex gap-3">
             <Button type="button" variant="outline" onClick={onClose} className="flex-1 rounded-xl">Cancel</Button>
-            <Button type="submit" className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl">Save Log</Button>
+            <Button type="submit" className="flex-1 bg-blue-600 hover:bg-blue-700 text-white rounded-xl">Save Log</Button>
           </div>
         </form>
       </div>

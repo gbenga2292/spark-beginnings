@@ -29,8 +29,9 @@ import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { fetchInvoicesData, fetchLedgerData, fetchEmployeesData } from '@/src/lib/supabaseService';
 import { SiteSummary } from './SiteSummary';
 import { AccountsReportBuilder } from '@/src/components/financial/AccountsReportBuilder';
+import { buildSettlementMap } from '@/src/lib/settlementUtils';
 
-const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
+const COLORS = ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#0284c7', '#0d9488'];
 
 const MONTHS_LIST = [
   { label: 'January', value: 1, key: 'jan' }, { label: 'February', value: 2, key: 'feb' },
@@ -105,7 +106,7 @@ function YearDropdown({
         className={`flex items-center gap-1.5 h-7 px-2.5 rounded-lg border text-[11px] font-semibold transition-all whitespace-nowrap ${
           isAll
             ? 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-white'
-            : 'border-indigo-300 bg-indigo-50 text-indigo-700'
+            : 'border-blue-300 bg-blue-50 text-blue-700'
         }`}
       >
         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-0.5">Year</span>
@@ -117,17 +118,17 @@ function YearDropdown({
         <div
           ref={panelRef}
           style={{ position: 'fixed', top: pos.top, left: pos.left, zIndex: 9999 }}
-          className="bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 min-w-[140px] animate-in fade-in slide-in-from-top-1 duration-150"
+          className="bg-white rounded-md shadow-xl border border-slate-200 py-1.5 min-w-[140px] animate-in fade-in slide-in-from-top-1 duration-150"
         >
           <label className="flex items-center gap-2.5 px-3 py-1.5 hover:bg-slate-50 cursor-pointer group">
-            <input type="checkbox" checked={isAll} onChange={onSelectAll} className="w-3.5 h-3.5 rounded accent-indigo-600 cursor-pointer" />
-            <span className="text-[11px] font-semibold text-slate-700 group-hover:text-indigo-600 transition-colors">All Years</span>
+            <input type="checkbox" checked={isAll} onChange={onSelectAll} className="w-3.5 h-3.5 rounded accent-blue-600 cursor-pointer" />
+            <span className="text-[11px] font-semibold text-slate-700 group-hover:text-blue-600 transition-colors">All Years</span>
           </label>
           <div className="mx-3 my-1 border-t border-slate-100" />
           {availableYears.map(year => (
             <label key={year} className="flex items-center gap-2.5 px-3 py-1.5 hover:bg-slate-50 cursor-pointer group">
-              <input type="checkbox" checked={selectedYears.includes(year) && !isAll} onChange={() => onToggleYear(year)} className="w-3.5 h-3.5 rounded accent-indigo-600 cursor-pointer" />
-              <span className="text-[11px] font-semibold text-slate-700 group-hover:text-indigo-600 transition-colors">{year}</span>
+              <input type="checkbox" checked={selectedYears.includes(year) && !isAll} onChange={() => onToggleYear(year)} className="w-3.5 h-3.5 rounded accent-blue-600 cursor-pointer" />
+              <span className="text-[11px] font-semibold text-slate-700 group-hover:text-blue-600 transition-colors">{year}</span>
             </label>
           ))}
         </div>,
@@ -186,7 +187,7 @@ function MonthDropdown({
         className={`flex items-center gap-1.5 h-7 px-2.5 rounded-lg border text-[11px] font-semibold transition-all whitespace-nowrap ${
           isAll
             ? 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-white'
-            : 'border-indigo-300 bg-indigo-50 text-indigo-700'
+            : 'border-blue-300 bg-blue-50 text-blue-700'
         }`}
       >
         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-0.5">Month</span>
@@ -198,17 +199,17 @@ function MonthDropdown({
         <div
           ref={panelRef}
           style={{ position: 'fixed', top: pos.top, left: pos.left, zIndex: 9999 }}
-          className="bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 min-w-[150px] max-h-72 overflow-y-auto animate-in fade-in slide-in-from-top-1 duration-150"
+          className="bg-white rounded-md shadow-xl border border-slate-200 py-1.5 min-w-[150px] max-h-72 overflow-y-auto animate-in fade-in slide-in-from-top-1 duration-150"
         >
           <label className="flex items-center gap-2.5 px-3 py-1.5 hover:bg-slate-50 cursor-pointer group">
-            <input type="checkbox" checked={isAll} onChange={onSelectAll} className="w-3.5 h-3.5 rounded accent-indigo-600 cursor-pointer" />
-            <span className="text-[11px] font-semibold text-slate-700 group-hover:text-indigo-600 transition-colors">All Months</span>
+            <input type="checkbox" checked={isAll} onChange={onSelectAll} className="w-3.5 h-3.5 rounded accent-blue-600 cursor-pointer" />
+            <span className="text-[11px] font-semibold text-slate-700 group-hover:text-blue-600 transition-colors">All Months</span>
           </label>
           <div className="mx-3 my-1 border-t border-slate-100" />
           {monthsList.map(m => (
             <label key={m.value} className="flex items-center gap-2.5 px-3 py-1.5 hover:bg-slate-50 cursor-pointer group">
-              <input type="checkbox" checked={selectedMonths.includes(m.value) && !isAll} onChange={() => onToggleMonth(m.value)} className="w-3.5 h-3.5 rounded accent-indigo-600 cursor-pointer" />
-              <span className="text-[11px] font-semibold text-slate-700 group-hover:text-indigo-600 transition-colors">{m.label}</span>
+              <input type="checkbox" checked={selectedMonths.includes(m.value) && !isAll} onChange={() => onToggleMonth(m.value)} className="w-3.5 h-3.5 rounded accent-blue-600 cursor-pointer" />
+              <span className="text-[11px] font-semibold text-slate-700 group-hover:text-blue-600 transition-colors">{m.label}</span>
             </label>
           ))}
         </div>,
@@ -361,7 +362,7 @@ export function FinancialReports() {
     <div className="flex">
       <Button 
         size="sm" 
-        className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2 font-bold whitespace-nowrap shrink-0 border border-indigo-500 shadow-sm px-2 sm:px-4" 
+        className="bg-blue-600 hover:bg-blue-700 text-white gap-2 font-bold whitespace-nowrap shrink-0 border border-blue-500 px-2 sm:px-4 rounded-sm" 
         onClick={() => setReportBuilderOpen(true)}
         title="Open Report Builder"
       >
@@ -589,7 +590,7 @@ export function FinancialReports() {
   }, [summaryTab]);
   const [debtorView, setDebtorView] = useState<'client' | 'site'>('client');
   const [rankingView, setRankingView] = useState<'client' | 'site'>('client');
-  const [rankingTooltip, setRankingTooltip] = useState<{ x: number; y: number; sites: string[]; count: number; accent: 'indigo' | 'emerald' } | null>(null);
+  const [rankingTooltip, setRankingTooltip] = useState<{ x: number; y: number; sites: string[]; count: number; accent: 'blue' | 'emerald' } | null>(null);
   const [selectedFields, setSelectedFields] = useState<string[]>([]);
   const [exportMessage, setExportMessage] = useState<string | null>(null);
   const [activeFinBuilderTab, setActiveFinBuilderTab] = useState<string>("Revenue & Billing");
@@ -1295,19 +1296,24 @@ export function FinancialReports() {
 
   // Site financial data
   const siteFinancialData = useMemo(() => {
+    const settlementMap = buildSettlementMap(invoices, payments);
     const siteMap: Record<string, { paid: number; pending: number }> = {};
     sites.forEach(s => { siteMap[s.name] = { paid: 0, pending: 0 }; });
     invoices.forEach(inv => {
       if (siteMap[inv.siteName]) {
-        if (inv.status === 'Paid') siteMap[inv.siteName].paid += inv.amount;
-        else siteMap[inv.siteName].pending += inv.amount;
+        const settlement = settlementMap[inv.id];
+        const invTotal = inv.totalCharge || inv.amount || 0;
+        const settled = settlement ? settlement.totalSettled : (inv.status === 'Paid' ? invTotal : 0);
+        const remaining = settlement ? settlement.balanceRemaining : (inv.status === 'Paid' ? 0 : invTotal);
+        siteMap[inv.siteName].paid += settled;
+        siteMap[inv.siteName].pending += remaining;
       }
     });
     return Object.entries(siteMap)
       .map(([name, data]) => ({ name, ...data }))
       .filter(item => item.paid > 0 || item.pending > 0)
       .sort((a, b) => (b.paid + b.pending) - (a.paid + a.pending));
-  }, [sites, invoices]);
+  }, [sites, invoices, payments]);
 
   const formatCurrCompact = (val: number) => {
     if (hideAmounts) return '***';
@@ -1623,7 +1629,7 @@ export function FinancialReports() {
     },
     {
       group: 'Revenue & Billing',
-      color: 'indigo',
+      color: 'blue',
       fields: ['Invoice Summary', 'Outstanding Balances', 'Client Balances', 'Site Revenue', 'Overdue Invoices'],
     },
     {
@@ -1638,7 +1644,7 @@ export function FinancialReports() {
     },
     {
       group: 'Performance',
-      color: 'violet',
+      color: 'sky',
       fields: ['Collection Efficiency', 'Monthly Revenue Trend', 'Top Debtors', 'VAT Deficit Alert'],
     },
   ];
@@ -1919,7 +1925,7 @@ export function FinancialReports() {
           <DialogHeader className="px-6 py-4 bg-slate-50/50 border-b">
             <div className="flex items-center justify-between w-full">
               <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-xl bg-indigo-100 flex items-center justify-center text-indigo-600">
+                <div className="h-10 w-10 rounded-md bg-blue-50 flex items-center justify-center text-blue-600 border border-blue-100">
                   <Eye className="w-5 h-5" />
                 </div>
                 <div>
@@ -1927,14 +1933,14 @@ export function FinancialReports() {
                   <p className="text-sm text-slate-500 font-medium">Previewing report content before export</p>
                 </div>
               </div>
-              <Badge className="bg-indigo-600 text-white font-bold uppercase tracking-wider px-3 py-1">
+              <Badge className="bg-blue-600 text-white font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-sm">
                 {previewModal.type.toUpperCase()}
               </Badge>
             </div>
           </DialogHeader>
 
           <div className="flex-1 overflow-auto p-6">
-            <div className="bg-slate-50 rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+            <div className="bg-slate-50 rounded-md border border-slate-200 overflow-hidden">
               <div className="overflow-x-auto">
                 <Table className="text-[11px] whitespace-nowrap">
                   <TableHeader className="bg-slate-900 sticky top-0 z-10">
@@ -1979,9 +1985,9 @@ export function FinancialReports() {
               </div>
             </div>
             
-            <div className="mt-4 p-4 rounded-xl border border-indigo-100 bg-indigo-50/30 flex items-start gap-3">
-              <AlertCircle className="h-5 w-5 text-indigo-500 shrink-0 mt-0.5" />
-              <div className="text-xs text-indigo-900 font-medium leading-relaxed">
+            <div className="mt-4 p-4 rounded-md border border-blue-100 bg-blue-50/30 flex items-start gap-3">
+              <AlertCircle className="h-5 w-5 text-blue-500 shrink-0 mt-0.5" />
+              <div className="text-xs text-slate-800 font-medium leading-relaxed">
                 Verification complete: The report matches your current filters ({filterYear === 'All' ? 'All Time' : filterYear}{filterClient !== 'All' ? `, Client: ${filterClient}` : ''}). 
                 Clicking save will generate the full document as {previewModal.filename}.
               </div>
@@ -1998,7 +2004,7 @@ export function FinancialReports() {
             </Button>
             <div className="flex gap-3">
               <Button 
-                className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold shadow-lg shadow-indigo-200"
+                className="gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-sm"
                 onClick={() => {
                   previewModal.onConfirm();
                   setPreviewModal(prev => ({ ...prev, isOpen: false }));
@@ -2028,7 +2034,7 @@ export function FinancialReports() {
       <div className="-mt-2 -mx-2 md:-mx-6 flex flex-col animate-in fade-in duration-300">
 
         {/* Tab switcher - compact implementation */}
-        <div className="flex bg-white p-2 mb-4 rounded-xl shadow-sm border border-slate-100 items-center overflow-x-auto no-scrollbar gap-2">
+        <div className="flex bg-white p-2 mb-4 rounded-md border border-slate-200 items-center overflow-x-auto no-scrollbar gap-2">
           <div className="flex gap-1">
             {[
               { id: 'client-account', label: 'Client Account', icon: Landmark },
@@ -2046,8 +2052,8 @@ export function FinancialReports() {
                   onClick={() => startTransition(() => setMainTab(tab.id as any))}
                   className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
                     isActive 
-                      ? 'bg-indigo-600 text-white shadow-md' 
-                      : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'
+                      ? 'bg-blue-600 text-white' 
+                      : 'text-slate-500 hover:bg-slate-50 hover:text-blue-600'
                   }`}
                 >
                   <Icon className={`h-4 w-4 ${isActive ? 'text-white' : 'text-slate-400'}`} />
@@ -2059,10 +2065,10 @@ export function FinancialReports() {
         </div>
 
         {/* ── Filter bar: flush full-width sticky strip right under header ── */}
-        <div className="bg-white/90 backdrop-blur-sm shadow-sm border-y border-slate-200 px-4 md:px-8 py-4 mb-6 sticky top-0 z-[40] transition-shadow hover:shadow-md">
+        <div className="bg-white/90 backdrop-blur-sm border-y border-slate-200 px-4 md:px-8 py-4 mb-6 sticky top-0 z-[40] transition-shadow">
           <div className="max-w-7xl mx-auto flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="flex items-center justify-center w-7 h-7 rounded-md bg-indigo-50 text-indigo-600 border border-indigo-100">
+              <div className="flex items-center justify-center w-7 h-7 rounded-md bg-blue-50 text-blue-600 border border-blue-200">
                 <Filter className="w-3.5 h-3.5" />
               </div>
               <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600">Report Filters</span>
@@ -2112,7 +2118,7 @@ export function FinancialReports() {
               <div className="flex items-center gap-1.5 shrink-0">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Client</span>
                 <select value={filterClient} onChange={e => startTransition(() => setFilterClient(e.target.value))}
-                  className="h-7 px-2 text-[11px] font-semibold rounded-lg border border-slate-200 bg-white text-slate-700 outline-none focus:ring-2 focus:ring-indigo-400/30 max-w-[140px] cursor-pointer hover:bg-slate-50 transition-colors">
+                  className="h-7 px-2 text-[11px] font-semibold rounded-lg border border-slate-200 bg-white text-slate-700 outline-none focus:ring-2 focus:ring-blue-400/30 max-w-[140px] cursor-pointer hover:bg-slate-50 transition-colors">
                   <option value="All">All Clients</option>
                   {availableClients.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
@@ -2123,7 +2129,7 @@ export function FinancialReports() {
                 <select
                   value={priorPeriodLimit}
                   onChange={e => startTransition(() => setPriorPeriodLimit(e.target.value as any))}
-                  className="h-7 px-2 text-[11px] font-semibold rounded-lg border border-slate-200 bg-white text-slate-700 outline-none focus:ring-2 focus:ring-indigo-400/30 min-w-[120px] cursor-pointer hover:bg-slate-50 transition-colors"
+                  className="h-7 px-2 text-[11px] font-semibold rounded-lg border border-slate-200 bg-white text-slate-700 outline-none focus:ring-2 focus:ring-blue-400/30 min-w-[120px] cursor-pointer hover:bg-slate-50 transition-colors"
                 >
                   <option value="none">None</option>
                   <option value="prev-month">Prev Month</option>
@@ -2186,7 +2192,7 @@ export function FinancialReports() {
               <div className="flex flex-col gap-1.5">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Client</span>
                 <select value={filterClient} onChange={e => startTransition(() => setFilterClient(e.target.value))}
-                  className="h-8 px-2 text-[11px] font-semibold rounded-md border border-slate-200 bg-slate-50 text-slate-700 outline-none w-full focus:ring-2 focus:ring-indigo-400/30">
+                  className="h-8 px-2 text-[11px] font-semibold rounded-md border border-slate-200 bg-slate-50 text-slate-700 outline-none w-full focus:ring-2 focus:ring-blue-400/30">
                   <option value="All">All Clients</option>
                   {availableClients.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
@@ -2196,7 +2202,7 @@ export function FinancialReports() {
                 <select
                   value={priorPeriodLimit}
                   onChange={e => startTransition(() => setPriorPeriodLimit(e.target.value as any))}
-                  className="h-8 px-2 text-[11px] font-semibold rounded-md border border-slate-200 bg-slate-50 text-slate-700 outline-none w-full focus:ring-2 focus:ring-indigo-400/30"
+                  className="h-8 px-2 text-[11px] font-semibold rounded-md border border-slate-200 bg-slate-50 text-slate-700 outline-none w-full focus:ring-2 focus:ring-blue-400/30"
                 >
                   <option value="none">None</option>
                   <option value="prev-month">Previous Month</option>
@@ -2282,12 +2288,12 @@ export function FinancialReports() {
           return (
             <div className="space-y-6">
               {/* Controls */}
-              <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+              <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-4 rounded-md border border-slate-200">
                 <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1">
                   {(['category', 'bank', 'client', 'site'] as const).map(v => (
                     <button key={v} onClick={() => setLedgerSummaryView(v)}
                       className={`px-3 py-1.5 rounded-md text-xs font-semibold capitalize transition-all ${
-                        ledgerSummaryView === v ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                        ledgerSummaryView === v ? 'bg-white text-slate-900' : 'text-slate-500 hover:text-slate-700'
                       }`}>
                       {v}
                     </button>
@@ -2299,7 +2305,7 @@ export function FinancialReports() {
               </div>
 
               {/* Monthly breakdown table */}
-              <Card className={`shadow-sm border-slate-200 overflow-hidden ${fullScreenTable === 'ledger-breakdown' ? 'fixed z-[100] m-0 rounded-none bg-slate-50 border-none landscape:inset-0 landscape:w-screen landscape:h-screen landscape:flex landscape:flex-col portrait:top-1/2 portrait:left-1/2 portrait:w-[100vh] portrait:h-[100vw] portrait:-translate-x-1/2 portrait:-translate-y-1/2 portrait:rotate-90 portrait:flex portrait:flex-col' : ''}`}>
+              <Card className={`border-slate-200 rounded-md overflow-hidden ${fullScreenTable === 'ledger-breakdown' ? 'fixed z-[100] m-0 rounded-none bg-slate-50 border-none landscape:inset-0 landscape:w-screen landscape:h-screen landscape:flex landscape:flex-col portrait:top-1/2 portrait:left-1/2 portrait:w-[100vh] portrait:h-[100vw] portrait:-translate-x-1/2 portrait:-translate-y-1/2 portrait:rotate-90 portrait:flex portrait:flex-col' : ''}`}>
                 <CardHeader className={`bg-slate-50/50 border-b border-slate-100 py-3 px-4 flex flex-row items-center justify-between ${fullScreenTable === 'ledger-breakdown' ? 'hidden' : ''}`}>
                   <CardTitle className="text-slate-800 text-base capitalize m-0">By {ledgerSummaryView} — Monthly Breakdown ({filterYear === 'All' ? 'All Time' : filterYear}{filterMonth !== 'All' ? ` - Month ${filterMonth}` : ''})</CardTitle>
                   <Button variant="outline" size="sm" className="gap-2 border-slate-200 text-slate-700 hover:bg-slate-100" onClick={() => toggleFullScreen('ledger-breakdown')}>
@@ -2312,7 +2318,7 @@ export function FinancialReports() {
                   <Button 
                     variant="default" 
                     size="icon" 
-                    className="fixed top-4 right-4 z-[110] rounded-full shadow-2xl bg-indigo-600 hover:bg-indigo-700 text-white w-12 h-12" 
+                    className="fixed top-4 right-4 z-[110] rounded-full shadow-2xl bg-blue-600 hover:bg-blue-700 text-white w-12 h-12" 
                     onClick={() => toggleFullScreen('ledger-breakdown')}
                     title="Exit Full Screen"
                   >
@@ -2323,9 +2329,9 @@ export function FinancialReports() {
                 <CardContent className={`p-0 flex flex-col ${fullScreenTable === 'ledger-breakdown' ? 'flex-1 h-full min-h-0' : ''}`}>
                   <div className={`overflow-auto relative no-scrollbar ${fullScreenTable === 'ledger-breakdown' ? 'flex-1 h-full min-h-0' : 'max-h-[60vh]'}`}>
                     <table className="w-full text-sm">
-                      <thead className="bg-indigo-700 text-white sticky top-0 z-20 shadow-md">
+                      <thead className="bg-slate-900 text-white sticky top-0 z-20">
                         <tr>
-                          <th className="py-2.5 px-4 text-left font-semibold capitalize sticky left-0 z-30 bg-indigo-700">{ledgerSummaryView}</th>
+                          <th className="py-2.5 px-4 text-left font-semibold capitalize sticky left-0 z-30 bg-slate-900">{ledgerSummaryView}</th>
                           {MONTH_NAMES.map((m, mi) => { if (filterMonth !== "All" && String(mi + 1) !== filterMonth) return null; return (
                             <th key={m} className="py-2.5 px-2 text-right font-semibold whitespace-nowrap">{m}</th>
                                   ); })}
@@ -2340,8 +2346,8 @@ export function FinancialReports() {
                           const mthMap = dataMap.get(grp)!;
                           const rowTotal = totalsPerGroup[gi];
                           return (
-                            <tr key={grp} className={`border-b border-slate-100 hover:bg-indigo-50/30 transition-colors ${gi % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'}`}>
-                              <td className={`py-2 px-4 font-medium text-slate-700 whitespace-nowrap sticky left-0 z-10 shadow-[1px_0_3px_rgba(0,0,0,0.05)] border-r border-slate-100 ${gi % 2 === 0 ? 'bg-white' : 'bg-[#fcfdfe]'}`}>{grp || '—'}</td>
+                            <tr key={grp} className={`border-b border-slate-100 hover:bg-slate-50 transition-colors ${gi % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'}`}>
+                              <td className={`py-2 px-4 font-medium text-slate-700 whitespace-nowrap sticky left-0 z-10  border-r border-slate-100 ${gi % 2 === 0 ? 'bg-white' : 'bg-[#fcfdfe]'}`}>{grp || '—'}</td>
                               {MONTH_NAMES.map((_, mi) => { if (filterMonth !== "All" && String(mi + 1) !== filterMonth) return null;
                                 const val = mthMap.get(mi) || 0;
                                 return (
@@ -2352,7 +2358,7 @@ export function FinancialReports() {
                                   </td>
                                 );
                               })}
-                              <td className="py-2 px-4 text-right font-bold text-indigo-700 whitespace-nowrap tabular-nums">
+                              <td className="py-2 px-4 text-right font-bold text-blue-600 whitespace-nowrap tabular-nums font-mono">
                                 ₦{rowTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                               </td>
                             </tr>
@@ -2360,19 +2366,19 @@ export function FinancialReports() {
                         })}
                         {/* Grand total row */}
                         {groups.length > 0 && (
-                          <tr className="bg-indigo-50 hover:bg-indigo-50 border-t-2 border-indigo-200 font-bold shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.1)] relative z-10">
-                            <td className="py-2.5 px-4 text-slate-800 sticky left-0 z-20 bg-indigo-50 shadow-[2px_0_5px_rgba(0,0,0,0.3)] border-r border-indigo-100">TOTAL</td>
+                          <tr className="bg-slate-100 hover:bg-slate-100 border-t-2 border-slate-300 font-bold relative z-10">
+                            <td className="py-2.5 px-4 text-slate-800 sticky left-0 z-20 bg-slate-100 border-r border-slate-200">TOTAL</td>
                             {MONTH_NAMES.map((_, mi) => { if (filterMonth !== "All" && String(mi + 1) !== filterMonth) return null;
                               const colTotal = filteredLedger
                                 .filter(e => { const d = new Date(e.date); return !isNaN(d.getTime()) && d.getMonth() === mi; })
                                 .reduce((sum, e) => sum + (e.amount || 0), 0);
                               return (
-                                <td key={mi} className="py-2.5 px-2 text-right text-indigo-800 tabular-nums text-xs">
+                                <td key={mi} className="py-2.5 px-2 text-right text-slate-800 tabular-nums font-mono text-xs">
                                   {colTotal > 0 ? colTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}
                                 </td>
                               );
                             })}
-                            <td className="py-2.5 px-4 text-right text-indigo-900 whitespace-nowrap tabular-nums">
+                            <td className="py-2.5 px-4 text-right text-blue-700 whitespace-nowrap tabular-nums font-mono">
                               ₦{grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </td>
                           </tr>
@@ -2385,7 +2391,7 @@ export function FinancialReports() {
 
               {/* Per-group bar chart */}
               {groups.length > 0 && (
-                <Card className="shadow-sm border-slate-200">
+                <Card className="border-slate-200">
                   <CardHeader className="bg-slate-50/50 border-b border-slate-100 py-3 px-4">
                     <CardTitle className="text-slate-800 text-base">Top {Math.min(groups.length, 10)} by Total Spend</CardTitle>
                   </CardHeader>
@@ -2401,7 +2407,7 @@ export function FinancialReports() {
                             <div key={item.name} className="flex items-center gap-3">
                               <div className="w-32 md:w-48 text-xs font-medium text-slate-600 truncate shrink-0">{item.name || '—'}</div>
                               <div className="flex-1 bg-slate-100 rounded-full h-2.5 overflow-hidden">
-                                <div className="h-full bg-indigo-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
+                                <div className="h-full bg-blue-600 rounded-full transition-all" style={{ width: `${pct}%` }} />
                               </div>
                               <div className="text-right text-xs font-semibold text-slate-700 w-28 shrink-0 tabular-nums">
                                 ₦{item.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span className="text-slate-400">({pct.toFixed(1)}%)</span>
@@ -2482,88 +2488,63 @@ export function FinancialReports() {
             <div className="space-y-6">
               {/* Stat Cards Row */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
-                <Card className="border-slate-200 shadow-sm bg-gradient-to-br from-emerald-500/10 to-teal-500/5">
-                  <CardContent className="p-4 flex items-center justify-between">
-                    <div>
-                      <p className="text-[10px] font-extrabold uppercase tracking-widest text-emerald-700">Accumulated Expenses VAT</p>
-                      <h3 className="text-xl font-extrabold text-slate-900 mt-1 tabular-nums">
-                        ₦{totalAccVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </h3>
-                      <p className="text-[11px] text-slate-500 mt-0.5">Total VAT on vatable purchases</p>
-                    </div>
-                    <div className="h-10 w-10 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center font-bold shrink-0">
-                      <Receipt className="h-5 w-5" />
-                    </div>
+                <Card className="border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 rounded-md">
+                  <CardContent className="p-4">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Accumulated Expenses VAT</p>
+                    <h3 className="text-xl font-bold font-mono text-slate-900 dark:text-slate-100 mt-1 tabular-nums">
+                      ₦{totalAccVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </h3>
+                    <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">Total VAT on vatable purchases</p>
                   </CardContent>
                 </Card>
 
-                <Card className="border-slate-200 shadow-sm bg-gradient-to-br from-teal-500/10 to-emerald-500/5">
-                  <CardContent className="p-4 flex items-center justify-between">
-                    <div>
-                      <p className="text-[10px] font-extrabold uppercase tracking-widest text-teal-700">VAT Paid / Remitted</p>
-                      <h3 className="text-xl font-extrabold text-slate-900 mt-1 tabular-nums">
-                        ₦{totalVatPaidRemitted.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </h3>
-                      <p className="text-[11px] text-slate-500 mt-0.5">Reconciled VAT remittances</p>
-                    </div>
-                    <div className="h-10 w-10 rounded-xl bg-teal-500/10 text-teal-600 flex items-center justify-center font-bold shrink-0">
-                      <CheckCircle2 className="h-5 w-5" />
-                    </div>
+                <Card className="border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 rounded-md">
+                  <CardContent className="p-4">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">VAT Paid / Remitted</p>
+                    <h3 className="text-xl font-bold font-mono text-slate-900 dark:text-slate-100 mt-1 tabular-nums">
+                      ₦{totalVatPaidRemitted.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </h3>
+                    <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">Reconciled VAT remittances</p>
                   </CardContent>
                 </Card>
 
-                <Card className={`border-slate-200 shadow-sm ${vatBalanceOwed <= 0 ? 'bg-emerald-50/50' : 'bg-rose-50/50'}`}>
-                  <CardContent className="p-4 flex items-center justify-between">
-                    <div>
-                      <p className={`text-[10px] font-extrabold uppercase tracking-widest ${vatBalanceOwed <= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
-                        Outstanding Deficit
-                      </p>
-                      <h3 className="text-xl font-extrabold text-slate-900 mt-1 tabular-nums">
-                        ₦{Math.max(0, vatBalanceOwed).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </h3>
-                      <p className="text-[11px] text-slate-500 mt-0.5">
-                        {vatBalanceOwed <= 0 ? 'Fully Reconciled' : 'VAT payment deficit'}
-                      </p>
-                    </div>
-                    <div className={`h-10 w-10 rounded-xl flex items-center justify-center font-bold shrink-0 ${vatBalanceOwed <= 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
-                      {vatBalanceOwed <= 0 ? <CheckCircle2 className="h-5 w-5" /> : <AlertCircle className="h-5 w-5" />}
-                    </div>
+                <Card className={`border rounded-md ${vatBalanceOwed <= 0 ? 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900' : 'border-rose-200 dark:border-rose-900/60 bg-rose-50/30 dark:bg-rose-950/20'}`}>
+                  <CardContent className="p-4">
+                    <p className={`text-[10px] font-bold uppercase tracking-wider ${vatBalanceOwed <= 0 ? 'text-slate-500 dark:text-slate-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                      Outstanding Deficit
+                    </p>
+                    <h3 className={`text-xl font-bold font-mono mt-1 tabular-nums ${vatBalanceOwed <= 0 ? 'text-slate-900 dark:text-slate-100' : 'text-rose-700 dark:text-rose-300'}`}>
+                      ₦{Math.max(0, vatBalanceOwed).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </h3>
+                    <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">
+                      {vatBalanceOwed <= 0 ? 'Fully Reconciled' : 'VAT payment deficit'}
+                    </p>
                   </CardContent>
                 </Card>
 
-                <Card className="border-slate-200 shadow-sm bg-gradient-to-br from-indigo-500/10 to-blue-500/5">
-                  <CardContent className="p-4 flex items-center justify-between">
-                    <div>
-                      <p className="text-[10px] font-extrabold uppercase tracking-widest text-indigo-700">Amount for VAT</p>
-                      <h3 className="text-xl font-extrabold text-slate-900 mt-1 tabular-nums">
-                        ₦{totalBaseAmountForVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </h3>
-                      <p className="text-[11px] text-slate-500 mt-0.5">Base gross amount for VAT</p>
-                    </div>
-                    <div className="h-10 w-10 rounded-xl bg-indigo-500/10 text-indigo-600 flex items-center justify-center font-bold shrink-0">
-                      <Landmark className="h-5 w-5" />
-                    </div>
+                <Card className="border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 rounded-md">
+                  <CardContent className="p-4">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Amount for VAT</p>
+                    <h3 className="text-xl font-bold font-mono text-slate-900 dark:text-slate-100 mt-1 tabular-nums">
+                      ₦{totalBaseAmountForVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </h3>
+                    <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">Base gross amount for VAT</p>
                   </CardContent>
                 </Card>
 
-                <Card className="border-slate-200 shadow-sm">
-                  <CardContent className="p-4 flex items-center justify-between">
-                    <div>
-                      <p className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500">Vatable Entries</p>
-                      <h3 className="text-xl font-extrabold text-slate-900 mt-1 tabular-nums">
-                        {filteredVatEntries.length}
-                      </h3>
-                      <p className="text-[11px] text-slate-500 mt-0.5">Line items in selection</p>
-                    </div>
-                    <div className="h-10 w-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold shrink-0">
-                      <ReceiptText className="h-5 w-5" />
-                    </div>
+                <Card className="border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 rounded-md">
+                  <CardContent className="p-4">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Vatable Entries</p>
+                    <h3 className="text-xl font-bold font-mono text-slate-900 dark:text-slate-100 mt-1 tabular-nums">
+                      {filteredVatEntries.length}
+                    </h3>
+                    <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">Line items in selection</p>
                   </CardContent>
                 </Card>
               </div>
 
               {/* Expenses VAT Ledger Table Card */}
-              <Card className="border-slate-200 shadow-sm overflow-hidden">
+              <Card className="border-slate-200 overflow-hidden">
                 <CardHeader className="bg-slate-50/50 border-b border-slate-100 py-3 px-4 flex flex-row items-center justify-between">
                   <div>
                     <CardTitle className="text-slate-800 text-base font-bold flex items-center gap-2">
@@ -2577,7 +2558,7 @@ export function FinancialReports() {
                 <CardContent className="p-0">
                   <div className="overflow-x-auto max-h-[60vh] no-scrollbar">
                     <table className="w-full text-left text-xs whitespace-nowrap">
-                      <thead className="bg-slate-900 text-white font-semibold sticky top-0 z-10 shadow-md">
+                      <thead className="bg-slate-900 text-white font-semibold sticky top-0 z-10">
                         <tr>
                           <th className="py-2.5 px-4 border-r border-slate-800">Voucher No.</th>
                           <th className="py-2.5 px-3 border-r border-slate-800">Date</th>
@@ -2605,12 +2586,12 @@ export function FinancialReports() {
                             const entryVat = entry.vatAmount ?? calculated.vatAmount;
                             const entryBase = entry.amountForVat ?? calculated.amountForVat;
                             return (
-                              <tr key={entry.id || idx} className="hover:bg-indigo-50/20 transition-colors">
-                                <td className="py-2.5 px-4 font-mono font-bold text-indigo-600">{entry.voucherNo}</td>
+                              <tr key={entry.id || idx} className="hover:bg-slate-50 transition-colors">
+                                <td className="py-2.5 px-4 font-mono font-bold text-blue-600">{entry.voucherNo}</td>
                                 <td className="py-2.5 px-3 font-mono text-slate-600">{formatDisplayDate(entry.date)}</td>
                                 <td className="py-2.5 px-4 font-medium text-slate-800 max-w-[250px] truncate" title={entry.description}>{entry.description || '—'}</td>
                                 <td className="py-2.5 px-3">
-                                  <span className="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full font-semibold">{entry.category}</span>
+                                  <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded-sm font-semibold border border-blue-200">{entry.category}</span>
                                 </td>
                                 <td className="py-2.5 px-3 text-slate-600">{entry.vendor || '—'}</td>
                                 <td className="py-2.5 px-3 text-slate-500">{entry.client || '—'}{entry.site ? ` / ${entry.site}` : ''}</td>
@@ -2622,7 +2603,7 @@ export function FinancialReports() {
                                 <td className="py-2.5 px-3 text-right font-semibold text-slate-800 tabular-nums">
                                   ₦{Number(entry.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                 </td>
-                                <td className="py-2.5 px-3 text-right font-semibold text-indigo-700 tabular-nums">
+                                <td className="py-2.5 px-3 text-right font-semibold text-blue-600 tabular-nums font-mono">
                                   ₦{entryBase.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                 </td>
                                 <td className="py-2.5 px-4 text-right font-extrabold text-emerald-700 bg-emerald-50/50 tabular-nums">
@@ -2644,14 +2625,14 @@ export function FinancialReports() {
         <>
       {/* Top Metrics */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="shadow-sm border-slate-200">
+        <Card className="border-slate-200">
           <CardContent className="p-5 flex flex-col justify-between h-full relative overflow-hidden group">
             <div className="flex justify-between items-start mb-4">
               <div>
                 <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Total Billed</p>
                 <h3 className="text-2xl font-bold font-mono text-slate-800">{formatCurrCompact(globalStats.totalBilled)}</h3>
               </div>
-              <div className="h-10 w-10 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600"><ReceiptText className="w-5 h-5" /></div>
+              <div className="h-10 w-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 border border-blue-100"><ReceiptText className="w-5 h-5" /></div>
             </div>
             <div className="text-[11px] font-medium text-slate-500 bg-slate-50 px-2 py-1 rounded-md inline-flex items-center gap-1 self-start">
               Across {invoices.length} invoices
@@ -2659,7 +2640,7 @@ export function FinancialReports() {
           </CardContent>
         </Card>
 
-        <Card className="shadow-sm border-slate-200">
+        <Card className="border-slate-200">
           <CardContent className="p-5 flex flex-col justify-between h-full relative overflow-hidden group">
             <div className="flex justify-between items-start mb-4">
               <div>
@@ -2674,7 +2655,7 @@ export function FinancialReports() {
           </CardContent>
         </Card>
 
-        <Card className="shadow-sm border-slate-200 border-l-4 border-l-amber-500">
+        <Card className="border-slate-200 border-l-4 border-l-amber-500">
           <CardContent className="p-5 flex flex-col justify-between h-full relative overflow-hidden group">
             <div className="flex justify-between items-start mb-4">
               <div>
@@ -2690,7 +2671,7 @@ export function FinancialReports() {
           </CardContent>
         </Card>
 
-        <Card className="shadow-sm border-slate-200 border-l-4 border-l-rose-500 relative group overflow-visible">
+        <Card className="border-slate-200 border-l-4 border-l-rose-500 relative group overflow-visible">
           <CardContent className="p-5 flex flex-col justify-between h-full relative cursor-help">
             <div className="flex justify-between items-start mb-4">
               <div>
@@ -2706,7 +2687,7 @@ export function FinancialReports() {
             </div>
             
             {/* Hover tooltip for forensic breakdown */}
-            <div className="absolute top-full mt-3 right-0 w-64 bg-slate-900 border border-slate-800 text-slate-100 p-4 rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-[100] pointer-events-none origin-top-right">
+            <div className="absolute top-full mt-3 right-0 w-64 bg-slate-900 border border-slate-800 text-slate-100 p-4 rounded-md shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-[100] pointer-events-none origin-top-right">
                 <div className="flex items-center justify-between border-b border-slate-800 pb-2 mb-3">
                     <span className="text-xs font-bold uppercase tracking-wider text-rose-400 flex items-center gap-1.5"><Activity className="w-3.5 h-3.5" /> VAT Forensics</span>
                 </div>
@@ -2744,11 +2725,11 @@ export function FinancialReports() {
       </div>
 
       {/* FINANCIAL SUMMARY Ledger - Featured at top */}
-      <Card className={`shadow-sm border-slate-200 overflow-hidden ${fullScreenTable === 'ledger' ? 'fixed z-[100] m-0 rounded-none bg-slate-50 border-none landscape:inset-0 landscape:w-screen landscape:h-screen landscape:flex landscape:flex-col portrait:top-1/2 portrait:left-1/2 portrait:w-[100vh] portrait:h-[100vw] portrait:-translate-x-1/2 portrait:-translate-y-1/2 portrait:rotate-90 portrait:flex portrait:flex-col' : ''}`}>
+      <Card className={`border-slate-200 rounded-md overflow-hidden ${fullScreenTable === 'ledger' ? 'fixed z-[100] m-0 rounded-none bg-slate-50 border-none landscape:inset-0 landscape:w-screen landscape:h-screen landscape:flex landscape:flex-col portrait:top-1/2 portrait:left-1/2 portrait:w-[100vh] portrait:h-[100vw] portrait:-translate-x-1/2 portrait:-translate-y-1/2 portrait:rotate-90 portrait:flex portrait:flex-col' : ''}`}>
         <CardHeader className={`bg-slate-50/50 border-b border-slate-100 pb-0 pt-4 px-0 shrink-0 ${fullScreenTable === 'ledger' ? 'hidden' : ''}`}>
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between px-5 pb-3">
             <div className="flex items-center gap-2">
-              <ReceiptText className="w-5 h-5 text-indigo-600" />
+              <ReceiptText className="w-5 h-5 text-blue-600" />
               <CardTitle className="text-sm text-slate-800 uppercase tracking-wide">Financial Summary Ledger</CardTitle>
             </div>
             <div className="flex items-center gap-2 mt-2 sm:mt-0">
@@ -2764,9 +2745,9 @@ export function FinancialReports() {
             </div>
           </div>
           <div className="flex px-5 gap-6 border-b border-slate-200 overflow-x-auto no-scrollbar">
-            <button className={`pb-3 text-sm font-semibold transition-all border-b-2 whitespace-nowrap ${summaryTab === 'client' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-700'}`} onClick={() => setSummaryTab('client')}>Client Summary</button>
-            <button className={`pb-3 text-sm font-semibold transition-all border-b-2 whitespace-nowrap ${summaryTab === 'site' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-700'}`} onClick={() => setSummaryTab('site')}>Site Summary</button>
-            <button className={`pb-3 text-sm font-semibold transition-all border-b-2 whitespace-nowrap ${summaryTab === 'vat' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-700'}`} onClick={() => setSummaryTab('vat')}>VAT Summary</button>
+            <button className={`pb-3 text-sm font-semibold transition-all border-b-2 whitespace-nowrap ${summaryTab === 'client' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`} onClick={() => setSummaryTab('client')}>Client Summary</button>
+            <button className={`pb-3 text-sm font-semibold transition-all border-b-2 whitespace-nowrap ${summaryTab === 'site' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`} onClick={() => setSummaryTab('site')}>Site Summary</button>
+            <button className={`pb-3 text-sm font-semibold transition-all border-b-2 whitespace-nowrap ${summaryTab === 'vat' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`} onClick={() => setSummaryTab('vat')}>VAT Summary</button>
             <button className={`pb-3 text-sm font-semibold transition-all border-b-2 whitespace-nowrap flex items-center gap-1.5 ${summaryTab === 'expenses-vat' ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-slate-500 hover:text-slate-700'}`} onClick={() => setSummaryTab('expenses-vat')}>
               <Receipt className="h-3.5 w-3.5" /> Expenses VAT
             </button>
@@ -2777,7 +2758,7 @@ export function FinancialReports() {
           <Button 
             variant="default" 
             size="icon" 
-            className="fixed top-4 right-4 z-[110] rounded-full shadow-2xl bg-indigo-600 hover:bg-indigo-700 text-white w-12 h-12" 
+            className="fixed top-4 right-4 z-[110] rounded-full shadow-2xl bg-blue-600 hover:bg-blue-700 text-white w-12 h-12" 
             onClick={() => toggleFullScreen('ledger')}
             title="Exit Full Screen"
           >
@@ -2789,7 +2770,7 @@ export function FinancialReports() {
           /* ── EXPENSES VAT TABLE ── */
           <div ref={expensesVatScrollRef} className={`overflow-auto relative no-scrollbar cursor-grab active:cursor-grabbing ${fullScreenTable === 'ledger' ? 'flex-1 h-full min-h-0' : 'max-h-[70vh]'}`}>
             <table className="w-full text-left text-[13px] whitespace-nowrap">
-              <thead className="bg-slate-900 text-white font-semibold sticky top-0 z-20 shadow-md">
+              <thead className="bg-slate-900 text-white font-semibold sticky top-0 z-20">
                 <tr>
                   <th className="py-3 px-5 sticky left-0 z-30 bg-slate-900 text-xs tracking-wider uppercase text-slate-300 border-r border-slate-700">Voucher No.</th>
                   <th className="py-3 px-4 text-xs tracking-wider uppercase text-slate-300">Date</th>
@@ -2798,7 +2779,7 @@ export function FinancialReports() {
                   <th className="py-3 px-4 text-xs tracking-wider uppercase text-slate-300">Vendor</th>
                   <th className="py-3 px-4 text-xs tracking-wider uppercase text-slate-300 text-center">VAT Policy</th>
                   <th className="py-3 px-5 text-xs tracking-wider uppercase text-slate-300 text-right">Line Amount (₦)</th>
-                  <th className="py-3 px-5 text-xs tracking-wider uppercase text-indigo-200 text-right">Amt for VAT (₦)</th>
+                  <th className="py-3 px-5 text-xs tracking-wider uppercase text-slate-300 text-right">Amt for VAT (₦)</th>
                   <th className="py-3 px-5 text-xs tracking-wider uppercase text-emerald-300 text-right">VAT Amount (₦)</th>
                   <th className="py-3 px-5 text-xs tracking-wider uppercase text-sky-300 text-right">VAT Remitted (₦)</th>
                   <th className="py-3 px-5 text-xs tracking-wider uppercase text-rose-300 text-right">VAT Owed (₦)</th>
@@ -2876,12 +2857,12 @@ export function FinancialReports() {
                     const isPartPaid = entryRemitted > 0.01 && !isFullyPaid;
 
                     return (
-                      <tr key={entry.id || idx} className={`hover:bg-indigo-50/20 transition-colors ${isEven ? 'bg-white' : 'bg-slate-50/30'}`}>
-                        <td className={`py-2.5 px-5 sticky left-0 z-10 border-r border-slate-100 shadow-[1px_0_3px_rgba(0,0,0,0.05)] font-mono font-bold text-indigo-600 ${isEven ? 'bg-white' : 'bg-[#fcfdfe]'}`}>{entry.voucherNo || '—'}</td>
+                      <tr key={entry.id || idx} className={`hover:bg-slate-50 transition-colors ${isEven ? 'bg-white' : 'bg-slate-50/30'}`}>
+                        <td className={`py-2.5 px-5 sticky left-0 z-10 border-r border-slate-100  font-mono font-bold text-blue-600 ${isEven ? 'bg-white' : 'bg-[#fcfdfe]'}`}>{entry.voucherNo || '—'}</td>
                         <td className="py-2.5 px-4 font-mono text-slate-500 text-xs">{formatDisplayDate(entry.date)}</td>
                         <td className="py-2.5 px-5 font-medium text-slate-800 max-w-[220px] truncate" title={entry.description}>{entry.description || '—'}</td>
                         <td className="py-2.5 px-4">
-                          <span className="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full text-[11px] font-semibold">{entry.category || '—'}</span>
+                          <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded-sm text-[11px] font-semibold border border-blue-200">{entry.category || '—'}</span>
                         </td>
                         <td className="py-2.5 px-4 text-slate-500 text-[12px]">{entry.vendor || '—'}</td>
                         <td className="py-2.5 px-4 text-center">
@@ -2894,7 +2875,7 @@ export function FinancialReports() {
                         <td className="py-2.5 px-5 text-right font-mono font-semibold text-slate-700 tabular-nums">
                           {lineAmt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </td>
-                        <td className="py-2.5 px-5 text-right font-mono font-semibold text-indigo-600 tabular-nums">
+                        <td className="py-2.5 px-5 text-right font-mono font-semibold text-blue-600 tabular-nums">
                           {amtForVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </td>
                         <td
@@ -2939,7 +2920,7 @@ export function FinancialReports() {
                       <tr className="bg-slate-900 border-t-4 border-emerald-500 sticky bottom-0 z-10">
                         <td className="sticky left-0 z-20 bg-slate-900 py-3.5 px-5 font-bold text-slate-200 text-sm tracking-wider uppercase border-r border-slate-700" colSpan={6}>Grand Total — {vatEntries.length} entries</td>
                         <td className="py-3.5 px-5 text-right font-mono font-bold text-slate-200 tabular-nums">{grandLineAmt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                        <td className="py-3.5 px-5 text-right font-mono font-bold text-indigo-300 tabular-nums">{grandAmtForVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        <td className="py-3.5 px-5 text-right font-mono font-bold text-slate-300 tabular-nums">{grandAmtForVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                         <td className="py-3.5 px-5 text-right font-mono font-bold text-emerald-400 tabular-nums">{grandVatAmt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                         <td className="py-3.5 px-5 text-right font-mono font-bold text-sky-400 tabular-nums">{grandRemitted > 0 ? grandRemitted.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}</td>
                         <td className={`py-3.5 px-5 text-right font-mono font-bold tabular-nums ${grandOwed <= 0.01 ? 'text-emerald-400' : 'text-rose-400'}`}>
@@ -2955,11 +2936,11 @@ export function FinancialReports() {
         ) : (
         <div className={`overflow-auto relative no-scrollbar ${fullScreenTable === 'ledger' ? 'flex-1 h-full min-h-0' : 'max-h-[70vh]'}`}>
           <Table className="whitespace-nowrap min-w-full text-[13px]">
-            <TableHeader className="bg-slate-900 sticky top-0 z-20 shadow-md">
-              <TableRow className="hover:bg-slate-900 border-b border-indigo-500/50">
-                <TableHead className="sticky left-0 z-30 bg-slate-900 font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 w-[180px] shadow-[2px_0_5px_rgba(0,0,0,0.3)]">Client</TableHead>
+            <TableHeader className="bg-slate-900 sticky top-0 z-20">
+              <TableRow className="hover:bg-slate-900 border-b border-slate-800">
+                <TableHead className="sticky left-0 z-30 bg-slate-900 font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 w-[180px]">Client</TableHead>
                 {summaryTab === 'vat' && <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 text-left">VAT Policy</TableHead>}
-                {summaryTab === 'site' && <TableHead className="sticky left-[180px] z-30 bg-slate-900 font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 w-[160px] shadow-[2px_0_5px_rgba(0,0,0,0.3)] border-l border-slate-700/50">Site</TableHead>}
+                {summaryTab === 'site' && <TableHead className="sticky left-[180px] z-30 bg-slate-900 font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 w-[160px] border-l border-slate-700/50">Site</TableHead>}
                 {summaryTab !== 'vat' && filterYear !== 'All' && (
                   <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-amber-300 px-5 py-4 text-right" title="Balance carried over from previous years">
                     B/F
@@ -2976,16 +2957,16 @@ export function FinancialReports() {
                   <>
                     <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-rose-300 px-5 py-4 text-right">Balance Due</TableHead>
                     <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 text-right">Discounts</TableHead>
-                    <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-indigo-200 px-5 py-4 text-right">WHT</TableHead>
+                    <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 text-right">WHT</TableHead>
                   </>
                 )}
                 {summaryTab === 'vat' && (
                   <>
-                    <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-indigo-200 px-5 py-4 text-right">AMT FOR VAT</TableHead>
-                    <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-indigo-200 px-5 py-4 text-right">VAT ON PAYMENTS</TableHead>
-                    <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-indigo-200 px-5 py-4 text-right">AMT FOR VAT (REMITTED)</TableHead>
-                    <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-indigo-200 px-5 py-4 text-right">VAT REMIT</TableHead>
-                    <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-indigo-200 px-5 py-4 text-right">AMT FOR VAT (OWED)</TableHead>
+                    <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 text-right">AMT FOR VAT</TableHead>
+                    <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 text-right">VAT ON PAYMENTS</TableHead>
+                    <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 text-right">AMT FOR VAT (REMITTED)</TableHead>
+                    <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 text-right">VAT REMIT</TableHead>
+                    <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 text-right">AMT FOR VAT (OWED)</TableHead>
                     <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-rose-300 px-5 py-4 text-right">VAT OWED</TableHead>
                   </>
                 )}
@@ -2996,10 +2977,10 @@ export function FinancialReports() {
             </TableHeader>
             <TableBody>
               {summaryData.map((row, i) => (
-                <TableRow key={i} className={`hover:bg-indigo-50/40 transition-colors border-b border-slate-100 ${i % 2 === 0 ? 'bg-white' : 'bg-slate-50/30'}`}>
-                  <TableCell className={`sticky left-0 z-10 px-5 py-3 font-semibold text-slate-700 border-r border-slate-100 shadow-[1px_0_3px_rgba(0,0,0,0.05)] ${i % 2 === 0 ? 'bg-white' : 'bg-[#fcfdfe]'}`}>{row.client}</TableCell>
+                <TableRow key={i} className={`hover:bg-slate-50 transition-colors border-b border-slate-100 ${i % 2 === 0 ? 'bg-white' : 'bg-slate-50/30'}`}>
+                  <TableCell className={`sticky left-0 z-10 px-5 py-3 font-semibold text-slate-700 border-r border-slate-100  ${i % 2 === 0 ? 'bg-white' : 'bg-[#fcfdfe]'}`}>{row.client}</TableCell>
                   {summaryTab === 'vat' && <TableCell className={`px-5 py-3 text-slate-500 font-medium ${i % 2 === 0 ? 'bg-white' : 'bg-[#fcfdfe]'}`}>{row.vatPolicy || 'No'}</TableCell>}
-                  {summaryTab === 'site' && <TableCell className={`sticky left-[180px] z-10 px-5 py-3 text-slate-500 font-medium border-r border-slate-100 shadow-[1px_0_3px_rgba(0,0,0,0.05)] ${i % 2 === 0 ? 'bg-white' : 'bg-[#fcfdfe]'}`}>{row.site}</TableCell>}
+                  {summaryTab === 'site' && <TableCell className={`sticky left-[180px] z-10 px-5 py-3 text-slate-500 font-medium border-r border-slate-100  ${i % 2 === 0 ? 'bg-white' : 'bg-[#fcfdfe]'}`}>{row.site}</TableCell>}
                   {summaryTab !== 'vat' && filterYear !== 'All' && (
                     <TableCell className={`px-5 py-3 text-right font-mono font-semibold ${
                       !row.bf || row.bf === 0 ? 'text-slate-300' : row.bf > 0 ? 'text-amber-600' : 'text-emerald-600'
@@ -3026,7 +3007,7 @@ export function FinancialReports() {
                         {row.balance !== 0 ? (row.balance < 0 ? `(${Math.abs(row.balance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})` : row.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })) : '-'}
                       </TableCell>
                       <TableCell className="px-5 py-3 text-right font-mono text-slate-400 text-xs">{row.discount ? row.discount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
-                      <TableCell className="px-5 py-3 text-right font-mono text-indigo-600/70 text-xs">{row.withholdingTax ? row.withholdingTax.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
+                      <TableCell className="px-5 py-3 text-right font-mono text-blue-600/70 text-xs">{row.withholdingTax ? row.withholdingTax.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
                     </>
                   )}
                   {summaryTab === 'vat' && (
@@ -3045,10 +3026,10 @@ export function FinancialReports() {
                   )}
                   {summaryTab !== 'vat' && (
                     <TableCell className="px-5 py-3 text-center">
-                      <span className={`inline-flex items-center justify-center px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wide uppercase shadow-sm
+                      <span className={`inline-flex items-center justify-center px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wide uppercase
                         ${row.status === 'OWING' ? 'bg-rose-100 border border-rose-200 text-rose-700' :
                           row.status === 'PART PAID' ? 'bg-amber-100 border border-amber-200 text-amber-700' :
-                            row.status === 'OVER PAID' ? 'bg-indigo-100 border border-indigo-200 text-indigo-700' :
+                            row.status === 'OVER PAID' ? 'bg-blue-100 border border-blue-200 text-blue-700' :
                               row.status === 'FULLY PAID' ? 'bg-emerald-100 border border-emerald-200 text-emerald-700' : 'bg-slate-100 text-slate-400'}`}>
                         {row.status}
                       </span>
@@ -3069,10 +3050,10 @@ export function FinancialReports() {
                 const totalVATOwed = summaryData.reduce((sum, r) => sum + (r.vatOwed || 0), 0);
 
                 return (
-                  <TableRow className="bg-slate-900 hover:bg-slate-900 border-t-4 border-indigo-500 shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.1)] relative z-10">
-                    <TableCell className="sticky left-0 z-20 bg-slate-900 px-5 py-4 font-bold text-slate-200 text-sm tracking-wider uppercase shadow-[2px_0_5px_rgba(0,0,0,0.3)]">Grand Total</TableCell>
+                  <TableRow className="bg-slate-900 hover:bg-slate-900 border-t-4 border-slate-700 relative z-10">
+                    <TableCell className="sticky left-0 z-20 bg-slate-900 px-5 py-4 font-bold text-slate-200 text-sm tracking-wider uppercase">Grand Total</TableCell>
                     {summaryTab === 'vat' && <TableCell className="bg-slate-900 px-5 py-4"></TableCell>}
-                    {summaryTab === 'site' && <TableCell className="sticky left-[180px] z-20 bg-slate-900 px-5 py-4 shadow-[2px_0_5px_rgba(0,0,0,0.3)]"></TableCell>}
+                    {summaryTab === 'site' && <TableCell className="sticky left-[180px] z-20 bg-slate-900 px-5 py-4"></TableCell>}
                     {summaryTab !== 'vat' && filterYear !== 'All' && (
                       <TableCell className={`px-5 py-4 text-right font-mono font-bold ${
                         !totalBF || totalBF === 0 ? 'text-slate-400' : totalBF > 0 ? 'text-amber-400' : 'text-emerald-400'
@@ -3099,7 +3080,7 @@ export function FinancialReports() {
                             : totalBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </TableCell>
                         <TableCell className="bg-slate-900 px-5 py-4 text-right font-mono font-medium text-slate-400">{totalDiscount ? totalDiscount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
-                        <TableCell className="bg-slate-900 px-5 py-4 text-right font-mono font-medium text-indigo-300">{totalWHT ? totalWHT.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
+                        <TableCell className="bg-slate-900 px-5 py-4 text-right font-mono font-medium text-slate-300">{totalWHT ? totalWHT.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
                       </>
                     )}
                     {summaryTab === 'vat' && (
@@ -3137,10 +3118,10 @@ export function FinancialReports() {
 
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="shadow-sm border-slate-200 col-span-1 lg:col-span-2 flex flex-col">
+        <Card className="border-slate-200 col-span-1 lg:col-span-2 flex flex-col">
           <CardHeader className="bg-slate-50/50 border-b border-slate-100 pb-4">
             <div className="flex items-center gap-2">
-              <TrendingUp className="w-5 h-5 text-indigo-600" />
+              <TrendingUp className="w-5 h-5 text-blue-600" />
               <CardTitle className="text-sm text-slate-800 uppercase tracking-wide">Cash Flow Velocity</CardTitle>
             </div>
             <CardDescription>Billed Revenue vs Cash Collected over time.</CardDescription>
@@ -3160,8 +3141,8 @@ export function FinancialReports() {
                       <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} tickFormatter={(val) => `₦${val / 1000000}M`} />
                       <RechartsTooltip formatter={(value: number | undefined) => formatCurr(value ?? 0)} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
                       <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px', fontSize: '13px' }} />
-                      <Area type="monotone" dataKey="Billed" stroke="#6366f1" strokeWidth={3} fillOpacity={1} fill="url(#colorBilledR)">
-                        <LabelList dataKey="Billed" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#6366f1' }} formatter={(v: any) => v > 0 ? `₦${(v/1000000).toFixed(1)}M` : ''} />
+                      <Area type="monotone" dataKey="Billed" stroke="#2563eb" strokeWidth={3} fillOpacity={1} fill="url(#colorBilledR)">
+                        <LabelList dataKey="Billed" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#2563eb' }} formatter={(v: any) => v > 0 ? `₦${(v/1000000).toFixed(1)}M` : ''} />
                       </Area>
                       <Area type="monotone" dataKey="Collected" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#colorCollectedR)">
                         <LabelList dataKey="Collected" position="bottom" style={{ fontSize: 10, fontWeight: 700, fill: '#10b981' }} formatter={(v: any) => v > 0 ? `₦${(v/1000000).toFixed(1)}M` : ''} />
@@ -3178,11 +3159,11 @@ export function FinancialReports() {
           </CardContent>
         </Card>
 
-        <Card className="shadow-sm border-slate-200 flex flex-col">
+        <Card className="border-slate-200 flex flex-col">
           <CardHeader className="bg-slate-50/50 border-b border-slate-100 pb-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <PieChartIcon className="w-5 h-5 text-indigo-600" />
+                <PieChartIcon className="w-5 h-5 text-blue-600" />
                 <CardTitle className="text-sm text-slate-800 uppercase tracking-wide">VAT Compliance</CardTitle>
               </div>
               <Badge variant={globalStats.vatDeficit > 0 ? "outline" : "secondary"} className={globalStats.vatDeficit > 0 ? "text-amber-600 border-amber-200 bg-amber-50" : "bg-emerald-50 text-emerald-700"}>
@@ -3223,7 +3204,7 @@ export function FinancialReports() {
       </div>
 
       {/* Debtors Chart */}
-      <Card className="shadow-sm border-slate-200">
+      <Card className="border-slate-200">
         <CardHeader className="bg-slate-50/50 border-b border-slate-100 pb-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -3231,8 +3212,8 @@ export function FinancialReports() {
               <CardTitle className="text-sm text-slate-800 uppercase tracking-wide">Receivables Risk Analysis</CardTitle>
             </div>
             <div className="flex bg-slate-200/50 p-1 rounded-lg">
-              <button className={`px-3 py-1 text-xs font-semibold rounded transition-all ${debtorView === 'client' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500'}`} onClick={() => setDebtorView('client')}>By Client</button>
-              <button className={`px-3 py-1 text-xs font-semibold rounded transition-all ${debtorView === 'site' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500'}`} onClick={() => setDebtorView('site')}>By Site</button>
+              <button className={`px-3 py-1 text-xs font-semibold rounded transition-all ${debtorView === 'client' ? 'bg-white text-blue-700 border border-slate-200' : 'text-slate-500'}`} onClick={() => setDebtorView('client')}>By Client</button>
+              <button className={`px-3 py-1 text-xs font-semibold rounded transition-all ${debtorView === 'site' ? 'bg-white text-blue-700 border border-slate-200' : 'text-slate-500'}`} onClick={() => setDebtorView('site')}>By Site</button>
             </div>
           </div>
           <CardDescription>Highest outstanding balances.</CardDescription>
@@ -3263,17 +3244,17 @@ export function FinancialReports() {
       </Card>
 
       {/* Invoices & Payments Ranking Card */}
-      <Card className="shadow-sm border-slate-200">
+      <Card className="border-slate-200">
         <CardHeader className="bg-slate-50/50 border-b border-slate-100 pb-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <TrendingUp className="w-5 h-5 text-indigo-600" />
+              <TrendingUp className="w-5 h-5 text-blue-600" />
               <CardTitle className="text-sm text-slate-800 uppercase tracking-wide">Invoices & Payments Ranking</CardTitle>
             </div>
             <div className="flex bg-slate-200/50 p-1 rounded-lg">
               <button
                 className={`px-3 py-1 text-xs font-semibold rounded transition-all ${
-                  rankingView === 'client' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500'
+                  rankingView === 'client' ? 'bg-white text-blue-700 border border-slate-200' : 'text-slate-500'
                 }`}
                 onClick={() => setRankingView('client')}
               >
@@ -3281,7 +3262,7 @@ export function FinancialReports() {
               </button>
               <button
                 className={`px-3 py-1 text-xs font-semibold rounded transition-all ${
-                  rankingView === 'site' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500'
+                  rankingView === 'site' ? 'bg-white text-blue-700 border border-slate-200' : 'text-slate-500'
                 }`}
                 onClick={() => setRankingView('site')}
               >
@@ -3301,8 +3282,8 @@ export function FinancialReports() {
               </div>
               <div className="[&>div]:max-h-[350px] [&>div]:no-scrollbar">
                 <Table className="whitespace-nowrap min-w-full text-xs">
-                  <TableHeader className="bg-slate-900 sticky top-0 z-10 shadow-sm">
-                    <TableRow className="hover:bg-slate-900 border-b border-indigo-500/50">
+                  <TableHeader className="bg-slate-900 sticky top-0 z-10">
+                    <TableRow className="hover:bg-slate-900 border-b border-slate-800">
                       <TableHead className="font-semibold tracking-wider uppercase text-slate-300 py-3 text-left">
                         {rankingView === 'client' ? 'CLIENT' : 'SITE'}
                       </TableHead>
@@ -3320,7 +3301,7 @@ export function FinancialReports() {
                       rankingData.invoiceRanked.map((row, idx) => (
                         <TableRow
                           key={idx}
-                          className={`hover:bg-indigo-50/20 transition-colors border-b border-slate-100/80 ${
+                          className={`hover:bg-slate-50 transition-colors border-b border-slate-100/80 ${
                             idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/20'
                           }`}
                         >
@@ -3330,11 +3311,11 @@ export function FinancialReports() {
                           {rankingView === 'client' ? (
                             <TableCell className="py-3 text-center">
                               <span
-                                className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-600 border border-indigo-100 hover:bg-indigo-600 hover:text-white transition-all cursor-help hover:scale-105 active:scale-95 shadow-sm"
+                                className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-600 hover:text-white transition-all cursor-help hover:scale-105 active:scale-95"
                                 onMouseEnter={(e) => {
                                   if (row.sites && row.sites.length > 0) {
                                     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                                    setRankingTooltip({ x: rect.left + rect.width / 2, y: rect.top, sites: row.sites, count: row.noOfSites, accent: 'indigo' });
+                                    setRankingTooltip({ x: rect.left + rect.width / 2, y: rect.top, sites: row.sites, count: row.noOfSites, accent: 'blue' });
                                   }
                                 }}
                                 onMouseLeave={() => setRankingTooltip(null)}
@@ -3348,21 +3329,21 @@ export function FinancialReports() {
                               {row.client}
                             </TableCell>
                           )}
-                          <TableCell className="py-3 text-right font-mono font-bold text-indigo-600">
+                          <TableCell className="py-3 text-right font-mono font-bold text-blue-600">
                             {fmRaw(row.amount)}
                           </TableCell>
                           <TableCell className="py-3 text-center">
                             <div className="flex justify-center">
                               {idx === 0 ? (
-                                <span className="flex items-center justify-center w-7 h-7 rounded-full font-black text-[11px] text-white bg-gradient-to-br from-amber-400 to-yellow-500 shadow-[0_0_12px_rgba(251,191,36,0.6)] border border-amber-300">
+                                <span className="flex items-center justify-center w-7 h-7 rounded-full font-black text-[11px] text-white bg-amber-500 border border-amber-400 text-white">
                                   1
                                 </span>
                               ) : idx === 1 ? (
-                                <span className="flex items-center justify-center w-7 h-7 rounded-full font-black text-[11px] text-white bg-gradient-to-br from-slate-400 to-slate-500 shadow-[0_0_10px_rgba(100,116,139,0.5)] border border-slate-300">
+                                <span className="flex items-center justify-center w-7 h-7 rounded-full font-black text-[11px] text-white bg-slate-500 border border-slate-400 text-white">
                                   2
                                 </span>
                               ) : idx === 2 ? (
-                                <span className="flex items-center justify-center w-7 h-7 rounded-full font-black text-[11px] text-white bg-gradient-to-br from-amber-600 to-orange-700 shadow-[0_0_10px_rgba(180,83,9,0.45)] border border-amber-500">
+                                <span className="flex items-center justify-center w-7 h-7 rounded-full font-black text-[11px] text-white bg-amber-700 border border-amber-600 text-white">
                                   3
                                 </span>
                               ) : (
@@ -3394,7 +3375,7 @@ export function FinancialReports() {
               </div>
               <div className="[&>div]:max-h-[350px] [&>div]:no-scrollbar">
                 <Table className="whitespace-nowrap min-w-full text-xs">
-                  <TableHeader className="bg-slate-900 sticky top-0 z-10 shadow-sm">
+                  <TableHeader className="bg-slate-900 sticky top-0 z-10">
                     <TableRow className="hover:bg-slate-900 border-b border-emerald-500/50">
                       <TableHead className="font-semibold tracking-wider uppercase text-slate-300 py-3 text-left">
                         {rankingView === 'client' ? 'CLIENT' : 'SITE'}
@@ -3423,7 +3404,7 @@ export function FinancialReports() {
                           {rankingView === 'client' ? (
                             <TableCell className="py-3 text-center">
                               <span
-                                className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-100 hover:bg-emerald-600 hover:text-white transition-all cursor-help hover:scale-105 active:scale-95 shadow-sm"
+                                className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-100 hover:bg-emerald-600 hover:text-white transition-all cursor-help hover:scale-105 active:scale-95"
                                 onMouseEnter={(e) => {
                                   if (row.sites && row.sites.length > 0) {
                                     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
@@ -3447,15 +3428,15 @@ export function FinancialReports() {
                           <TableCell className="py-3 text-center">
                             <div className="flex justify-center">
                               {idx === 0 ? (
-                                <span className="flex items-center justify-center w-7 h-7 rounded-full font-black text-[11px] text-white bg-gradient-to-br from-amber-400 to-yellow-500 shadow-[0_0_12px_rgba(251,191,36,0.6)] border border-amber-300">
+                                <span className="flex items-center justify-center w-7 h-7 rounded-full font-black text-[11px] text-white bg-amber-500 border border-amber-400 text-white">
                                   1
                                 </span>
                               ) : idx === 1 ? (
-                                <span className="flex items-center justify-center w-7 h-7 rounded-full font-black text-[11px] text-white bg-gradient-to-br from-slate-400 to-slate-500 shadow-[0_0_10px_rgba(100,116,139,0.5)] border border-slate-300">
+                                <span className="flex items-center justify-center w-7 h-7 rounded-full font-black text-[11px] text-white bg-slate-500 border border-slate-400 text-white">
                                   2
                                 </span>
                               ) : idx === 2 ? (
-                                <span className="flex items-center justify-center w-7 h-7 rounded-full font-black text-[11px] text-white bg-gradient-to-br from-amber-600 to-orange-700 shadow-[0_0_10px_rgba(180,83,9,0.45)] border border-amber-500">
+                                <span className="flex items-center justify-center w-7 h-7 rounded-full font-black text-[11px] text-white bg-amber-700 border border-amber-600 text-white">
                                   3
                                 </span>
                               ) : (
@@ -3491,33 +3472,33 @@ export function FinancialReports() {
               transform: 'translateX(-50%) translateY(-100%)',
             }}
           >
-            <div className={`w-56 bg-slate-950/97 backdrop-blur-md border shadow-2xl rounded-xl p-3 text-left ${rankingTooltip.accent === 'indigo' ? 'border-indigo-900/60' : 'border-emerald-900/60'}`}>
-              <div className={`text-[10px] font-bold uppercase tracking-wider mb-1.5 pb-1 border-b border-slate-800 flex items-center justify-between ${rankingTooltip.accent === 'indigo' ? 'text-indigo-400' : 'text-emerald-400'}`}>
+            <div className={`w-56 bg-slate-950/97 backdrop-blur-md border shadow-2xl rounded-md p-3 text-left ${rankingTooltip.accent === 'blue' ? 'border-blue-900/60' : 'border-emerald-900/60'}`}>
+              <div className={`text-[10px] font-bold uppercase tracking-wider mb-1.5 pb-1 border-b border-slate-800 flex items-center justify-between ${rankingTooltip.accent === 'blue' ? 'text-blue-400' : 'text-emerald-400'}`}>
                 <span>Sites</span>
-                <span className={`font-mono px-1.5 rounded text-[9px] font-extrabold border ${rankingTooltip.accent === 'indigo' ? 'bg-indigo-950 border-indigo-900/50 text-indigo-300' : 'bg-emerald-950 border-emerald-900/50 text-emerald-300'}`}>
+                <span className={`font-mono px-1.5 rounded text-[9px] font-extrabold border ${rankingTooltip.accent === 'blue' ? 'bg-blue-950 border-blue-900/50 text-blue-300' : 'bg-emerald-950 border-emerald-900/50 text-emerald-300'}`}>
                   {rankingTooltip.count}
                 </span>
               </div>
               <ul className="space-y-1 max-h-[140px] overflow-y-auto pr-1 no-scrollbar">
                 {rankingTooltip.sites.map((siteName, sIdx) => (
-                  <li key={sIdx} className={`text-[10px] font-medium text-slate-300 flex items-center gap-1.5 py-0.5 ${rankingTooltip.accent === 'indigo' ? 'hover:text-indigo-400' : 'hover:text-emerald-400'}`}>
-                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${rankingTooltip.accent === 'indigo' ? 'bg-indigo-500 shadow-[0_0_4px_#6366f1]' : 'bg-emerald-500 shadow-[0_0_4px_#10b981]'}`}></span>
+                  <li key={sIdx} className={`text-[10px] font-medium text-slate-300 flex items-center gap-1.5 py-0.5 ${rankingTooltip.accent === 'blue' ? 'hover:text-blue-400' : 'hover:text-emerald-400'}`}>
+                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${rankingTooltip.accent === 'blue' ? 'bg-blue-500' : 'bg-emerald-500'}`}></span>
                     <span className="truncate">{siteName}</span>
                   </li>
                 ))}
               </ul>
               {/* Arrow */}
-              <div className={`absolute top-full left-1/2 -translate-x-1/2 w-2.5 h-2.5 border-r border-b rotate-45 -mt-1.5 ${rankingTooltip.accent === 'indigo' ? 'bg-slate-950 border-indigo-900/60' : 'bg-slate-950 border-emerald-900/60'}`}></div>
+              <div className={`absolute top-full left-1/2 -translate-x-1/2 w-2.5 h-2.5 border-r border-b rotate-45 -mt-1.5 ${rankingTooltip.accent === 'blue' ? 'bg-slate-950 border-blue-900/60' : 'bg-slate-950 border-emerald-900/60'}`}></div>
             </div>
           </div>
         )}
       </Card>
 
       {/* Site Revenue Chart */}
-      <Card className="shadow-sm border-slate-200">
+      <Card className="border-slate-200">
         <CardHeader className="border-b border-slate-100 pb-4">
           <CardTitle className="text-lg flex items-center gap-2 text-slate-900">
-            <BarChart3 className="h-5 w-5 text-indigo-600" /> Revenue by Site
+            <BarChart3 className="h-5 w-5 text-blue-600" /> Revenue by Site
           </CardTitle>
         </CardHeader>
         <CardContent className="pt-6">
@@ -3550,9 +3531,9 @@ export function FinancialReports() {
       {/* ═══════════════════ PAYROLL SUMMARY TAB ═══════════════════ */}
 
       {/* PAYROLL EXPOSURE SECTION */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-white p-4 rounded-md border border-slate-200">
         <h2 className="text-sm font-bold uppercase tracking-wide text-slate-800 flex items-center gap-2">
-          <NairaSign className="w-5 h-5 text-indigo-600" /> Payroll & Statutory Overview
+          <NairaSign className="w-5 h-5 text-blue-600" /> Payroll & Statutory Overview
         </h2>
         <div className="flex items-center gap-2">
           <span className="text-xs text-slate-400">Filtered by global filters above</span>
@@ -3560,20 +3541,20 @@ export function FinancialReports() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
-        <Card className="bg-gradient-to-br from-slate-900 to-indigo-900 text-white border-0 shadow-xl overflow-hidden relative">
+        <Card className="bg-slate-900 text-white border border-slate-800 rounded-md overflow-hidden relative">
           <div className="absolute right-0 top-0 opacity-10"><NairaSign className="w-32 h-32 -mt-4 -mr-4" /></div>
           <CardHeader className="pb-2 relative z-10">
-            <CardTitle className="text-sm font-medium text-indigo-200 uppercase tracking-widest flex justify-between">
+            <CardTitle className="text-sm font-medium text-slate-300 uppercase tracking-widest flex justify-between">
               Payroll Exposure <Badge variant="outline" className="text-[10px] text-white/60 border-white/20">{(filterMonth === "All" ? null : parseInt(filterMonth, 10)) ? MONTHS_LIST.find(m => m.value === (filterMonth === "All" ? null : parseInt(filterMonth, 10)))?.label : 'All Months'} {(filterYear === "All" ? currentYear : parseInt(filterYear, 10))}</Badge>
             </CardTitle>
           </CardHeader>
           <CardContent className="relative z-10">
             <div className="text-4xl font-black mb-1">₦{fm(payrollStats.totalGrossExposure)}</div>
-            <p className="text-xs text-indigo-300 flex items-center mt-1 font-medium">Gross liability based on attendance.</p>
+            <p className="text-xs text-slate-300 flex items-center mt-1 font-medium">Gross liability based on attendance.</p>
           </CardContent>
         </Card>
 
-        <Card className="bg-white border-slate-200 shadow-sm relative overflow-hidden">
+        <Card className="bg-white border-slate-200 relative overflow-hidden">
           <div className="absolute right-0 top-0 opacity-[0.03] text-rose-500"><Backpack className="w-32 h-32 -mt-4 -mr-4" /></div>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-slate-500 uppercase tracking-widest">Est. Statutory Liab.</CardTitle>
@@ -3586,10 +3567,10 @@ export function FinancialReports() {
       </div>
 
       {/* Annual Payroll & Overtime Trend */}
-      <Card className="shadow-sm border-slate-200">
+      <Card className="border-slate-200">
         <CardHeader className="bg-slate-50/50 border-b pb-4">
           <CardTitle className="text-lg flex items-center justify-between gap-2 text-slate-800">
-            <span className="flex items-center gap-2"><TrendingUp className="h-5 w-5 text-indigo-600" /> Annual Payroll & Overtime Trend (Gross)</span>
+            <span className="flex items-center gap-2"><TrendingUp className="h-5 w-5 text-blue-600" /> Annual Payroll & Overtime Trend (Gross)</span>
             <Badge variant="outline" className="font-normal text-xs bg-white text-slate-500">{(filterYear === "All" ? currentYear : parseInt(filterYear, 10))} Performance</Badge>
           </CardTitle>
         </CardHeader>
@@ -3607,8 +3588,8 @@ export function FinancialReports() {
                   <RechartsTooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                     formatter={(value: number | undefined) => `₦${(value ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} />
                   <Legend wrapperStyle={{ paddingTop: '10px' }} />
-                  <Line yAxisId="left" type="monotone" name="Total Gross Payroll" dataKey="Payroll" stroke="#4f46e5" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }}>
-                    <LabelList dataKey="Payroll" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#4f46e5' }} formatter={(v: any) => v >= 1000000 ? `₦${(v/1000000).toFixed(1)}M` : v >= 1000 ? `₦${(v/1000).toFixed(0)}k` : ''} />
+                  <Line yAxisId="left" type="monotone" name="Total Gross Payroll" dataKey="Payroll" stroke="#2563eb" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }}>
+                    <LabelList dataKey="Payroll" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#2563eb' }} formatter={(v: any) => v >= 1000000 ? `₦${(v/1000000).toFixed(1)}M` : v >= 1000 ? `₦${(v/1000).toFixed(0)}k` : ''} />
                   </Line>
                   <Line yAxisId="right" type="monotone" name="Overtime Burn" dataKey="Overtime" stroke="#f59e0b" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }}>
                     <LabelList dataKey="Overtime" position="bottom" style={{ fontSize: 10, fontWeight: 700, fill: '#f59e0b' }} formatter={(v: any) => v >= 1000000 ? `₦${(v/1000000).toFixed(1)}M` : v >= 1000 ? `₦${(v/1000).toFixed(0)}k` : ''} />
@@ -3633,13 +3614,13 @@ export function FinancialReports() {
               <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1">
                 <button onClick={() => setAccountsTab('payroll')}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
-                    accountsTab === 'payroll' ? 'bg-white text-amber-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                    accountsTab === 'payroll' ? 'bg-white text-amber-700 border border-slate-200' : 'text-slate-500 hover:text-slate-700'
                   }`}>
                   <FileText className="h-3.5 w-3.5" /> Payroll Summary
                 </button>
                 <button onClick={() => setAccountsTab('loans')}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
-                    accountsTab === 'loans' ? 'bg-white text-amber-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                    accountsTab === 'loans' ? 'bg-white text-amber-700 border border-slate-200' : 'text-slate-500 hover:text-slate-700'
                   }`}>
                   <FileSpreadsheet className="h-3.5 w-3.5" /> Loans & Advances
                 </button>
@@ -3656,7 +3637,7 @@ export function FinancialReports() {
           <Button 
             variant="default" 
             size="icon" 
-            className="fixed top-4 right-4 z-[110] rounded-full shadow-2xl bg-indigo-600 hover:bg-indigo-700 text-white w-12 h-12" 
+            className="fixed top-4 right-4 z-[110] rounded-full shadow-2xl bg-blue-600 hover:bg-blue-700 text-white w-12 h-12" 
             onClick={() => toggleFullScreen('payroll')}
             title="Exit Full Screen"
           >
@@ -3764,10 +3745,10 @@ export function FinancialReports() {
                     )}
                   </div>
 
-                  <div className={`rounded-2xl border border-slate-200 shadow-lg overflow-auto no-scrollbar ${fullScreenTable === 'payroll' ? 'flex-1 min-h-0' : ''}`} style={{ background: 'linear-gradient(to bottom, #f8fafc, #ffffff)' }}>
+                  <div className={`rounded-md border border-slate-200 dark:border-slate-800 overflow-auto no-scrollbar ${fullScreenTable === 'payroll' ? 'flex-1 min-h-0' : ''}`}>
                     <div className="min-w-[1100px]">
                       {/* column legend bar */}
-                      <div className="grid grid-cols-9 text-[10px] font-bold tracking-widest uppercase px-0 bg-gradient-to-r from-[#1a4a5c] via-[#1f6075] to-[#1a4a5c] border-b border-[#0d3344]">
+                      <div className="grid grid-cols-9 text-[10px] font-bold tracking-widest uppercase px-0 bg-slate-900 border-b border-slate-800">
                         {[
                           { label: 'MONTH',        align: 'left',  accent: false, wide: true },
                           { label: 'SALARY',       align: 'right', accent: false },
@@ -3801,12 +3782,12 @@ export function FinancialReports() {
                           return (
                             <div
                               key={row.monthLabel}
-                              className={`grid grid-cols-9 items-center group transition-all duration-150 hover:shadow-md hover:z-10 relative ${
+                              className={`grid grid-cols-9 items-center group transition-all duration-150  hover:z-10 relative ${
                                 isEven ? 'bg-white' : 'bg-slate-50/70'
                               } hover:bg-teal-50/60`}
                             >
                               <div className="py-3 px-4 flex items-center gap-2.5">
-                                <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg text-[10px] font-black bg-gradient-to-br from-[#1f6075] to-[#1a4a5c] text-white shadow-sm shrink-0">
+                                <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg text-[10px] font-black bg-slate-800 text-white border border-slate-700 shrink-0">
                                   {row.monthLabel.slice(0, 3).toUpperCase()}
                                 </span>
                                 <span className="text-sm font-semibold text-slate-800">{row.monthLabel}</span>
@@ -3847,7 +3828,7 @@ export function FinancialReports() {
                                   <span className="text-sm font-mono font-extrabold text-slate-900">₦{fm(row.totalPayout)}</span>
                                   <div className="w-full max-w-[80px] h-1.5 bg-slate-200 rounded-full overflow-hidden">
                                     <div
-                                      className="h-full rounded-full bg-gradient-to-r from-[#1f6075] to-[#2aa0c8]"
+                                      className="h-full rounded-full bg-blue-600"
                                       style={{ width: `${pct}%` }}
                                     />
                                   </div>
@@ -3859,7 +3840,7 @@ export function FinancialReports() {
                       </div>
 
                       {/* Grand Total footer */}
-                      <div className="grid grid-cols-8 items-center bg-gradient-to-r from-[#1a4a5c] via-[#1f6075] to-[#1a4a5c] border-t-2 border-[#0d3344] shadow-inner">
+                      <div className="grid grid-cols-8 items-center bg-slate-900 border-t-2 border-slate-800">
                         <div className="py-4 px-4 flex items-center gap-2">
                           <span className="text-xs font-black uppercase tracking-widest text-white/90 bg-white/10 border border-white/20 rounded-lg px-2.5 py-1">
                             GRAND TOTAL
@@ -3957,7 +3938,7 @@ export function FinancialReports() {
                       { label: 'Pending Advances', value: pendingAdvances.length, color: 'rose' },
                       { label: 'Total Advance Amount', value: fmRaw(pendingAdvances.reduce((s, a) => s + a.amount, 0)), color: 'rose' },
                     ].map(tile => (
-                      <div key={tile.label} className={`rounded-xl border p-4 ${
+                      <div key={tile.label} className={`rounded-md border p-4 ${
                         tile.color === 'amber' ? 'bg-amber-50 border-amber-200' : 'bg-rose-50 border-rose-200'
                       }`}>
                         <div className={`text-lg font-bold ${
@@ -3982,11 +3963,11 @@ export function FinancialReports() {
                   <div className={`${fullScreenTable === 'payroll' ? 'flex-1 overflow-auto min-h-0 space-y-6 pr-2' : ''}`}>
                     <div className="mb-6">
                       <div className="text-xs font-bold uppercase tracking-widest text-amber-700 mb-2 px-1">Staff Loans</div>
-                    <div className="rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div className="rounded-md border border-slate-200 rounded-md overflow-hidden">
                       <div className="overflow-x-auto">
                         <Table>
                           <TableHeader>
-                            <TableRow className="bg-gradient-to-r from-amber-700 to-amber-600">
+                            <TableRow className="bg-amber-700 text-white">
                               <TableHead className="text-white font-semibold py-2 px-3">Employee</TableHead>
                               <TableHead className="text-white font-semibold py-2 px-3">Loan Type</TableHead>
                               <TableHead className="text-white font-semibold py-2 px-3 text-right">Principal</TableHead>
@@ -4028,11 +4009,11 @@ export function FinancialReports() {
                   {/* Salary Advances table */}
                   <div>
                     <div className="text-xs font-bold uppercase tracking-widest text-rose-700 mb-2 px-1">Salary Advances</div>
-                    <div className="rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div className="rounded-md border border-slate-200 rounded-md overflow-hidden">
                       <div className="overflow-x-auto">
                         <Table>
                           <TableHeader>
-                            <TableRow className="bg-gradient-to-r from-rose-700 to-rose-600">
+                            <TableRow className="bg-rose-700 text-white">
                               <TableHead className="text-white font-semibold py-2 px-3">Employee</TableHead>
                               <TableHead className="text-white font-semibold py-2 px-3 text-right">Amount</TableHead>
                               <TableHead className="text-white font-semibold py-2 px-3">Request Date</TableHead>

@@ -628,7 +628,7 @@ export default function Simulator() {
 
       <button 
         onClick={handleOpenLoadPanel}
-        className="flex items-center justify-center px-4 py-2 bg-indigo-600 text-white border border-transparent rounded-md shadow-sm text-sm font-medium hover:bg-indigo-700"
+        className="flex items-center justify-center px-4 py-2 bg-blue-600 text-white border border-transparent rounded-md shadow-sm text-sm font-medium hover:bg-blue-700"
       >
         <FolderOpen className="w-4 h-4 mr-2" />
         <span>Load</span>
@@ -849,7 +849,7 @@ export default function Simulator() {
         {/* Main Canvas Area */}
         <div className="flex-1 bg-[#e5e7eb] overflow-hidden relative">
           {activeTool === 'export-window' && (
-            <div className="absolute top-0 inset-x-0 z-50 bg-indigo-600 text-white text-center py-1.5 text-sm font-medium shadow-md flex items-center justify-center gap-4">
+            <div className="absolute top-0 inset-x-0 z-50 bg-blue-600 text-white text-center py-1.5 text-sm font-medium shadow-md flex items-center justify-center gap-4">
               <span>Click and drag on the canvas to select the export window area.</span>
               <button 
                 onClick={() => setActiveTool('select')} 
@@ -966,7 +966,7 @@ export default function Simulator() {
       {/* ── Save Dialog ── */}
       {showSaveDialog && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setShowSaveDialog(false)}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
+          <div className="bg-white rounded-md border border-slate-200 shadow-2xl w-full max-w-md mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
               <div className="flex items-center gap-2">
                 <Save className="w-5 h-5 text-green-600" />
@@ -1113,7 +1113,7 @@ export default function Simulator() {
             {/* Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 shrink-0">
               <div className="flex items-center gap-2">
-                <FolderOpen className="w-5 h-5 text-indigo-600" />
+                <FolderOpen className="w-5 h-5 text-blue-600" />
                 <h2 className="text-lg font-bold text-gray-900">Saved Layouts</h2>
               </div>
               <button onClick={() => setShowLoadPanel(false)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors">
@@ -1138,12 +1138,12 @@ export default function Simulator() {
                 savedLayouts.map(layout => (
                   <div
                     key={layout.id}
-                    className="group bg-gray-50 hover:bg-indigo-50 border border-gray-200 hover:border-indigo-300 rounded-xl p-4 cursor-pointer transition-all"
+                    className="group bg-gray-50 hover:bg-blue-50 border border-gray-200 hover:border-blue-300 rounded-xl p-4 cursor-pointer transition-all"
                     onClick={() => handleLoadLayout(layout)}
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0 flex-1">
-                        <p className="font-semibold text-sm text-gray-900 group-hover:text-indigo-700 truncate transition-colors">
+                        <p className="font-semibold text-sm text-gray-900 group-hover:text-blue-700 truncate transition-colors">
                           {layout.name}
                         </p>
                         <div className="flex items-center gap-3 mt-1.5 text-xs text-gray-500">
@@ -1218,7 +1218,7 @@ export default function Simulator() {
                       return next;
                     });
                   }}
-                  className="w-full text-sm border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 p-2 border"
+                  className="w-full text-sm border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 p-2 border"
                 >
                   <option value="combined">Combined Sheet (A-100) — 2D + 3D + BOM</option>
                   <option value="pure-2d">Pure 2D Floor Plan (A-101) — Blueprint layout</option>
@@ -1234,7 +1234,7 @@ export default function Simulator() {
                       id="exportWindowMode"
                       checked={exportWindowMode}
                       onChange={e => setExportWindowMode(e.target.checked)}
-                      className="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500"
+                      className="rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-500"
                     />
                     <label htmlFor="exportWindowMode" className="text-sm text-gray-700">
                       Select export window area (like AutoCAD)
@@ -1246,7 +1246,7 @@ export default function Simulator() {
                       id="includeBlueprint"
                       checked={exportOptions.includeBlueprint}
                       onChange={e => setExportOptions(prev => ({ ...prev, includeBlueprint: e.target.checked }))}
-                      className="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500"
+                      className="rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-500"
                     />
                     <label htmlFor="includeBlueprint" className="text-sm text-gray-700">
                       Include blueprint in export
@@ -1297,13 +1297,13 @@ export default function Simulator() {
             <div className="flex justify-end gap-3">
               <button
                 onClick={() => setShowExportOptions(false)}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
               >
                 Cancel
               </button>
               <button
                 onClick={confirmExport}
-                className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
               >
                 Generate Sheet
               </button>

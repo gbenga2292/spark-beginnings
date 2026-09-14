@@ -2046,7 +2046,7 @@ export function Attendance() {
           <>
             {priv.canImport && (
               <label className="flex items-center gap-2 px-2 sm:px-3 h-9 bg-white rounded-md border border-slate-200 text-slate-600 text-[11px] font-bold uppercase tracking-tight cursor-pointer hover:bg-slate-50 transition-all shadow-sm mb-0">
-                <Download className="h-4 w-4 text-indigo-500" /> <span className="hidden sm:inline">Import</span>
+                <Download className="h-4 w-4 text-blue-500" /> <span className="hidden sm:inline">Import</span>
                 <Input type="file" accept=".xlsx" className="hidden" onChange={handleImportExcel} />
               </label>
             )}
@@ -2086,7 +2086,7 @@ export function Attendance() {
         <div className="sm:absolute sm:left-1/2 sm:-translate-x-1/2 sm:top-1/2 sm:-translate-y-1/2 z-10">
           <TabsList className="bg-slate-100/80 dark:bg-slate-800 p-1 h-10 border border-slate-200/50 dark:border-slate-700 shadow-sm flex">
             <TabsTrigger active={activeTab === 'entry'} onClick={() => setActiveTab('entry')} className="gap-2 text-[11px] font-bold uppercase tracking-tight h-8 px-2 sm:px-4 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm transition-all">
-              <CalendarIcon className="h-3.5 w-3.5 text-indigo-500" /> <span className="hidden sm:inline">Entry</span>
+              <CalendarIcon className="h-3.5 w-3.5 text-blue-500" /> <span className="hidden sm:inline">Entry</span>
             </TabsTrigger>
             <TabsTrigger active={activeTab === 'database'} onClick={() => setActiveTab('database')} className="gap-2 text-[11px] font-bold uppercase tracking-tight h-8 px-2 sm:px-4 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm transition-all">
               <Database className="h-3.5 w-3.5 text-emerald-500" /> <span className="hidden sm:inline">Database</span>
@@ -2128,9 +2128,9 @@ export function Attendance() {
                   <span className="text-[11px] font-bold text-slate-500 uppercase tracking-widest px-0.5">
                     Date
                   </span>
-                  <div className="flex items-center bg-indigo-50 border border-indigo-100 rounded-full px-2.5 py-0.5 whitespace-nowrap shadow-sm">
-                    <span className="text-[10px] font-semibold text-indigo-400 mr-1.5 uppercase tracking-wider">Latest:</span>
-                    <span className="text-[11.5px] font-bold text-indigo-800">
+                  <div className="flex items-center bg-blue-50 border border-blue-100 rounded-full px-2.5 py-0.5 whitespace-nowrap shadow-sm">
+                    <span className="text-[10px] font-semibold text-blue-400 mr-1.5 uppercase tracking-wider">Latest:</span>
+                    <span className="text-[11.5px] font-bold text-blue-800">
                       {lastAttendanceDate ? formatDisplayDate(lastAttendanceDate) : 'None'}
                     </span>
                   </div>
@@ -2180,7 +2180,7 @@ export function Attendance() {
                 <Popover open={desktopCalendarOpen} onOpenChange={setDesktopCalendarOpen}>
                   <PopoverTrigger asChild>
                     <Button variant="outline" size="icon" className="h-9 w-9 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex-shrink-0 shadow-sm hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors" title="Attendance Calendar Overview">
-                      <CalendarIcon className="h-4 w-4 text-indigo-500" />
+                      <CalendarIcon className="h-4 w-4 text-blue-500" />
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent align="start" className="w-auto p-3 z-50 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-xl rounded-xl">
@@ -2262,7 +2262,7 @@ export function Attendance() {
                 </Button>
               )}
               {priv.canAdd ? (
-                <Button onClick={handleSubmit} disabled={isSubmitting} size="sm" className="h-9 text-[11px] font-bold uppercase tracking-tight gap-1.5 bg-slate-900 hover:bg-indigo-600 text-white shadow-md transition-all active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed">
+                <Button onClick={handleSubmit} disabled={isSubmitting} size="sm" className="h-9 text-[11px] font-bold uppercase tracking-tight gap-1.5 bg-slate-900 hover:bg-blue-600 text-white shadow-md transition-all active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed">
                   {isSubmitting ? <span className="animate-spin h-3.5 w-3.5 border-2 border-white border-t-transparent rounded-full" /> : <Save className="h-3.5 w-3.5" />}
                   {isSubmitting ? 'Saving…' : 'Submit'}
                 </Button>
@@ -2392,10 +2392,10 @@ export function Attendance() {
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
-                    className={`h-8 px-3 text-xs font-medium flex items-center justify-between gap-2 rounded-lg border-slate-200 dark:border-slate-700 shadow-sm hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors ${dbDateFilter ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300'}`}
+                    className={`h-8 px-3 text-xs font-medium flex items-center justify-between gap-2 rounded-lg border-slate-200 dark:border-slate-700 shadow-sm hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors ${dbDateFilter ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300'}`}
                   >
                     <div className="flex items-center gap-2">
-                       <CalendarIcon className={`h-3.5 w-3.5 ${dbDateFilter ? 'text-indigo-500' : 'text-slate-400'}`} />
+                       <CalendarIcon className={`h-3.5 w-3.5 ${dbDateFilter ? 'text-blue-500' : 'text-slate-400'}`} />
                        <span>{dbDateFilter ? format(dbDateFilter, 'PPP') : 'Filter by Date'}</span>
                     </div>
                     {dbDateFilter && (
@@ -2404,9 +2404,9 @@ export function Attendance() {
                           e.stopPropagation();
                           setDbDateFilter(undefined);
                         }}
-                        className="hover:bg-indigo-100 p-0.5 rounded-md transition-colors"
+                        className="hover:bg-blue-100 p-0.5 rounded-md transition-colors"
                       >
-                        <Trash2 className="h-3 w-3 text-indigo-400" />
+                        <Trash2 className="h-3 w-3 text-blue-400" />
                       </div>
                     )}
                   </Button>
@@ -2418,8 +2418,8 @@ export function Attendance() {
                     onSelect={setDbDateFilter}
                     className="p-3 border-none shadow-none"
                     classNames={{
-                      day_selected: "bg-indigo-600 text-white hover:bg-indigo-700 rounded-lg",
-                      day_today: "text-indigo-600 font-bold border-b-2 border-indigo-600",
+                      day_selected: "bg-blue-600 text-white hover:bg-blue-700 rounded-lg",
+                      day_today: "text-blue-600 font-bold border-b-2 border-blue-600",
                     }}
                   />
                 </PopoverContent>
@@ -2435,7 +2435,7 @@ export function Attendance() {
                     <label className="flex items-center gap-2 text-xs font-bold text-slate-600 dark:text-slate-300">
                       <input
                         type="checkbox"
-                        className="rounded border-slate-300 w-4 h-4 text-indigo-600 focus:ring-indigo-500"
+                        className="rounded border-slate-300 w-4 h-4 text-blue-600 focus:ring-blue-500"
                         checked={filteredDbRecords.length > 0 && dbSelectedIds.size === filteredDbRecords.length}
                         onChange={(e) => {
                           if (e.target.checked) setDbSelectedIds(new Set(filteredDbRecords.map(r => r.id)));
@@ -2460,7 +2460,7 @@ export function Attendance() {
                             <div className="flex items-start gap-3">
                               <input
                                 type="checkbox"
-                                className="rounded border-slate-300 w-4 h-4 text-indigo-600 focus:ring-indigo-500 mt-0.5"
+                                className="rounded border-slate-300 w-4 h-4 text-blue-600 focus:ring-blue-500 mt-0.5"
                                 checked={dbSelectedIds.has(r.id)}
                                 onChange={(e) => {
                                   const s = new Set(dbSelectedIds);
@@ -2493,7 +2493,7 @@ export function Attendance() {
                             </div>
                             <div className="flex flex-col gap-0.5">
                               <span className="text-slate-400 font-bold uppercase tracking-wider text-[8px]">Overtime</span>
-                              <span className="font-bold text-indigo-600">{met.ot > 0 ? `${met.ot} ${met.otSite ? `(${met.otSite})` : ''}` : '—'}</span>
+                              <span className="font-bold text-blue-600">{met.ot > 0 ? `${met.ot} ${met.otSite ? `(${met.otSite})` : ''}` : '—'}</span>
                             </div>
                             <div className="flex flex-col gap-0.5">
                               <span className="text-slate-400 font-bold uppercase tracking-wider text-[8px]">Metrics</span>
@@ -2554,7 +2554,7 @@ export function Attendance() {
                           <div className="flex items-center gap-1">
                             {h.label}
                             {sortItem ? (
-                              sortItem.direction === 'asc' ? <ArrowUp className="w-3 h-3 text-indigo-500" /> : <ArrowDown className="w-3 h-3 text-indigo-500" />
+                              sortItem.direction === 'asc' ? <ArrowUp className="w-3 h-3 text-blue-500" /> : <ArrowDown className="w-3 h-3 text-blue-500" />
                             ) : (
                               <ArrowUpDown className="w-3 h-3 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />
                             )}
@@ -2600,7 +2600,7 @@ export function Attendance() {
                           <td className="py-1.5 px-2">{r.night}</td>
                           <td className="py-1.5 px-2 text-red-500">{r.absentStatus}</td>
                           <td className="py-1.5 px-2 text-center">{met.nightWk}</td>
-                          <td className="py-1.5 px-2 text-center font-bold text-indigo-600">{met.ot}</td>
+                          <td className="py-1.5 px-2 text-center font-bold text-blue-600">{met.ot}</td>
                           <td className="py-1.5 px-2">{met.otSite ?? ''}</td>
                           <td className="py-1.5 px-2 text-center">{met.dayWk}</td>
                           <td className="py-1.5 px-2 text-center">{met.dow}</td>
@@ -2789,7 +2789,7 @@ export function Attendance() {
                   id="hideInactiveSites"
                   checked={hideInactiveMachineSites}
                   onChange={e => setHideInactiveMachineSites(e.target.checked)}
-                  className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4 cursor-pointer"
+                  className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-4 w-4 cursor-pointer"
                 />
                 <label htmlFor="hideInactiveSites" className="text-xs font-semibold text-slate-600 cursor-pointer select-none">
                   Hide inactive sites
@@ -2912,13 +2912,13 @@ export function Attendance() {
                                         }
                                       }));
                                     }}
-                                    className="w-14 h-8 px-1.5 text-center font-bold text-slate-700 border-slate-200 focus-visible:ring-indigo-500 bg-white"
+                                    className="w-14 h-8 px-1.5 text-center font-bold text-slate-700 border-slate-200 focus-visible:ring-blue-500 bg-white"
                                   />
                                   <span className="ml-1 text-[10px] font-bold text-slate-400">%</span>
                                 </div>
                                 <div className="w-10 bg-slate-100 rounded-full h-1.5 overflow-hidden hidden md:block">
                                   <div 
-                                    className="bg-indigo-500 h-1.5 transition-all duration-300"
+                                    className="bg-blue-500 h-1.5 transition-all duration-300"
                                     style={{ width: `${entry.progressPercentage ?? site.currentProgressPercentage ?? 0}%` }}
                                   />
                                 </div>
@@ -3080,7 +3080,7 @@ export function Attendance() {
                               </div>
                               <div className="flex-1 bg-slate-200/50 rounded-full h-2 overflow-hidden">
                                 <div 
-                                  className="bg-indigo-500 h-full transition-all duration-300"
+                                  className="bg-blue-500 h-full transition-all duration-300"
                                   style={{ width: `${entry.progressPercentage ?? site.currentProgressPercentage ?? 0}%` }}
                                 />
                               </div>
@@ -3317,15 +3317,15 @@ export function Attendance() {
 
           {/* Bulk Action Bar */}
           {priv.canDelete && selectedMachineGroups.size > 0 && (
-            <div className="flex items-center justify-between gap-3 bg-indigo-600 text-white px-4 py-2 rounded-lg mb-2 shadow-md animate-in slide-in-from-top-2 duration-200">
+            <div className="flex items-center justify-between gap-3 bg-blue-600 text-white px-4 py-2 rounded-lg mb-2 shadow-md animate-in slide-in-from-top-2 duration-200">
               <div className="flex items-center gap-2 text-sm font-semibold">
-                <span className="bg-white text-indigo-600 rounded-full px-2 py-0.5 text-xs font-bold">{selectedMachineGroups.size}</span>
+                <span className="bg-white text-blue-600 rounded-full px-2 py-0.5 text-xs font-bold">{selectedMachineGroups.size}</span>
                 record{selectedMachineGroups.size !== 1 ? 's' : ''} selected
               </div>
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setSelectedMachineGroups(new Set())}
-                  className="text-xs font-semibold text-indigo-200 hover:text-white underline"
+                  className="text-xs font-semibold text-blue-200 hover:text-white underline"
                 >
                   Clear
                 </button>
@@ -3371,13 +3371,13 @@ export function Attendance() {
                   const groupKey = `${group.date}_${group.siteId}`;
                   const isSelected = selectedMachineGroups.has(groupKey);
                   return (
-                    <Card key={groupKey} className={`border shadow-sm ${isSelected ? 'border-indigo-300 bg-indigo-50/50' : 'border-slate-200'}`}>
+                    <Card key={groupKey} className={`border shadow-sm ${isSelected ? 'border-blue-300 bg-blue-50/50' : 'border-slate-200'}`}>
                       <CardHeader className="p-3 pb-1 flex flex-row items-start justify-between space-y-0">
                         <div className="flex items-center gap-2">
                           {priv.canDelete && (
                             <input
                               type="checkbox"
-                              className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4 cursor-pointer shrink-0"
+                              className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-4 w-4 cursor-pointer shrink-0"
                               checked={isSelected}
                               onChange={e => {
                                 setSelectedMachineGroups(prev => {
@@ -3458,7 +3458,7 @@ export function Attendance() {
                         <th className="py-2.5 px-3 w-[3%]">
                           <input
                             type="checkbox"
-                            className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5 cursor-pointer"
+                            className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-3.5 w-3.5 cursor-pointer"
                             checked={paginatedMachineDbRecords.length > 0 && paginatedMachineDbRecords.every(g => selectedMachineGroups.has(`${g.date}_${g.siteId}`))}
                             onChange={e => {
                               if (e.target.checked) {
@@ -3499,12 +3499,12 @@ export function Attendance() {
                       const groupKey = `${group.date}_${group.siteId}`;
                       const isSelected = selectedMachineGroups.has(groupKey);
                       return (
-                        <tr key={groupKey} className={`transition-colors ${isSelected ? 'bg-indigo-50 hover:bg-indigo-100' : 'hover:bg-slate-50'}`}>
+                        <tr key={groupKey} className={`transition-colors ${isSelected ? 'bg-blue-50 hover:bg-blue-100' : 'hover:bg-slate-50'}`}>
                           {priv.canDelete && (
                             <td className="py-2 px-3">
                               <input
                                 type="checkbox"
-                                className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5 cursor-pointer"
+                                className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-3.5 w-3.5 cursor-pointer"
                                 checked={isSelected}
                                 onChange={e => {
                                   setSelectedMachineGroups(prev => {
@@ -3717,7 +3717,7 @@ export function Attendance() {
                   >
                     <div>
                       <h3 className="font-bold text-slate-800 text-lg flex items-center gap-2 flex-wrap">
-                        <Building2 className="w-5 h-5 text-indigo-400 shrink-0" />
+                        <Building2 className="w-5 h-5 text-blue-400 shrink-0" />
                         <span>{site.name}</span>
                         {stageText && (
                           <span className={`inline-flex items-center gap-0.5 text-xs font-bold px-2 py-0.5 rounded-full ${
@@ -3743,7 +3743,7 @@ export function Attendance() {
                         {site.client}
                       </span>
                       {timelineText && (
-                        <span className="text-[10px] text-indigo-700 bg-indigo-50 border border-indigo-150 px-2.5 py-1 rounded-full font-bold">
+                        <span className="text-[10px] text-blue-700 bg-blue-50 border border-blue-150 px-2.5 py-1 rounded-full font-bold">
                           ⏱️ Deployed: {timelineText}
                         </span>
                       )}
@@ -3843,12 +3843,12 @@ export function Attendance() {
       {importFile && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setImportFile(null)} />
-          <div className="relative bg-white rounded-xl shadow-2xl p-6 w-full max-w-md mx-4 border border-slate-200">
+          <div className="relative bg-white rounded-md shadow-2xl p-6 w-full max-w-md mx-4 border border-slate-200">
             <h3 className="text-xl font-bold text-slate-900 mb-1">Import Policy</h3>
             <p className="text-sm text-slate-500 leading-relaxed mb-2">File: <span className="font-medium text-slate-700">{importFile.name}</span></p>
             <p className="text-sm text-slate-500 leading-relaxed mb-6">How would you like to handle the attendance records from this file?</p>
             <div className="flex flex-col gap-3">
-              <Button onClick={() => processAttendanceImport(importFile, 'append')} className="bg-indigo-600 hover:bg-indigo-700 text-white h-auto py-3 flex-col items-center justify-center">
+              <Button onClick={() => processAttendanceImport(importFile, 'append')} className="bg-blue-600 hover:bg-blue-700 text-white h-auto py-3 flex-col items-center justify-center">
                 <span className="font-semibold block text-base">Append Records</span>
                 <span className="block text-xs opacity-80 mt-1 font-normal text-center">Adds imported records alongside existing ones. No data is removed.</span>
               </Button>
@@ -3866,7 +3866,7 @@ export function Attendance() {
       {pendingImport && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-4 border border-slate-200 flex flex-col max-h-[90vh]">
+          <div className="relative bg-white rounded-md shadow-2xl w-full max-w-2xl mx-4 border border-slate-200 flex flex-col max-h-[90vh]">
             {/* Header */}
             <div className="px-6 pt-6 pb-4 border-b border-slate-100 flex-shrink-0">
               <div className="flex items-start justify-between gap-4">
@@ -3886,7 +3886,7 @@ export function Attendance() {
               <div className="mt-3 flex items-center gap-2">
                 <div className="flex-1 bg-slate-100 rounded-full h-2">
                   <div
-                    className="bg-indigo-500 h-2 rounded-full transition-all"
+                    className="bg-blue-500 h-2 rounded-full transition-all"
                     style={{ width: `${(Object.values(nameResolutions).filter(v => v && v !== 'skip').length / pendingImport.unmatchedNames.length) * 100}%` }}
                   />
                 </div>
@@ -3954,7 +3954,7 @@ export function Attendance() {
                             <button
                               key={e.id}
                               onMouseDown={() => { setNameResolutions(prev => ({ ...prev, [name]: e.id })); setNameSearchTerms(prev => ({ ...prev, [name]: '' })); }}
-                              className="w-full text-left px-3 py-2 text-sm hover:bg-indigo-50 flex items-center justify-between gap-2"
+                              className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 flex items-center justify-between gap-2"
                             >
                               <span className="font-medium text-slate-800">{e.surname} {e.firstname}</span>
                               <span className="text-xs text-slate-400 flex-shrink-0">{e.position} {e.status === 'Terminated' ? '· Terminated' : ''}</span>
@@ -3984,7 +3984,7 @@ export function Attendance() {
                 <Button variant="ghost" onClick={() => { setPendingImport(null); setNameResolutions({}); setNameSearchTerms({}); }} className="text-slate-500">
                   Cancel Import
                 </Button>
-                <Button onClick={completeImportWithResolutions} className="bg-indigo-600 hover:bg-indigo-700 text-white">
+                <Button onClick={completeImportWithResolutions} className="bg-blue-600 hover:bg-blue-700 text-white">
                   Import {pendingImport.matchedRecords.length + Object.values(nameResolutions).filter(v => v && v !== 'skip').length} Records
                 </Button>
               </div>

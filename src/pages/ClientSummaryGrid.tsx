@@ -547,7 +547,7 @@ export function ClientSummaryGrid() {
 
           {/* Year Filter */}
           <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-lg border border-slate-200 shadow-xs hover:border-slate-300 transition-colors">
-            <Calendar className="w-4 h-4 text-indigo-500 shrink-0" />
+            <Calendar className="w-4 h-4 text-blue-500 shrink-0" />
             <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Year:</span>
             <select
               value={selectedYear}
@@ -569,7 +569,7 @@ export function ClientSummaryGrid() {
             variant="ghost"
             size="sm"
             onClick={() => setViewMode('grid')}
-            className={cn("px-3 text-slate-500", viewMode === 'grid' && "bg-white text-indigo-600 shadow-sm")}
+            className={cn("px-3 text-slate-500", viewMode === 'grid' && "bg-white text-blue-600 shadow-sm")}
           >
             <LayoutGrid className="w-4 h-4 mr-1.5" /> Grid
           </Button>
@@ -577,7 +577,7 @@ export function ClientSummaryGrid() {
             variant="ghost"
             size="sm"
             onClick={() => setViewMode('list')}
-            className={cn("px-3 text-slate-500", viewMode === 'list' && "bg-white text-indigo-600 shadow-sm")}
+            className={cn("px-3 text-slate-500", viewMode === 'list' && "bg-white text-blue-600 shadow-sm")}
           >
             <List className="w-4 h-4 mr-1.5" /> List
           </Button>
@@ -595,8 +595,8 @@ export function ClientSummaryGrid() {
             >
               <div className="p-5 border-b border-slate-100 flex justify-between items-start rounded-t-xl bg-white">
                 <div>
-                  <h3 className="font-semibold text-slate-800 text-lg flex items-center gap-2 group-hover:text-indigo-600 transition-colors">
-                    <Building2 className="h-5 w-5 text-indigo-500" />
+                  <h3 className="font-semibold text-slate-800 text-lg flex items-center gap-2 group-hover:text-blue-600 transition-colors">
+                    <Building2 className="h-5 w-5 text-blue-500" />
                     {client.name}
                   </h3>
                   <div className="mt-2 flex items-center gap-2 text-sm text-slate-500">
@@ -609,7 +609,7 @@ export function ClientSummaryGrid() {
                   </div>
                 </div>
                 <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
-                  <div className="p-2 -mr-2 -mt-2 text-slate-300 group-hover:text-indigo-500 transition-colors">
+                  <div className="p-2 -mr-2 -mt-2 text-slate-300 group-hover:text-blue-500 transition-colors">
                      <ChevronRight className="w-5 h-5" />
                   </div>
                 </div>
@@ -659,12 +659,12 @@ export function ClientSummaryGrid() {
                   </div>
 
                   <div className="relative group/used bg-white p-2 sm:p-2.5 rounded-lg border border-slate-100 shadow-xs flex flex-col justify-center min-w-0 cursor-default">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 mb-0.5 truncate flex items-center gap-1">
-                      <Activity className="w-2.5 h-2.5 text-indigo-500 shrink-0" /> Used
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 mb-0.5 truncate flex items-center gap-1">
+                      <Activity className="w-2.5 h-2.5 text-blue-500 shrink-0" /> Used
                     </span>
                     <StatAmount 
                       amount={client.stats.totalUsed} 
-                      colorClass="text-indigo-600" 
+                      colorClass="text-blue-600" 
                       canView={currentUser?.privileges?.billing?.canViewAmounts !== false} 
                     />
 
@@ -676,8 +676,8 @@ export function ClientSummaryGrid() {
                       >
                         <div className="p-3.5 bg-slate-900/95 backdrop-blur-md text-white rounded-xl shadow-2xl border border-slate-700/80 text-xs text-left max-h-80 overflow-y-auto style-scroll relative">
                           <div className="flex items-center justify-between pb-1.5 mb-2 border-b border-slate-800">
-                            <span className="font-bold text-indigo-300 text-[11px] uppercase tracking-wider flex items-center gap-1">
-                              <Activity className="w-3 h-3 text-indigo-400" /> Used Breakdown by Site
+                            <span className="font-bold text-blue-300 text-[11px] uppercase tracking-wider flex items-center gap-1">
+                              <Activity className="w-3 h-3 text-blue-400" /> Used Breakdown by Site
                             </span>
                             <div className="flex items-center gap-1.5">
                               <span className="text-[10px] text-slate-400 font-mono">
@@ -690,7 +690,7 @@ export function ClientSummaryGrid() {
                                   setBreakdownModalClient({ name: client.name, stats: client.stats });
                                 }}
                                 title="Expand to full breakdown modal"
-                                className="p-1 hover:bg-slate-800 text-slate-400 hover:text-indigo-300 rounded transition-colors"
+                                className="p-1 hover:bg-slate-800 text-slate-400 hover:text-blue-300 rounded transition-colors"
                               >
                                 <Maximize2 className="w-3.5 h-3.5" />
                               </button>
@@ -707,7 +707,7 @@ export function ClientSummaryGrid() {
                                       <MapPin className="w-3 h-3 text-amber-400 shrink-0" />
                                       {siteItem.siteName}
                                     </span>
-                                    <span className="font-mono font-bold text-indigo-300 text-[11px]">
+                                    <span className="font-mono font-bold text-blue-300 text-[11px]">
                                       ₦{Math.round(siteItem.totalUsed).toLocaleString()}
                                     </span>
                                   </div>
@@ -730,7 +730,7 @@ export function ClientSummaryGrid() {
                                           <span className="text-slate-400 flex items-center gap-1.5">
                                             ⚡ Daily Runtime
                                             {siteItem.duration > 0 && (
-                                              <span className="text-[9.5px] text-indigo-300 font-mono bg-indigo-950/80 px-1.5 py-0.5 rounded border border-indigo-700/50">
+                                              <span className="text-[9.5px] text-blue-300 font-mono bg-blue-950/80 px-1.5 py-0.5 rounded border border-blue-700/50">
                                                 {Number(siteItem.consumedDays.toFixed(1))} / {siteItem.duration}d
                                               </span>
                                             )}
@@ -781,7 +781,7 @@ export function ClientSummaryGrid() {
                           {/* Grand Total */}
                           <div className="mt-2.5 pt-2 border-t border-slate-800 flex items-center justify-between font-bold">
                             <span className="text-slate-300 text-[11px]">Total Client Used</span>
-                            <span className="font-mono text-sm text-indigo-400">₦{Math.round(client.stats.totalUsed).toLocaleString()}</span>
+                            <span className="font-mono text-sm text-blue-400">₦{Math.round(client.stats.totalUsed).toLocaleString()}</span>
                           </div>
                           {/* Tooltip Arrow */}
                           <div className="absolute bottom-full right-6 -mb-1 border-4 border-transparent border-b-slate-900" />
@@ -822,7 +822,7 @@ export function ClientSummaryGrid() {
                 {filteredClients.map((client) => (
                   <tr key={client.id} className="hover:bg-slate-50/80 transition-colors">
                     <td className="px-5 py-4 font-semibold text-slate-800 flex items-center gap-2">
-                       <Building2 className="w-4 h-4 text-indigo-500 shrink-0" />
+                       <Building2 className="w-4 h-4 text-blue-500 shrink-0" />
                        <span className="truncate max-w-[200px]">{client.name}</span>
                     </td>
                     <td className="px-4 py-4 text-slate-600">{client.tinNumber}</td>
@@ -840,7 +840,7 @@ export function ClientSummaryGrid() {
                         ? `₦${Math.round(client.stats.totalPaid).toLocaleString()}`
                         : '***'}
                     </td>
-                    <td className="px-4 py-4 text-right font-semibold text-indigo-600 relative group/used cursor-default">
+                    <td className="px-4 py-4 text-right font-semibold text-blue-600 relative group/used cursor-default">
                       {currentUser?.privileges?.billing?.canViewAmounts !== false
                         ? `₦${Math.round(client.stats.totalUsed).toLocaleString()}`
                         : '***'}
@@ -853,8 +853,8 @@ export function ClientSummaryGrid() {
                         >
                           <div className="p-3.5 bg-slate-900/95 backdrop-blur-md text-white rounded-xl shadow-2xl border border-slate-700/80 text-xs text-left max-h-80 overflow-y-auto style-scroll relative">
                             <div className="flex items-center justify-between pb-1.5 mb-2 border-b border-slate-800">
-                              <span className="font-bold text-indigo-300 text-[11px] uppercase tracking-wider flex items-center gap-1">
-                                <Activity className="w-3 h-3 text-indigo-400" /> Used Breakdown by Site
+                              <span className="font-bold text-blue-300 text-[11px] uppercase tracking-wider flex items-center gap-1">
+                                <Activity className="w-3 h-3 text-blue-400" /> Used Breakdown by Site
                               </span>
                               <div className="flex items-center gap-1.5">
                                 <span className="text-[10px] text-slate-400 font-mono">
@@ -867,7 +867,7 @@ export function ClientSummaryGrid() {
                                     setBreakdownModalClient({ name: client.name, stats: client.stats });
                                   }}
                                   title="Expand to full breakdown modal"
-                                  className="p-1 hover:bg-slate-800 text-slate-400 hover:text-indigo-300 rounded transition-colors"
+                                  className="p-1 hover:bg-slate-800 text-slate-400 hover:text-blue-300 rounded transition-colors"
                                 >
                                   <Maximize2 className="w-3.5 h-3.5" />
                                 </button>
@@ -881,7 +881,7 @@ export function ClientSummaryGrid() {
                                       <MapPin className="w-3 h-3 text-amber-400 shrink-0" />
                                       {siteItem.siteName}
                                     </span>
-                                    <span className="font-mono font-bold text-indigo-300 text-[11px]">
+                                    <span className="font-mono font-bold text-blue-300 text-[11px]">
                                       ₦{Math.round(siteItem.totalUsed).toLocaleString()}
                                     </span>
                                   </div>
@@ -904,7 +904,7 @@ export function ClientSummaryGrid() {
                                           <span className="text-slate-400 flex items-center gap-1.5">
                                             ⚡ Daily Runtime
                                             {siteItem.duration > 0 && (
-                                              <span className="text-[9.5px] text-indigo-300 font-mono bg-indigo-950/80 px-1.5 py-0.5 rounded border border-indigo-700/50">
+                                              <span className="text-[9.5px] text-blue-300 font-mono bg-blue-950/80 px-1.5 py-0.5 rounded border border-blue-700/50">
                                                 {Number(siteItem.consumedDays.toFixed(1))} / {siteItem.duration}d
                                               </span>
                                             )}
@@ -947,7 +947,7 @@ export function ClientSummaryGrid() {
                             </div>
                             <div className="mt-2.5 pt-2 border-t border-slate-800 flex items-center justify-between font-bold">
                               <span className="text-slate-300 text-[11px]">Total Used</span>
-                              <span className="font-mono text-sm text-indigo-400">₦{Math.round(client.stats.totalUsed).toLocaleString()}</span>
+                              <span className="font-mono text-sm text-blue-400">₦{Math.round(client.stats.totalUsed).toLocaleString()}</span>
                             </div>
                             <div className="absolute bottom-full right-8 -mb-1 border-4 border-transparent border-b-slate-900" />
                           </div>
@@ -956,7 +956,7 @@ export function ClientSummaryGrid() {
                     </td>
                      <td className="px-5 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <Button size="sm" variant="outline" className="text-indigo-600 border-indigo-200 hover:bg-indigo-50" onClick={() => navigate(`/sites?client=${encodeURIComponent(client.name)}`)}>
+                        <Button size="sm" variant="outline" className="text-blue-600 border-blue-200 hover:bg-blue-50" onClick={() => navigate(`/sites?client=${encodeURIComponent(client.name)}`)}>
                           View Details
                         </Button>
                       </div>
@@ -991,7 +991,7 @@ export function ClientSummaryGrid() {
         onClose={() => setBreakdownModalClient(null)}
         title={
           <div className="flex items-center gap-2.5">
-            <Building2 className="w-5 h-5 text-indigo-600" />
+            <Building2 className="w-5 h-5 text-blue-600" />
             <span className="font-bold">{breakdownModalClient.name} — Used Breakdown</span>
           </div>
         }
@@ -1045,16 +1045,16 @@ export function ClientSummaryGrid() {
                   </span>
                 </div>
 
-                <div className="p-3.5 bg-indigo-50/60 rounded-xl border border-indigo-200">
-                  <span className="text-[11px] font-bold text-indigo-600 uppercase tracking-wider block mb-1 flex items-center justify-between gap-1.5">
+                <div className="p-3.5 bg-blue-50/60 rounded-xl border border-blue-200">
+                  <span className="text-[11px] font-bold text-blue-600 uppercase tracking-wider block mb-1 flex items-center justify-between gap-1.5">
                     <span className="flex items-center gap-1.5"><Activity className="w-3.5 h-3.5" /> Used</span>
                     {invoiced > 0 && (
-                      <span className="text-[10px] font-bold text-indigo-700 bg-indigo-100/80 px-1.5 py-0.5 rounded">
+                      <span className="text-[10px] font-bold text-blue-700 bg-blue-100/80 px-1.5 py-0.5 rounded">
                         {Math.round((breakdownModalClient.stats.totalUsed / invoiced) * 100)}% of Invoiced
                       </span>
                     )}
                   </span>
-                  <span className="text-base sm:text-lg font-black text-indigo-700 font-mono">
+                  <span className="text-base sm:text-lg font-black text-blue-700 font-mono">
                     ₦{Math.round(breakdownModalClient.stats.totalUsed).toLocaleString()}
                   </span>
                   <span className="text-[10.5px] text-slate-500 block mt-0.5 font-medium">
@@ -1069,7 +1069,7 @@ export function ClientSummaryGrid() {
           <div className="space-y-4">
             <div className="flex items-center justify-between pb-2 border-b border-slate-200">
               <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                <MapPin className="w-4 h-4 text-indigo-500" />
+                <MapPin className="w-4 h-4 text-blue-500" />
                 Site-by-Site Breakdown ({Object.keys(breakdownModalClient.stats.breakdown.bySite).length} site{Object.keys(breakdownModalClient.stats.breakdown.bySite).length !== 1 ? 's' : ''})
               </h4>
             </div>
@@ -1092,7 +1092,7 @@ export function ClientSummaryGrid() {
                     </div>
                     <div className="text-right">
                       <span className="text-[11px] text-slate-400 block font-medium">Site Total Used</span>
-                      <span className="font-mono text-base font-black text-indigo-600">
+                      <span className="font-mono text-base font-black text-blue-600">
                         ₦{Math.round(siteItem.totalUsed).toLocaleString()}
                       </span>
                     </div>
@@ -1118,22 +1118,22 @@ export function ClientSummaryGrid() {
                       </span>
                     </div>
 
-                    <div className="p-2.5 rounded-lg bg-indigo-50/50 border border-indigo-100 sm:col-span-2">
+                    <div className="p-2.5 rounded-lg bg-blue-50/50 border border-blue-100 sm:col-span-2">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-[10.5px] text-indigo-700 font-semibold flex items-center gap-1">
+                        <span className="text-[10.5px] text-blue-700 font-semibold flex items-center gap-1">
                           ⚡ Daily Runtime
                           {siteItem.duration > 0 && (
-                            <span className="text-[9.5px] text-indigo-600 font-mono bg-indigo-100 px-1.5 py-0.5 rounded font-bold">
+                            <span className="text-[9.5px] text-blue-600 font-mono bg-blue-100 px-1.5 py-0.5 rounded font-bold">
                               {Number(siteItem.consumedDays.toFixed(1))} / {siteItem.duration} days ({Math.round((siteItem.consumedDays / siteItem.duration) * 100)}%)
                             </span>
                           )}
                         </span>
-                        <span className="font-mono font-bold text-indigo-800">
+                        <span className="font-mono font-bold text-blue-800">
                           ₦{Math.round(siteItem.runtime).toLocaleString()}
                         </span>
                       </div>
                       {/* Sub-items */}
-                      <div className="grid grid-cols-3 gap-1 pt-1.5 border-t border-indigo-100/70 text-[10px] text-slate-600 font-medium">
+                      <div className="grid grid-cols-3 gap-1 pt-1.5 border-t border-blue-100/70 text-[10px] text-slate-600 font-medium">
                         <div>
                           <span className="text-slate-400 block">🚜 Machine</span>
                           <span className="font-mono font-semibold text-slate-800">₦{Math.round(siteItem.rentalUsed).toLocaleString()}</span>
@@ -1184,7 +1184,7 @@ export function ClientSummaryGrid() {
                 setBreakdownModalClient(null);
                 navigate(`/sites?client=${encodeURIComponent(clientName)}`);
               }}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white gap-1.5"
+              className="bg-blue-600 hover:bg-blue-700 text-white gap-1.5"
             >
               View Client Sites <ExternalLink className="w-4 h-4" />
             </Button>

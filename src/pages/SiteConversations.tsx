@@ -60,7 +60,7 @@ export function SiteConversations() {
     return (
       <div className="flex flex-col items-center justify-center p-12">
         <h2 className="text-xl font-bold text-slate-800">Site not found</h2>
-        <button onClick={() => navigate(-1)} className="text-indigo-600 hover:underline mt-2">
+        <button onClick={() => navigate(-1)} className="text-blue-600 hover:underline mt-2">
           Go back
         </button>
       </div>
@@ -73,7 +73,7 @@ export function SiteConversations() {
     <div className="flex items-center gap-3">
       <Button
         size="sm"
-        className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white shrink-0 shadow-sm"
+        className="gap-2 bg-blue-600 hover:bg-blue-700 text-white shrink-0 shadow-sm"
         onClick={() => {
           navigate(`/comm-log?prefill_site=${siteId}&prefill_client=${encodeURIComponent(site.client)}`);
         }}
@@ -98,7 +98,7 @@ export function SiteConversations() {
               <p className="text-sm text-slate-400 mt-2">Click "New Log" to record the first communication.</p>
             </div>
           ) : (
-            <div className="relative border-l-2 border-indigo-100 dark:border-indigo-900 ml-4 pl-6 space-y-6">
+            <div className="relative border-l-2 border-slate-200 dark:border-slate-800 ml-4 pl-6 space-y-6">
               {grouped.map((log, idx) => {
                 const isIncoming = log.direction === 'Incoming';
                 const dateObj = new Date(log.date);
@@ -107,21 +107,21 @@ export function SiteConversations() {
                     {/* Timeline dot */}
                     <div className={cn(
                       "absolute -left-[35px] mt-1.5 h-4 w-4 rounded-full border-4 border-slate-50 dark:border-slate-950 shadow-sm ring-1 ring-slate-200",
-                      isIncoming ? "bg-emerald-500" : "bg-indigo-500"
+                      isIncoming ? "bg-emerald-500" : "bg-blue-600"
                     )} />
 
                     {/* Main log card */}
                     <div className={cn(
                       "rounded-xl border p-5 shadow-sm",
                       isDark
-                        ? isIncoming ? "bg-slate-900 border-emerald-900" : "bg-slate-900 border-indigo-900"
-                        : isIncoming ? "bg-white border-emerald-100" : "bg-white border-indigo-100"
+                        ? isIncoming ? "bg-slate-900 border-emerald-900" : "bg-slate-900 border-slate-800"
+                        : isIncoming ? "bg-white border-emerald-100" : "bg-white border-slate-200"
                     )}>
                       <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className={cn(
                             "inline-flex items-center justify-center w-7 h-7 rounded-lg text-white shadow-sm",
-                            isIncoming ? "bg-emerald-500" : "bg-indigo-500"
+                            isIncoming ? "bg-emerald-500" : "bg-blue-600"
                           )}>
                             {channelIcon(log.channel)}
                           </span>
@@ -130,7 +130,7 @@ export function SiteConversations() {
                           </span>
                           <span className={cn(
                             "px-2 py-0.5 rounded-full text-xs font-medium",
-                            isIncoming ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-indigo-50 text-indigo-700 border border-indigo-200"
+                            isIncoming ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-blue-50 text-blue-700 border border-blue-200"
                           )}>
                             {log.channel} · {isIncoming ? 'Incoming' : 'Outgoing'}
                           </span>
@@ -142,7 +142,7 @@ export function SiteConversations() {
                           <Button
                             variant="outline"
                             size="sm"
-                            className="h-7 px-2 text-xs gap-1 text-indigo-600 border-indigo-200 hover:bg-indigo-50 dark:hover:bg-indigo-950"
+                            className="h-7 px-2 text-xs gap-1 text-blue-600 border-slate-200 hover:bg-blue-50 dark:hover:bg-slate-900"
                             onClick={() => navigate(`/comm-log?highlightId=${log.id}`)}
                           >
                             <Pencil className="h-3 w-3" /> Edit
@@ -192,7 +192,7 @@ export function SiteConversations() {
                               <div className="flex items-center gap-1.5 flex-wrap">
                                 <span className={cn(
                                   "inline-flex items-center justify-center w-5 h-5 rounded text-white text-[10px]",
-                                  fu.direction === 'Incoming' ? "bg-emerald-400" : "bg-indigo-400"
+                                  fu.direction === 'Incoming' ? "bg-emerald-400" : "bg-blue-500"
                                 )}>
                                   {channelIcon(fu.channel)}
                                 </span>
@@ -206,7 +206,7 @@ export function SiteConversations() {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                className="h-6 px-1.5 text-xs text-slate-400 hover:text-indigo-600 shrink-0"
+                                className="h-6 px-1.5 text-xs text-slate-400 hover:text-blue-600 shrink-0"
                                 onClick={() => navigate(`/comm-log?highlightId=${fu.id}`)}
                               >
                                 <Pencil className="h-3 w-3" />

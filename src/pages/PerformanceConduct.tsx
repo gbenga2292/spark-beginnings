@@ -188,7 +188,7 @@ export function PerformanceConduct() {
             {isEditing ? 'Performance Event Review' : 'Log Professional Performance Action'}
           </h2>
         </div>
-        <Button onClick={isEditing ? handleUpdate : handleSave} className="bg-rose-600 hover:bg-rose-700 text-white px-5 h-9">
+        <Button onClick={isEditing ? handleUpdate : handleSave} className="bg-rose-600 hover:bg-rose-700 text-white px-5 h-9 rounded-md shadow-none">
           <Save className="h-4 w-4 mr-2" /> Save Progress
         </Button>
       </div>
@@ -196,17 +196,17 @@ export function PerformanceConduct() {
       <div className="p-4 md:p-6 max-w-4xl mx-auto w-full pb-32 space-y-4">
 
         {/* Step 1: Core Incident */}
-        <Card className="shadow-sm border-slate-200">
-          <CardHeader className="bg-slate-50 border-b border-slate-100 rounded-t-xl px-6 py-4">
-            <CardTitle className="text-slate-800 text-sm font-black uppercase tracking-wider flex items-center gap-2">
-              <span className="flex items-center justify-center bg-slate-200 text-slate-600 h-6 w-6 rounded-full text-xs">1</span>
+        <Card className="shadow-none border-slate-200 dark:border-slate-800 rounded-md">
+          <CardHeader className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800 rounded-t-md px-6 py-4">
+            <CardTitle className="text-slate-800 dark:text-slate-200 text-sm font-bold uppercase tracking-wider flex items-center gap-2">
+              <span className="flex items-center justify-center bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 h-6 w-6 rounded-full text-xs font-mono">1</span>
               Performance/Incident Report
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-6 grid grid-cols-1 md:grid-cols-2 gap-5 px-6 pb-6">
             <div className="space-y-2 md:col-span-2">
               <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Employee Involved</label>
-              <div className="h-10 flex items-center px-3 bg-slate-100 border border-slate-200 rounded-md text-sm font-medium text-slate-700">
+              <div className="h-10 flex items-center px-3 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md text-sm font-medium text-slate-700 dark:text-slate-300">
                 {internalEmployees.find(e => e.id === formData.employeeId)?.surname} {internalEmployees.find(e => e.id === formData.employeeId)?.firstname}
               </div>
             </div>
@@ -220,7 +220,7 @@ export function PerformanceConduct() {
             </div>
             <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Incident Type</label>
-              <select className="flex h-10 w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm focus:ring-indigo-500/20" value={formData.type} onChange={e => {
+              <select className="flex h-10 w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm focus:ring-blue-500/20" value={formData.type} onChange={e => {
                 const newType = e.target.value;
                 const isPositive = newType === 'Accolade';
                 setFormData({ 
@@ -241,22 +241,22 @@ export function PerformanceConduct() {
               <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Record Points / Weight</label>
               <div className="flex flex-col gap-2">
                 <div className="flex gap-2 items-center">
-                  <Input type="number" step="1" className={formData.points && formData.points > 0 ? 'border-emerald-200 bg-emerald-50/20 text-emerald-700 font-bold' : formData.points && formData.points < 0 ? 'border-rose-200 bg-rose-50/20 text-rose-700 font-bold' : ''} value={formData.points || 0} onChange={e => setFormData({ ...formData, points: parseInt(e.target.value) || 0 })} />
+                  <Input type="number" step="1" className={formData.points && formData.points > 0 ? 'border-emerald-200 bg-emerald-50/20 text-emerald-700 font-bold tabular-nums' : formData.points && formData.points < 0 ? 'border-rose-200 bg-rose-50/20 text-rose-700 font-bold tabular-nums' : 'tabular-nums'} value={formData.points || 0} onChange={e => setFormData({ ...formData, points: parseInt(e.target.value) || 0 })} />
                   <div className="flex flex-col">
-                    <span className="text-[10px] text-slate-400 font-bold uppercase whitespace-nowrap">Current: {currentPoints > 0 ? '+' : ''}{currentPoints} PTS</span>
+                    <span className="text-[10px] text-slate-400 font-bold uppercase whitespace-nowrap font-mono">Current: {currentPoints > 0 ? '+' : ''}{currentPoints} PTS</span>
                     {formData.points !== 0 && (
-                      <span className={`text-[10px] font-black uppercase whitespace-nowrap ${(currentPoints + (formData.points || 0)) < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                      <span className={`text-[10px] font-black uppercase whitespace-nowrap font-mono ${(currentPoints + (formData.points || 0)) < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
                         Projected: {currentPoints + (formData.points || 0) > 0 ? '+' : ''}{currentPoints + (formData.points || 0)} PTS
                       </span>
                     )}
                   </div>
                 </div>
                 {policyRecommendation && (
-                  <div className="bg-rose-50 border border-rose-100 p-2 rounded flex items-start gap-2 animate-in fade-in slide-in-from-top-1 duration-300">
+                  <div className="bg-rose-50 dark:bg-rose-950/30 border border-rose-100 dark:border-rose-900 p-2 rounded-md flex items-start gap-2 animate-in fade-in slide-in-from-top-1 duration-300">
                     <ShieldAlert className="h-3.5 w-3.5 text-rose-600 mt-0.5" />
                     <div className="flex-1">
-                      <p className="text-[10px] font-bold text-rose-800 uppercase leading-tight">Policy Recommendation</p>
-                      <p className="text-[10px] text-rose-700 font-medium">Accumulated points reach threshold for: <span className="underline decoration-rose-400 decoration-2 underline-offset-2">{policyRecommendation.action}</span></p>
+                      <p className="text-[10px] font-bold text-rose-800 dark:text-rose-300 uppercase leading-tight">Policy Recommendation</p>
+                      <p className="text-[10px] text-rose-700 dark:text-rose-400 font-medium">Accumulated points reach threshold for: <span className="underline decoration-rose-400 decoration-2 underline-offset-2">{policyRecommendation.action}</span></p>
                     </div>
                   </div>
                 )}
@@ -264,7 +264,7 @@ export function PerformanceConduct() {
             </div>
             <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Action/Sanction Level</label>
-              <select className="flex h-10 w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm focus:ring-indigo-500/20" value={formData.severity} onChange={e => setFormData({ ...formData, severity: e.target.value })}>
+              <select className="flex h-10 w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm focus:ring-blue-500/20" value={formData.severity} onChange={e => setFormData({ ...formData, severity: e.target.value })}>
                 {formData.type === 'Accolade' || (formData.points && formData.points > 0) ? (
                   <>
                     <option value="Commendation">Commendation Letter</option>
@@ -283,32 +283,32 @@ export function PerformanceConduct() {
         </Card>
 
         {/* Step 2: Query Process */}
-        <Card className="shadow-sm border-slate-200">
-          <CardHeader className="bg-slate-50 border-b border-slate-100 rounded-t-xl px-6 py-4">
-            <CardTitle className="text-slate-800 text-sm font-black uppercase tracking-wider flex items-center justify-between">
+        <Card className="shadow-none border-slate-200 dark:border-slate-800 rounded-md">
+          <CardHeader className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800 rounded-t-md px-6 py-4">
+            <CardTitle className="text-slate-800 dark:text-slate-200 text-sm font-bold uppercase tracking-wider flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="flex items-center justify-center bg-slate-200 text-slate-600 h-6 w-6 rounded-full text-xs">2</span>
+                <span className="flex items-center justify-center bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 h-6 w-6 rounded-full text-xs font-mono">2</span>
                 Query Process (Due Process)
               </div>
-              <label className="flex items-center gap-2 mt-1 sm:mt-0 font-semibold text-rose-700 cursor-pointer">
-                <input type="checkbox" className="h-4 w-4 rounded border-gray-300 text-rose-600 focus:ring-rose-600" checked={formData.queryIssued} onChange={(e) => setFormData({ ...formData, queryIssued: e.target.checked, queryReplied: e.target.checked ? formData.queryReplied : false })} />
+              <label className="flex items-center gap-2 mt-1 sm:mt-0 font-semibold text-rose-700 dark:text-rose-400 cursor-pointer">
+                <input type="checkbox" className="h-4 w-4 rounded-sm border-gray-300 text-rose-600 focus:ring-rose-600" checked={formData.queryIssued} onChange={(e) => setFormData({ ...formData, queryIssued: e.target.checked, queryReplied: e.target.checked ? formData.queryReplied : false })} />
                 Issue Query to Employee
               </label>
             </CardTitle>
           </CardHeader>
           {formData.queryIssued && (
             <CardContent className="pt-6 grid grid-cols-1 md:grid-cols-2 gap-5 px-6 pb-6 bg-rose-50/10">
-              <div className="space-y-2 md:col-span-2 bg-yellow-50 p-4 border border-yellow-200 rounded-lg">
-                <h4 className="text-sm font-bold text-yellow-800 flex items-center gap-2"><BellRing className="h-4 w-4" /> Pending Employee Notice</h4>
-                <p className="text-xs text-yellow-700 mt-1">This incident now sits in the "Notices" queue awaiting the employee's defense query reply. Provide a deadline for their response.</p>
+              <div className="space-y-2 md:col-span-2 bg-yellow-50 dark:bg-yellow-950/30 p-4 border border-yellow-200 dark:border-yellow-900 rounded-md">
+                <h4 className="text-sm font-bold text-yellow-800 dark:text-yellow-300 flex items-center gap-2"><BellRing className="h-4 w-4" /> Pending Employee Notice</h4>
+                <p className="text-xs text-yellow-700 dark:text-yellow-400 mt-1">This incident now sits in the "Notices" queue awaiting the employee's defense query reply. Provide a deadline for their response.</p>
               </div>
               <div className="space-y-2">
                 <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Query Reply Deadline</label>
                 <Input type="datetime-local" value={formData.queryDeadline || ''} onChange={e => setFormData({ ...formData, queryDeadline: e.target.value })} />
               </div>
               <div className="space-y-2 flex items-end pb-2">
-                <label className="flex items-center gap-2 bg-white px-3 py-2 border border-slate-200 rounded-md w-full font-bold text-slate-700 cursor-pointer">
-                  <input type="checkbox" className="h-4 w-4 rounded border-gray-300 text-rose-600 focus:ring-rose-600" checked={formData.queryReplied} onChange={(e) => setFormData({ ...formData, queryReplied: e.target.checked })} />
+                <label className="flex items-center gap-2 bg-white dark:bg-slate-800 px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-md w-full font-bold text-slate-700 dark:text-slate-300 cursor-pointer">
+                  <input type="checkbox" className="h-4 w-4 rounded-sm border-gray-300 text-rose-600 focus:ring-rose-600" checked={formData.queryReplied} onChange={(e) => setFormData({ ...formData, queryReplied: e.target.checked })} />
                   Has Employee Replied?
                 </label>
               </div>
@@ -324,10 +324,10 @@ export function PerformanceConduct() {
         </Card>
 
         {/* Step 3: Initial Resolution / Triage */}
-        <Card className="shadow-sm border-slate-200">
-          <CardHeader className="bg-slate-50 border-b border-slate-100 rounded-t-xl px-6 py-4">
-            <CardTitle className="text-slate-800 text-sm font-black uppercase tracking-wider flex items-center gap-2">
-              <span className="flex items-center justify-center bg-slate-200 text-slate-600 h-6 w-6 rounded-full text-xs">3</span>
+        <Card className="shadow-none border-slate-200 dark:border-slate-800 rounded-md">
+          <CardHeader className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800 rounded-t-md px-6 py-4">
+            <CardTitle className="text-slate-800 dark:text-slate-200 text-sm font-bold uppercase tracking-wider flex items-center gap-2">
+              <span className="flex items-center justify-center bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 h-6 w-6 rounded-full text-xs font-mono">3</span>
               Disposition & Committee Hand-off
             </CardTitle>
           </CardHeader>
@@ -345,9 +345,9 @@ export function PerformanceConduct() {
 
             {formData.initialResult === 'Committee' && (
               <>
-                <div className="space-y-2 md:col-span-2 bg-slate-100 p-4 border border-slate-200 rounded-lg mt-4 shadow-inner">
-                  <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2">Committee Escalation Path</h4>
-                  <p className="text-xs text-slate-600 mt-1 mb-4">You have escalated this to an official Disciplinary Committee. Track their meeting and outcome here.</p>
+                <div className="space-y-2 md:col-span-2 bg-slate-100 dark:bg-slate-800/50 p-4 border border-slate-200 dark:border-slate-700 rounded-md mt-4">
+                  <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">Committee Escalation Path</h4>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 mb-4">You have escalated this to an official Disciplinary Committee. Track their meeting and outcome here.</p>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
@@ -557,39 +557,39 @@ export function PerformanceConduct() {
         </div>
       )}
 
-      <div className="flex flex-1 min-h-0 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+      <div className="flex flex-1 min-h-0 bg-white dark:bg-slate-900 rounded-md border border-slate-200 dark:border-slate-800 overflow-hidden">
         {/* Left Sidebar - hidden on mobile */}
         {!(isAdding || isEditing) && !sidebarCollapsed && (
-          <div className={`hidden md:flex w-80 flex-shrink-0 border-r border-slate-200 flex-col transition-colors ${showNotices ? 'bg-amber-50/30' : 'bg-slate-50/50'}`}>
+          <div className={`hidden md:flex w-80 flex-shrink-0 border-r border-slate-200 dark:border-slate-800 flex-col transition-colors ${showNotices ? 'bg-amber-50/30 dark:bg-amber-950/20' : 'bg-slate-50/50 dark:bg-slate-900/50'}`}>
             <EmployeeSidebar />
           </div>
         )}
 
         {/* Right Content Area */}
-        <div className="flex-1 flex flex-col bg-slate-50/50 overflow-hidden relative">
+        <div className="flex-1 flex flex-col bg-slate-50/50 dark:bg-slate-900/40 overflow-hidden relative">
           {showNotices && !isEditing ? (
             <div className="flex-1 flex flex-col items-center justify-center text-slate-400 gap-4 p-8 bg-amber-50/10">
-              <div className="h-24 w-24 rounded-full bg-amber-100 flex items-center justify-center border border-amber-200 shadow-sm">
-                <BellRing className="h-10 w-10 text-amber-500" />
+              <div className="h-20 w-20 rounded-md bg-amber-100 dark:bg-amber-950/50 flex items-center justify-center border border-amber-200 dark:border-amber-900 shadow-none">
+                <BellRing className="h-8 w-8 text-amber-500" />
               </div>
               <div className="text-center max-w-sm">
-                <h3 className="font-bold text-xl text-amber-800">Notice Queue</h3>
-                <p className="text-sm mt-2 text-amber-700/80 leading-relaxed">Select a pending notice ticket from the left sidebar. This will instantly open the due process form so you can track the reply and escalate if necessary.</p>
-                <Button variant="outline" className="mt-6 border-amber-200 text-amber-700 hover:bg-amber-50" onClick={() => setShowNotices(false)}>
+                <h3 className="font-bold text-lg text-amber-800 dark:text-amber-300">Notice Queue</h3>
+                <p className="text-sm mt-2 text-amber-700/80 dark:text-amber-400/80 leading-relaxed">Select a pending notice ticket from the left sidebar. This will instantly open the due process form so you can track the reply and escalate if necessary.</p>
+                <Button variant="outline" className="mt-6 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300 hover:bg-amber-50 rounded-md" onClick={() => setShowNotices(false)}>
                   <ArrowLeft className="h-4 w-4 mr-2" /> Back to Directory
                 </Button>
               </div>
             </div>
           ) : !selectedEmployeeId && !showNotices ? (
             <div className="flex-1 flex flex-col items-center justify-center text-slate-400 gap-4 p-8">
-              <div className="h-24 w-24 rounded-full bg-slate-100 flex items-center justify-center border border-slate-200 shadow-sm">
-                <ShieldAlert className="h-10 w-10 text-slate-300" />
+              <div className="h-20 w-20 rounded-md bg-slate-100 dark:bg-slate-800 flex items-center justify-center border border-slate-200 dark:border-slate-700 shadow-none">
+                <ShieldAlert className="h-8 w-8 text-slate-400" />
               </div>
               <div className="text-center max-w-md">
-                <h3 className="font-bold text-xl text-slate-600">Action Center</h3>
+                <h3 className="font-bold text-lg text-slate-700 dark:text-slate-200">Action Center</h3>
                 <p className="text-sm mt-2 text-slate-500 leading-relaxed">Select an employee from the directory to review their record or begin a new Due Process log.</p>
               </div>
-              <Button className="md:hidden mt-2 bg-rose-600 hover:bg-rose-700 text-white" onClick={() => setIsMobileListOpen(true)}>
+              <Button className="md:hidden mt-2 bg-rose-600 hover:bg-rose-700 text-white rounded-md" onClick={() => setIsMobileListOpen(true)}>
                 <Users className="h-4 w-4 mr-2" /> Browse Employees
               </Button>
             </div>
@@ -597,38 +597,38 @@ export function PerformanceConduct() {
             renderForm()
           ) : (
             <div className="flex-1 flex flex-col overflow-hidden">
-              <div className="bg-white dark:bg-slate-900 border-b border-slate-200 p-4 md:p-6 flex justify-between items-center shrink-0 shadow-sm gap-2">
+              <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 p-4 md:p-6 flex justify-between items-center shrink-0 shadow-none gap-2">
                 <div className="flex items-center gap-2 min-w-0">
-                  <Button variant="ghost" size="icon" className="flex md:hidden shrink-0 h-8 w-8" onClick={() => setIsMobileListOpen(true)}>
+                  <Button variant="ghost" size="icon" className="flex md:hidden shrink-0 h-8 w-8 rounded-md" onClick={() => setIsMobileListOpen(true)}>
                     <Users className="h-4 w-4" />
                   </Button>
                   <div className="min-w-0">
-                    <h2 className="text-lg md:text-2xl font-bold text-slate-900 tracking-tight truncate">{selectedEmp?.surname} {selectedEmp?.firstname}</h2>
+                    <h2 className="text-lg md:text-xl font-bold text-slate-900 dark:text-slate-100 tracking-tight truncate">{selectedEmp?.surname} {selectedEmp?.firstname}</h2>
                     <p className="text-[10px] md:text-[11px] font-medium text-slate-500 mt-0.5 uppercase tracking-wider">{selectedEmp?.position} &bull; {selectedEmp?.department}</p>
                   </div>
                 </div>
                 {priv.canAdd && (
-                  <Button className="bg-indigo-600 hover:bg-indigo-700 shadow-sm px-3 md:px-6 shrink-0" onClick={() => { setFormData({ ...emptyForm, employeeId: selectedEmployeeId ?? undefined }); setIsAdding(true); }}>
+                  <Button className="bg-blue-600 hover:bg-blue-700 text-white shadow-none px-3 md:px-5 h-9 rounded-md shrink-0" onClick={() => { setFormData({ ...emptyForm, employeeId: selectedEmployeeId ?? undefined }); setIsAdding(true); }}>
                     <Plus className="h-4 w-4 md:mr-2" /><span className="hidden md:inline">Log Performance Action</span>
                   </Button>
                 )}
               </div>
 
-              <div className="flex-1 overflow-y-auto p-6">
+              <div className="flex-1 overflow-y-auto p-4 md:p-6">
                 {empRecords.length === 0 ? (
-                  <div className="bg-white dark:bg-slate-900 border border-slate-200 border-dashed rounded-xl p-12 flex flex-col items-center justify-center text-center shadow-sm">
-                    <div className="h-16 w-16 rounded-full bg-green-50 flex items-center justify-center mb-4 border border-green-100">
-                      <AlertTriangle className="h-8 w-8 text-green-500" />
+                  <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 border-dashed rounded-md p-12 flex flex-col items-center justify-center text-center shadow-none">
+                    <div className="h-12 w-12 rounded-md bg-emerald-50 dark:bg-emerald-950/50 flex items-center justify-center mb-4 border border-emerald-100 dark:border-emerald-900">
+                      <AlertTriangle className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
                     </div>
-                    <h3 className="font-bold text-slate-800 text-lg">Clean Record</h3>
+                    <h3 className="font-bold text-slate-800 dark:text-slate-200 text-base">Clean Record</h3>
                     <p className="text-slate-500 text-sm mt-2 max-w-sm leading-relaxed">There are currently no disciplinary logs or actions recorded for this employee. They are in good standing.</p>
                   </div>
                 ) : (
-                  <div className="bg-white dark:bg-slate-900 rounded-xl shadow-xs border border-slate-200 overflow-hidden">
+                  <div className="bg-white dark:bg-slate-900 rounded-md shadow-none border border-slate-200 dark:border-slate-800 overflow-hidden">
                     <div className="overflow-x-auto">
                     <Table>
                       <TableHeader>
-                        <TableRow className="bg-slate-50/80">
+                        <TableRow className="bg-slate-50/80 dark:bg-slate-800/50">
                           <TableHead className="w-28">Date</TableHead>
                           <TableHead>Type</TableHead>
                           <TableHead>Weight</TableHead>
@@ -639,37 +639,37 @@ export function PerformanceConduct() {
                       </TableHeader>
                       <TableBody>
                         {empRecords.map(r => (
-                          <TableRow key={r.id} className="hover:bg-slate-50/50">
+                          <TableRow key={r.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50">
                             <TableCell className="font-mono text-[11px] text-slate-500">{r.date}</TableCell>
                             <TableCell>
-                              <div className="font-semibold text-slate-800 text-sm">{r.type}</div>
+                              <div className="font-semibold text-slate-800 dark:text-slate-200 text-sm">{r.type}</div>
                               <div className="text-[10px] text-slate-500 mt-0.5">{r.severity}</div>
                             </TableCell>
                             <TableCell>
-                              <div className={`font-mono text-xs font-black ${r.points && r.points > 0 ? 'text-emerald-700' : r.points && r.points < 0 ? 'text-rose-700' : 'text-slate-400'}`}>
+                              <div className={`font-mono text-xs font-black ${r.points && r.points > 0 ? 'text-emerald-700 dark:text-emerald-400' : r.points && r.points < 0 ? 'text-rose-700 dark:text-rose-400' : 'text-slate-400'}`}>
                                 {r.points && r.points > 0 ? `+${r.points}` : r.points || 0}
                               </div>
                             </TableCell>
                             <TableCell>
-                              <Badge variant="outline" className={`text-[10px] font-bold tracking-tight uppercase ${r.workflowState === 'Reported' ? 'text-slate-500' : r.workflowState === 'Query Issued' ? 'text-amber-500 bg-amber-50' : r.workflowState === 'Under Review' ? 'text-indigo-500 bg-indigo-50' : r.workflowState === 'Committee' ? 'text-rose-600 bg-rose-50' : 'text-emerald-600 bg-emerald-50'}`}>
+                              <Badge variant="outline" className={`text-[10px] font-mono font-bold tracking-tight uppercase rounded-sm ${r.workflowState === 'Reported' ? 'text-slate-500' : r.workflowState === 'Query Issued' ? 'text-amber-600 bg-amber-50 dark:bg-amber-950/40' : r.workflowState === 'Under Review' ? 'text-blue-600 bg-blue-50 dark:bg-blue-950/40' : r.workflowState === 'Committee' ? 'text-rose-600 bg-rose-50 dark:bg-rose-950/40' : 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40'}`}>
                                 {r.workflowState || 'Legacy Action'}
                               </Badge>
                             </TableCell>
                             <TableCell>
-                              <Badge variant={r.status === 'Active' ? 'default' : 'outline'} className="text-[10px]">{r.status}</Badge>
+                              <Badge variant={r.status === 'Active' ? 'default' : 'outline'} className="text-[10px] rounded-sm font-mono">{r.status}</Badge>
                             </TableCell>
                             <TableCell className="text-right">
                               <div className="flex justify-end gap-1">
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50" onClick={() => setViewingRecord({ ...r, employeeName: `${selectedEmp?.surname} ${selectedEmp?.firstname}` })}>
+                                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-md text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30" onClick={() => setViewingRecord({ ...r, employeeName: `${selectedEmp?.surname} ${selectedEmp?.firstname}` })}>
                                   <Eye className="h-4 w-4" />
                                 </Button>
                                 {priv.canEdit && (
-                                  <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50" onClick={() => startEdit(r as any)}>
+                                  <Button variant="ghost" size="icon" className="h-8 w-8 rounded-md text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30" onClick={() => startEdit(r as any)}>
                                     <Pencil className="h-4 w-4" />
                                   </Button>
                                 )}
                                 {priv.canDelete && (
-                                  <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-rose-600 hover:bg-rose-50" onClick={() => handleDelete(r.id)}>
+                                  <Button variant="ghost" size="icon" className="h-8 w-8 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30" onClick={() => handleDelete(r.id)}>
                                     <Trash2 className="h-4 w-4" />
                                   </Button>
                                 )}
@@ -701,28 +701,28 @@ export function PerformanceConduct() {
 
               <div>
                 <h5 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Narrative of Event</h5>
-                <div className="bg-slate-50 p-4 rounded-lg text-sm text-slate-700 whitespace-pre-wrap border border-slate-100">
+                <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-md text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap border border-slate-200 dark:border-slate-700">
                   {viewingRecord.description || 'No description provided.'}
                 </div>
               </div>
 
               {viewingRecord.queryIssued && (
-                <div className="bg-amber-50 p-4 rounded-lg border border-amber-100 text-sm">
-                  <h5 className="text-xs font-bold uppercase tracking-wider text-amber-700 mb-2">Query Issued</h5>
-                  <p className="text-amber-800 mb-2">Deadline: {viewingRecord.queryDeadline ? new Date(viewingRecord.queryDeadline).toLocaleString() : 'Not Set'}</p>
+                <div className="bg-amber-50 dark:bg-amber-950/30 p-4 rounded-md border border-amber-200 dark:border-amber-900 text-sm">
+                  <h5 className="text-xs font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400 mb-2">Query Issued</h5>
+                  <p className="text-amber-800 dark:text-amber-300 mb-2">Deadline: {viewingRecord.queryDeadline ? new Date(viewingRecord.queryDeadline).toLocaleString() : 'Not Set'}</p>
                   {viewingRecord.queryReplied ? (
-                    <div className="bg-white dark:bg-slate-900 p-3 rounded border border-amber-200 mt-2">
+                    <div className="bg-white dark:bg-slate-900 p-3 rounded-md border border-amber-200 dark:border-amber-800 mt-2">
                       <p className="text-xs font-bold text-slate-500 mb-1">Employee Reply:</p>
-                      <p className="text-slate-700 whitespace-pre-wrap">{viewingRecord.queryReplyText}</p>
+                      <p className="text-slate-700 dark:text-slate-300 whitespace-pre-wrap">{viewingRecord.queryReplyText}</p>
                     </div>
-                  ) : <p className="text-rose-600 font-bold text-xs mt-2">Awaiting Reply...</p>}
+                  ) : <p className="text-rose-600 dark:text-rose-400 font-bold text-xs mt-2">Awaiting Reply...</p>}
                 </div>
               )}
 
               {viewingRecord.initialResult && viewingRecord.initialResult !== 'Pending' && (
                 <div>
                   <h5 className="text-xs font-bold uppercase tracking-wider text-slate-500 mt-4 mb-2">Initial Disposition</h5>
-                  <div className="bg-indigo-50 border border-indigo-100 p-4 rounded-lg text-sm text-indigo-900 font-bold">
+                  <div className="bg-blue-50 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900 p-4 rounded-md text-sm text-blue-900 dark:text-blue-200 font-bold">
                     {viewingRecord.initialResult}
                   </div>
                 </div>
@@ -731,11 +731,11 @@ export function PerformanceConduct() {
               {viewingRecord.initialResult === 'Committee' && viewingRecord.finalResult && (
                 <div>
                   <h5 className="text-xs font-bold uppercase tracking-wider text-slate-500 mt-4 mb-2">Final Disciplinary Finding</h5>
-                  <div className="bg-rose-50 border border-rose-100 p-4 rounded-lg space-y-2 text-sm text-rose-900 font-bold">
+                  <div className="bg-rose-50 dark:bg-rose-950/40 border border-rose-100 dark:border-rose-900 p-4 rounded-md space-y-2 text-sm text-rose-900 dark:text-rose-200 font-bold">
                     <p>Committee Decision: {viewingRecord.finalResult}</p>
-                    {viewingRecord.committeeMeetingDate && <p className="text-xs text-rose-700 mt-1 font-normal">Meeting Date: {viewingRecord.committeeMeetingDate}</p>}
+                    {viewingRecord.committeeMeetingDate && <p className="text-xs text-rose-700 dark:text-rose-400 mt-1 font-normal">Meeting Date: {viewingRecord.committeeMeetingDate}</p>}
                     {viewingRecord.finalResult === 'Suspension' && (
-                      <p className="text-xs p-2 bg-white rounded mt-2">Suspended from: {viewingRecord.suspensionStartDate} to {viewingRecord.suspensionEndDate}</p>
+                      <p className="text-xs p-2 bg-white dark:bg-slate-900 rounded-md mt-2">Suspended from: {viewingRecord.suspensionStartDate} to {viewingRecord.suspensionEndDate}</p>
                     )}
                   </div>
                 </div>
@@ -744,15 +744,15 @@ export function PerformanceConduct() {
               {viewingRecord.actionTaken && (
                 <div>
                   <h5 className="text-xs font-bold uppercase tracking-wider text-slate-500 mt-4 mb-2">Closure Remarks</h5>
-                  <div className="bg-slate-50 border border-slate-200 p-4 rounded-lg text-sm text-slate-700 whitespace-pre-wrap">
+                  <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 p-4 rounded-md text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap">
                     {viewingRecord.actionTaken}
                   </div>
                 </div>
               )}
 
-              <div className="pt-2 text-xs text-slate-400 border-t border-slate-100 flex items-center justify-between mt-6">
+              <div className="pt-2 text-xs text-slate-400 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between mt-6">
                 <span>Process State: {viewingRecord.workflowState || 'Closed'}</span>
-                <Badge variant={viewingRecord.status === 'Active' ? 'default' : 'outline'}>{viewingRecord.status}</Badge>
+                <Badge variant={viewingRecord.status === 'Active' ? 'default' : 'outline'} className="rounded-sm font-mono text-[10px]">{viewingRecord.status}</Badge>
               </div>
             </div>
           )}
@@ -763,10 +763,10 @@ export function PerformanceConduct() {
       {!selectedEmployeeId && !isMobileListOpen && (
         <button
           onClick={() => setIsMobileListOpen(true)}
-          className={`fixed bottom-6 right-6 z-40 md:hidden flex items-center gap-2 text-white px-4 py-3 rounded-full shadow-lg transition-colors ${showNotices ? 'bg-amber-600 hover:bg-amber-700' : 'bg-rose-600 hover:bg-rose-700'}`}
+          className={`fixed bottom-6 right-6 z-40 md:hidden flex items-center gap-2 text-white px-4 py-2.5 rounded-md shadow-md transition-colors ${showNotices ? 'bg-amber-600 hover:bg-amber-700' : 'bg-rose-600 hover:bg-rose-700'}`}
         >
-          {showNotices ? <BellRing className="h-5 w-5" /> : <Users className="h-5 w-5" />}
-          <span className="font-bold text-sm tracking-wide">{showNotices ? 'View Notices' : 'Employees'}</span>
+          {showNotices ? <BellRing className="h-4 w-4" /> : <Users className="h-4 w-4" />}
+          <span className="font-semibold text-xs tracking-wide">{showNotices ? 'View Notices' : 'Employees'}</span>
         </button>
       )}
     </div>

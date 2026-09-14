@@ -916,7 +916,7 @@ export function Payroll() {
       body, .preview-payslips-wrapper { font-family: sans-serif; color: #333; }
       .payslip { page-break-after: always; max-width: 800px; margin: 0 auto; padding: 20px; }
       .payslip.last { page-break-after: auto; }
-      .header { text-align: center; border-bottom: 2px solid #4f46e5; padding-bottom: 16px; margin-bottom: 24px; }
+      .header { text-align: center; border-bottom: 2px solid #2563eb; padding-bottom: 16px; margin-bottom: 24px; }
       .header h2 { margin: 0 0 4px; color: #1e293b; font-size: 18px; }
       .header p { margin: 4px 0 0; color: #64748b; font-size: 14px; }
       .two-col { display: flex; justify-content: space-between; margin-bottom: 24px; gap: 40px; }
@@ -952,7 +952,7 @@ export function Payroll() {
              th { background-color: #f1f5f9; font-weight: bold; }
              .text-right { text-align: right; }
              .text-center { text-align: center; }
-             .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #4f46e5; padding-bottom: 10px; }
+             .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #2563eb; padding-bottom: 10px; }
              .header img { height: 48px; margin-bottom: 10px; }
              .header h2 { margin: 0; font-size: 20px; text-transform: uppercase; letter-spacing: 1px; }
            </style>
@@ -1082,7 +1082,7 @@ export function Payroll() {
         {/* Desktop Controls */}
         <div className="hidden md:flex items-center gap-2">
           <select
-            className="h-9 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1 text-sm font-medium text-slate-700 dark:text-slate-200 shadow-sm outline-none focus:ring-2 focus:ring-indigo-500/20"
+            className="h-9 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1 text-sm font-medium text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-blue-500/20"
             value={selectedMonth}
             onChange={(e) => setSelectedMonth(e.target.value)}
           >
@@ -1092,7 +1092,7 @@ export function Payroll() {
           </select>
 
           <select
-            className="h-9 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1 text-sm font-medium text-slate-700 dark:text-slate-200 shadow-sm outline-none focus:ring-2 focus:ring-indigo-500/20 mr-1"
+            className="h-9 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1 text-sm font-medium text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-blue-500/20 mr-1"
             value={selectedYear}
             onChange={(e) => setSelectedYear(Number(e.target.value))}
           >
@@ -1108,7 +1108,7 @@ export function Payroll() {
                 <Button
                   size="sm"
                   variant="outline"
-                  className="h-9 gap-1.5 border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:border-emerald-800 dark:text-emerald-300 text-xs font-semibold shadow-sm"
+                  className="h-9 gap-1.5 border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:border-emerald-800 dark:text-emerald-300 text-xs font-semibold rounded-sm"
                 >
                   <Lock className="h-3.5 w-3.5 text-emerald-600" />
                   <span>Finalized (v{activeSnapshot.version})</span>
@@ -1125,7 +1125,7 @@ export function Payroll() {
                   }}
                   className="gap-2 text-xs cursor-pointer"
                 >
-                  <History className="h-4 w-4 text-indigo-500" /> View Version History & Diffs
+                  <History className="h-4 w-4 text-blue-600" /> View Version History & Diffs
                 </DropdownMenuItem>
                 {isAdmin && (
                   <DropdownMenuItem
@@ -1133,9 +1133,9 @@ export function Payroll() {
                       setVersionModalMode('CREATE_REVISION');
                       setVersionModalOpen(true);
                     }}
-                    className="gap-2 text-xs cursor-pointer text-indigo-600 font-semibold"
+                    className="gap-2 text-xs cursor-pointer text-blue-600 font-semibold"
                   >
-                    <GitCommit className="h-4 w-4 text-indigo-600" /> Create Revision (v{nextVersionNumber})
+                    <GitCommit className="h-4 w-4 text-blue-600" /> Create Revision (v{nextVersionNumber})
                   </DropdownMenuItem>
                 )}
               </DropdownMenuContent>
@@ -1146,23 +1146,23 @@ export function Payroll() {
                 size="sm"
                 onClick={handleFinalizePayroll}
                 disabled={isFinalizing}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs gap-1.5 shadow-sm h-9"
+                className="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs gap-1.5 h-9 rounded-sm"
               >
-                <Lock className="h-3.5 w-3.5 text-indigo-200" />
+                <Lock className="h-3.5 w-3.5 text-blue-200" />
                 {isFinalizing ? 'Finalizing...' : 'Finalize & Lock'}
               </Button>
             )
           )}
           
           {priv.canGenerate && (
-            <Button variant="outline" size="sm" className="h-9 w-9 border-indigo-200 text-indigo-700 hover:bg-indigo-50 shadow-sm" onClick={() => handleOpenPrintDialog(activeTab === 'processing' ? 'PAYSLIPS' : activeTab.toUpperCase() as any)} title={`Print ${activeTab === 'processing' ? 'Payslips' : 'Schedule'}`}>
+            <Button variant="outline" size="sm" className="h-9 w-9 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-sm" onClick={() => handleOpenPrintDialog(activeTab === 'processing' ? 'PAYSLIPS' : activeTab.toUpperCase() as any)} title={`Print ${activeTab === 'processing' ? 'Payslips' : 'Schedule'}`}>
               <Printer className="h-5 w-5" />
             </Button>
           )}
           {finRepPriv?.canExport && activeTab === 'processing' && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="h-9 w-9 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 shadow-sm hover:bg-slate-50 dark:hover:bg-slate-700" title="Export CSV">
+                <Button variant="outline" size="sm" className="h-9 w-9 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 rounded-sm dark:hover:bg-slate-700" title="Export CSV">
                   <Upload className="h-5 w-5 text-emerald-500" />
                 </Button>
               </DropdownMenuTrigger>
@@ -1195,7 +1195,7 @@ export function Payroll() {
           <div className="flex flex-col gap-1.5">
             <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Filter Period</span>
             <select
-              className="h-9 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 text-sm text-slate-700 dark:text-slate-200 outline-none w-full"
+              className="h-9 rounded-sm border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 text-sm text-slate-700 dark:text-slate-200 outline-none w-full"
               value={selectedMonth}
               onChange={(e) => setSelectedMonth(e.target.value)}
             >
@@ -1204,7 +1204,7 @@ export function Payroll() {
               ))}
             </select>
             <select
-              className="h-9 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 text-sm text-slate-700 dark:text-slate-200 outline-none w-full"
+              className="h-9 rounded-sm border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 text-sm text-slate-700 dark:text-slate-200 outline-none w-full"
               value={selectedYear}
               onChange={(e) => setSelectedYear(Number(e.target.value))}
             >
@@ -1222,7 +1222,7 @@ export function Payroll() {
                   setVersionModalMode('AUDIT_HISTORY');
                   setVersionModalOpen(true);
                 }}
-                className="flex-1 flex items-center justify-center gap-2 px-3 h-10 rounded-lg border border-emerald-300 bg-emerald-50 text-emerald-800 text-xs font-bold"
+                className="flex-1 flex items-center justify-center gap-2 px-3 h-10 rounded-sm border border-emerald-300 bg-emerald-50 text-emerald-800 text-xs font-bold"
               >
                 <Lock className="h-4 w-4 text-emerald-600" /> Finalized (v{activeSnapshot.version})
               </button>
@@ -1232,7 +1232,7 @@ export function Payroll() {
                     setVersionModalMode('CREATE_REVISION');
                     setVersionModalOpen(true);
                   }}
-                  className="px-3 h-10 rounded-lg bg-indigo-600 text-white text-xs font-semibold"
+                  className="px-3 h-10 rounded-sm bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold"
                 >
                   Revise
                 </button>
@@ -1243,7 +1243,7 @@ export function Payroll() {
               <button
                 onClick={handleFinalizePayroll}
                 disabled={isFinalizing}
-                className="flex items-center justify-center gap-2 w-full px-3 h-10 rounded-lg bg-indigo-600 text-white text-sm font-semibold shadow-sm"
+                className="flex items-center justify-center gap-2 w-full px-3 h-10 rounded-sm bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold"
               >
                 <Lock className="h-4 w-4" /> {isFinalizing ? 'Finalizing...' : 'Finalize & Lock Payroll'}
               </button>
@@ -1254,9 +1254,9 @@ export function Payroll() {
           {priv.canGenerate && (
             <button
               onClick={() => handleOpenPrintDialog(activeTab === 'processing' ? 'PAYSLIPS' : activeTab.toUpperCase() as any)}
-              className="flex items-center gap-2.5 w-full px-3 h-10 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-indigo-50 dark:hover:bg-slate-700 transition-colors text-left"
+              className="flex items-center gap-2.5 w-full px-3 h-10 rounded-sm border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-blue-50 dark:hover:bg-slate-700 transition-colors text-left"
             >
-              <Printer className="h-4 w-4 text-indigo-500 shrink-0" />
+              <Printer className="h-4 w-4 text-blue-600 shrink-0" />
               Print {activeTab === 'processing' ? 'Payslips' : 'Schedule'}
             </button>
           )}
@@ -1275,7 +1275,7 @@ export function Payroll() {
                 <button
                   key={key}
                   onClick={() => handleExportScheduleCSV(key)}
-                  className="flex items-center gap-2.5 w-full px-3 h-10 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-emerald-50 dark:hover:bg-slate-700 transition-colors text-left"
+                  className="flex items-center gap-2.5 w-full px-3 h-10 rounded-sm border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-emerald-50 dark:hover:bg-slate-700 transition-colors text-left"
                 >
                   <Upload className="h-4 w-4 text-emerald-500 shrink-0" />
                   {label}
@@ -1298,7 +1298,7 @@ export function Payroll() {
       <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
 
         {/* COMPACT TABS */}
-        <div className="flex bg-white dark:bg-slate-900 p-2 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 items-center overflow-x-auto no-scrollbar gap-2">
+        <div className="flex bg-white dark:bg-slate-900 p-1.5 rounded-md border border-slate-200 dark:border-slate-800 items-center overflow-x-auto no-scrollbar gap-2">
           <div className="flex gap-1">
             {[
               { id: 'processing', label: 'Payroll Processing' },
@@ -1313,10 +1313,10 @@ export function Payroll() {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id as any)}
-                  className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all whitespace-nowrap ${
+                  className={`px-3.5 py-1.5 rounded-sm text-xs font-semibold transition-all whitespace-nowrap ${
                     isActive 
-                      ? 'bg-indigo-600 text-white shadow-md' 
-                      : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'
+                      ? 'bg-blue-600 text-white'
+                      : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-blue-600'
                   }`}
                 >
                   {tab.label}
@@ -1331,7 +1331,7 @@ export function Payroll() {
 
             {/* LIVE DRIFT WARNING BANNER */}
             {hasDrift && activeSnapshot && (
-              <div className="bg-amber-50/90 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 rounded-xl p-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-amber-900 dark:text-amber-300 shadow-sm animate-in fade-in duration-300">
+              <div className="bg-amber-50/90 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 rounded-md p-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-amber-900 dark:text-amber-300 animate-in fade-in duration-300">
                 <div className="flex items-center gap-2.5 text-xs">
                   <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
                   <div>
@@ -1346,7 +1346,7 @@ export function Payroll() {
                       setVersionModalMode('CREATE_REVISION');
                       setVersionModalOpen(true);
                     }}
-                    className="bg-amber-600 hover:bg-amber-700 text-white text-xs h-7 gap-1 shrink-0 font-medium ml-auto"
+                    className="bg-amber-600 hover:bg-amber-700 text-white text-xs h-7 gap-1 shrink-0 font-medium ml-auto rounded-sm"
                   >
                     <GitCommit className="h-3.5 w-3.5" /> Review & Create Revision
                   </Button>
@@ -1354,48 +1354,60 @@ export function Payroll() {
               </div>
             )}
 
-             {/* COMPACT METRICS BAR FOR PROCESSING */}
-             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-             <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col justify-center relative overflow-hidden">
-                   <div className="absolute right-0 top-0 bottom-0 w-1/4 bg-gradient-to-l from-slate-50/50 to-transparent pointer-events-none" />
-                   <div className="flex justify-between items-center mb-1">
-                     <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Gross Pay</span>
-                   </div>
-                   <div className="text-xl font-bold text-slate-900">₦{priv?.canViewAmounts === false ? '***' : totals.totalGross.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                   <div className="flex gap-2 mt-1.5 flex-wrap">
-                     <span className="text-[10px] bg-slate-50 text-slate-600 px-1.5 py-0.5 rounded border border-slate-100 font-medium whitespace-nowrap">Salary: ₦{fm(totals.totalSalary)}</span>
-                     <span className="text-[10px] bg-slate-50 text-slate-600 px-1.5 py-0.5 rounded border border-slate-100 font-medium whitespace-nowrap">Overtime: ₦{fm(totals.totalOvertime)}</span>
-                   </div>
-                </div>
+      {/* COMPACT METRICS BAR FOR PROCESSING */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-white dark:bg-slate-900 p-4 rounded-md border border-slate-200 dark:border-slate-800 flex flex-col justify-center">
+          <div className="flex justify-between items-center mb-1">
+            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Total Gross Pay</span>
+          </div>
+          <div className="text-xl font-bold font-mono tabular-nums text-slate-900 dark:text-slate-100">
+            ₦{priv?.canViewAmounts === false ? '***' : totals.totalGross.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </div>
+          <div className="flex gap-2 mt-1.5 flex-wrap">
+            <span className="text-[10px] bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 px-1.5 py-0.5 rounded-sm border border-slate-200 dark:border-slate-700 font-medium font-mono tabular-nums whitespace-nowrap">
+              Salary: ₦{fm(totals.totalSalary)}
+            </span>
+            <span className="text-[10px] bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 px-1.5 py-0.5 rounded-sm border border-slate-200 dark:border-slate-700 font-medium font-mono tabular-nums whitespace-nowrap">
+              Overtime: ₦{fm(totals.totalOvertime)}
+            </span>
+          </div>
+        </div>
 
+        <div className="bg-white dark:bg-slate-900 p-4 rounded-md border border-slate-200 dark:border-slate-800 flex flex-col justify-center">
+          <div className="flex justify-between items-center mb-1">
+            <span className="text-xs font-semibold text-rose-600 dark:text-rose-400 uppercase tracking-wider">Total Deductions</span>
+          </div>
+          <div className="text-xl font-bold font-mono tabular-nums text-rose-600 dark:text-rose-400 flex items-center gap-2">
+            ₦{priv?.canViewAmounts === false ? '***' : totals.totalDeductions.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </div>
+          <div className="flex gap-2 mt-1.5 flex-wrap">
+            <span className="text-[10px] bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 px-1.5 py-0.5 rounded-sm border border-rose-200 dark:border-rose-900/40 font-medium font-mono tabular-nums whitespace-nowrap">
+              PAYE: ₦{fm(totals.totalPAYE)}
+            </span>
+            <span className="text-[10px] bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 px-1.5 py-0.5 rounded-sm border border-rose-200 dark:border-rose-900/40 font-medium font-mono tabular-nums whitespace-nowrap">
+              Loans: ₦{fm(totals.totalLoans)}
+            </span>
+            <span className="text-[10px] bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 px-1.5 py-0.5 rounded-sm border border-rose-200 dark:border-rose-900/40 font-medium font-mono tabular-nums whitespace-nowrap">
+              Pension: ₦{fm(totals.totalPension)}
+            </span>
+          </div>
+        </div>
 
-                <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-red-50 dark:border-red-900/30 shadow-sm flex flex-col justify-center relative overflow-hidden">
-                   <div className="absolute right-0 top-0 bottom-0 w-1/2 bg-gradient-to-l from-red-50/50 to-transparent pointer-events-none" />
-                   <div className="flex justify-between items-center mb-1 relative z-10">
-                     <span className="text-xs font-semibold text-red-500 uppercase tracking-wider">Total Deductions</span>
-                   </div>
-                   <div className="text-xl font-bold text-red-600 relative z-10 flex items-center gap-2">
-                     ₦{priv?.canViewAmounts === false ? '***' : totals.totalDeductions.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                   </div>
-                   <div className="flex gap-2 mt-1.5 relative z-10 flex-wrap">
-                      <span className="text-[10px] bg-red-50 text-red-600 px-1.5 py-0.5 rounded border border-red-100 font-medium whitespace-nowrap">PAYE: ₦{fm(totals.totalPAYE)}</span>
-                      <span className="text-[10px] bg-red-50 text-red-600 px-1.5 py-0.5 rounded border border-red-100 font-medium whitespace-nowrap">Loans: ₦{fm(totals.totalLoans)}</span>
-                      <span className="text-[10px] bg-red-50 text-red-600 px-1.5 py-0.5 rounded border border-red-100 font-medium whitespace-nowrap">Pension: ₦{fm(totals.totalPension)}</span>
-                   </div>
-                </div>
-
-                <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-emerald-50 dark:border-emerald-900/30 shadow-sm flex flex-col justify-center relative overflow-hidden">
-                   <div className="absolute right-0 top-0 bottom-0 w-1/2 bg-gradient-to-l from-emerald-50/50 to-transparent pointer-events-none" />
-                   <div className="flex justify-between items-center mb-1 relative z-10">
-                     <span className="text-xs font-semibold text-emerald-600 uppercase tracking-wider">Net Payroll</span>
-                     <span className="text-[10px] font-medium bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full whitespace-nowrap">{totals.employeeCount} staff</span>
-                   </div>
-                   <div className="text-xl font-bold text-emerald-600 relative z-10">₦{priv?.canViewAmounts === false ? '***' : totals.totalNet.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                   <div className="text-[10px] text-emerald-500/80 mt-1 relative z-10 flex justify-between items-center whitespace-nowrap">
-                     Take Home Pay
-                   </div>
-                </div>
-             </div>
+        <div className="bg-white dark:bg-slate-900 p-4 rounded-md border border-slate-200 dark:border-slate-800 flex flex-col justify-center">
+          <div className="flex justify-between items-center mb-1">
+            <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Net Payroll</span>
+            <span className="text-[10px] font-medium font-mono tabular-nums bg-emerald-50 text-emerald-700 border border-emerald-200 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 px-2 py-0.5 rounded-sm whitespace-nowrap">
+              {totals.employeeCount} staff
+            </span>
+          </div>
+          <div className="text-xl font-bold font-mono tabular-nums text-emerald-600 dark:text-emerald-400">
+            ₦{priv?.canViewAmounts === false ? '***' : totals.totalNet.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </div>
+          <div className="text-[10px] text-emerald-600/80 dark:text-emerald-400/80 mt-1 flex justify-between items-center whitespace-nowrap">
+            Take Home Pay
+          </div>
+        </div>
+      </div>
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between border-b border-slate-100 pb-4">
@@ -1415,7 +1427,7 @@ export function Payroll() {
                   )}
                   <Button
                     variant="outline" size="sm"
-                    className={`gap-2 ${showFilterPanel ? 'bg-indigo-50 border-indigo-300 text-indigo-700' : ''}`}
+                    className={`gap-2 ${showFilterPanel ? 'bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-950/40 dark:border-blue-800 dark:text-blue-300' : ''} rounded-sm`}
                     onClick={() => { setShowFilterPanel(p => !p); if (showFilterPanel) setFilterDept(''); }}
                   >
                     Filter <ChevronDown className="h-4 w-4" />
@@ -1450,7 +1462,7 @@ export function Payroll() {
                         {/* Summary chips */}
                         {priv?.canViewAmounts !== false && (
                           <div className="flex flex-wrap gap-1.5 text-[10px]">
-                            <span className="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded font-medium">Gross ₦{record.grossPay.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                            <span className="bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 px-2 py-0.5 rounded-sm font-medium font-mono tabular-nums">Gross ₦{record.grossPay.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
                             {record.paye > 0 && <span className="bg-red-50 text-red-600 px-2 py-0.5 rounded font-medium">PAYE ₦{record.paye.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>}
                             {record.pension > 0 && <span className="bg-amber-50 text-amber-700 px-2 py-0.5 rounded font-medium">Pension ₦{record.pension.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>}
                             {record.loanRepayment > 0 && <span className="bg-rose-50 text-rose-600 px-2 py-0.5 rounded font-medium">Loan ₦{record.loanRepayment.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>}
@@ -1481,7 +1493,7 @@ export function Payroll() {
                       <TableHead className="font-bold text-slate-900 dark:text-slate-100 sticky top-0 z-30 bg-slate-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700" style={{left:'268px',minWidth:'180px'}}>JOB TITTLE</TableHead>
                       <TableHead className="font-bold text-slate-900 dark:text-slate-100 sticky top-0 z-20 bg-slate-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700">BANK</TableHead>
                       <TableHead className="font-bold text-slate-900 dark:text-slate-100 sticky top-0 z-20 bg-slate-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700">ACCOUNT NO.</TableHead>
-                      <TableHead className="font-bold text-slate-900 dark:text-slate-100 sticky top-0 z-20 bg-indigo-50 dark:bg-indigo-900/50 ring-1 ring-slate-200 dark:ring-slate-700">SALARY</TableHead>
+                      <TableHead className="font-bold text-slate-900 dark:text-slate-100 sticky top-0 z-20 bg-slate-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700">SALARY</TableHead>
                       <TableHead className="font-bold text-slate-900 dark:text-slate-100 sticky top-0 z-20 bg-slate-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700">Basic Salary</TableHead>
                       <TableHead className="font-bold text-slate-900 dark:text-slate-100 sticky top-0 z-20 bg-slate-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700">Housing</TableHead>
                       <TableHead className="font-bold text-slate-900 dark:text-slate-100 sticky top-0 z-20 bg-slate-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700">Transport</TableHead>
@@ -1503,19 +1515,19 @@ export function Payroll() {
                         <TableCell className="sticky z-10 bg-white dark:bg-slate-900" style={{left:'158px',minWidth:'110px'}}>{record.firstname}</TableCell>
                         <TableCell className="sticky z-10 bg-white dark:bg-slate-900 border-r border-slate-300 dark:border-slate-700" style={{left:'268px',minWidth:'180px'}}>{record.position}</TableCell>
                         <TableCell>{record.bankName}</TableCell>
-                        <TableCell className="font-mono">{record.accountNo}</TableCell>
-                        <TableCell className="font-mono text-indigo-700 bg-indigo-50/30">₦{priv?.canViewAmounts === false ? '***' : record.salary.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
-                        <TableCell className="font-mono text-slate-600">{priv?.canViewAmounts === false ? '***' : record.basicSalary.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
-                        <TableCell className="font-mono text-slate-600">{priv?.canViewAmounts === false ? '***' : record.housing.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
-                        <TableCell className="font-mono text-slate-600">{priv?.canViewAmounts === false ? '***' : record.transport.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
-                        <TableCell className="font-mono text-slate-600">{priv?.canViewAmounts === false ? '***' : record.otherAllowances.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
-                        <TableCell className="font-mono font-medium bg-slate-50 border-x">{priv?.canViewAmounts === false ? '***' : record.totalAllowances.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
-                        <TableCell className="font-mono text-amber-600">{priv?.canViewAmounts === false ? '***' : record.overtime.toLocaleString()}</TableCell>
-                        <TableCell className="font-mono font-bold text-slate-900 bg-emerald-50/50">₦{priv?.canViewAmounts === false ? '***' : record.grossPay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
-                        <TableCell className="font-mono text-red-600">{priv?.canViewAmounts === false ? '***' : record.paye.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
-                        <TableCell className="font-mono text-red-600">{priv?.canViewAmounts === false ? '***' : record.loanRepayment.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
-                        <TableCell className="font-mono text-red-600">{priv?.canViewAmounts === false ? '***' : record.pension.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
-                        <TableCell className="font-mono font-bold text-emerald-700 bg-emerald-50 border-l">₦{priv?.canViewAmounts === false ? '***' : record.takeHomePay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
+                        <TableCell className="font-mono tabular-nums">{record.accountNo}</TableCell>
+                        <TableCell className="font-mono tabular-nums text-slate-900 dark:text-slate-100 bg-slate-50/30 dark:bg-slate-800/30">₦{priv?.canViewAmounts === false ? '***' : record.salary.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
+                        <TableCell className="font-mono tabular-nums text-slate-600">{priv?.canViewAmounts === false ? '***' : record.basicSalary.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
+                        <TableCell className="font-mono tabular-nums text-slate-600">{priv?.canViewAmounts === false ? '***' : record.housing.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
+                        <TableCell className="font-mono tabular-nums text-slate-600">{priv?.canViewAmounts === false ? '***' : record.transport.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
+                        <TableCell className="font-mono tabular-nums text-slate-600">{priv?.canViewAmounts === false ? '***' : record.otherAllowances.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
+                        <TableCell className="font-mono tabular-nums font-medium bg-slate-50 border-x">{priv?.canViewAmounts === false ? '***' : record.totalAllowances.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
+                        <TableCell className="font-mono tabular-nums text-amber-600">{priv?.canViewAmounts === false ? '***' : record.overtime.toLocaleString()}</TableCell>
+                        <TableCell className="font-mono tabular-nums font-bold text-slate-900 bg-emerald-50/50">₦{priv?.canViewAmounts === false ? '***' : record.grossPay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
+                        <TableCell className="font-mono tabular-nums text-red-600">{priv?.canViewAmounts === false ? '***' : record.paye.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
+                        <TableCell className="font-mono tabular-nums text-red-600">{priv?.canViewAmounts === false ? '***' : record.loanRepayment.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
+                        <TableCell className="font-mono tabular-nums text-red-600">{priv?.canViewAmounts === false ? '***' : record.pension.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
+                        <TableCell className="font-mono tabular-nums font-bold text-emerald-700 bg-emerald-50 border-l">₦{priv?.canViewAmounts === false ? '***' : record.takeHomePay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -1637,7 +1649,7 @@ export function Payroll() {
                         </div>
                         <div className="flex gap-2 flex-wrap">
                           <span className="text-[10px] bg-slate-50 border border-slate-100 rounded px-1.5 py-0.5 text-amber-700 font-mono">Emp: ₦{fm(r.pension)}</span>
-                          <span className="text-[10px] bg-slate-50 border border-slate-100 rounded px-1.5 py-0.5 text-indigo-700 font-mono">Empr: ₦{fm(r.employerPension)}</span>
+                          <span className="text-[10px] bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-sm px-1.5 py-0.5 text-blue-700 dark:text-blue-400 font-mono tabular-nums">Empr: ₦{fm(r.employerPension)}</span>
                         </div>
                       </div>
                     ))}
@@ -1658,7 +1670,7 @@ export function Payroll() {
                         <TableHead className="font-bold dark:text-slate-100 sticky top-0 z-20 bg-amber-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700">Department</TableHead>
                         <TableHead className="font-bold dark:text-slate-100 text-right sticky top-0 z-20 bg-amber-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700">Pensionable Sum (₦)</TableHead>
                         <TableHead className="font-bold text-right text-amber-700 dark:text-amber-500 sticky top-0 z-20 bg-amber-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700">Employee (₦)</TableHead>
-                        <TableHead className="font-bold text-right text-indigo-700 dark:text-indigo-400 sticky top-0 z-20 bg-amber-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700">Employer (₦)</TableHead>
+                        <TableHead className="font-bold text-right text-slate-700 dark:text-slate-300 sticky top-0 z-20 bg-amber-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700">Employer (₦)</TableHead>
                         <TableHead className="font-bold text-right text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 sticky top-0 z-20 ring-1 ring-slate-200 dark:ring-slate-700">Total (₦)</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -1673,7 +1685,7 @@ export function Payroll() {
                             <TableCell className="text-slate-500">{r.department}</TableCell>
                             <TableCell className="text-right font-mono">{fm(penSum)}</TableCell>
                             <TableCell className="text-right font-mono text-amber-600 font-semibold">{fm(r.pension)}</TableCell>
-                            <TableCell className="text-right font-mono text-indigo-600 font-semibold">{fm(r.employerPension)}</TableCell>
+                            <TableCell className="text-right font-mono tabular-nums text-slate-700 dark:text-slate-300 font-semibold">{fm(r.employerPension)}</TableCell>
                             <TableCell className="text-right font-mono text-emerald-700 font-bold bg-emerald-50/50">{fm(r.pension + r.employerPension)}</TableCell>
                           </TableRow>
                         );
@@ -1683,7 +1695,7 @@ export function Payroll() {
                         <TableCell colSpan={4} className="text-right font-bold">TOTALS</TableCell>
                         <TableCell className="text-right font-mono">{fmT(pp.reduce((s, r) => s + (r.basicSalary + r.housing + r.transport), 0))}</TableCell>
                         <TableCell className="text-right font-mono text-amber-600">{fmT(pp.reduce((s, r) => s + r.pension, 0))}</TableCell>
-                        <TableCell className="text-right font-mono text-indigo-600">{fmT(pp.reduce((s, r) => s + r.employerPension, 0))}</TableCell>
+                        <TableCell className="text-right font-mono tabular-nums text-slate-900 dark:text-slate-100">{fmT(pp.reduce((s, r) => s + r.employerPension, 0))}</TableCell>
                         <TableCell className="text-right font-mono text-emerald-700">{fmT(pp.reduce((s, r) => s + r.pension + r.employerPension, 0))}</TableCell>
                       </TableRow>); })()}
                     </TableBody>
@@ -1773,7 +1785,7 @@ export function Payroll() {
               <CardHeader className="flex flex-row items-center justify-between border-b border-slate-100 pb-4">
                 <CardTitle>Withholding Tax Schedule (Consultants): {selectedMonthLabel}</CardTitle>
                 <div className="flex items-center gap-3">
-                  <span className="text-xs text-slate-500 font-medium">Total Withholding: <span className="text-indigo-600 font-bold">₦{fmT(totals.totalWithholding)}</span></span>
+                  <span className="text-xs text-slate-500 font-medium">Total Withholding: <span className="text-blue-600 font-bold font-mono tabular-nums">₦{fmT(totals.totalWithholding)}</span></span>
                 </div>
               </CardHeader>
               <CardContent className="overflow-x-auto overflow-y-auto max-h-[70vh] border-t border-slate-100 p-0 sm:p-6 sm:pt-0">
@@ -1788,7 +1800,7 @@ export function Payroll() {
                         </div>
                         <div className="text-right ml-4 shrink-0">
                           <p className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Withholding</p>
-                          <p className="font-bold text-indigo-600 text-base">₦{fm(r.paye)}</p>
+                          <p className="font-bold text-blue-600 font-mono tabular-nums text-base">₦{fm(r.paye)}</p>
                         </div>
                       </div>
                       <div className="flex gap-2 flex-wrap">
@@ -1797,45 +1809,45 @@ export function Payroll() {
                       </div>
                     </div>
                   ))}
-                  <div className="p-4 bg-indigo-50 border-t border-indigo-100 flex justify-between items-center">
-                    <span className="font-bold text-indigo-900 text-sm">TOTAL WHT</span>
-                    <span className="font-bold text-indigo-600 text-lg">₦{fmT(totals.totalWithholding)}</span>
+                  <div className="p-4 bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex justify-between items-center">
+                    <span className="font-bold text-slate-900 dark:text-slate-100 text-sm">TOTAL WHT</span>
+                    <span className="font-bold text-blue-600 font-mono tabular-nums text-lg">₦{fmT(totals.totalWithholding)}</span>
                   </div>
                 </div>
 
                 <Table className="hidden md:table whitespace-nowrap w-full text-xs cursor-grab">
                   <TableHeader>
-                    <TableRow className="bg-indigo-50 dark:bg-slate-900">
-                      <TableHead className="font-bold dark:text-slate-100 sticky top-0 z-20 bg-indigo-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700">S/N</TableHead>
-                      <TableHead className="font-bold dark:text-slate-100 sticky top-0 z-20 bg-indigo-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700">Surname</TableHead>
-                      <TableHead className="font-bold dark:text-slate-100 sticky top-0 z-20 bg-indigo-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700">Firstname</TableHead>
-                      <TableHead className="font-bold dark:text-slate-100 sticky top-0 z-20 bg-indigo-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700">TIN</TableHead>
-                      <TableHead className="font-bold dark:text-slate-100 sticky top-0 z-20 bg-indigo-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700">Department</TableHead>
-                      <TableHead className="font-bold dark:text-slate-100 text-right sticky top-0 z-20 bg-indigo-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700">Gross Pay (₦)</TableHead>
-                      <TableHead className="font-bold dark:text-slate-100 text-center sticky top-0 z-20 bg-indigo-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700">Rate (%)</TableHead>
-                      <TableHead className="font-bold text-right text-indigo-700 dark:text-indigo-400 bg-indigo-50 dark:bg-slate-900 sticky top-0 z-20 ring-1 ring-slate-200 dark:ring-slate-700">Withholding (₦)</TableHead>
-                      <TableHead className="font-bold dark:text-slate-100 text-right text-slate-500 sticky top-0 z-20 bg-indigo-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700">Net Pay (₦)</TableHead>
+                    <TableRow className="bg-slate-50 dark:bg-slate-900">
+                      <TableHead className="font-bold dark:text-slate-100 sticky top-0 z-20 bg-slate-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700">S/N</TableHead>
+                      <TableHead className="font-bold dark:text-slate-100 sticky top-0 z-20 bg-slate-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700">Surname</TableHead>
+                      <TableHead className="font-bold dark:text-slate-100 sticky top-0 z-20 bg-slate-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700">Firstname</TableHead>
+                      <TableHead className="font-bold dark:text-slate-100 sticky top-0 z-20 bg-slate-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700">TIN</TableHead>
+                      <TableHead className="font-bold dark:text-slate-100 sticky top-0 z-20 bg-slate-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700">Department</TableHead>
+                      <TableHead className="font-bold dark:text-slate-100 text-right sticky top-0 z-20 bg-slate-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700">Gross Pay (₦)</TableHead>
+                      <TableHead className="font-bold dark:text-slate-100 text-center sticky top-0 z-20 bg-slate-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700">Rate (%)</TableHead>
+                      <TableHead className="font-bold text-right text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-900 sticky top-0 z-20 ring-1 ring-slate-200 dark:ring-slate-700">Withholding (₦)</TableHead>
+                      <TableHead className="font-bold dark:text-slate-100 text-right text-slate-500 sticky top-0 z-20 bg-slate-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700">Net Pay (₦)</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {payrollData.filter(r => r.staffType === 'NON-EMPLOYEE' && r.withholdingTax).map((r, i) => (
-                      <TableRow key={r.id} className="hover:bg-indigo-50/30">
+                      <TableRow key={r.id} className="hover:bg-slate-50/50">
                         <TableCell>{i + 1}</TableCell>
                         <TableCell className="font-medium">{r.surname}</TableCell>
                         <TableCell>{r.firstname}</TableCell>
-                        <TableCell className="font-mono text-[10px] text-slate-500">{r.taxId || 'N/A'}</TableCell>
+                        <TableCell className="font-mono tabular-nums text-[10px] text-slate-500">{r.taxId || 'N/A'}</TableCell>
                         <TableCell className="text-slate-500">{r.department}</TableCell>
                         <TableCell className="text-right font-mono">{fm(r.grossPay)}</TableCell>
                         <TableCell className="text-center font-mono text-slate-500">{(r.withholdingTaxRate || 0.05) * 100}%</TableCell>
-                        <TableCell className="text-right font-mono text-indigo-600 font-bold bg-indigo-50/50">{fm(r.paye)}</TableCell>
+                        <TableCell className="text-right font-mono tabular-nums text-blue-600 font-bold bg-slate-50/50 dark:bg-slate-800/50">{fm(r.paye)}</TableCell>
                         <TableCell className="text-right font-mono text-slate-600">{fm(r.takeHomePay)}</TableCell>
                       </TableRow>
                     ))}
-                    <TableRow className="border-t-2 bg-indigo-50 font-bold">
+                    <TableRow className="border-t-2 bg-slate-50 dark:bg-slate-900 font-bold">
                       <TableCell colSpan={5} className="text-right font-bold">TOTALS</TableCell>
                       <TableCell className="text-right font-mono">{fmT(payrollData.filter(r => r.staffType === 'NON-EMPLOYEE').reduce((s, r) => s + r.grossPay, 0))}</TableCell>
                       <TableCell />
-                      <TableCell className="text-right font-mono text-indigo-600">{fmT(totals.totalWithholding)}</TableCell>
+                      <TableCell className="text-right font-mono tabular-nums text-blue-600">{fmT(totals.totalWithholding)}</TableCell>
                       <TableCell className="text-right font-mono text-slate-600">{fmT(payrollData.filter(r => r.staffType === 'NON-EMPLOYEE').reduce((s, r) => s + r.takeHomePay, 0))}</TableCell>
                     </TableRow>
                   </TableBody>
@@ -1850,7 +1862,7 @@ export function Payroll() {
           <div className="fixed inset-0 bg-black/50 flex flex-col z-50 overflow-hidden items-center justify-center">
             <div className="bg-slate-100 shadow-xl flex flex-col w-screen h-screen relative rounded-none">
 
-              <div className="flex flex-col md:flex-row bg-indigo-600 p-4 justify-between md:items-center gap-4 md:gap-0 rounded-none shrink-0 z-10">
+              <div className="flex flex-col md:flex-row bg-blue-600 p-4 justify-between md:items-center gap-4 md:gap-0 rounded-none shrink-0 z-10">
                 <h3 className="text-white font-bold text-lg leading-tight">
                   {printType === 'PAYSLIPS' && "Print Bulk Payslips"}
                   {printType === 'PAYE' && "Generate PAYE Schedule"}
@@ -1869,7 +1881,7 @@ export function Payroll() {
                       <Printer className="h-4 w-4 shrink-0" /> <span className="hidden sm:inline">Print Document</span>
                     </Button>
                   </div>
-                  <Button variant="ghost" size="sm" className="text-white hover:bg-indigo-700 p-2 shrink-0" onClick={() => setPrintDialogOpen(false)}>
+                  <Button variant="ghost" size="sm" className="text-white hover:bg-blue-700 p-2 shrink-0" onClick={() => setPrintDialogOpen(false)}>
                     <X className="h-5 w-5" />
                   </Button>
                 </div>
@@ -1889,26 +1901,26 @@ export function Payroll() {
                 </div>
 
                 {/* Filter Sidebar */}
-                <div className={`w-full md:w-1/3 md:max-w-[300px] border-b md:border-b-0 md:border-r border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 md:overflow-y-auto flex-col gap-6 hide-on-print shadow-sm z-10 shrink-0 ${printSidebarOpen ? 'flex max-h-[50vh] overflow-y-auto' : 'hidden md:flex md:max-h-full'}`}>
+                <div className={`w-full md:w-1/3 md:max-w-[300px] border-b md:border-b-0 md:border-r border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 md:overflow-y-auto flex-col gap-6 hide-on-print z-10 shrink-0 ${printSidebarOpen ? 'flex max-h-[50vh] overflow-y-auto' : 'hidden md:flex md:max-h-full'}`}>
                   {/* Schedule type selector */}
                   {printType === 'PAYSLIPS' && (
                     <div className="mb-4">
                       <h4 className="font-bold text-sm text-slate-900 mb-2 border-b pb-1">Payslip Theme</h4>
                       <div className="flex gap-2">
                         <button 
-                          className={`flex-1 py-1.5 px-2 rounded-md text-xs font-medium border ${payslipTheme === 'MODERN' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
+                          className={`flex-1 py-1.5 px-2 rounded-md text-xs font-medium border ${payslipTheme === 'MODERN' ? 'bg-blue-600 text-white border-blue-600' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
                           onClick={() => setPayslipTheme('MODERN')}
                         >
                           Modern
                         </button>
                         <button 
-                          className={`flex-1 py-1.5 px-2 rounded-md text-xs font-medium border ${payslipTheme === 'CLASSIC' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
+                          className={`flex-1 py-1.5 px-2 rounded-md text-xs font-medium border ${payslipTheme === 'CLASSIC' ? 'bg-blue-600 text-white border-blue-600' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
                           onClick={() => setPayslipTheme('CLASSIC')}
                         >
                           Classic
                         </button>
                         <button 
-                          className={`flex-1 py-1.5 px-2 rounded-md text-xs font-medium border ${payslipTheme === 'FORMAL' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
+                          className={`flex-1 py-1.5 px-2 rounded-md text-xs font-medium border ${payslipTheme === 'FORMAL' ? 'bg-blue-600 text-white border-blue-600' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
                           onClick={() => setPayslipTheme('FORMAL')}
                         >
                           Formal
@@ -1948,16 +1960,16 @@ export function Payroll() {
                   <div>
                     <h4 className="font-bold text-sm text-slate-900 mb-2 border-b pb-1">Select Months</h4>
                     <div className="flex gap-2 mb-2">
-                      <button className="text-xs text-indigo-600 font-medium hover:underline" onClick={() => setPrintSelectedMonths(months.map(m => m.key))}>Select All</button>
+                      <button className="text-xs text-blue-600 font-medium hover:underline" onClick={() => setPrintSelectedMonths(months.map(m => m.key))}>Select All</button>
                       <span className="text-slate-300">|</span>
-                      <button className="text-xs text-indigo-600 font-medium hover:underline" onClick={() => setPrintSelectedMonths([])}>Select None</button>
+                      <button className="text-xs text-blue-600 font-medium hover:underline" onClick={() => setPrintSelectedMonths([])}>Select None</button>
                     </div>
                     <div className="grid grid-cols-2 gap-1 mt-1">
                       {months.map(m => (
                         <label key={m.key} className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
                           <input
                             type="checkbox"
-                            className="rounded border-slate-300 text-indigo-600"
+                            className="rounded-sm border-slate-300 text-blue-600 accent-blue-600"
                             checked={printSelectedMonths.includes(m.key)}
                             onChange={(e) => {
                               if (e.target.checked) setPrintSelectedMonths([...printSelectedMonths, m.key]);
@@ -1978,13 +1990,13 @@ export function Payroll() {
                       </h4>
                       <div className="flex gap-2">
                         <button 
-                          className={`flex-1 py-1.5 px-2 rounded-md text-xs font-medium border ${printViewMode === 'LIST' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
+                          className={`flex-1 py-1.5 px-2 rounded-md text-xs font-medium border ${printViewMode === 'LIST' ? 'bg-blue-600 text-white border-blue-600' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
                           onClick={() => setPrintViewMode('LIST')}
                         >
                           Row per Month
                         </button>
                         <button 
-                          className={`flex-1 py-1.5 px-2 rounded-md text-xs font-medium border ${printViewMode === 'MATRIX' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
+                          className={`flex-1 py-1.5 px-2 rounded-md text-xs font-medium border ${printViewMode === 'MATRIX' ? 'bg-blue-600 text-white border-blue-600' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
                           onClick={() => setPrintViewMode('MATRIX')}
                         >
                           Month Columns
@@ -2013,12 +2025,12 @@ export function Payroll() {
                           <h4 className="font-bold text-sm text-slate-900 mb-2 border-b pb-1 flex items-center justify-between">
                             Filter by Department
                             <div className="flex gap-2">
-                              <button className="text-xs text-indigo-600 font-medium hover:underline" onClick={() => {
+                              <button className="text-xs text-blue-600 font-medium hover:underline" onClick={() => {
                                 setPrintSelectedDepts(listDepts);
                                 setPrintSelectedEmployees(listStaff.filter(e => listDepts.includes(e.department)).map(e => e.id));
                               }}>All</button>
                               <span className="text-slate-300">|</span>
-                              <button className="text-xs text-indigo-600 font-medium hover:underline" onClick={() => { setPrintSelectedDepts([]); setPrintSelectedEmployees([]); }}>None</button>
+                              <button className="text-xs text-blue-600 font-medium hover:underline" onClick={() => { setPrintSelectedDepts([]); setPrintSelectedEmployees([]); }}>None</button>
                             </div>
                           </h4>
                           <div className="space-y-1 mt-2 max-h-[110px] overflow-y-auto">
@@ -2026,7 +2038,7 @@ export function Payroll() {
                               <label key={dept} className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
                                 <input
                                   type="checkbox"
-                                  className="rounded border-slate-300 text-indigo-600"
+                                  className="rounded-sm border-slate-300 text-blue-600 accent-blue-600"
                                   checked={printSelectedDepts.includes(dept)}
                                   onChange={(e) => {
                                     const newDepts = e.target.checked
@@ -2055,9 +2067,9 @@ export function Payroll() {
                           <h4 className="font-bold text-sm text-slate-900 mb-2 border-b pb-1 flex items-center justify-between">
                             Select Employees
                             <div className="flex gap-2">
-                              <button className="text-xs text-indigo-600 font-medium hover:underline" onClick={() => setPrintSelectedEmployees(listStaff.map(e => e.id))}>All</button>
+                              <button className="text-xs text-blue-600 font-medium hover:underline" onClick={() => setPrintSelectedEmployees(listStaff.map(e => e.id))}>All</button>
                               <span className="text-slate-300">|</span>
-                              <button className="text-xs text-indigo-600 font-medium hover:underline" onClick={() => setPrintSelectedEmployees([])}>None</button>
+                              <button className="text-xs text-blue-600 font-medium hover:underline" onClick={() => setPrintSelectedEmployees([])}>None</button>
                             </div>
                           </h4>
                           <div className="space-y-1 mt-2 max-h-[200px] overflow-y-auto pr-2">
@@ -2065,7 +2077,7 @@ export function Payroll() {
                               <label key={emp.id} className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
                                 <input
                                   type="checkbox"
-                                  className="rounded border-slate-300 text-indigo-600"
+                                  className="rounded-sm border-slate-300 text-blue-600 accent-blue-600"
                                   checked={printSelectedEmployees.includes(emp.id)}
                                   onChange={(e) => {
                                     if (e.target.checked) setPrintSelectedEmployees(prev => [...prev, emp.id]);
@@ -2102,9 +2114,9 @@ export function Payroll() {
                         <h4 className="font-bold text-sm text-slate-900 mb-2 border-b pb-1 flex items-center justify-between">
                           Columns to Include
                           <div className="flex gap-2">
-                            <button className="text-xs text-indigo-600 font-medium hover:underline" onClick={() => setPrintSelectedColumns(visibleCols.map(c => c.id))}>All</button>
+                            <button className="text-xs text-blue-600 font-medium hover:underline" onClick={() => setPrintSelectedColumns(visibleCols.map(c => c.id))}>All</button>
                             <span className="text-slate-300">|</span>
-                            <button className="text-xs text-indigo-600 font-medium hover:underline" onClick={() => setPrintSelectedColumns([])}>None</button>
+                            <button className="text-xs text-blue-600 font-medium hover:underline" onClick={() => setPrintSelectedColumns([])}>None</button>
                           </div>
                         </h4>
                         {isMatrix && (
@@ -2116,7 +2128,7 @@ export function Payroll() {
                                   <input
                                     type="radio"
                                     name="matrix-metric"
-                                    className="border-slate-300 text-indigo-600 shrink-0"
+                                    className="border-slate-300 text-blue-600 accent-blue-600 shrink-0"
                                     checked={printSelectedColumns.includes(col.id)}
                                     onChange={() => {
                                       // Remove all other metric cols, keep metadata cols, add this one
@@ -2136,7 +2148,7 @@ export function Payroll() {
                               <input
                                 type="checkbox"
                                 id={`col-${col.id}`}
-                                className="rounded border-slate-300 text-indigo-600 shrink-0"
+                                className="rounded-sm border-slate-300 text-blue-600 accent-blue-600 shrink-0"
                                 checked={printSelectedColumns.includes(col.id)}
                                 onChange={(e) => {
                                   if (e.target.checked) {
@@ -2149,7 +2161,7 @@ export function Payroll() {
                               <label htmlFor={`col-${col.id}`} className="text-sm text-slate-700 cursor-pointer flex-1 flex items-center justify-between">
                                 {col.label}
                                 {printSelectedColumns.includes(col.id) && (
-                                  <span className="text-[10px] bg-indigo-100 text-indigo-700 font-bold px-1.5 py-0.5 rounded-sm">
+                                  <span className="text-[10px] bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 font-bold px-1.5 py-0.5 rounded-sm">
                                     #{printSelectedColumns.indexOf(col.id) + 1}
                                   </span>
                                 )}
@@ -2169,7 +2181,7 @@ export function Payroll() {
                       No records match your selection.
                     </div>
                   ) : printType === 'PAYSLIPS' ? (
-                    <div className="bg-white mx-auto print-break shadow-sm" style={{ maxWidth: 820 }}>
+                    <div className="bg-white mx-auto print-break border border-slate-200" style={{ maxWidth: 820 }}>
                       <style>{`.preview-payslips-wrapper { text-align: left; } .preview-payslips-wrapper * { box-sizing: border-box; } ` + themeStyles}</style>
                       <div className="preview-payslips-wrapper" dangerouslySetInnerHTML={{ __html: payslipsToPrint.map((slip, i) => buildSlipHtml(slip, i)).join('') }} />
                     </div>
@@ -2190,8 +2202,8 @@ export function Payroll() {
                             : (slip.record.nsitf > 0 && !slip.record.department.trim().toLowerCase().includes('adhoc'))
                     );
 
-                    const accentColor = printType === 'PAYE' ? '#7c3aed' : printType === 'PENSION' ? '#0d9488' : printType === 'WITHHOLDING' ? '#4f46e5' : '#2563eb';
-                    const accentLight = printType === 'PAYE' ? '#ede9fe' : printType === 'PENSION' ? '#ccfbf1' : printType === 'WITHHOLDING' ? '#e0e7ff' : '#dbeafe';
+                    const accentColor = printType === 'PAYE' ? '#dc2626' : printType === 'PENSION' ? '#0d9488' : printType === 'WITHHOLDING' ? '#2563eb' : '#2563eb';
+                    const accentLight = printType === 'PAYE' ? '#fee2e2' : printType === 'PENSION' ? '#ccfbf1' : printType === 'WITHHOLDING' ? '#dbeafe' : '#dbeafe';
 
                     // Cell value getter
                     const getCellValue = (col: typeof orderedCols[0], slip: typeof filteredSlips[0], idx: number): React.ReactNode => {
@@ -2199,7 +2211,7 @@ export function Payroll() {
                       switch (col.id) {
                         case 'sn':             return <span style={{ color: '#94a3b8', fontSize: '12px' }}>{idx + 1}</span>;
                         case 'employee_name':  return <span style={{ fontWeight: 600, color: '#0f172a' }}>{slip.record.surname} {slip.record.firstname}</span>;
-                        case 'month':          return <span style={{ color: '#6366f1', fontSize: '12px', fontWeight: 500 }}>{slip.monthLabel}</span>;
+                        case 'month':          return <span style={{ color: '#2563eb', fontSize: '12px', fontWeight: 500 }}>{slip.monthLabel}</span>;
                         case 'paye_id':        { const emp = employees.find(e => e.id === slip.record.id); return <span style={{ fontSize: '12px', color: '#475569' }}>{emp?.payeNumber || emp?.taxId || 'N/A'}</span>; }
                         case 'tin':            return <span style={{ fontFamily: 'monospace', fontSize: '12px', color: '#475569' }}>{slip.record.taxId || 'N/A'}</span>;
                         case 'pension_pin':    { const emp = employees.find(e => e.id === slip.record.id); return <span style={{ fontSize: '12px', color: '#475569' }}>{emp?.pensionNumber || 'N/A'}</span>; }
@@ -2214,7 +2226,7 @@ export function Payroll() {
                         case 'net_pay':        return <span style={{ fontFamily: 'monospace', color: '#059669', fontWeight: 700 }}>{fm(slip.record.takeHomePay)}</span>;
                         case 'pensionable':    return <span style={{ fontFamily: 'monospace' }}>{fm(pSum)}</span>;
                         case 'employee_pension': return <span style={{ fontFamily: 'monospace', color: '#d97706' }}>{fm(slip.record.pension)}</span>;
-                        case 'employer_pension': return <span style={{ fontFamily: 'monospace', color: '#4f46e5' }}>{fm(slip.record.employerPension)}</span>;
+                        case 'employer_pension': return <span style={{ fontFamily: 'monospace', color: '#2563eb' }}>{fm(slip.record.employerPension)}</span>;
                         case 'total_pension':  return <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#059669' }}>{fm(slip.record.pension + slip.record.employerPension)}</span>;
                         case 'nsitf_rate':     return <span style={{ fontFamily: 'monospace', color: '#6b7280' }}>{payrollVariables.nsitfRate}%</span>;
                         case 'nsitf_amount':   return <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#059669' }}>{fm(slip.record.nsitf)}</span>;
@@ -2261,7 +2273,7 @@ export function Payroll() {
                     const matrixSelectedMetricLabel = matrixSelectedMetricId ? AVAILABLE_COLUMNS.find(c => c.id === matrixSelectedMetricId)?.label : null;
 
                     return (
-                      <div className="bg-white dark:bg-slate-900 mx-auto shadow-lg min-w-fit rounded-sm print-break" id="print-area-content"
+                      <div className="bg-white dark:bg-slate-900 mx-auto border border-slate-200 dark:border-slate-800 min-w-fit rounded-sm print-break" id="print-area-content"
                         style={{ fontFamily: "'Segoe UI', system-ui, sans-serif", overflow: 'hidden' }}>
 
                         {/* ── Premium print-safe header ── */}
@@ -2363,7 +2375,7 @@ export function Payroll() {
                                     {mData.map((row, idx) => {
                                       const dummySlip = { record: row.record, monthLabel: '', monthKey: '' } as typeof filteredSlips[0];
                                       return (
-                                        <tr key={row.record.id} style={{ background: idx % 2 === 0 ? 'white' : '#f8fafc', borderBottom: '1px solid #e2e8f0' }} className="hover:bg-indigo-50/30">
+                                        <tr key={row.record.id} style={{ background: idx % 2 === 0 ? 'white' : '#f8fafc', borderBottom: '1px solid #e2e8f0' }} className="hover:bg-slate-50/50">
                                           {metadataCols.map(col => (
                                             <td key={col.id} style={{ padding: '11px 10px', textAlign: colIsNumeric(col.id) ? 'right' : 'left', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
                                               {getCellValue(col, dummySlip, idx)}
@@ -2426,7 +2438,7 @@ export function Payroll() {
                                 <tbody>
                                   {filteredSlips.map((slip, idx) => (
                                     <tr key={idx} style={{ background: idx % 2 === 0 ? 'white' : '#f8fafc', borderBottom: '1px solid #e2e8f0' }}
-                                      className="hover:bg-indigo-50/30">
+                                      className="hover:bg-slate-50/50">
                                       {orderedCols.map(col => (
                                          <td key={col.id} style={{
                                            padding: '11px 10px',

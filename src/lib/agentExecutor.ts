@@ -29,7 +29,7 @@ export async function getActiveAiConfig(): Promise<ActiveAiConfig> {
 
     if (!error && dbKeys && dbKeys.length > 0) {
       const activeKey = dbKeys.find((k: any) => k.is_default) || dbKeys[0];
-      const provider = activeKey.provider || (activeKey.key_value?.startsWith('AIza') ? 'gemini' : 'groq');
+      const provider = activeKey.provider || ((activeKey.key_value?.startsWith('AIza') || activeKey.key_value?.startsWith('AQ.')) ? 'gemini' : 'groq');
       const rawModel = (activeKey.default_model || '').trim();
       const model = rawModel || (provider === 'gemini' ? 'gemini-2.0-flash' : 'llama-3.3-70b-versatile');
       return {

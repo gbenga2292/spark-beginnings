@@ -20,6 +20,7 @@ import { useSetPageTitle, useAutoCollapseSidebar } from '@/src/contexts/PageCont
 import { Button } from '@/src/components/ui/button';
 import { Badge } from '@/src/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/src/components/ui/card';
+import { MetricHeroCard } from '@/src/components/ui/MetricHeroCard';
 import { Input } from '@/src/components/ui/input';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/src/components/ui/table';
 import {
@@ -91,7 +92,7 @@ function formatLastRefilledDate(dateInput: any): string {
   return `${dayName}, ${formattedDate}`;
 }
 
-// Palette colors (strictly adhering to no-purple / no-generic design system)
+// Palette colors (strictly adhering to technical cobalt/slate design system)
 const CHART_COLORS = {
   emerald: '#10b981',
   emeraldLight: '#34d399',
@@ -4254,136 +4255,37 @@ export function ActiveSiteAnalytics() {
         </Button>
       </div>
 
-      {/* ── Top 5 Executive KPI Metric Tiles ── */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-        {/* Metric 1: Days Machine on Site */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-xs flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              Fleet Days on Site
-            </span>
-            <div className="h-8 w-8 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 flex items-center justify-center">
-              <Calendar className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-3">
-            <p className="text-2xl font-black text-slate-800 dark:text-white">
-              {siteAggregates.totalFleetDaysOnSite}
-              <span className="text-xs font-normal text-slate-400 ml-1">days</span>
-            </p>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-              Across {siteAggregates.machineCount} deployed unit{siteAggregates.machineCount !== 1 ? 's' : ''}
-            </p>
-          </div>
-        </div>
-
-        {/* Metric 2: Active Operational Days & Utilization */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-xs flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              Active Running Days
-            </span>
-            <div className="h-8 w-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
-              <Activity className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-3">
-            <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
-              {siteAggregates.activeDays}
-              <span className="text-xs font-normal text-slate-400 ml-1">days</span>
-            </p>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-              {siteAggregates.overallUtilization}% fleet running utilization
-            </p>
-          </div>
-        </div>
-
-        {/* Metric 3: Total Diesel Refilled & Benchmark Telemetry */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-xs flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              Diesel Refilled (Actual)
-            </span>
-            <div className="h-8 w-8 rounded-lg bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 flex items-center justify-center">
-              <Fuel className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-3">
-            <div className="flex items-baseline justify-between gap-1 flex-wrap">
-              <p className="text-2xl font-black text-amber-600 dark:text-amber-400">
-                {siteAggregates.totalDiesel.toLocaleString(undefined, { maximumFractionDigits: 1 })}
-                <span className="text-xs font-normal text-slate-400 ml-1">L</span>
-              </p>
-              {siteAggregates.hasBenchmarkData && (
-                <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded-full border leading-none', siteAggregates.overallFuelEfficiency.badgeCls)}>
-                  {siteAggregates.overallFuelEfficiency.label}
-                </span>
-              )}
-            </div>
-
-            {/* Last Refilled Date badge */}
-            <div className="mt-2 flex items-center gap-1.5 text-[11px] font-semibold text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 border border-amber-200/80 dark:border-amber-800/80 px-2 py-1 rounded-lg">
-              <Clock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
-              <span className="truncate">
-                Last Refill: <strong>{siteAggregates.lastRefilledFormatted}</strong>
-                {siteAggregates.lastRefillLitres > 0 && ` (${siteAggregates.lastRefillLitres}L)`}
-              </span>
-            </div>
-
-            {siteAggregates.hasBenchmarkData ? (
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                Expected: <strong className="text-slate-700 dark:text-slate-200">{siteAggregates.totalExpectedDiesel.toLocaleString()} L</strong> ({siteAggregates.overallVarianceLitres >= 0 ? `+${siteAggregates.overallVarianceLitres}` : siteAggregates.overallVarianceLitres} L variance)
-              </p>
-            ) : (
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                Avg {siteAggregates.avgDailyDiesel.toFixed(1)} L / active day
-              </p>
-            )}
-          </div>
-        </div>
-
-        {/* Metric 4: Machine Downtime Incidents */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-xs flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              Downtime Incidents
-            </span>
-            <div className="h-8 w-8 rounded-lg bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 flex items-center justify-center">
-              <AlertTriangle className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-3">
-            <p className="text-2xl font-black text-rose-600 dark:text-rose-400">
-              {siteAggregates.totalDowntimes}
-              <span className="text-xs font-normal text-slate-400 ml-1">event{siteAggregates.totalDowntimes !== 1 ? 's' : ''}</span>
-            </p>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-              {siteAggregates.totalDowntimeHours.toFixed(1)} total hours halted
-            </p>
-          </div>
-        </div>
-
-        {/* Metric 5: Active Fleet on Site */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-xs flex flex-col justify-between col-span-2 sm:col-span-1">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              Deployed Fleet
-            </span>
-            <div className="h-8 w-8 rounded-lg bg-cyan-50 dark:bg-cyan-950/40 text-cyan-600 dark:text-cyan-400 flex items-center justify-center">
-              <HardHat className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-3">
-            <p className="text-2xl font-black text-slate-800 dark:text-white">
-              {siteAggregates.activeFleetCount}
-              <span className="text-xs font-normal text-slate-400 ml-1">/ {siteAggregates.machineCount} units</span>
-            </p>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-              Stationed on active site
-            </p>
-          </div>
-        </div>
-      </div>
+      {/* ── Top Executive KPI Metric Card ── */}
+      <MetricHeroCard
+        title="Active Fleet Operations & Telemetry"
+        heroValue={`${siteAggregates.overallUtilization}%`}
+        heroLabel="Fleet Running Utilization"
+        period="Active Site Deployment"
+        sparklineData={[
+          Math.max(0, siteAggregates.overallUtilization - 20),
+          Math.max(0, siteAggregates.overallUtilization - 12),
+          Math.max(0, siteAggregates.overallUtilization - 8),
+          Math.max(0, siteAggregates.overallUtilization - 3),
+          siteAggregates.overallUtilization
+        ]}
+        secondaryMetrics={[
+          { 
+            label: 'Running Days', 
+            value: `${siteAggregates.activeDays} / ${siteAggregates.totalFleetDaysOnSite} d` 
+          },
+          { 
+            label: 'Total Diesel Refilled', 
+            value: `${siteAggregates.totalDiesel.toLocaleString(undefined, { maximumFractionDigits: 0 })} L`,
+            subValue: siteAggregates.lastRefilledFormatted !== 'No refill recorded' ? `Last: ${siteAggregates.lastRefilledFormatted}` : undefined
+          },
+          { 
+            label: 'Downtime Halt', 
+            value: `${siteAggregates.totalDowntimes} events`,
+            subValue: `${siteAggregates.totalDowntimeHours.toFixed(1)}h lost`,
+            tone: siteAggregates.totalDowntimes > 0 ? 'negative' : 'positive'
+          },
+        ]}
+      />
 
       {/* ── VISUAL SECTION: Live Machine Fuel Tank Gauges ── */}
       {machineFleetStats.length > 0 && (
@@ -4491,10 +4393,10 @@ export function ActiveSiteAnalytics() {
                                 className={cn(
                                   'w-full transition-all duration-700 relative z-10',
                                   m.fuelLevelStatus === 'critical'
-                                    ? 'bg-gradient-to-t from-rose-700 to-rose-500'
+                                    ? 'bg-rose-600'
                                     : m.fuelLevelStatus === 'low'
-                                    ? 'bg-gradient-to-t from-amber-800 to-amber-600'
-                                    : 'bg-gradient-to-t from-amber-700 to-amber-500'
+                                    ? 'bg-amber-600'
+                                    : 'bg-amber-500'
                                 )}
                                 style={{ height: `${Math.max(4, m.fuelPercentage)}%` }}
                               >

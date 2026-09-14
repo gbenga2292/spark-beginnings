@@ -12,7 +12,7 @@ import { useAuth } from "@/src/hooks/useAuth";
 import { Button } from "@/src/components/ui/button";
 import { toast, showConfirm } from "@/src/components/ui/toast";
 import { format, differenceInDays } from "date-fns";
-import { useSetPageTitle } from "@/src/contexts/PageContext";
+import { useSetPageTitle, useAutoCollapseSidebar } from "@/src/contexts/PageContext";
 import { Input } from "@/src/components/ui/input";
 import { useRef } from "react";
 
@@ -36,6 +36,7 @@ const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { st
 const item = { hidden: { opacity: 0, y: 15 }, show: { opacity: 1, y: 0 } };
 
 export function TaskArchive() {
+  useAutoCollapseSidebar();
   const { user: currentUser } = useAuth();
   const navigate = useNavigate();
   const { workspace: teamWs } = useWorkspace();
@@ -251,7 +252,7 @@ export function TaskArchive() {
                         variant="outline" 
                         size="sm" 
                         onClick={() => activeTab === 'subtasks' ? handleRestoreSub(item.id) : handleRestoreMain(item.id)}
-                        className="flex-1 sm:flex-none h-9 sm:h-8 gap-1.5 text-[10px] sm:text-xs font-bold border-indigo-200 text-indigo-600 hover:bg-indigo-50"
+                        className="flex-1 sm:flex-none h-9 sm:h-8 gap-1.5 text-[10px] sm:text-xs font-bold border-blue-200 text-blue-600 hover:bg-blue-50"
                       >
                         <RotateCcw className="w-3.5 h-3.5" /> RESTORE
                       </Button>

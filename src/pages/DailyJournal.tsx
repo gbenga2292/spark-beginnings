@@ -252,7 +252,7 @@ function SiteLogCard({
 
   return (
     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-sm relative overflow-hidden">
-      <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500" />
+      <div className="absolute top-0 left-0 w-1 h-full bg-blue-500" />
       <div className="flex items-start sm:items-center justify-between mb-3 pl-2">
         <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 pr-6">
           <div className="flex items-center gap-2 flex-wrap w-full">
@@ -262,7 +262,7 @@ function SiteLogCard({
                 type="button"
                 title="Camera"
                 onClick={() => setShowCustomCamera(true)}
-                className="h-10 w-10 sm:h-9 sm:w-9 rounded-full bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-100 dark:border-indigo-800 flex items-center justify-center text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 active:scale-95 transition-transform shadow-sm"
+                className="h-10 w-10 sm:h-9 sm:w-9 rounded-full bg-blue-50 dark:bg-blue-900/30 border border-blue-100 dark:border-blue-800 flex items-center justify-center text-blue-600 dark:text-blue-400 hover:bg-blue-100 active:scale-95 transition-transform shadow-sm"
               >
                 <Camera className="h-5 w-5 sm:h-4 sm:w-4" />
               </button>
@@ -279,7 +279,7 @@ function SiteLogCard({
 
       <div className={cn("mb-3 border-b border-slate-100 dark:border-slate-800", machineItems.length === 0 && consumableItems.length === 0 ? "hidden" : `grid grid-cols-${machineItems.length > 0 && consumableItems.length > 0 ? 3 : 2}`)}>
         <button
-          className={cn("flex items-center justify-center gap-1.5 py-2 text-[10px] font-bold uppercase tracking-wide transition-colors border-b-2", activeTab === 'general' ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400' : 'border-transparent text-slate-400 hover:text-slate-600 dark:hover:text-slate-300')}
+          className={cn("flex items-center justify-center gap-1.5 py-2 text-[10px] font-bold uppercase tracking-wide transition-colors border-b-2", activeTab === 'general' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-slate-400 hover:text-slate-600 dark:hover:text-slate-300')}
           onClick={() => setActiveTab('general')}
         >
           <FileText className="h-3.5 w-3.5 shrink-0" />
@@ -287,22 +287,22 @@ function SiteLogCard({
         </button>
         {machineItems.length > 0 && (
           <button
-            className={cn("flex items-center justify-center gap-1.5 py-2 text-[10px] font-bold uppercase tracking-wide transition-colors border-b-2", activeTab === 'machines' ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400' : 'border-transparent text-slate-400 hover:text-slate-600 dark:hover:text-slate-300')}
+            className={cn("flex items-center justify-center gap-1.5 py-2 text-[10px] font-bold uppercase tracking-wide transition-colors border-b-2", activeTab === 'machines' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-slate-400 hover:text-slate-600 dark:hover:text-slate-300')}
             onClick={() => setActiveTab('machines')}
           >
             <Wrench className="h-3.5 w-3.5 shrink-0" />
             Machines
-            <span className={cn("text-[9px] font-black px-1 rounded-full", activeTab === 'machines' ? 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/40' : 'bg-slate-100 text-slate-500 dark:bg-slate-800')}>{machineItems.length}</span>
+            <span className={cn("text-[9px] font-black px-1 rounded-full", activeTab === 'machines' ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/40' : 'bg-slate-100 text-slate-500 dark:bg-slate-800')}>{machineItems.length}</span>
           </button>
         )}
         {consumableItems.length > 0 && (
           <button
-            className={cn("flex items-center justify-center gap-1.5 py-2 text-[10px] font-bold uppercase tracking-wide transition-colors border-b-2", activeTab === 'consumables' ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400' : 'border-transparent text-slate-400 hover:text-slate-600 dark:hover:text-slate-300')}
+            className={cn("flex items-center justify-center gap-1.5 py-2 text-[10px] font-bold uppercase tracking-wide transition-colors border-b-2", activeTab === 'consumables' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-slate-400 hover:text-slate-600 dark:hover:text-slate-300')}
             onClick={() => setActiveTab('consumables')}
           >
             <Package className="h-3.5 w-3.5 shrink-0" />
             Stock
-            <span className={cn("text-[9px] font-black px-1 rounded-full", activeTab === 'consumables' ? 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/40' : 'bg-slate-100 text-slate-500 dark:bg-slate-800')}>{consumableItems.length}</span>
+            <span className={cn("text-[9px] font-black px-1 rounded-full", activeTab === 'consumables' ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/40' : 'bg-slate-100 text-slate-500 dark:bg-slate-800')}>{consumableItems.length}</span>
           </button>
         )}
       </div>
@@ -316,9 +316,9 @@ function SiteLogCard({
             {(uploadedMedia.length > 0 || mediaPreviews.length > 0) && (
               <div className="pt-1 pb-2">
                 <div className="flex items-center gap-2 mb-3">
-                  <ImageIcon className="h-3.5 w-3.5 text-indigo-500" />
+                  <ImageIcon className="h-3.5 w-3.5 text-blue-500" />
                   <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">Photos & Videos</span>
-                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400">
+                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
                     {uploadedMedia.length + mediaPreviews.length}
                   </span>
                 </div>
@@ -371,18 +371,18 @@ function SiteLogCard({
                   ))}
                   {/* Pending previews */}
                   {mediaPreviews.map((p, i) => (
-                    <div key={`pre-${i}`} className="group relative aspect-square rounded-lg overflow-hidden bg-indigo-50/50 border-2 border-dashed border-indigo-200 dark:border-indigo-800/50">
+                    <div key={`pre-${i}`} className="group relative aspect-square rounded-lg overflow-hidden bg-blue-50/50 border-2 border-dashed border-blue-200 dark:border-blue-800/50">
                       {p.type === 'image' ? (
                         <img src={p.url} className="w-full h-full object-cover opacity-60" alt="preview" />
                       ) : (
                         <div className="w-full h-full flex flex-col items-center justify-center bg-slate-100 dark:bg-slate-800 opacity-60">
-                          <FileVideo className="h-5 w-5 text-indigo-400" />
+                          <FileVideo className="h-5 w-5 text-blue-400" />
                         </div>
                       )}
                       <button type="button" onClick={() => removeMedia(i)} className="absolute top-1 right-1 h-5 w-5 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition-colors shadow-sm">
                         <X className="h-3 w-3" />
                       </button>
-                      <div className="absolute bottom-0 left-0 right-0 bg-indigo-600 py-0.5 text-[7px] font-black text-white text-center">AUTO-UPLOAD ON PUBLISH</div>
+                      <div className="absolute bottom-0 left-0 right-0 bg-blue-600 py-0.5 text-[7px] font-black text-white text-center">AUTO-UPLOAD ON PUBLISH</div>
                     </div>
                   ))}
                   {/* Add more tile */}
@@ -399,7 +399,7 @@ function SiteLogCard({
 
             <textarea value={entry.narration || ''} onChange={e => onChangeNarration(e.target.value)}
               rows={4} placeholder="Type your field notes here..."
-              className="w-full text-base sm:text-sm border border-slate-200 dark:border-slate-700 rounded-lg p-3 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50 dark:bg-slate-950 transition-all placeholder:text-slate-400" />
+              className="w-full text-base sm:text-sm border border-slate-200 dark:border-slate-700 rounded-lg p-3 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50 dark:bg-slate-950 transition-all placeholder:text-slate-400" />
 
             {/* Site Progress % Input */}
             <div className="space-y-1.5">
@@ -428,7 +428,7 @@ function SiteLogCard({
                   className={`w-full h-10 rounded-lg border px-3 pr-8 text-sm focus:outline-none focus:ring-2 bg-slate-50 dark:bg-slate-950 transition-all
                     ${progressError
                       ? 'border-red-400 focus:ring-red-400/30 text-red-600'
-                      : 'border-slate-200 dark:border-slate-700 focus:ring-indigo-500'
+                      : 'border-slate-200 dark:border-slate-700 focus:ring-blue-500'
                     }`}
                 />
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-slate-400 font-bold">%</span>
@@ -447,7 +447,7 @@ function SiteLogCard({
                     className="h-full rounded-full transition-all duration-300"
                     style={{
                       width: `${progressVal}%`,
-                      background: progressVal >= 80 ? '#10b981' : progressVal >= 40 ? '#f59e0b' : '#6366f1'
+                      background: progressVal >= 80 ? '#10b981' : progressVal >= 40 ? '#f59e0b' : '#2563eb'
                     }}
                   />
                 </div>
@@ -462,7 +462,7 @@ function SiteLogCard({
               <select
                 value={entry.dewateringStage ?? ''}
                 onChange={e => onChangeStage(e.target.value === '' ? undefined : e.target.value as DewateringStage)}
-                className="w-full h-10 rounded-lg border border-slate-200 dark:border-slate-700 px-3 text-sm bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+                className="w-full h-10 rounded-lg border border-slate-200 dark:border-slate-700 px-3 text-sm bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
               >
                 <option value="">— Select Stage —</option>
                 <option value="mobilization">🚚 Mobilization</option>
@@ -525,7 +525,7 @@ function SiteLogCard({
               <>
                 {machineItems.length > 1 && (
                   <div className="flex justify-end mb-3">
-                    <Button onClick={() => setIsBulkMachineOpen(true)} size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold h-8 text-xs">
+                    <Button onClick={() => setIsBulkMachineOpen(true)} size="sm" className="bg-blue-600 hover:bg-blue-700 text-white font-bold h-8 text-xs">
                       Bulk Log Machines
                     </Button>
                   </div>
@@ -535,7 +535,7 @@ function SiteLogCard({
                 return (
                   <div key={m.id} className="flex items-center justify-between p-3 rounded-lg border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/50">
                     <div className="flex items-center gap-3">
-                      <div className="h-8 w-8 rounded-lg bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
+                      <div className="h-8 w-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400">
                         <Wrench className="h-4 w-4" />
                       </div>
                       <div>
@@ -548,7 +548,7 @@ function SiteLogCard({
                     <Button 
                       size="sm" 
                       variant={hasLog ? "outline" : "default"}
-                      className={cn("h-8 text-xs font-bold px-4", hasLog ? "border-emerald-200 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-900/50 dark:text-emerald-400 dark:hover:bg-emerald-900/30" : "bg-indigo-600 hover:bg-indigo-700 text-white")}
+                      className={cn("h-8 text-xs font-bold px-4", hasLog ? "border-emerald-200 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-900/50 dark:text-emerald-400 dark:hover:bg-emerald-900/30" : "bg-blue-600 hover:bg-blue-700 text-white")}
                       onClick={() => onOpenMachineLog({ id: m.id, name: m.name }, entry.siteId!, entry.siteName!)}
                     >
                       {hasLog ? 'Edit Log' : 'Start Log'}
@@ -1178,20 +1178,20 @@ export function DailyJournal() {
               className="w-full text-left bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 sm:p-4 hover:shadow-md transition-all flex flex-col gap-3 group">
               <div className="flex items-start justify-between gap-2 w-full">
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className="flex-shrink-0 h-10 w-10 rounded-xl bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-800/50">
+                  <div className="flex-shrink-0 h-10 w-10 rounded-xl bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-800/50">
                     <Calendar className="h-5 w-5" />
                   </div>
                   <div className="min-w-0">
                     <div className="flex flex-wrap sm:flex-nowrap items-center gap-x-2 gap-y-1">
                       <p className="text-sm font-bold text-slate-900 dark:text-slate-100 truncate">{format(new Date(group.date + 'T00:00:00'), 'EEEE, MMMM d, yyyy')}</p>
-                      {isSameDay(new Date(group.date + 'T00:00:00'), new Date()) && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300 flex-shrink-0">Today</span>}
+                      {isSameDay(new Date(group.date + 'T00:00:00'), new Date()) && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 flex-shrink-0">Today</span>}
                     </div>
                     <p className="text-xs text-slate-500 font-medium mt-0.5">
                       {entries.length} log points{' \u2022 '}{group.journals.length} session{group.journals.length !== 1 ? 's' : ''}
                     </p>
                   </div>
                 </div>
-                <div className="flex-shrink-0 flex items-center justify-center h-10 w-8 text-slate-300 group-hover:text-indigo-500 group-hover:translate-x-1 transition-all">
+                <div className="flex-shrink-0 flex items-center justify-center h-10 w-8 text-slate-300 group-hover:text-blue-500 group-hover:translate-x-1 transition-all">
                   <ChevronRight className="h-5 w-5" />
                 </div>
               </div>
@@ -1247,7 +1247,7 @@ export function DailyJournal() {
               <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">Add Site Activity</label>
               <div className="flex flex-col sm:flex-row gap-2 w-full">
                 <select value={selectedSiteId} onChange={e => setSelectedSiteId(e.target.value)}
-                  className="w-full sm:flex-1 h-11 rounded-md border border-slate-200 bg-white px-3 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-slate-900 dark:border-slate-700">
+                  className="w-full sm:flex-1 h-11 rounded-md border border-slate-200 bg-white px-3 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-900 dark:border-slate-700">
                   <option value="">Select site...</option>
                   {activeSites.map(s => <option key={s.id} value={s.id}>{s.name} ({s.client})</option>)}
                 </select>
@@ -1265,7 +1265,7 @@ export function DailyJournal() {
                     }]);
                     setSelectedSiteId('');
                   }
-                }} disabled={!selectedSiteId} className="h-11 w-full sm:w-auto px-6 bg-indigo-600 hover:bg-indigo-700 text-white font-bold shrink-0 shadow-sm">
+                }} disabled={!selectedSiteId} className="h-11 w-full sm:w-auto px-6 bg-blue-600 hover:bg-blue-700 text-white font-bold shrink-0 shadow-sm">
                   <Plus className="h-4 w-4 sm:mr-1" /> Add
                 </Button>
               </div>
@@ -1351,11 +1351,11 @@ export function DailyJournal() {
   function renderExportModal() {
     return (
       <Dialog open={isExportModalOpen} onOpenChange={setIsExportModalOpen}>
-        <DialogContent className="w-full max-w-sm sm:max-w-md p-0 overflow-hidden border-0 shadow-2xl rounded-2xl">
+        <DialogContent className="w-full max-w-sm sm:max-w-md p-0 overflow-hidden border border-slate-200 dark:border-slate-800 shadow-2xl rounded-md">
           {/* Header */}
           <DialogHeader className="px-5 py-4 sm:px-6 sm:py-5 bg-white dark:bg-slate-950 border-b border-slate-100 dark:border-slate-800">
             <DialogTitle className="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-3">
-              <div className="h-8 w-8 sm:h-9 sm:w-9 rounded-xl bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0">
+              <div className="h-8 w-8 sm:h-9 sm:w-9 rounded-md bg-blue-50 dark:bg-blue-950/40 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0">
                 <FileText className="h-4 w-4" />
               </div>
               Export Diary Report
@@ -1377,7 +1377,7 @@ export function DailyJournal() {
                   type="date"
                   value={exportFilters.startDate}
                   onChange={e => setExportFilters(f => ({ ...f, startDate: e.target.value }))}
-                  className="h-11 text-sm font-medium bg-slate-50 dark:bg-slate-900 border-slate-200 focus:ring-indigo-500"
+                  className="h-11 text-sm font-medium bg-slate-50 dark:bg-slate-900 border-slate-200 focus:ring-blue-500"
                 />
               </div>
               <div className="space-y-1.5">
@@ -1388,7 +1388,7 @@ export function DailyJournal() {
                   type="date"
                   value={exportFilters.endDate}
                   onChange={e => setExportFilters(f => ({ ...f, endDate: e.target.value }))}
-                  className="h-11 text-sm font-medium bg-slate-50 dark:bg-slate-900 border-slate-200 focus:ring-indigo-500"
+                  className="h-11 text-sm font-medium bg-slate-50 dark:bg-slate-900 border-slate-200 focus:ring-blue-500"
                 />
               </div>
             </div>
@@ -1401,7 +1401,7 @@ export function DailyJournal() {
               <select
                 value={exportFilters.siteId}
                 onChange={e => setExportFilters(f => ({ ...f, siteId: e.target.value }))}
-                className="w-full h-11 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 px-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-700 dark:text-slate-300"
+                className="w-full h-11 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 px-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 dark:text-slate-300"
               >
                 <option value="">All Sites</option>
                 {sites.map(s => <option key={s.id} value={s.id}>{s.name} ({s.client})</option>)}
@@ -1416,7 +1416,7 @@ export function DailyJournal() {
               <select
                 value={exportFilters.author}
                 onChange={e => setExportFilters(f => ({ ...f, author: e.target.value }))}
-                className="w-full h-11 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 px-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-700 dark:text-slate-300"
+                className="w-full h-11 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 px-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 dark:text-slate-300"
               >
                 <option value="">All Authors</option>
                 {authors.map(a => <option key={a} value={a}>{a}</option>)}
@@ -1427,25 +1427,25 @@ export function DailyJournal() {
             <div className={cn(
               "p-3 sm:p-4 rounded-xl border flex items-center justify-between transition-all",
               matchingExportJournals.length > 0
-                ? "bg-indigo-50 border-indigo-200 dark:bg-indigo-900/20 dark:border-indigo-800/50"
+                ? "bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800/50"
                 : "bg-slate-50 border-slate-200 dark:bg-slate-900 dark:border-slate-800"
             )}>
               <div className="flex items-center gap-2.5">
                 <div className={cn("h-8 w-8 rounded-full flex items-center justify-center shrink-0",
                   matchingExportJournals.length > 0
-                    ? "bg-indigo-100 text-indigo-600 dark:bg-indigo-800 dark:text-indigo-300"
+                    ? "bg-blue-100 text-blue-600 dark:bg-blue-800 dark:text-blue-300"
                     : "bg-slate-200 text-slate-400 dark:bg-slate-800"
                 )}>
                   <FileText className="h-4 w-4" />
                 </div>
                 <span className={cn("text-sm font-bold",
-                  matchingExportJournals.length > 0 ? "text-indigo-900 dark:text-indigo-200" : "text-slate-400"
+                  matchingExportJournals.length > 0 ? "text-blue-900 dark:text-blue-200" : "text-slate-400"
                 )}>
                   Logs Found
                 </span>
               </div>
               <span className={cn("text-xl font-black",
-                matchingExportJournals.length > 0 ? "text-indigo-600 dark:text-indigo-400" : "text-slate-400"
+                matchingExportJournals.length > 0 ? "text-blue-600 dark:text-blue-400" : "text-slate-400"
               )}>
                 {matchingExportJournals.length}
                 <span className="text-sm font-semibold ml-1">day{matchingExportJournals.length !== 1 ? 's' : ''}</span>
@@ -1465,7 +1465,7 @@ export function DailyJournal() {
             <Button
               onClick={handleRunExport}
               disabled={matchingExportJournals.length === 0}
-              className="h-11 sm:h-10 w-full sm:w-auto px-6 bg-indigo-600 hover:bg-indigo-700 text-white font-bold shadow-md gap-2 order-1 sm:order-2"
+              className="h-11 sm:h-10 w-full sm:w-auto px-6 bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-md gap-2 order-1 sm:order-2"
             >
               <FileText className="h-4 w-4 shrink-0" />
               Generate Preview

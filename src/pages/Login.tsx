@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/src/hooks/useAuth';
 import { useAuthStore } from '@/src/store/auth';
-import { useUserStore } from '@/src/store/userStore';
+import { useUserStore, AppUser, NO_ACCESS, backfillPrivileges } from '@/src/store/userStore';
 import { supabase } from '@/src/integrations/supabase/client';
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
@@ -133,6 +133,26 @@ export function Login() {
         role: userRole,
         avatar: profile?.avatar,
       });
+
+      const freshPrivs = backfillPrivileges(NO_ACCESS, profile?.privileges || {});
+      const appUser: AppUser = {
+        id: user.id,
+        name: profile?.name || user.email || '',
+        email: user.email || '',
+        password: '',
+        workspaceId: profile?.workspace_id || 'dcel-team',
+        privileges: freshPrivs,
+        isActive: profile?.is_active ?? true,
+        createdAt: profile?.created_at || new Date().toISOString(),
+        role: userRole,
+        avatar: profile?.avatar,
+      };
+      const existingUsers = useUserStore.getState().users;
+      if (existingUsers.some((u) => u.id === user.id)) {
+        useUserStore.getState().updateUser(user.id, appUser);
+      } else {
+        useUserStore.setState({ users: [...existingUsers, appUser] });
+      }
       setCurrentUser(user.id);
 
       // Save email for memory (autocomplete)
@@ -201,13 +221,13 @@ export function Login() {
   return (
     <div className="min-h-full flex">
       {/* ── Left Panel ─────────────────────────────────────────── */}
-      <div className="hidden lg:flex lg:w-[55%] bg-gradient-to-br from-[#0d1b3e] via-[#0f2260] to-[#0d1b3e] relative overflow-hidden flex-col justify-between">
+      <div className="hidden lg:flex lg:w-[55%] bg-slate-950 relative overflow-hidden flex-col justify-between">
 
         {/* Decorative blobs */}
         <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute -top-32 -left-32 w-[500px] h-[500px] bg-indigo-600/15 rounded-full blur-3xl" />
+          <div className="absolute -top-32 -left-32 w-[500px] h-[500px] bg-blue-600/15 rounded-full blur-3xl" />
           <div className="absolute bottom-0 right-0 w-[400px] h-[400px] bg-blue-500/10 rounded-full blur-3xl" />
-          <div className="absolute top-1/2 left-1/3 w-72 h-72 bg-purple-600/10 rounded-full blur-3xl" />
+          <div className="absolute top-1/2 left-1/3 w-72 h-72 bg-sky-600/10 rounded-full blur-3xl" />
         </div>
 
         {/* Grid pattern overlay */}
@@ -258,7 +278,7 @@ export function Login() {
         </div>
 
         {/* Bottom gradient line */}
-        <div className="relative z-10 h-1 bg-gradient-to-r from-blue-500 via-purple-400 to-blue-500" />
+        <div className="relative z-10 h-1 bg-blue-600" />
       </div>
 
       {/* ── Right Panel (Form) ──────────────────────────────────── */}

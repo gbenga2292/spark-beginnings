@@ -271,7 +271,7 @@ export function WeeklyReport() {
     <div className="relative flex items-center gap-2">
       {showPreview ? (
         <>
-          <Button size="sm" variant="outline" onClick={() => setShowPreview(false)} className="h-9 w-9 border-slate-200 bg-white text-slate-600 hover:bg-slate-50 shadow-sm" title="Close Preview">
+          <Button size="sm" variant="outline" onClick={() => setShowPreview(false)} className="h-9 w-9 border-slate-200 bg-white text-slate-600 hover:bg-slate-50" title="Close Preview">
             <X className="h-5 w-5 text-slate-400" />
           </Button>
           <Button size="sm" onClick={() => generateProfessionalPDF('download')} className="h-9 w-9 bg-slate-900 hover:bg-black text-white shadow-lg shadow-slate-200" title="Download PDF">
@@ -280,8 +280,8 @@ export function WeeklyReport() {
         </>
       ) : (
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={handleExportXLSX} className="h-8 sm:h-9 px-3 gap-1.5 border-slate-200 bg-white text-slate-600 hover:bg-slate-50 shadow-sm shrink-0" title="Export Excel">
-            <Download className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-indigo-500" />
+          <Button variant="outline" size="sm" onClick={handleExportXLSX} className="h-8 sm:h-9 px-3 gap-1.5 border-slate-200 bg-white text-slate-600 hover:bg-slate-50 shrink-0" title="Export Excel">
+            <Download className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-600" />
             <span className="text-[10px] sm:text-xs font-semibold">Export</span>
           </Button>
           <Button size="sm" onClick={() => { setShowPreview(true); setShowFiltersDropdown(false); }} className="h-8 sm:h-9 px-3 gap-1.5 bg-slate-900 hover:bg-black text-white shadow-lg shadow-slate-200 shrink-0" title="View PDF Report">
@@ -293,12 +293,12 @@ export function WeeklyReport() {
             <button
               onClick={() => setShowFiltersDropdown(!showFiltersDropdown)}
               className={cn(
-                "h-8 sm:h-9 px-3 gap-1.5 bg-white dark:bg-slate-900 border rounded-lg sm:rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-all shadow-sm flex items-center text-slate-600 dark:text-slate-300 font-bold text-[10px] sm:text-xs",
-                showFiltersDropdown ? "border-indigo-500 text-indigo-600 ring-2 ring-indigo-500/10" : "border-slate-200 dark:border-slate-700"
+                "h-8 sm:h-9 px-3 gap-1.5 bg-white dark:bg-slate-900 border rounded-lg sm:rounded-md hover:bg-slate-50 dark:hover:bg-slate-800 transition-all  flex items-center text-slate-600 dark:text-slate-300 font-bold text-[10px] sm:text-xs",
+                showFiltersDropdown ? "border-blue-500 text-blue-600 ring-2 ring-blue-500/10" : "border-slate-200 dark:border-slate-700"
               )}
               title="Toggle Filters"
             >
-              <SlidersHorizontal className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-indigo-500" />
+              <SlidersHorizontal className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-600" />
               <span>Filters</span>
             </button>
 
@@ -308,14 +308,14 @@ export function WeeklyReport() {
                   className="fixed inset-0 z-30" 
                   onClick={() => setShowFiltersDropdown(false)} 
                 />
-                <div className="absolute right-0 top-full mt-2 z-40 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl p-4 min-w-[280px] w-80 space-y-4 animate-in fade-in slide-in-from-top-2 duration-150 text-left">
+                <div className="absolute right-0 top-full mt-2 z-40 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md shadow-xl p-4 min-w-[280px] w-80 space-y-4 animate-in fade-in slide-in-from-top-2 duration-150 text-left">
                   <div>
                     <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block mb-2">Report Type</label>
-                    <div className="grid grid-cols-2 bg-slate-100 dark:bg-slate-800 rounded-xl p-1 gap-1 border border-slate-200 dark:border-slate-700">
+                    <div className="grid grid-cols-2 bg-slate-100 dark:bg-slate-800 rounded-md p-1 gap-1 border border-slate-200 dark:border-slate-700">
                       {(['weekly', 'monthly'] as const).map(mode => (
                         <button key={mode} onClick={() => setReportMode(mode)}
                           className={cn("py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all duration-150 flex-1",
-                            reportMode === mode ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-sm border border-slate-200 dark:border-slate-700" : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200")}>
+                            reportMode === mode ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100  border border-slate-200 dark:border-slate-700" : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200")}>
                           {mode}
                         </button>
                       ))}
@@ -324,15 +324,15 @@ export function WeeklyReport() {
 
                   <div>
                     <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block mb-2">Select Date Period</label>
-                    <div className="flex items-center bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 shadow-inner overflow-hidden justify-between">
-                      <button onClick={() => setAnchor(a => reportMode === 'monthly' ? subMonths(a, 1) : subWeeks(a, 1))} className="h-9 w-9 flex items-center justify-center text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/30 active:scale-95 transition-all">
+                    <div className="flex items-center bg-slate-50 dark:bg-slate-950 rounded-md border border-slate-200 dark:border-slate-800 shadow-inner overflow-hidden justify-between">
+                      <button onClick={() => setAnchor(a => reportMode === 'monthly' ? subMonths(a, 1) : subWeeks(a, 1))} className="h-9 w-9 flex items-center justify-center text-slate-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30 active:scale-95 transition-all">
                         <ChevronLeft className="h-4 w-4" />
                       </button>
                       <div className="flex items-center gap-1.5 px-1 justify-center flex-1 min-w-0">
-                        <span className="h-1.5 w-1.5 rounded-full bg-indigo-500 shrink-0" />
+                        <span className="h-1.5 w-1.5 rounded-full bg-blue-600 shrink-0" />
                         <span className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate text-center leading-none">{reportLabel}</span>
                       </div>
-                      <button onClick={() => setAnchor(a => reportMode === 'monthly' ? addMonths(a, 1) : addWeeks(a, 1))} className="h-9 w-9 flex items-center justify-center text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/30 active:scale-95 transition-all">
+                      <button onClick={() => setAnchor(a => reportMode === 'monthly' ? addMonths(a, 1) : addWeeks(a, 1))} className="h-9 w-9 flex items-center justify-center text-slate-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30 active:scale-95 transition-all">
                         <ChevronRight className="h-4 w-4" />
                       </button>
                     </div>
@@ -341,13 +341,13 @@ export function WeeklyReport() {
                   <div className="flex gap-2 pt-1.5 border-t border-slate-100 dark:border-slate-800">
                     <button 
                       onClick={() => setAnchor(new Date())} 
-                      className="flex-1 h-9 text-xs font-bold text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-indigo-50 dark:hover:bg-indigo-950/30 hover:text-indigo-600 transition-all shadow-sm"
+                      className="flex-1 h-9 text-xs font-bold text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md hover:bg-blue-50 dark:hover:bg-blue-950/30 hover:text-blue-600 transition-all"
                     >
                       Today
                     </button>
                     <button 
                       onClick={() => setShowFiltersDropdown(false)} 
-                      className="flex-1 h-9 text-xs font-bold text-white bg-slate-900 dark:bg-slate-100 dark:text-slate-900 rounded-xl hover:opacity-90 transition-all shadow-sm"
+                      className="flex-1 h-9 text-xs font-bold text-white bg-slate-900 dark:bg-slate-100 dark:text-slate-900 rounded-md hover:opacity-90 transition-all"
                     >
                       Done
                     </button>
@@ -725,10 +725,10 @@ export function WeeklyReport() {
             { label: 'Diesel Consumed', value: `${totalDiesel.toFixed(0)}L`, icon: Fuel, color: 'text-amber-600 bg-amber-100/50', show: privs.canViewOps },
             { label: 'Income', value: totalIncome.toLocaleString(), icon: TrendingUp, color: 'text-emerald-600 bg-emerald-100/50', isCurrency: true, sub: `${weekPayments.length} payment${weekPayments.length !== 1 ? 's' : ''}`, show: privs.canViewFinance },
             { label: 'Expenses', value: totalExpenses.toLocaleString(), icon: TrendingDown, color: 'text-rose-600 bg-rose-100/50', isCurrency: true, show: privs.canViewFinance },
-            { label: 'Comms', value: weekCommLogs.length, icon: MessageSquare, color: 'text-indigo-600 bg-indigo-100/50', show: privs.canViewComm },
-            { label: 'HR Incidents', value: weekMerits.length + weekDisciplinary.length, icon: ShieldAlert, color: 'text-violet-600 bg-violet-100/50', show: privs.canViewHr },
+            { label: 'Comms', value: weekCommLogs.length, icon: MessageSquare, color: 'text-blue-600 bg-blue-50 dark:bg-blue-950/40', show: privs.canViewComm },
+            { label: 'HR Incidents', value: weekMerits.length + weekDisciplinary.length, icon: ShieldAlert, color: 'text-amber-600 bg-amber-50 dark:bg-amber-950/40', show: privs.canViewHr },
           ].filter(s => s.show || currentUser?.role === 'admin').map(stat => (
-            <Card key={stat.label} className="border border-border/50 shadow-sm bg-card rounded-xl overflow-hidden hover:shadow-md transition-shadow">
+            <Card key={stat.label} className="border border-border/50 bg-card rounded-md overflow-hidden hover: transition-shadow">
               <CardContent className="p-3 flex flex-col gap-2">
                 <div className="flex items-center justify-between gap-1">
                   <div className={cn('h-7 w-7 rounded-lg flex items-center justify-center shrink-0', stat.color)}>
@@ -760,7 +760,7 @@ export function WeeklyReport() {
             <section className="space-y-4">
               <div className="flex items-center justify-between px-1 mb-2">
                 <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400">
+                  <div className="h-10 w-10 rounded-md bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400">
                     <Users className="h-5 w-5" />
                   </div>
                   <div>
@@ -772,7 +772,7 @@ export function WeeklyReport() {
               </div>
 
               {/* Attendance Table */}
-              <Card className="border border-border/50 shadow-sm rounded-2xl bg-card overflow-hidden">
+              <Card className="border border-border/50 rounded-md bg-card overflow-hidden">
                 <div className="px-5 py-4 border-b border-border flex items-center justify-between">
                    <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">Attendance & Shifts</CardTitle>
                 </div>
@@ -873,7 +873,7 @@ export function WeeklyReport() {
                             <td className="px-6 py-4">
                               {r.isPresent ? (
                                 <div className="flex items-center gap-1.5 font-bold text-[9px] uppercase text-emerald-500">
-                                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_4px_rgba(16,185,129,0.5)]" /> Active
+                                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Active
                                 </div>
                               ) : (
                                 <Badge className="bg-slate-100 text-slate-400 border-none text-[9px] font-black px-2 py-0.5 uppercase">Inactive</Badge>
@@ -889,7 +889,7 @@ export function WeeklyReport() {
 
               {/* HR Events Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Card className="border-none shadow-sm rounded-xl bg-white dark:bg-slate-900 overflow-hidden">
+                <Card className="border-none rounded-md bg-white dark:bg-slate-900 overflow-hidden">
                   <CardHeader className="py-4 px-6 border-b dark:border-slate-800 bg-emerald-50/20 dark:bg-emerald-950/10">
                     <CardTitle className="text-[10px] font-black text-emerald-600 uppercase tracking-widest flex items-center gap-2">
                       <TrendingUp className="h-3.5 w-3.5" /> Recognition & Merits
@@ -914,7 +914,7 @@ export function WeeklyReport() {
                   </CardContent>
                 </Card>
 
-                <Card className="border-none shadow-sm rounded-xl bg-white dark:bg-slate-900 overflow-hidden">
+                <Card className="border-none rounded-md bg-white dark:bg-slate-900 overflow-hidden">
                   <CardHeader className="py-4 px-6 border-b dark:border-slate-800 bg-rose-50/20 dark:bg-rose-950/10">
                     <CardTitle className="text-[10px] font-black text-rose-600 uppercase tracking-widest flex items-center gap-2">
                       <TrendingDown className="h-3.5 w-3.5" /> Disciplinary Actions
@@ -947,7 +947,7 @@ export function WeeklyReport() {
             <section className="space-y-4">
               <div className="flex items-center justify-between px-1">
                 <div className="flex items-center gap-2">
-                  <div className="h-8 w-8 rounded-lg bg-emerald-600 flex items-center justify-center text-white shadow-md shadow-emerald-200">
+                  <div className="h-8 w-8 rounded-lg bg-emerald-600 flex items-center justify-center text-white shadow-emerald-200">
                     <Activity className="h-4 w-4" />
                   </div>
                   <h2 className="text-base font-bold text-slate-800 dark:text-slate-200 tracking-tight">Operational Activity</h2>
@@ -958,7 +958,7 @@ export function WeeklyReport() {
               {/* Machine Site Summary Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {siteMachineSummary.map((site, si) => (
-                  <Card key={si} className="border-none shadow-sm rounded-xl bg-white dark:bg-slate-900 overflow-hidden border-t-4 border-t-emerald-500">
+                  <Card key={si} className="border-none rounded-md bg-white dark:bg-slate-900 overflow-hidden border-t-4 border-t-emerald-500">
                     <CardHeader className="py-3 px-5 bg-slate-50/50 dark:bg-slate-800/30 border-b dark:border-slate-800">
                       <CardTitle className="text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center gap-2 uppercase tracking-tight">
                         <MapPin className="h-3.5 w-3.5 text-emerald-500" /> {site.siteName}
@@ -992,7 +992,7 @@ export function WeeklyReport() {
               </div>
 
               {/* Logistics Table */}
-              <Card className="border border-border/50 shadow-sm rounded-2xl bg-card overflow-hidden mt-6">
+              <Card className="border border-border/50 rounded-md bg-card overflow-hidden mt-6">
                 <div className="px-5 py-4 border-b border-border flex items-center justify-between">
                    <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">Fleet Movement Logs</CardTitle>
                 </div>
@@ -1033,7 +1033,7 @@ export function WeeklyReport() {
               </Card>
 
               {/* Daily Journals / Diary Table */}
-              <Card className="border border-border/50 shadow-sm rounded-2xl bg-card overflow-hidden mt-6">
+              <Card className="border border-border/50 rounded-md bg-card overflow-hidden mt-6">
                 <div className="px-5 py-4 border-b border-border flex items-center justify-between">
                    <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2"><BookOpen className="h-4 w-4 text-emerald-600" /> Operations Diary (Daily Journals)</CardTitle>
                 </div>
@@ -1052,7 +1052,7 @@ export function WeeklyReport() {
                             </h3>
                             <div className="space-y-4">
                               {entries.map(e => (
-                                <div key={e.id} className="bg-slate-50 dark:bg-slate-900/50 rounded-xl p-4 border border-border/50">
+                                <div key={e.id} className="bg-slate-50 dark:bg-slate-900/50 rounded-md p-4 border border-border/50">
                                   <div className="flex items-center justify-between mb-2">
                                     <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border-none font-bold text-[10px] uppercase">{e.siteName}</Badge>
                                     <span className="text-[10px] text-muted-foreground font-semibold">Logged by: {e.loggedBy}</span>
@@ -1079,20 +1079,20 @@ export function WeeklyReport() {
             {/* COMMUNICATIONS SECTION */}
             {(privs.canViewComm || currentUser?.role === 'admin') && (
             <section className="space-y-4">
-              <div className="flex items-center gap-2 border-b-2 border-indigo-500/10 pb-3 px-1">
-                <MessageSquare className="h-5 w-5 text-indigo-600" />
+              <div className="flex items-center gap-2 border-b-2 border-slate-200 dark:border-slate-800 pb-3 px-1">
+                <MessageSquare className="h-5 w-5 text-blue-600" />
                 <h2 className="text-base font-bold text-slate-800 dark:text-slate-200 tracking-tight">Communications</h2>
               </div>
 
-              <Card className="border-none shadow-sm overflow-hidden rounded-xl bg-white dark:bg-slate-900">
+              <Card className="border-none overflow-hidden rounded-md bg-white dark:bg-slate-900">
                 <div className="grid grid-cols-2 border-b dark:border-slate-800 bg-slate-50/30 dark:bg-slate-800/30">
                    <div className="p-3 text-center border-r dark:border-slate-800">
                       <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">External</p>
-                      <p className="text-xl font-black text-indigo-600 tracking-tighter">{weekExternalComm.length}</p>
+                      <p className="text-xl font-black text-blue-600 tracking-tighter">{weekExternalComm.length}</p>
                    </div>
                    <div className="p-3 text-center">
                       <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Internal</p>
-                      <p className="text-xl font-black text-violet-600 tracking-tighter">{weekInternalComm.length}</p>
+                      <p className="text-xl font-black text-sky-600 tracking-tighter">{weekInternalComm.length}</p>
                    </div>
                 </div>
                 <CardContent className="p-0 max-h-[450px] overflow-y-auto scrollbar-hide">
@@ -1103,7 +1103,7 @@ export function WeeklyReport() {
                         {weekCommLogs.sort((a,b) => b.date.localeCompare(a.date)).map(l => (
                           <div key={l.id} className="p-4 hover:bg-slate-50/30 transition-all">
                              <div className="flex justify-between items-start mb-1.5">
-                                <span className="text-[8px] font-black text-indigo-500 uppercase tracking-tight bg-indigo-50 dark:bg-indigo-900/20 px-1.5 py-0.5 rounded border dark:border-slate-800">{l.channel}</span>
+                                <span className="text-[8px] font-black text-blue-600 uppercase tracking-tight bg-blue-50 dark:bg-blue-900/20 px-1.5 py-0.5 rounded border dark:border-slate-800">{l.channel}</span>
                                 <span className="text-[9px] text-slate-300 font-mono font-bold">{l.date}</span>
                              </div>
                              <p className="text-[11px] font-black text-slate-800 dark:text-slate-200 leading-tight mb-1">
@@ -1125,8 +1125,8 @@ export function WeeklyReport() {
                                 <span className="text-[8px] font-bold text-slate-400 uppercase">
                                   {l.contactPerson ? `With: ${l.contactPerson}` : 'General Update'}
                                 </span>
-                                <Badge className={cn("text-[8px] border-none font-black px-1.5 py-0", l.isInternal ? "bg-violet-100 text-violet-600" : "bg-indigo-100 text-indigo-600")}>
-                                  {l.isInternal ? 'INTERNAL' : 'CLIENT'}
+                                <Badge className={cn("text-[8px] border-none font-black px-1.5 py-0", l.isInternal ? "bg-sky-100 text-sky-700 dark:bg-sky-950/40 dark:text-sky-400" : "bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400")}>
+                                  {l.isInternal ? "Internal" : "Client Facing"}
                                 </Badge>
                              </div>
                           </div>
@@ -1146,7 +1146,7 @@ export function WeeklyReport() {
                 <h2 className="text-base font-bold text-slate-800 dark:text-slate-200 tracking-tight">Payments Received</h2>
                 <Badge className="ml-auto bg-emerald-100 text-emerald-700 border-none text-[10px] font-black">{weekPayments.length} records</Badge>
               </div>
-              <Card className="border border-border/50 shadow-sm rounded-2xl bg-card overflow-hidden">
+              <Card className="border border-border/50 rounded-md bg-card overflow-hidden">
                 <CardContent className="p-0 divide-y divide-border/50">
                   {weekPayments.sort((a, b) => b.date.localeCompare(a.date)).map(p => (
                     <div key={p.id} className="px-4 py-3 hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">

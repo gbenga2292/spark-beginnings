@@ -220,8 +220,8 @@ export function HmoManagement() {
   useSetPageTitle(
     'LASHMA / HMO Management',
     'Track employee health insurance policies and manage renewals',
-    <Button onClick={handleExportCSV} variant="outline" className="flex items-center gap-2 shadow-sm border-slate-200 bg-white text-slate-600 hover:bg-slate-50 font-bold text-[11px] uppercase tracking-tight h-9">
-      <Upload className="h-3.5 w-3.5 text-emerald-500" />
+    <Button onClick={handleExportCSV} variant="outline" className="flex items-center gap-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 font-semibold text-xs h-9 rounded-md shadow-none">
+      <Upload className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
       Export CSV
     </Button>
   );
@@ -230,32 +230,32 @@ export function HmoManagement() {
   // Render
   // -------------------------------------------------------------------------
   return (
-    <div className="p-6">
+    <div className="p-4 sm:p-6">
       {/* Tabs */}
-      <div className="flex space-x-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg w-fit mb-6">
+      <div className="flex space-x-1 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-1 rounded-md w-fit mb-6">
         <button
           onClick={() => setActiveTab('directory')}
-          className={`px-4 py-2 text-sm font-medium rounded-md transition-colors flex items-center gap-2 ${
+          className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors flex items-center gap-2 ${
             activeTab === 'directory'
               ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm'
               : 'text-slate-500 dark:text-slate-400 hover:text-slate-700'
           }`}
         >
-          <ShieldAlert className="h-4 w-4" />
+          <ShieldAlert className="h-3.5 w-3.5" />
           Policy Directory
         </button>
         <button
           onClick={() => setActiveTab('renewals')}
-          className={`px-4 py-2 text-sm font-medium rounded-md transition-colors flex items-center gap-2 ${
+          className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors flex items-center gap-2 ${
             activeTab === 'renewals'
               ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm'
               : 'text-slate-500 dark:text-slate-400 hover:text-slate-700'
           }`}
         >
-          <AlertCircle className="h-4 w-4" />
+          <AlertCircle className="h-3.5 w-3.5" />
           Pending Renewals
           {pendingRenewals.length > 0 && (
-            <span className="bg-rose-100 text-rose-600 dark:bg-rose-500/20 dark:text-rose-400 px-1.5 py-0.5 rounded-full text-xs ml-1">
+            <span className="bg-rose-100 text-rose-600 dark:bg-rose-500/20 dark:text-rose-400 px-1.5 py-0.2 rounded-sm text-[10px] font-bold ml-1">
               {pendingRenewals.length}
             </span>
           )}
@@ -263,23 +263,23 @@ export function HmoManagement() {
       </div>
 
       {/* Table card */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md overflow-hidden shadow-none">
         <div className="p-4 border-b border-slate-200 dark:border-slate-800">
           <div className="relative w-full sm:w-72">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
             <input
               type="text"
               placeholder="Search employee or policy..."
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full pl-9 pr-3 py-1.5 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
           </div>
         </div>
 
         <div className="hidden md:block overflow-x-auto">
-          <table className="w-full text-sm text-left text-slate-500 dark:text-slate-400">
-            <thead className="text-xs text-slate-700 dark:text-slate-300 uppercase bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
+          <table className="w-full text-xs text-left text-slate-500 dark:text-slate-400">
+            <thead className="text-[11px] font-semibold text-slate-600 dark:text-slate-400 uppercase bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800">
               <tr>
                 <th className="px-5 py-3">Employee</th>
                 <th className="px-5 py-3">Policy Number</th>
@@ -290,7 +290,7 @@ export function HmoManagement() {
                 <th className="px-5 py-3 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {visibleRows.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-5 py-8 text-center text-slate-500">
@@ -303,15 +303,15 @@ export function HmoManagement() {
                   const expiryStatus        = getExpiryStatus(end);
 
                   return (
-                    <tr key={emp.id} className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50">
-                      <td className="px-5 py-3 font-medium text-slate-900 dark:text-white">
+                    <tr key={emp.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40">
+                      <td className="px-5 py-3 font-semibold text-slate-800 dark:text-slate-200">
                         {emp.firstname} {emp.surname}
                       </td>
-                      <td className="px-5 py-3">
-                        {emp.lashmaPolicyNumber || <span className="text-slate-300 italic">Not set</span>}
+                      <td className="px-5 py-3 font-mono text-[11px]">
+                        {emp.lashmaPolicyNumber || <span className="text-slate-400 italic">Not set</span>}
                       </td>
                       <td className="px-5 py-3 hidden md:table-cell">
-                        {formatDate(start) || <span className="text-slate-300 italic">Not set</span>}
+                        {formatDate(start) || <span className="text-slate-400 italic">Not set</span>}
                       </td>
                       <td className="px-5 py-3 hidden md:table-cell">{dur ? `${dur} months` : '-'}</td>
                       <td className="px-5 py-3">{formatDate(end) || '-'}</td>
@@ -321,7 +321,7 @@ export function HmoManagement() {
                       <td className="px-5 py-3 text-right">
                         <button
                           onClick={() => setViewHistoryEmp(emp)}
-                          className="text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300 font-medium text-xs px-2 py-1.5 inline-flex items-center gap-1 rounded transition-colors"
+                          className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 font-semibold text-xs px-2 py-1 inline-flex items-center gap-1 rounded transition-colors"
                         >
                           <History className="h-3.5 w-3.5" /> History
                         </button>
@@ -341,15 +341,15 @@ export function HmoManagement() {
             const expiryStatus        = getExpiryStatus(end);
 
             return (
-              <div key={`mobile-${emp.id}`} className="p-4 flex flex-col gap-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+              <div key={`mobile-${emp.id}`} className="p-4 flex flex-col gap-3 hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
                 <div className="flex items-start justify-between">
                   <div className="flex flex-col">
-                    <span className="font-bold text-slate-900 dark:text-white">{emp.firstname} {emp.surname}</span>
-                    <span className="text-xs text-slate-500 font-mono tracking-tight mt-0.5">{emp.lashmaPolicyNumber || 'No Policy Set'}</span>
+                    <span className="font-bold text-slate-800 dark:text-slate-200 text-xs">{emp.firstname} {emp.surname}</span>
+                    <span className="text-[11px] text-slate-500 font-mono tracking-tight mt-0.5">{emp.lashmaPolicyNumber || 'No Policy Set'}</span>
                   </div>
                   <button
                     onClick={() => setViewHistoryEmp(emp)}
-                    className="text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300 font-medium text-xs px-2 py-1.5 inline-flex items-center gap-1 rounded transition-colors"
+                    className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 font-semibold text-xs px-2 py-1 inline-flex items-center gap-1 rounded transition-colors"
                   >
                     <History className="h-3.5 w-3.5" /> History
                   </button>
@@ -398,25 +398,25 @@ function StatusBadge({ status }: { status: ExpiryStatus }) {
   switch (status) {
     case 'expired':
       return (
-        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-400">
-          <AlertCircle className="h-3.5 w-3.5" /> Expired
+        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-sm text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950/30 dark:text-rose-400 dark:border-rose-900/40">
+          <AlertCircle className="h-3 w-3" /> Expired
         </span>
       );
     case 'expiring-soon':
       return (
-        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400">
-          <Clock className="h-3.5 w-3.5" /> Expiring Soon
+        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-sm text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-900/40">
+          <Clock className="h-3 w-3" /> Expiring Soon
         </span>
       );
     case 'active':
       return (
-        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400">
-          <CheckCircle2 className="h-3.5 w-3.5" /> Active
+        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-sm text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-900/40">
+          <CheckCircle2 className="h-3 w-3" /> Active
         </span>
       );
     default:
       return (
-        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-600">
+        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-sm text-[11px] font-medium bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700">
           Unknown
         </span>
       );
@@ -441,65 +441,56 @@ const HmoHistoryModal = React.memo(function HmoHistoryModal({
       className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="bg-white dark:bg-slate-900 p-6 rounded-xl shadow-xl w-full max-w-lg">
+      <div className="bg-white dark:bg-slate-900 p-5 rounded-md border border-slate-200 dark:border-slate-800 shadow-xl w-full max-w-lg">
         {/* Modal header */}
-        <div className="flex justify-between items-center mb-4 border-b border-slate-100 dark:border-slate-800 pb-3">
-          <h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
-            <History className="text-slate-400 h-5 w-5" />
+        <div className="flex justify-between items-center mb-4 border-b border-slate-200 dark:border-slate-800 pb-3">
+          <h3 className="text-base font-bold text-slate-800 dark:text-white flex items-center gap-2">
+            <History className="text-blue-600 dark:text-blue-400 h-4 w-4" />
             HMO Renewal Log
           </h3>
 
-          {/* Close button — high-contrast red destructive X */}
+          {/* Close button */}
           <button
             onClick={onClose}
             aria-label="Close dialog"
-            className={[
-              'flex items-center justify-center',
-              'w-8 h-8 rounded-md',
-              'bg-red-500 hover:bg-red-600 active:bg-red-700',
-              'text-white',
-              'shadow-sm',
-              'transition-all duration-100',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:ring-offset-2',
-              'active:scale-95',
-            ].join(' ')}
+            className="flex items-center justify-center w-7 h-7 rounded-md bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors"
           >
-            <X className="h-4 w-4 stroke-[2.5]" />
+            <X className="h-3.5 w-3.5" />
           </button>
         </div>
 
-        <p className="text-sm text-slate-500 mb-4">
+        <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
           Historical record of HMO policy renewals for{' '}
           <span className="font-semibold text-slate-700 dark:text-slate-300">
             {emp.firstname} {emp.surname}
           </span>
         </p>
 
-        <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
+        <div className="space-y-3 max-h-80 overflow-y-auto pr-2">
           {hasHistory ? (
-            <div className="p-3 border border-slate-200 dark:border-slate-800 rounded-lg bg-slate-50 dark:bg-slate-800/50">
-              <p className="text-xs text-slate-400 mb-1">Current Active / Latest Entry</p>
+            <div className="p-3 border border-slate-200 dark:border-slate-800 rounded-md bg-slate-50 dark:bg-slate-800/50">
+              <p className="text-[10px] uppercase font-semibold text-slate-400 mb-1">Current Active / Latest Entry</p>
               <div className="flex justify-between items-center">
                 <div>
-                  <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+                  <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 font-mono">
                     Policy: {emp.lashmaPolicyNumber || 'N/A'}
                   </p>
-                  <p className="text-xs font-medium text-slate-500">
+                  <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mt-0.5">
                     {formatDate(start) || 'N/A'} – {formatDate(end) || 'N/A'}{dur ? ` (${dur} months)` : ''}
                   </p>
                 </div>
               </div>
             </div>
           ) : (
-            <div className="text-center py-6 text-slate-400 text-sm italic">
+            <div className="text-center py-6 text-slate-400 text-xs italic">
               No renewal history found.
             </div>
           )}
         </div>
 
         {/* Footer */}
-        <div className="mt-6 flex justify-end gap-3 border-t border-slate-100 dark:border-slate-800 pt-3">
-          <Button variant="outline" onClick={onClose}>Close</Button>
+        <div className="mt-5 flex justify-end gap-3 border-t border-slate-200 dark:border-slate-800 pt-3">
+          <Button variant="outline" size="sm" onClick={onClose} className="rounded-md text-xs h-8 shadow-none border-slate-200 dark:border-slate-700">Close</Button>
         </div>
       </div>
     </div>

@@ -152,21 +152,21 @@ export function DiaryDetailView({
     <div className="space-y-5">
       {/* Top bar */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <button onClick={onBack} className="flex items-center gap-2 text-sm text-slate-500 hover:text-indigo-600 font-semibold transition-colors">
+        <button onClick={onBack} className="flex items-center gap-2 text-sm text-slate-500 hover:text-blue-600 font-semibold transition-colors">
           <ArrowLeft className="h-4 w-4" /> Back to Calendar
         </button>
         {onDateChange && (
           <div className="flex items-center gap-1.5 ml-auto">
             <button 
               onClick={() => onDateChange(format(subDays(diaryDate, 1), 'yyyy-MM-dd'))} 
-              className="flex items-center justify-center h-8 w-8 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 hover:text-indigo-600 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors shadow-sm"
+              className="flex items-center justify-center h-8 w-8 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 hover:text-blue-600 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors shadow-sm"
               title="Previous Date"
             >
               <ChevronLeft className="h-4 w-4" />
             </button>
             <button 
               onClick={() => onDateChange(format(addDays(diaryDate, 1), 'yyyy-MM-dd'))} 
-              className="flex items-center justify-center h-8 w-8 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 hover:text-indigo-600 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors shadow-sm"
+              className="flex items-center justify-center h-8 w-8 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 hover:text-blue-600 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors shadow-sm"
               title="Next Date"
             >
               <ChevronRight className="h-4 w-4" />
@@ -312,7 +312,7 @@ export function DiaryDetailView({
                                               </div>
                                               {onEditMachineLog && (
                                                 <button onClick={() => onEditMachineLog({id: ml.assetId, name: ml.assetName}, ml.siteId, ml.siteName)} 
-                                                  className="sm:opacity-0 sm:group-hover:opacity-100 p-1.5 rounded-md hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all ml-2 flex-shrink-0"
+                                                  className="sm:opacity-0 sm:group-hover:opacity-100 p-1.5 rounded-md hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-all ml-2 flex-shrink-0"
                                                   title="Edit Machine Log">
                                                   <Edit className="h-3.5 w-3.5" />
                                                 </button>

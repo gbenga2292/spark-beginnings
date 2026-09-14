@@ -266,8 +266,9 @@ export function SiteCopilotDrawer({ isOpen, onClose }: Props) {
           )}
         >
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-sky-400 flex items-center justify-center text-white shadow-md shadow-indigo-500/25">
-              <Bot className="w-4 h-4" />
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-700 to-slate-900 dark:bg-none dark:bg-slate-900 text-white flex items-center justify-center border border-white/15 dark:border-slate-700/80 shadow-md shadow-blue-950/25 dark:shadow-black/30 transition-colors relative">
+              <span className="absolute -inset-0.5 rounded-xl bg-white/20 blur-xs animate-pulse opacity-60 pointer-events-none" />
+              <Bot className="w-4 h-4 text-white relative z-10 drop-shadow-xs" />
             </div>
             <div>
               <div className="flex items-center gap-1.5">
@@ -276,9 +277,9 @@ export function SiteCopilotDrawer({ isOpen, onClose }: Props) {
                 </span>
                 <span className={cn(
                   "text-[10px] px-1.5 py-0.2 rounded font-semibold border",
-                  isDark 
-                    ? "bg-indigo-500/20 text-indigo-300 border-indigo-500/30" 
-                    : "bg-indigo-50 text-indigo-700 border-indigo-200"
+                  isDark
+                    ? "bg-slate-800 text-slate-300 border-slate-700"
+                    : "bg-blue-50 text-blue-700 border-blue-200"
                 )}>
                   Universal ERP
                 </span>

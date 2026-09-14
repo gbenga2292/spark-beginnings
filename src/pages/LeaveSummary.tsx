@@ -88,19 +88,19 @@ export function LeaveSummary() {
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-[1600px] mx-auto space-y-6">
 
-      <Card className="border-none shadow-sm overflow-hidden bg-white min-h-[500px] flex flex-col">
-        <div className="border-b border-slate-100 p-4 sm:p-5 flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center bg-slate-50/50">
+      <Card className="border border-slate-200 dark:border-slate-800 rounded-md shadow-none overflow-hidden bg-white dark:bg-slate-900 min-h-[500px] flex flex-col">
+        <div className="border-b border-slate-200 dark:border-slate-800 p-4 sm:p-5 flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center bg-slate-50/50 dark:bg-slate-900/50">
           <div className="flex items-center gap-2 ml-1">
-            <div className="h-8 w-8 rounded-lg bg-teal-100 flex items-center justify-center text-teal-600">
+            <div className="h-8 w-8 rounded-md bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-600 dark:text-slate-300">
               <ListFilter className="h-4 w-4" />
             </div>
-            <p className="font-semibold text-slate-700 text-sm">Leave Balances <span className="text-slate-400 font-normal">({filteredSummary.length})</span></p>
+            <p className="font-semibold text-slate-700 dark:text-slate-200 text-sm">Leave Balances <span className="text-slate-400 dark:text-slate-500 font-normal">({filteredSummary.length})</span></p>
           </div>
 
           <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-            <div className="flex bg-slate-200/50 p-1 rounded-lg w-full sm:w-auto">
+            <div className="flex bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-1 rounded-md w-full sm:w-auto">
               <select
-                className="bg-transparent w-full border-none text-sm font-semibold text-slate-600 px-2 py-1 outline-none cursor-pointer"
+                className="bg-transparent w-full border-none text-xs font-semibold text-slate-700 dark:text-slate-200 px-2 py-1 outline-none cursor-pointer"
                 value={filterLeaveType}
                 onChange={e => setFilterLeaveType(e.target.value)}
               >
@@ -110,14 +110,14 @@ export function LeaveSummary() {
                 ))}
               </select>
             </div>
-            <div className="flex bg-slate-200/50 p-1 rounded-lg w-full sm:w-auto">
+            <div className="flex bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-1 rounded-md w-full sm:w-auto">
               <select
-                className="bg-transparent w-full border-none text-sm font-semibold text-slate-600 px-2 py-1 outline-none cursor-pointer"
+                className="bg-transparent w-full border-none text-xs font-semibold text-slate-700 dark:text-slate-200 px-2 py-1 outline-none cursor-pointer"
                 value={filterDept}
                 onChange={e => setFilterDept(e.target.value)}
               >
                 <option value="All">All Departments</option>
-                {departments.map((dept, i) => (
+                {departments.map((dept) => (
                   <option key={dept.id} value={dept.name}>{dept.name}</option>
                 ))}
               </select>
@@ -126,7 +126,7 @@ export function LeaveSummary() {
               <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
               <Input 
                 placeholder="Search staff name..." 
-                className="pl-9 bg-white border-slate-200 h-9 text-sm focus-visible:ring-teal-500/50 rounded-lg shadow-sm" 
+                className="pl-9 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 dark:text-slate-100 h-9 text-xs focus-visible:ring-blue-500 rounded-md shadow-none" 
                 value={searchQuery} 
                 onChange={e => setSearchQuery(e.target.value)} 
               />
@@ -135,27 +135,27 @@ export function LeaveSummary() {
         </div>
 
         <div className="hidden md:block overflow-x-auto flex-1">
-          <table className="w-full text-left border-collapse text-sm">
+          <table className="w-full text-left border-collapse text-xs">
             <thead>
-              <tr className="bg-slate-100 text-slate-600 uppercase text-[11px] tracking-wider font-bold">
-                <th className="px-5 py-4">Employee</th>
-                <th className="px-5 py-4 hidden sm:table-cell">Department</th>
+              <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 uppercase text-[11px] tracking-wider font-semibold">
+                <th className="px-5 py-3">Employee</th>
+                <th className="px-5 py-3 hidden sm:table-cell">Department</th>
                 {filterLeaveType === 'All Leaves' ? (
                   <>
-                    <th className="px-5 py-4 text-center">Annual Leave</th>
-                    <th className="px-5 py-4 text-center">Days Taken</th>
-                    <th className="px-5 py-4 text-center">Remaining</th>
+                    <th className="px-5 py-3 text-center">Annual Leave</th>
+                    <th className="px-5 py-3 text-center">Days Taken</th>
+                    <th className="px-5 py-3 text-center">Remaining</th>
                   </>
                 ) : (
                   <>
-                    <th className="px-5 py-4 text-center">Times Taken</th>
-                    <th className="px-5 py-4 text-center">Days Taken</th>
+                    <th className="px-5 py-3 text-center">Times Taken</th>
+                    <th className="px-5 py-3 text-center">Days Taken</th>
                   </>
                 )}
-                <th className="px-5 py-4 text-center">Status</th>
+                <th className="px-5 py-3 text-center">Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {filteredSummary.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-5 py-12 text-center text-slate-500">
@@ -164,31 +164,31 @@ export function LeaveSummary() {
                 </tr>
               ) : (
                 filteredSummary.map(({ emp, deductibleTaken, remaining, entitlement, isCurrentlyOnLeave, timesTakenSpecific, daysTakenSpecific }) => (
-                  <tr key={emp.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-5 py-3 font-bold text-slate-800 uppercase text-xs">{emp.surname} {emp.firstname}</td>
-                    <td className="px-5 py-3 text-slate-500 text-xs hidden sm:table-cell">{emp.department}</td>
+                  <tr key={emp.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
+                    <td className="px-5 py-3 font-semibold text-slate-800 dark:text-slate-200 uppercase text-xs">{emp.surname} {emp.firstname}</td>
+                    <td className="px-5 py-3 text-slate-500 dark:text-slate-400 text-xs hidden sm:table-cell">{emp.department}</td>
                     {filterLeaveType === 'All Leaves' ? (
                       <>
-                        <td className="px-5 py-3 text-center font-mono font-semibold">{entitlement}</td>
+                        <td className="px-5 py-3 text-center font-semibold tabular-nums text-slate-700 dark:text-slate-300">{entitlement}</td>
                         <td className="px-5 py-3 text-center">
-                          <span className={`font-mono font-bold ${deductibleTaken > 0 ? 'text-amber-600' : 'text-slate-400'}`}>{deductibleTaken}</span>
+                          <span className={`font-semibold tabular-nums ${deductibleTaken > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-slate-400'}`}>{deductibleTaken}</span>
                         </td>
                         <td className="px-5 py-3 text-center">
-                          <span className={`font-mono font-bold ${remaining < 5 ? 'text-rose-600' : 'text-emerald-600'}`}>{remaining}</span>
+                          <span className={`font-semibold tabular-nums ${remaining < 5 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'}`}>{remaining}</span>
                         </td>
                       </>
                     ) : (
                       <>
                         <td className="px-5 py-3 text-center">
-                          <span className="font-mono font-bold text-indigo-600">{timesTakenSpecific}</span>
+                          <span className="font-semibold tabular-nums text-blue-600 dark:text-blue-400">{timesTakenSpecific}</span>
                         </td>
                         <td className="px-5 py-3 text-center">
-                          <span className={`font-mono font-bold ${daysTakenSpecific > 0 ? 'text-amber-600' : 'text-slate-400'}`}>{daysTakenSpecific}</span>
+                          <span className={`font-semibold tabular-nums ${daysTakenSpecific > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-slate-400'}`}>{daysTakenSpecific}</span>
                         </td>
                       </>
                     )}
                     <td className="px-5 py-3 text-center">
-                      <Badge variant="outline" className={isCurrentlyOnLeave ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-emerald-100 text-emerald-700 border-emerald-200'}>
+                      <Badge variant="outline" className={isCurrentlyOnLeave ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800/40' : 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800/40'}>
                         {isCurrentlyOnLeave ? 'On Leave' : 'Active'}
                       </Badge>
                     </td>
@@ -200,49 +200,49 @@ export function LeaveSummary() {
         </div>
 
         {/* Mobile View: Cards */}
-        <div className="md:hidden flex flex-col divide-y divide-slate-100 flex-1">
+        <div className="md:hidden flex flex-col divide-y divide-slate-100 dark:divide-slate-800 flex-1">
           {filteredSummary.length === 0 ? (
             <div className="px-5 py-12 text-center text-slate-500">
               No records found matching your filters.
             </div>
           ) : (
             filteredSummary.map(({ emp, deductibleTaken, remaining, entitlement, isCurrentlyOnLeave, timesTakenSpecific, daysTakenSpecific }) => (
-              <div key={`mobile-${emp.id}`} className="p-4 flex flex-col gap-3 hover:bg-slate-50 transition-colors">
+              <div key={`mobile-${emp.id}`} className="p-4 flex flex-col gap-3 hover:bg-slate-50/60 dark:hover:bg-slate-800/30 transition-colors">
                 <div className="flex items-start justify-between">
                   <div className="flex flex-col">
-                    <span className="font-bold text-slate-800 uppercase text-sm">{emp.surname} {emp.firstname}</span>
-                    <span className="text-xs text-slate-500 mt-0.5">{emp.department}</span>
+                    <span className="font-bold text-slate-800 dark:text-slate-200 uppercase text-xs">{emp.surname} {emp.firstname}</span>
+                    <span className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">{emp.department}</span>
                   </div>
-                  <Badge variant="outline" className={isCurrentlyOnLeave ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-emerald-100 text-emerald-700 border-emerald-200'}>
+                  <Badge variant="outline" className={isCurrentlyOnLeave ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800/40' : 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800/40'}>
                     {isCurrentlyOnLeave ? 'On Leave' : 'Active'}
                   </Badge>
                 </div>
 
-                <div className={`grid ${filterLeaveType === 'All Leaves' ? 'grid-cols-3' : 'grid-cols-2'} gap-2 text-sm mt-1`}>
+                <div className={`grid ${filterLeaveType === 'All Leaves' ? 'grid-cols-3' : 'grid-cols-2'} gap-2 text-xs mt-1`}>
                   {filterLeaveType === 'All Leaves' ? (
                     <>
-                      <div className="flex flex-col items-center bg-slate-50 p-2 rounded border border-slate-100">
-                        <span className="text-[10px] uppercase font-bold text-slate-400 text-center">Entitled</span>
-                        <span className="font-mono font-semibold text-slate-700 mt-1">{entitlement}</span>
+                      <div className="flex flex-col items-center bg-slate-50 dark:bg-slate-800/50 p-2 rounded-md border border-slate-200 dark:border-slate-800">
+                        <span className="text-[10px] uppercase font-semibold text-slate-500 text-center">Entitled</span>
+                        <span className="font-semibold tabular-nums text-slate-700 dark:text-slate-200 mt-1">{entitlement}</span>
                       </div>
-                      <div className="flex flex-col items-center bg-slate-50 p-2 rounded border border-slate-100">
-                        <span className="text-[10px] uppercase font-bold text-slate-400 text-center">Taken</span>
-                        <span className={`font-mono font-bold mt-1 ${deductibleTaken > 0 ? 'text-amber-600' : 'text-slate-400'}`}>{deductibleTaken}</span>
+                      <div className="flex flex-col items-center bg-slate-50 dark:bg-slate-800/50 p-2 rounded-md border border-slate-200 dark:border-slate-800">
+                        <span className="text-[10px] uppercase font-semibold text-slate-500 text-center">Taken</span>
+                        <span className={`font-semibold tabular-nums mt-1 ${deductibleTaken > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-slate-400'}`}>{deductibleTaken}</span>
                       </div>
-                      <div className="flex flex-col items-center bg-slate-50 p-2 rounded border border-slate-100">
-                        <span className="text-[10px] uppercase font-bold text-slate-400 text-center">Remaining</span>
-                        <span className={`font-mono font-bold mt-1 ${remaining < 5 ? 'text-rose-600' : 'text-emerald-600'}`}>{remaining}</span>
+                      <div className="flex flex-col items-center bg-slate-50 dark:bg-slate-800/50 p-2 rounded-md border border-slate-200 dark:border-slate-800">
+                        <span className="text-[10px] uppercase font-semibold text-slate-500 text-center">Remaining</span>
+                        <span className={`font-semibold tabular-nums mt-1 ${remaining < 5 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'}`}>{remaining}</span>
                       </div>
                     </>
                   ) : (
                     <>
-                      <div className="flex flex-col items-center bg-slate-50 p-2 rounded border border-slate-100">
-                        <span className="text-[10px] uppercase font-bold text-slate-400 text-center">Times Taken</span>
-                        <span className="font-mono font-bold text-indigo-600 mt-1">{timesTakenSpecific}</span>
+                      <div className="flex flex-col items-center bg-slate-50 dark:bg-slate-800/50 p-2 rounded-md border border-slate-200 dark:border-slate-800">
+                        <span className="text-[10px] uppercase font-semibold text-slate-500 text-center">Times Taken</span>
+                        <span className="font-semibold tabular-nums text-blue-600 dark:text-blue-400 mt-1">{timesTakenSpecific}</span>
                       </div>
-                      <div className="flex flex-col items-center bg-slate-50 p-2 rounded border border-slate-100">
-                        <span className="text-[10px] uppercase font-bold text-slate-400 text-center">Days Taken</span>
-                        <span className={`font-mono font-bold mt-1 ${daysTakenSpecific > 0 ? 'text-amber-600' : 'text-slate-400'}`}>{daysTakenSpecific}</span>
+                      <div className="flex flex-col items-center bg-slate-50 dark:bg-slate-800/50 p-2 rounded-md border border-slate-200 dark:border-slate-800">
+                        <span className="text-[10px] uppercase font-semibold text-slate-500 text-center">Days Taken</span>
+                        <span className={`font-semibold tabular-nums mt-1 ${daysTakenSpecific > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-slate-400'}`}>{daysTakenSpecific}</span>
                       </div>
                     </>
                   )}

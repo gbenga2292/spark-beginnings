@@ -189,14 +189,14 @@ export function QuickCheckout() {
   if (view === 'activity') {
     return (
       <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
-        <Card className="border-none shadow-sm overflow-hidden bg-white dark:bg-slate-900">
-          <CardHeader className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 py-4 px-5 sm:px-6 flex flex-row items-center justify-between space-y-0">
+        <Card className="rounded-md border border-slate-200 dark:border-slate-800 shadow-none overflow-hidden bg-card">
+          <CardHeader className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 py-3.5 px-5 sm:px-6 flex flex-row items-center justify-between space-y-0">
             <div>
-              <CardTitle className="text-sm font-semibold text-slate-700 dark:text-white">Recent Activity</CardTitle>
-              <CardDescription className="text-xs">Full history of all checkouts</CardDescription>
+              <CardTitle className="text-sm font-semibold text-slate-800 dark:text-slate-100">Recent Activity</CardTitle>
+              <CardDescription className="text-xs text-slate-500">Full history of all checkouts</CardDescription>
             </div>
             <select 
-              className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-semibold px-3 py-1.5 outline-none shadow-sm"
+              className="bg-background rounded-md border border-slate-200 dark:border-slate-700 text-xs font-medium px-3 py-1.5 outline-none"
               value={activityFilter}
               onChange={(e) => setActivityFilter(e.target.value)}
             >
@@ -222,19 +222,19 @@ export function QuickCheckout() {
                 }).map((c) => {
                   const isConsumed = c.status === 'consumed' || c.condition?.toLowerCase().includes('consumed');
                   return (
-                    <div key={c.id} className="flex items-center justify-between p-5 hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors">
+                    <div key={c.id} className="flex items-center justify-between p-4 sm:p-5 hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors">
                       <div className="flex flex-col">
-                        <span className="font-semibold text-slate-800 dark:text-white text-sm">{c.assetName}</span>
-                        <div className="flex items-center gap-2 text-xs text-slate-400 mt-1 flex-wrap">
-                          <Users className="h-3 w-3" />
+                        <span className="font-semibold text-slate-900 dark:text-white text-sm">{c.assetName}</span>
+                        <div className="flex items-center gap-2 text-xs text-slate-500 mt-1 flex-wrap">
+                          <Users className="h-3 w-3 text-slate-400" />
                           <span>{c.employeeName}</span>
                           {!c.employeeId && (
-                            <Badge variant="outline" className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 font-bold text-[9px] px-1 py-0 rounded">
+                            <Badge variant="outline" className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 font-bold text-[9px] px-1 py-0 rounded-sm">
                               External
                             </Badge>
                           )}
                           <span>•</span>
-                          <span>{c.quantity} units {c.returnedQuantity > 0 && `(Returned: ${c.returnedQuantity})`}</span>
+                          <span className="font-mono tabular-nums">{c.quantity} units {c.returnedQuantity > 0 && `(Returned: ${c.returnedQuantity})`}</span>
                           {c.notes && (
                             <>
                               <span>•</span>
@@ -245,7 +245,7 @@ export function QuickCheckout() {
                       </div>
                       <div className="flex items-center gap-4">
                         <Badge variant="outline" className={cn(
-                          "font-semibold px-2 py-0.5 rounded-full text-[11px]",
+                          "font-semibold px-2 py-0.5 rounded-sm text-[10px] uppercase tracking-wider",
                           c.status === 'outstanding' 
                             ? "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300" :
                           isConsumed 
@@ -254,8 +254,8 @@ export function QuickCheckout() {
                         )}>
                           {isConsumed ? 'consumed' : c.status.replace('_', ' ')}
                         </Badge>
-                        <span className="text-xs text-slate-400 hidden sm:flex items-center gap-1">
-                          <FileText className="h-3 w-3" />
+                        <span className="text-xs text-slate-500 font-mono tabular-nums hidden sm:flex items-center gap-1">
+                          <FileText className="h-3 w-3 text-slate-400" />
                           {formatDisplayDate(c.checkoutDate)}
                         </span>
                       </div>
@@ -274,44 +274,44 @@ export function QuickCheckout() {
     <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* New Checkout Form */}
-        <Card className="border-none shadow-sm overflow-hidden bg-white dark:bg-slate-900">
-          <CardHeader className="p-5 sm:p-6 pb-2">
-            <CardTitle className="text-base font-bold flex items-center gap-2 text-slate-800 dark:text-white">
-              <ShoppingCart className="h-5 w-5 text-blue-600" />
+        <Card className="rounded-md border border-slate-200 dark:border-slate-800 shadow-none overflow-hidden bg-card">
+          <CardHeader className="p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30">
+            <CardTitle className="text-sm font-bold flex items-center gap-2 text-slate-900 dark:text-white">
+              <ShoppingCart className="h-4 w-4 text-blue-600" />
               Direct Checkout
             </CardTitle>
-            <CardDescription className="text-xs">Assign assets to employees instantly</CardDescription>
+            <CardDescription className="text-xs text-slate-500">Assign assets to employees instantly</CardDescription>
           </CardHeader>
-          <CardContent className="p-5 sm:p-6 space-y-4">
+          <CardContent className="p-4 sm:p-6 space-y-4">
             <div className="space-y-4">
               
               {/* Searchable Asset Combobox */}
               <div className="space-y-2 relative" ref={assetDropdownRef}>
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-500 ml-1">Select Asset *</label>
+                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 ml-0.5">Select Asset *</label>
                 
                 <div 
                   onClick={() => setIsAssetMenuOpen(true)}
                   className={cn(
-                    "w-full min-h-[44px] rounded-lg border px-3 py-2 text-sm flex items-center justify-between cursor-pointer transition-all",
+                    "w-full min-h-[40px] rounded-md border px-3 py-2 text-sm flex items-center justify-between cursor-pointer transition-colors",
                     isDark ? "bg-slate-800 border-slate-700 hover:border-slate-600" : "bg-slate-50 border-slate-200 hover:border-slate-300",
-                    isAssetMenuOpen && "ring-2 ring-blue-500/20 border-blue-500"
+                    isAssetMenuOpen && "ring-1 ring-blue-500 border-blue-500"
                   )}
                 >
                   {selectedAssetObj ? (
                     <div className="flex items-center justify-between w-full pr-1">
                       <div className="flex items-center gap-2 min-w-0">
-                        <Package className="w-4 h-4 text-blue-500 shrink-0" />
+                        <Package className="w-4 h-4 text-blue-600 shrink-0" />
                         <span className={cn("font-semibold truncate", isDark ? "text-white" : "text-slate-900")}>
                           {selectedAssetObj.name}
                         </span>
                         {selectedAssetObj.category && (
-                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-medium">
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-sm bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-medium">
                             {selectedAssetObj.category}
                           </span>
                         )}
                       </div>
                       <span className={cn(
-                        "text-xs font-bold shrink-0 ml-2",
+                        "text-xs font-mono tabular-nums font-bold shrink-0 ml-2",
                         selectedAssetObj.availableQuantity > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-500"
                       )}>
                         {selectedAssetObj.availableQuantity} in stock
@@ -326,11 +326,11 @@ export function QuickCheckout() {
                 {/* Dropdown Menu */}
                 {isAssetMenuOpen && (
                   <div className={cn(
-                    "absolute top-full left-0 right-0 mt-1 z-50 rounded-xl border shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-150",
+                    "absolute top-full left-0 right-0 mt-1 z-50 rounded-md border shadow-lg overflow-hidden animate-in fade-in zoom-in-95 duration-150",
                     isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
                   )}>
                     {/* Search Input */}
-                    <div className="p-2 border-b border-slate-100 dark:border-slate-800 relative">
+                    <div className="p-2 border-b border-slate-200 dark:border-slate-800 relative">
                       <Search className="w-4 h-4 text-slate-400 absolute left-4 top-4.5" />
                       <input
                         type="text"
@@ -339,7 +339,7 @@ export function QuickCheckout() {
                         onChange={(e) => setAssetSearchQuery(e.target.value)}
                         placeholder="Type to search asset name, category, serial..."
                         className={cn(
-                          "w-full h-9 pl-9 pr-8 rounded-lg text-xs outline-none border transition-colors",
+                          "w-full h-8 pl-8 pr-8 rounded-md text-xs outline-none border transition-colors",
                           isDark 
                             ? "bg-slate-800 border-slate-700 text-white placeholder-slate-500 focus:border-blue-500" 
                             : "bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400 focus:border-blue-500"
@@ -348,7 +348,7 @@ export function QuickCheckout() {
                       {assetSearchQuery && (
                         <button 
                           onClick={() => setAssetSearchQuery('')}
-                          className="absolute right-4 top-4.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                          className="absolute right-4 top-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
                         >
                           <X className="w-3.5 h-3.5" />
                         </button>
@@ -373,7 +373,7 @@ export function QuickCheckout() {
                                 setIsAssetMenuOpen(false);
                               }}
                               className={cn(
-                                "flex items-center justify-between p-2.5 rounded-lg cursor-pointer transition-colors text-xs",
+                                "flex items-center justify-between p-2 rounded-sm cursor-pointer transition-colors text-xs",
                                 isSelected 
                                   ? (isDark ? "bg-blue-950/40 text-blue-300 border border-blue-800/40" : "bg-blue-50 text-blue-700 border border-blue-200")
                                   : (isDark ? "hover:bg-slate-800 text-slate-200" : "hover:bg-slate-50 text-slate-700")
@@ -382,14 +382,14 @@ export function QuickCheckout() {
                               <div className="min-w-0 flex-1 pr-2">
                                 <div className="flex items-center gap-1.5">
                                   <span className="font-semibold truncate text-sm">{a.name}</span>
-                                  {isSelected && <Check className="w-3.5 h-3.5 text-blue-500 shrink-0" />}
+                                  {isSelected && <Check className="w-3.5 h-3.5 text-blue-600 shrink-0" />}
                                 </div>
-                                <div className="flex items-center gap-2 mt-0.5 text-[11px] text-slate-400">
+                                <div className="flex items-center gap-2 mt-0.5 text-[11px] text-slate-500">
                                   <span>{a.category || 'General'}</span>
                                   {a.serialNumber && (
                                     <>
                                       <span>•</span>
-                                      <span className="font-mono">SN: {a.serialNumber}</span>
+                                      <span className="font-mono tabular-nums">SN: {a.serialNumber}</span>
                                     </>
                                   )}
                                 </div>
@@ -397,7 +397,7 @@ export function QuickCheckout() {
 
                               <div className="text-right shrink-0">
                                 <span className={cn(
-                                  "font-bold text-xs px-2 py-0.5 rounded-full",
+                                  "font-bold font-mono tabular-nums text-[11px] px-1.5 py-0.5 rounded-sm",
                                   isOutOfStock 
                                     ? "bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400" 
                                     : "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400"
@@ -416,25 +416,29 @@ export function QuickCheckout() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-slate-500 ml-1">Quantity *</label>
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 ml-0.5">Quantity *</label>
                   <Input 
                     type="number" 
                     value={quantity} 
                     min={1}
                     max={selectedAssetObj ? selectedAssetObj.availableQuantity : undefined}
                     onChange={(e) => setQuantity(Number(e.target.value))}
-                    className="h-11 rounded-md bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 focus:ring-blue-500/20 font-semibold text-center text-sm" 
+                    className="h-10 rounded-md bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 focus:ring-1 focus:ring-blue-500 font-mono tabular-nums font-semibold text-center text-sm" 
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-slate-500 ml-1">Duration (days)</label>
-                  <Input type="number" value={returnDays} onChange={(e) => setReturnDays(Number(e.target.value))}
-                    className="h-11 rounded-md bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 focus:ring-blue-500/20 font-semibold text-center text-sm" />
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 ml-0.5">Duration (days)</label>
+                  <Input 
+                    type="number" 
+                    value={returnDays} 
+                    onChange={(e) => setReturnDays(Number(e.target.value))}
+                    className="h-10 rounded-md bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 focus:ring-1 focus:ring-blue-500 font-mono tabular-nums font-semibold text-center text-sm" 
+                  />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-500 ml-1">Assign To *</label>
+                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 ml-0.5">Assign To *</label>
                 <select 
                   value={selectedEmployee} 
                   onChange={(e) => {
@@ -443,7 +447,7 @@ export function QuickCheckout() {
                       setCustomEmployeeName('');
                     }
                   }}
-                  className="w-full h-11 rounded-md bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-blue-500/20 font-medium text-slate-600 dark:text-slate-300 px-3 outline-none text-sm"
+                  className="w-full h-10 rounded-md bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-1 focus:ring-blue-500 font-medium text-slate-700 dark:text-slate-300 px-3 outline-none text-sm"
                 >
                   <option value="" disabled>Select site personnel</option>
                   {opsStaff.map(emp => (
@@ -455,13 +459,13 @@ export function QuickCheckout() {
 
               {selectedEmployee === 'other' && (
                 <div className="space-y-2 animate-in slide-in-from-top-2 duration-200">
-                  <label className="text-xs font-bold uppercase tracking-wider text-slate-500 ml-1">Name *</label>
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 ml-0.5">Name *</label>
                   <Input 
                     type="text" 
                     placeholder="Enter full name of non-employee" 
                     value={customEmployeeName} 
                     onChange={(e) => setCustomEmployeeName(e.target.value)}
-                    className="h-11 rounded-md bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 focus:ring-blue-500/20 font-semibold text-sm"
+                    className="h-10 rounded-md bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 focus:ring-1 focus:ring-blue-500 font-medium text-sm"
                   />
                 </div>
               )}
@@ -470,7 +474,7 @@ export function QuickCheckout() {
             <Button 
               onClick={handleCheckout}
               disabled={!selectedAsset || !selectedEmployee || (selectedEmployee === 'other' && !customEmployeeName.trim())}
-              className="w-full h-11 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm gap-2 shadow-sm disabled:opacity-50 mt-2"
+              className="w-full h-10 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm gap-2 shadow-none disabled:opacity-50 mt-2"
             >
               <ShoppingCart className="h-4 w-4" />
               Confirm Checkout
@@ -479,15 +483,15 @@ export function QuickCheckout() {
         </Card>
 
         {/* Outstanding Checkouts */}
-        <Card className="border-none shadow-sm overflow-hidden bg-white dark:bg-slate-900">
-          <CardHeader className="p-5 sm:p-6 pb-2">
-            <CardTitle className="text-base font-bold flex items-center gap-2 text-slate-800 dark:text-white">
-              <RotateCcw className="h-5 w-5 text-amber-500" />
-              Outstanding ({checkouts.filter(c => c.status === 'outstanding').length})
+        <Card className="rounded-md border border-slate-200 dark:border-slate-800 shadow-none overflow-hidden bg-card">
+          <CardHeader className="p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30">
+            <CardTitle className="text-sm font-bold flex items-center gap-2 text-slate-900 dark:text-white">
+              <RotateCcw className="h-4 w-4 text-amber-500" />
+              Outstanding <span className="font-mono tabular-nums">({checkouts.filter(c => c.status === 'outstanding').length})</span>
             </CardTitle>
-            <CardDescription className="text-xs">Recently assigned items awaiting return</CardDescription>
+            <CardDescription className="text-xs text-slate-500">Recently assigned items awaiting return</CardDescription>
           </CardHeader>
-          <CardContent className="p-5 sm:p-6 pt-2 space-y-3 max-h-[500px] overflow-y-auto">
+          <CardContent className="p-4 sm:p-5 space-y-3 max-h-[500px] overflow-y-auto">
             {checkouts.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-slate-400">
                 <ShoppingCart className="h-10 w-10 mb-3 opacity-30" />
@@ -499,26 +503,26 @@ export function QuickCheckout() {
                   key={c.id} 
                   onMouseEnter={() => setHoveredCheckout(c.id)}
                   onMouseLeave={() => setHoveredCheckout(null)}
-                  className="relative p-4 rounded-lg border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 hover:shadow-sm transition-all"
+                  className="relative p-3.5 rounded-md border border-slate-200 dark:border-slate-800 bg-background hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors"
                 >
                   <div className="flex items-start justify-between">
                     <div>
-                      <h4 className="font-semibold text-slate-800 dark:text-white text-sm">{c.assetName}</h4>
-                      <div className="text-xs text-slate-400 mt-1 flex items-center gap-1.5 flex-wrap">
+                      <h4 className="font-semibold text-slate-900 dark:text-white text-sm">{c.assetName}</h4>
+                      <div className="text-xs text-slate-500 mt-1 flex items-center gap-1.5 flex-wrap">
                         <span>{c.employeeName}</span>
                         {!c.employeeId && (
-                          <Badge variant="outline" className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 font-bold text-[9px] px-1 py-0 rounded">
+                          <Badge variant="outline" className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 font-bold text-[9px] px-1 py-0 rounded-sm">
                             External
                           </Badge>
                         )}
                         <span>•</span>
-                        <span>{formatDisplayDate(c.checkoutDate)}</span>
-                        {c.returnedQuantity > 0 && <span className="text-blue-500 ml-2">Returned: {c.returnedQuantity}</span>}
+                        <span className="font-mono tabular-nums">{formatDisplayDate(c.checkoutDate)}</span>
+                        {c.returnedQuantity > 0 && <span className="text-blue-600 dark:text-blue-400 font-mono tabular-nums ml-2">Returned: {c.returnedQuantity}</span>}
                       </div>
                     </div>
                     <div className="flex flex-col items-end gap-1">
-                      <span className="font-bold text-slate-600 dark:text-slate-400">×{c.quantity}</span>
-                      <Badge variant="outline" className="bg-amber-100 text-amber-700 border-amber-200 font-semibold text-[11px] px-2 py-0">
+                      <span className="font-bold font-mono tabular-nums text-slate-700 dark:text-slate-300">×{c.quantity}</span>
+                      <Badge variant="outline" className="bg-amber-100 text-amber-700 border-amber-200 font-semibold text-[10px] uppercase tracking-wider px-1.5 py-0 rounded-sm">
                         Awaiting
                       </Badge>
                     </div>
@@ -526,11 +530,11 @@ export function QuickCheckout() {
 
                   {hoveredCheckout === c.id && (
                     <div className="flex items-center gap-2 mt-3 animate-in fade-in duration-200">
-                      <Button variant="outline" className="flex-1 h-9 rounded-lg font-semibold text-slate-600 dark:text-slate-300 text-xs gap-2"
+                      <Button variant="outline" className="flex-1 h-8 rounded-md font-medium text-slate-700 dark:text-slate-300 text-xs gap-2 border-slate-200 dark:border-slate-700"
                         onClick={() => openReturnDialog(c)}>
                         <RotateCcw className="h-3.5 w-3.5" /> Update Status
                       </Button>
-                      <Button variant="ghost" size="icon" className="h-9 w-9 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg"
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-md"
                         onClick={() => deleteCheckout(c.id)}>
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -545,7 +549,7 @@ export function QuickCheckout() {
 
       <Button 
         variant="outline"
-        className="w-full h-11 border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-all font-semibold text-slate-500 text-sm gap-2"
+        className="w-full h-10 rounded-md border-slate-200 dark:border-slate-800 shadow-none font-medium text-slate-600 dark:text-slate-400 text-xs gap-2"
         onClick={() => setView('activity')}
       >
         <FileText className="h-4 w-4" />
@@ -556,43 +560,43 @@ export function QuickCheckout() {
       {checkoutToUpdate && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-0">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setCheckoutToUpdate(null)} />
-          <div className="bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-full max-w-[420px] relative z-10 animate-in zoom-in-95 fade-in duration-200 overflow-hidden flex flex-col">
-            <div className="flex justify-between items-center p-5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50">
+          <div className="bg-card rounded-md border border-slate-200 dark:border-slate-800 shadow-xl w-full max-w-[420px] relative z-10 animate-in zoom-in-95 fade-in duration-200 overflow-hidden flex flex-col">
+            <div className="flex justify-between items-center p-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50">
               <div>
-                <h2 className="text-base font-bold text-slate-800 dark:text-white">Update Item Status</h2>
-                <p className="text-xs text-slate-400">{checkoutToUpdate.assetName} (Total: {checkoutToUpdate.quantity})</p>
+                <h2 className="text-sm font-bold text-slate-900 dark:text-white">Update Item Status</h2>
+                <p className="text-xs text-slate-500">{checkoutToUpdate.assetName} (Total: <span className="font-mono tabular-nums font-bold">{checkoutToUpdate.quantity}</span>)</p>
               </div>
               <button 
                 onClick={() => setCheckoutToUpdate(null)}
                 className="text-slate-400 hover:text-slate-600 transition-colors"
               >
-                <div className="h-4 w-4 flex items-center justify-center">✕</div>
+                <div className="h-4 w-4 flex items-center justify-center text-sm">✕</div>
               </button>
             </div>
             
-            <div className="p-5 space-y-4">
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">Quantity to Update</label>
+            <div className="p-4 space-y-4">
+              <div className="space-y-3.5">
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">Quantity to Update</label>
                   <Input 
                     type="number" 
                     value={returnQty} 
                     onChange={(e) => setReturnQty(Number(e.target.value))}
                     min={1}
                     max={checkoutToUpdate.quantity - checkoutToUpdate.returnedQuantity}
-                    className="h-11 rounded-lg border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-offset-0 focus-visible:border-blue-500 shadow-sm" 
+                    className="h-10 rounded-md border-slate-200 dark:border-slate-700 focus-visible:ring-1 focus-visible:ring-blue-500 font-mono tabular-nums" 
                   />
-                  <p className="text-[11px] text-slate-400">
+                  <p className="text-[11px] text-slate-400 font-mono tabular-nums">
                     Max: {checkoutToUpdate.quantity - checkoutToUpdate.returnedQuantity} units awaiting status update
                   </p>
                 </div>
 
-                <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">Condition / Action</label>
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">Condition / Action</label>
                   <select 
                     value={returnCondition} 
                     onChange={(e) => setReturnCondition(e.target.value)}
-                    className="w-full h-11 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 outline-none text-sm px-3 appearance-none font-medium text-slate-700 dark:text-slate-200"
+                    className="w-full h-10 rounded-md bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 outline-none text-xs px-3 appearance-none font-medium text-slate-700 dark:text-slate-200"
                     style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E\")", backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center' }}
                   >
                     <option value="Returned (Good)">Returned (Good) - Restore to Available Stock</option>
@@ -602,29 +606,29 @@ export function QuickCheckout() {
                   </select>
                 </div>
 
-                <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">Notes (Optional)</label>
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">Notes (Optional)</label>
                   <textarea 
                     placeholder="Add any notes about this usage, return condition, or job reference..."
                     value={returnNotes}
                     onChange={(e) => setReturnNotes(e.target.value)}
-                    className="w-full min-h-[70px] rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-2.5 text-xs text-slate-600 dark:text-slate-300 outline-none resize-none font-medium"
+                    className="w-full min-h-[70px] rounded-md bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-2.5 text-xs text-slate-700 dark:text-slate-200 outline-none resize-none font-medium"
                   />
                 </div>
               </div>
               
-              <div className="flex gap-3 pt-2">
+              <div className="flex gap-2 pt-2">
                 <Button 
                   variant="outline" 
-                  className="flex-1 h-10 rounded-lg border-slate-200 dark:border-slate-800 font-semibold text-xs"
+                  className="flex-1 h-9 rounded-md border-slate-200 dark:border-slate-800 font-medium text-xs"
                   onClick={() => setCheckoutToUpdate(null)}
                 >
                   Cancel
                 </Button>
                 <Button 
                   className={cn(
-                    "flex-1 h-10 rounded-lg text-white font-semibold text-xs gap-1.5 shadow-sm",
-                    returnCondition === 'Consumed completely' ? "bg-orange-500 hover:bg-orange-600" : "bg-blue-600 hover:bg-blue-700"
+                    "flex-1 h-9 rounded-md text-white font-medium text-xs gap-1.5 shadow-none",
+                    returnCondition === 'Consumed completely' ? "bg-orange-600 hover:bg-orange-700" : "bg-blue-600 hover:bg-blue-700"
                   )}
                   onClick={handleConfirmReturn}
                 >

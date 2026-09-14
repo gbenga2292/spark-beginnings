@@ -440,12 +440,12 @@ export function BulkMachineLogModal({ isOpen, onClose, siteId, siteName, machine
       <DialogContent className="w-full h-[100dvh] max-h-[100dvh] max-w-full sm:max-w-3xl sm:h-[88vh] sm:max-h-[88vh] p-0 border-0 shadow-2xl rounded-none sm:rounded-2xl overflow-hidden flex flex-col bg-white dark:bg-slate-950">
         <DialogHeader className="px-5 py-3.5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/90 dark:bg-slate-900/90 backdrop-blur-sm shrink-0 z-10">
           <DialogTitle className="text-base sm:text-lg font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
-            <Wrench className="h-5 w-5 text-indigo-500" />
+            <Wrench className="h-5 w-5 text-blue-500" />
             Bulk Log Machines
           </DialogTitle>
           <div className="flex items-center gap-1.5 mt-1">
             <span className="text-[11px] text-slate-400 dark:text-slate-500 font-medium uppercase tracking-wide">Site:</span>
-            <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 px-2 py-0.5 rounded-full border border-indigo-200 dark:border-indigo-800/40">
+            <span className="text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 px-2 py-0.5 rounded-full border border-blue-200 dark:border-blue-800/40">
               {siteName}
             </span>
           </div>
@@ -605,7 +605,7 @@ export function BulkMachineLogModal({ isOpen, onClose, siteId, siteName, machine
                 </div>
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                  <select value={supervisorOnSite} onChange={(e) => setSupervisorOnSite(e.target.value)} className="w-full h-10 pl-9 pr-12 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md text-sm font-medium focus:ring-2 focus:ring-indigo-500 transition-all appearance-none">
+                  <select value={supervisorOnSite} onChange={(e) => setSupervisorOnSite(e.target.value)} className="w-full h-10 pl-9 pr-12 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md text-sm font-medium focus:ring-2 focus:ring-blue-500 transition-all appearance-none">
                     <option value="">Select Supervisor...</option>
                     {dewateringStaff.map(staff => <option key={staff.id} value={`${staff.firstname} ${staff.surname}`}>{staff.firstname} {staff.surname}</option>)}
                   </select>
@@ -642,7 +642,7 @@ export function BulkMachineLogModal({ isOpen, onClose, siteId, siteName, machine
           </div>
           <div className="flex items-center gap-2.5 ml-auto">
             <Button type="button" variant="ghost" onClick={onClose} disabled={isSubmitting} className="h-9 font-medium">Cancel</Button>
-            <Button type="submit" onClick={handleSubmit} disabled={isSubmitting} className="h-9 px-5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold shadow-sm min-w-[140px]">
+            <Button type="submit" onClick={handleSubmit} disabled={isSubmitting} className="h-9 px-5 bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-sm min-w-[140px]">
               {isSubmitting ? 'Logging...' : `Log ${machines.length} Machines`}
             </Button>
           </div>

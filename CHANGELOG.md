@@ -4,6 +4,56 @@ All notable changes to this project will be documented in this file.
 
 ---
 
+## [2.0.0] - 2026-09-14
+
+### Added / Improved
+
+- **Instantaneous Zero-Lag Navigation & Route Prefetching**:
+  - Implemented comprehensive route prefetch engine (`src/lib/routePrefetch.ts`) covering all 42 application routes.
+  - Linked intent-based prefetching on `onMouseEnter`, `onTouchStart`, and `onFocus` across all navigation links in both `HomePage` and `Sidebar`.
+  - Added progressive background idle-time route warming (`requestIdleCallback`) for 16 core daily operational modules (`/tasks/dashboard`, `/tasks`, `/hr-dashboard`, `/attendance`, `/employees`, `/operations`, `/comm-log`, `/payroll`, `/sites`, etc.), eliminating route loading spinners and rendering transitions instantaneously.
+
+- **Next-Gen Modular Launchpad (`HomePage.tsx`)**:
+  - Re-architected the main workspace launchpad into an accessible, role-governed card grid with rich hover bloom popovers for sub-modules.
+  - Removed redundant "Activity Audit Log" card from Home (consolidated within System Settings).
+  - Eliminated procedural SVG `feTurbulence` fractal noise filters, drastically cutting GPU rasterization overhead and memory pressure.
+  - Guarded profile fetching on mount to eliminate redundant network queries and render cycles.
+  - Defer-rendered `OmniSearch` to avoid eager background task subscriptions when search modal is inactive.
+
+- **Sidebar 2.0 (High-Performance Modular Navigation)**:
+  - Added hardware compositing acceleration hints (`will-change-[width,transform]`, `transform-gpu`) for buttery smooth 60/120 FPS drawer animations.
+  - Upgraded viewport detection to modern `matchMedia('(max-width: 1023px)')` event listeners, eliminating continuous CPU cycles during window resizing.
+  - Extended smart auto-collapse behavior to `/tasks/archive`, `/tasks/dashboard`, Reports, Simulator, and Machine Reconciliation for maximum canvas workspace.
+  - Optimized communication unread counter (`unreadCommCount`) using $O(N + M)$ `Set` lookup.
+  - Decoupled `pendingLedgerEntries` from reactive hook state into imperative click handling (`useAppStore.getState()`), preventing spurious re-renders during transaction entry.
+
+- **Operations & Analytics Suite**:
+  - Added `RefillForecastModal.tsx` and `useRefillForecast.ts` for predictive diesel consumption estimation.
+  - Integrated `useActiveSiteInvoices.ts` and `useMachineReconSummary.ts` for operational financial metrics.
+  - Introduced `MetricHeroCard.tsx` and `Sparkline.tsx` reusable analytics components.
+  - Redesigned `OfflineCapabilitiesModal.tsx` with responsive, non-overflowing flex layout, compact hero status banner, and pinned action bar.
+  - Added `TaskArchive.tsx` with auto-collapse sidebar lifecycle hooks.
+
+- **QuickBooks-Style Unified Invoice & Payment Settlement Architecture**:
+  - Re-architected financial settlement engine (`src/lib/settlementUtils.ts`) to resolve invoice/payment dissonance with multi-invoice allocation and advance credits.
+  - Added instant Withholding Tax (WHT) and discount credit clearance: $\text{Settled} = \text{Cash} + \text{WHT} + \text{Discount}$.
+  - Chronological FIFO waterfall for historical and advance payments, guaranteeing 100% backward compatibility.
+  - Linked direct "Record Payment" flow from `Billing.tsx` and `InvoiceDetailDialog.tsx` to `ClientAccounts.tsx` with pre-filled allocation matrix.
+  - Standardized real-time settlement status badges (`Paid`, `Partially Paid`, `Overdue`, `Sent`) and remaining balance indicators across `InvoiceDetailDialog.tsx`, `SiteDetailDialog.tsx`, `Site360View.tsx`, `Client360.tsx`, `Sites.tsx`, and `FinancialReports.tsx`.
+  - Fixed hardcoded VAT formula in `Payments.tsx` to dynamically use the configured payroll variable `vatRate`.
+
+### Git Commits Since v1.8.0
+
+- `bd61eb3`: feat: implement AI-powered daily log analysis modal and project tracking pages
+- `d733afd`: feat: implement operational management pages for assets, daily logs, and site analytics with new context and routing utilities
+
+### Database Migrations (Supabase)
+
+- `20260914140000_add_invoice_linkage_to_payments.sql`: Added `invoice_id`, `invoice_number`, `allocations`, and `unapplied_amount` columns to `public.payments`.
+- All prior migrations verified and in sync up to `20260907153000_add_dipstick_to_daily_logs.sql`.
+
+---
+
 ## [1.8.0] - 2026-09-08
 
 ### Added / Improved

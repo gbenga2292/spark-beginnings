@@ -207,7 +207,7 @@ export function PayrollVersionModal({
         <DialogHeader className="p-5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
-              <div className="p-2 rounded-lg bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-800">
+              <div className="p-2 rounded-md bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-800">
                 {mode === 'CREATE_REVISION' ? <GitCommit className="h-5 w-5" /> : <History className="h-5 w-5" />}
               </div>
               <div>
@@ -236,7 +236,7 @@ export function PayrollVersionModal({
             ───────────────────────────────────────────────────────────── */
             <div className="space-y-6">
               {/* Revision Notice */}
-              <div className="p-3.5 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 rounded-xl flex items-start gap-3 text-amber-900 dark:text-amber-300">
+              <div className="p-3.5 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 rounded-md flex items-start gap-3 text-amber-900 dark:text-amber-300">
                 <ShieldCheck className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
                 <div className="text-xs space-y-1">
                   <p className="font-semibold">Admin Authorization & Audit Trail</p>
@@ -253,19 +253,19 @@ export function PayrollVersionModal({
                     Calculated Changes (v{activeSnapshot?.version} &rarr; Live State)
                   </h4>
                   <div className="grid grid-cols-3 gap-3">
-                    <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-100 dark:border-slate-700">
+                    <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-md border border-slate-200 dark:border-slate-700">
                       <span className="text-[10px] font-semibold text-slate-400 uppercase">Gross Pay Diff</span>
                       <p className={`text-sm font-bold font-mono ${diffMetrics.grossDiff >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
                         {diffMetrics.grossDiff >= 0 ? '+' : ''}₦{fm(diffMetrics.grossDiff)}
                       </p>
                     </div>
-                    <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-100 dark:border-slate-700">
+                    <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-md border border-slate-200 dark:border-slate-700">
                       <span className="text-[10px] font-semibold text-slate-400 uppercase">Deductions Diff</span>
                       <p className={`text-sm font-bold font-mono ${diffMetrics.deductionsDiff >= 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
                         {diffMetrics.deductionsDiff >= 0 ? '+' : ''}₦{fm(diffMetrics.deductionsDiff)}
                       </p>
                     </div>
-                    <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-100 dark:border-slate-700">
+                    <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-md border border-slate-200 dark:border-slate-700">
                       <span className="text-[10px] font-semibold text-slate-400 uppercase">Net Take-Home Diff</span>
                       <p className={`text-sm font-bold font-mono ${diffMetrics.netDiff >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
                         {diffMetrics.netDiff >= 0 ? '+' : ''}₦{fm(diffMetrics.netDiff)}
@@ -275,7 +275,7 @@ export function PayrollVersionModal({
 
                   {/* List of Affected Staff */}
                   {diffMetrics.changedEmployees.length > 0 ? (
-                    <div className="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
+                    <div className="border border-slate-200 dark:border-slate-700 rounded-md overflow-hidden">
                       <div className="px-3 py-2 bg-slate-100 dark:bg-slate-800 text-[11px] font-semibold text-slate-600 dark:text-slate-300 flex justify-between">
                         <span>Staff with Net Pay Discrepancies ({diffMetrics.changedEmployees.length})</span>
                         <span>Old &rarr; New Net Pay</span>
@@ -288,8 +288,8 @@ export function PayrollVersionModal({
                               <p className="text-[10px] text-slate-400">{emp.position}</p>
                             </div>
                             <div className="text-right">
-                              <span className="font-mono text-slate-400 line-through mr-2">₦{fm(emp.oldNet)}</span>
-                              <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400">₦{fm(emp.newNet)}</span>
+                              <span className="font-mono tabular-nums text-slate-400 line-through mr-2">₦{fm(emp.oldNet)}</span>
+                              <span className="font-mono tabular-nums font-bold text-blue-600 dark:text-blue-400">₦{fm(emp.newNet)}</span>
                             </div>
                           </div>
                         ))}
@@ -370,7 +370,7 @@ export function PayrollVersionModal({
                                   <span className="font-semibold">{snap.createdByName || snap.createdBy || 'Administrator'}</span>
                                 </div>
                                 {snap.changeReason && (
-                                  <p className="text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-900 p-2.5 rounded-lg border border-slate-100 dark:border-slate-800 italic">
+                                  <p className="text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-900 p-2.5 rounded-md border border-slate-200 dark:border-slate-800 italic">
                                     &ldquo;{snap.changeReason}&rdquo;
                                   </p>
                                 )}
@@ -378,13 +378,13 @@ export function PayrollVersionModal({
 
                               {/* Snapshot Metric Chips */}
                               <div className="flex flex-wrap gap-2 pt-1 border-t border-slate-100 dark:border-slate-800 text-[11px]">
-                                <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-700 font-mono">
+                                <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-700 font-mono tabular-nums">
                                   Staff: {snap.totals?.employeeCount ?? snap.records?.length ?? 0}
                                 </span>
-                                <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-700 font-mono">
+                                <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-700 font-mono tabular-nums">
                                   Gross: ₦{fm(snap.totals?.totalGross || 0)}
                                 </span>
-                                <span className="px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 font-bold font-mono">
+                                <span className="px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 font-bold font-mono tabular-nums">
                                   Net: ₦{fm(snap.totals?.totalNet || 0)}
                                 </span>
 
@@ -394,7 +394,7 @@ export function PayrollVersionModal({
                                       size="sm"
                                       variant="outline"
                                       onClick={() => handleSwitchActiveVersion(snap.version)}
-                                      className="h-7 text-xs border-indigo-200 text-indigo-600 hover:bg-indigo-50"
+                                      className="h-7 text-xs border-blue-200 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-950/40 rounded-sm"
                                     >
                                       Set as Active Version
                                     </Button>
@@ -422,7 +422,7 @@ export function PayrollVersionModal({
               size="sm"
               onClick={handleCreateRevision}
               disabled={isSaving || !changeReason.trim() || !isAdmin}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white gap-1.5 shadow-sm"
+              className="bg-blue-600 hover:bg-blue-700 text-white gap-1.5 rounded-sm"
             >
               {isSaving ? (
                 'Saving Revision...'

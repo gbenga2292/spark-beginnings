@@ -73,19 +73,18 @@ function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): nu
 
 // ── Section collapse wrapper ───────────────────────────────────
 function Section({
-  icon, title, children, defaultOpen = true, accentColor = 'indigo'
+  icon, title, children, defaultOpen = true, accentColor = 'blue'
 }: {
   icon: React.ReactNode; title: string; children: React.ReactNode;
   defaultOpen?: boolean; accentColor?: string;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const colorMap: Record<string, string> = {
-    indigo: 'text-indigo-500',
+    blue: 'text-blue-600',
     amber: 'text-amber-500',
     emerald: 'text-emerald-500',
     rose: 'text-rose-500',
     sky: 'text-sky-500',
-    violet: 'text-blue-500',
   };
   return (
     <div className="border border-slate-200/80 rounded-xl overflow-hidden bg-white/60">
@@ -94,7 +93,7 @@ function Section({
         className="w-full flex items-center justify-between px-4 py-3 bg-slate-50/80 hover:bg-slate-100/80 transition-colors"
       >
         <div className="flex items-center gap-2">
-          <span className={colorMap[accentColor] || 'text-indigo-500'}>{icon}</span>
+          <span className={colorMap[accentColor] || 'text-blue-600'}>{icon}</span>
           <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">{title}</span>
         </div>
         {open ? <ChevronUp className="h-3.5 w-3.5 text-slate-400" /> : <ChevronDown className="h-3.5 w-3.5 text-slate-400" />}
@@ -153,9 +152,9 @@ function SliderField({
       <input
         type="range" min={min} max={max} step={step} value={value}
         onChange={e => onChange(Number(e.target.value))}
-        className="w-full h-1.5 bg-slate-200 rounded-full appearance-none cursor-pointer accent-indigo-500
+        className="w-full h-1.5 bg-slate-200 rounded-full appearance-none cursor-pointer accent-blue-600
                    [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4
-                   [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-indigo-500 [&::-webkit-slider-thumb]:shadow-md
+                   [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-blue-500 [&::-webkit-slider-thumb]:shadow-md
                    [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white"
       />
     </div>
@@ -431,7 +430,7 @@ export function LogisticsEstimatorDialog({ open, onClose, siteName, clientName }
   // Warehouse icon
   const warehouseIcon = useMemo(() => {
     return leafletLoaded && L ? new L.DivIcon({
-      html: `<div style="background:linear-gradient(135deg,#4f46e5,#6366f1);width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.3);">
+      html: `<div style="background:#2563eb;width:32px;height:32px;border-radius:4px;display:flex;align-items:center;justify-content:center;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.25);">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
       </div>`,
       className: '',
@@ -443,7 +442,7 @@ export function LogisticsEstimatorDialog({ open, onClose, siteName, clientName }
   // Site icon
   const siteIcon = useMemo(() => {
     return leafletLoaded && L ? new L.DivIcon({
-      html: `<div style="background:linear-gradient(135deg,#ef4444,#f97316);width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.3);">
+      html: `<div style="background:#dc2626;width:32px;height:32px;border-radius:4px;display:flex;align-items:center;justify-content:center;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.25);">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
       </div>`,
       className: '',
@@ -471,7 +470,7 @@ export function LogisticsEstimatorDialog({ open, onClose, siteName, clientName }
         <Marker position={[warehouse.lat, warehouse.lng]} icon={warehouseIcon}>
           <Popup>
             <div className="font-sans">
-              <p className="font-bold text-sm text-indigo-700">{warehouse.label}</p>
+              <p className="font-bold text-sm text-blue-700">{warehouse.label}</p>
               <p className="text-xs text-slate-500">Origin point</p>
             </div>
           </Popup>
@@ -492,7 +491,7 @@ export function LogisticsEstimatorDialog({ open, onClose, siteName, clientName }
           <Polyline
             positions={routeCoords}
             pathOptions={{
-              color: '#4f46e5',
+              color: '#2563eb',
               weight: 4,
               opacity: 0.8,
               dashArray: undefined,
@@ -509,12 +508,12 @@ export function LogisticsEstimatorDialog({ open, onClose, siteName, clientName }
   }, [leafletLoaded, warehouse, sitePos, routeCoords, warehouseIcon, siteIcon, MapClickHandler]);
 
   return (
-    <div className="flex flex-col h-full w-full bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden animate-in fade-in duration-300">
+    <div className="flex flex-col h-full w-full bg-white rounded-md shadow-sm border border-slate-200 overflow-hidden animate-in fade-in duration-300">
 
         {/* ── Header ──────────────────────────────────── */}
-        <div className="bg-gradient-to-r from-slate-800 via-slate-700 to-indigo-800 px-3 sm:px-5 py-3 sm:py-4 flex items-center justify-between shrink-0 gap-2">
+        <div className="bg-slate-900 border-b border-slate-800 px-3 sm:px-5 py-3 sm:py-4 flex items-center justify-between shrink-0 gap-2">
           <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-            <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
+            <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-md bg-white/10 flex items-center justify-center shrink-0">
               <Calculator className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
             </div>
             <div className="min-w-0">
@@ -524,10 +523,10 @@ export function LogisticsEstimatorDialog({ open, onClose, siteName, clientName }
               </h2>
               <p className="text-xs text-white/60 font-medium hidden sm:block">
                 Mobilisation + Installation cost calculator
-                {clientName && <span className="text-indigo-300 ml-1">· {clientName}</span>}
+                {clientName && <span className="text-blue-300 ml-1">· {clientName}</span>}
               </p>
               {clientName && (
-                <p className="text-[10px] text-indigo-300 font-medium sm:hidden truncate">
+                <p className="text-[10px] text-blue-300 font-medium sm:hidden truncate">
                   {clientName}
                 </p>
               )}
@@ -535,7 +534,7 @@ export function LogisticsEstimatorDialog({ open, onClose, siteName, clientName }
           </div>
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             {/* Grand total badge */}
-            <div className={cn("px-2.5 py-1 sm:px-4 sm:py-2 rounded-xl bg-gradient-to-r text-white", costTierBg)}>
+            <div className={cn("px-2.5 py-1 sm:px-4 sm:py-2 rounded-md text-white", costTierBg)}>
               <p className="text-[8px] sm:text-[9px] font-bold uppercase tracking-wider opacity-80">Total Estimate</p>
               <p className="text-sm sm:text-lg font-black tabular-nums leading-tight">₦{fmt(estimate.grandTotal)}</p>
             </div>
@@ -560,13 +559,13 @@ export function LogisticsEstimatorDialog({ open, onClose, siteName, clientName }
                   {/* Origin / Home location */}
                   <div className="flex gap-1.5 flex-1 min-w-0">
                     <div className="relative flex-1">
-                      <Home className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-indigo-600" />
+                      <Home className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-blue-600" />
                       <input
                         value={originQuery}
                         onChange={e => setOriginQuery(e.target.value)}
                         onKeyDown={e => e.key === 'Enter' && handleOriginSearch()}
                         placeholder="Home / Origin location..."
-                        className="w-full h-9 pl-9 pr-3 rounded-lg border border-slate-200 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 transition-all bg-white"
+                        className="w-full h-9 pl-9 pr-3 rounded-lg border border-slate-200 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-all bg-white"
                         title="Home / Origin location"
                       />
                     </div>
@@ -575,7 +574,7 @@ export function LogisticsEstimatorDialog({ open, onClose, siteName, clientName }
                       variant="outline"
                       onClick={() => handleOriginSearch()}
                       disabled={searchingOrigin}
-                      className="h-9 px-3 text-indigo-700 bg-indigo-50/80 border-indigo-200 hover:bg-indigo-100 text-xs font-bold shrink-0"
+                      className="h-9 px-3 text-blue-700 bg-blue-50/80 border-blue-200 hover:bg-blue-100 text-xs font-bold shrink-0"
                     >
                       {searchingOrigin ? 'Setting…' : 'Set Origin'}
                     </Button>
@@ -594,7 +593,7 @@ export function LogisticsEstimatorDialog({ open, onClose, siteName, clientName }
                         title="Destination site location"
                       />
                     </div>
-                    <Button size="sm" onClick={handleSearch} disabled={searching} className="h-9 px-3 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shrink-0">
+                    <Button size="sm" onClick={handleSearch} disabled={searching} className="h-9 px-3 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shrink-0">
                       {searching ? 'Searching…' : 'Find Site'}
                     </Button>
                   </div>
@@ -605,7 +604,7 @@ export function LogisticsEstimatorDialog({ open, onClose, siteName, clientName }
                   className="h-9 px-3 flex items-center justify-center gap-1.5 text-xs font-bold text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors shrink-0 shadow-sm"
                   title={isMapOpen ? "Hide Map View" : "Show Map View"}
                 >
-                  <MapPin className="h-3.5 w-3.5 text-indigo-600" />
+                  <MapPin className="h-3.5 w-3.5 text-blue-600" />
                   <span>{isMapOpen ? 'Hide Map' : 'Show Map'}</span>
                   {isMapOpen ? <ChevronUp className="h-3.5 w-3.5 text-slate-400" /> : <ChevronDown className="h-3.5 w-3.5 text-slate-400" />}
                 </button>
@@ -632,7 +631,7 @@ export function LogisticsEstimatorDialog({ open, onClose, siteName, clientName }
                       <Marker position={[warehouse.lat, warehouse.lng]} icon={warehouseIcon}>
                         <Popup>
                           <div className="font-sans">
-                            <p className="font-bold text-sm text-indigo-700">{warehouse.label}</p>
+                            <p className="font-bold text-sm text-blue-700">{warehouse.label}</p>
                             <p className="text-xs text-slate-500">Origin point</p>
                           </div>
                         </Popup>
@@ -653,7 +652,7 @@ export function LogisticsEstimatorDialog({ open, onClose, siteName, clientName }
                         <Polyline
                           positions={routeCoords}
                           pathOptions={{
-                            color: '#4f46e5',
+                            color: '#2563eb',
                             weight: 4,
                             opacity: 0.8,
                             dashArray: undefined,
@@ -670,8 +669,8 @@ export function LogisticsEstimatorDialog({ open, onClose, siteName, clientName }
                 ) : (
                   <div className="h-full flex items-center justify-center bg-slate-100">
                     <div className="text-center">
-                      <div className="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center mx-auto mb-2 animate-pulse">
-                        <MapPin className="h-5 w-5 text-indigo-500" />
+                      <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center mx-auto mb-2 animate-pulse">
+                        <MapPin className="h-5 w-5 text-blue-500" />
                       </div>
                       <p className="text-sm text-slate-500 font-medium">Loading map…</p>
                     </div>
@@ -683,7 +682,7 @@ export function LogisticsEstimatorDialog({ open, onClose, siteName, clientName }
                   <div className="absolute bottom-3 left-3 right-3 flex gap-2 z-[1000] pointer-events-none">
                     <div className="bg-white/95 backdrop-blur-md rounded-lg px-3 py-2 shadow-lg border border-slate-200/50 pointer-events-auto">
                       <div className="flex items-center gap-1.5">
-                        <Route className="h-3.5 w-3.5 text-indigo-500" />
+                        <Route className="h-3.5 w-3.5 text-blue-500" />
                         <span className="text-xs font-bold text-slate-700">{inputs.distance.toFixed(1)} km</span>
                       </div>
                     </div>
@@ -721,15 +720,15 @@ export function LogisticsEstimatorDialog({ open, onClose, siteName, clientName }
               {/* ── Cost breakdown (below map on large screens) ─── */}
               <div className="bg-slate-50/50 p-4 space-y-1 shrink-0">
                 <div className="flex items-center gap-2 mb-2">
-                  <DollarSign className="h-4 w-4 text-indigo-500" />
+                  <DollarSign className="h-4 w-4 text-blue-500" />
                   <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Cost Breakdown</h3>
                 </div>
 
                 {/* Mobilisation */}
                 <div className="bg-white border border-slate-100 rounded-lg p-3 space-y-0.5">
                   <div className="flex items-center gap-1.5 mb-1">
-                    <Truck className="h-3 w-3 text-indigo-400" />
-                    <span className="text-[10px] font-bold text-indigo-500 uppercase tracking-wider">Mobilisation</span>
+                    <Truck className="h-3 w-3 text-blue-400" />
+                    <span className="text-[10px] font-bold text-blue-500 uppercase tracking-wider">Mobilisation</span>
                   </div>
                   <CostLine label="Fuel / Diesel" value={inputs.tripType === 'full_lifecycle' ? estimate.fuelCost / 2 : estimate.fuelCost} indent />
                   <CostLine label="Driver Wages" value={inputs.tripType === 'full_lifecycle' ? estimate.driverCost / 2 : estimate.driverCost} indent />
@@ -784,10 +783,10 @@ export function LogisticsEstimatorDialog({ open, onClose, siteName, clientName }
                 <div className="bg-white border border-slate-100 rounded-lg p-3 space-y-0.5">
                   <CostLine label={`Contingency (${inputs.contingencyPercent}%)`} value={estimate.contingencyAmount} muted />
                   <CostLine label={`Trip setup (${estimate.tripMultiplier} trip${estimate.tripMultiplier !== 1 ? 's' : ''})`} value={0} muted />
-                  <div className="border-t border-indigo-100 mt-1 pt-1">
-                    <div className="flex items-center justify-between py-1 bg-indigo-50 rounded-lg px-3 -mx-1">
-                      <span className="text-sm font-black text-indigo-700">GRAND TOTAL</span>
-                      <span className="font-black text-base text-indigo-700 font-mono tabular-nums">₦{fmt(estimate.grandTotal)}</span>
+                  <div className="border-t border-blue-100 mt-1 pt-1">
+                    <div className="flex items-center justify-between py-1 bg-blue-50 rounded-lg px-3 -mx-1">
+                      <span className="text-sm font-black text-blue-700">GRAND TOTAL</span>
+                      <span className="font-black text-base text-blue-700 font-mono tabular-nums">₦{fmt(estimate.grandTotal)}</span>
                     </div>
                   </div>
                 </div>
@@ -798,18 +797,18 @@ export function LogisticsEstimatorDialog({ open, onClose, siteName, clientName }
             <div className="overflow-y-auto p-4 space-y-3 bg-slate-50/30">
 
               {/* Route info */}
-              <Section icon={<Route className="h-4 w-4" />} title="Route & Distance" accentColor="indigo">
+              <Section icon={<Route className="h-4 w-4" />} title="Route & Distance" accentColor="blue">
                 {/* Home / Origin location field */}
                 <div className="space-y-1.5 pb-2.5 border-b border-slate-100 mb-2">
                   <div className="flex items-center justify-between">
                     <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
-                      <Home className="h-3 w-3 text-indigo-600" /> Home / Origin Location
+                      <Home className="h-3 w-3 text-blue-600" /> Home / Origin Location
                     </label>
                     <button
                       type="button"
                       onClick={() => handleOriginSearch()}
                       disabled={searchingOrigin}
-                      className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 disabled:opacity-50"
+                      className="text-[10px] font-bold text-blue-600 hover:text-blue-800 disabled:opacity-50"
                     >
                       {searchingOrigin ? 'Updating…' : 'Set Origin'}
                     </button>
@@ -820,7 +819,7 @@ export function LogisticsEstimatorDialog({ open, onClose, siteName, clientName }
                     onChange={e => setOriginQuery(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && handleOriginSearch()}
                     placeholder="Home / Origin address..."
-                    className="h-8 text-xs font-medium bg-white text-slate-700 border-slate-200 focus:border-indigo-400"
+                    className="h-8 text-xs font-medium bg-white text-slate-700 border-slate-200 focus:border-blue-400"
                   />
                   <p className="text-[9px] text-slate-400 truncate">
                     Active: <span className="font-semibold text-slate-600">{warehouse.label}</span>
@@ -852,7 +851,7 @@ export function LogisticsEstimatorDialog({ open, onClose, siteName, clientName }
                       else if (tType === 'full_lifecycle') nTrips = 4;
                       setInputs(prev => ({ ...prev, tripType: tType, numberOfTrips: nTrips }));
                     }}
-                    className="w-full h-8 text-xs rounded-md border border-slate-200 bg-white px-2 focus:ring-1 focus:ring-indigo-500 outline-none"
+                    className="w-full h-8 text-xs rounded-md border border-slate-200 bg-white px-2 focus:ring-1 focus:ring-blue-500 outline-none"
                   >
                     <option value="one_way">One Way (1 trip)</option>
                     <option value="mobilisation_only">Mobilisation Only (Drop-off & Return - 2 trips)</option>
@@ -920,7 +919,7 @@ export function LogisticsEstimatorDialog({ open, onClose, siteName, clientName }
                     id="accomReq"
                     checked={inputs.accommodationRequired}
                     onChange={e => set('accommodationRequired', e.target.checked)}
-                    className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                    className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                   />
                   <label htmlFor="accomReq" className="text-xs text-slate-600 font-semibold cursor-pointer">
                     Accommodation required
@@ -969,7 +968,7 @@ export function LogisticsEstimatorDialog({ open, onClose, siteName, clientName }
                           <label key={emp.id} className="flex items-center gap-2 p-1 hover:bg-slate-50 rounded cursor-pointer">
                             <input
                               type="checkbox"
-                              className="h-3.5 w-3.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                              className="h-3.5 w-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                               checked={isSelected}
                               onChange={(e) => {
                                 let newTechs = [...inputs.selectedTechnicians];

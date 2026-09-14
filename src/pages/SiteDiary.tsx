@@ -32,7 +32,7 @@ const renderFormattedChatMessage = (content: string) => {
             return <strong key={i} className="font-extrabold text-slate-900 dark:text-white">{part.slice(2, -2)}</strong>;
           }
           if (part.startsWith('*') && part.endsWith('*') && part.length >= 2 && !part.startsWith('**')) {
-            return <em key={i} className="italic text-indigo-600 dark:text-indigo-200">{part.slice(1, -1)}</em>;
+            return <em key={i} className="italic text-blue-600 dark:text-blue-200">{part.slice(1, -1)}</em>;
           }
           const cleanPart = part.replace(/\*\*/g, '').replace(/#/g, '');
           return <span key={i}>{cleanPart}</span>;
@@ -52,7 +52,7 @@ const renderFormattedChatMessage = (content: string) => {
         if (trimmed.startsWith('#') || (/^\*\*[^*]+\*\*:?$/.test(trimmed) && trimmed.length < 60)) {
           const cleanHeader = trimmed.replace(/^#+\s*/, '').replace(/\*\*/g, '').replace(/#/g, '').trim();
           return (
-            <div key={idx} className="text-xs font-black tracking-wider text-indigo-700 dark:text-indigo-300 uppercase mt-3.5 mb-1.5 border-b border-indigo-200 dark:border-indigo-700/50 pb-1 flex items-center gap-1.5">
+            <div key={idx} className="text-xs font-black tracking-wider text-blue-700 dark:text-blue-300 uppercase mt-3.5 mb-1.5 border-b border-slate-200 dark:border-slate-700/50 pb-1 flex items-center gap-1.5">
               <span>{cleanHeader}</span>
             </div>
           );
@@ -63,7 +63,7 @@ const renderFormattedChatMessage = (content: string) => {
           if (!bulletText) return null;
           return (
             <div key={idx} className="flex items-start gap-2 pl-1.5 my-1 text-slate-800 dark:text-slate-100">
-              <span className="text-indigo-600 dark:text-indigo-400 font-bold text-sm select-none leading-none mt-0.5">•</span>
+              <span className="text-blue-600 dark:text-blue-400 font-bold text-sm select-none leading-none mt-0.5">•</span>
               <div className="flex-1">
                 {renderInlineText(bulletText)}
               </div>
@@ -72,7 +72,7 @@ const renderFormattedChatMessage = (content: string) => {
         }
 
         return (
-          <p key={idx} className="my-1 text-slate-700 dark:text-indigo-50">
+          <p key={idx} className="my-1 text-slate-700 dark:text-slate-100">
             {renderInlineText(trimmed)}
           </p>
         );
@@ -894,7 +894,7 @@ export function SiteDiary() {
             handleGenerateAiSummary();
           }
         }}
-        className="h-8 gap-1.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white font-semibold text-xs shadow-xs active:scale-95 transition-all"
+        className="h-8 gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-xs active:scale-95 transition-all"
       >
         <Sparkles className="h-3.5 w-3.5" />
         <span className="hidden sm:inline">Summarize with AI</span>
@@ -905,8 +905,8 @@ export function SiteDiary() {
         id="site-diary-import-btn"
         className={cn(
           'flex items-center gap-1.5 h-8 px-2.5 rounded-md border text-xs font-semibold transition-all cursor-pointer active:scale-95',
-          'border-indigo-200 text-indigo-700 hover:bg-indigo-50 hover:border-indigo-400',
-          'dark:border-indigo-800 dark:text-indigo-400 dark:hover:bg-indigo-900/20',
+          'border-blue-200 text-blue-700 hover:bg-blue-50 hover:border-blue-400',
+          'dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-900/20',
           isImporting && 'opacity-70 cursor-not-allowed pointer-events-none'
         )}
       >
@@ -1041,9 +1041,9 @@ export function SiteDiary() {
                     setShowAiModal(true);
                     if (!aiSummary) handleGenerateAiSummary();
                   }}
-                  className="h-7 px-2.5 text-xs font-semibold border-indigo-200 text-indigo-700 hover:bg-indigo-50 dark:border-indigo-800 dark:text-indigo-400 dark:hover:bg-indigo-950/30 gap-1.5 shadow-xs transition-all"
+                  className="h-7 px-2.5 text-xs font-semibold border-blue-200 text-blue-700 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-950/30 gap-1.5 shadow-xs transition-all"
                 >
-                  <Sparkles className="h-3.5 w-3.5 text-indigo-500" />
+                  <Sparkles className="h-3.5 w-3.5 text-blue-600" />
                   <span>AI Log Digest</span>
                 </Button>
               </div>
@@ -1101,7 +1101,7 @@ export function SiteDiary() {
                           {((entry as any).dewateringStage || (entry as any).progressPercentage !== undefined) && (
                             <div className="flex flex-wrap items-center gap-2">
                               {(entry as any).dewateringStage && (
-                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-indigo-50 border border-indigo-200 text-indigo-700 dark:bg-indigo-950/40 dark:border-indigo-800 dark:text-indigo-300 uppercase tracking-wider">
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-50 border border-blue-200 text-blue-700 dark:bg-blue-950/40 dark:border-blue-800 dark:text-blue-300 uppercase tracking-wider">
                                   Stage: {(entry as any).dewateringStage}
                                 </span>
                               )}
@@ -1188,7 +1188,7 @@ export function SiteDiary() {
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col p-0 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800">
           <DialogHeader className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 flex-shrink-0 flex flex-row items-center justify-between">
             <div className="flex items-center gap-2.5">
-              <div className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400">
+              <div className="p-2 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400">
                 <Sparkles className="w-5 h-5" />
               </div>
               <div>
@@ -1208,7 +1208,7 @@ export function SiteDiary() {
             <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/30 space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-                  <Filter className="w-3.5 h-3.5 text-indigo-500" /> Reporting Timeframe:
+                  <Filter className="w-3.5 h-3.5 text-blue-600" /> Reporting Timeframe:
                 </span>
                 
                 {/* Date Preset Buttons */}
@@ -1229,7 +1229,7 @@ export function SiteDiary() {
                       className={cn(
                         "px-2.5 py-1 text-xs font-medium rounded-md transition-all",
                         aiPreset === preset.id
-                          ? "bg-indigo-600 text-white font-semibold shadow-xs"
+                          ? "bg-blue-600 text-white font-semibold shadow-xs"
                           : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
                       )}
                     >
@@ -1271,7 +1271,7 @@ export function SiteDiary() {
                       type="checkbox"
                       checked={aiScope.journals}
                       onChange={e => setAiScope(s => ({ ...s, journals: e.target.checked }))}
-                      className="rounded text-indigo-600 focus:ring-indigo-500"
+                      className="rounded text-blue-600 focus:ring-blue-500"
                     />
                     <span>Field Journals</span>
                   </label>
@@ -1280,7 +1280,7 @@ export function SiteDiary() {
                       type="checkbox"
                       checked={aiScope.machineLogs}
                       onChange={e => setAiScope(s => ({ ...s, machineLogs: e.target.checked }))}
-                      className="rounded text-indigo-600 focus:ring-indigo-500"
+                      className="rounded text-blue-600 focus:ring-blue-500"
                     />
                     <span>Machine Operations</span>
                   </label>
@@ -1289,7 +1289,7 @@ export function SiteDiary() {
                       type="checkbox"
                       checked={aiScope.internalNotes}
                       onChange={e => setAiScope(s => ({ ...s, internalNotes: e.target.checked }))}
-                      className="rounded text-indigo-600 focus:ring-indigo-500"
+                      className="rounded text-blue-600 focus:ring-blue-500"
                     />
                     <span>Internal Notes</span>
                   </label>
@@ -1299,7 +1299,7 @@ export function SiteDiary() {
                   size="sm"
                   onClick={handleGenerateAiSummary}
                   disabled={isGeneratingAi}
-                  className="h-8 px-3.5 text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white gap-1.5 shadow-sm active:scale-95"
+                  className="h-8 px-3.5 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white gap-1.5 shadow-sm active:scale-95"
                 >
                   {isGeneratingAi ? (
                     <>
@@ -1319,7 +1319,7 @@ export function SiteDiary() {
             {/* AI Summary Content Output */}
             {isGeneratingAi ? (
               <div className="py-16 text-center space-y-3">
-                <div className="inline-flex p-3 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 animate-pulse">
+                <div className="inline-flex p-3 rounded-full bg-blue-50 dark:bg-blue-950/60 text-blue-600 animate-pulse">
                   <Sparkles className="w-6 h-6 animate-spin" />
                 </div>
                 <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">Analyzing field journals & equipment logs...</p>
@@ -1393,7 +1393,7 @@ export function SiteDiary() {
           </DialogHeader>
 
           <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4 bg-white dark:bg-slate-950">
-            <div className="p-3.5 rounded-lg border border-indigo-100 bg-indigo-50/50 dark:border-indigo-900/30 dark:bg-indigo-950/20 text-xs text-indigo-800 dark:text-indigo-300 leading-relaxed">
+            <div className="p-3.5 rounded-lg border border-blue-100 bg-blue-50/50 dark:border-blue-900/30 dark:bg-blue-950/20 text-xs text-blue-800 dark:text-blue-300 leading-relaxed">
               <strong>Offline Logs Detected:</strong> We found <strong>{pendingUploads.journals.length}</strong> unsynced field activity session(s). Choose <strong>Upload & Sync</strong> to merge these logs into the company database, or <strong>Discard Local Logs</strong> to overwrite the local cache with the database state.
             </div>
 
@@ -1409,7 +1409,7 @@ export function SiteDiary() {
                     <div className="flex justify-between items-center pb-2 border-b border-slate-100 dark:border-slate-800/80">
                       <div className="flex flex-col">
                         <span className="font-bold text-slate-800 dark:text-slate-200 text-sm">{dateLabel}</span>
-                        <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider mt-0.5">Local Log Entry</span>
+                        <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider mt-0.5">Local Log Entry</span>
                       </div>
                       <span className="text-xs text-slate-400 italic">by {entry.loggedBy}</span>
                     </div>

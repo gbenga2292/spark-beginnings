@@ -231,11 +231,11 @@ export function CompanyExpenses() {
     'Company Expenses',
     'Manage and track company expenses and bank transfers',
     <div className="flex items-center gap-2">
-      <div className="flex bg-slate-100/80 p-0.5 rounded-lg border border-slate-200/60 shadow-sm backdrop-blur-sm mr-2 hidden sm:flex">
+      <div className="flex bg-slate-100/80 p-0.5 rounded-md border border-slate-200 dark:border-slate-800 backdrop-blur-sm mr-2 hidden sm:flex">
          <button 
            onClick={() => { setTab('pending'); setSelectedIds(new Set()); }} 
            className={`px-3 py-1.5 rounded-md text-[10px] uppercase tracking-wider font-extrabold transition-all duration-200 flex items-center gap-1.5 ${
-             tab === 'pending' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-indigo-600'
+             tab === 'pending' ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 font-semibold' : 'text-slate-600 dark:text-slate-400 hover:text-blue-600'
            }`}
          >
            <Filter className="h-3 w-3" /> Pending
@@ -243,14 +243,14 @@ export function CompanyExpenses() {
          <button 
            onClick={() => { setTab('history'); setSelectedIds(new Set()); }} 
            className={`px-3 py-1.5 rounded-md text-[10px] uppercase tracking-wider font-extrabold transition-all duration-200 flex items-center gap-1.5 ${
-             tab === 'history' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-indigo-600'
+             tab === 'history' ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 font-semibold' : 'text-slate-600 dark:text-slate-400 hover:text-blue-600'
            }`}
          >
            <History className="h-3 w-3" /> History
          </button>
       </div>
       {tab === 'pending' && selectedIds.size > 0 && (
-        <Button size="sm" onClick={handleBulkAddToLedger} className="bg-indigo-600 hover:bg-indigo-700 text-white h-9 text-xs font-semibold px-3 flex items-center gap-1.5 shadow-sm">
+        <Button size="sm" onClick={handleBulkAddToLedger} className="bg-blue-600 hover:bg-blue-700 text-white h-9 text-xs font-semibold px-3 flex items-center gap-1.5">
           <Send className="w-3.5 h-3.5" /> Continue to Ledger ({selectedIds.size})
         </Button>
       )}
@@ -265,7 +265,7 @@ export function CompanyExpenses() {
           <Button 
             onClick={() => setIsFormVisible(!isFormVisible)} 
             variant={isFormVisible ? "outline" : "default"} 
-            className={`w-full font-bold shadow-sm transition-all ${!isFormVisible ? 'bg-indigo-600 hover:bg-indigo-700 text-white' : 'text-slate-600 border-slate-300 bg-white hover:bg-slate-50'}`}
+            className={`w-full font-bold transition-all ${!isFormVisible ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'text-slate-600 border-slate-300 bg-white hover:bg-slate-50'}`}
           >
             {isFormVisible ? <><X className="w-4 h-4 mr-2" /> Hide Expense Form</> : <><Plus className="w-4 h-4 mr-2" /> Log New Expense</>}
           </Button>
@@ -273,8 +273,8 @@ export function CompanyExpenses() {
 
         {/* Form Column */}
         <div className={`lg:col-span-1 transition-all duration-300 ${isFormVisible ? 'block animate-in slide-in-from-top-4' : 'hidden lg:block'}`}>
-          <Card className={`border-slate-200 shadow-sm overflow-hidden group transition-all duration-300 ${editingId ? 'ring-2 ring-amber-500' : ''}`}>
-            <div className={`h-1.5 w-full ${editingId ? 'bg-amber-500' : 'bg-indigo-600'}`}></div>
+          <Card className={`border border-slate-200 dark:border-slate-800 rounded-md overflow-hidden group transition-all duration-300 ${editingId ? 'ring-2 ring-amber-500' : ''}`}>
+            <div className={`h-1.5 w-full ${editingId ? 'bg-amber-500' : 'bg-blue-600'}`}></div>
             <CardHeader className="bg-slate-50/50 pb-4 border-b border-slate-100 flex flex-row items-center justify-between">
               <div>
                 <CardTitle className="text-lg">{editingId ? 'Edit Expense' : 'Log New Expense'}</CardTitle>
@@ -306,7 +306,7 @@ export function CompanyExpenses() {
                 <div>
                   <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">Paid From (Bank)</label>
                   <select 
-                    className="w-full flex h-10 items-center justify-between rounded-md border border-slate-200 bg-slate-50 focus:bg-white px-3 py-2 text-sm ring-offset-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="w-full flex h-10 items-center justify-between rounded-md border border-slate-200 bg-slate-50 focus:bg-white px-3 py-2 text-sm ring-offset-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     value={paidFrom} 
                     onChange={e => setPaidFrom(e.target.value)} 
                     required
@@ -322,7 +322,7 @@ export function CompanyExpenses() {
                   <div>
                     <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">Paid To (Bank)</label>
                     <select 
-                      className="w-full flex h-10 items-center justify-between rounded-md border border-slate-200 bg-slate-50 focus:bg-white px-3 py-2 text-sm ring-offset-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="w-full flex h-10 items-center justify-between rounded-md border border-slate-200 bg-slate-50 focus:bg-white px-3 py-2 text-sm ring-offset-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                       value={paidToBankName} 
                       onChange={e => handleBeneficiaryBankChange(e.target.value)} 
                       required
@@ -340,7 +340,7 @@ export function CompanyExpenses() {
                 </div>
 
                 <div className="pt-2">
-                  <Button type="submit" disabled={!priv?.canAdd} className={`w-full font-semibold transition-all shadow-sm ${editingId ? 'bg-amber-600 hover:bg-amber-700 text-white' : 'bg-indigo-600 hover:bg-indigo-700 text-white'}`}>
+                  <Button type="submit" disabled={!priv?.canAdd} className={`w-full font-semibold transition-all  ${editingId ? 'bg-amber-600 hover:bg-amber-700 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}>
                     {editingId ? <><Pencil className="w-4 h-4 mr-2" /> Update Expense</> : <><Plus className="w-4 h-4 mr-2" /> Log Expense</>}
                   </Button>
                 </div>
@@ -352,11 +352,11 @@ export function CompanyExpenses() {
         {/* List Column */}
         <div className="lg:col-span-2 flex flex-col min-h-[500px]">
           {/* Mobile Tab Toggle */}
-          <div className="flex sm:hidden mb-4 bg-slate-100/80 p-1 rounded-lg border border-slate-200/60 shadow-sm relative w-full h-11 shrink-0">
+          <div className="flex sm:hidden mb-4 bg-slate-100/80 p-1 rounded-md border border-slate-200 dark:border-slate-800 relative w-full h-11 shrink-0">
              <button 
                onClick={() => { setTab('pending'); setSelectedIds(new Set()); }} 
                className={`flex-1 rounded-md text-[11px] uppercase tracking-wider font-extrabold transition-all duration-200 flex items-center justify-center gap-1.5 ${
-                 tab === 'pending' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-indigo-600'
+                 tab === 'pending' ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 font-semibold' : 'text-slate-600 dark:text-slate-400 hover:text-blue-600'
                }`}
              >
                <Filter className="h-3.5 w-3.5" /> Pending
@@ -364,14 +364,14 @@ export function CompanyExpenses() {
              <button 
                onClick={() => { setTab('history'); setSelectedIds(new Set()); }} 
                className={`flex-1 rounded-md text-[11px] uppercase tracking-wider font-extrabold transition-all duration-200 flex items-center justify-center gap-1.5 ${
-                 tab === 'history' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-indigo-600'
+                 tab === 'history' ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 font-semibold' : 'text-slate-600 dark:text-slate-400 hover:text-blue-600'
                }`}
              >
                <History className="h-3.5 w-3.5" /> History
              </button>
           </div>
 
-          <Card className="flex-1 flex flex-col border-slate-200 shadow-sm overflow-hidden min-h-[500px]">
+          <Card className="flex-1 flex flex-col border border-slate-200 dark:border-slate-800 rounded-md overflow-hidden min-h-[500px]">
             <div className="p-4 bg-white border-b border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4">
               <div className="flex items-center gap-3">
                 <h3 className="font-semibold text-slate-700 flex items-center gap-2">
@@ -379,14 +379,14 @@ export function CompanyExpenses() {
                   {tab === 'history' ? 'Ledger History' : 'Recent Expenses'}
                 </h3>
                 {tab === 'pending' && selectedIds.size > 0 && (
-                  <Button size="sm" onClick={handleBulkAddToLedger} className="bg-indigo-600 hover:bg-indigo-700 text-white h-8 text-xs font-semibold px-3 hidden sm:flex">
+                  <Button size="sm" onClick={handleBulkAddToLedger} className="bg-blue-600 hover:bg-blue-700 text-white h-8 text-xs font-semibold px-3 hidden sm:flex">
                     <Send className="w-3 h-3 mr-1.5" /> Continue to Ledger ({selectedIds.size})
                   </Button>
                 )}
               </div>
               <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
                 {tab === 'pending' && selectedIds.size > 0 && (
-                  <Button size="sm" onClick={handleBulkAddToLedger} className="bg-indigo-600 hover:bg-indigo-700 text-white w-full h-8 text-xs font-semibold px-3 sm:hidden">
+                  <Button size="sm" onClick={handleBulkAddToLedger} className="bg-blue-600 hover:bg-blue-700 text-white w-full h-8 text-xs font-semibold px-3 sm:hidden">
                     <Send className="w-3 h-3 mr-1.5" /> Continue to Ledger ({selectedIds.size})
                   </Button>
                 )}
@@ -405,8 +405,8 @@ export function CompanyExpenses() {
             {tab === 'pending' && (
               <div className="bg-slate-50 border-b border-slate-100 flex items-center px-4 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wider">
                 <div className="flex items-center gap-3 flex-1">
-                  <button onClick={toggleAll} className="p-0.5 mt-0.5 rounded focus:ring-2 focus:ring-indigo-500 outline-none text-slate-400 hover:text-indigo-600 transition-colors">
-                    <CheckSquare className={`w-4 h-4 ${selectedIds.size > 0 ? 'text-indigo-600' : ''}`} />
+                  <button onClick={toggleAll} className="p-0.5 mt-0.5 rounded focus:ring-2 focus:ring-blue-500 outline-none text-slate-400 hover:text-blue-600 transition-colors">
+                    <CheckSquare className={`w-4 h-4 ${selectedIds.size > 0 ? 'text-blue-600' : ''}`} />
                   </button>
                   <span>Select Matching (Up to 8)</span>
                 </div>
@@ -416,7 +416,7 @@ export function CompanyExpenses() {
             <div className="flex-1 overflow-auto bg-slate-50/50 p-2 md:p-4">
               {filteredExpenses.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-slate-400 space-y-3 py-10">
-                  <div className="p-4 bg-white rounded-full shadow-sm">
+                  <div className="p-4 bg-white rounded-full ">
                     <FileText className="h-8 w-8 text-slate-300" />
                   </div>
                   <p>{tab === 'history' ? 'No history available.' : 'No expenses found. Log one to get started.'}</p>
@@ -429,21 +429,21 @@ export function CompanyExpenses() {
                     return (
                     <div 
                       key={expense.id} 
-                      className={`bg-white p-4 rounded-xl border shadow-sm transition-all group ${tab === 'pending' ? 'cursor-pointer' : 'cursor-default'} ${isSelected ? 'border-indigo-500 ring-1 ring-indigo-500 shadow-md' : 'border-slate-200 hover:shadow-md hover:border-indigo-200'} ${isEditing ? 'border-amber-500 ring-1 ring-amber-500' : ''}`}
+                      className={`bg-white p-4 rounded-md border transition-all group ${tab === 'pending' ? 'cursor-pointer' : 'cursor-default'} ${isSelected ? 'border-blue-500 ring-1 ring-blue-500 ' : 'border-slate-200  hover:border-blue-300 dark:hover:border-blue-700'} ${isEditing ? 'border-amber-500 ring-1 ring-amber-500' : ''}`}
                       onClick={() => tab === 'pending' && toggleSelection(expense.id)}
                     >
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <div className="flex-1 flex gap-3">
                           {tab === 'pending' && (
                             <div className="pt-0.5">
-                              <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${isSelected ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-slate-300'}`}>
+                              <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${isSelected ? 'bg-blue-600 border-blue-600 text-white' : 'border-slate-300'}`}>
                                 {isSelected && <CheckSquare className="w-3.5 h-3.5" />}
                               </div>
                             </div>
                           )}
                           <div className={tab === 'history' ? 'pl-1' : ''}>
                             <div className="flex items-center gap-2 mb-1 flex-wrap">
-                              <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md uppercase tracking-wide">
+                              <span className="text-xs font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/40 px-2 py-0.5 rounded-sm uppercase tracking-wide">
                                 {expense.date.split('-').reverse().join('/')}
                               </span>
                               <span className="text-xs font-semibold text-slate-400">
@@ -473,14 +473,14 @@ export function CompanyExpenses() {
                           </div>
                         </div>
                         <div className="flex items-center gap-4 sm:flex-col sm:items-end sm:gap-2">
-                          <div className="text-lg font-bold text-slate-900 bg-slate-100/80 px-3 py-1 rounded-lg shrink-0">
+                          <div className="text-base font-bold font-mono tabular-nums text-slate-900 dark:text-slate-100 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-sm shrink-0">
                             ₦{expense.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </div>
                           <div className="flex items-center gap-1.5 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                             {tab === 'pending' && priv?.canAdd && (
                               <button 
                                 onClick={(e) => { e.stopPropagation(); handleEditClick(expense); }}
-                                className={`p-1.5 rounded-md transition-colors ${isEditing ? 'text-amber-500 bg-amber-50' : 'text-slate-400 hover:text-indigo-600 hover:bg-indigo-50'}`}
+                                className={`p-1.5 rounded-md transition-colors ${isEditing ? 'text-amber-500 bg-amber-50' : 'text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30'}`}
                                 title="Edit Expense"
                               >
                                 <Pencil className="w-4 h-4" />

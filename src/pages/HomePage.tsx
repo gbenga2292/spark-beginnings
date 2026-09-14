@@ -1,280 +1,54 @@
-import { useState, useRef, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { useUserStore } from '../store/userStore';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useUserStore, NO_ACCESS, backfillPrivileges, AppUser } from '../store/userStore';
+import { useAppStore } from '../store/appStore';
 import { useTheme } from '../hooks/useTheme';
-import { IS_LIMITED_WEB_WEB } from '../lib/utils';
+import { useAuth } from '../hooks/useAuth';
 import { cn } from '../lib/utils';
-import logoSrc from '../../logo/logo-2.png';
 import {
-  LayoutDashboard,
-  Users,
-  CalendarClock,
-  Wallet,
-  FileText,
-  Settings,
-  UserPlus,
-  MapPin,
-  Library,
-  Landmark,
-  ShieldCheck,
-  Building2,
-  ReceiptText,
-  BarChart3,
-  AlertTriangle,
-  ClipboardList,
-  BookOpen,
-  ListTodo,
-  BellRing,
-  ClipboardCheck,
-  BarChart2,
-  Bell,
-  History,
-  MessageSquare,
-  Package,
-  Fuel,
-  Truck,
-  ArrowRightLeft,
-  ShoppingCart,
-  Activity,
-  FolderOpen,
-  Sparkles,
-  TrendingUp,
-  ChevronRight,
-  User,
-  LogOut,
-  Search,
-  X,
-  HardHat,
-  PiggyBank,
-  Calculator,
+  LayoutDashboard, Sparkles, BarChart3, HardHat, ArrowRightLeft,
+  Calculator, ListTodo, MessageSquare, Users, Cpu, Landmark, FileText,
+  Settings, Search, LogOut, ArrowUpRight, Layers, ShieldAlert,
+  Bell, User as UserIcon,
 } from 'lucide-react';
 import { supabase } from '../integrations/supabase/client';
-import { NairaSign } from '../components/ui/naira-sign';
-import { useNavigate } from 'react-router-dom';
-import { toast, showConfirm } from '../components/ui/toast';
+import { showConfirm } from '../components/ui/toast';
+import { OmniSearch } from '@/src/components/common/OmniSearch';
+import { getVisibleNavItems, NavItem } from '@/src/constants/navigation';
+import companyLogo from '../../logo/logo-1.png';
+import { StatusIndicator } from '@/src/components/offline/StatusIndicator';
+import { Avatar, AvatarFallback, AvatarImage } from '@/src/components/ui/avatar';
+import { prefetchRoute } from '@/src/lib/routePrefetch';
 
-// ── Same NavItem types as Sidebar ────────────────────────────────────────────
-interface NavItem {
+interface SubModuleItem {
   name: string;
   href: string;
-  icon: any;
-  privKey: string;
-  privField: string;
-  visible?: (user: any) => boolean;
 }
 
-interface NavCategory {
+interface WorkspaceItem {
   name: string;
   icon: any;
-  color: string;         // Tailwind gradient pair
-  bgLight: string;
-  bgDark: string;
-  iconColor: string;
-  items: NavItem[];
-  standalone?: boolean;
-  standaloneHref?: string;
+  href: string;
+  bg: string;
+  glow: string;
+  dotColor: string;
+  badge: string | null;
+  badgeStyle?: React.CSSProperties;
+  subModules: SubModuleItem[];
 }
 
-// ── Navigation definition (mirrors Sidebar exactly) ─────────────────────────
-const navigation: NavCategory[] = [
-  {
-    name: 'Dashboard',
-    icon: LayoutDashboard,
-    color: 'from-indigo-500 to-indigo-600',
-    bgLight: 'bg-indigo-50 hover:bg-indigo-100',
-    bgDark: 'dark:bg-indigo-950/40 dark:hover:bg-indigo-900/60',
-    iconColor: 'text-indigo-600 dark:text-indigo-400',
-    standalone: true,
-    standaloneHref: '/tasks/dashboard',
-    items: [
-      { name: 'Dashboard', href: '/tasks/dashboard', icon: LayoutDashboard, privKey: 'tasks', privField: 'canViewDashboard' },
-    ],
-  },
-  {
-    name: 'Client 360',
-    icon: Sparkles,
-    color: 'from-cyan-500 to-teal-500',
-    bgLight: 'bg-cyan-50 hover:bg-cyan-100',
-    bgDark: 'dark:bg-cyan-950/40 dark:hover:bg-cyan-900/60',
-    iconColor: 'text-cyan-600 dark:text-cyan-400',
-    standalone: true,
-    standaloneHref: '/client-360',
-    items: [
-      { name: 'Client 360', href: '/client-360', icon: Sparkles, privKey: 'sites', privField: 'canView' },
-    ],
-  },
-  {
-    name: 'Site Analytics',
-    icon: BarChart3,
-    color: 'from-emerald-500 to-teal-500',
-    bgLight: 'bg-emerald-50 hover:bg-emerald-100',
-    bgDark: 'dark:bg-emerald-950/40 dark:hover:bg-emerald-900/60',
-    iconColor: 'text-emerald-600 dark:text-emerald-400',
-    standalone: true,
-    standaloneHref: '/operations/site-analytics',
-    items: [
-      { name: 'Site Analytics', href: '/operations/site-analytics', icon: BarChart3, privKey: 'operations', privField: 'canView' },
-    ],
-  },
-  {
-    name: 'Simulator',
-    icon: HardHat,
-    color: 'from-blue-500 to-indigo-500',
-    bgLight: 'bg-blue-50 hover:bg-blue-100',
-    bgDark: 'dark:bg-blue-950/40 dark:hover:bg-blue-900/60',
-    iconColor: 'text-blue-600 dark:text-blue-400',
-    standalone: true,
-    standaloneHref: '/operations/simulator',
-    items: [
-      { name: 'Simulator', href: '/operations/simulator', icon: HardHat, privKey: 'simulator', privField: 'canView' },
-    ],
-  },
-  {
-    name: 'Machine Recon',
-    icon: ArrowRightLeft,
-    color: 'from-teal-500 to-cyan-500',
-    bgLight: 'bg-teal-50 hover:bg-teal-100',
-    bgDark: 'dark:bg-teal-950/40 dark:hover:bg-teal-900/60',
-    iconColor: 'text-teal-600 dark:text-teal-400',
-    standalone: true,
-    standaloneHref: '/operations/machine-reconciliation',
-    items: [
-      { name: 'Machine Reconciliation', href: '/operations/machine-reconciliation', icon: ArrowRightLeft, privKey: 'opsMachineRecon', privField: 'canView' },
-    ],
-  },
-  {
-    name: 'Logistics Estimator',
-    icon: Calculator,
-    color: 'from-amber-500 to-orange-500',
-    bgLight: 'bg-amber-50 hover:bg-amber-100',
-    bgDark: 'dark:bg-amber-950/40 dark:hover:bg-amber-900/60',
-    iconColor: 'text-amber-600 dark:text-amber-400',
-    standalone: true,
-    standaloneHref: '/operations/estimator',
-    items: [
-      { name: 'Logistics Estimator', href: '/operations/estimator', icon: Calculator, privKey: 'simulator', privField: 'canView' },
-    ],
-  },
-  {
-    name: 'Tasks',
-    icon: ListTodo,
-    color: 'from-violet-500 to-purple-600',
-    bgLight: 'bg-violet-50 hover:bg-violet-100',
-    bgDark: 'dark:bg-violet-950/40 dark:hover:bg-violet-900/60',
-    iconColor: 'text-violet-600 dark:text-violet-400',
-    items: [
-      { name: 'Task Register', href: '/tasks', icon: ClipboardCheck, privKey: 'tasks', privField: 'canViewMyTasks' },
-      { name: 'Reminders', href: '/tasks/reminders', icon: Bell, privKey: 'tasks', privField: 'canViewReminders' },
-    ],
-  },
-  {
-    name: 'Comms & Journals',
-    icon: MessageSquare,
-    color: 'from-sky-500 to-blue-600',
-    bgLight: 'bg-sky-50 hover:bg-sky-100',
-    bgDark: 'dark:bg-sky-950/40 dark:hover:bg-sky-900/60',
-    iconColor: 'text-sky-600 dark:text-sky-400',
-    items: [
-      { name: 'External Comms', href: '/comm-log', icon: MessageSquare, privKey: 'commLog', privField: 'canView' },
-      { name: 'Daily Journal', href: '/daily-journal', icon: BookOpen, privKey: 'dailyJournal', privField: 'canView' },
-    ],
-  },
-  {
-    name: 'HR',
-    icon: Users,
-    color: 'from-emerald-500 to-green-600',
-    bgLight: 'bg-emerald-50 hover:bg-emerald-100',
-    bgDark: 'dark:bg-emerald-950/40 dark:hover:bg-emerald-900/60',
-    iconColor: 'text-emerald-600 dark:text-emerald-400',
-    items: [
-      { name: 'HR Dashboard', href: '/hr-dashboard', icon: LayoutDashboard, privKey: 'dashboard', privField: 'canView' },
-      { name: 'Daily Register', href: '/attendance', icon: CalendarClock, privKey: 'attendance', privField: 'canView' },
-      { name: 'Employees', href: '/employees', icon: Users, privKey: 'employees', privField: 'canView' },
-      { name: 'Onboarding', href: '/onboarding', icon: UserPlus, privKey: 'onboarding', privField: 'canView' },
-      { name: 'Leaves', href: '/leaves', icon: CalendarClock, privKey: 'leaves', privField: 'canView' },
-      { name: 'Salary & Loan Advance', href: '/salary-loans', icon: Wallet, privKey: 'salaryLoans', privField: 'canView' },
-      { name: 'HMO Management', href: '/hmo', icon: ShieldCheck, privKey: 'hmo', privField: 'canView' },
-      { name: 'Evaluations', href: '/evaluations', icon: ClipboardList, privKey: 'evaluations', privField: 'canView' },
-      { name: 'Interviews', href: '/interviews', icon: Users, privKey: 'interviews', privField: 'canView' },
-      { name: 'Performance & Conduct', href: '/performance-conduct', icon: AlertTriangle, privKey: 'disciplinary', privField: 'canView' },
-    ],
-  },
-  {
-    name: 'Operations',
-    icon: Package,
-    color: 'from-orange-500 to-amber-500',
-    bgLight: 'bg-orange-50 hover:bg-orange-100',
-    bgDark: 'dark:bg-orange-950/40 dark:hover:bg-orange-900/60',
-    iconColor: 'text-orange-600 dark:text-orange-400',
-    items: [
-      { name: 'Overview', href: '/operations', icon: LayoutDashboard, privKey: 'operations', privField: 'canView' },
-      { name: 'Inventory', href: '/operations/assets', icon: Package, privKey: 'opsInventory', privField: 'canView' },
-      { name: 'Waybills', href: '/operations/waybills', icon: FileText, privKey: 'opsWaybills', privField: 'canView' },
-      { name: 'Quick Checkout', href: '/operations/checkout', icon: ShoppingCart, privKey: 'opsCheckout', privField: 'canView' },
-      { name: 'Maintenance', href: '/operations/maintenance', icon: Activity, privKey: 'opsMaintenance', privField: 'canView' },
-      { name: 'Diesel Refill', href: '/operations/diesel', icon: Fuel, privKey: 'opsDiesel', privField: 'canView' },
-      { name: 'Vehicles', href: '/operations/vehicles', icon: Truck, privKey: 'opsVehicles', privField: 'canView' },
-      { name: 'Sites', href: '/operations/sites', icon: MapPin, privKey: 'opsSites', privField: 'canView' },
-      { name: 'Site Analytics', href: '/operations/site-analytics', icon: BarChart3, privKey: 'operations', privField: 'canView' },
-    ],
-  },
-  {
-    name: 'Account',
-    icon: Landmark,
-    color: 'from-yellow-500 to-amber-600',
-    bgLight: 'bg-yellow-50 hover:bg-yellow-100',
-    bgDark: 'dark:bg-yellow-950/40 dark:hover:bg-yellow-900/60',
-    iconColor: 'text-yellow-600 dark:text-yellow-400',
-    items: [
-      {
-        name: 'Client Accounts',
-        href: '/client-accounts',
-        icon: ReceiptText,
-        privKey: 'custom',
-        privField: '',
-        visible: (user: any) =>
-          user?.privileges?.billing?.canView ||
-          user?.privileges?.payments?.canView ||
-          user?.privileges?.payments?.canViewVat,
-      },
-      { name: 'Payroll', href: '/payroll', icon: Wallet, privKey: 'payroll', privField: 'canView' },
-      { name: 'Non-Employee Directory', href: '/beneficiaries', icon: Users, privKey: 'beneficiaries', privField: 'canView' },
-      { name: 'Ledger', href: '/ledger', icon: BookOpen, privKey: 'ledger', privField: 'canView' },
-      { name: 'Bank AI Import', href: '/bank-import', icon: Sparkles, privKey: 'bankImport', privField: 'canView' },
-      { name: 'Company Expenses', href: '/company-expenses', icon: BookOpen, privKey: 'ledger', privField: 'canView' },
-      { name: 'Budget', href: '/budget', icon: PiggyBank, privKey: 'budget', privField: 'canView' },
-    ],
-  },
-  {
-    name: 'Reports',
-    icon: FolderOpen,
-    color: 'from-rose-500 to-pink-600',
-    bgLight: 'bg-rose-50 hover:bg-rose-100',
-    bgDark: 'dark:bg-rose-950/40 dark:hover:bg-rose-900/60',
-    iconColor: 'text-rose-600 dark:text-rose-400',
-    items: [
-      { name: 'HR Reports', href: '/reports', icon: FileText, privKey: 'reports', privField: 'canView' },
-      { name: 'Account Reports', href: '/financial-reports', icon: BarChart3, privKey: 'financialReports', privField: 'canView' },
-      { name: 'Task Reports', href: '/tasks/reports', icon: ClipboardList, privKey: 'tasks', privField: 'canViewReports' },
-      { name: 'Weekly Report', href: '/weekly-report', icon: BarChart2, privKey: 'weeklyReport', privField: 'canView' },
-    ],
-  },
-  {
-    name: 'Settings',
-    icon: Settings,
-    color: 'from-slate-500 to-slate-600',
-    bgLight: 'bg-slate-100 hover:bg-slate-200',
-    bgDark: 'dark:bg-slate-800/60 dark:hover:bg-slate-700/80',
-    iconColor: 'text-slate-600 dark:text-slate-400',
-    items: [
-      { name: 'User Management', href: '/users', icon: ShieldCheck, privKey: 'users', privField: 'canView' },
-      { name: 'Settings', href: '/settings', icon: Settings, privKey: 'variables', privField: 'canView' },
-      { name: 'Activity Log', href: '/activity-log', icon: History, privKey: 'activityLog', privField: 'canView' },
-    ],
-  },
-];
+interface WorkspaceDefinition {
+  name: string;
+  icon: any;
+  defaultHref: string;
+  bg: string;
+  glow: string;
+  dotColor: string;
+  staticBadge?: string;
+  badgeStyle?: React.CSSProperties;
+  items: NavItem[];
+}
 
-// ── Greeting helper ───────────────────────────────────────────────────────────
 function getGreeting(): string {
   const h = new Date().getHours();
   if (h < 12) return 'Good morning';
@@ -282,292 +56,666 @@ function getGreeting(): string {
   return 'Good evening';
 }
 
-// ── Avatar initials helper ────────────────────────────────────────────────────
 function getInitials(name: string): string {
-  return name
-    .split(' ')
-    .map((n) => n[0])
-    .slice(0, 2)
-    .join('')
-    .toUpperCase();
+  return name.split(' ').map((n) => n[0]).slice(0, 2).join('').toUpperCase();
 }
 
-// ── Main component ────────────────────────────────────────────────────────────
-import { OmniSearch } from '@/src/components/common/OmniSearch';
 export function HomePage() {
-  const currentUser = useUserStore((s) => s.getCurrentUser());
-  const { isDark } = useTheme();
   const navigate = useNavigate();
-  const location = useLocation();
+  const { isDark } = useTheme();
+  const { user: authUser } = useAuth();
+  const currentUser = useUserStore((s) => s.getCurrentUser());
 
-  // ── Exact same permission logic as Sidebar.getVisibleItems ───────────────
-  const getVisibleItems = (items: NavItem[]) => {
-    return items.filter((item) => {
-      if (IS_LIMITED_WEB_WEB) {
-        const isTaskPath = item.href.startsWith('/tasks') || item.href === '/comm-log';
-        const isDashboardPath = item.href === '/';
-        const isCompanyExpenses = item.href === '/company-expenses';
-        const isDailyJournal = item.href === '/daily-journal';
-        if (!isTaskPath && !isDashboardPath && !isCompanyExpenses && !isDailyJournal) return false;
+  // Direct primitive unread count selector — matches Sidebar and CommLog schema
+  const unreadCommCount = useAppStore((s) => {
+    const user = useUserStore.getState().getCurrentUser();
+    if (!user?.id || !s.commLogs?.length) return 0;
+    const canViewCommLog = user?.privileges?.users?.canManage === true || user?.privileges?.commLog?.canView === true;
+    if (!canViewCommLog) return 0;
+    const reads = s.commLogReads;
+    const readSet = new Set(
+      reads ? reads.filter((r: any) => r.userId === user.id).map((r: any) => r.logId) : []
+    );
+    return s.commLogs.filter((log: any) => log.loggedBy !== user.name && !readSet.has(log.id)).length;
+  });
+
+  // Prefetch popular destinations during browser idle for instant click-throughs
+  useEffect(() => {
+    const scheduleIdle = (window as any).requestIdleCallback || ((cb: () => void) => setTimeout(cb, 1200));
+    const handle = scheduleIdle(() => {
+      ['/tasks/dashboard', '/hr-dashboard', '/operations', '/sites', '/attendance', '/client-360', '/reports'].forEach(prefetchRoute);
+    });
+    return () => {
+      if ((window as any).cancelIdleCallback && typeof handle === 'number') {
+        (window as any).cancelIdleCallback(handle);
       }
+    };
+  }, []);
 
-      if (!currentUser) return false;
-      if (item.visible) return item.visible(currentUser);
-      if (item.privKey === 'custom') return false;
+  // Ensure active user profile is available without firing redundant network queries on every mount
+  useEffect(() => {
+    if (!authUser?.id) return;
+    const state = useUserStore.getState();
+    if (state.currentUserId !== authUser.id) {
+      state.setCurrentUser(authUser.id);
+    }
+    const hasUser = state.users.some((u) => u.id === authUser.id);
+    if (!hasUser) {
+      supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', authUser.id)
+        .single()
+        .then(({ data: profile }) => {
+          if (profile) {
+            const freshPrivs = backfillPrivileges(NO_ACCESS, profile.privileges || {});
+            const existing = useUserStore.getState().users;
+            const userObj: AppUser = {
+              id: profile.id,
+              name: profile.name || authUser.email || '',
+              email: profile.email || authUser.email || '',
+              password: '',
+              workspaceId: profile.workspace_id || 'dcel-team',
+              privileges: freshPrivs,
+              isActive: profile.is_active ?? true,
+              createdAt: profile.created_at || new Date().toISOString(),
+              avatar: profile.avatar,
+            };
+            if (existing.some((u) => u.id === profile.id)) {
+              useUserStore.getState().updateUser(profile.id, userObj);
+            } else {
+              useUserStore.setState({ users: [...existing, userObj] });
+            }
+          }
+        });
+    }
+  }, [authUser?.id]);
 
-      const pagePriv = (currentUser.privileges as any)[item.privKey] as Record<string, boolean>;
-      if (item.privField !== 'canView' && pagePriv?.['canView'] !== true) return false;
-      return pagePriv?.[item.privField] === true;
-    });
-  };
-
-  const handleSignOut = async () => {
-    const ok = await showConfirm('Are you sure you want to sign out?', {
-      title: 'Sign Out',
-      confirmLabel: 'Sign Out',
-      cancelLabel: 'Stay',
-      variant: 'danger',
-    });
-    if (!ok) return;
-    await supabase.auth.signOut();
-    navigate('/login');
-  };
-
-  const totalAccessible = navigation.reduce((acc, cat) => {
-    const v = getVisibleItems(cat.items);
-    return acc + v.length;
-  }, 0);
-
-  // ── Home-page global search (OmniSearch) ────────────────────────────────────────────────
   const [omniOpen, setOmniOpen] = useState(false);
-
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-        e.preventDefault();
-        setOmniOpen(true);
-      }
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); setOmniOpen(true); }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  const profileRef = useRef<HTMLDivElement>(null);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const { signOut } = useAuth();
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
+        setIsProfileOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleSignOut = async () => {
+    setIsProfileOpen(false);
+    const ok = await showConfirm('Are you sure you want to sign out?', {
+      title: 'Sign Out', confirmLabel: 'Sign Out', cancelLabel: 'Stay', variant: 'danger',
+    });
+    if (!ok) return;
+    try {
+      await signOut();
+    } catch (_) {}
+    useUserStore.getState().setCurrentUser(null);
+    navigate('/login');
+  };
+
+  // Workspaces definition with full permission requirements for every item
+  const workspaces: WorkspaceItem[] = useMemo(() => {
+    if (!currentUser) return [];
+
+    const definitions: WorkspaceDefinition[] = [
+      {
+        name: 'Dashboard',
+        icon: LayoutDashboard,
+        defaultHref: '/tasks/dashboard',
+        bg: 'linear-gradient(135deg, #1d6fdb 0%, #0ea5e9 100%)',
+        glow: 'rgba(14, 165, 233, 0.35)',
+        dotColor: '#38bdf8',
+        staticBadge: 'Live',
+        items: [
+          { name: 'Dashboard', href: '/tasks/dashboard', icon: LayoutDashboard, privKey: 'tasks', privField: 'canViewDashboard' },
+        ],
+      },
+      {
+        name: 'Clients',
+        icon: Sparkles,
+        defaultHref: '/client-360',
+        bg: 'linear-gradient(135deg, #0d9488 0%, #06b6d4 100%)',
+        glow: 'rgba(6, 182, 212, 0.35)',
+        dotColor: '#22d3ee',
+        items: [
+          {
+            name: 'Client 360',
+            href: '/client-360',
+            icon: Sparkles,
+            privKey: 'custom',
+            privField: '',
+            visible: (user: any) =>
+              Boolean(
+                user?.privileges?.users?.canManage ||
+                user?.privileges?.sites?.canView ||
+                user?.privileges?.clients?.canView
+              ),
+          },
+          { name: 'Machine Recon', href: '/operations/machine-reconciliation', icon: ArrowRightLeft, privKey: 'opsMachineRecon', privField: 'canView' },
+          { name: 'Site Analytics', href: '/operations/site-analytics', icon: BarChart3, privKey: 'operations', privField: 'canView' },
+        ],
+      },
+      {
+        name: 'Communication',
+        icon: MessageSquare,
+        defaultHref: '/tasks',
+        bg: unreadCommCount > 0
+          ? 'linear-gradient(135deg, #dc2626 0%, #f97316 100%)'
+          : 'linear-gradient(135deg, #0284c7 0%, #22d3ee 100%)',
+        glow: unreadCommCount > 0 ? 'rgba(239, 68, 68, 0.35)' : 'rgba(34, 211, 238, 0.30)',
+        dotColor: '#38bdf8',
+        staticBadge: unreadCommCount > 0 ? `${unreadCommCount} Unread` : undefined,
+        items: [
+          { name: 'Task Register', href: '/tasks', icon: ListTodo, privKey: 'tasks', privField: 'canViewMyTasks' },
+          { name: 'Task Reminders', href: '/tasks/reminders', icon: Bell, privKey: 'tasks', privField: 'canViewReminders' },
+          { name: 'External Comms', href: '/comm-log', icon: MessageSquare, privKey: 'commLog', privField: 'canView' },
+          { name: 'Daily Journals', href: '/daily-journal', icon: MessageSquare, privKey: 'dailyJournal', privField: 'canView' },
+        ],
+      },
+      {
+        name: 'HR',
+        icon: Users,
+        defaultHref: '/hr-dashboard',
+        bg: 'linear-gradient(135deg, #047857 0%, #34d399 100%)',
+        glow: 'rgba(52, 211, 153, 0.30)',
+        dotColor: '#10b981',
+        items: [
+          { name: 'HR Dashboard', href: '/hr-dashboard', icon: Users, privKey: 'dashboard', privField: 'canView' },
+          { name: 'Daily Attendance', href: '/attendance', icon: Users, privKey: 'attendance', privField: 'canView' },
+          { name: 'Employees Directory', href: '/employees', icon: Users, privKey: 'employees', privField: 'canView' },
+          { name: 'Staff Onboarding', href: '/onboarding', icon: Users, privKey: 'onboarding', privField: 'canView' },
+          { name: 'Leave Management', href: '/leaves', icon: Users, privKey: 'leaves', privField: 'canView' },
+          { name: 'Salary & Loans', href: '/salary-loans', icon: Users, privKey: 'salaryLoans', privField: 'canView' },
+          { name: 'HMO Management', href: '/hmo', icon: Users, privKey: 'hmo', privField: 'canView' },
+          { name: 'Staff Evaluations', href: '/evaluations', icon: Users, privKey: 'evaluations', privField: 'canView' },
+          { name: 'Candidate Interviews', href: '/interviews', icon: Users, privKey: 'interviews', privField: 'canView' },
+          { name: 'Conduct & Disciplinary', href: '/performance-conduct', icon: Users, privKey: 'disciplinary', privField: 'canView' },
+        ],
+      },
+      {
+        name: 'Operations',
+        icon: Cpu,
+        defaultHref: '/operations',
+        bg: 'linear-gradient(135deg, #c2410c 0%, #fb923c 100%)',
+        glow: 'rgba(251, 146, 60, 0.35)',
+        dotColor: '#f97316',
+        items: [
+          { name: 'Operations Overview', href: '/operations', icon: Cpu, privKey: 'operations', privField: 'canView' },
+          { name: 'Site Inventory', href: '/operations/assets', icon: Cpu, privKey: 'opsInventory', privField: 'canView' },
+          { name: 'Waybills Register', href: '/operations/waybills', icon: Cpu, privKey: 'opsWaybills', privField: 'canView' },
+          { name: 'Quick Checkout', href: '/operations/checkout', icon: Cpu, privKey: 'opsCheckout', privField: 'canView' },
+          { name: 'Asset Maintenance', href: '/operations/maintenance', icon: Cpu, privKey: 'opsMaintenance', privField: 'canView' },
+          { name: 'Diesel Refills', href: '/operations/diesel', icon: Cpu, privKey: 'opsDiesel', privField: 'canView' },
+          { name: 'Fleet Vehicles', href: '/operations/vehicles', icon: Cpu, privKey: 'opsVehicles', privField: 'canView' },
+          { name: 'Active Sites', href: '/operations/sites', icon: Cpu, privKey: 'opsSites', privField: 'canView' },
+        ],
+      },
+      {
+        name: 'Accounts',
+        icon: Landmark,
+        defaultHref: '/ledger',
+        bg: 'linear-gradient(135deg, #b45309 0%, #fbbf24 100%)',
+        glow: 'rgba(251, 191, 36, 0.35)',
+        dotColor: '#f59e0b',
+        items: [
+          {
+            name: 'Client Accounts',
+            href: '/client-accounts',
+            icon: Landmark,
+            privKey: 'custom',
+            privField: '',
+            visible: (user: any) =>
+              Boolean(
+                user?.privileges?.billing?.canView ||
+                user?.privileges?.payments?.canView ||
+                user?.privileges?.payments?.canViewVat
+              ),
+          },
+          { name: 'Payroll Engine', href: '/payroll', icon: Landmark, privKey: 'payroll', privField: 'canView' },
+          { name: 'Beneficiaries Directory', href: '/beneficiaries', icon: Landmark, privKey: 'beneficiaries', privField: 'canView' },
+          { name: 'Financial Ledger', href: '/ledger', icon: Landmark, privKey: 'ledger', privField: 'canView' },
+          { name: 'Bank AI Import', href: '/bank-import', icon: Landmark, privKey: 'bankImport', privField: 'canView' },
+          { name: 'Company Expenses', href: '/company-expenses', icon: Landmark, privKey: 'ledger', privField: 'canView' },
+          { name: 'Budget Tracking', href: '/budget', icon: Landmark, privKey: 'budget', privField: 'canView' },
+        ],
+      },
+      {
+        name: 'Tools',
+        icon: HardHat,
+        defaultHref: '/operations/simulator',
+        bg: 'linear-gradient(135deg, #ea580c 0%, #fde68a 100%)',
+        glow: 'rgba(234, 88, 12, 0.30)',
+        dotColor: '#f97316',
+        items: [
+          { name: 'Simulator', href: '/operations/simulator', icon: HardHat, privKey: 'simulator', privField: 'canView' },
+          { name: 'Logistics Estimator', href: '/operations/estimator', icon: Calculator, privKey: 'simulator', privField: 'canView' },
+        ],
+      },
+      {
+        name: 'Reports',
+        icon: FileText,
+        defaultHref: '/reports',
+        bg: 'linear-gradient(135deg, #be123c 0%, #fb7185 100%)',
+        glow: 'rgba(251, 113, 133, 0.30)',
+        dotColor: '#f43f5e',
+        items: [
+          { name: 'HR Reports', href: '/reports', icon: FileText, privKey: 'reports', privField: 'canView' },
+          { name: 'Financial Reports', href: '/financial-reports', icon: FileText, privKey: 'financialReports', privField: 'canView' },
+          { name: 'Task Reports', href: '/tasks/reports', icon: FileText, privKey: 'tasks', privField: 'canViewReports' },
+          { name: 'Weekly Executive Report', href: '/weekly-report', icon: FileText, privKey: 'weeklyReport', privField: 'canView' },
+        ],
+      },
+      {
+        name: 'System Settings',
+        icon: Settings,
+        defaultHref: '/settings',
+        bg: 'linear-gradient(135deg, #334155 0%, #64748b 100%)',
+        glow: 'rgba(100, 116, 139, 0.25)',
+        dotColor: '#94a3b8',
+        items: [
+          { name: 'User Management', href: '/users', icon: Settings, privKey: 'users', privField: 'canView' },
+          { name: 'System Settings', href: '/settings', icon: Settings, privKey: 'variables', privField: 'canView' },
+          { name: 'Activity Audit Log', href: '/activity-log', icon: Settings, privKey: 'activityLog', privField: 'canView' },
+        ],
+      },
+    ];
+
+    // Filter strictly by the user's active permissions
+    return definitions
+      .map((def) => {
+        const permitted = getVisibleNavItems(def.items, currentUser);
+        // Completely exclude workspace if user has no permitted modules in it
+        if (permitted.length === 0) return null;
+
+        // Use defaultHref if permitted; otherwise fallback to the first permitted item
+        const isDefaultPermitted = permitted.some((p) => p.href === def.defaultHref);
+        const targetHref = isDefaultPermitted ? def.defaultHref : permitted[0].href;
+
+        const hasMultiplePermitted = permitted.length > 1;
+        // Dynamically compute badge: only show count if more than 1 module is accessible
+        const badge = def.staticBadge || (hasMultiplePermitted ? `${permitted.length} Modules` : null);
+
+        return {
+          name: def.name,
+          icon: def.icon,
+          href: targetHref,
+          bg: def.bg,
+          glow: def.glow,
+          dotColor: def.dotColor,
+          badge,
+          badgeStyle: def.badgeStyle,
+          // Hover flyout is only needed when there are multiple accessible sub-modules
+          subModules: hasMultiplePermitted ? permitted.map((p) => ({ name: p.name, href: p.href })) : [],
+        };
+      })
+      .filter(Boolean) as WorkspaceItem[];
+  }, [currentUser, unreadCommCount]);
+
   return (
     <div
-      className={cn(
-        'min-h-full w-full flex flex-col',
-        isDark ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'
-      )}
+      className="w-full h-full overflow-hidden flex flex-col select-none"
+      style={{
+        background: isDark ? '#070f1e' : '#f8fafc',
+      }}
     >
-      {/* ── Compact Hero Header ─────────────────────────────────────────────────────── */}
-      <div
+      {/* ── App Themed Header ─────────────────────────────────────────────────── */}
+      <header
         className={cn(
-          'sticky top-0 z-50 px-4 py-2 md:px-6 md:py-3',
-          isDark
-            ? 'bg-gradient-to-r from-slate-900 via-indigo-950/60 to-slate-900 border-b border-slate-800'
-            : 'bg-gradient-to-r from-indigo-700 via-indigo-600 to-indigo-800 shadow-sm'
+          "flex min-h-[56px] py-2 sm:py-0 h-auto items-center justify-between border-b px-3 md:px-6 gap-2 md:gap-4 transition-colors duration-200 relative z-40 shrink-0",
+          isDark ? 'bg-slate-900 border-slate-700/60' : 'bg-white border-slate-200'
         )}
       >
-        <div className="pointer-events-none absolute inset-0 overflow-hidden">
-          <div className="absolute -top-10 -right-10 h-48 w-48 rounded-full bg-white/5 blur-3xl" />
-        </div>
-
-        <div className="relative flex flex-row items-center justify-between max-w-screen-xl mx-auto gap-2">
-          {/* Left: Greeting */}
-          <div className="flex items-center gap-2 sm:gap-2.5 shrink-0 min-w-0">
-            <Link
-              to="/profile"
-              className="flex h-8 w-8 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-xl text-sm font-bold text-white shadow-md ring-1 ring-white/20 hover:ring-white/40 transition-all"
-              style={{
-                background: currentUser?.avatarColor
-                  ? currentUser.avatarColor
-                  : 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-              }}
-            >
-              {currentUser?.avatar ? (
-                <img src={currentUser.avatar} alt={currentUser.name} className="h-full w-full rounded-xl object-cover" />
-              ) : (
-                getInitials(currentUser?.name || 'U')
-              )}
-            </Link>
-            <div className="min-w-0 flex flex-col justify-center">
-               <h1 className="text-lg sm:text-xl font-bold text-white tracking-tight truncate">
-                 <span className="hidden sm:inline">{getGreeting()}, </span>
-                 {currentUser?.name?.split(' ')[0] || 'User'}
-               </h1>
+        {/* Left: Company Logo + Greeting */}
+        <div className="flex items-center gap-3 shrink-0">
+          <div
+            className={cn(
+              "shrink-0 h-9 w-9 rounded-xl flex items-center justify-center p-1 shadow-xs border transition-colors",
+              isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-200"
+            )}
+          >
+            <img
+              src={companyLogo}
+              alt="Company Logo"
+              className="h-full w-full object-contain pointer-events-none"
+            />
+          </div>
+          <div className="flex flex-col min-w-0">
+            <h1 className={cn("text-[14px] sm:text-base md:text-lg font-bold tracking-tight line-clamp-1 leading-tight", isDark ? "text-slate-100" : "text-slate-900")}>
+              {getGreeting()}, {currentUser?.name ? currentUser.name.split(' ')[0] : 'Director'}
+            </h1>
+            <div className={cn("hidden sm:block text-[10px] font-medium leading-tight mt-0.5", isDark ? "text-slate-400" : "text-slate-500")}>
+              Operational Command & Launchpad
             </div>
           </div>
-
-          {/* Center: Desktop search using OmniSearch */}
-          <div className="relative hidden sm:block flex-1 max-w-xs mx-4">
-            <button
-              onClick={() => setOmniOpen(true)}
-              className={cn(
-                'flex items-center w-full gap-2 px-3 py-1.5 rounded-full border transition-all',
-                'bg-white/15 border-white/25 hover:bg-white/25 hover:border-white/50 backdrop-blur-sm'
-              )}
-            >
-              <Search className="w-3.5 h-3.5 text-white/60 shrink-0" />
-              <span className="text-white/60 text-xs font-medium flex-1 text-left">Search anything...</span>
-              <kbd className="hidden sm:inline-block text-[10px] px-1.5 py-0.5 rounded border border-white/20 text-white/60 bg-white/5 font-sans">
-                ⌘K
-              </kbd>
-            </button>
-          </div>
-
-          {/* Right: Actions */}
-          <div className="flex items-center gap-1.5 shrink-0 ml-auto">
-            <button
-              onClick={handleSignOut}
-              className="flex items-center gap-2 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-red-500/80 backdrop-blur-sm"
-            >
-              <LogOut className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Sign out</span>
-            </button>
-          </div>
         </div>
-      </div>
 
-      {/* ── Mobile Search Bar (triggers OmniSearch) ─────────────────────────────────────────── */}
-      <div className="sm:hidden px-4 pt-3 pb-1 relative">
-        <button
-          onClick={() => setOmniOpen(true)}
-          className={cn(
-            'flex items-center w-full gap-2 px-3 py-2 rounded-xl border shadow-sm transition-all',
-            isDark
-              ? 'bg-slate-800 border-slate-700 hover:border-slate-600'
-              : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50'
-          )}
-        >
-          <Search className={cn('w-4 h-4 shrink-0', isDark ? 'text-slate-400' : 'text-slate-400')} />
-          <span className={cn('text-sm font-medium flex-1 text-left', isDark ? 'text-slate-500' : 'text-slate-400')}>
-            Search anything...
-          </span>
-        </button>
-      </div>
+        {/* Center: OmniSearch styled with app theme */}
+        <div className="flex-1 max-w-md mx-2 sm:mx-6 hidden sm:block">
+          <button
+            onClick={() => setOmniOpen(true)}
+            className={cn(
+              "w-full flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs transition-colors border shadow-2xs group cursor-pointer",
+              isDark
+                ? "bg-slate-800/80 border-slate-700 text-slate-400 hover:bg-slate-700/60 hover:text-slate-200 hover:border-slate-600"
+                : "bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100 hover:text-slate-700 hover:border-slate-300"
+            )}
+          >
+            <Search className="h-3.5 w-3.5 shrink-0 text-sky-500 group-hover:text-sky-400 transition-colors" />
+            <span className="flex-1 text-left truncate">Search tasks, sites, fleet, finances...</span>
+            <kbd className={cn(
+              "text-[10px] px-1.5 py-0.5 rounded font-mono border",
+              isDark ? "bg-slate-700/80 text-slate-300 border-slate-600" : "bg-white text-slate-500 border-slate-200"
+            )}>⌘K</kbd>
+          </button>
+        </div>
 
-      {/* ── Compact Grid ─────────────────────────────────────────────────────── */}
-      <div className="w-full px-4 py-3 md:px-6 md:py-5 max-w-[1600px] mx-auto">
-        <div className="columns-1 sm:columns-2 md:columns-3 lg:columns-4 xl:columns-5 2xl:columns-6 gap-3 md:gap-4">
-          {navigation.map((category) => {
-            // Web build filtering
-            if (IS_LIMITED_WEB_WEB) {
-              const allowed = ['Dashboard', 'Client 360', 'Simulator', 'Tasks', 'Account', 'Comms & Journals'];
-              if (!allowed.includes(category.name)) return null;
-            }
+        {/* Right: App Controls, Status, Notifications & Profile Dropdown */}
+        <div className="flex items-center gap-2 shrink-0">
+          <StatusIndicator />
+          <div className={cn("h-6 w-px hidden sm:block mx-1", isDark ? "bg-slate-700" : "bg-slate-200")} />
 
-            const visibleItems = getVisibleItems(category.items);
-            if (visibleItems.length === 0) return null;
+          {/* Notifications button */}
+          <button
+            onClick={() => navigate('/notifications')}
+            className={cn(
+              "relative h-8 w-8 rounded-lg flex items-center justify-center transition-colors cursor-pointer",
+              isDark ? "text-slate-400 hover:bg-slate-800" : "text-slate-500 hover:bg-slate-100"
+            )}
+            title="Notifications & Comms"
+          >
+            <Bell className="h-4 w-4" />
+            {unreadCommCount > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 min-w-4 h-4 px-1 rounded-full bg-rose-500 text-white text-[9px] font-bold flex items-center justify-center animate-pulse">
+                {unreadCommCount}
+              </span>
+            )}
+          </button>
 
-            const CatIcon = category.icon;
-            const isStandalone = category.standalone && visibleItems.length === 1;
+          <div className={cn("h-6 w-px hidden sm:block", isDark ? "bg-slate-700" : "bg-slate-200")} />
 
-            // Render standalone item (like Dashboard or Client 360) as a prominent action card
-            if (isStandalone) {
-              const item = visibleItems[0];
-              return (
-                <div key={category.name} className="w-full break-inside-avoid mb-3 md:mb-4">
-                  <Link
-                    to={item.href}
-                    className={cn(
-                      'group flex w-full items-center justify-between rounded-xl border p-3 sm:p-3.5 transition-all duration-200',
-                      'hover:scale-[1.02] hover:shadow-md active:scale-[0.98]',
-                      isDark
-                        ? cn('border-slate-800 hover:border-slate-700', category.bgDark)
-                        : cn('border-slate-200 bg-white shadow-sm hover:border-slate-300', category.bgLight)
-                    )}
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <div className={cn('flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br shadow-sm', category.color)}>
-                        <item.icon className="h-5 w-5 text-white" />
-                      </div>
-                      <div>
-                         <h2 className={cn('text-sm font-bold', isDark ? 'text-slate-200' : 'text-slate-800')}>{item.name}</h2>
-                         <p className={cn('text-[10px] uppercase tracking-wider font-semibold mt-0.5', isDark ? 'text-slate-500' : 'text-slate-400')}>{category.name}</p>
-                      </div>
+          {/* Profile Dropdown */}
+          <div ref={profileRef} className="relative">
+            <button
+              onClick={() => setIsProfileOpen(!isProfileOpen)}
+              className={cn(
+                "flex items-center rounded-full p-0.5 transition-all focus:outline-none focus:ring-2 focus:ring-sky-500/30 cursor-pointer",
+                isDark ? "hover:bg-slate-800" : "hover:bg-slate-100"
+              )}
+              title={currentUser?.name || authUser?.email || 'User Profile'}
+              aria-label="User Profile"
+            >
+              <Avatar className="h-8 w-8 ring-1 ring-slate-200 dark:ring-slate-700 hover:ring-sky-400 transition-all">
+                <AvatarImage src={currentUser?.avatar} alt={currentUser?.name} referrerPolicy="no-referrer" />
+                <AvatarFallback className="text-xs bg-sky-100 text-sky-700 font-bold uppercase dark:bg-sky-950 dark:text-sky-300">
+                  {(currentUser?.name || authUser?.email || '?').charAt(0)}
+                </AvatarFallback>
+              </Avatar>
+            </button>
+
+            {isProfileOpen && (
+              <div className={cn(
+                "fixed right-3 top-[57px] w-64 max-w-[calc(100vw-1.5rem)] border rounded-xl shadow-2xl z-50 overflow-hidden",
+                isDark ? "bg-slate-800 border-slate-700/80 shadow-black/60" : "bg-white border-slate-200 shadow-slate-300/60"
+              )}>
+                <div className={cn("px-4 py-4 border-b", isDark ? "bg-slate-900/60 border-slate-700" : "bg-slate-50 border-slate-100")}>
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-10 w-10">
+                      <AvatarImage src={currentUser?.avatar} alt={currentUser?.name} referrerPolicy="no-referrer" />
+                      <AvatarFallback className="bg-sky-600 text-white font-bold uppercase">
+                        {(currentUser?.name || authUser?.email || '?').charAt(0)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0">
+                      <p className={cn("text-[12px] font-bold truncate leading-tight", isDark ? "text-slate-100" : "text-slate-900")}>
+                        {currentUser?.name || authUser?.email}
+                      </p>
+                      <p className="text-[10px] text-slate-500 truncate mt-0.5">{currentUser?.email || authUser?.email}</p>
                     </div>
-                    <ChevronRight className={cn('h-4 w-4 transition-transform duration-200 group-hover:translate-x-1', category.iconColor)} />
-                  </Link>
+                  </div>
                 </div>
-              );
-            }
 
-            // Render standard category as a card containing a list of modules
-            return (
-              <div key={category.name} className="w-full break-inside-avoid mb-3 md:mb-4">
-                <div className={cn(
-                   'w-full rounded-xl border p-3 sm:p-3.5 shadow-sm',
-                   isDark ? 'border-slate-800 bg-slate-900/50' : 'border-slate-200 bg-white'
-                )}>
-                  {/* Category Header */}
-                  <div className="flex items-center gap-2 mb-2 px-1">
-                    <CatIcon className={cn('h-4 w-4', category.iconColor)} />
-                    <h2 className={cn('text-xs font-bold uppercase tracking-wider', isDark ? 'text-slate-400' : 'text-slate-500')}>
-                      {category.name}
-                    </h2>
-                  </div>
+                <div className="py-1">
+                  <button
+                    onClick={() => { setIsProfileOpen(false); navigate('/profile'); }}
+                    className={cn("w-full flex items-center gap-3 px-4 py-2.5 text-xs transition-colors cursor-pointer", isDark ? "text-slate-300 hover:bg-slate-700" : "text-slate-600 hover:bg-slate-50")}
+                  >
+                    <UserIcon className="h-3.5 w-3.5 text-slate-400" />
+                    My Profile
+                  </button>
+                  <button
+                    onClick={() => { setIsProfileOpen(false); navigate('/settings'); }}
+                    className={cn("w-full flex items-center gap-3 px-4 py-2.5 text-xs transition-colors cursor-pointer", isDark ? "text-slate-300 hover:bg-slate-700" : "text-slate-600 hover:bg-slate-50")}
+                  >
+                    <Settings className="h-3.5 w-3.5 text-slate-400" />
+                    Settings
+                  </button>
+                  {currentUser?.privileges?.users?.canView && (
+                    <button
+                      onClick={() => { setIsProfileOpen(false); navigate('/users'); }}
+                      className={cn("w-full flex items-center gap-3 px-4 py-2.5 text-xs transition-colors cursor-pointer", isDark ? "text-slate-300 hover:bg-slate-700" : "text-slate-600 hover:bg-slate-50")}
+                    >
+                      <Users className="h-3.5 w-3.5 text-slate-400" />
+                      User Management
+                    </button>
+                  )}
 
-                  {/* Module List */}
-                  <div className="flex flex-col gap-1">
-                    {visibleItems.map(item => {
-                       const Icon = item.icon;
-                       return (
-                         <Link
-                           key={item.href + item.name}
-                           to={item.href}
-                           className={cn(
-                             'group flex w-full items-center justify-between rounded-lg px-2 py-1.5 sm:py-2 transition-colors',
-                             isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-50'
-                           )}
-                         >
-                           <div className="flex items-center gap-2.5">
-                             <Icon className={cn('h-4 w-4 transition-colors', isDark ? 'text-slate-500 group-hover:text-slate-300' : 'text-slate-400 group-hover:text-slate-600')} />
-                             <span className={cn('text-sm font-medium', isDark ? 'text-slate-300 group-hover:text-slate-100' : 'text-slate-600 group-hover:text-slate-900')}>
-                               {item.name}
-                             </span>
-                           </div>
-                           <ChevronRight className={cn('h-3.5 w-3.5 opacity-0 transition-all duration-200 group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0', category.iconColor)} />
-                         </Link>
-                       )
-                    })}
-                  </div>
+                  <div className={cn("my-1 border-t", isDark ? "border-slate-700" : "border-slate-100")} />
+                  <button
+                    onClick={handleSignOut}
+                    className="w-full flex items-center gap-3 px-4 py-2 text-xs font-semibold text-rose-500 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                  >
+                    <LogOut className="h-3.5 w-3.5" />
+                    Sign Out
+                  </button>
                 </div>
               </div>
-            );
-          })}
+            )}
+          </div>
         </div>
+      </header>
 
-        {/* Empty state — user has no modules */}
-        {totalAccessible === 0 && (
-          <div className="flex flex-col items-center justify-center gap-4 py-20 text-center">
-            <ShieldCheck className="h-14 w-14 text-slate-300 dark:text-slate-700" />
-            <h2 className="text-lg font-semibold text-slate-500 dark:text-slate-400">
-              No modules available
+      {/* ── Accessible Workspaces Grid ───────────────────────────────────────── */}
+      <main
+        className="flex-1 min-h-0 w-full max-w-[1600px] mx-auto p-4 sm:p-6 pb-6 overflow-y-auto md:overflow-hidden [&::-webkit-scrollbar]:hidden"
+        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+      >
+        {/* Empty state if user has 0 permitted workspaces */}
+        {workspaces.length === 0 && (
+          <div className="flex flex-col items-center justify-center gap-4 py-28 text-center animate-in fade-in duration-300">
+            <div
+              className="h-16 w-16 rounded-2xl flex items-center justify-center shadow-lg"
+              style={{ background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }}
+            >
+              <ShieldAlert className="h-8 w-8 text-amber-500" />
+            </div>
+            <h2 className={cn('text-lg font-bold tracking-tight', isDark ? 'text-white' : 'text-slate-900')}>
+              No Accessible Modules
             </h2>
-            <p className="text-sm text-slate-400 dark:text-slate-500 max-w-xs">
-              You don't have permission to access any modules yet. Contact an administrator.
+            <p className="text-xs text-slate-400 max-w-sm leading-relaxed">
+              Your account does not currently have permissions assigned to access any operational modules. Please contact your system administrator to request access.
             </p>
             <Link
               to="/profile"
-              className="mt-2 rounded-xl bg-indigo-600 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700"
+              className="mt-2 px-5 py-2 rounded-xl text-xs font-semibold text-white transition-transform hover:scale-105"
+              style={{ background: 'linear-gradient(135deg, #1d6fdb, #0ea5e9)' }}
             >
               View Profile
             </Link>
           </div>
         )}
-      </div>
 
-      {/* Footer */}
-      <div
-        className={cn(
-          'mt-4 border-t px-10 py-5 text-center text-xs',
-          isDark ? 'border-slate-800 text-slate-600' : 'border-slate-200 text-slate-400'
+        {/* Dynamic Responsive Grid of Permitted Workspaces */}
+        {workspaces.length > 0 && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3.5">
+            {workspaces.map((item, index) => {
+              const ItemIcon = item.icon;
+              const hasSubModules = item.subModules.length > 0;
+
+              return (
+                <div
+                  key={item.name}
+                  className="relative group hover:z-50"
+                >
+                  {/* Main Action Card */}
+                  <Link
+                    to={item.href}
+                    onMouseEnter={() => prefetchRoute(item.href)}
+                    onTouchStart={() => prefetchRoute(item.href)}
+                    onFocus={() => prefetchRoute(item.href)}
+                    className="relative flex flex-col justify-between overflow-hidden rounded-2xl transition-all duration-300 hover:-translate-y-1 active:translate-y-0 w-full select-none"
+                    style={{
+                      background: item.bg,
+                      boxShadow: isDark
+                        ? '0 4px 14px rgba(0,0,0,0.45)'
+                        : '0 2px 8px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04)',
+                      minHeight: '124px',
+                      padding: '16px',
+                      contain: 'layout style',
+                    }}
+                  >
+                    {/* Sheen overlay on hover */}
+                    <div
+                      className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none rounded-2xl"
+                      style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.18) 0%, transparent 60%)' }}
+                    />
+
+                    {/* Top row: icon + badge + arrow */}
+                    <div className="relative z-10 flex items-start justify-between gap-2">
+                      <div
+                        className="h-9 w-9 rounded-xl flex items-center justify-center shrink-0 transition-transform duration-300 group-hover:scale-110 shadow-xs"
+                        style={{ background: 'rgba(255,255,255,0.22)' }}
+                      >
+                        <ItemIcon className="h-4.5 w-4.5 text-white" />
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        {item.badge && (
+                          <span
+                            className="text-[9px] font-extrabold px-2 py-0.5 rounded-full shadow-xs shrink-0"
+                            style={item.badgeStyle || { background: 'rgba(255,255,255,0.25)', color: '#fff' }}
+                          >
+                            {item.badge}
+                          </span>
+                        )}
+                        <div
+                          className="h-5 w-5 rounded-full flex items-center justify-center opacity-60 group-hover:opacity-100 transition-all duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 shrink-0"
+                          style={{ background: 'rgba(255,255,255,0.18)' }}
+                        >
+                          <ArrowUpRight className="h-3 w-3 text-white" />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Bottom: Clean bold title & micro-cue */}
+                    <div className="relative z-10 mt-auto pt-3">
+                      <h3 className="text-sm sm:text-base font-bold text-white leading-snug tracking-tight truncate drop-shadow-xs">
+                        {item.name}
+                      </h3>
+                      {hasSubModules ? (
+                        <div className="flex items-center gap-1.5 mt-1 text-[10px] font-medium text-white/75 group-hover:text-white transition-colors">
+                          <Layers className="h-3 w-3 shrink-0 text-white/80" />
+                          <span className="truncate">Hover to explore</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1.5 mt-1 text-[10px] font-medium text-white/60">
+                          <span className="truncate">Direct launch</span>
+                        </div>
+                      )}
+                    </div>
+                  </Link>
+
+                  {/* ── Fancy Frosted Glass Sub-Modules Popover on Hover ──────── */}
+                  {hasSubModules && (
+                    <div
+                      className={cn(
+                        "absolute z-50 w-[340px] sm:w-[380px] rounded-2xl p-3.5 shadow-2xl transition-all duration-200 pointer-events-none opacity-0 group-hover:opacity-100 group-hover:pointer-events-auto",
+                        // Bottom row items bloom upward so they never get clipped by the viewport
+                        index >= 10
+                          ? "bottom-[calc(100%+8px)] mb-1"
+                          : "top-[calc(100%+8px)] mt-1",
+                        // Right columns align right so they never overflow window edge
+                        index % 5 >= 3
+                          ? "right-0 left-auto"
+                          : "left-0 right-auto"
+                      )}
+                      style={{
+                        background: isDark ? 'rgba(10, 20, 38, 0.94)' : 'rgba(255, 255, 255, 0.97)',
+                        backdropFilter: 'blur(16px)',
+                        WebkitBackdropFilter: 'blur(16px)',
+                        border: isDark ? '1px solid rgba(255,255,255,0.14)' : '1px solid rgba(0,0,0,0.1)',
+                        boxShadow: isDark
+                          ? '0 20px 40px -10px rgba(0,0,0,0.6), 0 4px 12px rgba(0,0,0,0.4)'
+                          : '0 20px 40px -10px rgba(0,0,0,0.14), 0 4px 12px rgba(0,0,0,0.05)',
+                        willChange: 'opacity, transform',
+                      }}
+                    >
+                      {/* Popover Header */}
+                      <div className="flex items-center justify-between pb-2 mb-2 border-b border-white/10">
+                        <div className="flex items-center gap-2">
+                          <div
+                            className="h-5 w-5 rounded-md flex items-center justify-center text-white shrink-0"
+                            style={{ background: item.bg }}
+                          >
+                            <ItemIcon className="h-3 w-3" />
+                          </div>
+                          <span className={cn("text-xs font-bold truncate", isDark ? "text-white" : "text-slate-900")}>
+                            {item.name}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Submodules Grid */}
+                      <div className={cn(
+                        item.subModules.length > 4 ? "grid grid-cols-2 gap-1.5" : "flex flex-col gap-1.5"
+                      )}>
+                        {item.subModules.map((sub) => (
+                          <Link
+                            key={sub.name}
+                            to={sub.href}
+                            onMouseEnter={() => prefetchRoute(sub.href)}
+                            onTouchStart={() => prefetchRoute(sub.href)}
+                            onFocus={() => prefetchRoute(sub.href)}
+                            className={cn(
+                              "group/sub flex items-center justify-between px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-all duration-150",
+                              isDark
+                                ? "text-slate-200 bg-white/5 hover:bg-white/15 hover:text-white"
+                                : "text-slate-700 bg-slate-100 hover:bg-slate-200 hover:text-slate-950"
+                            )}
+                          >
+                            <div className="flex items-center gap-2 truncate">
+                              <div
+                                className="h-1.5 w-1.5 rounded-full shrink-0"
+                                style={{ background: item.dotColor }}
+                              />
+                              <span className="truncate">{sub.name}</span>
+                            </div>
+                            <ArrowUpRight className="h-3 w-3 shrink-0 opacity-0 group-hover/sub:opacity-100 transition-opacity" />
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         )}
-      >
-        Select a module above to get started · {currentUser?.email}
-      </div>
-      <OmniSearch isOpen={omniOpen} onClose={() => setOmniOpen(false)} isDark={isDark} />
+      </main>
+
+      {omniOpen && <OmniSearch isOpen={omniOpen} onClose={() => setOmniOpen(false)} isDark={isDark} />}
     </div>
   );
 }

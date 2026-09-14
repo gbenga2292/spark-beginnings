@@ -86,26 +86,26 @@ export function RestockModal({ onClose, preselectedAssetId }: RestockModalProps)
   const isValid = items.some(i => i.assetId && i.quantity > 0);
 
   const selectCls =
-    'w-full h-9 pl-3 pr-8 rounded-xl text-sm font-medium appearance-none outline-none ' +
-    'bg-background border border-border text-foreground ' +
-    'focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all cursor-pointer';
+    'w-full h-9 pl-3 pr-8 rounded-md text-sm font-medium appearance-none outline-none ' +
+    'bg-background border border-slate-200 dark:border-slate-800 text-foreground ' +
+    'focus:ring-1 focus:ring-blue-600 focus:border-blue-600 transition-all cursor-pointer';
 
   const inputCls =
-    'h-9 px-3 rounded-xl text-sm font-bold text-center outline-none w-full ' +
-    'bg-background border border-border text-foreground ' +
-    'focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all';
+    'h-9 px-3 rounded-md text-sm font-bold font-mono tabular-nums text-center outline-none w-full ' +
+    'bg-background border border-slate-200 dark:border-slate-800 text-foreground ' +
+    'focus:ring-1 focus:ring-blue-600 focus:border-blue-600 transition-all';
 
   return (
     <Dialog open onOpenChange={onClose}>
       <DialogContent
         aria-describedby={undefined}
-        className="max-w-2xl p-0 overflow-hidden rounded-2xl bg-card border border-border shadow-2xl"
+        className="max-w-2xl p-0 overflow-hidden rounded-md bg-card border border-slate-200 dark:border-slate-800 shadow-lg"
       >
         {/* Header */}
-        <DialogHeader className="flex flex-row items-center justify-between space-y-0 px-6 py-4 border-b border-border bg-gradient-to-r from-primary/5 to-transparent">
+        <DialogHeader className="flex flex-row items-center justify-between space-y-0 px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-muted/30">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
-              <Package className="h-4.5 w-4.5 text-primary" />
+            <div className="w-9 h-9 rounded-md bg-blue-50 dark:bg-blue-900/30 border border-slate-200 dark:border-slate-800 flex items-center justify-center">
+              <Package className="h-4.5 w-4.5 text-blue-600" />
             </div>
             <div>
               <DialogTitle className="text-base font-semibold text-foreground leading-none">
@@ -121,9 +121,9 @@ export function RestockModal({ onClose, preselectedAssetId }: RestockModalProps)
 
         {/* Column Headers */}
         <div className="grid grid-cols-[2fr_1.3fr_1.5fr_auto] gap-2 px-6 pt-4 pb-1">
-          <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Asset</span>
-          <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest text-center">Qty / Packs</span>
-          <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Total Cost (₦)</span>
+          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Asset</span>
+          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider text-center">Qty / Packs</span>
+          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Total Cost (₦)</span>
           <span className="w-6" />
         </div>
 
@@ -135,7 +135,7 @@ export function RestockModal({ onClose, preselectedAssetId }: RestockModalProps)
             const hasPackaging = Boolean(asset?.packUnit && asset?.packSize && asset.packSize > 1);
 
             return (
-              <div key={item.id} className="p-3 rounded-xl border border-border bg-muted/20 space-y-2">
+              <div key={item.id} className="p-3 rounded-md border border-slate-200 dark:border-slate-800 bg-muted/20 space-y-2">
                 <div className="grid grid-cols-[2fr_1.3fr_1.5fr_auto] gap-2 items-center">
                   {/* Asset select */}
                   <div className="relative">
@@ -156,18 +156,18 @@ export function RestockModal({ onClose, preselectedAssetId }: RestockModalProps)
                   <div>
                     {hasPackaging ? (
                       <div className="space-y-1">
-                        <div className="flex rounded-lg overflow-hidden border border-border bg-background p-0.5 text-[11px]">
+                        <div className="flex rounded-md overflow-hidden border border-slate-200 dark:border-slate-800 bg-background p-0.5 text-[11px]">
                           <button
                             type="button"
                             onClick={() => handleUpdate(item.id, 'inputMode', 'units')}
-                            className={`flex-1 py-0.5 font-bold rounded ${item.inputMode === 'units' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                            className={`flex-1 py-0.5 font-bold rounded-sm ${item.inputMode === 'units' ? 'bg-blue-600 text-white' : 'text-muted-foreground hover:text-foreground'}`}
                           >
                             Units
                           </button>
                           <button
                             type="button"
                             onClick={() => handleUpdate(item.id, 'inputMode', 'packs')}
-                            className={`flex-1 py-0.5 font-bold rounded ${item.inputMode === 'packs' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                            className={`flex-1 py-0.5 font-bold rounded-sm ${item.inputMode === 'packs' ? 'bg-blue-600 text-white' : 'text-muted-foreground hover:text-foreground'}`}
                           >
                             {asset?.packUnit || 'Packs'}
                           </button>
@@ -215,7 +215,7 @@ export function RestockModal({ onClose, preselectedAssetId }: RestockModalProps)
                       className={inputCls + ' text-left'}
                     />
                     {unitCost > 0 && (
-                      <p className="text-[10px] text-primary font-semibold text-right pr-1">
+                      <p className="text-[10px] text-blue-600 font-mono tabular-nums font-semibold text-right pr-1">
                         ₦{unitCost.toFixed(2)}/unit
                       </p>
                     )}
@@ -225,17 +225,17 @@ export function RestockModal({ onClose, preselectedAssetId }: RestockModalProps)
                   <button
                     onClick={() => handleRemoveItem(item.id)}
                     disabled={items.length === 1}
-                    className="h-7 w-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-0 transition-all"
+                    className="h-7 w-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20 disabled:opacity-0 transition-all"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
                 </div>
 
                 {/* Sub-bar with conversions & Details toggle */}
-                <div className="flex items-center justify-between text-[11px] pt-1 text-muted-foreground border-t border-border/40">
+                <div className="flex items-center justify-between text-[11px] pt-1 text-muted-foreground border-t border-slate-200/60 dark:border-slate-800/60">
                   <span>
                     {item.quantity > 0 && asset && (
-                      <span className="font-semibold text-foreground">
+                      <span className="font-semibold text-foreground font-mono tabular-nums">
                         Total Stock: {formatDualUnit(item.quantity, asset.unitOfMeasurement, asset.packUnit, asset.packSize)}
                       </span>
                     )}
@@ -243,7 +243,7 @@ export function RestockModal({ onClose, preselectedAssetId }: RestockModalProps)
                   <button
                     type="button"
                     onClick={() => handleUpdate(item.id, 'showDetails', !item.showDetails)}
-                    className="text-primary hover:underline font-semibold flex items-center gap-1"
+                    className="text-blue-600 hover:underline font-semibold flex items-center gap-1"
                   >
                     <Hash className="h-3 w-3" />
                     {item.showDetails ? 'Hide Batch & Supplier' : '+ Batch / Expiry / Supplier'}
@@ -252,7 +252,7 @@ export function RestockModal({ onClose, preselectedAssetId }: RestockModalProps)
 
                 {/* Batch & Supplier detail drawer */}
                 {item.showDetails && (
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2 border-t border-border/40 bg-background/50 p-2.5 rounded-lg text-xs">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2 border-t border-slate-200 dark:border-slate-800 bg-background/50 p-2.5 rounded-md text-xs">
                     <div>
                       <label className="block text-[10px] font-bold text-muted-foreground uppercase mb-1">Batch #</label>
                       <input
@@ -260,7 +260,7 @@ export function RestockModal({ onClose, preselectedAssetId }: RestockModalProps)
                         placeholder="e.g. BATCH-2026-08"
                         value={item.batchNumber || ''}
                         onChange={e => handleUpdate(item.id, 'batchNumber', e.target.value)}
-                        className="h-8 px-2.5 rounded-lg border border-border bg-background text-xs w-full outline-none focus:border-primary"
+                        className="h-8 px-2.5 rounded-md border border-slate-200 dark:border-slate-800 bg-background text-xs w-full outline-none focus:border-blue-600"
                       />
                     </div>
                     <div>
@@ -269,7 +269,7 @@ export function RestockModal({ onClose, preselectedAssetId }: RestockModalProps)
                         type="date"
                         value={item.expiryDate || ''}
                         onChange={e => handleUpdate(item.id, 'expiryDate', e.target.value)}
-                        className="h-8 px-2.5 rounded-lg border border-border bg-background text-xs w-full outline-none focus:border-primary"
+                        className="h-8 px-2.5 rounded-md border border-slate-200 dark:border-slate-800 bg-background text-xs w-full outline-none focus:border-blue-600"
                       />
                     </div>
                     <div>
@@ -279,7 +279,7 @@ export function RestockModal({ onClose, preselectedAssetId }: RestockModalProps)
                         placeholder="Supplier name"
                         value={item.supplier || ''}
                         onChange={e => handleUpdate(item.id, 'supplier', e.target.value)}
-                        className="h-8 px-2.5 rounded-lg border border-border bg-background text-xs w-full outline-none focus:border-primary"
+                        className="h-8 px-2.5 rounded-md border border-slate-200 dark:border-slate-800 bg-background text-xs w-full outline-none focus:border-blue-600"
                       />
                     </div>
                   </div>
@@ -292,28 +292,28 @@ export function RestockModal({ onClose, preselectedAssetId }: RestockModalProps)
         {/* Add row */}
         <button
           onClick={handleAddItem}
-          className="mx-6 mb-3 flex items-center gap-1.5 text-xs font-semibold text-primary hover:text-primary/80 transition-colors"
+          className="mx-6 mb-3 flex items-center gap-1.5 text-xs font-semibold text-blue-600 hover:text-blue-700 transition-colors"
         >
           <Plus className="h-3.5 w-3.5" /> Add another asset
         </button>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-border flex items-center justify-between bg-muted/30">
+        <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between bg-muted/30">
           <p className="text-[11px] text-muted-foreground font-medium">
-            {items.filter(i => i.assetId && i.quantity > 0).length} item(s) ready
+            <span className="font-mono tabular-nums font-bold text-foreground">{items.filter(i => i.assetId && i.quantity > 0).length}</span> item(s) ready
           </p>
           <div className="flex gap-2">
             <button
               type="button"
               onClick={onClose}
-              className="h-9 px-4 rounded-xl border border-border bg-card text-sm text-muted-foreground hover:bg-muted transition-colors font-medium"
+              className="h-9 px-4 rounded-md border border-slate-200 dark:border-slate-800 bg-card text-sm text-muted-foreground hover:bg-muted transition-colors font-medium"
             >
               Cancel
             </button>
             <button
               onClick={handleRestock}
               disabled={!isValid}
-              className="h-9 px-5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm shadow-sm disabled:opacity-40 transition-all hover:bg-primary/90"
+              className="h-9 px-5 rounded-md bg-blue-600 text-white font-semibold text-sm disabled:opacity-40 transition-all hover:bg-blue-700"
             >
               Restock
             </button>

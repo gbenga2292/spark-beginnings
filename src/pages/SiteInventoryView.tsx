@@ -671,7 +671,7 @@ export function SiteInventoryView({ site, questionnaire, onBack, onSiteChange, i
                                         {lineage.hasPredecessor && (
                                           <Badge
                                             variant="outline"
-                                            className="bg-indigo-50 dark:bg-indigo-950/20 text-indigo-700 dark:text-indigo-300 border-indigo-200/60 font-bold px-1.5 py-0 text-[10px] rounded shrink-0 flex items-center gap-1"
+                                            className="bg-blue-50 dark:bg-blue-950/20 text-blue-700 dark:text-blue-300 border-blue-200/60 font-bold px-1.5 py-0 text-[10px] rounded-sm shrink-0 flex items-center gap-1 font-mono"
                                             title={`Replaces ${lineage.predecessorName} (${lineage.swapReason || 'Machine Swap'})`}
                                           >
                                             <ArrowRightLeft className="h-2.5 w-2.5" />
@@ -684,7 +684,7 @@ export function SiteInventoryView({ site, questionnaire, onBack, onSiteChange, i
                                       <Badge
                                         variant="outline"
                                         className={cn(
-                                          "text-[10px] font-bold px-2 py-0.5 shrink-0",
+                                          "text-[10px] font-bold px-2 py-0.5 shrink-0 rounded-sm font-mono uppercase tracking-wider",
                                           mAsset.status === 'ok' ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
                                           mAsset.status === 'due_soon' ? "bg-amber-50 text-amber-700 border-amber-200" :
                                           "bg-rose-50 text-rose-700 border-rose-200"
@@ -699,31 +699,31 @@ export function SiteInventoryView({ site, questionnaire, onBack, onSiteChange, i
                                   <div className="p-4 grid grid-cols-5 divide-x divide-slate-100 dark:divide-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
                                     <div className="flex flex-col items-center justify-center px-1">
                                       <p className="text-[10px] sm:text-[11px] text-slate-500 mb-1 whitespace-nowrap">Next Service</p>
-                                      <p className="text-[11px] font-bold text-slate-800 dark:text-slate-200 text-center">
+                                      <p className="text-[11px] font-bold text-slate-800 dark:text-slate-200 text-center font-mono">
                                         {mAsset ? new Date(mAsset.nextServiceDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '—'}
                                       </p>
                                     </div>
                                     <div className="flex flex-col items-center justify-center px-1">
                                       <p className="text-[10px] sm:text-[11px] text-slate-500 mb-1 whitespace-nowrap">Interval</p>
-                                      <p className="text-[11px] sm:text-xs font-bold text-slate-800 dark:text-slate-200">
+                                      <p className="text-[11px] sm:text-xs font-bold text-slate-800 dark:text-slate-200 font-mono tabular-nums">
                                         {mAsset ? `${mAsset.serviceIntervalMonths}mo` : '—'}
                                       </p>
                                     </div>
                                     <div className="flex flex-col items-center justify-center px-1">
                                       <p className="text-[10px] sm:text-[11px] text-slate-500 mb-1 whitespace-nowrap">Asset Days</p>
-                                      <p className="text-[11px] sm:text-xs font-bold text-emerald-600 dark:text-emerald-400" title={`Individual machine active days on site`}>
+                                      <p className="text-[11px] sm:text-xs font-bold text-emerald-600 dark:text-emerald-400 font-mono tabular-nums" title={`Individual machine active days on site`}>
                                         {lineage.thisActiveDays}d
                                       </p>
                                     </div>
                                     <div className="flex flex-col items-center justify-center px-1">
                                       <p className="text-[10px] sm:text-[11px] text-slate-500 mb-1 whitespace-nowrap">Slot Total</p>
-                                      <p className="text-[11px] sm:text-xs font-bold text-indigo-600 dark:text-indigo-400" title={`Continuous site operational days across replacements`}>
+                                      <p className="text-[11px] sm:text-xs font-bold text-blue-600 dark:text-blue-400 font-mono tabular-nums" title={`Continuous site operational days across replacements`}>
                                         {lineage.cumulativeActiveDays}d
                                       </p>
                                     </div>
                                     <div className="flex flex-col items-center justify-center px-1">
                                       <p className="text-[10px] sm:text-[11px] text-slate-500 mb-1 whitespace-nowrap">Diesel</p>
-                                      <p className="text-[11px] sm:text-xs font-bold text-blue-600 dark:text-blue-400" title={`Machine: ${lineage.thisDiesel}L · Slot Total: ${lineage.cumulativeDiesel}L`}>
+                                      <p className="text-[11px] sm:text-xs font-bold text-blue-600 dark:text-blue-400 font-mono tabular-nums" title={`Machine: ${lineage.thisDiesel}L · Slot Total: ${lineage.cumulativeDiesel}L`}>
                                         {lineage.thisDiesel}L
                                       </p>
                                     </div>
@@ -731,9 +731,9 @@ export function SiteInventoryView({ site, questionnaire, onBack, onSiteChange, i
 
                                   {/* Lineage Info Banner if replaced */}
                                   {lineage.hasPredecessor && (
-                                    <div className="px-4 py-1.5 bg-indigo-50/50 dark:bg-indigo-950/20 border-t border-indigo-100 dark:border-indigo-900/30 text-[11px] text-indigo-700 dark:text-indigo-300 flex items-center justify-between">
+                                    <div className="px-4 py-1.5 bg-blue-50/50 dark:bg-blue-950/20 border-t border-blue-100 dark:border-blue-900/30 text-[11px] text-blue-700 dark:text-blue-300 flex items-center justify-between font-mono">
                                       <span>Continuous Slot Days:</span>
-                                      <span className="font-bold">{lineage.cumulativeActiveDays} days ({lineage.predecessorActiveDays}d + {lineage.thisActiveDays}d)</span>
+                                      <span className="font-bold tabular-nums">{lineage.cumulativeActiveDays} days ({lineage.predecessorActiveDays}d + {lineage.thisActiveDays}d)</span>
                                     </div>
                                   )}
 

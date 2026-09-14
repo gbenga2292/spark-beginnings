@@ -38,6 +38,8 @@ import { CreateTaskDialog } from './Tasks/CreateTaskDialog';
 import { InvoiceDetailDialog } from './InvoiceDetailDialog';
 import { GlobalSearch } from '@/src/components/common/GlobalSearch';
 import { ClientSitesTimeline } from '@/src/components/sites/ClientSitesTimeline';
+import { MetricHeroCard } from '@/src/components/ui/MetricHeroCard';
+import { getInvoiceSettlement } from '@/src/lib/settlementUtils';
 
 type TabType = 'overview' | 'timeline' | 'contacts' | 'financials' | 'report' | 'operations' | 'activity' | 'tasks' | 'onboarding';
 
@@ -54,7 +56,7 @@ const renderFormattedChatMessage = (content: string) => {
             return <strong key={i} className="font-extrabold text-slate-900 dark:text-white">{part.slice(2, -2)}</strong>;
           }
           if (part.startsWith('*') && part.endsWith('*') && part.length >= 2 && !part.startsWith('**')) {
-            return <em key={i} className="italic text-indigo-600 dark:text-indigo-200">{part.slice(1, -1)}</em>;
+            return <em key={i} className="italic text-blue-600 dark:text-blue-200">{part.slice(1, -1)}</em>;
           }
           // Clean up any loose lone asterisks or hashes
           const cleanPart = part.replace(/\*\*/g, '').replace(/#/g, '');
@@ -76,7 +78,7 @@ const renderFormattedChatMessage = (content: string) => {
         if (trimmed.startsWith('#') || (/^\*\*[^*]+\*\*:?$/.test(trimmed) && trimmed.length < 60)) {
           const cleanHeader = trimmed.replace(/^#+\s*/, '').replace(/\*\*/g, '').replace(/#/g, '').trim();
           return (
-            <div key={idx} className="text-xs font-black tracking-wider text-indigo-700 dark:text-indigo-300 uppercase mt-3.5 mb-1.5 border-b border-indigo-200 dark:border-indigo-700/50 pb-1 flex items-center gap-1.5">
+            <div key={idx} className="text-xs font-black tracking-wider text-blue-700 dark:text-blue-300 uppercase mt-3.5 mb-1.5 border-b border-blue-200 dark:border-blue-700/50 pb-1 flex items-center gap-1.5">
               <span>{cleanHeader}</span>
             </div>
           );
@@ -88,7 +90,7 @@ const renderFormattedChatMessage = (content: string) => {
           if (!bulletText) return null;
           return (
             <div key={idx} className="flex items-start gap-2 pl-1.5 my-1 text-slate-800 dark:text-slate-100">
-              <span className="text-indigo-600 dark:text-indigo-400 font-bold text-sm select-none leading-none mt-0.5">•</span>
+              <span className="text-blue-600 dark:text-blue-400 font-bold text-sm select-none leading-none mt-0.5">•</span>
               <div className="flex-1">
                 {renderInlineText(bulletText)}
               </div>
@@ -98,7 +100,7 @@ const renderFormattedChatMessage = (content: string) => {
 
         // Standard paragraph line
         return (
-          <p key={idx} className="my-1 text-slate-700 dark:text-indigo-50">
+          <p key={idx} className="my-1 text-slate-700 dark:text-blue-50">
             {renderInlineText(trimmed)}
           </p>
         );
@@ -569,7 +571,7 @@ export function Client360() {
           .company-title {
             font-size: 11px;
             font-weight: 800;
-            color: #4f46e5;
+            color: #2563eb;
             text-transform: uppercase;
             letter-spacing: 1px;
             margin-bottom: 4px;
@@ -753,7 +755,7 @@ export function Client360() {
             color: #065f46;
           }
           .total-tag {
-            color: #4f46e5;
+            color: #2563eb;
           }
           .total-tag.green-tag {
             color: #059669;
@@ -785,7 +787,7 @@ export function Client360() {
           }
           .inv-num {
             font-weight: 800;
-            color: #4f46e5;
+            color: #2563eb;
           }
           .green-text {
             color: #059669;
@@ -1079,9 +1081,9 @@ export function Client360() {
         const card = document.getElementById('vat-deficit-card');
         if (card) {
           card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          card.classList.add('ring-2', 'ring-indigo-600', 'ring-offset-2', 'dark:ring-offset-slate-900');
+          card.classList.add('ring-2', 'ring-blue-600', 'ring-offset-2', 'dark:ring-offset-slate-900');
           setTimeout(() => {
-            card.classList.remove('ring-2', 'ring-indigo-600', 'ring-offset-2', 'dark:ring-offset-slate-900');
+            card.classList.remove('ring-2', 'ring-blue-600', 'ring-offset-2', 'dark:ring-offset-slate-900');
           }, 3000);
         }
       }, 200);
@@ -1520,27 +1522,18 @@ export function Client360() {
         }
       }
 
-      let intelligentStatus = inv.status;
-      if (intelligentStatus !== 'Paid') {
-        const invAmount = inv.totalCharge || inv.amount || 0;
-        const invDateNum = inv.date ? new Date(normalizeDate(inv.date)).getTime() : 0;
-        
-        const matchingPayment = allClientPayments.find(p => {
-          const siteMatch = (p.site?.trim() === inv.siteName?.trim() || p.site === inv.siteId);
-          const diff = Math.abs((p.amount || 0) - invAmount);
-          const isSimilarAmount = invAmount > 0 && (diff / invAmount) <= 0.05;
-          const pDateNum = p.date ? new Date(normalizeDate(p.date)).getTime() : 0;
-          const isDateValid = pDateNum >= (invDateNum - (7 * 24 * 60 * 60 * 1000));
-          
-          return siteMatch && isSimilarAmount && isDateValid;
-        });
+      const settlement = getInvoiceSettlement(inv, invoices, payments);
+      const intelligentStatus = settlement.status;
 
-        if (matchingPayment) {
-          intelligentStatus = 'Paid';
-        }
-      }
-
-      return { ...inv, nextBillingDate, siteStatus, status: intelligentStatus };
+      return { 
+        ...inv, 
+        nextBillingDate, 
+        siteStatus, 
+        status: intelligentStatus,
+        balanceRemaining: settlement.balanceRemaining,
+        totalSettled: settlement.totalSettled,
+        isSettledPaid: settlement.isPaid
+      };
     }).sort((a, b) => {
       const dateA = a.date ? new Date(normalizeDate(a.date)).getTime() : 0;
       const dateB = b.date ? new Date(normalizeDate(b.date)).getTime() : 0;
@@ -1833,7 +1826,7 @@ export function Client360() {
         const defaultKey = keys.find(k => k.is_default) || keys.find(k => k.provider === selectedProvider) || keys[0];
         if (defaultKey) {
           apiKey = defaultKey.key_value;
-          provider = (defaultKey.provider === 'gemini' || defaultKey.provider === 'groq') ? defaultKey.provider : (defaultKey.key_value?.startsWith('AIza') ? 'gemini' : 'groq');
+          provider = (defaultKey.provider === 'gemini' || defaultKey.provider === 'groq') ? defaultKey.provider : ((defaultKey.key_value?.startsWith('AIza') || defaultKey.key_value?.startsWith('AQ.')) ? 'gemini' : 'groq');
           if (defaultKey.default_model) model = defaultKey.default_model;
         }
       }
@@ -2073,12 +2066,12 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
           className={cn(
             "h-8 px-2.5 flex items-center gap-1.5 border shadow-none rounded-md text-xs font-semibold transition-colors",
             isQuickStatsOpen
-              ? "bg-indigo-50 border-indigo-300 text-indigo-700 dark:bg-indigo-950/60 dark:border-indigo-800 dark:text-indigo-300"
+              ? "bg-blue-50 border-blue-300 text-blue-700 dark:bg-blue-950/60 dark:border-blue-800 dark:text-blue-300"
               : isDark ? "bg-slate-900 border-slate-700 text-slate-200 hover:bg-slate-800" : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
           )}
           title="Toggle quick telemetry overview"
         >
-          <Activity className="w-3.5 h-3.5 text-indigo-500" />
+          <Activity className="w-3.5 h-3.5 text-blue-500" />
           <span className="hidden sm:inline">Quick Stats</span>
         </Button>
       )}
@@ -2093,7 +2086,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
               sendChatMessage(true);
             }
           }}
-          className="h-8 px-2.5 flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-md text-xs font-semibold shadow-none transition-all"
+          className="h-8 px-3 flex items-center gap-1.5 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-white rounded-xl text-xs font-bold shadow-[0_2px_12px_rgba(14,165,233,0.35)] transition-all border-0"
           title="Open Decision Intelligence Assistant"
         >
           <Sparkles className="w-3.5 h-3.5" />
@@ -2111,14 +2104,14 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
             className={cn(
               "h-8 w-8 p-0 flex items-center justify-center border shadow-none rounded-md transition-colors",
               isDark ? "bg-slate-900 border-slate-700 text-white hover:bg-slate-800" : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50",
-              (filterMonth !== 'all' || filterYear !== 'all') && "border-indigo-500 text-indigo-600 dark:text-indigo-400"
+              (filterMonth !== 'all' || filterYear !== 'all') && "border-blue-500 text-blue-600 dark:text-blue-400"
             )}
             title="Filter by period"
           >
             <div className="relative flex items-center justify-center">
               <Filter className="w-3.5 h-3.5" />
               {(filterMonth !== 'all' || filterYear !== 'all') && (
-                <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-indigo-600 animate-pulse" />
+                <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
               )}
             </div>
           </Button>
@@ -2133,7 +2126,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                 {(filterMonth !== 'all' || filterYear !== 'all') && (
                   <button 
                     onClick={() => { setFilterMonth('all'); setFilterYear('all'); }} 
-                    className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline"
+                    className="text-[10px] font-semibold text-blue-600 dark:text-blue-400 hover:underline"
                   >
                     Reset
                   </button>
@@ -2143,7 +2136,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
               <div>
                 <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Month</label>
                 <div className={cn("flex items-center px-2 py-1 rounded-md border transition-colors", 
-                  isDark ? "bg-slate-800 border-slate-700 focus-within:border-indigo-500" : "bg-slate-50 border-slate-200 focus-within:border-indigo-300"
+                  isDark ? "bg-slate-800 border-slate-700 focus-within:border-blue-500" : "bg-slate-50 border-slate-200 focus-within:border-blue-300"
                 )}>
                   <div className="relative w-full">
                     <select
@@ -2167,7 +2160,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
               <div>
                 <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Year</label>
                 <div className={cn("flex items-center px-2 py-1 rounded-md border transition-colors", 
-                  isDark ? "bg-slate-800 border-slate-700 focus-within:border-indigo-500" : "bg-slate-50 border-slate-200 focus-within:border-indigo-300"
+                  isDark ? "bg-slate-800 border-slate-700 focus-within:border-blue-500" : "bg-slate-50 border-slate-200 focus-within:border-blue-300"
                 )}>
                   <div className="relative w-full">
                     <select
@@ -2190,7 +2183,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
 
               <Button 
                 size="sm" 
-                className="w-full bg-indigo-600 hover:bg-indigo-500 text-white text-xs h-7.5 rounded-md mt-1" 
+                className="w-full bg-blue-600 hover:bg-blue-500 text-white text-xs h-7.5 rounded-md mt-1" 
                 onClick={() => setShowFilterMenu(false)}
               >
                 Apply Filters
@@ -2208,21 +2201,21 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
           <div className={cn(
             "flex items-center gap-1.5 px-2.5 py-1 h-8 rounded-md border shadow-none transition-all shrink-0 order-first md:order-last w-full md:w-auto",
             isAll
-              ? (isDark ? "bg-indigo-950/60 border-indigo-800/80" : "bg-indigo-50 border-indigo-200")
+              ? (isDark ? "bg-blue-950/60 border-blue-800/80" : "bg-blue-50 border-blue-200")
               : currentStatus === 'active'
               ? (isDark ? "bg-emerald-950/50 border-emerald-800/70" : "bg-emerald-50 border-emerald-200")
               : currentStatus === 'onboarding'
               ? (isDark ? "bg-amber-950/50 border-amber-800/70" : "bg-amber-50 border-amber-200")
-              : (isDark ? "bg-slate-900 border-slate-700 hover:border-indigo-500" : "bg-white border-slate-200 hover:border-indigo-300")
+              : (isDark ? "bg-slate-900 border-slate-700 hover:border-blue-500" : "bg-white border-slate-200 hover:border-blue-300")
           )}>
             {isAll ? (
-              <Globe className="w-3.5 h-3.5 shrink-0 text-indigo-600 dark:text-indigo-400" />
+              <Globe className="w-3.5 h-3.5 shrink-0 text-blue-600 dark:text-blue-400" />
             ) : (
               <Building2 className={cn(
                 "w-3.5 h-3.5 shrink-0 transition-colors",
                 currentStatus === 'active' ? "text-emerald-600 dark:text-emerald-400" :
                 currentStatus === 'onboarding' ? "text-amber-600 dark:text-amber-400" :
-                "text-indigo-600"
+                "text-blue-600"
               )} />
             )}
             
@@ -2233,7 +2226,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                 className={cn(
                   "appearance-none bg-transparent font-bold text-xs pr-5 focus:outline-none cursor-pointer w-full md:max-w-[170px] truncate transition-colors",
                   isAll
-                    ? "text-indigo-900 dark:text-indigo-200"
+                    ? "text-blue-900 dark:text-blue-200"
                     : currentStatus === 'active'
                     ? "text-emerald-900 dark:text-emerald-200"
                     : currentStatus === 'onboarding'
@@ -2275,7 +2268,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
               </select>
               <ChevronDown className={cn(
                 "w-3.5 h-3.5 absolute right-0 pointer-events-none transition-colors",
-                isAll ? "text-indigo-500 dark:text-indigo-400" :
+                isAll ? "text-blue-500 dark:text-blue-400" :
                 currentStatus === 'active' ? "text-emerald-500 dark:text-emerald-400" :
                 currentStatus === 'onboarding' ? "text-amber-500 dark:text-amber-400" :
                 "text-slate-400"
@@ -2400,170 +2393,222 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
           onEditSite={openSiteEdit}
         />
       ) : (
-        <div className="flex flex-col h-full min-h-0 overflow-hidden bg-slate-50 dark:bg-slate-950">
+        <div 
+          className="flex flex-col h-full min-h-0 overflow-hidden"
+          style={isDark ? {
+            background: 'radial-gradient(circle at 15% 10%, rgba(14, 165, 233, 0.08) 0%, transparent 40%), radial-gradient(circle at 85% 85%, rgba(13, 148, 136, 0.06) 0%, transparent 40%), #050d1a',
+          } : {
+            background: 'radial-gradient(circle at 10% 10%, rgba(14, 165, 233, 0.06) 0%, transparent 35%), radial-gradient(circle at 90% 90%, rgba(16, 185, 129, 0.05) 0%, transparent 35%), #f0f6ff',
+          }}
+        >
           {/* Main Content Area */}
           <div className="flex-1 overflow-y-auto px-2 sm:px-4 lg:px-6 pb-6 style-scroll">
             {clientData ? (
               <div className="max-w-6xl mx-auto space-y-3 pt-2">
                 {/* ── Compact Client Identity Bar ── */}
-                <div className="flex flex-wrap items-center justify-between gap-2.5 px-3.5 py-2.5 rounded-md border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 shadow-none">
-              {/* Left: Client Identity & Chips */}
-              <div className="flex flex-wrap items-center gap-2 min-w-0">
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <div className="p-1 rounded bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 shrink-0">
-                    {selectedClient === 'ALL' || selectedClient === 'All Clients' ? <Globe className="w-4 h-4" /> : <Building2 className="w-4 h-4" />}
-                  </div>
-                  <h1 className="text-sm sm:text-base font-bold text-slate-900 dark:text-slate-100 truncate tracking-tight">
-                    {selectedClient === 'ALL' || selectedClient === 'All Clients' ? 'All Clients Portfolio' : selectedClient}
-                  </h1>
-                </div>
-
-                {/* Micro Badges */}
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  {(() => {
-                    const isAll = selectedClient === 'ALL' || selectedClient === 'All Clients';
-                    const currentStatus = isAll ? 'all' : (clientStatusMap.get(selectedClient) || 'normal');
-                    return (
-                      <Badge className={cn(
-                        'text-[10px] font-bold uppercase tracking-wide border px-1.5 py-0.5 rounded shadow-none',
-                        isAll ? 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/60 dark:text-indigo-300 dark:border-indigo-800' :
-                        currentStatus === 'active' ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800' :
-                        currentStatus === 'onboarding' ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800' :
-                        'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700'
-                      )}>
-                        {isAll ? 'PORTFOLIO' : currentStatus.toUpperCase()}
-                      </Badge>
-                    );
-                  })()}
-
-                  <div className="flex items-center gap-1 text-[11px] font-mono text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 px-2 py-0.5 rounded">
-                    <MapPin className="w-3 h-3 text-slate-400" />
-                    <span>{clientData.activeSites} / {clientData.totalSites} Sites</span>
-                  </div>
-
-                  {principalContact && (
-                    <div className="hidden sm:flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 px-2 py-0.5 rounded truncate max-w-[200px]" title={`Principal Contact: ${principalContact.name} (${principalContact.phone || principalContact.email || 'No contact info'})`}>
-                      <Users className="w-3 h-3 text-slate-400 shrink-0" />
-                      <span className="truncate">{principalContact.name}</span>
+                <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl shadow-[0_4px_24px_-4px_rgba(0,0,0,0.06)]">
+                  {/* Left: Client Identity & Chips */}
+                  <div className="flex flex-wrap items-center gap-2.5 min-w-0">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="p-2 rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 text-white shadow-[0_2px_10px_rgba(14,165,233,0.35)] shrink-0">
+                        {selectedClient === 'ALL' || selectedClient === 'All Clients' ? <Globe className="w-4 h-4" /> : <Building2 className="w-4 h-4" />}
+                      </div>
+                      <h1 className="text-sm sm:text-base font-extrabold text-slate-900 dark:text-white truncate tracking-tight">
+                        {selectedClient === 'ALL' || selectedClient === 'All Clients' ? 'All Clients Portfolio' : selectedClient}
+                      </h1>
                     </div>
-                  )}
-                </div>
-              </div>
 
-              {/* Right: Quick Action Buttons */}
-              <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
-                {canViewComm && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      setCommForm(f => ({ ...f, clientName: selectedClient === 'ALL' ? '' : selectedClient }));
-                      setCommDialogOpen(true);
-                    }}
-                    className="h-7 px-2 text-xs font-semibold rounded-md border-slate-200 dark:border-slate-700"
-                  >
-                    <MessageSquare className="w-3.5 h-3.5 sm:mr-1 text-indigo-500" />
-                    <span className="hidden sm:inline">Log Comm</span>
-                    <span className="sm:hidden">Log</span>
-                  </Button>
+                    {/* Micro Badges */}
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {(() => {
+                        const isAll = selectedClient === 'ALL' || selectedClient === 'All Clients';
+                        const currentStatus = isAll ? 'all' : (clientStatusMap.get(selectedClient) || 'normal');
+                        return (
+                          <Badge className={cn(
+                            'text-[10px] font-extrabold uppercase tracking-wider border px-2 py-0.5 rounded-full',
+                            isAll ? 'bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-500/30 shadow-[0_1px_8px_rgba(14,165,233,0.15)]' :
+                            currentStatus === 'active' ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30 shadow-[0_1px_8px_rgba(16,185,129,0.15)]' :
+                            currentStatus === 'onboarding' ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30 shadow-[0_1px_8px_rgba(245,158,11,0.15)]' :
+                            'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700'
+                          )}>
+                            {isAll ? 'PORTFOLIO' : currentStatus.toUpperCase()}
+                          </Badge>
+                        );
+                      })()}
+
+                      <div className="flex items-center gap-1 text-[11px] font-mono font-semibold text-slate-600 dark:text-slate-300 bg-slate-100/90 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700 px-2.5 py-0.5 rounded-full">
+                        <MapPin className="w-3 h-3 text-sky-500" />
+                        <span>{clientData.activeSites} / {clientData.totalSites} Sites</span>
+                      </div>
+
+                      {principalContact && (
+                        <div className="hidden sm:flex items-center gap-1.5 text-[11px] font-medium text-slate-600 dark:text-slate-300 bg-slate-100/90 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700 px-2.5 py-0.5 rounded-full truncate max-w-[200px]" title={`Principal Contact: ${principalContact.name} (${principalContact.phone || principalContact.email || 'No contact info'})`}>
+                          <Users className="w-3 h-3 text-slate-400 shrink-0" />
+                          <span className="truncate">{principalContact.name}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Right: Quick Action Buttons */}
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {canViewComm && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setCommForm(f => ({ ...f, clientName: selectedClient === 'ALL' ? '' : selectedClient }));
+                          setCommDialogOpen(true);
+                        }}
+                        className="h-7.5 px-2.5 text-xs font-bold rounded-xl border border-sky-200 dark:border-sky-800/60 bg-sky-50/80 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 hover:bg-sky-100 dark:hover:bg-sky-900/60 transition-all shadow-xs"
+                      >
+                        <MessageSquare className="w-3.5 h-3.5 sm:mr-1 text-sky-500" />
+                        <span className="hidden sm:inline">Log Comm</span>
+                        <span className="sm:hidden">Log</span>
+                      </Button>
+                    )}
+
+                    {currentUser?.privileges?.sites?.canView && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => navigate('/sites')}
+                        className="h-7.5 px-2.5 text-xs font-bold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all shadow-xs"
+                      >
+                        <Building2 className="w-3.5 h-3.5 sm:mr-1 text-blue-500" />
+                        <span className="hidden sm:inline">Client Manager</span>
+                        <span className="sm:hidden">Clients</span>
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                {/* ── Expandable Quick Stats Telemetry Strip ── */}
+                {isQuickStatsOpen && (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 p-1 animate-in fade-in-50 duration-150">
+                    {[
+                      {
+                        label: 'TOTAL REVENUE',
+                        value: currentUser?.privileges?.billing?.canViewAmounts ? `₦${Math.round(clientData.totalRevenue).toLocaleString()}` : '₦***',
+                        sub: 'Lifetime Billed',
+                        bg: 'linear-gradient(135deg, #047857 0%, #10b981 100%)',
+                        glow: 'rgba(16, 185, 129, 0.35)',
+                      },
+                      {
+                        label: 'VAT DEFICIT',
+                        value: currentUser?.privileges?.billing?.canViewAmounts ? `₦${Math.round(clientData.vatDeficit).toLocaleString()}` : '₦***',
+                        sub: clientData.vatDeficit > 0 ? 'Tax Outstanding' : 'All Settled',
+                        bg: clientData.vatDeficit > 0 ? 'linear-gradient(135deg, #be123c 0%, #f43f5e 100%)' : 'linear-gradient(135deg, #0d9488 0%, #14b8a6 100%)',
+                        glow: clientData.vatDeficit > 0 ? 'rgba(244, 63, 94, 0.35)' : 'rgba(20, 184, 166, 0.3)',
+                      },
+                      {
+                        label: 'ACTIVE SITES',
+                        value: `${clientData.activeSites} / ${clientData.totalSites}`,
+                        sub: 'Active / Total Sites',
+                        bg: 'linear-gradient(135deg, #0284c7 0%, #38bdf8 100%)',
+                        glow: 'rgba(56, 189, 248, 0.35)',
+                      },
+                      {
+                        label: 'HEALTH SCORE',
+                        value: `${clientData.healthScore}/100`,
+                        sub: clientData.healthScore > 80 ? 'Optimal' : clientData.healthScore > 50 ? 'Moderate' : 'Attention Needed',
+                        bg: clientData.healthScore > 80 ? 'linear-gradient(135deg, #059669 0%, #34d399 100%)' : clientData.healthScore > 50 ? 'linear-gradient(135deg, #d97706 0%, #fbbf24 100%)' : 'linear-gradient(135deg, #e11d48 0%, #f87171 100%)',
+                        glow: 'rgba(245, 158, 11, 0.35)',
+                      },
+                      {
+                        label: 'INVOICES',
+                        value: `${clientData.clientInvoices.length} issued`,
+                        sub: 'Commercial Invoices',
+                        bg: 'linear-gradient(135deg, #0891b2 0%, #06b6d4 100%)',
+                        glow: 'rgba(6, 182, 212, 0.35)',
+                      },
+                      {
+                        label: 'PENDING TASKS',
+                        value: `${clientData.pendingTasks.length} tasks`,
+                        sub: 'Operations Queue',
+                        bg: 'linear-gradient(135deg, #1e293b 0%, #334155 100%)',
+                        glow: 'rgba(71, 85, 105, 0.35)',
+                      },
+                    ].map((card, idx) => (
+                      <div
+                        key={idx}
+                        className="relative overflow-hidden rounded-2xl p-3.5 text-white transition-all duration-200 hover:-translate-y-0.5 cursor-default flex flex-col justify-between group"
+                        style={{
+                          background: card.bg,
+                          boxShadow: `0 8px 24px -4px ${card.glow}`,
+                        }}
+                      >
+                        {/* Glass Sheen */}
+                        <div
+                          className="pointer-events-none absolute inset-0 opacity-25 transition-opacity group-hover:opacity-40"
+                          style={{
+                            background: 'linear-gradient(135deg, rgba(255,255,255,0.4) 0%, transparent 60%)',
+                          }}
+                        />
+                        {/* Noise texture */}
+                        <div
+                          className="pointer-events-none absolute inset-0 opacity-5"
+                          style={{
+                            backgroundImage: "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")",
+                          }}
+                        />
+
+                        <div className="relative z-10">
+                          <span className="inline-block px-2 py-0.5 rounded-full text-[9px] font-extrabold tracking-wider uppercase mb-1.5" style={{ background: 'rgba(255,255,255,0.22)', color: '#fff' }}>
+                            {card.label}
+                          </span>
+                          <p className="text-base sm:text-lg font-black font-mono tracking-tight text-white truncate drop-shadow-xs">
+                            {card.value}
+                          </p>
+                        </div>
+
+                        <div className="relative z-10 mt-2 pt-1 border-t border-white/15 flex items-center justify-between text-[10px] text-white/80 font-medium">
+                          <span>{card.sub}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 )}
 
-                {currentUser?.privileges?.sites?.canView && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => navigate('/sites')}
-                    className="h-7 px-2 text-xs font-semibold rounded-md border-slate-200 dark:border-slate-700"
-                  >
-                    <Building2 className="w-3.5 h-3.5 sm:mr-1 text-indigo-500" />
-                    <span className="hidden sm:inline">Client Manager</span>
-                    <span className="sm:hidden">Clients</span>
-                  </Button>
-                )}
-              </div>
-            </div>
-
-            {/* ── Expandable Quick Stats Telemetry Strip ── */}
-            {isQuickStatsOpen && (
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 p-2.5 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/50 animate-in fade-in-50 duration-150">
-                <div className="p-2 rounded bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800">
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Total Revenue</span>
-                  <span className="text-xs sm:text-sm font-black text-emerald-600 dark:text-emerald-400 font-mono">
-                    ₦{currentUser?.privileges?.billing?.canViewAmounts ? Math.round(clientData.totalRevenue).toLocaleString() : '***'}
-                  </span>
+                {/* ── Flat Segmented Navigation Tabs (Sticky Header Strip) ── */}
+                <div className="sticky top-0 z-20 bg-slate-50/90 dark:bg-slate-950/90 backdrop-blur-xl flex items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden touch-pan-x scroll-smooth py-2 border-b border-slate-200/80 dark:border-slate-800">
+                  {[
+                    { id: 'timeline', label: 'Timeline & History', show: currentUser?.privileges?.sites?.canView !== false },
+                    { id: 'overview', label: 'Overview', show: currentUser?.privileges?.clients?.canView },
+                    { id: 'financials', label: 'Financials', count: currentUser?.privileges?.billing?.canViewAmounts ? `₦${Math.round(clientData.totalRevenue).toLocaleString()}` : undefined, show: currentUser?.privileges?.billing?.canView || currentUser?.privileges?.payments?.canView },
+                    { id: 'report', label: 'Client Statement', show: currentUser?.privileges?.billing?.canView || currentUser?.privileges?.payments?.canView },
+                    { id: 'operations', label: 'Site 360', count: clientPendingSites.length > 0 ? `${clientPendingSites.length} onboarding` : undefined, show: currentUser?.privileges?.sites?.canView },
+                    { id: 'contacts', label: 'Contacts', count: clientContacts.filter(c => selectedClient === 'ALL' || c.clientName?.trim().toLowerCase() === selectedClient?.trim().toLowerCase()).length, show: currentUser?.privileges?.clients?.canView },
+                    { id: 'activity', label: 'Comms', count: commLogs.filter(l => selectedClient === 'ALL' || l.client?.trim().toLowerCase() === selectedClient?.trim().toLowerCase()).length, show: currentUser?.privileges?.commLog?.canView },
+                    { id: 'tasks', label: 'Tasks', count: clientData.pendingTasks.length, show: currentUser?.privileges?.tasks?.canView || currentUser?.privileges?.tasks?.canViewMyTasks },
+                  ].filter(tab => tab.show !== false).map(tab => {
+                    const isActive = activeTab === tab.id;
+                    return (
+                      <button
+                        key={tab.id}
+                        onClick={() => setActiveTab(tab.id as TabType)}
+                        className={cn(
+                          'flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all duration-150 shrink-0 border',
+                          isActive
+                            ? 'bg-gradient-to-r from-sky-500 to-blue-600 text-white border-transparent shadow-[0_2px_12px_rgba(14,165,233,0.35)] translate-y-[-1px]'
+                            : 'bg-white/70 dark:bg-slate-900/70 border-slate-200/70 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white dark:hover:bg-slate-800'
+                        )}
+                      >
+                        <span>{tab.label}</span>
+                        {tab.count !== undefined && tab.count !== null && (
+                          <span className={cn(
+                            'text-[10px] px-1.5 py-0.2 rounded-md font-mono font-bold transition-colors',
+                            isActive
+                              ? 'bg-white/25 text-white'
+                              : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200/60 dark:border-slate-700'
+                          )}>
+                            {tab.count}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
-                <div className="p-2 rounded bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800">
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">VAT Deficit</span>
-                  <span className={cn("text-xs sm:text-sm font-black font-mono", clientData.vatDeficit > 0 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400")}>
-                    ₦{currentUser?.privileges?.billing?.canViewAmounts ? Math.round(clientData.vatDeficit).toLocaleString() : '***'}
-                  </span>
-                </div>
-                <div className="p-2 rounded bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800">
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Active Sites</span>
-                  <span className="text-xs sm:text-sm font-black text-indigo-600 dark:text-indigo-400 font-mono">
-                    {clientData.activeSites} <span className="text-[10px] text-slate-400 font-normal">/ {clientData.totalSites}</span>
-                  </span>
-                </div>
-                <div className="p-2 rounded bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800">
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Health Score</span>
-                  <span className={cn("text-xs sm:text-sm font-black font-mono", clientData.healthScore > 80 ? "text-emerald-600" : clientData.healthScore > 50 ? "text-amber-600" : "text-rose-600")}>
-                    {clientData.healthScore}/100
-                  </span>
-                </div>
-                <div className="p-2 rounded bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800">
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Invoices</span>
-                  <span className="text-xs sm:text-sm font-bold text-slate-700 dark:text-slate-200 font-mono">
-                    {clientData.clientInvoices.length} issued
-                  </span>
-                </div>
-                <div className="p-2 rounded bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800">
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Pending Tasks</span>
-                  <span className="text-xs sm:text-sm font-bold text-slate-700 dark:text-slate-200 font-mono">
-                    {clientData.pendingTasks.length} tasks
-                  </span>
-                </div>
-              </div>
-            )}
-
-            {/* ── Flat Segmented Navigation Tabs (Sticky Header Strip) ── */}
-            <div className="sticky top-0 z-20 bg-slate-50/95 dark:bg-slate-950/95 backdrop-blur-md flex items-center gap-1 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden touch-pan-x scroll-smooth py-1.5 border-b border-slate-200 dark:border-slate-800">
-              {[
-                { id: 'timeline', label: 'Timeline & History', icon: Clock, show: currentUser?.privileges?.sites?.canView !== false },
-                { id: 'overview', label: 'Overview', icon: Activity, show: currentUser?.privileges?.clients?.canView },
-                { id: 'financials', label: 'Financials', icon: DollarSign, count: currentUser?.privileges?.billing?.canViewAmounts ? `₦${Math.round(clientData.totalRevenue).toLocaleString()}` : undefined, show: currentUser?.privileges?.billing?.canView || currentUser?.privileges?.payments?.canView },
-                { id: 'report', label: 'Client Statement', icon: Printer, show: currentUser?.privileges?.billing?.canView || currentUser?.privileges?.payments?.canView },
-                { id: 'operations', label: 'Site 360', icon: Briefcase, count: clientPendingSites.length > 0 ? `${clientPendingSites.length} onboarding` : undefined, show: currentUser?.privileges?.sites?.canView },
-                { id: 'contacts', label: 'Contacts', icon: Users, count: clientContacts.filter(c => selectedClient === 'ALL' || c.clientName?.trim().toLowerCase() === selectedClient?.trim().toLowerCase()).length, show: currentUser?.privileges?.clients?.canView },
-                { id: 'activity', label: 'Comms', icon: MessagesSquare, count: commLogs.filter(l => selectedClient === 'ALL' || l.client?.trim().toLowerCase() === selectedClient?.trim().toLowerCase()).length, show: currentUser?.privileges?.commLog?.canView },
-                { id: 'tasks', label: 'Tasks', icon: CheckSquare, count: clientData.pendingTasks.length, show: currentUser?.privileges?.tasks?.canView || currentUser?.privileges?.tasks?.canViewMyTasks },
-              ].filter(tab => tab.show !== false).map(tab => {
-                const isActive = activeTab === tab.id;
-                const Icon = tab.icon;
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id as TabType)}
-                    className={cn(
-                      'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold whitespace-nowrap transition-all border shrink-0',
-                      isActive
-                        ? 'bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 text-indigo-600 dark:text-indigo-400 shadow-xs'
-                        : 'bg-transparent border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-900/60'
-                    )}
-                  >
-                    <Icon className={cn('w-3.5 h-3.5', isActive ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400')} />
-                    <span>{tab.label}</span>
-                    {tab.count !== undefined && tab.count !== null && (
-                      <span className={cn(
-                        'text-[10px] px-1.5 py-0.2 rounded font-mono font-medium',
-                        isActive ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
-                      )}>
-                        {tab.count}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
 
             {/* Tab Content */}
             <div className="space-y-4">
@@ -2582,36 +2627,28 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
               {activeTab === 'overview' && (
                 <div className="space-y-6 animate-in fade-in-50 duration-100">
                   {/* KPI Cards */}
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-                    <div className={cn("p-3 sm:p-5 rounded-2xl border shadow-sm min-w-0", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
-                      <p className="text-[10px] sm:text-xs text-slate-500 font-bold uppercase tracking-wider mb-1 flex items-center gap-1.5 truncate"><DollarSign className="w-3.5 h-3.5 shrink-0"/> Total Revenue</p>
-                      <p className="text-sm min-[390px]:text-base sm:text-lg md:text-2xl font-black text-emerald-600 truncate" title={`₦${clientData.totalRevenue.toLocaleString()}`}>
-                        ₦{currentUser?.privileges?.billing?.canViewAmounts ? Math.round(clientData.totalRevenue).toLocaleString() : '***'}
-                      </p>
-                    </div>
-                    <div id="vat-deficit-card" className={cn("p-3 sm:p-5 rounded-2xl border shadow-sm flex flex-col justify-between min-w-0 transition-all duration-300", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
-                      <div className="min-w-0">
-                        <p className="text-[10px] sm:text-xs text-slate-500 font-bold uppercase tracking-wider mb-1 flex items-center gap-1.5 truncate"><AlertTriangle className="w-3.5 h-3.5 shrink-0"/> VAT Deficit</p>
-                        <p className={cn("text-sm min-[390px]:text-base sm:text-lg md:text-2xl font-black truncate", clientData.vatDeficit > 0 ? "text-rose-500" : "text-emerald-500")} title={`₦${clientData.vatDeficit.toLocaleString()}`}>
-                          ₦{currentUser?.privileges?.billing?.canViewAmounts ? Math.round(clientData.vatDeficit).toLocaleString() : '***'}
-                        </p>
-                      </div>
-                      <p className="text-[10px] sm:text-[11px] text-slate-400 mt-2 font-medium bg-slate-100 dark:bg-slate-800 rounded px-1.5 sm:px-2 py-0.5 sm:py-1 truncate max-w-full block" title={clientData.vatMonthsIncluded.length > 0 ? `Payments include: ${clientData.vatMonthsIncluded.join(', ')}` : 'No VAT payments in this period'}>
-                        {clientData.vatMonthsIncluded.length > 0 ? `Paid for: ${clientData.vatMonthsIncluded.join(', ')}` : 'No VAT payments'}
-                      </p>
-                    </div>
-                    <div className={cn("p-3 sm:p-5 rounded-2xl border shadow-sm min-w-0", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
-                      <p className="text-[10px] sm:text-xs text-slate-500 font-bold uppercase tracking-wider mb-1 flex items-center gap-1.5 truncate"><CheckCircle2 className="w-3.5 h-3.5 shrink-0"/> Active Sites</p>
-                      <p className="text-sm min-[390px]:text-base sm:text-lg md:text-2xl font-black text-indigo-600 truncate">
-                        {clientData.activeSites} <span className="text-xs sm:text-sm font-medium text-slate-400">/ {clientData.totalSites}</span>
-                      </p>
-                    </div>
-
-                  </div>
+                  <MetricHeroCard
+                    title="Client Revenue & Billing Performance"
+                    heroValue={currentUser?.privileges?.billing?.canViewAmounts ? `₦${Math.round(clientData.totalRevenue).toLocaleString()}` : '₦***'}
+                    heroLabel="Total Lifetime Billed"
+                    period="Financial Overview"
+                    sparklineData={[
+                      Math.max(0, clientData.totalRevenue * 0.4),
+                      Math.max(0, clientData.totalRevenue * 0.6),
+                      Math.max(0, clientData.totalRevenue * 0.75),
+                      Math.max(0, clientData.totalRevenue * 0.9),
+                      clientData.totalRevenue
+                    ]}
+                    secondaryMetrics={[
+                      { label: 'Active Sites', value: `${clientData.activeSites} / ${clientData.totalSites}` },
+                      { label: 'VAT Deficit', value: currentUser?.privileges?.billing?.canViewAmounts ? `₦${Math.round(clientData.vatDeficit).toLocaleString()}` : '₦***', tone: clientData.vatDeficit > 0 ? 'negative' : 'positive' },
+                      { label: 'Health Score', value: `${clientData.healthScore}/100`, tone: clientData.healthScore > 80 ? 'positive' : clientData.healthScore > 50 ? 'neutral' : 'negative' },
+                    ]}
+                  />
 
                   {/* Proactive Alerts & Health Score */}
                   <div className="grid grid-cols-1 gap-4 sm:gap-6">
-                    <div className={cn("p-5 sm:p-6 rounded-2xl border shadow-sm flex flex-col sm:flex-row items-center text-center sm:text-left gap-4 sm:gap-6", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
+                    <div className={cn("p-5 sm:p-6 rounded-md border flex flex-col sm:flex-row items-center text-center sm:text-left gap-4 sm:gap-6", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
                       <div className="relative shrink-0 w-20 h-20 sm:w-24 sm:h-24">
                         <svg viewBox="0 0 128 128" className="w-full h-full transform -rotate-90">
                           <circle cx="64" cy="64" r="56" fill="none" stroke="currentColor" strokeWidth="12" className={isDark ? "text-slate-800" : "text-slate-100"} />
@@ -2622,7 +2659,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                           />
                         </svg>
                         <div className="absolute inset-0 flex flex-col items-center justify-center">
-                          <span className={cn("text-2xl sm:text-3xl font-black", clientData.healthScore > 80 ? "text-emerald-600" : clientData.healthScore > 50 ? "text-amber-600" : "text-rose-600")}>
+                          <span className={cn("text-2xl sm:text-3xl font-black tabular-nums", clientData.healthScore > 80 ? "text-emerald-600" : clientData.healthScore > 50 ? "text-amber-600" : "text-rose-600")}>
                             {clientData.healthScore}
                           </span>
                         </div>
@@ -2633,7 +2670,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                       </div>
                     </div>
 
-                    <div className={cn("p-4 sm:p-6 rounded-2xl border shadow-sm flex-1", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
+                    <div className={cn("p-4 sm:p-6 rounded-md border flex-1", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
                       <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
                         {clientData.alerts.length > 0 ? <ShieldAlert className="w-5 h-5 text-amber-500" /> : <ShieldCheck className="w-5 h-5 text-emerald-500" />} 
                         Proactive Alerts
@@ -2679,7 +2716,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                               <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Total Billed Revenue</span>
                               <span className="text-xs text-slate-400">Total amount invoiced to the client</span>
                             </div>
-                            <span className="font-bold text-lg text-indigo-600 dark:text-indigo-400">{currentUser?.privileges?.billing?.canViewAmounts ? `₦${clientData.totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '***'}</span>
+                            <span className="font-bold text-lg text-blue-600 dark:text-blue-400">{currentUser?.privileges?.billing?.canViewAmounts ? `₦${clientData.totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '***'}</span>
                           </div>
                           <div className="flex justify-between items-center pb-3.5 border-b border-slate-100 dark:border-slate-800">
                             <div className="flex flex-col">
@@ -2737,7 +2774,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                           className={cn(
                             "flex items-center gap-2 px-3 py-1.5 rounded text-xs font-semibold transition-all whitespace-nowrap outline-none",
                             isSubActive
-                              ? "bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-xs border border-slate-200/80 dark:border-slate-700 font-bold"
+                              ? "bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-xs border border-slate-200/80 dark:border-slate-700 font-bold"
                               : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
                           )}
                         >
@@ -2755,7 +2792,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
                       <div>
                         <h3 className="text-lg font-bold flex items-center gap-2">
-                          <FileText className="w-5 h-5 text-indigo-500" />
+                          <FileText className="w-5 h-5 text-blue-500" />
                           Invoice Issuance Registry
                         </h3>
                         <p className="text-xs text-slate-500 mt-1">
@@ -2768,7 +2805,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                           className={cn(
                             "flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors",
                             showOnlyUnpaidInvoices 
-                              ? "bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-500/10 dark:text-indigo-400 dark:border-indigo-500/20"
+                              ? "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20"
                               : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700 dark:hover:bg-slate-700"
                           )}
                         >
@@ -2816,11 +2853,17 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                                   <div className="font-bold text-sm text-slate-850 dark:text-slate-150">
                                     ₦{(inv.totalCharge || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                   </div>
+                                  {(inv as any).balanceRemaining > 0 && (inv as any).totalSettled > 0 && (
+                                    <div className="text-[10px] text-amber-600 font-mono">
+                                      Bal: ₦{(inv as any).balanceRemaining.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </div>
+                                  )}
                                   <Badge variant="outline" className={cn(
                                     "mt-1.5 text-[9px] px-1.5 py-0.5",
                                     inv.status === 'Paid' ? 'text-emerald-600 bg-emerald-50 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-900' :
+                                    inv.status === 'Partially Paid' ? 'text-amber-600 bg-amber-50 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-900' :
                                     inv.status === 'Overdue' ? 'text-rose-600 bg-rose-50 border-rose-200 dark:bg-rose-950/30 dark:text-rose-400 dark:border-rose-900' :
-                                    'text-amber-600 bg-amber-50 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-900'
+                                    'text-blue-600 bg-blue-50 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-900'
                                   )}>
                                     {inv.status}
                                   </Badge>
@@ -2851,7 +2894,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                                     {inv.siteStatus === 'Ended' ? (
                                       <span className="text-slate-400 italic">Site Ended</span>
                                     ) : inv.nextBillingDate ? (
-                                      <span className="text-indigo-600 dark:text-indigo-400 font-bold">
+                                      <span className="text-blue-600 dark:text-blue-400 font-bold">
                                         {new Date(inv.nextBillingDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
                                       </span>
                                     ) : (
@@ -2895,7 +2938,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                                   <div className={`flex items-center gap-1.5 inline-flex ${col.align === 'right' ? 'flex-row-reverse' : ''}`}>
                                     {col.label}
                                     {invoiceSort.key === col.key ? (
-                                      invoiceSort.direction === 'asc' ? <ChevronUp className="w-3 h-3 text-indigo-500" /> : <ChevronDown className="w-3 h-3 text-indigo-500" />
+                                      invoiceSort.direction === 'asc' ? <ChevronUp className="w-3 h-3 text-blue-500" /> : <ChevronDown className="w-3 h-3 text-blue-500" />
                                     ) : (
                                       <div className="flex flex-col opacity-30">
                                         <ChevronUp className="w-2 h-2 -mb-[3px]" />
@@ -2923,14 +2966,20 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                                   {inv.duration ? `${inv.duration} days` : '—'}
                                 </td>
                                 <td className="p-3 text-right font-bold text-slate-850 dark:text-slate-150">
-                                  ₦{(inv.totalCharge || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  <div>₦{(inv.totalCharge || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                                  {(inv as any).balanceRemaining > 0 && (inv as any).totalSettled > 0 && (
+                                    <div className="text-[10px] text-amber-600 font-mono font-normal">
+                                      Bal: ₦{(inv as any).balanceRemaining.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </div>
+                                  )}
                                 </td>
                                 <td className="p-3 text-center">
                                   <Badge variant="outline" className={cn(
                                     "text-[9px] sm:text-[10px] px-1.5 py-0.5",
                                     inv.status === 'Paid' ? 'text-emerald-600 bg-emerald-50 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-900' :
+                                    inv.status === 'Partially Paid' ? 'text-amber-600 bg-amber-50 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-900' :
                                     inv.status === 'Overdue' ? 'text-rose-600 bg-rose-50 border-rose-200 dark:bg-rose-950/30 dark:text-rose-400 dark:border-rose-900' :
-                                    'text-amber-600 bg-amber-50 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-900'
+                                    'text-blue-600 bg-blue-50 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-900'
                                   )}>
                                     {inv.status}
                                   </Badge>
@@ -2942,7 +2991,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                                   {inv.siteStatus === 'Ended' ? (
                                     <span className="text-slate-400 italic text-[10px]">Site Ended</span>
                                   ) : inv.nextBillingDate ? (
-                                    <span className="text-indigo-600 dark:text-indigo-400 font-bold">
+                                    <span className="text-blue-600 dark:text-blue-400 font-bold">
                                       {new Date(inv.nextBillingDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
                                     </span>
                                   ) : (
@@ -2974,7 +3023,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
                       <div>
                         <h3 className="text-lg font-bold flex items-center gap-2">
-                          <CheckCircle2 className="w-5 h-5 text-indigo-500" />
+                          <CheckCircle2 className="w-5 h-5 text-blue-500" />
                           Payments & VAT Settlement Registry
                         </h3>
                         <p className="text-xs text-slate-500 mt-1">
@@ -3010,7 +3059,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                             )} />
                             {hideFullySettled ? "Showing Unsettled Only" : "Hide Fully Settled"}
                           </button>
-                          <span className="w-full sm:w-auto sm:ml-auto text-[10px] font-semibold text-indigo-500">{filteredPayments.length} record{filteredPayments.length !== 1 ? 's' : ''} · Sorted by Date ↓</span>
+                          <span className="w-full sm:w-auto sm:ml-auto text-[10px] font-semibold text-blue-500">{filteredPayments.length} record{filteredPayments.length !== 1 ? 's' : ''} · Sorted by Date ↓</span>
                         </div>
 
                         {/* Mobile Card View */}
@@ -3089,7 +3138,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                                         </div>
                                         <div className="text-right">
                                           <div className="text-[10px] text-slate-500 mb-0.5">Total VAT</div>
-                                          <div className="font-bold text-xs text-indigo-600 dark:text-indigo-400">
+                                          <div className="font-bold text-xs text-blue-600 dark:text-blue-400">
                                             ₦{groupVatTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                           </div>
                                         </div>
@@ -3108,11 +3157,11 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                                                 <div className="text-xs text-slate-500 mt-0.5">{p.site}</div>
                                               </div>
                                               <div className="text-right">
-                                                <div className="font-bold text-xs text-indigo-600 dark:text-indigo-400">
+                                                <div className="font-bold text-xs text-blue-600 dark:text-blue-400">
                                                   VAT: ₦{(p.vatAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                 </div>
                                                 <Badge variant="outline" className={cn("mt-1 text-[9px] px-1.5 whitespace-nowrap",
-                                                  p.payVat === 'Add' ? 'text-indigo-600 bg-indigo-50 border-indigo-200 dark:bg-indigo-950/30 dark:text-indigo-400 dark:border-indigo-900' :
+                                                  p.payVat === 'Add' ? 'text-blue-600 bg-blue-50 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-900' :
                                                   p.payVat === 'Yes' ? 'text-teal-650 bg-teal-50 border-teal-200 dark:bg-teal-950/30 dark:text-teal-400 dark:border-teal-900' :
                                                   'text-slate-500 bg-slate-50 border-slate-200 dark:bg-slate-850 dark:text-slate-400 dark:border-slate-800'
                                                 )}>
@@ -3145,7 +3194,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                             </div>
                             <div>
                               <div className="text-[10px] text-slate-400 mb-0.5">Total VAT</div>
-                              <div className="font-black text-indigo-600 dark:text-indigo-400">
+                              <div className="font-black text-blue-600 dark:text-blue-400">
                                 ₦{filteredPayments.reduce((sum, p) => sum + (p.vatAmount || 0), 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                               </div>
                             </div>
@@ -3256,7 +3305,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                                     </td>
                                     <td className="p-2.5 text-center" />
                                     <td className="p-2.5 text-right">
-                                      <span className="text-[10px] font-semibold text-indigo-500 dark:text-indigo-400">
+                                      <span className="text-[10px] font-semibold text-blue-500 dark:text-blue-400">
                                         ₦{groupVatTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                       </span>
                                     </td>
@@ -3299,14 +3348,14 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                                       </td>
                                       <td className="p-3 text-center">
                                         <Badge variant="outline" className={cn("text-[9px] sm:text-[10px] px-1.5 sm:px-2 whitespace-nowrap",
-                                          p.payVat === 'Add' ? 'text-indigo-600 bg-indigo-50 border-indigo-200 dark:bg-indigo-950/30 dark:text-indigo-400 dark:border-indigo-900' :
+                                          p.payVat === 'Add' ? 'text-blue-600 bg-blue-50 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-900' :
                                           p.payVat === 'Yes' ? 'text-teal-650 bg-teal-50 border-teal-200 dark:bg-teal-950/30 dark:text-teal-400 dark:border-teal-900' :
                                           'text-slate-500 bg-slate-50 border-slate-200 dark:bg-slate-850 dark:text-slate-400 dark:border-slate-800'
                                         )}>
                                           {p.payVat === 'Add' ? `Add ${vatRate}%` : p.payVat === 'Yes' ? `Incl. ${vatRate}%` : <><span className="inline sm:hidden">Exempt</span><span className="hidden sm:inline">Exempt / No VAT</span></>}
                                         </Badge>
                                       </td>
-                                      <td className="p-3 text-right font-black text-indigo-600 dark:text-indigo-400">
+                                      <td className="p-3 text-right font-black text-blue-600 dark:text-blue-400">
                                         ₦{(p.vatAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                       </td>
                                       {/* VAT Period, Settlement Status, Amount Owe — shown on group header only */}
@@ -3326,7 +3375,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                                 ₦{filteredPayments.reduce((sum, p) => sum + (p.amount || 0), 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                               </td>
                               <td className="p-3 text-center text-slate-400 text-[10px]">—</td>
-                              <td className="p-3 text-right font-black text-indigo-600 dark:text-indigo-400 text-sm">
+                              <td className="p-3 text-right font-black text-blue-600 dark:text-blue-400 text-sm">
                                 ₦{filteredPayments.reduce((sum, p) => sum + (p.vatAmount || 0), 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                               </td>
                               <td className="p-3 text-center text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
@@ -3416,7 +3465,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm no-print">
                     <div>
                       <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                        <Printer className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                        <Printer className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                         Client Financial Activity Statement
                       </h3>
                       <div className="flex flex-wrap items-center gap-2 mt-1">
@@ -3440,7 +3489,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                         variant="outline"
                         className="h-9 px-3.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap shadow-sm shrink-0"
                       >
-                        <Calendar className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                        <Calendar className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
                         <span>Select Date Range</span>
                       </Button>
 
@@ -3449,7 +3498,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                           setReportDateModalMode('print');
                           setShowReportDateModal(true);
                         }}
-                        className="h-9 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold border border-indigo-600 shadow-sm flex items-center gap-2 whitespace-nowrap shrink-0 transition-all active:scale-95"
+                        className="h-9 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold border border-blue-600 shadow-sm flex items-center gap-2 whitespace-nowrap shrink-0 transition-all active:scale-95"
                       >
                         <Printer className="w-4 h-4 text-white shrink-0" />
                         <span>Download PDF / Print</span>
@@ -3516,7 +3565,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                       {/* Header */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-6 border-b border-slate-200 dark:border-slate-800">
                         <div>
-                          <div className="text-xs font-bold uppercase tracking-widest text-indigo-600 dark:text-indigo-400 mb-1">
+                          <div className="text-xs font-bold uppercase tracking-widest text-blue-600 dark:text-blue-400 mb-1">
                             {companyInfo.name}
                           </div>
                         <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900 dark:text-white">
@@ -3611,7 +3660,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                             <div className={cn("p-5 rounded-2xl border shadow-sm print-card-bg", isDark ? "bg-slate-800/60 border-slate-800" : "bg-slate-50 border-slate-200")}>
                               <div className="flex justify-between items-start mb-2">
                                 <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Total Invoiced</span>
-                                <div className="p-1.5 bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 rounded-lg">
+                                <div className="p-1.5 bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 rounded-lg">
                                   <FileText className="w-4 h-4" />
                                 </div>
                               </div>
@@ -3684,7 +3733,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                                     {/* Site Header Bar */}
                                     <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800 gap-2">
                                       <div className="flex items-center gap-2">
-                                        <MapPin className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                                        <MapPin className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
                                         <h3 className="text-base font-bold text-slate-900 dark:text-white">
                                           {site.name}
                                         </h3>
@@ -3702,7 +3751,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                                       <div className="bg-white/40 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-xs">
                                         <div className="px-4 py-2.5 bg-slate-100/60 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center print-table-header">
                                           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">Invoices Sent</span>
-                                          <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400">Total: ₦{siteTotalInvoiced.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                                          <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400">Total: ₦{siteTotalInvoiced.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
                                         </div>
                                         {siteInvoices.length > 0 ? (
                                           <div className="overflow-x-auto">
@@ -3723,7 +3772,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                                                       <td className="p-2.5 text-slate-600 dark:text-slate-400 font-medium">
                                                         {inv.date ? new Date(normalizeDate(inv.date)).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
                                                       </td>
-                                                      <td className="p-2.5 font-bold text-indigo-600 dark:text-indigo-400">
+                                                      <td className="p-2.5 font-bold text-blue-600 dark:text-blue-400">
                                                         {inv.invoiceNumber || '-'}
                                                       </td>
                                                       <td className="p-2.5 text-slate-500 font-medium">
@@ -3845,7 +3894,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                     <Button
                       onClick={() => setShowContactsPanel(true)}
                       size="sm"
-                      className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl flex items-center gap-1.5"
+                      className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl flex items-center gap-1.5"
                     >
                       <Edit2 className="w-4 h-4" />
                       <span>Manage Contacts</span>
@@ -3858,7 +3907,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                         <div className="flex items-start justify-between mb-3">
                           <div>
                             <h4 className="font-bold text-slate-800 dark:text-slate-200">{contact.name}</h4>
-                            <p className="text-xs text-indigo-600 dark:text-indigo-400 font-medium">{contact.position || 'No Position Specified'}</p>
+                            <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">{contact.position || 'No Position Specified'}</p>
                           </div>
                           <div className="flex items-center gap-2">
                             <Badge variant="outline" className={contact.isActive ? "text-emerald-600 bg-emerald-50 border-emerald-200" : "text-slate-500 bg-slate-50 border-slate-200"}>
@@ -3867,7 +3916,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                             <button
                               type="button"
                               onClick={() => setShowContactsPanel(true)}
-                              className="text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800/60 bg-transparent border-0 cursor-pointer opacity-0 group-hover:opacity-100"
+                              className="text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800/60 bg-transparent border-0 cursor-pointer opacity-0 group-hover:opacity-100"
                               title="Edit Contact"
                             >
                               <Edit2 className="w-3.5 h-3.5" />
@@ -3907,7 +3956,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                           className={cn(
                             "flex items-center gap-2 px-3 py-1.5 rounded text-xs font-semibold transition-all whitespace-nowrap outline-none",
                             isSubActive
-                              ? "bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-xs border border-slate-200/80 dark:border-slate-700 font-bold"
+                              ? "bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-xs border border-slate-200/80 dark:border-slate-700 font-bold"
                               : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
                           )}
                         >
@@ -3915,7 +3964,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                           <span>{subTab.label}</span>
                           <span className={cn(
                             "text-[10px] font-mono px-1.5 py-0.2 rounded font-medium",
-                            isSubActive ? "bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800" : "bg-slate-200 dark:bg-slate-800 text-slate-500"
+                            isSubActive ? "bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800" : "bg-slate-200 dark:bg-slate-800 text-slate-500"
                           )}>
                             {subTab.count}
                           </span>
@@ -3930,7 +3979,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                     return (
                       <div className={cn("p-6 rounded-2xl border shadow-sm flex flex-col", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
                         <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-                          <Building2 className="w-5 h-5 text-indigo-500"/> All Sites ({allSitesList.length})
+                          <Building2 className="w-5 h-5 text-blue-500"/> All Sites ({allSitesList.length})
                         </h3>
                         <div className="space-y-3 flex-1 overflow-y-auto max-h-[500px] style-scroll pr-2">
                           {allSitesList.length > 0 ? allSitesList.map((site: any) => {
@@ -3939,7 +3988,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                             return (
                               <div key={site.id}
                                 className={cn(
-                                  'p-3 rounded-lg border cursor-pointer transition-all hover:border-indigo-400 hover:shadow-md group relative',
+                                  'p-3 rounded-lg border cursor-pointer transition-all hover:border-blue-400 hover:shadow-md group relative',
                                   activeHold
                                     ? (isDark ? 'border-amber-900/60 bg-amber-950/20 hover:bg-amber-950/40' : 'border-amber-200 bg-amber-50/40 hover:bg-amber-50/70')
                                     : (isDark ? 'border-slate-800 bg-slate-800/50 hover:bg-slate-800' : 'border-slate-100 bg-slate-50 hover:bg-white')
@@ -3948,7 +3997,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                               >
                                 <div className="flex justify-between items-center">
                                   <div className="flex items-center gap-2">
-                                    <MapPin className={cn("w-3.5 h-3.5 shrink-0", activeHold ? "text-amber-500" : "text-indigo-500")} />
+                                    <MapPin className={cn("w-3.5 h-3.5 shrink-0", activeHold ? "text-amber-500" : "text-blue-500")} />
                                     <div>
                                       <span className="font-semibold text-sm">{site.name}</span>
                                       {(selectedClient === 'ALL' || selectedClient === 'All Clients') && (
@@ -3970,7 +4019,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                                       <DropdownMenuTrigger asChild>
                                         <Button
                                           variant="ghost" size="icon"
-                                          className="h-8 w-8 text-slate-400 hover:text-indigo-600 hover:bg-slate-200/50 dark:hover:bg-slate-700/50 rounded-lg flex items-center justify-center shrink-0 border-0 bg-transparent cursor-pointer"
+                                          className="h-8 w-8 text-slate-400 hover:text-blue-600 hover:bg-slate-200/50 dark:hover:bg-slate-700/50 rounded-lg flex items-center justify-center shrink-0 border-0 bg-transparent cursor-pointer"
                                         >
                                           <MoreVertical className="h-4 w-4" />
                                         </Button>
@@ -4015,7 +4064,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                                         {canEditSite && (
                                           <DropdownMenuItem 
                                             onClick={() => openSiteEdit(site)}
-                                            className="gap-2 text-indigo-700 focus:text-indigo-700 focus:bg-indigo-50"
+                                            className="gap-2 text-blue-700 focus:text-blue-700 focus:bg-blue-50"
                                           >
                                             <Pencil className="h-4 w-4" />
                                             <span>Edit Site</span>
@@ -4073,7 +4122,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                     const activeSitesList = clientData.clientSites.filter((s: any) => s.status === 'Active' && s.startDate);
                     return (
                       <div className={cn("p-6 rounded-2xl border shadow-sm flex flex-col", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
-                        <h3 className="text-lg font-bold mb-4 flex items-center gap-2"><MapPin className="w-5 h-5 text-indigo-500"/> Site Portfolio ({activeSitesList.length})</h3>
+                        <h3 className="text-lg font-bold mb-4 flex items-center gap-2"><MapPin className="w-5 h-5 text-blue-500"/> Site Portfolio ({activeSitesList.length})</h3>
                         <div className="space-y-3 flex-1 overflow-y-auto max-h-[400px] style-scroll pr-2">
                           {activeSitesList.length > 0 ? activeSitesList.map((site: any) => {
                             const activeHold = siteHoldPeriods?.find(h => h.siteId === site.id && !h.holdEnd);
@@ -4081,7 +4130,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                             return (
                               <div key={site.id}
                                 className={cn(
-                                  'p-3 rounded-lg border cursor-pointer transition-all hover:border-indigo-400 hover:shadow-md group relative',
+                                  'p-3 rounded-lg border cursor-pointer transition-all hover:border-blue-400 hover:shadow-md group relative',
                                   activeHold
                                     ? (isDark ? 'border-amber-900/60 bg-amber-950/20 hover:bg-amber-950/40' : 'border-amber-200 bg-amber-50/40 hover:bg-amber-50/70')
                                     : (isDark ? 'border-slate-800 bg-slate-800/50 hover:bg-slate-800' : 'border-slate-100 bg-slate-50 hover:bg-white')
@@ -4090,7 +4139,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                               >
                                 <div className="flex justify-between items-center">
                                   <div className="flex items-center gap-2">
-                                    <MapPin className={cn("w-3.5 h-3.5 shrink-0", activeHold ? "text-amber-500" : "text-indigo-500")} />
+                                    <MapPin className={cn("w-3.5 h-3.5 shrink-0", activeHold ? "text-amber-500" : "text-blue-500")} />
                                     <span className="font-semibold text-sm">{site.name}</span>
                                   </div>
                                   <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
@@ -4105,7 +4154,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                                       <DropdownMenuTrigger asChild>
                                         <Button
                                           variant="ghost" size="icon"
-                                          className="h-8 w-8 text-slate-400 hover:text-indigo-600 hover:bg-slate-200/50 dark:hover:bg-slate-700/50 rounded-lg flex items-center justify-center shrink-0 border-0 bg-transparent cursor-pointer"
+                                          className="h-8 w-8 text-slate-400 hover:text-blue-600 hover:bg-slate-200/50 dark:hover:bg-slate-700/50 rounded-lg flex items-center justify-center shrink-0 border-0 bg-transparent cursor-pointer"
                                         >
                                           <MoreVertical className="h-4 w-4" />
                                         </Button>
@@ -4157,7 +4206,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                                         {canEditSite && (
                                           <DropdownMenuItem 
                                             onClick={() => openSiteEdit(site)}
-                                            className="gap-2 text-indigo-700 focus:text-indigo-700 focus:bg-indigo-50"
+                                            className="gap-2 text-blue-700 focus:text-blue-700 focus:bg-blue-50"
                                           >
                                             <Pencil className="h-4 w-4" />
                                             <span>Edit Site</span>
@@ -4230,7 +4279,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                                 setCommDialogOpen(true);
                                 setCommForm(f => ({ ...f, siteOption: 'NEW_ONBOARDING' }));
                               }}
-                              className="mt-4 bg-indigo-600 hover:bg-indigo-500 text-white gap-2 text-xs font-bold shadow-sm"
+                              className="mt-4 bg-blue-600 hover:bg-blue-500 text-white gap-2 text-xs font-bold shadow-sm"
                               size="sm"
                             >
                               <Plus className="w-3.5 h-3.5" /> Log Comm to Start Onboarding
@@ -4247,7 +4296,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                                 key={site.id}
                                 className={cn("rounded-2xl border shadow-sm overflow-hidden flex flex-col transition-all hover:shadow-md", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}
                               >
-                                <div className="h-1 bg-gradient-to-r from-amber-400 to-orange-400" />
+                                <div className="h-1 bg-amber-500" />
                                 <div className="p-4 flex flex-col gap-3 flex-1">
                                   <div className="flex items-start justify-between gap-2">
                                     <div className="flex items-center gap-2 min-w-0">
@@ -4280,7 +4329,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
 
                                   <div className="h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
                                     <div
-                                      className="h-full bg-gradient-to-r from-amber-400 to-emerald-500 rounded-full transition-all duration-300"
+                                      className="h-full bg-emerald-500 rounded-full transition-all duration-300"
                                       style={{ width: `${(completedCount / 5) * 100}%` }}
                                     />
                                   </div>
@@ -4296,7 +4345,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                                     )}
                                     <button
                                       onClick={() => navigate(`/sites/onboarding/${site.id}`)}
-                                      className="flex items-center gap-1.5 text-[11px] font-bold text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/20 rounded-lg px-2.5 py-1.5 transition-all"
+                                      className="flex items-center gap-1.5 text-[11px] font-bold text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-950/20 rounded-lg px-2.5 py-1.5 transition-all"
                                     >
                                       <Eye className="h-3.5 w-3.5" /> View Form
                                     </button>
@@ -4321,12 +4370,12 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                         <div className="space-y-3 flex-1 overflow-y-auto max-h-[400px] style-scroll pr-2">
                           {inactiveSites.length > 0 ? inactiveSites.map((site: any) => (
                             <div key={site.id}
-                              className={cn('p-3 rounded-lg border cursor-pointer transition-all hover:border-indigo-400 hover:shadow-md group relative', isDark ? 'border-slate-800 bg-slate-800/50 hover:bg-slate-800' : 'border-slate-100 bg-slate-50 hover:bg-white')}
+                              className={cn('p-3 rounded-lg border cursor-pointer transition-all hover:border-blue-400 hover:shadow-md group relative', isDark ? 'border-slate-800 bg-slate-800/50 hover:bg-slate-800' : 'border-slate-100 bg-slate-50 hover:bg-white')}
                               onClick={() => setSelectedSite(site)}
                             >
                               <div className="flex justify-between items-center">
                                 <div className="flex items-center gap-2">
-                                  <MapPin className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                                  <MapPin className="w-3.5 h-3.5 text-blue-500 shrink-0" />
                                   <span className="font-semibold text-sm">{site.name}</span>
                                 </div>
                                 <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
@@ -4335,7 +4384,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                                     <DropdownMenuTrigger asChild>
                                       <Button
                                         variant="ghost" size="icon"
-                                        className="h-8 w-8 text-slate-400 hover:text-indigo-600 hover:bg-slate-200/50 dark:hover:bg-slate-700/50 rounded-lg flex items-center justify-center shrink-0 border-0 bg-transparent cursor-pointer"
+                                        className="h-8 w-8 text-slate-400 hover:text-blue-600 hover:bg-slate-200/50 dark:hover:bg-slate-700/50 rounded-lg flex items-center justify-center shrink-0 border-0 bg-transparent cursor-pointer"
                                       >
                                         <MoreVertical className="h-4 w-4" />
                                       </Button>
@@ -4381,7 +4430,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                                       {canEditSite && (
                                         <DropdownMenuItem
                                           onClick={() => openSiteEdit(site)}
-                                          className="gap-2 text-indigo-700 focus:text-indigo-700 focus:bg-indigo-50"
+                                          className="gap-2 text-blue-700 focus:text-blue-700 focus:bg-blue-50"
                                         >
                                           <Pencil className="h-4 w-4" />
                                           <span>Edit Site</span>
@@ -4510,14 +4559,14 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                   <div className="flex justify-between items-center mb-6">
                     <div>
                       <h3 className="text-lg font-bold flex items-center gap-2">
-                        <MessagesSquare className="w-5 h-5 text-indigo-500"/> Interaction History
+                        <MessagesSquare className="w-5 h-5 text-blue-500"/> Interaction History
                       </h3>
                       <p className="text-xs text-slate-500 mt-0.5">Record client interactions and communication logs.</p>
                     </div>
                     {currentUser?.privileges?.commLog?.canAdd && (
                       <Button 
                         onClick={() => setCommDialogOpen(true)}
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs h-9 px-3.5 rounded-xl flex items-center gap-1.5 shadow-sm transition-all"
+                        className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs h-9 px-3.5 rounded-xl flex items-center gap-1.5 shadow-sm transition-all"
                       >
                         <Plus className="w-4 h-4" /> Log Communication
                       </Button>
@@ -4549,7 +4598,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                                 <div className="flex items-center gap-2 flex-wrap">
                                   <span className="text-xs font-bold text-slate-700 dark:text-slate-300">{log.subject || 'No Subject'}</span>
                                   <span className={cn("text-[9px] px-2 py-0.5 font-bold rounded-full uppercase tracking-wider", 
-                                    log.direction === 'Incoming' ? 'bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950/30 dark:text-blue-405 dark:border-blue-900/50' : 'bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-950/30 dark:text-indigo-405 dark:border-indigo-900/50'
+                                    log.direction === 'Incoming' ? 'bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950/30 dark:text-blue-405 dark:border-blue-900/50' : 'bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950/30 dark:text-blue-405 dark:border-blue-900/50'
                                   )}>
                                     {log.direction}
                                   </span>
@@ -4557,14 +4606,14 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                                     {log.channel}
                                   </span>
                                   {log.siteName && (
-                                    <span className="text-[10px] text-indigo-650 dark:text-indigo-400 font-semibold bg-indigo-50/60 dark:bg-indigo-950/10 px-2 py-0.5 rounded-lg flex items-center gap-1">
+                                    <span className="text-[10px] text-blue-650 dark:text-blue-400 font-semibold bg-blue-50/60 dark:bg-blue-950/10 px-2 py-0.5 rounded-lg flex items-center gap-1">
                                       <MapPin className="w-3 h-3" /> {log.siteName}
                                     </span>
                                   )}
                                 </div>
                                 <p className="text-[11px] text-slate-450 font-medium font-mono">Logged by {log.loggedBy} on {new Date(log.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
                               </div>
-                              <div className="text-slate-400 group-hover:text-indigo-500 transition-colors p-1 rounded-lg">
+                              <div className="text-slate-400 group-hover:text-blue-500 transition-colors p-1 rounded-lg">
                                 {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                               </div>
                             </div>
@@ -4619,7 +4668,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                   {/* Secondary Tab Switcher */}
                   <div className="flex border-b border-slate-200 dark:border-slate-800 mb-2 overflow-x-auto style-scroll pb-px gap-1">
                     {[
-                      { id: 'pending', label: 'Pending / Active', count: clientData.pendingTasks.length, color: 'text-indigo-650 bg-indigo-50 dark:bg-indigo-950/20 dark:text-indigo-400', icon: CheckSquare },
+                      { id: 'pending', label: 'Pending / Active', count: clientData.pendingTasks.length, color: 'text-blue-650 bg-blue-50 dark:bg-blue-950/20 dark:text-blue-400', icon: CheckSquare },
                       { id: 'approval', label: 'Pending Approval', count: clientData.approvalTasks.length, color: 'text-amber-700 bg-amber-50 dark:bg-amber-950/20 dark:text-amber-400', icon: ShieldAlert },
                       { id: 'completed', label: 'Completed', count: clientData.completedTasks.length, color: 'text-emerald-700 bg-emerald-50 dark:bg-emerald-950/20 dark:text-emerald-400', icon: CheckCircle2 }
                     ].map(subTab => {
@@ -4631,11 +4680,11 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                           className={cn(
                             "flex items-center gap-2 px-3.5 py-2.5 text-xs sm:text-sm font-bold border-b-2 transition-all relative shrink-0",
                             isActive
-                              ? "border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400"
+                              ? "border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400"
                               : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
                           )}
                         >
-                          <subTab.icon className={cn("w-4 h-4", isActive ? "text-indigo-600 dark:text-indigo-400" : "text-slate-400")} />
+                          <subTab.icon className={cn("w-4 h-4", isActive ? "text-blue-600 dark:text-blue-400" : "text-slate-400")} />
                           <span>{subTab.label}</span>
                           <span className={cn(
                             "text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0",
@@ -4653,7 +4702,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                     <div className={cn("p-4 sm:p-6 rounded-2xl border shadow-sm", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
                       <div className="flex items-center justify-between mb-4">
                         <h3 className="font-bold text-lg flex items-center gap-2">
-                          <CheckSquare className="w-5 h-5 text-indigo-500" /> Pending Tasks ({clientData.pendingTasks.length})
+                          <CheckSquare className="w-5 h-5 text-blue-500" /> Pending Tasks ({clientData.pendingTasks.length})
                         </h3>
                       </div>
                       {clientData.pendingTasks.length > 0 ? (
@@ -4665,15 +4714,15 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                             return (
                               <div key={task.id} className="py-3 flex flex-col gap-3 border-b border-slate-50 dark:border-slate-800/40 last:border-b-0">
                                 <div className="flex justify-between items-start gap-3 cursor-pointer group" onClick={() => { const next = new Set(expandedTasks); if (next.has(task.id)) next.delete(task.id); else next.add(task.id); setExpandedTasks(next); }}>
-                                  <div className="flex-shrink-0 mt-0.5 text-slate-400 group-hover:text-indigo-500 transition-colors">{isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}</div>
+                                  <div className="flex-shrink-0 mt-0.5 text-slate-400 group-hover:text-blue-500 transition-colors">{isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}</div>
                                   <div className="min-w-0 flex-1">
-                                    <p className="font-semibold text-sm truncate group-hover:text-indigo-600 transition-colors">{task.title}</p>
+                                    <p className="font-semibold text-sm truncate group-hover:text-blue-600 transition-colors">{task.title}</p>
                                     {task.deadline && <p className="text-xs text-slate-500 mt-0.5">Due: {new Date(task.deadline).toLocaleDateString('en-GB')}</p>}
-                                    {taskSubs.length > 0 && (<div className="mt-1.5 flex items-center gap-2"><div className="flex-1 max-w-[120px] h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden"><div className="h-full bg-indigo-500 rounded-full" style={{ width: `${Math.round((completed / taskSubs.length) * 100)}%` }} /></div><span className="text-[10px] text-slate-500 font-medium">{completed}/{taskSubs.length} done</span></div>)}
+                                    {taskSubs.length > 0 && (<div className="mt-1.5 flex items-center gap-2"><div className="flex-1 max-w-[120px] h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden"><div className="h-full bg-blue-500 rounded-full" style={{ width: `${Math.round((completed / taskSubs.length) * 100)}%` }} /></div><span className="text-[10px] text-slate-500 font-medium">{completed}/{taskSubs.length} done</span></div>)}
                                   </div>
                                   <div className="flex flex-col items-end gap-1 shrink-0">
                                     {task.priority && (<span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wider ${task.priority === 'urgent' ? 'bg-red-100 text-red-700' : task.priority === 'high' ? 'bg-orange-100 text-orange-700' : task.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' : 'bg-slate-100 text-slate-650'}`}>{task.priority}</span>)}
-                                    <Badge variant="outline" className="text-[9px] sm:text-[10px] px-1.5 sm:px-2.5 whitespace-nowrap bg-indigo-50/50 text-indigo-700 border-indigo-200">Active</Badge>
+                                    <Badge variant="outline" className="text-[9px] sm:text-[10px] px-1.5 sm:px-2.5 whitespace-nowrap bg-blue-50/50 text-blue-700 border-blue-200">Active</Badge>
                                   </div>
                                 </div>
                                 <AnimatePresence initial={false}>
@@ -4682,7 +4731,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                                       <div className="pl-7 pr-2 space-y-2 pt-1 pb-2">
                                         {taskSubs.length === 0 ? <p className="text-xs text-slate-500 italic">No subtasks.</p> : taskSubs.map(sub => (
                                           <div key={sub.id} onClick={(e) => { e.stopPropagation(); setOpenSubtaskId(sub.id!); }} className="flex items-center justify-between gap-3 p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer border border-transparent hover:border-slate-200 dark:hover:border-slate-700 transition-all group/sub">
-                                            <p className={`text-[13px] font-medium truncate group-hover/sub:text-indigo-600 transition-colors flex-1 min-w-0 ${sub.status === 'completed' ? 'line-through text-slate-400' : 'text-slate-700 dark:text-slate-300'}`}>{sub.title}</p>
+                                            <p className={`text-[13px] font-medium truncate group-hover/sub:text-blue-600 transition-colors flex-1 min-w-0 ${sub.status === 'completed' ? 'line-through text-slate-400' : 'text-slate-700 dark:text-slate-300'}`}>{sub.title}</p>
                                             <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full whitespace-nowrap flex-shrink-0 ml-2 ${sub.status === 'completed' ? 'bg-emerald-100 text-emerald-700' : sub.status === 'in_progress' ? 'bg-blue-100 text-blue-700' : sub.status === 'pending_approval' ? 'bg-amber-100 text-amber-700' : 'bg-slate-150 text-slate-600'}`}>{sub.status === 'not_started' ? 'To Start' : sub.status === 'in_progress' ? 'In Progress' : sub.status === 'pending_approval' ? 'Pending Approval' : 'Completed'}</span>
                                           </div>
                                         ))}
@@ -4720,9 +4769,9 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                             return (
                               <div key={task.id} className="py-3 flex flex-col gap-3 border-b border-slate-50 dark:border-slate-800/40 last:border-b-0">
                                 <div className="flex justify-between items-start gap-3 cursor-pointer group" onClick={() => { const next = new Set(expandedTasks); if (next.has(task.id)) next.delete(task.id); else next.add(task.id); setExpandedTasks(next); }}>
-                                  <div className="flex-shrink-0 mt-0.5 text-slate-400 group-hover:text-indigo-500 transition-colors">{isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}</div>
+                                  <div className="flex-shrink-0 mt-0.5 text-slate-400 group-hover:text-blue-500 transition-colors">{isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}</div>
                                   <div className="min-w-0 flex-1">
-                                    <p className="font-semibold text-sm truncate group-hover:text-indigo-600 transition-colors">{task.title}</p>
+                                    <p className="font-semibold text-sm truncate group-hover:text-blue-600 transition-colors">{task.title}</p>
                                     {task.deadline && <p className="text-xs text-slate-500 mt-0.5">Due: {new Date(task.deadline).toLocaleDateString('en-GB')}</p>}
                                     {taskSubs.length > 0 && (<div className="mt-1.5 flex items-center gap-2"><div className="flex-1 max-w-[120px] h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden"><div className="h-full bg-amber-500 rounded-full" style={{ width: `${Math.round((completed / taskSubs.length) * 100)}%` }} /></div><span className="text-[10px] text-slate-500 font-medium">{completed}/{taskSubs.length} done</span></div>)}
                                   </div>
@@ -4737,7 +4786,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                                       <div className="pl-7 pr-2 space-y-2 pt-1 pb-2">
                                         {taskSubs.length === 0 ? <p className="text-xs text-slate-500 italic">No subtasks.</p> : taskSubs.map(sub => (
                                           <div key={sub.id} onClick={(e) => { e.stopPropagation(); setOpenSubtaskId(sub.id!); }} className="flex items-center justify-between gap-3 p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer border border-transparent hover:border-slate-200 dark:hover:border-slate-700 transition-all group/sub">
-                                            <p className={`text-[13px] font-medium truncate group-hover/sub:text-indigo-600 transition-colors flex-1 min-w-0 ${sub.status === 'completed' ? 'line-through text-slate-400' : 'text-slate-700 dark:text-slate-300'}`}>{sub.title}</p>
+                                            <p className={`text-[13px] font-medium truncate group-hover/sub:text-blue-600 transition-colors flex-1 min-w-0 ${sub.status === 'completed' ? 'line-through text-slate-400' : 'text-slate-700 dark:text-slate-300'}`}>{sub.title}</p>
                                             <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full whitespace-nowrap flex-shrink-0 ml-2 ${sub.status === 'completed' ? 'bg-emerald-100 text-emerald-700' : sub.status === 'in_progress' ? 'bg-blue-100 text-blue-700' : sub.status === 'pending_approval' ? 'bg-amber-100 text-amber-700' : 'bg-slate-150 text-slate-600'}`}>{sub.status === 'not_started' ? 'To Start' : sub.status === 'in_progress' ? 'In Progress' : sub.status === 'pending_approval' ? 'Pending Approval' : 'Completed'}</span>
                                           </div>
                                         ))}
@@ -4775,9 +4824,9 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                             return (
                               <div key={task.id} className="py-3 flex flex-col gap-3 border-b border-slate-50 dark:border-slate-800/40 last:border-b-0">
                                 <div className="flex justify-between items-start gap-3 cursor-pointer group" onClick={() => { const next = new Set(expandedTasks); if (next.has(task.id)) next.delete(task.id); else next.add(task.id); setExpandedTasks(next); }}>
-                                  <div className="flex-shrink-0 mt-0.5 text-slate-400 group-hover:text-indigo-500 transition-colors">{isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}</div>
+                                  <div className="flex-shrink-0 mt-0.5 text-slate-400 group-hover:text-blue-500 transition-colors">{isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}</div>
                                   <div className="min-w-0 flex-1">
-                                    <p className="font-semibold text-sm truncate group-hover:text-indigo-600 transition-colors text-slate-500 line-through">{task.title}</p>
+                                    <p className="font-semibold text-sm truncate group-hover:text-blue-600 transition-colors text-slate-500 line-through">{task.title}</p>
                                     {task.deadline && <p className="text-xs text-slate-500 mt-0.5">Due: {new Date(task.deadline).toLocaleDateString('en-GB')}</p>}
                                     {taskSubs.length > 0 && (<div className="mt-1.5 flex items-center gap-2"><div className="flex-1 max-w-[120px] h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden"><div className="h-full bg-emerald-500 rounded-full" style={{ width: `${Math.round((completed / taskSubs.length) * 100)}%` }} /></div><span className="text-[10px] text-slate-500 font-medium">{completed}/{taskSubs.length} done</span></div>)}
                                   </div>
@@ -4789,7 +4838,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                                       <div className="pl-7 pr-2 space-y-2 pt-1 pb-2">
                                         {taskSubs.length === 0 ? <p className="text-xs text-slate-500 italic">No subtasks.</p> : taskSubs.map(sub => (
                                           <div key={sub.id} onClick={(e) => { e.stopPropagation(); setOpenSubtaskId(sub.id!); }} className="flex items-center justify-between gap-3 p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer border border-transparent hover:border-slate-200 dark:hover:border-slate-700 transition-all group/sub">
-                                            <p className={`text-[13px] font-medium truncate group-hover/sub:text-indigo-600 transition-colors flex-1 min-w-0 line-through text-slate-400`}>{sub.title}</p>
+                                            <p className={`text-[13px] font-medium truncate group-hover/sub:text-blue-600 transition-colors flex-1 min-w-0 line-through text-slate-400`}>{sub.title}</p>
                                             <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full whitespace-nowrap flex-shrink-0 ml-2 bg-emerald-100 text-emerald-700`}>Completed</span>
                                           </div>
                                         ))}
@@ -4828,7 +4877,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setSiteEditTarget(null)} />
           <div className={cn('relative z-10 w-full max-w-md rounded-3xl shadow-2xl p-5 sm:p-6 max-h-[90vh] flex flex-col', isDark ? 'bg-slate-900 border border-slate-700' : 'bg-white border border-slate-200')}>
             <div className="flex justify-between items-center mb-5 shrink-0">
-              <h2 className="text-lg font-black flex items-center gap-2"><Edit2 className="w-5 h-5 text-indigo-600" /> Edit Site</h2>
+              <h2 className="text-lg font-black flex items-center gap-2"><Edit2 className="w-5 h-5 text-blue-600" /> Edit Site</h2>
               <Button variant="ghost" size="icon" onClick={() => setSiteEditTarget(null)} className="h-8 w-8"><X className="w-4 h-4" /></Button>
             </div>
             <div className="space-y-4 overflow-y-auto pr-1 flex-1 style-scroll mb-4">
@@ -4839,7 +4888,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                   value={siteEditForm.name || ''}
                   onChange={e => setSiteEditForm(f => ({ ...f, name: e.target.value }))}
                   placeholder="e.g. Warri Refinery Site B"
-                  className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
+                  className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
                 />
               </div>
 
@@ -4851,7 +4900,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                     type="date"
                     value={siteEditForm.startDate || ''}
                     onChange={e => setSiteEditForm(f => ({ ...f, startDate: e.target.value }))}
-                    className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
+                    className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
                   />
                 </div>
                 <div>
@@ -4860,7 +4909,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                     type="date"
                     value={siteEditForm.endDate || ''}
                     onChange={e => setSiteEditForm(f => ({ ...f, endDate: e.target.value }))}
-                    className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
+                    className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
                   />
                 </div>
               </div>
@@ -4873,7 +4922,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                   onChange={e => setSiteEditForm(f => ({ ...f, address: e.target.value }))}
                   rows={2}
                   placeholder="e.g. 5 Marina Road, Lagos Island"
-                  className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
+                  className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
                 />
               </div>
 
@@ -4884,7 +4933,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                   value={siteEditForm.mainContactPerson || ''}
                   onChange={e => setSiteEditForm(f => ({ ...f, mainContactPerson: e.target.value }))}
                   placeholder="e.g. John Doe"
-                  className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
+                  className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
                 />
               </div>
 
@@ -4896,7 +4945,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                     value={siteEditForm.contactPhone || ''}
                     onChange={e => setSiteEditForm(f => ({ ...f, contactPhone: e.target.value }))}
                     placeholder="e.g. +234 801 234 5678"
-                    className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
+                    className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
                   />
                 </div>
                 <div>
@@ -4905,7 +4954,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                     value={siteEditForm.position || ''}
                     onChange={e => setSiteEditForm(f => ({ ...f, position: e.target.value }))}
                     placeholder="e.g. Site Manager"
-                    className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
+                    className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
                   />
                 </div>
               </div>
@@ -4916,7 +4965,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                 <select
                   value={siteEditForm.vat || 'No'}
                   onChange={e => setSiteEditForm(f => ({ ...f, vat: e.target.value as 'Yes' | 'No' | 'Add' }))}
-                  className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
+                  className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
                 >
                   <option value="No">No VAT — Free Trade Zone (0%)</option>
                   <option value="Yes">Yes — Mainland (7.5% VAT)</option>
@@ -4926,7 +4975,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
             </div>
             <div className="flex gap-3 shrink-0 pt-3 border-t border-slate-100 dark:border-slate-800">
               <Button variant="outline" onClick={() => setSiteEditTarget(null)} className="flex-1 rounded-xl">Cancel</Button>
-              <Button onClick={saveSiteEdit} className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl">Save Changes</Button>
+              <Button onClick={saveSiteEdit} className="flex-1 bg-blue-600 hover:bg-blue-500 text-white rounded-xl">Save Changes</Button>
             </div>
           </div>
         </div>
@@ -4938,7 +4987,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setCommDialogOpen(false)} />
           <div className={cn('relative z-10 w-full max-w-lg rounded-3xl shadow-2xl p-5 sm:p-6 max-h-[92vh] flex flex-col', isDark ? 'bg-slate-900 border border-slate-700' : 'bg-white border border-slate-200')}>
             <div className="flex justify-between items-center mb-5 shrink-0">
-              <h2 className="text-lg font-black flex items-center gap-2"><MessagesSquare className="w-5 h-5 text-indigo-600" /> Log Communication</h2>
+              <h2 className="text-lg font-black flex items-center gap-2"><MessagesSquare className="w-5 h-5 text-blue-600" /> Log Communication</h2>
               <Button variant="ghost" size="icon" onClick={() => setCommDialogOpen(false)} className="h-8 w-8"><X className="w-4 h-4" /></Button>
             </div>
             
@@ -4949,7 +4998,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                   <select 
                     value={commForm.direction} 
                     onChange={e => setCommForm(f => ({ ...f, direction: e.target.value as any }))}
-                    className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
+                    className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
                   >
                     <option value="Incoming">📥 Incoming</option>
                     <option value="Outgoing">📤 Outgoing</option>
@@ -4960,7 +5009,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                   <select 
                     value={commForm.channel} 
                     onChange={e => setCommForm(f => ({ ...f, channel: e.target.value as any }))}
-                    className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
+                    className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
                   >
                     <option value="Phone">📞 Phone Call</option>
                     <option value="WhatsApp">💬 WhatsApp</option>
@@ -4977,7 +5026,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                   <select 
                     value={commForm.linkedTo || "Existing Client"} 
                     onChange={e => setCommForm(f => ({ ...f, linkedTo: e.target.value }))}
-                    className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-semibold', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200 text-slate-800')}
+                    className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200 text-slate-800')}
                   >
                     <option value="Existing Client">🏢 Existing Client</option>
                     <option value="All Clients">🌐 All Clients / General</option>
@@ -4988,7 +5037,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                   <select 
                     value={effectiveFormClient} 
                     onChange={e => setCommForm(f => ({ ...f, clientName: e.target.value, siteOption: '' }))}
-                    className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-semibold', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200 text-slate-800')}
+                    className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200 text-slate-800')}
                   >
                     <option value="ALL">🌐 ALL (All Clients)</option>
                     {allClients.map(c => (
@@ -5003,7 +5052,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                 <select 
                   value={commForm.siteOption} 
                   onChange={e => setCommForm(f => ({ ...f, siteOption: e.target.value }))}
-                  className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
+                  className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
                 >
                   <option value="">Select site...</option>
                   <option value="NEW_ONBOARDING">+ Create new site onboarding...</option>
@@ -5049,7 +5098,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                   value={commForm.subject} 
                   onChange={e => setCommForm(f => ({ ...f, subject: e.target.value }))}
                   placeholder="e.g. Onboarding kickoff, Site update"
-                  className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
+                  className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
                 />
               </div>
 
@@ -5061,7 +5110,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                   rows={3} 
                   required
                   placeholder="Details of the conversation..."
-                  className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
+                  className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
                 />
               </div>
 
@@ -5074,7 +5123,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                       value={commForm.contactPerson} 
                       onChange={e => setCommForm(f => ({ ...f, contactPerson: e.target.value }))}
                       placeholder="e.g. Mr. Adeyemi, Site Manager"
-                      className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
+                      className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
                     />
                   ) : !isManualContact ? (
                     <select
@@ -5090,7 +5139,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                           setCommForm(f => ({ ...f, contactPerson: val }));
                         }
                       }}
-                      className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
+                      className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
                     >
                       <option value="">Select contact...</option>
                       {activeClientContacts.map(c => (
@@ -5111,7 +5160,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                         value={commForm.contactPerson} 
                         onChange={e => setCommForm(f => ({ ...f, contactPerson: e.target.value }))}
                         placeholder="Type contact name..."
-                        className={cn('flex-1 rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
+                        className={cn('flex-1 rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
                       />
                       <Button 
                         type="button"
@@ -5134,7 +5183,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                     value={commForm.outcome} 
                     onChange={e => setCommForm(f => ({ ...f, outcome: e.target.value }))}
                     placeholder="e.g. Move to site next week"
-                    className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
+                    className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
                   />
                 </div>
               </div>
@@ -5145,7 +5194,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                   type="date" 
                   value={commForm.followUpDate} 
                   onChange={e => setCommForm(f => ({ ...f, followUpDate: e.target.value }))}
-                  className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
+                  className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
                 />
               </div>
 
@@ -5153,19 +5202,19 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
               <label className={cn(
                 'flex items-center gap-2.5 text-sm cursor-pointer select-none px-3 py-2.5 rounded-xl border transition-colors',
                 commForm.createTask
-                  ? (isDark ? 'bg-indigo-950/40 border-indigo-700/80 text-indigo-300' : 'bg-indigo-50 border-indigo-200 text-indigo-700')
+                  ? (isDark ? 'bg-blue-950/40 border-blue-700/80 text-blue-300' : 'bg-blue-50 border-blue-200 text-blue-700')
                   : (isDark ? 'border-slate-800 text-slate-400 hover:border-slate-700 bg-slate-900/50' : 'border-slate-200 text-slate-500 hover:border-slate-300 bg-slate-50/50')
               )}>
                 <input
                   type="checkbox"
                   checked={commForm.createTask}
                   onChange={e => setCommForm(f => ({ ...f, createTask: e.target.checked }))}
-                  className="rounded-lg border-slate-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer"
+                  className="rounded-lg border-slate-300 text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
                 />
                 <Building2 className="w-4 h-4 flex-shrink-0" />
                 <span className="font-semibold">Create a task from this communication log</span>
                 {commForm.createTask && (
-                  <span className={cn('text-xs ml-1 font-medium', isDark ? 'text-indigo-400' : 'text-indigo-500')}>
+                  <span className={cn('text-xs ml-1 font-medium', isDark ? 'text-blue-400' : 'text-blue-500')}>
                     — task dialog opens after saving
                   </span>
                 )}
@@ -5173,7 +5222,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
 
               <div className="flex gap-3 shrink-0 pt-3 border-t border-slate-100 dark:border-slate-800">
                 <Button type="button" variant="outline" onClick={() => setCommDialogOpen(false)} className="flex-1 rounded-xl">Cancel</Button>
-                <Button type="submit" className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl">Save Log</Button>
+                <Button type="submit" className="flex-1 bg-blue-600 hover:bg-blue-500 text-white rounded-xl">Save Log</Button>
               </div>
             </form>
           </div>
@@ -5214,15 +5263,15 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
       {narrativeSite && (
         <div className="fixed inset-0 bg-slate-900/60 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4 animate-in fade-in duration-200">
           <div className="absolute inset-0 bg-slate-900/60" onClick={() => setNarrativeSite(null)} />
-          <div className={cn("relative bg-white h-full sm:h-auto sm:max-h-[90vh] w-full max-w-xl sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-10 duration-300", isDark ? "bg-slate-900 text-white" : "bg-white text-slate-900")}>
+          <div className={cn("relative bg-white h-full sm:h-auto sm:max-h-[90vh] w-full max-w-xl sm:rounded-md shadow-2xl flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-10 duration-300", isDark ? "bg-slate-900 text-white" : "bg-white text-slate-900")}>
             {/* Header */}
-            <div className="bg-gradient-to-r from-indigo-600 to-indigo-500 px-5 sm:px-6 py-4 sm:py-5 flex items-start justify-between shrink-0">
+            <div className="bg-blue-600 px-5 sm:px-6 py-4 sm:py-5 flex items-start justify-between shrink-0">
               <div className="pr-8 text-left">
                 <h2 className="text-white font-bold text-lg leading-tight truncate">{narrativeSite.site.name}</h2>
                 <div className="flex items-center gap-2 mt-1">
-                  <p className="text-indigo-100 text-xs font-medium bg-white/10 px-2 py-0.5 rounded uppercase tracking-wider">{narrativeSite.site.status}</p>
-                  <span className="text-indigo-300 text-xs">•</span>
-                  <p className="text-indigo-100 text-xs truncate max-w-[150px] sm:max-w-none">{narrativeSite.site.client}</p>
+                  <p className="text-blue-100 text-xs font-medium bg-white/10 px-2 py-0.5 rounded-sm uppercase tracking-wider">{narrativeSite.site.status}</p>
+                  <span className="text-blue-200 text-xs">•</span>
+                  <p className="text-blue-100 text-xs truncate max-w-[150px] sm:max-w-none">{narrativeSite.site.client}</p>
                 </div>
               </div>
               <button 
@@ -5237,9 +5286,9 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
             <div className="p-5 sm:p-6 overflow-y-auto style-scroll flex-1 text-left">
               {/* Quick Info Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-6">
-                <div className={cn("p-3 sm:p-4 rounded-xl border group hover:border-indigo-100 transition-colors", isDark ? "bg-slate-800 border-slate-700" : "bg-slate-50 border-slate-100")}>
+                <div className={cn("p-3 sm:p-4 rounded-xl border group hover:border-blue-100 transition-colors", isDark ? "bg-slate-800 border-slate-700" : "bg-slate-50 border-slate-100")}>
                   <div className="flex items-center gap-2 mb-2">
-                    <div className="p-1.5 bg-indigo-50 dark:bg-indigo-950/30 rounded-md text-indigo-600 dark:text-indigo-400">
+                    <div className="p-1.5 bg-blue-50 dark:bg-blue-950/30 rounded-md text-blue-600 dark:text-blue-400">
                       <MapPin className="h-3.5 w-3.5" />
                     </div>
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Site Address</p>
@@ -5247,7 +5296,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                   <p className="text-sm font-semibold">{narrativeSite.q?.address || 'Address not listed'}</p>
                 </div>
 
-                <div className={cn("p-3 sm:p-4 rounded-xl border group hover:border-indigo-100 transition-colors", isDark ? "bg-slate-800 border-slate-700" : "bg-slate-50 border-slate-100")}>
+                <div className={cn("p-3 sm:p-4 rounded-xl border group hover:border-blue-100 transition-colors", isDark ? "bg-slate-800 border-slate-700" : "bg-slate-50 border-slate-100")}>
                   <div className="flex items-center gap-2 mb-2">
                     <div className="p-1.5 bg-emerald-50 dark:bg-emerald-950/30 rounded-md text-emerald-600 dark:text-emerald-400">
                       <Users className="h-3.5 w-3.5" />
@@ -5264,7 +5313,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                   </p>
                 </div>
 
-                <div className={cn("p-3 sm:p-4 rounded-xl border group hover:border-indigo-100 transition-colors", isDark ? "bg-slate-800 border-slate-700" : "bg-slate-50 border-slate-100")}>
+                <div className={cn("p-3 sm:p-4 rounded-xl border group hover:border-blue-100 transition-colors", isDark ? "bg-slate-800 border-slate-700" : "bg-slate-50 border-slate-100")}>
                   <div className="flex items-center gap-2 mb-2">
                     <div className="p-1.5 bg-amber-50 dark:bg-amber-950/30 rounded-md text-amber-600 dark:text-amber-400">
                       <Briefcase className="h-3.5 w-3.5" />
@@ -5274,7 +5323,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                   <p className="text-sm font-semibold truncate">{narrativeSite.q?.phase1?.whatIsBeingBuilt || 'Dewatering Operations'}</p>
                 </div>
 
-                <div className={cn("p-3 sm:p-4 rounded-xl border group hover:border-indigo-100 transition-colors", isDark ? "bg-slate-800 border-slate-700" : "bg-slate-50 border-slate-100")}>
+                <div className={cn("p-3 sm:p-4 rounded-xl border group hover:border-blue-100 transition-colors", isDark ? "bg-slate-800 border-slate-700" : "bg-slate-50 border-slate-100")}>
                   <div className="flex items-center gap-2 mb-2">
                     <div className="p-1.5 bg-blue-50 dark:bg-blue-950/30 rounded-md text-blue-600 dark:text-blue-400">
                       <FileText className="h-3.5 w-3.5" />
@@ -5287,9 +5336,9 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
 
               {/* Narrative Section */}
               <div className="relative">
-                <div className="absolute left-0 top-0 bottom-0 w-1 bg-indigo-50 dark:bg-indigo-950 rounded-full" />
+                <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-50 dark:bg-blue-950 rounded-full" />
                 <div className="pl-5">
-                  <h3 className="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                  <h3 className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest mb-3 flex items-center gap-2">
                     <BookOpen className="h-3.5 w-3.5" />
                     Project Narrative
                   </h3>
@@ -5322,7 +5371,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
           )}>
             <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
               <div className="flex items-center gap-2">
-                <div className="p-2 bg-indigo-50 dark:bg-indigo-950/50 rounded-xl text-indigo-600 dark:text-indigo-400">
+                <div className="p-2 bg-blue-50 dark:bg-blue-950/50 rounded-xl text-blue-600 dark:text-blue-400">
                   <Calendar className="w-5 h-5" />
                 </div>
                 <div>
@@ -5364,7 +5413,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                     className={cn(
                       "px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-colors text-center truncate",
                       reportPreset === p.key
-                        ? "bg-indigo-600 text-white border-indigo-600"
+                        ? "bg-blue-600 text-white border-blue-600"
                         : "bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100"
                     )}
                   >
@@ -5386,7 +5435,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                     setReportPreset('custom');
                   }}
                   className={cn(
-                    "w-full px-3 py-2 text-xs rounded-xl border focus:outline-none focus:ring-2 focus:ring-indigo-500",
+                    "w-full px-3 py-2 text-xs rounded-xl border focus:outline-none focus:ring-2 focus:ring-blue-500",
                     isDark ? "bg-slate-800 border-slate-700 text-white" : "bg-white border-slate-300 text-slate-900"
                   )}
                 />
@@ -5401,7 +5450,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                     setReportPreset('custom');
                   }}
                   className={cn(
-                    "w-full px-3 py-2 text-xs rounded-xl border focus:outline-none focus:ring-2 focus:ring-indigo-500",
+                    "w-full px-3 py-2 text-xs rounded-xl border focus:outline-none focus:ring-2 focus:ring-blue-500",
                     isDark ? "bg-slate-800 border-slate-700 text-white" : "bg-white border-slate-300 text-slate-900"
                   )}
                 />
@@ -5409,7 +5458,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
             </div>
 
             {/* Selected Range Display Note */}
-            <div className="p-3 bg-indigo-50/60 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/50 rounded-xl text-xs text-indigo-700 dark:text-indigo-300 font-medium">
+            <div className="p-3 bg-blue-50/60 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900/50 rounded-xl text-xs text-blue-700 dark:text-blue-300 font-medium">
               Statement Period: {reportStartDate || reportEndDate
                 ? `${reportStartDate ? new Date(reportStartDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Beginning'} — ${reportEndDate ? new Date(reportEndDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Present'}`
                 : 'All-Time Financial Records'}
@@ -5432,7 +5481,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                     setShowReportDateModal(false);
                     toast.success('Date range applied!');
                   }}
-                  className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs h-9 px-6 flex items-center gap-1.5 shadow-md"
+                  className="bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs h-9 px-6 flex items-center gap-1.5 shadow-md"
                 >
                   <Check className="w-4 h-4" />
                   <span>OK</span>
@@ -5446,7 +5495,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                       handlePrintPDFReport();
                     }, 150);
                   }}
-                  className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs h-9 px-4 flex items-center gap-2 shadow-md"
+                  className="bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs h-9 px-4 flex items-center gap-2 shadow-md"
                 >
                   <Printer className="w-4 h-4" />
                   <span>Generate & Print Executive PDF</span>
@@ -5489,14 +5538,14 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                 <div className="flex items-center gap-2 min-w-0">
                   <div className={cn(
                     "p-1.5 rounded-md shrink-0",
-                    isDark ? "bg-indigo-500/20 text-indigo-400" : "bg-indigo-50 text-indigo-600"
+                    isDark ? "bg-blue-500/20 text-blue-400" : "bg-blue-50 text-blue-600"
                   )}>
                     <Sparkles className="w-4 h-4" />
                   </div>
                   <div className="min-w-0">
                     <h2 className={cn(
                       "text-xs font-bold uppercase tracking-wider truncate",
-                      isDark ? "text-indigo-200" : "text-indigo-900"
+                      isDark ? "text-blue-200" : "text-blue-900"
                     )}>Decision Intelligence</h2>
                     <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">{selectedClient === 'ALL' || selectedClient === 'All Clients' ? 'All Clients Portfolio' : selectedClient}</p>
                   </div>
@@ -5504,7 +5553,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
 
                 <div className="flex items-center gap-1.5 shrink-0">
                   {selectedModel && (
-                    <span className="hidden sm:inline-block text-[10px] font-bold px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/80">
+                    <span className="hidden sm:inline-block text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800/80">
                       {selectedModel}
                     </span>
                   )}
@@ -5539,7 +5588,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                   <div className="text-center py-10 space-y-3">
                     <div className={cn(
                       "w-10 h-10 mx-auto rounded-full flex items-center justify-center border",
-                      isDark ? "bg-indigo-500/10 text-indigo-400 border-indigo-500/20" : "bg-indigo-50 text-indigo-600 border-indigo-200"
+                      isDark ? "bg-blue-500/10 text-blue-400 border-blue-500/20" : "bg-blue-50 text-blue-600 border-blue-200"
                     )}>
                       <Sparkles className="w-5 h-5" />
                     </div>
@@ -5551,7 +5600,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                       onClick={() => sendChatMessage(true)}
                       disabled={isGeneratingBrief}
                       size="sm"
-                      className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs rounded-md shadow-sm h-8 font-semibold"
+                      className="bg-blue-600 hover:bg-blue-500 text-white text-xs rounded-md shadow-sm h-8 font-semibold"
                     >
                       {isGeneratingBrief ? <RefreshCcw className="w-3.5 h-3.5 animate-spin mr-1.5" /> : <Sparkles className="w-3.5 h-3.5 mr-1.5" />}
                       Generate Intelligence Brief
@@ -5564,9 +5613,9 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                     <div className={cn(
                       'max-w-[90%] rounded-lg p-3 text-xs shadow-xs',
                       msg.role === 'user'
-                        ? 'bg-indigo-600 text-white'
+                        ? 'bg-blue-600 text-white'
                         : isDark
-                          ? 'bg-slate-950 text-indigo-50 border border-slate-800'
+                          ? 'bg-slate-950 text-blue-50 border border-slate-800'
                           : 'bg-slate-50 text-slate-800 border border-slate-200'
                     )}>
                       {msg.role === 'user' ? <p className="whitespace-pre-wrap">{msg.content}</p> : renderFormattedChatMessage(msg.content)}
@@ -5578,9 +5627,9 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                   <div className="flex justify-start">
                     <div className={cn(
                       "rounded-lg border p-2.5 text-xs flex items-center gap-2",
-                      isDark ? "bg-slate-950 text-indigo-200 border-slate-800" : "bg-slate-50 text-indigo-900 border-slate-200"
+                      isDark ? "bg-slate-950 text-blue-200 border-slate-800" : "bg-slate-50 text-blue-900 border-slate-200"
                     )}>
-                      <RefreshCcw className="w-3.5 h-3.5 animate-spin text-indigo-600 dark:text-indigo-400" /> Analyzing client intelligence...
+                      <RefreshCcw className="w-3.5 h-3.5 animate-spin text-blue-600 dark:text-blue-400" /> Analyzing client intelligence...
                     </div>
                   </div>
                 )}
@@ -5599,7 +5648,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                   onKeyDown={e => e.key === 'Enter' && sendChatMessage()}
                   placeholder="Ask about invoices, staff, or machines..."
                   className={cn(
-                    "flex-1 text-xs rounded-md h-8.5 px-3 focus:outline-none focus:ring-1 focus:ring-indigo-500 border transition-colors",
+                    "flex-1 text-xs rounded-md h-8.5 px-3 focus:outline-none focus:ring-1 focus:ring-blue-500 border transition-colors",
                     isDark ? "bg-slate-900 border-slate-700 text-white placeholder:text-slate-500" : "bg-white border-slate-300 text-slate-900 placeholder:text-slate-400"
                   )}
                 />
@@ -5607,7 +5656,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                   size="icon"
                   onClick={() => sendChatMessage()}
                   disabled={!chatInput.trim() || isGeneratingBrief}
-                  className="h-8.5 w-8.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-md shrink-0"
+                  className="h-8.5 w-8.5 bg-blue-600 hover:bg-blue-500 text-white rounded-md shrink-0"
                 >
                   <Send className="w-3.5 h-3.5" />
                 </Button>

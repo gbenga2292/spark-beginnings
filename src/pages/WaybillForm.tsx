@@ -273,14 +273,14 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
         <Button 
           variant="outline" 
           onClick={onClose} 
-          className="gap-2 text-slate-600 font-bold h-9"
+          className="gap-2 text-muted-foreground font-semibold h-9 rounded-md border-slate-200 dark:border-slate-800"
         >
           <ArrowLeft className="h-4 w-4" /> Cancel
         </Button>
         <Button
           onClick={handleSubmit}
           disabled={items.length === 0 || !siteName || !driverName}
-          className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white shadow-md font-semibold h-9"
+          className="gap-2 bg-blue-600 hover:bg-blue-700 text-white shadow-none font-semibold h-9 rounded-md"
         >
           <CheckCircle2 className="h-4 w-4" /> 
           <span className="hidden sm:inline">{isEditing ? 'Update' : 'Create'} {initialType === 'waybill' ? 'Waybill' : 'Return Sheet'}</span>
@@ -292,37 +292,37 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
   );
 
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem)] bg-slate-50/30 -mx-6 -my-6 sm:-mx-8 sm:-my-8">
+    <div className="flex flex-col h-[calc(100vh-4rem)] bg-background -mx-6 -my-6 sm:-mx-8 sm:-my-8">
 
 
       {/* Scrollable Content */}
       <div className="flex-1 overflow-y-auto w-full p-6 sm:p-8">
-        <div className="max-w-5xl mx-auto bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden flex flex-col animate-in fade-in duration-300">
+        <div className="max-w-5xl mx-auto bg-card border border-slate-200 dark:border-slate-800 rounded-md shadow-none overflow-hidden flex flex-col">
         <div className="p-6 sm:p-8 space-y-8">
           {/* Waybill Information */}
           <div className="space-y-4">
             <div className="flex items-center gap-2">
               <div className="text-muted-foreground"><MapPin className="h-4 w-4" /></div>
-              <h3 className="text-xs font-black text-muted-foreground uppercase tracking-widest">
+              <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
                 Waybill Information
               </h3>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Purpose */}
               <div className="space-y-1.5 md:col-span-1 row-span-2">
-                <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Purpose *</Label>
+                <Label className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider">Purpose *</Label>
                 <textarea
                   value={purpose}
                   onChange={e => setPurpose(e.target.value)}
                   rows={3}
-                  className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium text-foreground resize-none focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  className="w-full rounded-md border border-slate-200 dark:border-slate-800 bg-background px-3 py-2 text-sm font-medium text-foreground resize-none focus:outline-none focus:ring-1 focus:ring-blue-600"
                   placeholder="e.g. Operational Activities"
                 />
               </div>
 
               {/* Driver Name */}
               <div className="space-y-1.5">
-                <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Driver Name *</Label>
+                <Label className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider">Driver Name *</Label>
                 <div className="relative">
                   <select
                     value={driverIsCustom ? '__custom__' : driverName}
@@ -335,7 +335,7 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
                         setDriverName(e.target.value);
                       }
                     }}
-                    className="w-full h-10 rounded-xl border border-border bg-background px-3 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 appearance-none"
+                    className="w-full h-10 rounded-md border border-slate-200 dark:border-slate-800 bg-background px-3 text-sm font-medium text-foreground focus:outline-none focus:ring-1 focus:ring-blue-600 appearance-none"
                   >
                     <option value="">Select Driver</option>
                     {uniqueDrivers.map(d => <option key={d} value={d}>{d}</option>)}
@@ -349,14 +349,14 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
                     placeholder="Enter driver name…"
                     value={driverName}
                     onChange={e => setDriverName(e.target.value)}
-                    className="h-10 rounded-xl border-border bg-background text-sm font-medium"
+                    className="h-10 rounded-md border-slate-200 dark:border-slate-800 bg-background text-sm font-medium"
                   />
                 )}
               </div>
 
               {/* Vehicle */}
               <div className="space-y-1.5">
-                <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Vehicle *</Label>
+                <Label className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider">Vehicle *</Label>
                 <div className="relative">
                   <select
                     value={vehicleIsCustom ? '__custom__' : vehicleName}
@@ -369,7 +369,7 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
                         setVehicleName(e.target.value);
                       }
                     }}
-                    className="w-full h-10 rounded-xl border border-border bg-background px-3 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 appearance-none"
+                    className="w-full h-10 rounded-md border border-slate-200 dark:border-slate-800 bg-background px-3 text-sm font-medium text-foreground focus:outline-none focus:ring-1 focus:ring-blue-600 appearance-none"
                   >
                     <option value="">Select Vehicle</option>
                     {vehicles.map(v => {
@@ -390,7 +390,7 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
                     placeholder="Enter vehicle name or number plate…"
                     value={vehicleName}
                     onChange={e => setVehicleName(e.target.value)}
-                    className="h-10 rounded-xl border-border bg-background text-sm font-medium"
+                    className="h-10 rounded-md border-slate-200 dark:border-slate-800 bg-background text-sm font-medium"
                   />
                 )}
               </div>
@@ -398,21 +398,21 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
               {/* Site */}
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Site *</Label>
+                  <Label className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider">Site *</Label>
                   {selectedSiteStatus === 'active' && (
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/50 flex items-center gap-1 animate-in fade-in duration-200">
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-sm bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/50 flex items-center gap-1">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                       Active Site
                     </span>
                   )}
                   {selectedSiteStatus === 'onboarding' && (
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-900/50 flex items-center gap-1 animate-in fade-in duration-200">
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-sm bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-900/50 flex items-center gap-1">
                       <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
                       In Onboarding
                     </span>
                   )}
                   {selectedSiteStatus === 'closed' && (
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/50 flex items-center gap-1 animate-in fade-in duration-200">
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-sm bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/50 flex items-center gap-1">
                       <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
                       Closed Project
                     </span>
@@ -423,11 +423,11 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
                     value={siteName}
                     onChange={e => setSiteName(e.target.value)}
                     className={cn(
-                      "w-full h-10 rounded-xl border bg-background px-3 text-sm font-medium text-foreground focus:outline-none focus:ring-2 appearance-none",
-                      selectedSiteStatus === 'active' ? "border-emerald-300 dark:border-emerald-800 focus:ring-emerald-500/30" :
-                      selectedSiteStatus === 'onboarding' ? "border-amber-300 dark:border-amber-800 focus:ring-amber-500/30" :
-                      selectedSiteStatus === 'closed' ? "border-rose-300 dark:border-rose-800 focus:ring-rose-500/30" :
-                      "border-border focus:ring-primary/30"
+                      "w-full h-10 rounded-md border bg-background px-3 text-sm font-medium text-foreground focus:outline-none focus:ring-1 appearance-none",
+                      selectedSiteStatus === 'active' ? "border-emerald-300 dark:border-emerald-800 focus:ring-emerald-500" :
+                      selectedSiteStatus === 'onboarding' ? "border-amber-300 dark:border-amber-800 focus:ring-amber-500" :
+                      selectedSiteStatus === 'closed' ? "border-rose-300 dark:border-rose-800 focus:ring-rose-500" :
+                      "border-slate-200 dark:border-slate-800 focus:ring-blue-600"
                     )}
                   >
                     <option value="">Select Site</option>
@@ -477,15 +477,15 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
                   <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
                 </div>
                 <div className="flex items-center flex-wrap gap-3 pt-0.5 text-[10px] text-muted-foreground font-semibold">
-                  <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+                  <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-mono tabular-nums">
                     <span>🟢</span> Active ({activeSitesList.length})
                   </span>
                   <span>|</span>
-                  <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400">
+                  <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400 font-mono tabular-nums">
                     <span>🟧</span> Onboarding ({onboardingSitesList.length})
                   </span>
                   <span>|</span>
-                  <span className="flex items-center gap-1 text-rose-600 dark:text-rose-400">
+                  <span className="flex items-center gap-1 text-rose-600 dark:text-rose-400 font-mono tabular-nums">
                     <span>🔴</span> Closed ({closedSitesList.length})
                   </span>
                 </div>
@@ -493,23 +493,23 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
 
               {/* Waybill Date */}
               <div className="space-y-1.5">
-                <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Waybill Date *</Label>
+                <Label className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider">Waybill Date *</Label>
                 <Input
                   type="date"
                   value={waybillDate}
                   onChange={e => setWaybillDate(e.target.value)}
-                  className="h-10 rounded-xl border-border bg-background text-sm font-medium"
+                  className="h-10 rounded-md border-slate-200 dark:border-slate-800 bg-background text-sm font-medium"
                 />
               </div>
 
               {/* Service */}
               <div className="space-y-1.5 md:col-span-2">
-                <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Service *</Label>
+                <Label className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider">Service *</Label>
                 <div className="relative">
                   <select
                     value={service}
                     onChange={e => setService(e.target.value)}
-                    className="w-full h-10 rounded-xl border border-border bg-background px-3 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 appearance-none max-w-xs"
+                    className="w-full h-10 rounded-md border border-slate-200 dark:border-slate-800 bg-background px-3 text-sm font-medium text-foreground focus:outline-none focus:ring-1 focus:ring-blue-600 appearance-none max-w-xs"
                   >
                     {SERVICES.map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
@@ -530,11 +530,11 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
                   className="flex items-center gap-2 cursor-pointer w-fit select-none"
                 >
                   {addSignature ? (
-                    <CheckCircle2 className="h-5 w-5 text-blue-500" />
+                    <CheckCircle2 className="h-5 w-5 text-blue-600" />
                   ) : (
-                    <Circle className="h-5 w-5 text-slate-300" />
+                    <Circle className="h-5 w-5 text-muted-foreground" />
                   )}
-                  <span className="text-sm font-bold text-slate-700 pb-0.5">
+                  <span className="text-sm font-semibold text-foreground pb-0.5">
                     Add my signature to waybill PDF
                   </span>
                 </div>
@@ -549,7 +549,7 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="text-muted-foreground"><Package className="h-4 w-4" /></div>
-                <h3 className="text-xs font-black text-muted-foreground uppercase tracking-widest">Items to Issue</h3>
+                <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Items to Issue</h3>
               </div>
               
               <div className="flex flex-wrap items-center gap-2">
@@ -557,8 +557,8 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
                   type="button"
                   onClick={() => setItemMode('single')}
                   className={cn(
-                    "text-xs font-bold px-3 py-1.5 rounded-lg transition-all",
-                    itemMode === 'single' ? "bg-slate-800 text-white dark:bg-white dark:text-slate-900" : "bg-slate-100 text-slate-500 hover:text-slate-900 dark:bg-slate-800 dark:text-slate-400"
+                    "text-xs font-semibold px-3 py-1.5 rounded-md transition-all",
+                    itemMode === 'single' ? "bg-slate-800 text-white dark:bg-white dark:text-slate-900" : "bg-muted text-muted-foreground hover:text-foreground"
                   )}
                 >
                   Single Items
@@ -567,8 +567,8 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
                   type="button"
                   onClick={() => setItemMode('bulk')}
                   className={cn(
-                    "text-xs font-bold px-3 py-1.5 rounded-lg transition-all",
-                    itemMode === 'bulk' ? "bg-slate-800 text-white dark:bg-white dark:text-slate-900" : "bg-slate-100 text-slate-500 hover:text-slate-900 dark:bg-slate-800 dark:text-slate-400"
+                    "text-xs font-semibold px-3 py-1.5 rounded-md transition-all",
+                    itemMode === 'bulk' ? "bg-slate-800 text-white dark:bg-white dark:text-slate-900" : "bg-muted text-muted-foreground hover:text-foreground"
                   )}
                 >
                   Bulk Import
@@ -577,7 +577,7 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
                   <button
                     type="button"
                     onClick={addItem}
-                    className="flex items-center gap-1.5 text-xs font-bold bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 px-3 py-1.5 rounded-lg transition-all hover:bg-blue-200 dark:hover:bg-blue-900/50"
+                    className="flex items-center gap-1.5 text-xs font-semibold bg-blue-50 dark:bg-blue-900/30 border border-slate-200 dark:border-slate-800 text-blue-600 dark:text-blue-400 px-3 py-1.5 rounded-md transition-all hover:bg-blue-100 dark:hover:bg-blue-900/50"
                   >
                     <Plus className="h-3.5 w-3.5" /> Add Item
                   </button>
@@ -588,19 +588,19 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
             {itemMode === 'bulk' ? (
               <div className="space-y-6">
                 <div className="space-y-2">
-                  <Label className="text-xs font-bold text-slate-700 dark:text-slate-300">Paste items (one per line)</Label>
+                  <Label className="text-xs font-bold text-foreground">Paste items (one per line)</Label>
                   <textarea
                     value={bulkText}
                     onChange={e => setBulkText(e.target.value)}
                     rows={4}
                     placeholder={`DEWATERING PUMP`}
-                    className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 px-3 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/30 resize-none"
+                    className="w-full rounded-md border border-slate-200 dark:border-slate-800 bg-background px-3 py-3 text-sm font-medium focus:outline-none focus:ring-1 focus:ring-blue-600 resize-none"
                   />
                   <div className="flex gap-2">
                     <Button 
                       type="button" 
                       onClick={handleParse} 
-                      className="bg-blue-600 hover:bg-blue-700 text-white font-bold h-9 px-6 rounded-lg shadow-sm"
+                      className="bg-blue-600 hover:bg-blue-700 text-white font-semibold h-9 px-6 rounded-md shadow-none"
                       disabled={!bulkText.trim()}
                     >
                       Parse
@@ -609,7 +609,7 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
                       type="button" 
                       variant="ghost" 
                       onClick={() => { setBulkText(''); setParsedItems([]); }} 
-                      className="h-9 px-4 font-bold text-slate-600 dark:text-slate-400 hover:text-slate-900"
+                      className="h-9 px-4 font-semibold text-muted-foreground hover:text-foreground rounded-md"
                     >
                       Clear
                     </Button>
@@ -618,9 +618,9 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
 
                 {parsedItems.length > 0 && (
                   <div className="space-y-3">
-                    <Label className="text-xs font-bold text-slate-700 dark:text-slate-300">Parsed Preview</Label>
-                    <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden bg-white dark:bg-slate-900">
-                      <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                    <Label className="text-xs font-bold text-foreground">Parsed Preview</Label>
+                    <div className="border border-slate-200 dark:border-slate-800 rounded-md overflow-hidden bg-card">
+                      <div className="divide-y divide-slate-200 dark:divide-slate-800">
                         {parsedItems.map(item => {
                           const matched = item.matchedAssetId ? assets.find(a => a.id === item.matchedAssetId) : null;
                           return (
@@ -628,29 +628,29 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
                               <Input 
                                 value={item.originalText} 
                                 onChange={e => setParsedItems(parsedItems.map(p => p.id === item.id ? { ...p, originalText: e.target.value } : p))}
-                                className="h-9 bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 sm:w-1/3" 
+                                className="h-9 bg-background border-slate-200 dark:border-slate-800 sm:w-1/3 rounded-md" 
                               />
                               <Input 
                                 type="number" 
                                 min="1"
                                 value={item.quantity} 
                                 onChange={e => setParsedItems(parsedItems.map(p => p.id === item.id ? { ...p, quantity: parseInt(e.target.value) || 1 } : p))}
-                                className="h-9 bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 w-24" 
+                                className="h-9 bg-background border-slate-200 dark:border-slate-800 w-24 rounded-md font-mono tabular-nums" 
                               />
                               <div className="flex-1 min-w-0">
                                 {item.isRematching ? (
                                   <select
                                     value={item.matchedAssetId || ''}
                                     onChange={e => setParsedItems(parsedItems.map(p => p.id === item.id ? { ...p, matchedAssetId: e.target.value, isRematching: false } : p))}
-                                    className="w-full h-9 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 px-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/30 appearance-none"
+                                    className="w-full h-9 rounded-md border border-slate-200 dark:border-slate-800 bg-background px-3 text-sm font-medium focus:outline-none focus:ring-1 focus:ring-blue-600 appearance-none"
                                   >
                                     <option value="">Select correct asset...</option>
                                     {assets.map(a => <option key={a.id} value={a.id}>{a.name} ({a.availableQuantity})</option>)}
                                   </select>
                                 ) : matched ? (
                                   <div className="flex flex-col justify-center">
-                                    <span className="text-sm font-medium text-slate-800 dark:text-slate-200 truncate">{matched.name}</span>
-                                    <span className="text-xs text-slate-500">Available: {matched.availableQuantity} {formatUnit(matched.unitOfMeasurement)}</span>
+                                    <span className="text-sm font-medium text-foreground truncate">{matched.name}</span>
+                                    <span className="text-xs text-muted-foreground font-mono tabular-nums">Available: {matched.availableQuantity} {formatUnit(matched.unitOfMeasurement)}</span>
                                   </div>
                                 ) : (
                                   <div className="text-sm font-medium text-rose-500 flex items-center h-full">No match found</div>
@@ -661,7 +661,7 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
                                   <Button 
                                     type="button" 
                                     onClick={() => setParsedItems(parsedItems.map(p => p.id === item.id ? { ...p, isRematching: true } : p))}
-                                    className="h-8 px-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-lg"
+                                    className="h-8 px-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-md shadow-none"
                                   >
                                     Rematch
                                   </Button>
@@ -677,9 +677,9 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
                         type="button" 
                         onClick={handleImportBulk}
                         disabled={parsedItems.filter(p => p.matchedAssetId).length === 0}
-                        className="bg-blue-600 hover:bg-blue-700 text-white font-bold h-10 px-6 rounded-lg shadow-sm"
+                        className="bg-blue-600 hover:bg-blue-700 text-white font-semibold h-9 px-6 rounded-md shadow-none"
                       >
-                        Import {parsedItems.filter(p => p.matchedAssetId).length} items
+                        Import <span className="font-mono tabular-nums">{parsedItems.filter(p => p.matchedAssetId).length}</span> items
                       </Button>
                     </div>
                   </div>
@@ -688,60 +688,60 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
             ) : (
               <div className="space-y-3">
                 {items.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-10 text-slate-400 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl bg-slate-50/50 dark:bg-slate-900/30">
+                  <div className="flex flex-col items-center justify-center py-10 text-muted-foreground border border-dashed border-slate-200 dark:border-slate-800 rounded-md bg-muted/20">
                     <FileText className="h-10 w-10 mb-2 opacity-30" />
-                    <p className="text-sm font-bold opacity-70 uppercase tracking-widest">No items added yet</p>
+                    <p className="text-sm font-bold opacity-70 uppercase tracking-wider">No items added yet</p>
                   </div>
                 ) : (
                   items.map((item) => {
                     const selectedAsset = assets.find(a => a.id === item.assetId);
                     
                     return (
-                      <div key={item.rowId} className="relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 sm:p-5 shadow-sm group transition-all">
+                      <div key={item.rowId} className="relative bg-card border border-slate-200 dark:border-slate-800 rounded-md p-4 sm:p-5 shadow-none group transition-all">
                         <div className="absolute left-3 top-5 opacity-40 hover:opacity-100 transition-opacity hidden sm:block cursor-grab">
-                          <GripVertical className="h-4 w-4 text-slate-400" />
+                          <GripVertical className="h-4 w-4 text-muted-foreground" />
                         </div>
                         
                         <button
                           type="button"
                           onClick={() => removeItem(item.rowId)}
-                          className="absolute right-4 top-4 text-rose-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20 p-1.5 rounded-lg transition-colors"
+                          className="absolute right-4 top-4 text-rose-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20 p-1.5 rounded-md transition-colors"
                         >
                           <X className="h-4 w-4" />
                         </button>
 
                         <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 sm:ml-6 pr-6 sm:pr-8">
                           <div className="space-y-1.5 sm:col-span-6">
-                            <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Asset</Label>
+                            <Label className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider">Asset</Label>
                             <div className="relative">
                               <select
                                 value={item.assetId}
                                 onChange={(e) => updateItemAsset(item.rowId, e.target.value)}
-                                className="w-full h-10 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 px-3 text-sm font-medium text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500/30 appearance-none"
+                                className="w-full h-10 rounded-md border border-slate-200 dark:border-slate-800 bg-background px-3 text-sm font-medium text-foreground focus:outline-none focus:ring-1 focus:ring-blue-600 appearance-none"
                               >
                                 <option value="">Select asset</option>
                                 {assets.map(a => (
                                   <option key={a.id} value={a.id}>{a.name} ({a.availableQuantity} {formatUnit(a.unitOfMeasurement)})</option>
                                 ))}
                               </select>
-                              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+                              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
                             </div>
                           </div>
 
                           <div className="space-y-1.5 sm:col-span-3">
-                            <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Quantity</Label>
+                            <Label className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider">Quantity</Label>
                             <Input
                               type="number"
                               min="1"
                               value={item.quantity}
                               onChange={(e) => updateItemQuantity(item.rowId, parseInt(e.target.value) || 1)}
-                              className="h-10 rounded-xl border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-sm font-medium focus-visible:ring-blue-500/30"
+                              className="h-10 rounded-md border-slate-200 dark:border-slate-800 bg-background text-sm font-medium font-mono tabular-nums focus-visible:ring-1 focus-visible:ring-blue-600"
                             />
                           </div>
 
                           <div className="space-y-1.5 sm:col-span-3">
-                            <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Available</Label>
-                            <div className="h-10 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-100/50 dark:bg-slate-900 flex items-center px-3 text-sm font-bold text-slate-500 cursor-not-allowed">
+                            <Label className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider">Available</Label>
+                            <div className="h-10 rounded-md border border-slate-200 dark:border-slate-800 bg-muted/20 flex items-center px-3 text-sm font-mono tabular-nums font-bold text-muted-foreground cursor-not-allowed">
                               {selectedAsset ? `${selectedAsset.availableQuantity} ${formatUnit(selectedAsset.unitOfMeasurement)}` : '-'}
                             </div>
                           </div>

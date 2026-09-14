@@ -16,6 +16,7 @@ import type {
   InterviewScoresheet, KeyAttributes, SuitabilityVerdict 
 } from '@/src/types/interviews';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
+import { MetricHeroCard } from '@/src/components/ui/MetricHeroCard';
 
 const uid = () => {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -32,7 +33,7 @@ const fmt = (d?: string) => d ? new Date(d).toLocaleDateString('en-GB', { day: '
 const STATUS_CFG: Record<string, { color: string; label: string }> = {
   'Invited':    { color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',       label: 'Invited' },
   'Scheduled':  { color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',   label: 'Scheduled' },
-  'In Progress':{ color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300',label: 'In Progress' },
+  'In Progress':{ color: 'bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300',label: 'In Progress' },
   'Completed':  { color: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300',   label: 'Completed' },
   'Cancelled':  { color: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',           label: 'Cancelled' },
 };
@@ -41,7 +42,7 @@ const DECISION_CFG: Record<string, { color: string; icon: any }> = {
   'Not Applicable':          { color: 'bg-red-100 text-red-700',     icon: XCircle },
   'Applicable':              { color: 'bg-green-100 text-green-700', icon: CheckCircle2 },
   'Callback':                { color: 'bg-amber-100 text-amber-700', icon: PhoneCall },
-  'Forwarded to Onboarding': { color: 'bg-indigo-100 text-indigo-700', icon: UserPlus },
+  'Forwarded to Onboarding': { color: 'bg-blue-100 text-blue-700', icon: UserPlus },
 };
 
 const ATTR_KEYS: (keyof KeyAttributes)[] = ['appearance','attitude','intelligenceAptitude','motivation','teamSpirit','leadershipAbility','competence'];
@@ -207,7 +208,7 @@ function InviteDialog({ open, onClose, currentUser }: { open: boolean; onClose: 
   const [isOcrLoading, setIsOcrLoading] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
-  const inp = cn('w-full border rounded-xl px-3 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent', isDark ? 'bg-slate-900 border-slate-700 text-white placeholder:text-slate-600' : 'bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400');
+  const inp = cn('w-full border rounded-md px-3 py-2 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent', isDark ? 'bg-slate-900 border-slate-700 text-white placeholder:text-slate-600' : 'bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400');
   const lbl = 'block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 ml-1';
 
   const runInviteOcr = async (file?: File) => {
@@ -283,29 +284,29 @@ function InviteDialog({ open, onClose, currentUser }: { open: boolean; onClose: 
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: 8 }}
             transition={{ duration: 0.18 }}
-            className="bg-card border-0 sm:border border-border rounded-none sm:rounded-2xl shadow-2xl w-full max-w-xl overflow-hidden flex flex-col h-[100dvh] sm:h-auto sm:max-h-[90vh]"
+            className="bg-card border-0 sm:border border-border rounded-none sm:rounded-md shadow-2xl w-full max-w-xl overflow-hidden flex flex-col h-[100dvh] sm:h-auto sm:max-h-[90vh]"
           >
-            <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-border bg-gradient-to-r from-primary/5 to-transparent shrink-0">
+            <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-border bg-white dark:bg-slate-900 shrink-0">
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
-                  <UserPlus className="w-4.5 h-4.5 text-primary" />
+                <div className="w-8 h-8 rounded-md bg-blue-50 dark:bg-blue-950/50 flex items-center justify-center">
+                  <UserPlus className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                 </div>
                 <div>
                   <h2 className="text-base font-semibold text-foreground">Invite Candidate</h2>
                   <p className="text-[11px] text-muted-foreground">Upload a CV or manually fill the form to invite a candidate.</p>
                 </div>
               </div>
-              <button onClick={handleClose} className="p-1.5 rounded-full hover:bg-muted transition-colors flex-shrink-0">
+              <button onClick={handleClose} className="p-1.5 rounded-md hover:bg-muted transition-colors flex-shrink-0">
                 <X className="w-4 h-4 text-muted-foreground" />
               </button>
             </div>
 
             <div className="p-4 sm:p-6 space-y-5 sm:space-y-6 overflow-y-auto custom-scrollbar flex-1">
               {/* AI Parsing Section */}
-              <div className="bg-primary/5 border border-dashed border-primary/20 rounded-2xl p-3 sm:p-4 flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4 transition-colors hover:border-primary/40 group">
+              <div className="bg-slate-50 dark:bg-slate-800/30 border border-dashed border-slate-200 dark:border-slate-700 rounded-md p-3 sm:p-4 flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4 transition-colors hover:border-blue-400 group">
                 <div className="flex items-center gap-3 sm:gap-4 w-full sm:w-auto">
-                  <div className="h-10 w-10 sm:h-12 sm:w-12 bg-background rounded-xl flex items-center justify-center shadow-sm text-primary group-hover:scale-110 transition-transform flex-shrink-0">
-                    <RefreshCw className={cn("h-5 w-5 sm:h-6 sm:w-6", isOcrLoading && "animate-spin")} />
+                  <div className="h-9 w-9 sm:h-10 sm:w-10 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md flex items-center justify-center shadow-sm text-blue-600 dark:text-blue-400 group-hover:scale-105 transition-transform flex-shrink-0">
+                    <RefreshCw className={cn("h-4 w-4 sm:h-5 sm:w-5", isOcrLoading && "animate-spin")} />
                   </div>
                   <div>
                     <h4 className="text-sm font-bold text-foreground">AI CV Auto-Fill</h4>
@@ -313,7 +314,7 @@ function InviteDialog({ open, onClose, currentUser }: { open: boolean; onClose: 
                   </div>
                 </div>
                 <input type="file" ref={fileInputRef} className="hidden" accept=".pdf,.doc,.docx,image/*" onChange={handleFileChange} />
-                <Button onClick={handleFileClick} disabled={isOcrLoading} variant="outline" className="w-full sm:w-auto text-primary font-bold h-9 sm:h-10 border-primary/20 hover:bg-primary/10">
+                <Button onClick={handleFileClick} disabled={isOcrLoading} variant="outline" className="w-full sm:w-auto text-blue-600 dark:text-blue-400 font-semibold h-9 rounded-md border-slate-200 dark:border-slate-700 hover:bg-blue-50 dark:hover:bg-blue-950/30">
                   {isOcrLoading ? 'Processing...' : 'Upload & Parse CV'}
                 </Button>
               </div>
@@ -387,8 +388,8 @@ function InviteDialog({ open, onClose, currentUser }: { open: boolean; onClose: 
             </div>
 
             <div className="flex justify-end gap-3 px-4 sm:px-6 py-4 pb-6 sm:pb-4 border-t border-border bg-muted/30 shrink-0 flex-col sm:flex-row">
-              <Button variant="outline" onClick={handleClose} className="w-full sm:w-auto h-auto py-2.5 rounded-xl text-sm font-medium order-2 sm:order-1 border-border">Cancel</Button>
-              <Button onClick={submit} className="w-full sm:w-auto px-5 h-auto py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors shadow-sm order-1 sm:order-2">
+              <Button variant="outline" onClick={handleClose} className="w-full sm:w-auto h-auto py-2 rounded-md text-sm font-medium order-2 sm:order-1 border-border">Cancel</Button>
+              <Button onClick={submit} className="w-full sm:w-auto px-5 h-auto py-2 rounded-md bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors shadow-none order-1 sm:order-2">
                 Generate Invitation
               </Button>
             </div>
@@ -449,7 +450,7 @@ function ScoresheetDialog({ open, candidate, onClose, onSave, onForward, current
     if (file) runMockOcr(file);
   };
 
-  const inp = cn('w-full border rounded-xl px-3 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent', isDark ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-200 text-slate-900');
+  const inp = cn('w-full border rounded-md px-3 py-2 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent', isDark ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-200 text-slate-900');
   const lbl = 'block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 ml-1';
   const upd = (k: keyof InterviewScoresheet, v: any) => setSheet(p => ({ ...p, [k]: v }));
 
@@ -473,12 +474,12 @@ function ScoresheetDialog({ open, candidate, onClose, onSave, onForward, current
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: 8 }}
             transition={{ duration: 0.18 }}
-            className="bg-card border-0 sm:border border-border rounded-none sm:rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col h-[100dvh] sm:h-auto sm:max-h-[90vh]"
+            className="bg-card border-0 sm:border border-border rounded-none sm:rounded-md shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col h-[100dvh] sm:h-auto sm:max-h-[90vh]"
           >
-            <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-border bg-gradient-to-r from-primary/5 to-transparent shrink-0">
+            <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-border bg-white dark:bg-slate-900 shrink-0">
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
-                  <ClipboardList className="w-4.5 h-4.5 text-primary" />
+                <div className="w-8 h-8 rounded-md bg-blue-50 dark:bg-blue-950/50 flex items-center justify-center">
+                  <ClipboardList className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                 </div>
                 <div>
                   <h2 className="text-base font-semibold text-foreground">Assessment</h2>
@@ -486,13 +487,13 @@ function ScoresheetDialog({ open, candidate, onClose, onSave, onForward, current
                 </div>
               </div>
               <div className="flex items-center gap-4">
-                <div className="hidden sm:flex items-center gap-2 bg-muted/50 px-3 py-1.5 rounded-xl border border-border">
+                <div className="hidden sm:flex items-center gap-2 bg-muted/50 px-3 py-1.5 rounded-md border border-border">
                   <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground">Progress</span>
                   <div className="w-16 h-1.5 bg-border rounded-full overflow-hidden">
-                    <div className="h-full bg-primary transition-all duration-700" style={{ width: `${(tabs.findIndex(t => t.id === activeTab) + 1) * 25}%` }} />
+                    <div className="h-full bg-blue-600 transition-all duration-700" style={{ width: `${(tabs.findIndex(t => t.id === activeTab) + 1) * 25}%` }} />
                   </div>
                 </div>
-                <button onClick={onClose} className="p-1.5 rounded-full hover:bg-muted transition-colors flex-shrink-0">
+                <button onClick={onClose} className="p-1.5 rounded-md hover:bg-muted transition-colors flex-shrink-0">
                   <X className="w-4 h-4 text-muted-foreground" />
                 </button>
               </div>
@@ -501,8 +502,8 @@ function ScoresheetDialog({ open, candidate, onClose, onSave, onForward, current
             <div className="bg-muted/10 px-4 py-2 border-b border-border flex items-center gap-1 sm:gap-2 overflow-x-auto no-scrollbar shrink-0">
               {tabs.map(({ id, label, icon: Icon }) => (
                 <button key={id} onClick={() => setActiveTab(id as any)} 
-                  className={cn('flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold transition-all whitespace-nowrap', 
-                  activeTab === id ? 'bg-background text-foreground shadow-sm border border-border' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50 border border-transparent')}>
+                  className={cn('flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all whitespace-nowrap', 
+                  activeTab === id ? 'bg-blue-600 text-white shadow-none' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50')}>
                   <Icon className="h-3.5 w-3.5" /> {label}
                 </button>
               ))}
@@ -511,10 +512,10 @@ function ScoresheetDialog({ open, candidate, onClose, onSave, onForward, current
             <div className="p-4 sm:p-6 space-y-6 overflow-y-auto custom-scrollbar flex-1">
               {activeTab === 'info' && (
                 <div className="space-y-5 animate-in fade-in duration-300">
-                  <div className="bg-primary/5 border border-dashed border-primary/20 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 transition-colors hover:border-primary/40">
+                  <div className="bg-slate-50 dark:bg-slate-800/30 border border-dashed border-slate-200 dark:border-slate-700 rounded-md p-4 flex flex-col sm:flex-row items-center justify-between gap-4 transition-colors hover:border-blue-400">
                     <div className="flex items-center gap-4 w-full sm:w-auto">
-                      <div className="h-10 w-10 bg-background rounded-xl flex items-center justify-center shadow-sm text-primary flex-shrink-0">
-                        <RefreshCw className={cn("h-5 w-5", isOcrLoading && "animate-spin")} />
+                      <div className="h-9 w-9 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md flex items-center justify-center shadow-sm text-blue-600 dark:text-blue-400 flex-shrink-0">
+                        <RefreshCw className={cn("h-4 w-4", isOcrLoading && "animate-spin")} />
                       </div>
                       <div>
                         <h4 className="text-sm font-bold text-foreground">AI Intelligence</h4>
@@ -522,7 +523,7 @@ function ScoresheetDialog({ open, candidate, onClose, onSave, onForward, current
                       </div>
                     </div>
                     <input type="file" ref={fileInputRef} className="hidden" accept=".pdf,.doc,.docx,image/*" onChange={handleFileChange} />
-                    <Button onClick={handleOcrClick} disabled={isOcrLoading} variant="outline" className="w-full sm:w-auto text-primary font-bold h-9 border-primary/20 hover:bg-primary/10">
+                    <Button onClick={handleOcrClick} disabled={isOcrLoading} variant="outline" className="w-full sm:w-auto text-blue-600 dark:text-blue-400 font-semibold h-9 rounded-md border-slate-200 dark:border-slate-700 hover:bg-blue-50 dark:hover:bg-blue-950/30">
                       {isOcrLoading ? 'Processing...' : 'Upload & Parse CV'}
                     </Button>
                   </div>
@@ -543,8 +544,8 @@ function ScoresheetDialog({ open, candidate, onClose, onSave, onForward, current
                 <div className="space-y-6 animate-in fade-in duration-300">
                   <div className="space-y-3">
                     <div className="flex items-center justify-between px-1">
-                      <h4 className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-1.5"><ArrowRight className="h-3.5 w-3.5 text-primary" /> Educational Background</h4>
-                      <Button size="sm" variant="ghost" onClick={() => upd('qualifications', [...sheet.qualifications, {dates:'', institution:'', qualification:''}])} className="text-primary text-[11px] font-bold h-7 hover:bg-primary/10">+ Add Entry</Button>
+                      <h4 className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-1.5"><ArrowRight className="h-3.5 w-3.5 text-blue-600" /> Educational Background</h4>
+                      <Button size="sm" variant="ghost" onClick={() => upd('qualifications', [...sheet.qualifications, {dates:'', institution:'', qualification:''}])} className="text-blue-600 dark:text-blue-400 text-[11px] font-semibold h-7 hover:bg-blue-50 dark:hover:bg-blue-950/30">+ Add Entry</Button>
                     </div>
                     <div className="grid gap-2">
                       {sheet.qualifications.map((q, i) => (
@@ -559,8 +560,8 @@ function ScoresheetDialog({ open, candidate, onClose, onSave, onForward, current
 
                   <div className="space-y-3">
                     <div className="flex items-center justify-between px-1">
-                      <h4 className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-1.5"><ArrowRight className="h-3.5 w-3.5 text-primary" /> Professional Experience</h4>
-                      <Button size="sm" variant="ghost" onClick={() => upd('workExperience', [...sheet.workExperience, {date:'', organisation:'', jobTitle:''}])} className="text-primary text-[11px] font-bold h-7 hover:bg-primary/10">+ Add Entry</Button>
+                      <h4 className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-1.5"><ArrowRight className="h-3.5 w-3.5 text-blue-600" /> Professional Experience</h4>
+                      <Button size="sm" variant="ghost" onClick={() => upd('workExperience', [...sheet.workExperience, {date:'', organisation:'', jobTitle:''}])} className="text-blue-600 dark:text-blue-400 text-[11px] font-semibold h-7 hover:bg-blue-50 dark:hover:bg-blue-950/30">+ Add Entry</Button>
                     </div>
                     <div className="grid gap-2">
                       {sheet.workExperience.map((w, i) => (
@@ -579,10 +580,10 @@ function ScoresheetDialog({ open, candidate, onClose, onSave, onForward, current
                 <div className="space-y-3 animate-in fade-in duration-300">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {ATTR_KEYS.map(k => (
-                      <div key={k} className="p-4 bg-muted/30 rounded-2xl border border-border flex flex-col gap-3">
+                      <div key={k} className="p-4 bg-muted/30 rounded-md border border-border flex flex-col gap-3">
                         <div className="flex items-center justify-between">
                           <span className="text-[11px] font-bold text-foreground uppercase tracking-wide">{ATTR_LABELS[k]}</span>
-                          <span className={cn("text-[10px] px-2 py-0.5 rounded-full font-bold bg-background border border-border", 
+                          <span className={cn("text-[10px] px-2 py-0.5 rounded-sm font-mono font-bold bg-background border border-border", 
                             (sheet.keyAttributes as any)[k] === 4 ? "text-emerald-600 border-emerald-200 bg-emerald-50" :
                             (sheet.keyAttributes as any)[k] === 3 ? "text-sky-600 border-sky-200 bg-sky-50" :
                             (sheet.keyAttributes as any)[k] === 2 ? "text-amber-600 border-amber-200 bg-amber-50" :
@@ -600,14 +601,14 @@ function ScoresheetDialog({ open, candidate, onClose, onSave, onForward, current
                               4: 'hover:bg-emerald-50 hover:border-emerald-400 text-emerald-600'
                             };
                             const activeColors = {
-                              1: 'bg-rose-600 border-rose-600 text-white shadow-sm',
-                              2: 'bg-amber-600 border-amber-600 text-white shadow-sm',
-                              3: 'bg-sky-600 border-sky-600 text-white shadow-sm',
-                              4: 'bg-emerald-600 border-emerald-600 text-white shadow-sm'
+                              1: 'bg-rose-600 border-rose-600 text-white shadow-none',
+                              2: 'bg-amber-600 border-amber-600 text-white shadow-none',
+                              3: 'bg-sky-600 border-sky-600 text-white shadow-none',
+                              4: 'bg-emerald-600 border-emerald-600 text-white shadow-none'
                             };
                             return (
                               <button key={v} onClick={() => upd('keyAttributes', {...sheet.keyAttributes, [k]: v})} 
-                                className={cn('flex-1 h-9 rounded-lg border font-bold text-xs transition-all flex items-center justify-center', 
+                                className={cn('flex-1 h-8 rounded-md border font-mono font-bold text-xs transition-all flex items-center justify-center', 
                                 (sheet.keyAttributes as any)[k] === v ? (activeColors as any)[v] : cn('bg-background border-border text-muted-foreground', (colors as any)[v]))}>
                                 {v}
                               </button>
@@ -627,8 +628,8 @@ function ScoresheetDialog({ open, candidate, onClose, onSave, onForward, current
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                       {SUITABILITY_OPTS.map(o => (
                         <button key={o} onClick={() => upd('suitabilityVerdict', o)} 
-                          className={cn('px-3 py-3 rounded-xl border text-xs font-bold transition-all text-center flex items-center justify-center', 
-                          sheet.suitabilityVerdict === o ? 'bg-primary border-primary text-primary-foreground shadow-md' : 'bg-background border-border text-muted-foreground hover:border-primary/40 hover:text-foreground')}>
+                          className={cn('px-3 py-2.5 rounded-md border text-xs font-semibold transition-all text-center flex items-center justify-center', 
+                          sheet.suitabilityVerdict === o ? 'bg-blue-600 border-blue-600 text-white shadow-none' : 'bg-background border-border text-muted-foreground hover:border-blue-400 hover:text-foreground')}>
                           {o}
                         </button>
                       ))}
@@ -640,10 +641,10 @@ function ScoresheetDialog({ open, candidate, onClose, onSave, onForward, current
                     <div><label className={lbl}>Assessment Date</label><input type="date" className={inp} value={sheet.interviewDate} onChange={e => upd('interviewDate', e.target.value)} /></div>
                   </div>
                   {(sheet.suitabilityVerdict === 'Good Candidate' || sheet.suitabilityVerdict === 'Potential Star') && (
-                    <div className="bg-emerald-500/10 border border-emerald-500/20 p-4 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4 animate-in zoom-in duration-300">
+                    <div className="bg-emerald-500/10 border border-emerald-500/20 p-4 rounded-md flex flex-col sm:flex-row items-center justify-between gap-4 animate-in zoom-in duration-300">
                       <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 bg-emerald-600 rounded-xl flex items-center justify-center text-white shadow-sm flex-shrink-0">
-                          <UserCheck className="h-5 w-5" />
+                        <div className="h-9 w-9 bg-emerald-600 rounded-md flex items-center justify-center text-white shadow-none flex-shrink-0">
+                          <UserCheck className="h-4 w-4" />
                         </div>
                         <div>
                           <h4 className="text-sm font-bold text-emerald-700 dark:text-emerald-400">Ready for Onboarding</h4>
@@ -652,7 +653,7 @@ function ScoresheetDialog({ open, candidate, onClose, onSave, onForward, current
                       </div>
                       <Button 
                         onClick={() => { if (candidate) onForward?.(candidate, sheet); onClose(); }} 
-                        className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl px-5 h-9 font-bold shadow-sm text-xs"
+                        className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white rounded-md px-5 h-9 font-semibold shadow-none text-xs"
                       >
                         Forward & Onboard
                       </Button>
@@ -664,14 +665,14 @@ function ScoresheetDialog({ open, candidate, onClose, onSave, onForward, current
               {activeTab === 'others' && (
                 <div className="space-y-4 animate-in fade-in duration-300">
                   {allSheets.map((os, i) => (
-                    <div key={i} className="p-4 bg-muted/20 border border-border rounded-xl space-y-3 relative overflow-hidden">
+                    <div key={i} className="p-4 bg-muted/20 border border-border rounded-md space-y-3 relative overflow-hidden">
                       {os.interviewerName === currentUser?.name && (
-                        <div className="absolute top-0 right-0 bg-primary text-primary-foreground text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-bl-lg">
+                        <div className="absolute top-0 right-0 bg-blue-600 text-white text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-bl-md">
                           My Assessment
                         </div>
                       )}
                       <div className="flex items-center gap-2 border-b border-border pb-2">
-                        <UserCheck className="h-4 w-4 text-primary" />
+                        <UserCheck className="h-4 w-4 text-blue-600" />
                         <span className="font-bold text-sm text-foreground">{os.interviewerName}</span>
                         <span className="text-[10px] text-muted-foreground ml-auto">{os.interviewDate}</span>
                       </div>
@@ -688,7 +689,7 @@ function ScoresheetDialog({ open, candidate, onClose, onSave, onForward, current
                       {Object.keys(os.keyAttributes || {}).length > 0 && (
                         <div className="flex flex-wrap gap-1.5 pt-2 border-t border-border/50">
                           {Object.entries(os.keyAttributes || {}).map(([k, v]) => (
-                            <span key={k} className="text-[10px] bg-background border border-border px-2 py-0.5 rounded flex gap-1">
+                            <span key={k} className="text-[10px] bg-background border border-border px-2 py-0.5 rounded-sm flex gap-1 font-mono">
                               {ATTR_LABELS[k as keyof KeyAttributes]}: <span className="font-bold">{v}/4</span>
                             </span>
                           ))}
@@ -701,8 +702,8 @@ function ScoresheetDialog({ open, candidate, onClose, onSave, onForward, current
             </div>
 
             <div className="flex justify-end gap-3 px-4 sm:px-6 py-4 pb-6 sm:pb-4 border-t border-border bg-muted/30 shrink-0 flex-col sm:flex-row">
-              <Button variant="outline" onClick={onClose} className="w-full sm:w-auto h-auto py-2.5 rounded-xl text-sm font-medium order-2 sm:order-1 border-border">Discard Changes</Button>
-              <Button onClick={() => { onSave(sheet); onClose(); }} className="w-full sm:w-auto px-5 h-auto py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors shadow-sm order-1 sm:order-2">
+              <Button variant="outline" onClick={onClose} className="w-full sm:w-auto h-auto py-2 rounded-md text-sm font-medium order-2 sm:order-1 border-border">Discard Changes</Button>
+              <Button onClick={() => { onSave(sheet); onClose(); }} className="w-full sm:w-auto px-5 h-auto py-2 rounded-md bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors shadow-none order-1 sm:order-2">
                 Finalize Scoresheet
               </Button>
             </div>
@@ -731,7 +732,7 @@ export default function InterviewManager() {
     'Interview Management',
     'Track candidates, conduct interviews, and manage evaluations.',
     user?.privileges?.interviews?.canAdd && (
-      <Button onClick={() => setShowInvite(true)} className="hidden sm:flex bg-indigo-600 hover:bg-indigo-700 text-white gap-2">
+      <Button onClick={() => setShowInvite(true)} className="hidden sm:flex bg-blue-600 hover:bg-blue-700 text-white gap-2 rounded-md">
         <Plus className="h-4 w-4" /> Invite Candidate
       </Button>
     )
@@ -813,17 +814,17 @@ export default function InterviewManager() {
     <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto">
 
       {user?.privileges?.interviews?.canAdd && (
-        <Button onClick={() => setShowInvite(true)} className="w-full sm:hidden bg-indigo-600 hover:bg-indigo-700 text-white flex gap-2 h-11 text-base rounded-xl shadow-sm">
-          <Plus className="h-5 w-5" /> Invite Candidate
+        <Button onClick={() => setShowInvite(true)} className="w-full sm:hidden bg-blue-600 hover:bg-blue-700 text-white flex gap-2 h-10 text-sm font-medium rounded-md shadow-none">
+          <Plus className="h-4 w-4" /> Invite Candidate
         </Button>
       )}
 
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
-          <BarChart2 className="w-4 h-4 text-indigo-500" />
+          <BarChart2 className="w-4 h-4 text-blue-600" />
           Overview Statistics
         </h3>
-        <Button variant="ghost" size="sm" className="h-8 text-xs text-slate-500" onClick={() => setShowStats(!showStats)}>
+        <Button variant="ghost" size="sm" className="h-8 text-xs text-slate-500 rounded-md" onClick={() => setShowStats(!showStats)}>
           {showStats ? <><ChevronUp className="w-3.5 h-3.5 mr-1" /> Hide</> : <><ChevronDown className="w-3.5 h-3.5 mr-1" /> Show</>}
         </Button>
       </div>
@@ -836,32 +837,33 @@ export default function InterviewManager() {
             exit={{ height: 0, opacity: 0 }}
             className="overflow-hidden"
           >
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 pb-2">
-              {[
-                { label: 'Total Candidates', value: stats.total, icon: Users, color: 'text-blue-600 bg-blue-50' },
-                { label: 'Scheduled', value: stats.scheduled, icon: CalendarDays, color: 'text-amber-600 bg-amber-50' },
-                { label: 'Completed', value: stats.completed, icon: CheckCircle2, color: 'text-green-600 bg-green-50' },
-                { label: 'Shortlisted', value: stats.shortlisted, icon: Star, color: 'text-indigo-600 bg-indigo-50' },
-              ].map((s, i) => (
-                <div key={i} className={cn("p-4 rounded-2xl border flex items-center gap-4", isDark ? "bg-slate-800/50 border-slate-700" : "bg-white")}>
-                  <div className={cn("p-3 rounded-xl", s.color)}><s.icon className="h-5 w-5" /></div>
-                  <div><p className="text-2xl font-bold">{s.value}</p><p className="text-xs text-slate-500">{s.label}</p></div>
-                </div>
-              ))}
-            </div>
+            <MetricHeroCard
+              className="mb-2"
+              primary={{
+                label: 'Total Candidates',
+                value: stats.total,
+                period: 'Active pipeline',
+                sparklineData: [stats.total - stats.scheduled, stats.scheduled, stats.completed, stats.total],
+              }}
+              secondary={[
+                { label: 'Scheduled', value: stats.scheduled, period: 'Pending interview' },
+                { label: 'Completed', value: stats.completed, period: 'Interviewed' },
+                { label: 'Shortlisted', value: stats.shortlisted, period: 'Applicable' },
+              ]}
+            />
           </motion.div>
         )}
       </AnimatePresence>
 
-      <div className={cn("rounded-2xl border overflow-hidden", isDark ? "bg-slate-800/50 border-slate-700" : "bg-white shadow-sm")}>
-        <div className="p-4 border-b flex flex-col sm:flex-row gap-4 justify-between items-center">
+      <div className={cn("rounded-md border border-slate-200 dark:border-slate-800 overflow-hidden", isDark ? "bg-slate-900/50" : "bg-white shadow-none")}>
+        <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row gap-4 justify-between items-center">
           <div className="relative max-w-sm w-full">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-            <input className={cn("w-full pl-9 pr-4 py-2 text-sm border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-400", isDark ? "bg-slate-900 border-slate-700" : "bg-slate-50 border-slate-200")} placeholder="Search candidates or roles..." value={search} onChange={e => setSearch(e.target.value)} />
+            <input className={cn("w-full pl-9 pr-4 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500", isDark ? "bg-slate-900 border-slate-700" : "bg-slate-50 border-slate-200")} placeholder="Search candidates or roles..." value={search} onChange={e => setSearch(e.target.value)} />
           </div>
           <div className="flex items-center gap-2">
             <span className="text-xs font-medium text-slate-500">Group by Position</span>
-            <button onClick={() => setIsGrouped(!isGrouped)} className={cn("relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none", isGrouped ? "bg-indigo-600" : "bg-slate-200")}>
+            <button onClick={() => setIsGrouped(!isGrouped)} className={cn("relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none", isGrouped ? "bg-blue-600" : "bg-slate-200 dark:bg-slate-700")}>
               <span className={cn("pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out", isGrouped ? "translate-x-4" : "translate-x-0")} />
             </button>
           </div>
@@ -873,10 +875,10 @@ export default function InterviewManager() {
               {Object.entries(grouped).map(([role, items]) => (
                 <div key={role} className="space-y-3">
                   <div className="flex items-center gap-2 px-1">
-                    <Briefcase className="h-4 w-4 text-indigo-500" />
-                    <h3 className="font-bold text-slate-800 dark:text-slate-200">{role} <span className="text-xs font-normal text-slate-400 ml-2">({items.length} candidates)</span></h3>
+                    <Briefcase className="h-4 w-4 text-blue-600" />
+                    <h3 className="font-bold text-slate-800 dark:text-slate-200">{role} <span className="text-xs font-normal text-slate-400 ml-2 font-mono tabular-nums">({items.length} candidates)</span></h3>
                   </div>
-                  <div className="border rounded-xl overflow-hidden">
+                  <div className="border border-slate-200 dark:border-slate-800 rounded-md overflow-hidden">
                     {/* Desktop Table */}
                     <table className="hidden md:table w-full text-sm text-left">
                       <thead className={cn("text-xs uppercase font-semibold", isDark ? "bg-slate-900/50 text-slate-400" : "bg-slate-50 text-slate-500")}>
@@ -896,11 +898,11 @@ export default function InterviewManager() {
                               <div className="text-xs text-slate-500">{c.email || c.phone || 'No contact'}</div>
                             </td>
                             <td className="px-4 py-3">
-                              <div className="flex items-center gap-1.5"><CalendarDays className="h-3.5 w-3.5 text-slate-400" /> {fmt(c.scheduledDate)}</div>
-                              <div className="text-xs text-slate-500">{c.scheduledTime || '--:--'}</div>
+                              <div className="flex items-center gap-1.5 font-mono text-xs"><CalendarDays className="h-3.5 w-3.5 text-slate-400" /> {fmt(c.scheduledDate)}</div>
+                              <div className="text-xs text-slate-500 font-mono mt-0.5">{c.scheduledTime || '--:--'}</div>
                             </td>
                             <td className="px-4 py-3">
-                              <span className={cn("px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider", STATUS_CFG[c.status]?.color || "bg-slate-100")}>
+                              <span className={cn("px-2 py-0.5 rounded-sm text-[11px] font-mono font-medium uppercase tracking-wider", STATUS_CFG[c.status]?.color || "bg-slate-100")}>
                                 {c.status}
                               </span>
                             </td>
@@ -916,11 +918,11 @@ export default function InterviewManager() {
                               <div className="flex justify-end gap-1">
                                 {user?.privileges?.interviews?.canEdit && (
                                   <>
-                                    <Button variant="ghost" size="icon" title="Conduct Interview" onClick={() => { setActiveCandidate(c); setShowScoresheet(true); }}>
-                                      <FileText className="h-4 w-4 text-indigo-600" />
+                                    <Button variant="ghost" size="icon" title="Conduct Interview" className="rounded-md" onClick={() => { setActiveCandidate(c); setShowScoresheet(true); }}>
+                                      <FileText className="h-4 w-4 text-blue-600" />
                                     </Button>
                                     {c.decision === 'Applicable' && (
-                                      <Button variant="ghost" size="icon" title="Forward to Onboarding" onClick={() => forwardToOnboarding(c)}>
+                                      <Button variant="ghost" size="icon" title="Forward to Onboarding" className="rounded-md" onClick={() => forwardToOnboarding(c)}>
                                         <ArrowRight className="h-4 w-4 text-green-600" />
                                       </Button>
                                     ) }
@@ -950,16 +952,16 @@ export default function InterviewManager() {
                               <div className="font-bold text-slate-800 dark:text-slate-200">{c.candidateName}</div>
                               <div className="text-xs text-slate-500 mt-0.5">{c.email || c.phone || 'No contact'}</div>
                             </div>
-                            <span className={cn("px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider shrink-0", STATUS_CFG[c.status]?.color || "bg-slate-100")}>
+                            <span className={cn("px-2 py-0.5 rounded-sm text-[11px] font-mono font-medium uppercase tracking-wider shrink-0", STATUS_CFG[c.status]?.color || "bg-slate-100")}>
                               {c.status}
                             </span>
                           </div>
                           
-                          <div className="grid grid-cols-2 gap-3 text-sm bg-slate-50 dark:bg-slate-800/30 p-3 rounded-xl border border-slate-100 dark:border-slate-800">
+                          <div className="grid grid-cols-2 gap-3 text-sm bg-slate-50 dark:bg-slate-800/30 p-3 rounded-md border border-slate-200 dark:border-slate-800">
                             <div>
                               <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Schedule</span>
-                              <div className="flex items-center gap-1.5"><CalendarDays className="h-3.5 w-3.5 text-slate-400" /> {fmt(c.scheduledDate)}</div>
-                              <div className="text-xs text-slate-500 mt-1">{c.scheduledTime || '--:--'}</div>
+                              <div className="flex items-center gap-1.5 font-mono text-xs"><CalendarDays className="h-3.5 w-3.5 text-slate-400" /> {fmt(c.scheduledDate)}</div>
+                              <div className="text-xs text-slate-500 font-mono mt-1">{c.scheduledTime || '--:--'}</div>
                             </div>
                             <div>
                               <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Decision</span>
@@ -975,18 +977,18 @@ export default function InterviewManager() {
                           <div className="flex items-center justify-end gap-2 pt-1">
                             {user?.privileges?.interviews?.canEdit && (
                               <>
-                                <Button variant="outline" size="sm" className="h-8 text-indigo-600 border-indigo-200 hover:bg-indigo-50 dark:border-indigo-800/50 dark:hover:bg-indigo-900/30" onClick={() => { setActiveCandidate(c); setShowScoresheet(true); }}>
-                                  <FileText className="h-3.5 w-3.5 mr-1.5" /> Assess
+                                <Button variant="outline" size="sm" className="h-8 rounded-md text-blue-600 border-slate-200 hover:bg-blue-50 dark:border-slate-700 dark:hover:bg-blue-950/30" onClick={() => { setActiveCandidate(c); setShowScoresheet(true); }}>
+                                  <FileText className="h-3.5 w-3.5 mr-1.5 text-blue-600" /> Assess
                                 </Button>
                                 {c.decision === 'Applicable' && (
-                                  <Button variant="outline" size="sm" className="h-8 text-green-600 border-green-200 hover:bg-green-50 dark:border-green-800/50 dark:hover:bg-green-900/30" onClick={() => forwardToOnboarding(c)}>
+                                  <Button variant="outline" size="sm" className="h-8 rounded-md text-green-600 border-green-200 hover:bg-green-50 dark:border-green-800/50 dark:hover:bg-green-900/30" onClick={() => forwardToOnboarding(c)}>
                                     <ArrowRight className="h-3.5 w-3.5 mr-1.5" /> Onboard
                                   </Button>
                                 ) }
                               </>
                             )}
                             {user?.privileges?.interviews?.canDelete && (
-                              <Button variant="outline" size="sm" className="h-8 px-2 text-red-600 border-red-200 hover:bg-red-50 dark:border-red-800/50 dark:hover:bg-red-900/30" onClick={async () => {
+                              <Button variant="outline" size="sm" className="h-8 px-2 rounded-md text-red-600 border-red-200 hover:bg-red-50 dark:border-red-800/50 dark:hover:bg-red-900/30" onClick={async () => {
                                 const ok = await showConfirm('Delete this candidate?', { variant: 'danger' });
                                 if (ok) deleteInterviewCandidate(c.id);
                               }}>
@@ -1030,11 +1032,11 @@ export default function InterviewManager() {
                       <div className="text-xs text-slate-500">{c.department || 'N/A'} • {c.stage}</div>
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-1.5"><CalendarDays className="h-3.5 w-3.5 text-slate-400" /> {fmt(c.scheduledDate)}</div>
-                      <div className="text-xs text-slate-500">{c.scheduledTime || '--:--'}</div>
+                      <div className="flex items-center gap-1.5 font-mono text-xs"><CalendarDays className="h-3.5 w-3.5 text-slate-400" /> {fmt(c.scheduledDate)}</div>
+                      <div className="text-xs text-slate-500 font-mono mt-0.5">{c.scheduledTime || '--:--'}</div>
                     </td>
                     <td className="px-4 py-3">
-                      <span className={cn("px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider", STATUS_CFG[c.status]?.color || "bg-slate-100")}>
+                      <span className={cn("px-2 py-0.5 rounded-sm text-[11px] font-mono font-medium uppercase tracking-wider", STATUS_CFG[c.status]?.color || "bg-slate-100")}>
                         {c.status}
                       </span>
                     </td>
@@ -1050,18 +1052,18 @@ export default function InterviewManager() {
                       <div className="flex justify-end gap-1">
                         {user?.privileges?.interviews?.canEdit && (
                           <>
-                            <Button variant="ghost" size="icon" title="Conduct Interview" onClick={() => { setActiveCandidate(c); setShowScoresheet(true); }}>
-                              <FileText className="h-4 w-4 text-indigo-600" />
+                            <Button variant="ghost" size="icon" title="Conduct Interview" className="rounded-md" onClick={() => { setActiveCandidate(c); setShowScoresheet(true); }}>
+                              <FileText className="h-4 w-4 text-blue-600" />
                             </Button>
                             {c.decision === 'Applicable' && (
-                              <Button variant="ghost" size="icon" title="Forward to Onboarding" onClick={() => forwardToOnboarding(c)}>
+                              <Button variant="ghost" size="icon" title="Forward to Onboarding" className="rounded-md" onClick={() => forwardToOnboarding(c)}>
                                 <ArrowRight className="h-4 w-4 text-green-600" />
                               </Button>
                             ) }
                           </>
                         )}
                         {user?.privileges?.interviews?.canDelete && (
-                          <Button variant="ghost" size="icon" onClick={async () => {
+                          <Button variant="ghost" size="icon" className="rounded-md" onClick={async () => {
                             const ok = await showConfirm('Delete this candidate?', { variant: 'danger' });
                             if (ok) deleteInterviewCandidate(c.id);
                           }}>
@@ -1087,12 +1089,12 @@ export default function InterviewManager() {
                       <div className="font-bold text-slate-800 dark:text-slate-200">{c.candidateName}</div>
                       <div className="text-xs text-slate-500 mt-0.5">{c.email || c.phone || 'No contact'}</div>
                     </div>
-                    <span className={cn("px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider shrink-0", STATUS_CFG[c.status]?.color || "bg-slate-100")}>
+                    <span className={cn("px-2 py-0.5 rounded-sm text-[11px] font-mono font-medium uppercase tracking-wider shrink-0", STATUS_CFG[c.status]?.color || "bg-slate-100")}>
                       {c.status}
                     </span>
                   </div>
                   
-                  <div className="bg-slate-50 dark:bg-slate-800/40 p-3 rounded-xl border border-slate-100 dark:border-slate-800">
+                  <div className="bg-slate-50 dark:bg-slate-800/40 p-3 rounded-md border border-slate-200 dark:border-slate-800">
                     <div className="flex items-center gap-1.5 text-sm font-semibold"><Briefcase className="h-4 w-4 text-slate-400" /> {c.appliedRole}</div>
                     <div className="text-xs text-slate-500 mt-1.5 ml-5.5">{c.department || 'N/A'} • <span className="font-medium text-slate-600 dark:text-slate-400">{c.stage}</span></div>
                   </div>
@@ -1100,8 +1102,8 @@ export default function InterviewManager() {
                   <div className="grid grid-cols-2 gap-3 text-sm">
                     <div>
                       <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Schedule</span>
-                      <div className="flex items-center gap-1.5"><CalendarDays className="h-3.5 w-3.5 text-slate-400" /> {fmt(c.scheduledDate)}</div>
-                      <div className="text-xs text-slate-500 mt-1">{c.scheduledTime || '--:--'}</div>
+                      <div className="flex items-center gap-1.5 font-mono text-xs"><CalendarDays className="h-3.5 w-3.5 text-slate-400" /> {fmt(c.scheduledDate)}</div>
+                      <div className="text-xs text-slate-500 font-mono mt-1">{c.scheduledTime || '--:--'}</div>
                     </div>
                     <div>
                       <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Decision</span>
@@ -1117,18 +1119,18 @@ export default function InterviewManager() {
                   <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
                     {user?.privileges?.interviews?.canEdit && (
                       <>
-                        <Button variant="outline" size="sm" className="h-8 text-indigo-600 border-indigo-200 hover:bg-indigo-50 dark:border-indigo-800/50 dark:hover:bg-indigo-900/30" onClick={() => { setActiveCandidate(c); setShowScoresheet(true); }}>
-                          <FileText className="h-3.5 w-3.5 mr-1.5" /> Assess
+                        <Button variant="outline" size="sm" className="h-8 rounded-md text-blue-600 border-slate-200 hover:bg-blue-50 dark:border-slate-700 dark:hover:bg-blue-950/30" onClick={() => { setActiveCandidate(c); setShowScoresheet(true); }}>
+                          <FileText className="h-3.5 w-3.5 mr-1.5 text-blue-600" /> Assess
                         </Button>
                         {c.decision === 'Applicable' && (
-                          <Button variant="outline" size="sm" className="h-8 text-green-600 border-green-200 hover:bg-green-50 dark:border-green-800/50 dark:hover:bg-green-900/30" onClick={() => forwardToOnboarding(c)}>
+                          <Button variant="outline" size="sm" className="h-8 rounded-md text-green-600 border-green-200 hover:bg-green-50 dark:border-green-800/50 dark:hover:bg-green-900/30" onClick={() => forwardToOnboarding(c)}>
                             <ArrowRight className="h-3.5 w-3.5 mr-1.5" /> Onboard
                           </Button>
                         ) }
                       </>
                     )}
                     {user?.privileges?.interviews?.canDelete && (
-                      <Button variant="outline" size="sm" className="h-8 px-2 text-red-600 border-red-200 hover:bg-red-50 dark:border-red-800/50 dark:hover:bg-red-900/30" onClick={async () => {
+                      <Button variant="outline" size="sm" className="h-8 px-2 rounded-md text-red-600 border-red-200 hover:bg-red-50 dark:border-red-800/50 dark:hover:bg-red-900/30" onClick={async () => {
                         const ok = await showConfirm('Delete this candidate?', { variant: 'danger' });
                         if (ok) deleteInterviewCandidate(c.id);
                       }}>

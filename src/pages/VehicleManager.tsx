@@ -39,6 +39,7 @@ import { fetchOperationsData } from '@/src/lib/supabaseService';
 import { useEffect } from 'react';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/src/components/ui/card';
+import { MetricHeroCard } from '@/src/components/ui/MetricHeroCard';
 import { toast } from 'sonner';
 import { Button } from '@/src/components/ui/button';
 import { Badge } from '@/src/components/ui/badge';
@@ -56,10 +57,10 @@ const VEHICLE_COLORS = [
   '#10b981', // emerald
   '#f59e0b', // amber
   '#ef4444', // rose
-  '#8b5cf6', // violet
+  '#0284c7', // sky
   '#06b6d4', // cyan
   '#ec4899', // pink
-  '#6366f1'  // indigo
+  '#0d9488'  // teal
 ];
 
 const CustomTooltip = ({ active, payload, label, valType }: any) => {
@@ -72,11 +73,11 @@ const CustomTooltip = ({ active, payload, label, valType }: any) => {
     const divisor = filteredPayload.length > 0 ? filteredPayload.length : payload.length;
     
     return (
-      <div className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 p-3.5 rounded-xl shadow-xl space-y-2 max-h-80 overflow-y-auto min-w-[220px]">
+      <div className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 p-3.5 rounded-md space-y-2 max-h-80 overflow-y-auto min-w-[220px]">
         <p className="text-xs font-bold text-slate-400 dark:text-slate-500">{label}</p>
         <div className="border-b border-slate-100 dark:border-slate-800 pb-1.5 mb-1.5 flex justify-between items-center font-extrabold text-xs">
           <span className="text-slate-800 dark:text-slate-200">Total</span>
-          <span className="text-slate-900 dark:text-slate-100 font-extrabold">
+          <span className="text-slate-900 dark:text-slate-100 font-extrabold font-mono tabular-nums">
             {valType === 'litres' ? `${total.toFixed(1)} L` : valType === 'cost' ? `₦${total.toLocaleString()}` : `₦${(total/divisor).toFixed(2)}/L`}
           </span>
         </div>
@@ -89,7 +90,7 @@ const CustomTooltip = ({ active, payload, label, valType }: any) => {
                   <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: entry.color }} />
                   <span className="text-slate-600 dark:text-slate-300 font-bold truncate">{cleanName}</span>
                 </div>
-                <span className="font-extrabold text-slate-700 dark:text-slate-200 shrink-0">
+                <span className="font-extrabold font-mono tabular-nums text-slate-700 dark:text-slate-200 shrink-0">
                   {valType === 'litres' ? `${Number(entry.value).toFixed(1)} L` : valType === 'cost' ? `₦${Number(entry.value).toLocaleString()}` : `₦${Number(entry.value).toFixed(2)}/L`}
                 </span>
               </div>
@@ -1976,21 +1977,21 @@ export function VehicleManager() {
         {priv.canImport && (
           <Button
             variant="outline" size="sm"
-            className="flex items-center gap-1.5 h-9 px-2 sm:px-3 border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 shadow-sm"
+            className="flex items-center gap-1.5 h-9 px-2 sm:px-3 border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 rounded-md"
             onClick={() => {
               setImportType(activeTab === 'logs' ? 'logs' : 'vehicles');
               setShowImportDialog(true);
             }}
             title="Import"
           >
-            <Download className="h-3.5 w-3.5 text-indigo-500" />
+            <Download className="h-3.5 w-3.5 text-blue-600" />
             <span className="text-xs font-medium">Import</span>
           </Button>
         )}
         {priv.canExport && (
           <Button
             variant="outline" size="sm"
-            className="flex items-center gap-1.5 h-9 px-2 sm:px-3 border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 shadow-sm"
+            className="flex items-center gap-1.5 h-9 px-2 sm:px-3 border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 rounded-md"
             onClick={() => handleExport()}
             title="Export"
           >
@@ -2353,8 +2354,8 @@ export function VehicleManager() {
       {/* Vehicle Form Modal */}
       {showVehicleForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <Card className="w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200">
-            <CardHeader className="bg-slate-50 dark:bg-slate-800 border-b">
+          <Card className="w-full max-w-md shadow-2xl rounded-md border border-slate-200 dark:border-slate-800 animate-in zoom-in-95 duration-200">
+            <CardHeader className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-lg font-bold">{editingVehicle ? 'Edit Vehicle' : 'Add New Vehicle'}</CardTitle>
                 <Button variant="ghost" size="icon" onClick={() => setShowVehicleForm(false)}><X className="h-4 w-4" /></Button>
@@ -2367,7 +2368,7 @@ export function VehicleManager() {
               </div>
               <div className="space-y-2">
                 <Label>Registration Number</Label>
-                <Input placeholder="e.g. LAG-123-XY" value={vForm.registration_number} onChange={e => setVForm({...vForm, registration_number: e.target.value})} />
+                <Input placeholder="e.g. LAG-123-XY" className="font-mono" value={vForm.registration_number} onChange={e => setVForm({...vForm, registration_number: e.target.value})} />
               </div>
               <div className="space-y-2">
                 <Label>Vehicle Type</Label>
@@ -2381,8 +2382,8 @@ export function VehicleManager() {
                 </select>
               </div>
               <div className="flex gap-3 pt-2">
-                <Button className="flex-1 bg-blue-600 hover:bg-blue-700" onClick={handleSaveVehicle}>Save Vehicle</Button>
-                <Button variant="outline" className="flex-1" onClick={() => setShowVehicleForm(false)}>Cancel</Button>
+                <Button className="flex-1 bg-blue-600 hover:bg-blue-700 rounded-md" onClick={handleSaveVehicle}>Save Vehicle</Button>
+                <Button variant="outline" className="flex-1 rounded-md" onClick={() => setShowVehicleForm(false)}>Cancel</Button>
               </div>
             </CardContent>
           </Card>
@@ -2392,11 +2393,11 @@ export function VehicleManager() {
       {/* Trip Log Modal */}
       {showTripForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto">
-          <Card className="w-full max-w-2xl shadow-2xl my-8 animate-in slide-in-from-bottom-4 duration-300">
-            <CardHeader className="bg-slate-50 dark:bg-slate-800 border-b sticky top-0 z-10">
+          <Card className="w-full max-w-2xl shadow-2xl my-8 rounded-md border border-slate-200 dark:border-slate-800 animate-in slide-in-from-bottom-4 duration-300">
+            <CardHeader className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-10">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600">
+                  <div className="h-10 w-10 rounded-md bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600">
                     <ClipboardList className="h-5 w-5" />
                   </div>
                   <div>
@@ -2420,7 +2421,7 @@ export function VehicleManager() {
                 </div>
                 <div className="space-y-2">
                   <Label>Date</Label>
-                  <Input type="date" value={tForm.date} onChange={e => setTForm({...tForm, date: e.target.value})} />
+                  <Input type="date" className="font-mono tabular-nums" value={tForm.date} onChange={e => setTForm({...tForm, date: e.target.value})} />
                 </div>
                 <div className="space-y-2">
                   <Label>Driver Name</Label>
@@ -2440,7 +2441,7 @@ export function VehicleManager() {
                     <MapPin className="h-4 w-4" /> {editingTrip ? 'Trip Details' : 'Trip Leg(s) / Site Visits'}
                   </h3>
                   {!editingTrip && (
-                    <Button variant="ghost" size="sm" className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 h-8 gap-1"
+                    <Button variant="ghost" size="sm" className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 h-8 gap-1 rounded-md"
                       onClick={() => setTForm({...tForm, legs: [...tForm.legs, { site_name: '', purpose: '', departure_time: '', arrival_time: '', remark: '', odometer_start: undefined, odometer_end: undefined }]})}>
                       <PlusCircle className="h-4 w-4" /> Add Leg
                     </Button>
@@ -2448,9 +2449,9 @@ export function VehicleManager() {
                 </div>
 
                 {tForm.legs.map((leg, idx) => (
-                  <div key={idx} className="relative p-4 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 space-y-4 group">
+                  <div key={idx} className="relative p-4 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 space-y-4 group">
                     {tForm.legs.length > 1 && (
-                      <Button variant="ghost" size="icon" className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-white dark:bg-slate-800 border shadow-sm text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                      <Button variant="ghost" size="icon" className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"
                         onClick={() => {
                           const newLegs = [...tForm.legs];
                           newLegs.splice(idx, 1);
@@ -2487,7 +2488,7 @@ export function VehicleManager() {
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                       <div className="space-y-2">
                         <Label className="text-xs flex items-center gap-1"><Clock className="h-3 w-3" /> Dept Time</Label>
-                        <Input type="time" className="h-9 px-2" value={leg.departure_time} 
+                        <Input type="time" className="h-9 px-2 font-mono tabular-nums" value={leg.departure_time} 
                           onChange={e => {
                             const newLegs = [...tForm.legs];
                             newLegs[idx].departure_time = e.target.value;
@@ -2496,7 +2497,7 @@ export function VehicleManager() {
                       </div>
                       <div className="space-y-2">
                         <Label className="text-xs flex items-center gap-1"><Clock className="h-3 w-3" /> Arr Time</Label>
-                        <Input type="time" className="h-9 px-2" value={leg.arrival_time} 
+                        <Input type="time" className="h-9 px-2 font-mono tabular-nums" value={leg.arrival_time} 
                           onChange={e => {
                             const newLegs = [...tForm.legs];
                             newLegs[idx].arrival_time = e.target.value;
@@ -2505,7 +2506,7 @@ export function VehicleManager() {
                       </div>
                       <div className="space-y-2">
                         <Label className="text-xs">Odom. Start</Label>
-                        <Input type="number" className="h-9 px-2" placeholder="Start" value={leg.odometer_start || ''} 
+                        <Input type="number" className="h-9 px-2 font-mono tabular-nums" placeholder="Start" value={leg.odometer_start || ''} 
                           onChange={e => {
                             const newLegs = [...tForm.legs];
                             newLegs[idx].odometer_start = Number(e.target.value) || undefined;
@@ -2514,7 +2515,7 @@ export function VehicleManager() {
                       </div>
                       <div className="space-y-2">
                         <Label className="text-xs">Odom. End</Label>
-                        <Input type="number" className="h-9 px-2" placeholder="End" value={leg.odometer_end || ''} 
+                        <Input type="number" className="h-9 px-2 font-mono tabular-nums" placeholder="End" value={leg.odometer_end || ''} 
                           onChange={e => {
                             const newLegs = [...tForm.legs];
                             newLegs[idx].odometer_end = Number(e.target.value) || undefined;
@@ -2536,9 +2537,9 @@ export function VehicleManager() {
                 ))}
               </div>
             </CardContent>
-            <CardHeader className="bg-slate-50 dark:bg-slate-800 border-t flex flex-row gap-3 pt-4">
-              <Button className="flex-1 bg-blue-600 hover:bg-blue-700" onClick={handleSaveTrip}>{editingTrip ? 'Update Entry' : 'Submit Entry'}</Button>
-              <Button variant="outline" className="flex-1" onClick={() => { setShowTripForm(false); setEditingTrip(null); }}>Discard</Button>
+            <CardHeader className="bg-slate-50 dark:bg-slate-800/60 border-t border-slate-200 dark:border-slate-800 flex flex-row gap-3 pt-4">
+              <Button className="flex-1 bg-blue-600 hover:bg-blue-700 rounded-md" onClick={handleSaveTrip}>{editingTrip ? 'Update Entry' : 'Submit Entry'}</Button>
+              <Button variant="outline" className="flex-1 rounded-md" onClick={() => { setShowTripForm(false); setEditingTrip(null); }}>Discard</Button>
             </CardHeader>
           </Card>
         </div>
@@ -2547,25 +2548,25 @@ export function VehicleManager() {
       {/* Import Dialog */}
       {showImportDialog && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <Card className="w-full max-w-md shadow-2xl animate-in fade-in zoom-in duration-200">
-            <CardHeader className="space-y-1">
+          <Card className="w-full max-w-md shadow-2xl rounded-md border border-slate-200 dark:border-slate-800 animate-in fade-in zoom-in duration-200">
+            <CardHeader className="space-y-1 border-b border-slate-200 dark:border-slate-800 pb-4">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-xl flex items-center gap-2">
                   <FileSpreadsheet className="h-5 w-5 text-blue-600" />
                   Import Data
                 </CardTitle>
-                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={() => setShowImportDialog(false)}>
+                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-md" onClick={() => setShowImportDialog(false)}>
                   <X className="h-4 w-4" />
                 </Button>
               </div>
               <CardDescription>Configure how you want to import your data</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4 pt-2">
+            <CardContent className="space-y-4 pt-4">
               <div className="space-y-2">
                 <Label>What would you like to import?</Label>
                 <div className="grid grid-cols-2 gap-3">
                   <button 
-                    className={`p-3 rounded-lg border-2 text-left transition-all ${importType === 'vehicles' ? 'border-blue-600 bg-blue-50 dark:bg-blue-900/20' : 'border-slate-100 dark:border-slate-800'}`}
+                    className={`p-3 rounded-md border text-left transition-all ${importType === 'vehicles' ? 'border-blue-600 bg-blue-50 dark:bg-blue-900/20' : 'border-slate-200 dark:border-slate-800'}`}
                     onClick={() => setImportType('vehicles')}
                   >
                     <Truck className={`h-5 w-5 mb-1 ${importType === 'vehicles' ? 'text-blue-600' : 'text-slate-400'}`} />
@@ -2573,7 +2574,7 @@ export function VehicleManager() {
                     <div className="text-[10px] text-slate-500">Fleet & Documents</div>
                   </button>
                   <button 
-                    className={`p-3 rounded-lg border-2 text-left transition-all ${importType === 'logs' ? 'border-blue-600 bg-blue-50 dark:bg-blue-900/20' : 'border-slate-100 dark:border-slate-800'}`}
+                    className={`p-3 rounded-md border text-left transition-all ${importType === 'logs' ? 'border-blue-600 bg-blue-50 dark:bg-blue-900/20' : 'border-slate-200 dark:border-slate-800'}`}
                     onClick={() => setImportType('logs')}
                   >
                     <ClipboardList className={`h-5 w-5 mb-1 ${importType === 'logs' ? 'text-blue-600' : 'text-slate-400'}`} />
@@ -2587,14 +2588,14 @@ export function VehicleManager() {
                 <Label>Import Mode</Label>
                 <div className="grid grid-cols-2 gap-3">
                   <button 
-                    className={`p-3 rounded-lg border-2 text-left transition-all ${importMode === 'append' ? 'border-blue-600 bg-blue-50 dark:bg-blue-900/20' : 'border-slate-100 dark:border-slate-800'}`}
+                    className={`p-3 rounded-md border text-left transition-all ${importMode === 'append' ? 'border-blue-600 bg-blue-50 dark:bg-blue-900/20' : 'border-slate-200 dark:border-slate-800'}`}
                     onClick={() => setImportMode('append')}
                   >
                     <div className="text-sm font-bold">Append</div>
                     <div className="text-[10px] text-slate-500">Add to existing data</div>
                   </button>
                   <button 
-                    className={`p-3 rounded-lg border-2 text-left transition-all ${importMode === 'replace' ? 'border-blue-600 bg-blue-50 dark:bg-blue-900/20' : 'border-slate-100 dark:border-slate-800'}`}
+                    className={`p-3 rounded-md border text-left transition-all ${importMode === 'replace' ? 'border-blue-600 bg-blue-50 dark:bg-blue-900/20' : 'border-slate-200 dark:border-slate-800'}`}
                     onClick={() => setImportMode('replace')}
                   >
                     <div className="text-sm font-bold text-red-600">Replace</div>
@@ -2603,7 +2604,7 @@ export function VehicleManager() {
                 </div>
               </div>
 
-              <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
+              <div className="pt-4 border-t border-slate-200 dark:border-slate-800">
                 <div className="relative">
                   <input
                     type="file"
@@ -2612,7 +2613,7 @@ export function VehicleManager() {
                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
                     disabled={isImporting}
                   />
-                  <Button className="w-full bg-blue-600 hover:bg-blue-700 h-12 gap-2" disabled={isImporting}>
+                  <Button className="w-full bg-blue-600 hover:bg-blue-700 h-11 gap-2 rounded-md" disabled={isImporting}>
                     {isImporting ? (
                       <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                     ) : (
@@ -2633,11 +2634,11 @@ export function VehicleManager() {
       {/* Fuel Log Modal */}
       {showFuelForm && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 backdrop-blur-sm p-0 sm:p-4 overflow-y-auto">
-          <Card className="w-full h-full sm:h-auto sm:max-h-[90vh] max-w-lg shadow-2xl rounded-none sm:rounded-xl flex flex-col animate-in slide-in-from-bottom-4 duration-300">
-            <CardHeader className="bg-slate-50 dark:bg-slate-800 border-b shrink-0">
+          <Card className="w-full h-full sm:h-auto sm:max-h-[90vh] max-w-lg shadow-2xl rounded-none sm:rounded-md border border-slate-200 dark:border-slate-800 flex flex-col animate-in slide-in-from-bottom-4 duration-300">
+            <CardHeader className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 shrink-0">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center text-amber-600">
+                  <div className="h-10 w-10 rounded-md bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center text-amber-600">
                     <Fuel className="h-5 w-5" />
                   </div>
                   <div>
@@ -2671,7 +2672,7 @@ export function VehicleManager() {
                     type="date" 
                     value={fuelForm.date} 
                     onChange={e => handleFuelFormChange('date', e.target.value)} 
-                    className={cn(fuelValidationErrors.date && "border-red-500 ring-2 ring-red-500/50 bg-red-50/20")}
+                    className={cn("font-mono tabular-nums", fuelValidationErrors.date && "border-red-500 ring-2 ring-red-500/50 bg-red-50/20")}
                   />
                   {fuelValidationErrors.date && <p className="text-[11px] text-red-500 font-medium">Date is required</p>}
                 </div>
@@ -2690,7 +2691,7 @@ export function VehicleManager() {
 
                 {/* Duplicate / Existing Fuel Refill Warning Card */}
                 {detectedDuplicateFuelLog && !editingFuelLog && (
-                  <div className="md:col-span-2 p-3.5 rounded-xl border border-amber-300 dark:border-amber-700/80 bg-amber-50/90 dark:bg-amber-950/40 text-amber-950 dark:text-amber-200 space-y-2 text-xs shadow-xs animate-in fade-in duration-200">
+                  <div className="md:col-span-2 p-3.5 rounded-md border border-amber-300 dark:border-amber-700/80 bg-amber-50/90 dark:bg-amber-950/40 text-amber-950 dark:text-amber-200 space-y-2 text-xs animate-in fade-in duration-200">
                     <div className="flex items-start gap-2.5">
                       <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
                       <div className="flex-1 min-w-0">
@@ -2698,12 +2699,12 @@ export function VehicleManager() {
                           <p className="font-bold text-amber-900 dark:text-amber-300 flex items-center gap-1.5">
                             <span>Existing Fuel Refill Logged on this Date</span>
                           </p>
-                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-200/80 dark:bg-amber-900/60 font-semibold text-amber-900 dark:text-amber-200">
+                          <span className="text-[10px] px-2 py-0.5 rounded-sm font-mono tabular-nums bg-amber-200/80 dark:bg-amber-900/60 font-semibold text-amber-900 dark:text-amber-200">
                             {formatDisplayDate(detectedDuplicateFuelLog.date)}
                           </span>
                         </div>
                         <p className="text-[11px] text-amber-800/95 dark:text-amber-300/90 mt-1 leading-relaxed">
-                          A refill record for <strong>{getVehicleName(detectedDuplicateFuelLog.vehicle_reg)}</strong> ({detectedDuplicateFuelLog.vehicle_reg}) is already logged for <strong>{fmtCurrency(detectedDuplicateFuelLog.total_cost)}</strong> ({detectedDuplicateFuelLog.litres} L)
+                          A refill record for <strong>{getVehicleName(detectedDuplicateFuelLog.vehicle_reg)}</strong> ({detectedDuplicateFuelLog.vehicle_reg}) is already logged for <strong className="font-mono tabular-nums">{fmtCurrency(detectedDuplicateFuelLog.total_cost)}</strong> (<span className="font-mono tabular-nums">{detectedDuplicateFuelLog.litres} L</span>)
                           {detectedDuplicateFuelLog.linkedLedgerIds?.length 
                             ? ` · Linked to ${detectedDuplicateFuelLog.linkedLedgerIds.length} expense voucher(s)` 
                             : ' · Unlinked'}.
@@ -2732,7 +2733,7 @@ export function VehicleManager() {
                           });
                           toast.info('Switched to update existing fuel log with linked voucher(s).');
                         }}
-                        className="px-3 py-1 text-[11px] font-bold rounded-lg bg-amber-600 hover:bg-amber-700 text-white flex items-center gap-1.5 shadow-xs transition-colors"
+                        className="px-3 py-1 text-[11px] font-bold rounded-md bg-amber-600 hover:bg-amber-700 text-white flex items-center gap-1.5 transition-colors"
                       >
                         <Edit2 className="w-3 h-3" />
                         Update Existing Log Instead
@@ -2745,7 +2746,7 @@ export function VehicleManager() {
                   <div className="flex items-center justify-between mb-1.5">
                     <Label className="text-xs font-semibold">Reconcile Costs / Expense Voucher</Label>
                     {(fuelForm.linkedLedgerIds?.length || 0) > 0 && (
-                      <span className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400">
+                      <span className="text-[11px] font-bold text-blue-600 dark:text-blue-400 font-mono tabular-nums">
                         {fuelForm.linkedLedgerIds.length} Linked ({fmtCurrency(totalLinkedFuelAmount)})
                       </span>
                     )}
@@ -2755,28 +2756,28 @@ export function VehicleManager() {
                     variant="outline"
                     onClick={() => setShowFuelFormLedgerDialog(true)}
                     className={cn(
-                      "w-full h-10 flex items-center justify-between px-3 text-xs font-semibold rounded-xl border transition-all shadow-xs",
+                      "w-full h-10 flex items-center justify-between px-3 text-xs font-semibold rounded-md border transition-all",
                       (fuelForm.linkedLedgerIds?.length || 0) > 0
-                        ? "bg-indigo-50/70 border-indigo-200 text-indigo-700 dark:bg-indigo-950/30 dark:border-indigo-800 dark:text-indigo-300"
+                        ? "bg-blue-50/70 border-blue-200 text-blue-700 dark:bg-blue-950/30 dark:border-blue-800 dark:text-blue-300"
                         : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50 dark:bg-slate-900 dark:border-slate-800 dark:text-slate-300"
                     )}
                   >
                     <div className="flex items-center gap-2">
-                      <LinkIcon className="h-4 w-4 text-indigo-500" />
+                      <LinkIcon className="h-4 w-4 text-blue-500" />
                       <span>{(fuelForm.linkedLedgerIds?.length || 0) > 0 ? 'Manage Linked Vouchers' : 'Link Expense Voucher & Auto-Fill'}</span>
                     </div>
-                    <span className="text-[11px] text-indigo-600 dark:text-indigo-400 font-medium">Select from Ledger →</span>
+                    <span className="text-[11px] text-blue-600 dark:text-blue-400 font-medium">Select from Ledger →</span>
                   </Button>
                 </div>
 
                 {/* Linked Vouchers Breakdown Card */}
                 {(fuelForm.linkedLedgerIds?.length || 0) > 0 && (
-                  <div className="md:col-span-2 p-3.5 rounded-xl border bg-indigo-50/50 dark:bg-indigo-950/20 border-indigo-200/80 dark:border-indigo-900/60 space-y-2.5 shadow-xs">
+                  <div className="md:col-span-2 p-3.5 rounded-md border bg-blue-50/50 dark:bg-blue-950/20 border-blue-200/80 dark:border-blue-900/60 space-y-2.5">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <Receipt className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                        <span className="text-xs font-bold text-indigo-950 dark:text-indigo-200">
-                          Linked Vouchers ({linkedFuelEntries.length}) — {fmtCurrency(totalLinkedFuelAmount)}
+                        <Receipt className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                        <span className="text-xs font-bold text-slate-900 dark:text-slate-200">
+                          Linked Vouchers ({linkedFuelEntries.length}) — <span className="font-mono tabular-nums">{fmtCurrency(totalLinkedFuelAmount)}</span>
                         </span>
                         <button
                           type="button"
@@ -2791,14 +2792,14 @@ export function VehicleManager() {
                         <button
                           type="button"
                           onClick={() => setShowFuelFormLedgerDialog(true)}
-                          className="text-xs font-semibold px-2.5 py-1 rounded-lg border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100/50 dark:hover:bg-indigo-900/40 transition-colors"
+                          className="text-xs font-semibold px-2.5 py-1 rounded-md border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 hover:bg-blue-100/50 dark:hover:bg-blue-900/40 transition-colors"
                         >
                           + Manage
                         </button>
                         <button
                           type="button"
                           onClick={() => autoSyncFuelFromLinkedEntries()}
-                          className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white flex items-center gap-1 shadow-xs transition-colors"
+                          className="text-xs font-semibold px-2.5 py-1 rounded-md bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-1 transition-colors"
                         >
                           <Sparkles className="w-3.5 h-3.5 text-amber-300" />
                           Re-AutoFill
@@ -2811,12 +2812,12 @@ export function VehicleManager() {
                         const rem = ledgerRemainingAmounts.get(e.id) ?? Number(e.amount) ?? 0;
                         const parsedL = parseLitresFromText(e.description);
                         return (
-                          <div key={e.id} className="p-2.5 rounded-lg bg-white dark:bg-slate-800/90 border border-indigo-100 dark:border-slate-700/80 text-xs flex flex-col justify-between gap-1 shadow-xs">
+                          <div key={e.id} className="p-2.5 rounded-md bg-white dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 text-xs flex flex-col justify-between gap-1">
                             <div>
                               <div className="flex items-center justify-between gap-1 font-semibold text-slate-800 dark:text-slate-200">
-                                <span className="font-mono text-[11px] text-indigo-600 dark:text-indigo-400 font-bold">{e.voucherNo || 'Voucher'}</span>
+                                <span className="font-mono text-[11px] text-blue-600 dark:text-blue-400 font-bold">{e.voucherNo || 'Voucher'}</span>
                                 <div className="flex items-center gap-1.5">
-                                  <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">{fmtCurrency(rem)}</span>
+                                  <span className="text-[11px] font-bold font-mono tabular-nums text-emerald-600 dark:text-emerald-400">{fmtCurrency(rem)}</span>
                                   <button
                                     type="button"
                                     onClick={() => handleToggleFuelLedger(e.id)}
@@ -2829,10 +2830,10 @@ export function VehicleManager() {
                               </div>
                               <p className="text-[11px] text-slate-600 dark:text-slate-300 line-clamp-2 mt-0.5">{e.description}</p>
                             </div>
-                            <div className="flex items-center justify-between text-[10px] text-slate-500 border-t border-slate-100 dark:border-slate-700/60 pt-1 mt-1">
+                            <div className="flex items-center justify-between text-[10px] text-slate-500 border-t border-slate-100 dark:border-slate-700/60 pt-1 mt-1 font-mono tabular-nums">
                               <span>{new Date(e.date).toLocaleDateString('en-GB')}</span>
                               {parsedL && (
-                                <span className="font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-1 rounded">
+                                <span className="font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-1 rounded-sm">
                                   ~{parsedL}L
                                 </span>
                               )}
@@ -2846,7 +2847,7 @@ export function VehicleManager() {
               </div>
 
               {/* Fuel Calculator */}
-              <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-900/20 p-4 space-y-3">
+              <div className="rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-900/20 p-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Fuel Calculator</p>
                 </div>
@@ -2864,7 +2865,7 @@ export function VehicleManager() {
                       onChange={e => handleFuelFormChange('total_cost', e.target.value)}
                       onFocus={e => e.target.select()}
                       className={cn(
-                        "caret-amber-500 font-semibold",
+                        "caret-amber-500 font-semibold font-mono tabular-nums",
                         fuelValidationErrors.total_cost && "border-red-500 ring-2 ring-red-500/50 bg-red-50/20"
                       )}
                     />
@@ -2880,7 +2881,7 @@ export function VehicleManager() {
                       onChange={e => handleFuelFormChange('litres', e.target.value)}
                       onFocus={e => e.target.select()}
                       className={cn(
-                        "caret-amber-500",
+                        "caret-amber-500 font-mono tabular-nums",
                         fuelValidationErrors.litres && "border-red-500 ring-2 ring-red-500/50 bg-red-50/20"
                       )}
                     />
@@ -2895,12 +2896,12 @@ export function VehicleManager() {
                       value={fuelForm.rate_per_litre}
                       onChange={e => handleFuelFormChange('rate_per_litre', e.target.value)}
                       onFocus={e => e.target.select()}
-                      className="caret-amber-500"
+                      className="caret-amber-500 font-mono tabular-nums"
                     />
                   </div>
                 </div>
                 {Number(fuelForm.litres) > 0 && Number(fuelForm.rate_per_litre) > 0 && (
-                  <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400 font-mono tabular-nums font-medium">
                     {Number(fuelForm.litres).toFixed(2)} L × ₦{Number(fuelForm.rate_per_litre).toLocaleString()}/L = ₦{(Number(fuelForm.litres) * Number(fuelForm.rate_per_litre)).toLocaleString(undefined, { maximumFractionDigits: 2 })}
                   </p>
                 )}
@@ -2909,7 +2910,7 @@ export function VehicleManager() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Odometer Reading (km)</Label>
-                  <Input type="number" placeholder="Optional" value={fuelForm.odometer} onChange={e => handleFuelFormChange('odometer', e.target.value)} />
+                  <Input type="number" placeholder="Optional" className="font-mono tabular-nums" value={fuelForm.odometer} onChange={e => handleFuelFormChange('odometer', e.target.value)} />
                 </div>
                 <div className="space-y-2">
                   <Label>Notes</Label>
@@ -2918,11 +2919,11 @@ export function VehicleManager() {
               </div>
 
             </CardContent>
-            <CardHeader className="bg-slate-50 dark:bg-slate-800 border-t flex flex-row gap-3 pt-4 shrink-0">
-              <Button className="flex-1 bg-amber-500 hover:bg-amber-600 text-white" onClick={handleSaveFuelLog}>
+            <CardHeader className="bg-slate-50 dark:bg-slate-800/60 border-t border-slate-200 dark:border-slate-800 flex flex-row gap-3 pt-4 shrink-0">
+              <Button className="flex-1 bg-amber-500 hover:bg-amber-600 text-white rounded-md" onClick={handleSaveFuelLog}>
                 {editingFuelLog ? 'Update Record' : 'Save Fuel Log'}
               </Button>
-              <Button variant="outline" className="flex-1" onClick={() => { setShowFuelForm(false); setEditingFuelLog(null); }}>Discard</Button>
+              <Button variant="outline" className="flex-1 rounded-md" onClick={() => { setShowFuelForm(false); setEditingFuelLog(null); }}>Discard</Button>
             </CardHeader>
           </Card>
         </div>
@@ -2930,10 +2931,10 @@ export function VehicleManager() {
 
       {/* Fuel Log Modal - Ledger Linking Dialog */}
       <Dialog open={showFuelFormLedgerDialog} onOpenChange={setShowFuelFormLedgerDialog}>
-        <DialogContent className="max-w-2xl w-full max-h-[88vh] flex flex-col p-5 sm:p-6 rounded-2xl shadow-2xl overflow-hidden bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white">
-          <DialogHeader className="pb-3 border-b border-slate-100 dark:border-slate-800 shrink-0">
+        <DialogContent className="max-w-2xl w-full max-h-[88vh] flex flex-col p-5 sm:p-6 rounded-md shadow-2xl overflow-hidden bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white">
+          <DialogHeader className="pb-3 border-b border-slate-200 dark:border-slate-800 shrink-0">
             <DialogTitle className="flex items-center gap-2 text-base font-bold">
-              <LinkIcon className="w-4 h-4 text-indigo-500" />
+              <LinkIcon className="w-4 h-4 text-blue-600" />
               Link Vehicle Fuel Expenses (Ledger)
             </DialogTitle>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
@@ -2943,7 +2944,7 @@ export function VehicleManager() {
           
           <div className="flex flex-col flex-1 min-h-0 pt-3 space-y-3">
             {Number(fuelForm.total_cost) > 0 && (
-              <div className="p-2.5 rounded-xl border flex items-center justify-between text-xs font-semibold shrink-0 bg-indigo-50/50 dark:bg-indigo-950/30 border-indigo-200 dark:border-indigo-800 text-indigo-900 dark:text-indigo-200">
+              <div className="p-2.5 rounded-md border flex items-center justify-between text-xs font-semibold shrink-0 bg-blue-50/50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800 text-blue-900 dark:text-blue-200 font-mono tabular-nums">
                 <span>Fuel Cost: {fmtCurrency(Number(fuelForm.total_cost))}</span>
                 <span>Linked: {fmtCurrency(totalLinkedFuelAmount)}</span>
               </div>
@@ -2957,7 +2958,7 @@ export function VehicleManager() {
                   value={fuelFormLedgerSearch}
                   onChange={e => setFuelFormLedgerSearch(e.target.value)}
                   placeholder="Search voucher by description, vehicle, driver..."
-                  className="w-full h-9 pl-8 pr-8 rounded-lg text-xs border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/90 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-colors"
+                  className="w-full h-9 pl-8 pr-8 rounded-md text-xs border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/90 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors"
                 />
                 <span className="absolute left-2.5 top-2.5 text-slate-400">
                   <Search className="w-3.5 h-3.5" />
@@ -2977,7 +2978,7 @@ export function VehicleManager() {
                 <select
                   value={fuelFormLedgerMonth}
                   onChange={e => setFuelFormLedgerMonth(e.target.value)}
-                  className="h-9 rounded-lg text-xs px-2.5 border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/90 text-slate-700 dark:text-white outline-none font-medium appearance-none cursor-pointer pr-7"
+                  className="h-9 rounded-md text-xs px-2.5 border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/90 text-slate-700 dark:text-white outline-none font-medium appearance-none cursor-pointer pr-7"
                   style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E\")", backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center' }}
                 >
                   <option value="">All Months</option>
@@ -3001,7 +3002,7 @@ export function VehicleManager() {
                       setFuelFormLedgerStartDate('');
                       setFuelFormLedgerEndDate('');
                     }}
-                    className="h-9 px-2.5 rounded-lg text-xs border border-slate-200 dark:border-slate-700 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 font-medium transition-colors flex items-center gap-1 shrink-0"
+                    className="h-9 px-2.5 rounded-md text-xs border border-slate-200 dark:border-slate-700 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 font-medium transition-colors flex items-center gap-1 shrink-0"
                   >
                     <X className="w-3 h-3" />
                     <span className="hidden sm:inline">Clear</span>
@@ -3034,9 +3035,9 @@ export function VehicleManager() {
                       key={entry.id}
                       onClick={() => handleToggleFuelLedger(entry.id)}
                       className={cn(
-                        "p-3 rounded-xl border transition-all text-xs flex flex-col gap-2 shadow-xs cursor-pointer select-none",
+                        "p-3 rounded-md border transition-all text-xs flex flex-col gap-2 cursor-pointer select-none",
                         isLinked
-                          ? "bg-indigo-50/70 dark:bg-indigo-950/30 border-indigo-200 dark:border-indigo-800/60 ring-1 ring-indigo-500/20"
+                          ? "bg-blue-50/70 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800/60 ring-1 ring-blue-500/20"
                           : "bg-white dark:bg-slate-800/80 border-slate-200 dark:border-slate-700/80 hover:bg-slate-50 dark:hover:bg-slate-800"
                       )}
                     >
@@ -3046,19 +3047,19 @@ export function VehicleManager() {
                           checked={isLinked}
                           onChange={() => handleToggleFuelLedger(entry.id)}
                           onClick={e => e.stopPropagation()}
-                          className="mt-0.5 rounded border-slate-300 dark:border-slate-600 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                          className="mt-0.5 rounded-sm border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500 cursor-pointer"
                         />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between gap-2">
-                            <span className="font-mono text-xs font-bold text-indigo-600 dark:text-indigo-400">
+                            <span className="font-mono text-xs font-bold text-blue-600 dark:text-blue-400">
                               {entry.voucherNo || 'Voucher'}
                             </span>
                             <div className="text-right">
-                              <span className="font-extrabold text-xs text-emerald-600 dark:text-emerald-400">
+                              <span className="font-extrabold font-mono tabular-nums text-xs text-emerald-600 dark:text-emerald-400">
                                 {fmtCurrency(rem)}
                               </span>
                               {isPartial && (
-                                <span className="text-[10px] text-slate-400 block">
+                                <span className="text-[10px] font-mono tabular-nums text-slate-400 block">
                                   of {fmtCurrency(total)}
                                 </span>
                               )}
@@ -3068,9 +3069,9 @@ export function VehicleManager() {
                             {entry.description}
                           </p>
                           <div className="flex items-center gap-3 mt-1 text-[11px] text-slate-500 dark:text-slate-400 flex-wrap">
-                            <span>📅 {new Date(entry.date).toLocaleDateString('en-GB')}</span>
+                            <span className="font-mono tabular-nums">📅 {new Date(entry.date).toLocaleDateString('en-GB')}</span>
                             {parsedL && (
-                              <span className="font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 rounded">
+                              <span className="font-bold font-mono tabular-nums text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 rounded-sm">
                                 ⛽ ~{parsedL} L
                               </span>
                             )}
@@ -3089,8 +3090,8 @@ export function VehicleManager() {
               </div>
             )}
 
-            <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800 shrink-0">
-              <span className="text-xs text-slate-500 font-medium">
+            <div className="flex items-center justify-between pt-3 border-t border-slate-200 dark:border-slate-800 shrink-0">
+              <span className="text-xs text-slate-500 font-medium font-mono tabular-nums">
                 {fuelForm.linkedLedgerIds?.length || 0} selected ({fmtCurrency(totalLinkedFuelAmount)})
               </span>
               <div className="flex gap-2">
@@ -3098,6 +3099,7 @@ export function VehicleManager() {
                   type="button"
                   variant="outline"
                   size="sm"
+                  className="rounded-md"
                   onClick={() => setShowFuelFormLedgerDialog(false)}
                 >
                   Done
@@ -3110,7 +3112,7 @@ export function VehicleManager() {
                     setShowFuelFormLedgerDialog(false);
                     toast.success('Form auto-filled from linked vouchers');
                   }}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white gap-1.5"
+                  className="bg-blue-600 hover:bg-blue-700 text-white gap-1.5 rounded-md"
                 >
                   <Sparkles className="w-3.5 h-3.5" />
                   Auto-Fill & Close
@@ -4076,36 +4078,49 @@ export function VehicleManager() {
 
       {activeTab === 'fleet' ? (
         <div className="space-y-6">
-          {/* Stats Bar */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 px-1">
-            <Card className="border-none shadow-sm bg-blue-50 dark:bg-blue-900/10">
-              <CardContent className="p-4 flex items-center gap-4">
-                <div className="h-10 w-10 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600">
-                  <Truck className="h-5 w-5" />
-                </div>
-                <div>
-                  <p className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Total Fleet</p>
-                  <p className="text-xl font-bold text-slate-700 dark:text-slate-200">{vehicles.length}</p>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+          {/* Primary Hero + Secondary Metrics */}
+          <MetricHeroCard
+            primary={{
+              label: 'Total Fleet Vehicles',
+              value: vehicles.length.toString(),
+              period: 'Registered Fleet Assets',
+              delta: `${vehicles.filter(v => v.status === 'active').length} Active`,
+              deltaType: 'positive',
+            }}
+            secondary={[
+              {
+                label: 'Active Vehicles',
+                value: vehicles.filter(v => v.status === 'active').length.toString(),
+                period: 'Operational',
+              },
+              {
+                label: 'Inactive / Maintenance',
+                value: vehicles.filter(v => v.status !== 'active').length.toString(),
+                period: 'Standby or Inactive',
+              },
+              {
+                label: 'Document Types',
+                value: vehicleDocumentTypes.length.toString(),
+                period: 'Compliance Classes',
+              },
+            ]}
+          />
 
-          <Card className="border-none shadow-sm overflow-hidden bg-white dark:bg-slate-900">
-            <div className="p-4 bg-slate-50/50 dark:bg-slate-800/30 flex flex-col sm:flex-row gap-4 justify-between items-center border-b dark:border-slate-800">
+          <Card className="border border-slate-200 dark:border-slate-800 rounded-md overflow-hidden bg-white dark:bg-slate-900">
+            <div className="p-4 bg-slate-50/50 dark:bg-slate-800/30 flex flex-col sm:flex-row gap-4 justify-between items-center border-b border-slate-200 dark:border-slate-800">
               <h3 className="font-bold text-slate-700 dark:text-slate-200 text-sm flex items-center gap-2">
-                <Truck className="h-4 w-4 text-blue-500" /> Fleet Overview
+                <Truck className="h-4 w-4 text-blue-600" /> Fleet Overview
               </h3>
               <div className="relative w-full sm:w-64">
                 <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-                <Input placeholder="Search fleet..." className="pl-9 h-9 text-sm" value={search} onChange={e => setSearch(e.target.value)} />
+                <Input placeholder="Search fleet..." className="pl-9 h-9 text-sm rounded-md" value={search} onChange={e => setSearch(e.target.value)} />
               </div>
             </div>
             
             <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-left">
                 <thead>
-                  <tr className="bg-slate-100 dark:bg-slate-800/50 text-[10px] uppercase font-bold tracking-wider text-slate-500">
+                  <tr className="bg-slate-100 dark:bg-slate-800/50 text-[10px] uppercase font-bold tracking-wider text-slate-500 font-mono">
                     <th className="px-6 py-3">Vehicle Details</th>
                     <th className="px-6 py-3">Registration</th>
                     <th className="px-6 py-3">Type</th>
@@ -4123,7 +4138,7 @@ export function VehicleManager() {
                       <tr key={v.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
-                            <div className="h-8 w-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500">
+                            <div className="h-8 w-8 rounded-md bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500">
                               <Truck className="h-4 w-4" />
                             </div>
                             <span className="font-bold text-slate-700 dark:text-slate-200">{v.name}</span>
@@ -4131,15 +4146,15 @@ export function VehicleManager() {
                         </td>
                         <td className="px-6 py-4 font-mono text-xs font-bold text-blue-600 dark:text-blue-400">{v.registration_number}</td>
                         <td className="px-6 py-4">
-                          <Badge variant="outline" className="capitalize text-[10px] bg-slate-50 dark:bg-slate-800">{v.type}</Badge>
+                          <Badge variant="outline" className="capitalize text-[10px] bg-slate-50 dark:bg-slate-800 rounded-sm font-mono tracking-wider">{v.type}</Badge>
                         </td>
                         <td className="px-6 py-4">
                           {v.status === 'active' ? (
-                            <div className="flex items-center gap-1.5 font-bold text-[10px] uppercase text-emerald-500">
+                            <div className="flex items-center gap-1.5 font-bold text-[10px] uppercase font-mono tracking-wider text-emerald-500">
                               <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" /> Active
                             </div>
                           ) : (
-                            <div className="flex items-center gap-1.5 font-bold text-[10px] uppercase text-rose-500">
+                            <div className="flex items-center gap-1.5 font-bold text-[10px] uppercase font-mono tracking-wider text-rose-500">
                               <span className="h-1.5 w-1.5 rounded-full bg-rose-500" /> Inactive
                             </div>
                           )}
@@ -4147,7 +4162,7 @@ export function VehicleManager() {
                         <td className="px-6 py-4 text-right">
                           <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                             {priv.canEditFleet && (
-                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => {
+                              <Button variant="ghost" size="icon" className="h-7 w-7 rounded-md" onClick={() => {
                                 setEditingVehicle(v);
                                 setVForm({ name: v.name, registration_number: v.registration_number, type: v.type || 'van', status: v.status });
                                 setShowVehicleForm(true);
@@ -4156,7 +4171,7 @@ export function VehicleManager() {
                               </Button>
                             )}
                             {priv.canDeleteFleet && (
-                              <Button variant="ghost" size="icon" className="h-7 w-7 text-rose-500" onClick={() => deleteVehicle(v.id)}>
+                              <Button variant="ghost" size="icon" className="h-7 w-7 text-rose-500 rounded-md" onClick={() => deleteVehicle(v.id)}>
                                 <Trash2 className="h-3.5 w-3.5" />
                               </Button>
                             )}
@@ -4177,7 +4192,7 @@ export function VehicleManager() {
                   <div key={`mobile-${v.id}`} className="p-4 flex flex-col gap-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-3">
-                        <div className="h-8 w-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500">
+                        <div className="h-8 w-8 rounded-md bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500">
                           <Truck className="h-4 w-4" />
                         </div>
                         <div className="flex flex-col">
@@ -4186,13 +4201,13 @@ export function VehicleManager() {
                         </div>
                       </div>
                       <div className="flex flex-col items-end gap-1">
-                        <Badge variant="outline" className="capitalize text-[10px] bg-slate-50 dark:bg-slate-800">{v.type}</Badge>
+                        <Badge variant="outline" className="capitalize text-[10px] bg-slate-50 dark:bg-slate-800 rounded-sm font-mono tracking-wider">{v.type}</Badge>
                         {v.status === 'active' ? (
-                          <div className="flex items-center gap-1.5 font-bold text-[10px] uppercase text-emerald-500">
+                          <div className="flex items-center gap-1.5 font-bold text-[10px] uppercase font-mono tracking-wider text-emerald-500">
                             <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" /> Active
                           </div>
                         ) : (
-                          <div className="flex items-center gap-1.5 font-bold text-[10px] uppercase text-rose-500">
+                          <div className="flex items-center gap-1.5 font-bold text-[10px] uppercase font-mono tracking-wider text-rose-500">
                             <span className="h-1.5 w-1.5 rounded-full bg-rose-500" /> Inactive
                           </div>
                         )}
@@ -4201,7 +4216,7 @@ export function VehicleManager() {
                     
                     <div className="flex items-center justify-end gap-1 mt-1 pt-2 border-t border-slate-100 dark:border-slate-800">
                         {priv.canEditFleet && (
-                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => {
+                          <Button variant="ghost" size="icon" className="h-7 w-7 rounded-md" onClick={() => {
                             setEditingVehicle(v);
                             setVForm({ name: v.name, registration_number: v.registration_number, type: v.type || 'van', status: v.status });
                             setShowVehicleForm(true);
@@ -4210,7 +4225,7 @@ export function VehicleManager() {
                           </Button>
                         )}
                         {priv.canDeleteFleet && (
-                          <Button variant="ghost" size="icon" className="h-7 w-7 text-rose-500" onClick={() => deleteVehicle(v.id)}>
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-rose-500 rounded-md" onClick={() => deleteVehicle(v.id)}>
                             <Trash2 className="h-3.5 w-3.5" />
                           </Button>
                         )}
@@ -4227,7 +4242,7 @@ export function VehicleManager() {
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 px-1">
             <div className="flex flex-wrap gap-2">
               {vehicleDocumentTypes.map(type => (
-                <Badge key={type.id} variant="secondary" className="px-3 py-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-none">
+                <Badge key={type.id} variant="secondary" className="px-2.5 py-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-sm text-[10px] font-bold uppercase tracking-wider font-mono">
                   {type.name}
                 </Badge>
               ))}
@@ -4237,11 +4252,11 @@ export function VehicleManager() {
 
           {/* Flat UI & Minimalist Vehicle Document Update & History Modal */}
           <Dialog open={showDocModal} onOpenChange={open => { if (!open) setShowDocModal(false); }}>
-            <DialogContent className="max-w-3xl w-full max-h-[88vh] flex flex-col gap-0 p-0 overflow-hidden border border-slate-200 dark:border-slate-800 shadow-xl rounded-xl">
+            <DialogContent className="max-w-3xl w-full max-h-[88vh] flex flex-col gap-0 p-0 overflow-hidden border border-slate-200 dark:border-slate-800 shadow-xl rounded-md">
               {/* Flat Header */}
               <div className="px-5 py-3.5 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                 <div className="flex items-center gap-2.5">
-                  <div className="h-8 w-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-700 dark:text-slate-200 shrink-0">
+                  <div className="h-8 w-8 rounded-md bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-700 dark:text-slate-200 shrink-0">
                     <Truck className="h-4 w-4" />
                   </div>
                   <div>
@@ -4249,11 +4264,11 @@ export function VehicleManager() {
                       <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100">
                         {editingDocVehicle?.name}
                       </h3>
-                      <span className="font-mono text-xs font-bold text-blue-600 dark:text-blue-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">
+                      <span className="font-mono text-xs font-bold text-blue-600 dark:text-blue-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded-sm">
                         {editingDocVehicle?.registration_number}
                       </span>
                       {editingDocVehicle?.type && (
-                        <span className="text-[10px] uppercase font-semibold text-slate-400">
+                        <span className="text-[10px] uppercase font-semibold text-slate-400 font-mono">
                           · {editingDocVehicle.type}
                         </span>
                       )}
@@ -4262,22 +4277,22 @@ export function VehicleManager() {
                 </div>
 
                 {/* Flat Stats Chips */}
-                <div className="flex items-center gap-1.5 text-xs font-semibold">
+                <div className="flex items-center gap-1.5 text-xs font-semibold font-mono tabular-nums">
                   {docStats.expired > 0 && (
-                    <span className="px-2 py-0.5 rounded text-[11px] font-bold text-rose-600 bg-rose-50 dark:bg-rose-950/40 dark:text-rose-400 border border-rose-200 dark:border-rose-900/60">
+                    <span className="px-2 py-0.5 rounded-sm text-[11px] font-bold text-rose-600 bg-rose-50 dark:bg-rose-950/40 dark:text-rose-400 border border-rose-200 dark:border-rose-900/60">
                       {docStats.expired} Expired
                     </span>
                   )}
                   {docStats.expiringSoon > 0 && (
-                    <span className="px-2 py-0.5 rounded text-[11px] font-bold text-amber-600 bg-amber-50 dark:bg-amber-950/40 dark:text-amber-400 border border-amber-200 dark:border-amber-900/60">
+                    <span className="px-2 py-0.5 rounded-sm text-[11px] font-bold text-amber-600 bg-amber-50 dark:bg-amber-950/40 dark:text-amber-400 border border-amber-200 dark:border-amber-900/60">
                       {docStats.expiringSoon} Expiring Soon
                     </span>
                   )}
-                  <span className="px-2 py-0.5 rounded text-[11px] font-medium text-emerald-700 bg-emerald-50 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/60">
+                  <span className="px-2 py-0.5 rounded-sm text-[11px] font-medium text-emerald-700 bg-emerald-50 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/60">
                     {docStats.valid} Valid
                   </span>
                   {docStats.notSet > 0 && (
-                    <span className="px-2 py-0.5 rounded text-[11px] font-medium text-slate-500 bg-slate-100 dark:bg-slate-800 dark:text-slate-400">
+                    <span className="px-2 py-0.5 rounded-sm text-[11px] font-medium text-slate-500 bg-slate-100 dark:bg-slate-800 dark:text-slate-400">
                       {docStats.notSet} Not Set
                     </span>
                   )}
@@ -4573,25 +4588,25 @@ export function VehicleManager() {
           </Dialog>
 
           {filteredVehicles.length === 0 ? (
-            <Card className="border-none shadow-sm bg-white dark:bg-slate-900 p-10 text-center text-slate-400 text-sm italic">
+            <Card className="border border-slate-200 dark:border-slate-800 rounded-md bg-white dark:bg-slate-900 p-10 text-center text-slate-400 text-sm italic">
               No vehicles found
             </Card>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredVehicles.map(v => (
-                <Card key={v.id} className="border-none shadow-sm overflow-hidden bg-white dark:bg-slate-900 flex flex-col">
-                  <div className="p-4 bg-slate-50 dark:bg-slate-800/30 border-b dark:border-slate-800 flex justify-between items-start">
+                <Card key={v.id} className="border border-slate-200 dark:border-slate-800 rounded-md overflow-hidden bg-white dark:bg-slate-900 flex flex-col">
+                  <div className="p-4 bg-slate-50 dark:bg-slate-800/30 border-b border-slate-200 dark:border-slate-800 flex justify-between items-start">
                     <div>
                       <h4 className="font-bold text-sm text-slate-700 dark:text-slate-200">{v.name}</h4>
-                      <p className="text-xs font-mono font-bold text-blue-600">{v.registration_number}</p>
+                      <p className="text-xs font-mono font-bold text-blue-600 dark:text-blue-400">{v.registration_number}</p>
                     </div>
                     {priv.canEditDocuments && (
                       <div className="flex items-center gap-1">
-                        <Button variant="ghost" size="sm" className="h-7 text-[10px] uppercase font-bold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 px-2" 
+                        <Button variant="ghost" size="sm" className="h-7 text-[10px] uppercase font-bold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 px-2 rounded-md font-mono" 
                           onClick={() => openDocModal(v, 'history')}>
                           <History className="h-3 w-3 mr-1" /> History
                         </Button>
-                        <Button variant="ghost" size="sm" className="h-7 text-[10px] uppercase font-bold text-blue-600 hover:text-blue-700 dark:text-blue-400 px-2" 
+                        <Button variant="ghost" size="sm" className="h-7 text-[10px] uppercase font-bold text-blue-600 hover:text-blue-700 dark:text-blue-400 px-2 rounded-md font-mono" 
                           onClick={() => openDocModal(v, 'update')}>
                           Update
                         </Button>
@@ -4618,7 +4633,7 @@ export function VehicleManager() {
                               <td className="px-4 py-3 text-right">
                                 {date ? (
                                   <span className={cn(
-                                    "font-bold flex items-center justify-end gap-1.5", 
+                                    "font-bold flex items-center justify-end gap-1.5 font-mono tabular-nums", 
                                     isExpiringSoon ? "text-rose-600 dark:text-rose-400" : "text-slate-700 dark:text-slate-300"
                                   )}>
                                     {formatDisplayDate(date)}
@@ -4642,29 +4657,29 @@ export function VehicleManager() {
       ) : activeTab === 'fuel' ? null : (
         <div className="space-y-6">
           {/* Sub-tab selection row */}
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 px-1 pb-2 border-b border-slate-100 dark:border-slate-800">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 px-1 pb-2 border-b border-slate-200 dark:border-slate-800">
             {priv.canViewLogs && priv.canViewFuel && (
-              <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
+              <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-0.5 rounded-md border border-slate-200 dark:border-slate-800">
                 <Button
                   variant={logsSubTab === 'all' ? 'secondary' : 'ghost'}
                   size="sm"
-                  className="h-8 text-[11px] font-bold uppercase tracking-wider px-3"
+                  className="h-8 text-[11px] font-bold uppercase tracking-wider px-3 rounded-sm font-mono"
                   onClick={() => handleSetLogsSubTab('all')}
                 >
-                  <History className="h-3.5 w-3.5 mr-1" /> All Activity
+                  <History className="h-3.5 w-3.5 mr-1 text-blue-600" /> All Activity
                 </Button>
                 <Button
                   variant={logsSubTab === 'movement' ? 'secondary' : 'ghost'}
                   size="sm"
-                  className="h-8 text-[11px] font-bold uppercase tracking-wider px-3"
+                  className="h-8 text-[11px] font-bold uppercase tracking-wider px-3 rounded-sm font-mono"
                   onClick={() => handleSetLogsSubTab('movement')}
                 >
-                  <MapPin className="h-3.5 w-3.5 mr-1 text-blue-500" /> Movements
+                  <MapPin className="h-3.5 w-3.5 mr-1 text-blue-600" /> Movements
                 </Button>
                 <Button
                   variant={logsSubTab === 'fuel' ? 'secondary' : 'ghost'}
                   size="sm"
-                  className="h-8 text-[11px] font-bold uppercase tracking-wider px-3"
+                  className="h-8 text-[11px] font-bold uppercase tracking-wider px-3 rounded-sm font-mono"
                   onClick={() => handleSetLogsSubTab('fuel')}
                 >
                   <Fuel className="h-3.5 w-3.5 mr-1 text-amber-500" /> Fuel Logs
@@ -4674,17 +4689,17 @@ export function VehicleManager() {
 
             {/* List/Calendar Toggle (only when movements/all is selected) */}
             {logsSubTab !== 'fuel' && (
-              <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
+              <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-0.5 rounded-md border border-slate-200 dark:border-slate-800">
                 <Button 
                   variant={viewMode === 'list' ? 'secondary' : 'ghost'} 
-                  size="sm" className="h-8 px-3 gap-2 text-[10px] font-bold uppercase"
+                  size="sm" className="h-8 px-3 gap-2 text-[10px] font-bold uppercase rounded-sm font-mono"
                   onClick={() => setViewMode('list')}
                 >
                   <List className="h-3.5 w-3.5" /> List
                 </Button>
                 <Button 
                   variant={viewMode === 'calendar' ? 'secondary' : 'ghost'} 
-                  size="sm" className="h-8 px-3 gap-2 text-[10px] font-bold uppercase"
+                  size="sm" className="h-8 px-3 gap-2 text-[10px] font-bold uppercase rounded-sm font-mono"
                   onClick={() => setViewMode('calendar')}
                 >
                   <LayoutGrid className="h-3.5 w-3.5" /> Calendar
@@ -4695,7 +4710,7 @@ export function VehicleManager() {
 
           {/* Render Calendar View for Movement Logs */}
           {logsSubTab !== 'fuel' && viewMode === 'calendar' ? (
-            <Card className="border-none shadow-sm bg-white dark:bg-slate-900 overflow-hidden">
+            <Card className="border border-slate-200 dark:border-slate-800 rounded-md bg-white dark:bg-slate-900 overflow-hidden">
               <div className="p-4 bg-slate-50 dark:bg-slate-800/50 border-b dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3">
                 <div className="flex items-center gap-4">
                   <h4 className="font-bold text-sm text-slate-700 dark:text-slate-200">{format(currentMonth, 'MMMM yyyy')}</h4>
@@ -4799,26 +4814,26 @@ export function VehicleManager() {
             </Card>
           ) : (
             /* Unified Desktop and Mobile Activity Feed */
-            <Card className="border-none shadow-sm overflow-hidden bg-white dark:bg-slate-900">
-              <div className="p-4 bg-slate-50/50 dark:bg-slate-800/30 flex flex-col sm:flex-row gap-3 justify-between items-stretch sm:items-center border-b dark:border-slate-800">
+            <Card className="border border-slate-200 dark:border-slate-800 rounded-md overflow-hidden bg-white dark:bg-slate-900">
+              <div className="p-4 bg-slate-50/50 dark:bg-slate-800/30 flex flex-col sm:flex-row gap-3 justify-between items-stretch sm:items-center border-b border-slate-200 dark:border-slate-800">
                 <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                   <h3 className="font-bold text-slate-700 dark:text-slate-200 text-sm flex items-center gap-2">
-                    <History className="h-4 w-4 text-blue-500 shrink-0" /> 
+                    <History className="h-4 w-4 text-blue-600 shrink-0" /> 
                     <span>
                       {logsSubTab === 'all' && 'All Activity Logs'}
                       {logsSubTab === 'movement' && 'Movement Logs'}
                       {logsSubTab === 'fuel' && 'Fuel Logs'}
                     </span>
-                    <span className="ml-1 text-[10px] font-normal text-slate-400">({filteredCombinedLogs.length} entries)</span>
+                    <span className="ml-1 text-[10px] font-normal text-slate-400 font-mono">({filteredCombinedLogs.length} entries)</span>
                   </h3>
 
                   {priv.canViewFuel && logsSubTab !== 'movement' && (filteredFuelMetrics.totalLitres > 0 || logsVehicleFilter !== 'all') && (
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      <Badge variant="outline" className="h-6 px-2.5 text-[11px] font-bold bg-amber-50 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300 border-amber-300 dark:border-amber-700/60 gap-1 shadow-2xs">
+                      <Badge variant="outline" className="h-6 px-2.5 text-[11px] font-bold bg-amber-50 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300 border-amber-300 dark:border-amber-700/60 gap-1 rounded-sm font-mono tabular-nums">
                         <Fuel className="h-3 w-3 text-amber-600 dark:text-amber-400" />
                         <span>{filteredFuelMetrics.totalLitres.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 2 })} L</span>
                       </Badge>
-                      <Badge variant="outline" className="h-6 px-2.5 text-[11px] font-bold bg-emerald-50 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700/60 gap-1 shadow-2xs">
+                      <Badge variant="outline" className="h-6 px-2.5 text-[11px] font-bold bg-emerald-50 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700/60 gap-1 rounded-sm font-mono tabular-nums">
                         <Receipt className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
                         <span>₦{filteredFuelMetrics.totalCost.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
                       </Badge>
@@ -4827,7 +4842,7 @@ export function VehicleManager() {
                 </div>
                 <div className="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto">
                   <select
-                    className="h-9 w-full sm:w-52 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-200 shadow-xs focus:outline-hidden focus:ring-1 focus:ring-blue-500 cursor-pointer shrink-0"
+                    className="h-9 w-full sm:w-52 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-200 focus:outline-hidden focus:ring-1 focus:ring-blue-500 cursor-pointer shrink-0"
                     value={logsVehicleFilter}
                     onChange={e => handleSetLogsVehicleFilter(e.target.value)}
                     aria-label="Filter by vehicle"
@@ -4843,7 +4858,7 @@ export function VehicleManager() {
                     <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
                     <Input 
                       placeholder="Search logs by vehicle, person, site..." 
-                      className="pl-9 pr-8 h-9 text-sm" 
+                      className="pl-9 pr-8 h-9 text-sm rounded-md" 
                       value={logsSearch} 
                       onChange={e => handleSetLogsSearch(e.target.value)} 
                     />
@@ -4861,7 +4876,7 @@ export function VehicleManager() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="h-9 px-2 text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 shrink-0"
+                      className="h-9 px-2 text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 shrink-0 rounded-md"
                       onClick={() => {
                         handleSetLogsVehicleFilter('all');
                         handleSetLogsSearch('');
@@ -4877,7 +4892,7 @@ export function VehicleManager() {
               <div className="hidden md:block overflow-x-auto">
                 <table className="w-full text-left">
                   <thead>
-                    <tr className="bg-slate-100 dark:bg-slate-800/50 text-[10px] uppercase font-bold tracking-wider text-slate-500">
+                    <tr className="bg-slate-100 dark:bg-slate-800/50 text-[10px] uppercase font-bold tracking-wider text-slate-500 font-mono">
                       <th className="px-6 py-3">Date</th>
                       <th className="px-6 py-3">Type</th>
                       <th className="px-6 py-3">Vehicle & Operator</th>
@@ -4897,18 +4912,18 @@ export function VehicleManager() {
                           const trip = log.details;
                           return (
                             <tr key={trip.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
-                              <td className="px-6 py-4 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                              <td className="px-6 py-4 text-xs font-semibold text-slate-600 dark:text-slate-300 font-mono tabular-nums">
                                 {formatDisplayDate(trip.departure_time)}
                               </td>
                               <td className="px-6 py-4">
-                                <Badge variant="outline" className="text-[10px] font-bold bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 border-blue-200">
+                                <Badge variant="outline" className="text-[10px] font-bold bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 border-blue-200 rounded-sm font-mono tracking-wider">
                                   Trip
                                 </Badge>
                               </td>
                               <td className="px-6 py-4">
                                 <div className="flex flex-col">
                                   <span className="font-bold text-slate-700 dark:text-slate-200 text-xs">{getVehicleName(trip.vehicle_reg)}</span>
-                                  <span className="text-[10px] font-semibold text-slate-400">{trip.driver_name} <span className="text-slate-300 dark:text-slate-600 font-normal">({trip.vehicle_reg})</span></span>
+                                  <span className="text-[10px] font-semibold text-slate-400">{trip.driver_name} <span className="text-slate-300 dark:text-slate-600 font-normal font-mono">({trip.vehicle_reg})</span></span>
                                 </div>
                               </td>
                               <td className="px-6 py-4">
@@ -4921,11 +4936,11 @@ export function VehicleManager() {
                                 </div>
                               </td>
                               <td className="px-6 py-4">
-                                <div className="flex flex-col text-[10px] font-bold text-slate-600 dark:text-slate-300">
+                                <div className="flex flex-col text-[10px] font-bold text-slate-600 dark:text-slate-300 font-mono tabular-nums">
                                   <div className="flex items-center gap-1"><span className="text-slate-400 uppercase text-[8px]">Dep:</span> {new Date(trip.departure_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
                                   <div className="flex items-center gap-1"><span className="text-slate-400 uppercase text-[8px]">Arr:</span> {trip.arrival_time ? new Date(trip.arrival_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '—'}</div>
                                   {trip.odometer_start && trip.odometer_end && (
-                                    <div className="text-[9px] text-blue-500 mt-0.5">Total: {trip.odometer_end - trip.odometer_start} km</div>
+                                    <div className="text-[9px] text-blue-600 mt-0.5">Total: {trip.odometer_end - trip.odometer_start} km</div>
                                   )}
                                 </div>
                               </td>
@@ -4933,11 +4948,11 @@ export function VehicleManager() {
                                 <div className="flex items-center justify-end">
                                   <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
-                                      <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-slate-700 dark:hover:text-slate-200">
+                                      <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 rounded-md">
                                         <MoreVertical className="h-4 w-4" />
                                       </Button>
                                     </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end" className="w-40">
+                                    <DropdownMenuContent align="end" className="w-40 rounded-md border border-slate-200 dark:border-slate-800">
                                       {priv.canEditLogs && (
                                         <DropdownMenuItem
                                           onClick={() => handleEditTrip(trip)}
@@ -4969,31 +4984,31 @@ export function VehicleManager() {
                           const fuelLog = log.details;
                           return (
                             <tr key={fuelLog.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
-                              <td className="px-6 py-4 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                              <td className="px-6 py-4 text-xs font-semibold text-slate-600 dark:text-slate-300 font-mono tabular-nums">
                                 {formatDisplayDate(fuelLog.date)}
                               </td>
                               <td className="px-6 py-4">
-                                <Badge variant="outline" className="text-[10px] font-bold bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400 border-amber-200">
+                                <Badge variant="outline" className="text-[10px] font-bold bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400 border-amber-200 rounded-sm font-mono tracking-wider">
                                   Fuel
                                 </Badge>
                               </td>
                               <td className="px-6 py-4">
                                 <div className="flex flex-col">
                                   <span className="font-bold text-slate-700 dark:text-slate-200 text-xs">{getVehicleName(fuelLog.vehicle_reg)}</span>
-                                  <span className="text-[10px] font-semibold text-slate-400">{fuelLog.filled_by || '—'} <span className="text-slate-300 dark:text-slate-600 font-normal">({fuelLog.vehicle_reg})</span></span>
+                                  <span className="text-[10px] font-semibold text-slate-400">{fuelLog.filled_by || '—'} <span className="text-slate-300 dark:text-slate-600 font-normal font-mono">({fuelLog.vehicle_reg})</span></span>
                                 </div>
                               </td>
                               <td className="px-6 py-4">
-                                <div className="flex flex-col">
+                                <div className="flex flex-col font-mono tabular-nums">
                                   <span className="font-bold text-amber-600 dark:text-amber-500 text-xs flex items-center gap-1">
                                     <Fuel className="h-3 w-3" /> {fuelLog.litres.toFixed(2)} Litres
                                   </span>
                                   <span className="text-[10px] text-slate-500">Rate: ₦{fuelLog.rate_per_litre.toLocaleString()}/L</span>
-                                  {fuelLog.notes && <span className="text-[9px] text-slate-400 max-w-[200px] truncate mt-0.5 block" title={fuelLog.notes}>{fuelLog.notes}</span>}
+                                  {fuelLog.notes && <span className="text-[9px] text-slate-400 max-w-[200px] truncate mt-0.5 block font-sans" title={fuelLog.notes}>{fuelLog.notes}</span>}
                                 </div>
                               </td>
                               <td className="px-6 py-4">
-                                <div className="flex flex-col text-[10px] font-bold">
+                                <div className="flex flex-col text-[10px] font-bold font-mono tabular-nums">
                                   <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
                                     ₦{fuelLog.total_cost.toLocaleString()}
                                   </span>
@@ -5001,7 +5016,7 @@ export function VehicleManager() {
                                     <span className="text-[8px] text-slate-400 mt-0.5">Odo: {fuelLog.odometer.toLocaleString()} km</span>
                                   )}
                                   {fuelLog.linkedLedgerIds && fuelLog.linkedLedgerIds.length > 0 && (
-                                    <Badge variant="outline" className="text-[8px] h-4 bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400 border-emerald-200 mt-1 w-fit gap-1 font-semibold">
+                                    <Badge variant="outline" className="text-[8px] h-4 bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400 border-emerald-200 mt-1 w-fit gap-1 font-semibold rounded-sm">
                                       <LinkIcon className="h-2.5 w-2.5" /> Linked ({fuelLog.linkedLedgerIds.length})
                                     </Badge>
                                   )}
@@ -5011,11 +5026,11 @@ export function VehicleManager() {
                                 <div className="flex items-center justify-end">
                                   <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
-                                      <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-slate-700 dark:hover:text-slate-200">
+                                      <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 rounded-md">
                                         <MoreVertical className="h-4 w-4" />
                                       </Button>
                                     </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end" className="w-48">
+                                    <DropdownMenuContent align="end" className="w-48 rounded-md border border-slate-200 dark:border-slate-800">
                                       <DropdownMenuItem
                                         onClick={() => handleOpenStandaloneLedgerDialog(fuelLog)}
                                         className="cursor-pointer flex items-center gap-2 text-xs text-amber-600 dark:text-amber-400 font-semibold focus:text-amber-600 focus:bg-amber-50 dark:focus:bg-amber-950/20"
@@ -5071,9 +5086,9 @@ export function VehicleManager() {
                             <div className="flex flex-col">
                               <div className="flex items-center gap-2">
                                 <span className="font-bold text-slate-700 dark:text-slate-200 text-xs">{getVehicleName(trip.vehicle_reg)}</span>
-                                <Badge variant="outline" className="text-[8px] h-4 font-bold bg-blue-50 text-blue-600 border-blue-200">Trip</Badge>
+                                <Badge variant="outline" className="text-[8px] h-4 font-bold bg-blue-50 text-blue-600 border-blue-200 rounded-sm font-mono tracking-wider">Trip</Badge>
                               </div>
-                              <span className="text-[10px] font-semibold text-slate-400">{trip.driver_name} <span className="text-slate-300 dark:text-slate-600 font-normal">({trip.vehicle_reg})</span></span>
+                              <span className="text-[10px] font-semibold text-slate-400">{trip.driver_name} <span className="text-slate-300 dark:text-slate-600 font-normal font-mono">({trip.vehicle_reg})</span></span>
                             </div>
                             <div className="flex flex-col items-end">
                               <span className="font-bold text-blue-600 text-xs flex items-center gap-1">
@@ -5082,23 +5097,23 @@ export function VehicleManager() {
                               <span className="text-[10px] text-slate-500 italic">{trip.purpose}</span>
                             </div>
                           </div>
-                          <div className="grid grid-cols-2 gap-2 text-[10px] text-slate-600 font-medium">
+                          <div className="grid grid-cols-2 gap-2 text-[10px] text-slate-600 font-medium font-mono tabular-nums">
                             <div>Dep: {new Date(trip.departure_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
                             <div>Arr: {trip.arrival_time ? new Date(trip.arrival_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '—'}</div>
                           </div>
                           {trip.odometer_start && trip.odometer_end && (
-                            <div className="text-[10px] text-blue-500 font-bold">Distance: {trip.odometer_end - trip.odometer_start} km</div>
+                            <div className="text-[10px] text-blue-600 font-bold font-mono tabular-nums">Distance: {trip.odometer_end - trip.odometer_start} km</div>
                           )}
                           {trip.remark && <p className="text-[10px] text-slate-400 italic mt-1">{trip.remark}</p>}
                           <div className="flex items-center justify-end gap-1 mt-2 border-t border-slate-100 dark:border-slate-800 pt-2">
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="sm" className="h-7 px-2 text-xs gap-1.5 text-slate-600 dark:text-slate-300">
+                                <Button variant="ghost" size="sm" className="h-7 px-2 text-xs gap-1.5 text-slate-600 dark:text-slate-300 rounded-md">
                                   <MoreVertical className="h-3.5 w-3.5" />
                                   Actions
                                 </Button>
                               </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="w-40">
+                              <DropdownMenuContent align="end" className="w-40 rounded-md border border-slate-200 dark:border-slate-800">
                                 {priv.canEditLogs && (
                                   <DropdownMenuItem
                                     onClick={() => handleEditTrip(trip)}
@@ -5133,34 +5148,34 @@ export function VehicleManager() {
                             <div className="flex flex-col">
                               <div className="flex items-center gap-2">
                                 <span className="font-bold text-slate-700 dark:text-slate-200 text-xs">{getVehicleName(fuelLog.vehicle_reg)}</span>
-                                <Badge variant="outline" className="text-[8px] h-4 font-bold bg-amber-50 text-amber-700 border-amber-200">Fuel</Badge>
+                                <Badge variant="outline" className="text-[8px] h-4 font-bold bg-amber-50 text-amber-700 border-amber-200 rounded-sm font-mono tracking-wider">Fuel</Badge>
                               </div>
-                              <span className="text-[10px] font-semibold text-slate-400">{fuelLog.filled_by || '—'} <span className="text-slate-300 dark:text-slate-600 font-normal">({fuelLog.vehicle_reg})</span></span>
+                              <span className="text-[10px] font-semibold text-slate-400">{fuelLog.filled_by || '—'} <span className="text-slate-300 dark:text-slate-600 font-normal font-mono">({fuelLog.vehicle_reg})</span></span>
                             </div>
-                            <div className="flex flex-col items-end">
+                            <div className="flex flex-col items-end font-mono tabular-nums">
                               <span className="text-xs font-bold text-amber-600">{fuelLog.litres.toFixed(2)} L</span>
                               <span className="text-xs font-bold text-emerald-600">₦{fuelLog.total_cost.toLocaleString()}</span>
                             </div>
                           </div>
-                          <div className="flex justify-between items-center text-[10px] text-slate-500">
+                          <div className="flex justify-between items-center text-[10px] text-slate-500 font-mono tabular-nums">
                             <span>Rate: ₦{fuelLog.rate_per_litre.toLocaleString()}/L</span>
                             {fuelLog.odometer && <span>Odo: {fuelLog.odometer.toLocaleString()} km</span>}
                           </div>
                           {fuelLog.notes && <p className="text-[10px] text-slate-400 italic mt-1">{fuelLog.notes}</p>}
                           <div className="flex items-center justify-between mt-2 border-t border-slate-100 dark:border-slate-800 pt-2">
                             {fuelLog.linkedLedgerIds && fuelLog.linkedLedgerIds.length > 0 ? (
-                              <Badge variant="outline" className="text-[8px] h-4 bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400 border-emerald-200 gap-1 font-semibold">
+                              <Badge variant="outline" className="text-[8px] h-4 bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400 border-emerald-200 gap-1 font-semibold rounded-sm font-mono">
                                 <LinkIcon className="h-2.5 w-2.5" /> Linked ({fuelLog.linkedLedgerIds.length})
                               </Badge>
                             ) : <div />}
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="sm" className="h-7 px-2 text-xs gap-1.5 text-slate-600 dark:text-slate-300">
+                                <Button variant="ghost" size="sm" className="h-7 px-2 text-xs gap-1.5 text-slate-600 dark:text-slate-300 rounded-md">
                                   <MoreVertical className="h-3.5 w-3.5" />
                                   Actions
                                 </Button>
                               </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="w-48">
+                              <DropdownMenuContent align="end" className="w-48 rounded-md border border-slate-200 dark:border-slate-800">
                                 <DropdownMenuItem
                                   onClick={() => handleOpenStandaloneLedgerDialog(fuelLog)}
                                   className="cursor-pointer flex items-center gap-2 text-xs text-amber-600 dark:text-amber-400 font-semibold focus:text-amber-600 focus:bg-amber-50 dark:focus:bg-amber-950/20"
@@ -5201,11 +5216,11 @@ export function VehicleManager() {
 
               {/* Pagination Bar */}
               {totalLogsCount > 0 && (
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-6 py-3 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 text-xs text-slate-500">
-                  <div className="font-medium">
-                    Showing <span className="font-bold text-slate-700 dark:text-slate-200">{((logsPage - 1) * LOGS_PAGE_SIZE) + 1}</span> to{' '}
-                    <span className="font-bold text-slate-700 dark:text-slate-200">{Math.min(logsPage * LOGS_PAGE_SIZE, totalLogsCount)}</span> of{' '}
-                    <span className="font-bold text-slate-700 dark:text-slate-200">{totalLogsCount}</span> entries
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-6 py-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 text-xs text-slate-500 font-mono tabular-nums">
+                  <div className="font-medium font-sans">
+                    Showing <span className="font-bold text-slate-700 dark:text-slate-200 font-mono">{((logsPage - 1) * LOGS_PAGE_SIZE) + 1}</span> to{' '}
+                    <span className="font-bold text-slate-700 dark:text-slate-200 font-mono">{Math.min(logsPage * LOGS_PAGE_SIZE, totalLogsCount)}</span> of{' '}
+                    <span className="font-bold text-slate-700 dark:text-slate-200 font-mono">{totalLogsCount}</span> entries
                   </div>
                   <div className="flex items-center gap-1.5">
                     <Button
@@ -5213,12 +5228,12 @@ export function VehicleManager() {
                       size="sm"
                       onClick={() => setLogsPage(p => Math.max(1, p - 1))}
                       disabled={logsPage <= 1}
-                      className="h-8 px-2.5 text-xs font-semibold gap-1 text-slate-600 dark:text-slate-300 disabled:opacity-40"
+                      className="h-8 px-2.5 text-xs font-semibold gap-1 text-slate-600 dark:text-slate-300 disabled:opacity-40 rounded-md font-sans"
                     >
                       <ChevronLeft className="h-3.5 w-3.5" />
                       Prev
                     </Button>
-                    <div className="px-3 py-1 font-semibold text-slate-700 dark:text-slate-300 text-xs">
+                    <div className="px-3 py-1 font-semibold text-slate-700 dark:text-slate-300 text-xs font-mono">
                       Page {logsPage} of {totalLogsPages}
                     </div>
                     <Button
@@ -5242,72 +5257,77 @@ export function VehicleManager() {
       {/* ── Fuel Analytics ── */}
       {activeTab === 'fuel' && priv.canViewFuelAnalytics && (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-          {/* Metrics */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {([
-              { label: 'Total Litres', value: `${totalFuelLitres.toFixed(1)} L`, icon: Fuel, color: 'amber' },
-              { label: 'Total Cost', value: `₦${totalFuelCost.toLocaleString(undefined, { maximumFractionDigits: 0 })}`, icon: TrendingUp, color: 'emerald' },
-              { label: 'Avg Rate', value: `₦${avgRate.toFixed(0)}/L`, icon: BarChart3, color: 'blue' },
-              { label: fuelFilterVehicle === '' ? 'Top Vehicle' : 'Vehicle Odo Span', value: fuelFilterVehicle === '' ? topVehicleName : efficiency ? `${efficiency.distance.toLocaleString()} km` : '\u2014', icon: Truck, color: 'blue' }
-            ] as const).map(({ label, value, icon: Icon, color }) => (
-              <Card key={label} className="border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900/50">
-                <CardContent className="p-4 flex items-center gap-3">
-                  <div className={`h-9 w-9 rounded-lg flex items-center justify-center bg-${color}-100 dark:bg-${color}-900/30 text-${color}-600`}>
-                    <Icon className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <p className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">{label}</p>
-                    <p className="text-sm font-bold text-slate-700 dark:text-slate-200 truncate max-w-[120px]">{value}</p>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+          {/* Primary Hero + Secondary Metrics */}
+          <MetricHeroCard
+            primary={{
+              label: 'Total Fuel Expenditure',
+              value: `₦${totalFuelCost.toLocaleString(undefined, { maximumFractionDigits: 0 })}`,
+              period: fuelFilterVehicle === '' ? 'Fleet Total' : getVehicleName(fuelFilterVehicle),
+              delta: `Avg Rate: ₦${avgRate.toFixed(0)}/L`,
+              deltaType: 'neutral',
+              sparklineData: chartData.map(d => d.cost || 0),
+            }}
+            secondary={[
+              {
+                label: 'Total Fuel Volume',
+                value: `${totalFuelLitres.toFixed(1)} L`,
+                period: 'Dispensed volume',
+                sparklineData: chartData.map(d => d.litres || 0),
+              },
+              {
+                label: 'Fleet Efficiency',
+                value: `${(fuelFilterVehicle !== '' ? efficiency : fleetEfficiency)?.kmPerLitre.toFixed(2) || '—'} km/L`,
+                period: `${(fuelFilterVehicle !== '' ? efficiency : fleetEfficiency)?.lPer100km.toFixed(2) || '—'} L/100km`,
+              },
+              {
+                label: fuelFilterVehicle === '' ? 'Top Consumer' : 'Odometer Span',
+                value: fuelFilterVehicle === '' ? topVehicleName : efficiency ? `${efficiency.distance.toLocaleString()} km` : '—',
+                period: 'Logged mileage span',
+              },
+            ]}
+          />
+
           {/* Efficiency Banner */}
           {(fuelFilterVehicle !== '' ? efficiency : fleetEfficiency) && (
-            <div className="p-4 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <div className="h-9 w-9 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-600"><TrendingUp className="h-4 w-4" /></div>
-                <div>
-                  <h4 className="text-xs font-bold text-emerald-800 dark:text-emerald-300">
-                    {fuelFilterVehicle !== '' ? 'Vehicle Fuel Efficiency' : 'Fleet-Wide Fuel Efficiency'}
-                  </h4>
-                  <p className="text-[10px] text-slate-500">
-                    Based on {(fuelFilterVehicle !== '' ? efficiency : fleetEfficiency)?.distance.toLocaleString()} km of logged travel
-                  </p>
-                </div>
+            <div className="p-4 bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 rounded-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div>
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-200">
+                  {fuelFilterVehicle !== '' ? 'Vehicle Fuel Efficiency' : 'Fleet-Wide Fuel Efficiency'}
+                </h4>
+                <p className="text-[11px] text-slate-500 font-mono mt-0.5">
+                  Calculated from {(fuelFilterVehicle !== '' ? efficiency : fleetEfficiency)?.distance.toLocaleString()} km of logged travel
+                </p>
               </div>
               <div className="flex gap-6">
                 <div className="text-right">
-                  <p className="text-sm font-bold text-emerald-700 dark:text-emerald-400">{(fuelFilterVehicle !== '' ? efficiency : fleetEfficiency)?.kmPerLitre.toFixed(2)} km/L</p>
-                  <p className="text-[8px] uppercase font-bold text-slate-400">km per Litre</p>
+                  <p className="text-sm font-bold font-mono text-slate-900 dark:text-slate-100 tabular-nums">{(fuelFilterVehicle !== '' ? efficiency : fleetEfficiency)?.kmPerLitre.toFixed(2)} km/L</p>
+                  <p className="text-[9px] uppercase font-medium text-slate-400">km per Litre</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-bold text-emerald-700 dark:text-emerald-400">{(fuelFilterVehicle !== '' ? efficiency : fleetEfficiency)?.lPer100km.toFixed(2)} L/100km</p>
-                  <p className="text-[8px] uppercase font-bold text-slate-400">Litres per 100km</p>
+                  <p className="text-sm font-bold font-mono text-slate-900 dark:text-slate-100 tabular-nums">{(fuelFilterVehicle !== '' ? efficiency : fleetEfficiency)?.lPer100km.toFixed(2)} L/100km</p>
+                  <p className="text-[9px] uppercase font-medium text-slate-400">Litres per 100km</p>
                 </div>
               </div>
             </div>
           )}
 
-
             {/* Tabbed Analytics Charts */}
-            <Card className="border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm overflow-hidden rounded-xl">
-              <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 p-4 bg-slate-50/50 dark:bg-slate-800/20">
+            <Card className="border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden rounded-md">
+              <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 p-4 bg-slate-50/50 dark:bg-slate-800/20">
                 <div>
                   <CardTitle className="text-sm font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-                    <BarChart3 className="h-4 w-4 text-blue-500" /> 
+                    <BarChart3 className="h-4 w-4 text-blue-600" /> 
                     {activeChartTab === 'litres' ? 'Fuel Consumed (Litres)' : activeChartTab === 'cost' ? 'Total Expenditures (₦)' : 'Average Fuel Rate (₦/L)'}
                   </CardTitle>
                   <CardDescription className="text-xs">
                     {activeChartTab === 'litres' ? 'Track fuel quantities consumed across the fleet' : activeChartTab === 'cost' ? 'Monitor costs of refueling records' : 'Price fluctuations and rate per litre over time'}
                   </CardDescription>
                 </div>
-                <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl shrink-0 self-start sm:self-center">
+                <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-md shrink-0 self-start sm:self-center">
                   <Button
                     variant={activeChartTab === 'litres' ? 'secondary' : 'ghost'}
                     size="sm"
-                    className="h-8 text-[11px] font-bold uppercase tracking-wider px-3 rounded-lg"
+                    className="h-7 text-[11px] font-semibold uppercase tracking-wider px-2.5 rounded-sm"
                     onClick={() => setActiveChartTab('litres')}
                   >
                     <Fuel className="h-3.5 w-3.5 mr-1 text-amber-500" /> Litres
@@ -5315,7 +5335,7 @@ export function VehicleManager() {
                   <Button
                     variant={activeChartTab === 'cost' ? 'secondary' : 'ghost'}
                     size="sm"
-                    className="h-8 text-[11px] font-bold uppercase tracking-wider px-3 rounded-lg"
+                    className="h-7 text-[11px] font-semibold uppercase tracking-wider px-2.5 rounded-sm"
                     onClick={() => setActiveChartTab('cost')}
                   >
                     <TrendingUp className="h-3.5 w-3.5 mr-1 text-emerald-500" /> Cost
@@ -5323,7 +5343,7 @@ export function VehicleManager() {
                   <Button
                     variant={activeChartTab === 'trend' ? 'secondary' : 'ghost'}
                     size="sm"
-                    className="h-8 text-[11px] font-bold uppercase tracking-wider px-3 rounded-lg"
+                    className="h-7 text-[11px] font-semibold uppercase tracking-wider px-2.5 rounded-sm"
                     onClick={() => setActiveChartTab('trend')}
                   >
                     <BarChart3 className="h-3.5 w-3.5 mr-1 text-blue-500" /> Price Trend
@@ -5416,11 +5436,11 @@ export function VehicleManager() {
             </Card>
 
             {/* Top Consuming Vehicles */}
-            <Card className="border-none shadow-sm overflow-hidden bg-white dark:bg-slate-900">
-              <div className="p-4 bg-slate-50/50 dark:bg-slate-800/30 border-b dark:border-slate-800 flex flex-col sm:flex-row gap-4 justify-between items-center">
+            <Card className="border border-slate-200 dark:border-slate-800 rounded-md overflow-hidden bg-white dark:bg-slate-900">
+              <div className="p-4 bg-slate-50/50 dark:bg-slate-800/30 border-b border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row gap-4 justify-between items-center">
                 <h3 className="font-bold text-slate-700 dark:text-slate-200 text-sm flex items-center gap-2">
                   <Truck className="h-4 w-4 text-blue-500" /> Top Consuming Vehicles
-                  <span className="ml-1 text-[10px] font-normal text-slate-400">(By Total Cost)</span>
+                  <span className="ml-1 text-[10px] font-normal text-slate-400 font-mono">(By Total Cost)</span>
                 </h3>
               </div>
               <div className="p-4 space-y-4">
@@ -5429,13 +5449,13 @@ export function VehicleManager() {
                 ) : (
                   topVehiclesData.map((v, i) => (
                     <div key={v.reg} className="flex items-center gap-4">
-                      <div className="w-6 text-right text-xs font-bold text-slate-400">#{i + 1}</div>
+                      <div className="w-6 text-right text-xs font-bold text-slate-400 font-mono">#{i + 1}</div>
                       <div className="flex-1">
                         <div className="flex justify-between items-end mb-1">
                           <span className="text-xs font-bold text-slate-700 dark:text-slate-200">
-                            {getVehicleName(v.reg)} <span className="text-[10px] font-normal text-slate-400">({v.reg})</span>
+                            {getVehicleName(v.reg)} <span className="text-[10px] font-normal text-slate-400 font-mono">({v.reg})</span>
                           </span>
-                          <span className="text-[10px] font-semibold text-emerald-600">₦{v.cost.toLocaleString()}</span>
+                          <span className="text-[10px] font-semibold text-emerald-600 font-mono tabular-nums">₦{v.cost.toLocaleString()}</span>
                         </div>
                         <div className="w-full h-2 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden flex">
                           <div 
@@ -5443,7 +5463,7 @@ export function VehicleManager() {
                             style={{ width: `${Math.max((v.cost / maxTopVehicleCost) * 100, 2)}%` }}
                           />
                         </div>
-                        <p className="text-[9px] text-slate-400 mt-1 text-right">{v.litres.toFixed(1)} L total</p>
+                        <p className="text-[9px] text-slate-400 mt-1 text-right font-mono tabular-nums">{v.litres.toFixed(1)} L total</p>
                       </div>
                     </div>
                   ))

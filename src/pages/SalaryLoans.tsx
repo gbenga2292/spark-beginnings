@@ -470,26 +470,26 @@ export function SalaryLoans({ setPreviewModal }: { setPreviewModal?: (val: any) 
     viewMode ? 'View all recorded salary advances and loans' : 'Submit salary advances or loans for approval',
     <div className="flex items-center gap-2 md:gap-3">
       {priv.canAdd && (
-        <label className="flex items-center gap-2 bg-white text-indigo-700 hover:bg-indigo-50 shadow-sm border border-indigo-200 rounded-md h-8 sm:h-9 px-2 sm:px-3 text-xs font-medium cursor-pointer transition-colors whitespace-nowrap">
+        <label className="flex items-center gap-2 bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-md h-8 sm:h-9 px-2 sm:px-3 text-xs font-medium cursor-pointer transition-colors whitespace-nowrap">
           <Upload className="h-4 w-4" /> <span className="hidden lg:inline">Import</span>
           <input type="file" accept=".csv" className="hidden" onChange={handleImportCSVSelected} />
         </label>
       )}
       {priv.canAdd && (
         <div className="relative group">
-          <button className="inline-flex items-center justify-center whitespace-nowrap rounded-md font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 border border-indigo-200 text-indigo-700 hover:bg-indigo-50 h-8 sm:h-9 px-2 sm:px-3 text-xs gap-2">
+          <button className="inline-flex items-center justify-center whitespace-nowrap rounded-md font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-blue-500 border border-slate-200 dark:border-slate-700 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-slate-700 h-8 sm:h-9 px-2 sm:px-3 text-xs gap-2">
             <Download className="h-4 w-4" /> <span className="hidden lg:inline">Export</span>
           </button>
-          <div className="absolute right-0 top-full mt-1 w-56 bg-white rounded-md shadow-lg border border-slate-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 overflow-hidden translate-y-1 group-hover:translate-y-0">
-            <div className="px-3 py-2 border-b border-slate-100 bg-slate-50/50">
-              <span className="font-semibold text-xs text-slate-700">Choose Export Type</span>
+          <div className="absolute right-0 top-full mt-1 w-56 bg-white dark:bg-slate-900 rounded-md shadow-lg border border-slate-200 dark:border-slate-800 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 overflow-hidden translate-y-1 group-hover:translate-y-0">
+            <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50">
+              <span className="font-semibold text-xs text-slate-700 dark:text-slate-300">Choose Export Type</span>
             </div>
-            <button onClick={() => handleExportCSV('bare')} className="w-full text-left px-3 py-2.5 hover:bg-slate-50 transition-colors flex flex-col border-b border-slate-50">
-              <span className="font-medium text-sm text-slate-900">Bare Minimum</span>
+            <button onClick={() => handleExportCSV('bare')} className="w-full text-left px-3 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex flex-col border-b border-slate-100 dark:border-slate-800">
+              <span className="font-medium text-xs text-slate-900 dark:text-slate-100">Bare Minimum</span>
               <span className="text-[10px] text-slate-500">Essential fields for reporting</span>
             </button>
-            <button onClick={() => handleExportCSV('detailed')} className="w-full text-left px-3 py-2.5 hover:bg-slate-50 transition-colors flex flex-col">
-              <span className="font-medium text-sm text-slate-900">Detailed Version</span>
+            <button onClick={() => handleExportCSV('detailed')} className="w-full text-left px-3 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex flex-col">
+              <span className="font-medium text-xs text-slate-900 dark:text-slate-100">Detailed Version</span>
               <span className="text-[10px] text-slate-500">Full database records</span>
             </button>
           </div>
@@ -498,7 +498,7 @@ export function SalaryLoans({ setPreviewModal }: { setPreviewModal?: (val: any) 
       <Button
         variant={viewMode ? 'default' : 'outline'}
         size="sm"
-        className={viewMode ? 'bg-indigo-600 hover:bg-indigo-700 h-8 sm:h-9 px-2 sm:px-3 text-xs' : 'border-slate-200 h-8 sm:h-9 px-2 sm:px-3 text-xs'}
+        className={viewMode ? 'bg-blue-600 hover:bg-blue-700 text-white rounded-md h-8 sm:h-9 px-2 sm:px-3 text-xs shadow-none' : 'border-slate-200 dark:border-slate-700 rounded-md h-8 sm:h-9 px-2 sm:px-3 text-xs shadow-none'}
         onClick={() => setViewMode(!viewMode)}
       >
         {viewMode ? <><ArrowLeft className="h-4 w-4 lg:mr-2" /> <span className="hidden lg:inline">Back to Form</span></> : <><List className="h-4 w-4 lg:mr-2" /> <span className="hidden lg:inline">View Database</span></>}
@@ -530,42 +530,42 @@ export function SalaryLoans({ setPreviewModal }: { setPreviewModal?: (val: any) 
         <div className="flex flex-col gap-6 max-w-7xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* Salary Advances Table */}
-            <Card className="shadow-md border-0 ring-1 ring-slate-100 rounded-2xl overflow-hidden">
-              <CardHeader className="bg-slate-50/50 border-b border-slate-100 p-5">
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Banknote className="h-5 w-5 text-indigo-500" /> Salary Advances
+            <Card className="shadow-none border border-slate-200 dark:border-slate-800 rounded-md overflow-hidden bg-white dark:bg-slate-900">
+              <CardHeader className="bg-slate-50/50 dark:bg-slate-850 border-b border-slate-200 dark:border-slate-800 p-4">
+                <CardTitle className="text-sm font-semibold flex items-center gap-2 text-slate-800 dark:text-slate-100">
+                  <Banknote className="h-4 w-4 text-blue-600 dark:text-blue-400" /> Salary Advances
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-0">
                 <div className="overflow-x-auto">
                 <Table>
-                  <TableHeader className="bg-slate-50">
+                  <TableHeader className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800">
                     <TableRow>
-                      <TableHead className="px-4 h-12 text-xs uppercase tracking-wider">Employee</TableHead>
-                      <TableHead className="h-12 text-xs uppercase tracking-wider">Amount</TableHead>
-                      <TableHead className="h-12 text-xs uppercase tracking-wider">Date</TableHead>
-                      <TableHead className="h-12 text-xs uppercase tracking-wider">Approver</TableHead>
-                      <TableHead className="h-12 text-xs uppercase tracking-wider">Status</TableHead>
-                      {priv.canDelete && <TableHead className="h-12 w-16 text-xs uppercase tracking-wider text-right">Actions</TableHead>}
+                      <TableHead className="px-4 h-10 text-[11px] font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400">Employee</TableHead>
+                      <TableHead className="h-10 text-[11px] font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400">Amount</TableHead>
+                      <TableHead className="h-10 text-[11px] font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400">Date</TableHead>
+                      <TableHead className="h-10 text-[11px] font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400">Approver</TableHead>
+                      <TableHead className="h-10 text-[11px] font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400">Status</TableHead>
+                      {priv.canDelete && <TableHead className="h-10 w-16 text-[11px] font-semibold uppercase tracking-wider text-right text-slate-600 dark:text-slate-400">Actions</TableHead>}
                     </TableRow>
                   </TableHeader>
-                  <TableBody>
+                  <TableBody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
                     {salaryAdvances.map(sa => (
-                      <TableRow key={sa.id} className="hover:bg-slate-50/50">
-                        <TableCell className="font-medium px-4 text-slate-900">{sa.employeeName}</TableCell>
-                        <TableCell className="font-mono font-medium text-slate-700">
+                      <TableRow key={sa.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40">
+                        <TableCell className="font-semibold px-4 text-slate-800 dark:text-slate-200">{sa.employeeName}</TableCell>
+                        <TableCell className="font-semibold tabular-nums text-slate-700 dark:text-slate-300">
                           ₦{(priv as any)?.canViewAmounts === false ? '***' : sa.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </TableCell>
-                        <TableCell className="text-slate-500 text-sm">{formatDisplayDate(sa.requestDate)}</TableCell>
+                        <TableCell className="text-slate-500 dark:text-slate-400 text-xs">{formatDisplayDate(sa.requestDate)}</TableCell>
                         <TableCell>
                           {sa.approvedByName ? (
-                            <div className="flex items-center gap-1 text-xs text-slate-600">
+                            <div className="flex items-center gap-1 text-xs text-slate-600 dark:text-slate-300">
                               {sa.status === 'Approved'
                                 ? <ShieldCheck className="h-3 w-3 text-emerald-500" />
                                 : <Clock className="h-3 w-3 text-amber-500" />}
                               {sa.approvedByName}
                             </div>
-                          ) : <span className="text-slate-300 text-xs">—</span>}
+                          ) : <span className="text-slate-400 text-xs">—</span>}
                         </TableCell>
                         <TableCell>{getStatusBadge(sa.status)}</TableCell>
                         {priv.canDelete && (
@@ -573,10 +573,10 @@ export function SalaryLoans({ setPreviewModal }: { setPreviewModal?: (val: any) 
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                              className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30"
                               onClick={() => handleDeleteAdvance(sa.id, sa.employeeName)}
                             >
-                              <Trash2 className="h-4 w-4" />
+                              <Trash2 className="h-3.5 w-3.5" />
                             </Button>
                           </TableCell>
                         )}
@@ -594,47 +594,47 @@ export function SalaryLoans({ setPreviewModal }: { setPreviewModal?: (val: any) 
             </Card>
 
             {/* Loans Table */}
-            <Card className="shadow-md border-0 ring-1 ring-slate-100 rounded-2xl overflow-hidden">
-              <CardHeader className="bg-slate-50/50 border-b border-slate-100 p-5">
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Landmark className="h-5 w-5 text-emerald-500" /> Active Loans
+            <Card className="shadow-none border border-slate-200 dark:border-slate-800 rounded-md overflow-hidden bg-white dark:bg-slate-900">
+              <CardHeader className="bg-slate-50/50 dark:bg-slate-850 border-b border-slate-200 dark:border-slate-800 p-4">
+                <CardTitle className="text-sm font-semibold flex items-center gap-2 text-slate-800 dark:text-slate-100">
+                  <Landmark className="h-4 w-4 text-emerald-600 dark:text-emerald-400" /> Active Loans
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-0">
                 <div className="overflow-x-auto">
                 <Table>
-                  <TableHeader className="bg-slate-50">
+                  <TableHeader className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800">
                     <TableRow>
-                      <TableHead className="px-4 h-12 text-xs uppercase tracking-wider">Employee</TableHead>
-                      <TableHead className="h-12 text-xs uppercase tracking-wider">Amount</TableHead>
-                      <TableHead className="h-12 text-xs uppercase tracking-wider">Pay Start</TableHead>
-                      <TableHead className="h-12 text-xs uppercase tracking-wider">Approver</TableHead>
-                      <TableHead className="h-12 text-xs uppercase tracking-wider">Status</TableHead>
-                      {priv.canDelete && <TableHead className="h-12 w-16 text-xs uppercase tracking-wider text-right">Actions</TableHead>}
+                      <TableHead className="px-4 h-10 text-[11px] font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400">Employee</TableHead>
+                      <TableHead className="h-10 text-[11px] font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400">Amount</TableHead>
+                      <TableHead className="h-10 text-[11px] font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400">Pay Start</TableHead>
+                      <TableHead className="h-10 text-[11px] font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400">Approver</TableHead>
+                      <TableHead className="h-10 text-[11px] font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400">Status</TableHead>
+                      {priv.canDelete && <TableHead className="h-10 w-16 text-[11px] font-semibold uppercase tracking-wider text-right text-slate-600 dark:text-slate-400">Actions</TableHead>}
                     </TableRow>
                   </TableHeader>
-                  <TableBody>
+                  <TableBody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
                     {loans.map(ln => (
-                      <TableRow key={ln.id} className="hover:bg-slate-50/50">
-                        <TableCell className="font-medium px-4">
+                      <TableRow key={ln.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40">
+                        <TableCell className="font-semibold px-4">
                           <div className="flex flex-col">
-                            <span className="text-slate-900">{ln.employeeName}</span>
-                            <span className="text-[10px] uppercase tracking-wider text-slate-400 mt-0.5 font-semibold">{ln.loanType}</span>
+                            <span className="text-slate-800 dark:text-slate-200">{ln.employeeName}</span>
+                            <span className="text-[10px] uppercase tracking-wider text-slate-400 dark:text-slate-500 mt-0.5 font-medium">{ln.loanType}</span>
                           </div>
                         </TableCell>
-                        <TableCell className="font-mono font-medium text-slate-700">
+                        <TableCell className="font-semibold tabular-nums text-slate-700 dark:text-slate-300">
                           ₦{(priv as any)?.canViewAmounts === false ? '***' : ln.principalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </TableCell>
-                        <TableCell className="text-slate-500 text-sm">{formatDisplayDate(ln.paymentStartDate)}</TableCell>
+                        <TableCell className="text-slate-500 dark:text-slate-400 text-xs">{formatDisplayDate(ln.paymentStartDate)}</TableCell>
                         <TableCell>
                           {ln.approvedByName ? (
-                            <div className="flex items-center gap-1 text-xs text-slate-600">
+                            <div className="flex items-center gap-1 text-xs text-slate-600 dark:text-slate-300">
                               {ln.status === 'Approved' || ln.status === 'Active'
                                 ? <ShieldCheck className="h-3 w-3 text-emerald-500" />
                                 : <Clock className="h-3 w-3 text-amber-500" />}
                               {ln.approvedByName}
                             </div>
-                          ) : <span className="text-slate-300 text-xs">—</span>}
+                          ) : <span className="text-slate-400 text-xs">—</span>}
                         </TableCell>
                         <TableCell>{getStatusBadge(ln.status)}</TableCell>
                         {priv.canDelete && (
@@ -642,10 +642,10 @@ export function SalaryLoans({ setPreviewModal }: { setPreviewModal?: (val: any) 
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                              className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30"
                               onClick={() => handleDeleteLoan(ln.id, ln.employeeName)}
                             >
-                              <Trash2 className="h-4 w-4" />
+                              <Trash2 className="h-3.5 w-3.5" />
                             </Button>
                           </TableCell>
                         )}
@@ -668,21 +668,21 @@ export function SalaryLoans({ setPreviewModal }: { setPreviewModal?: (val: any) 
         {importFile && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center">
             <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setImportFile(null)} />
-            <div className="relative bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm mx-4 border border-slate-200">
-              <h3 className="text-xl font-bold text-slate-900 mb-2 font-display">Import Policy</h3>
-              <p className="text-sm text-slate-500 leading-relaxed mb-6">
+            <div className="relative bg-white dark:bg-slate-900 rounded-md shadow-2xl p-5 w-full max-w-sm mx-4 border border-slate-200 dark:border-slate-800">
+              <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 mb-1">Import Policy</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed mb-5">
                 How would you like to process the record entries from this CSV file?
               </p>
-              <div className="flex flex-col gap-3">
-                <Button onClick={() => processImport(importFile, 'update')} className="bg-indigo-600 hover:bg-indigo-700 text-white h-auto py-3.5 flex-col items-center justify-center">
-                  <span className="font-bold block text-base leading-none">Update & Add</span>
-                  <span className="block text-[10px] opacity-70 mt-1.5 font-normal text-center">Matches IDs and adds new ones. Recommended.</span>
+              <div className="flex flex-col gap-2.5">
+                <Button onClick={() => processImport(importFile, 'update')} className="bg-blue-600 hover:bg-blue-700 text-white rounded-md h-auto py-2.5 flex-col items-center justify-center shadow-none">
+                  <span className="font-semibold block text-xs leading-none">Update & Add</span>
+                  <span className="block text-[10px] opacity-80 mt-1 font-normal text-center">Matches IDs and adds new ones. Recommended.</span>
                 </Button>
-                <Button onClick={() => processImport(importFile, 'append')} variant="outline" className="border-slate-200 h-auto py-3.5 text-slate-700 hover:bg-slate-50 flex-col items-center justify-center">
-                  <span className="font-bold block text-base leading-none">Append Only</span>
-                  <span className="block text-[10px] text-slate-400 mt-1.5 font-normal text-center">Creates brand new records for every row.</span>
+                <Button onClick={() => processImport(importFile, 'append')} variant="outline" className="border-slate-200 dark:border-slate-700 rounded-md h-auto py-2.5 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 flex-col items-center justify-center shadow-none">
+                  <span className="font-semibold block text-xs leading-none">Append Only</span>
+                  <span className="block text-[10px] text-slate-500 dark:text-slate-400 mt-1 font-normal text-center">Creates brand new records for every row.</span>
                 </Button>
-                <Button onClick={() => setImportFile(null)} variant="ghost" className="text-slate-400 hover:text-slate-600 mt-2 text-xs">
+                <Button onClick={() => setImportFile(null)} variant="ghost" className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 mt-1 text-xs">
                   Cancel
                 </Button>
               </div>
@@ -694,37 +694,39 @@ export function SalaryLoans({ setPreviewModal }: { setPreviewModal?: (val: any) 
   }
 
   return (
-    <div className="flex items-center justify-center min-h-[80vh] p-4 lg:p-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="w-full max-w-4xl bg-white rounded-[2rem] shadow-xl border border-slate-100 overflow-hidden flex flex-col md:flex-row">
+    <div className="flex items-center justify-center min-h-[80vh] p-4 lg:p-8 animate-in fade-in duration-300">
+      <div className="w-full max-w-4xl bg-white dark:bg-slate-900 rounded-md shadow-none border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col md:flex-row">
 
-        {/* Left Side: Gradient Banner */}
-        <div className="md:w-[40%] bg-gradient-to-br from-indigo-600 via-indigo-700 to-indigo-900 p-6 md:p-10 text-white flex flex-col justify-between relative overflow-hidden">
-          <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10 mix-blend-overlay"></div>
-
-          <div className="relative z-10">
-            <div className="inline-flex items-center justify-center p-3 font-bold bg-white/10 backdrop-blur-md rounded-2xl mb-8 border border-white/20">
-              <Wallet className="h-8 w-8 text-white" />
+        {/* Left Side: Technical Info Panel */}
+        <div className="md:w-[38%] bg-slate-900 dark:bg-slate-950 p-6 md:p-8 text-white flex flex-col justify-between border-b md:border-b-0 md:border-r border-slate-800">
+          <div>
+            <div className="inline-flex items-center justify-center h-10 w-10 rounded-md bg-blue-600 text-white mb-6">
+              <Wallet className="h-5 w-5" />
             </div>
-            <h1 className="text-3xl font-bold tracking-tight mb-3">Finance Portal</h1>
-            <p className="text-indigo-100 text-sm leading-relaxed mb-8 opacity-90">
-              Submit requests for advances or loans. Requests go through a multi-stage approval process.
+            <h1 className="text-xl font-bold tracking-tight text-white mb-2">Finance Portal</h1>
+            <p className="text-slate-400 text-xs leading-relaxed mb-6">
+              Submit requests for advances or loans. All requests go through a verified multi-stage approval process.
             </p>
+          </div>
+          <div className="pt-6 border-t border-slate-800 text-[11px] text-slate-500 space-y-1">
+            <p className="font-semibold text-slate-400 uppercase tracking-wider text-[10px]">Processing Policy</p>
+            <p>Direct debit or payroll reconciliation applies to all approved disbursements.</p>
           </div>
         </div>
 
         {/* Right Side: Form */}
-        <div className="md:w-[60%] p-6 md:p-8 lg:p-12 bg-slate-50/50">
-          <div className="space-y-5">
+        <div className="md:w-[62%] p-6 md:p-8 bg-white dark:bg-slate-900">
+          <div className="space-y-4">
 
             {/* Request Type */}
-            <div className="space-y-2">
-              <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                <CreditCard className="h-4 w-4 text-slate-400" /> Request Type
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                <CreditCard className="h-3.5 w-3.5 text-slate-400" /> Request Type
               </label>
               <select
                 value={requestType}
                 onChange={(e) => setRequestType(e.target.value)}
-                className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-white text-slate-900 font-medium focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-shadow appearance-none cursor-pointer"
+                className="w-full h-9 px-3 text-xs rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-medium focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 appearance-none cursor-pointer"
               >
                 <option value="Salary Advance">Salary Advance</option>
                 <option value="Personal Loan">Personal Loan</option>
@@ -734,14 +736,14 @@ export function SalaryLoans({ setPreviewModal }: { setPreviewModal?: (val: any) 
             </div>
 
             {/* Select Staff */}
-            <div className="space-y-2">
-              <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                <User className="h-4 w-4 text-slate-400" /> Select Staff
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                <User className="h-3.5 w-3.5 text-slate-400" /> Select Staff
               </label>
               <select
                 value={staffId}
                 onChange={(e) => setStaffId(e.target.value)}
-                className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-white text-slate-900 font-medium focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-shadow appearance-none cursor-pointer"
+                className="w-full h-9 px-3 text-xs rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-medium focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 appearance-none cursor-pointer"
               >
                 <option value="">Choose an employee...</option>
                 {internalEmployees.map(emp => (
@@ -751,66 +753,66 @@ export function SalaryLoans({ setPreviewModal }: { setPreviewModal?: (val: any) 
             </div>
 
             {/* Amount & Date */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                  <Banknote className="h-4 w-4 text-slate-400" /> Amount (₦)
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                  <Banknote className="h-3.5 w-3.5 text-slate-400" /> Amount (₦)
                 </label>
                 <Input
                   type="number"
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   placeholder="e.g. 50000"
-                  className="h-12 rounded-xl border-slate-200 font-medium text-lg focus:ring-indigo-500 bg-white"
+                  className="h-9 text-xs rounded-md border-slate-200 dark:border-slate-700 font-medium focus-visible:ring-blue-500 bg-white dark:bg-slate-800"
                 />
               </div>
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                  <CalendarRange className="h-4 w-4 text-slate-400" /> Request Date
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                  <CalendarRange className="h-3.5 w-3.5 text-slate-400" /> Request Date
                 </label>
                 <Input
                   type="date"
                   value={date}
                   onChange={(e) => setDate(e.target.value)}
-                  className="h-12 rounded-xl border-slate-200 font-medium bg-white"
+                  className="h-9 text-xs rounded-md border-slate-200 dark:border-slate-700 font-medium focus-visible:ring-blue-500 bg-white dark:bg-slate-800"
                 />
               </div>
             </div>
 
             {/* Loan-specific fields */}
             {requestType !== 'Salary Advance' && (
-              <div className="grid grid-cols-2 gap-4 p-4 bg-indigo-50/40 rounded-2xl border border-indigo-100 animate-in fade-in slide-in-from-top-2">
-                <div className="space-y-2">
-                  <label className="text-sm font-semibold text-indigo-900">Duration (Months)</label>
+              <div className="grid grid-cols-2 gap-3 p-3 bg-slate-50 dark:bg-slate-800/60 rounded-md border border-slate-200 dark:border-slate-700 animate-in fade-in">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Duration (Months)</label>
                   <Input
                     type="number"
                     value={duration}
                     onChange={(e) => setDuration(e.target.value)}
                     placeholder="e.g. 6"
-                    className="h-11 rounded-lg border-indigo-200 bg-white text-indigo-900 font-medium focus:ring-indigo-500"
+                    className="h-9 text-xs rounded-md border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-medium focus-visible:ring-blue-500"
                   />
                 </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-semibold text-indigo-900">Pay Start Date</label>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Pay Start Date</label>
                   <Input
                     type="date"
                     value={payStartDate}
                     onChange={(e) => setPayStartDate(e.target.value)}
-                    className="h-11 rounded-lg border-indigo-200 bg-white text-indigo-900 font-medium focus:ring-indigo-500"
+                    className="h-9 text-xs rounded-md border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-medium focus-visible:ring-blue-500"
                   />
                 </div>
               </div>
             )}
 
             {/* Send for Approval To */}
-            <div className="space-y-2">
-              <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                <ShieldCheck className="h-4 w-4 text-indigo-400" /> Send for Approval To
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                <ShieldCheck className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" /> Send for Approval To
               </label>
               <select
                 value={approverId}
                 onChange={(e) => setApproverId(e.target.value)}
-                className="w-full h-12 px-4 rounded-xl border border-indigo-200 bg-white text-slate-900 font-medium focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-shadow appearance-none cursor-pointer"
+                className="w-full h-9 px-3 text-xs rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-medium focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 appearance-none cursor-pointer"
               >
                 <option value="">Select approver...</option>
                 {approverOptions.map((u: any) => (
@@ -818,7 +820,7 @@ export function SalaryLoans({ setPreviewModal }: { setPreviewModal?: (val: any) 
                 ))}
               </select>
               {approverId && (
-                <p className="text-xs text-indigo-600 mt-1 flex items-center gap-1">
+                <p className="text-[11px] text-blue-600 dark:text-blue-400 mt-1 flex items-center gap-1">
                   <Clock className="h-3 w-3" />
                   A task will be sent to the approver for review before processing.
                 </p>
@@ -826,17 +828,17 @@ export function SalaryLoans({ setPreviewModal }: { setPreviewModal?: (val: any) 
             </div>
 
             {/* Actions */}
-            <div className="pt-2 flex gap-4">
+            <div className="pt-2 flex gap-3">
               <Button
                 onClick={handleClear}
                 variant="ghost"
-                className="h-12 px-6 rounded-xl font-semibold text-slate-500 hover:text-slate-700 hover:bg-slate-100"
+                className="h-9 px-4 rounded-md font-semibold text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
               >
                 Clear
               </Button>
               <Button
                 onClick={handleSubmit}
-                className="flex-1 h-12 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-base transition-all hover:-translate-y-0.5"
+                className="flex-1 h-9 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs transition-colors shadow-none"
               >
                 Submit for Approval
               </Button>

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 
 type Mode = 'light' | 'dark';
-export type ColorTheme = 'default' | 'ocean' | 'forest' | 'sunset' | 'rose' | 'violet' | 'slate' | 'burgundy' | 'midnight' | 'monokai' | 'solarized' | 'tokyo-night';
+export type ColorTheme = 'default' | 'ocean' | 'forest' | 'sunset' | 'rose' | 'sky' | 'slate' | 'burgundy' | 'midnight' | 'monokai' | 'solarized' | 'tokyo-night';
 export type UITheme = 'default' | 'modern' | 'glass' | 'brutalism' | 'minimalist';
 
 const MODE_KEY = 'dcel-theme';
@@ -11,7 +11,7 @@ const COLOR_DARK_KEY = 'dcel-color-theme-dark';
 const UI_KEY = 'dcel-ui-theme';
 const CALENDAR_KEY = 'dcel-floating-calendar';
 
-const ALL_COLOR_THEMES: ColorTheme[] = ['default', 'ocean', 'forest', 'sunset', 'rose', 'violet', 'slate', 'burgundy', 'midnight', 'monokai', 'solarized', 'tokyo-night'];
+const ALL_COLOR_THEMES: ColorTheme[] = ['default', 'ocean', 'forest', 'sunset', 'rose', 'sky', 'slate', 'burgundy', 'midnight', 'monokai', 'solarized', 'tokyo-night'];
 const ALL_UI_THEMES: UITheme[] = ['default', 'modern', 'glass', 'brutalism', 'minimalist'];
 export const IDE_THEMES: ColorTheme[] = ['burgundy', 'midnight', 'monokai', 'solarized', 'tokyo-night'];
 

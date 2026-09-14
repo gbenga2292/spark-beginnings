@@ -17,44 +17,39 @@ import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { SiteInventoryView } from './SiteInventoryView';
 import { filterOperationalSites } from '@/src/lib/siteUtils';
 import { useLocation } from 'react-router-dom';
+import { MetricHeroCard } from '@/src/components/ui/MetricHeroCard';
 
 /* ── Status palette config ─────────────────────────────────────────────────── */
 const STATUS_CONFIG = {
   Active: {
-    gradient: 'from-emerald-500 to-green-400',
-    cardBorder: 'border-emerald-200 dark:border-emerald-800/60',
-    cardBg: 'bg-gradient-to-br from-emerald-50 to-green-50 dark:from-emerald-950/40 dark:to-green-950/30',
-    iconBg: 'bg-emerald-500',
-    badgeBg: 'bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700',
+    cardBorder: 'border-slate-200 dark:border-slate-800',
+    cardBg: 'bg-white dark:bg-slate-900',
+    iconBg: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800',
+    badgeBg: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800',
     pulse: true,
     Icon: CheckCircle2,
     label: 'Active',
-    stripColor: 'bg-emerald-400',
-    glowClass: 'hover:shadow-emerald-200/60 dark:hover:shadow-emerald-900/40',
+    stripColor: 'bg-emerald-500',
   },
   Inactive: {
-    gradient: 'from-amber-500 to-orange-400',
-    cardBorder: 'border-amber-200 dark:border-amber-800/60',
-    cardBg: 'bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/40 dark:to-orange-950/30',
-    iconBg: 'bg-amber-500',
-    badgeBg: 'bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700',
+    cardBorder: 'border-slate-200 dark:border-slate-800',
+    cardBg: 'bg-white dark:bg-slate-900',
+    iconBg: 'bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400 border-amber-200 dark:border-amber-800',
+    badgeBg: 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800',
     pulse: false,
     Icon: Clock,
     label: 'Pending',
-    stripColor: 'bg-amber-400',
-    glowClass: 'hover:shadow-amber-200/60 dark:hover:shadow-amber-900/40',
+    stripColor: 'bg-amber-500',
   },
   Ended: {
-    gradient: 'from-slate-400 to-slate-500',
-    cardBorder: 'border-slate-200 dark:border-slate-700',
-    cardBg: 'bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900/60 dark:to-slate-800/40',
-    iconBg: 'bg-slate-400',
-    badgeBg: 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-300 dark:border-slate-600',
+    cardBorder: 'border-slate-200 dark:border-slate-800',
+    cardBg: 'bg-white dark:bg-slate-900',
+    iconBg: 'bg-slate-50 text-slate-600 dark:bg-slate-800/60 dark:text-slate-400 border-slate-200 dark:border-slate-700',
+    badgeBg: 'bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700',
     pulse: false,
     Icon: XCircle,
     label: 'Ended',
-    stripColor: 'bg-slate-300 dark:bg-slate-600',
-    glowClass: 'hover:shadow-slate-200/60 dark:hover:shadow-slate-900/40',
+    stripColor: 'bg-slate-400 dark:bg-slate-600',
   },
 } as const;
 
@@ -95,50 +90,51 @@ export function SiteManager() {
     inventorySite ? null : 'Site Management',
     inventorySite ? '' : `${activeCount} of ${totalCount} sites currently active`,
     inventorySite ? null : (
-      <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto items-center">
+      <div className="flex flex-col sm:flex-row gap-2.5 w-full sm:w-auto items-center">
         {/* View Mode Toggle */}
-        <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-border">
+        <div className="flex bg-slate-100 dark:bg-slate-800/80 p-0.5 rounded-md border border-slate-200 dark:border-slate-800">
           <button
             onClick={() => setViewMode('list')}
             className={cn(
-              "flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all",
+              "flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-sm transition-all",
               viewMode === 'list'
-                ? "bg-white dark:bg-slate-900 text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
+                ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-700"
+                : "text-slate-500 hover:text-slate-900 dark:hover:text-slate-100"
             )}
             title="List View"
           >
-            <List className="h-4 w-4" />
+            <List className="h-3.5 w-3.5" />
             <span>List</span>
           </button>
           <button
             onClick={() => setViewMode('grid')}
             className={cn(
-              "flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all",
+              "flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-sm transition-all",
               viewMode === 'grid'
-                ? "bg-white dark:bg-slate-900 text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
+                ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-700"
+                : "text-slate-500 hover:text-slate-900 dark:hover:text-slate-100"
             )}
             title="Grid View"
           >
-            <LayoutGrid className="h-4 w-4" />
+            <LayoutGrid className="h-3.5 w-3.5" />
             <span>Grid</span>
           </button>
         </div>
 
         {/* Status tabs */}
-        <div className="flex bg-slate-50/80 dark:bg-secondary p-1 rounded-xl border border-border">
+        <div className="flex bg-slate-100 dark:bg-slate-800/80 p-0.5 rounded-md border border-slate-200 dark:border-slate-800">
           {(['All', 'Active', 'Inactive'] as const).map(tab => {
             const isActive = statusFilter === tab;
-            const tabColor =
-              tab === 'Active' ? (isActive ? 'bg-emerald-500 text-white shadow-sm' : 'text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/30') :
-              tab === 'Inactive' ? (isActive ? 'bg-amber-500 text-white shadow-sm' : 'text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/30') :
-              (isActive ? 'bg-slate-700 text-white shadow-sm' : 'text-muted-foreground hover:text-foreground hover:bg-slate-100/50 dark:hover:bg-slate-800/50');
             return (
               <button
                 key={tab}
                 onClick={() => setStatusFilter(tab)}
-                className={`px-5 py-1.5 text-xs font-semibold rounded-lg transition-all ${tabColor}`}
+                className={cn(
+                  "px-3 py-1 text-xs font-semibold rounded-sm transition-all font-mono",
+                  isActive
+                    ? "bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 border border-slate-200 dark:border-slate-700 font-bold"
+                    : "text-slate-500 hover:text-slate-900 dark:hover:text-slate-100"
+                )}
               >
                 {tab}
               </button>
@@ -147,11 +143,11 @@ export function SiteManager() {
         </div>
 
         {/* Search */}
-        <div className="relative w-full sm:w-72">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <div className="relative w-full sm:w-64">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
           <Input
             placeholder="Search site name or client..."
-            className="pl-9 bg-background border-border h-10 text-sm focus-visible:ring-blue-500/50 rounded-xl shadow-sm font-medium"
+            className="pl-8 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 h-8 text-xs focus-visible:ring-1 focus-visible:ring-blue-600 rounded-md"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -249,54 +245,48 @@ export function SiteManager() {
   }
 
   return (
-    <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
+    <div className="flex flex-col gap-4 max-w-7xl mx-auto pb-10">
 
-      {/* ── Summary Stat Pills ─────────────────────────────── */}
-      <div className="grid grid-cols-3 gap-3">
-        {/* Active */}
-        <div className="flex items-center gap-3 bg-gradient-to-br from-emerald-500 to-green-500 rounded-xl p-4 shadow-lg shadow-emerald-200/60 dark:shadow-emerald-900/40">
-          <div className="h-10 w-10 rounded-full bg-white/20 flex items-center justify-center">
-            <CheckCircle2 className="h-5 w-5 text-white" />
-          </div>
-          <div>
-            <p className="text-2xl font-black text-white leading-none">{activeCount}</p>
-            <p className="text-xs font-semibold text-emerald-100 mt-0.5">Active Sites</p>
-          </div>
-        </div>
-        {/* Pending / Inactive */}
-        <div className="flex items-center gap-3 bg-gradient-to-br from-amber-500 to-orange-500 rounded-xl p-4 shadow-lg shadow-amber-200/60 dark:shadow-amber-900/40">
-          <div className="h-10 w-10 rounded-full bg-white/20 flex items-center justify-center">
-            <Clock className="h-5 w-5 text-white" />
-          </div>
-          <div>
-            <p className="text-2xl font-black text-white leading-none">{inactiveCount}</p>
-            <p className="text-xs font-semibold text-amber-100 mt-0.5">Pending Sites</p>
-          </div>
-        </div>
-        {/* Total */}
-        <div className="flex items-center gap-3 bg-gradient-to-br from-slate-600 to-slate-700 rounded-xl p-4 shadow-lg shadow-slate-300/40 dark:shadow-slate-900/60">
-          <div className="h-10 w-10 rounded-full bg-white/20 flex items-center justify-center">
-            <Activity className="h-5 w-5 text-white" />
-          </div>
-          <div>
-            <p className="text-2xl font-black text-white leading-none">{totalCount}</p>
-            <p className="text-xs font-semibold text-slate-300 mt-0.5">Total Sites</p>
-          </div>
-        </div>
-      </div>
+      {/* ── Summary Stat Hero Card ────────────────────────── */}
+      <MetricHeroCard
+        primary={{
+          label: "Operational Sites",
+          value: totalCount,
+          period: `${activeCount} active, ${inactiveCount} pending/inactive across all clients`,
+          delta: `${Math.round((activeCount / (totalCount || 1)) * 100)}% active`,
+          deltaType: 'positive',
+        }}
+        secondary={[
+          {
+            label: "Active Sites",
+            value: activeCount,
+            period: "Operational",
+          },
+          {
+            label: "Pending Sites",
+            value: inactiveCount,
+            period: "Awaiting / Inactive",
+          },
+          {
+            label: "Ended Sites",
+            value: operationalSites.filter(s => s.status === 'Ended').length,
+            period: "Decommissioned",
+          }
+        ]}
+      />
 
       {/* ── Content View (List or Grid) ────────────────────── */}
       {viewMode === 'list' ? (
-        <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
+        <div className="bg-white dark:bg-slate-900 rounded-md border border-slate-200 dark:border-slate-800 overflow-hidden">
           <Table>
             <TableHeader>
-              <TableRow className="bg-slate-50/80 dark:bg-slate-900/80 hover:bg-slate-50/80 dark:hover:bg-slate-900/80 border-b border-border">
-                <TableHead className="font-bold text-xs uppercase text-muted-foreground py-3">Site Name</TableHead>
-                <TableHead className="font-bold text-xs uppercase text-muted-foreground py-3">Client</TableHead>
-                <TableHead className="font-bold text-xs uppercase text-muted-foreground py-3">Status</TableHead>
-                <TableHead className="font-bold text-xs uppercase text-muted-foreground text-center py-3">Items</TableHead>
-                <TableHead className="font-bold text-xs uppercase text-muted-foreground text-center py-3">Waybills</TableHead>
-                <TableHead className="w-[100px] text-right font-bold text-xs uppercase text-muted-foreground py-3 pr-6">Action</TableHead>
+              <TableRow className="bg-slate-50/75 dark:bg-slate-800/40 hover:bg-slate-50/75 dark:hover:bg-slate-800/40 border-b border-slate-200 dark:border-slate-800">
+                <TableHead className="font-bold text-[11px] uppercase tracking-wider font-mono text-slate-500 py-2.5">Site Name</TableHead>
+                <TableHead className="font-bold text-[11px] uppercase tracking-wider font-mono text-slate-500 py-2.5">Client</TableHead>
+                <TableHead className="font-bold text-[11px] uppercase tracking-wider font-mono text-slate-500 py-2.5">Status</TableHead>
+                <TableHead className="font-bold text-[11px] uppercase tracking-wider font-mono text-slate-500 text-center py-2.5">Items</TableHead>
+                <TableHead className="font-bold text-[11px] uppercase tracking-wider font-mono text-slate-500 text-center py-2.5">Waybills</TableHead>
+                <TableHead className="w-[80px] text-right font-bold text-[11px] uppercase tracking-wider font-mono text-slate-500 py-2.5 pr-4">Action</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -312,39 +302,36 @@ export function SiteManager() {
                 return (
                   <TableRow
                     key={site.id}
-                    className="cursor-pointer group hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+                    className="cursor-pointer group hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors border-b border-slate-100 dark:border-slate-800/60"
                     onClick={() => setInventorySite({ site, q: q || null })}
                   >
                     {/* Site Name */}
-                    <TableCell className="py-3.5">
-                      <div className="flex items-center gap-3">
-                        <div className={cn(
-                          'h-9 w-9 rounded-xl flex items-center justify-center shrink-0 shadow-sm bg-gradient-to-br',
-                          cfg.gradient
-                        )}>
-                          <MapPin className="h-4 w-4 text-white drop-shadow-sm" />
+                    <TableCell className="py-2.5">
+                      <div className="flex items-center gap-2.5">
+                        <div className="h-7 w-7 rounded-sm flex items-center justify-center shrink-0 border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-800 text-blue-600 dark:text-blue-400">
+                          <MapPin className="h-3.5 w-3.5" />
                         </div>
-                        <span className="font-bold text-sm text-foreground uppercase truncate group-hover:text-primary transition-colors" title={site.name}>
+                        <span className="font-semibold text-xs text-slate-900 dark:text-slate-100 uppercase truncate group-hover:text-blue-600 transition-colors" title={site.name}>
                           {site.name}
                         </span>
                       </div>
                     </TableCell>
 
                     {/* Client */}
-                    <TableCell className="py-3.5">
+                    <TableCell className="py-2.5">
                       <div className="flex items-center gap-1.5">
-                        <Building2 className="h-3.5 w-3.5 text-muted-foreground/70 shrink-0" />
-                        <span className="text-xs font-semibold text-muted-foreground truncate max-w-[160px]" title={site.client}>
+                        <Building2 className="h-3 w-3 text-slate-400 shrink-0" />
+                        <span className="text-xs font-normal text-slate-600 dark:text-slate-300 truncate max-w-[160px]" title={site.client}>
                           {site.client}
                         </span>
                       </div>
                     </TableCell>
 
                     {/* Status */}
-                    <TableCell className="py-3.5">
+                    <TableCell className="py-2.5">
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <span className={cn(
-                          'inline-flex items-center gap-1 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border',
+                          'inline-flex items-center gap-1 text-[10px] font-bold uppercase font-mono tracking-wider px-2 py-0.5 rounded-sm border',
                           cfg.badgeBg
                         )}>
                           {cfg.pulse && (
@@ -357,7 +344,7 @@ export function SiteManager() {
                           {cfg.label}
                         </span>
                         {activeHold && (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-700/60 shadow-sm" title={`On Hold: ${activeHold.holdNote}`}>
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase font-mono tracking-wider px-2 py-0.5 rounded-sm border bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-800" title={`On Hold: ${activeHold.holdNote}`}>
                             <PauseCircle className="h-2.5 w-2.5" />
                             On Hold ({holdDays}d)
                           </span>
@@ -366,33 +353,33 @@ export function SiteManager() {
                     </TableCell>
 
                     {/* Items */}
-                    <TableCell className="py-3.5 text-center">
-                      <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-foreground">
-                        <Package className="h-3.5 w-3.5 text-muted-foreground" />
+                    <TableCell className="py-2.5 text-center">
+                      <span className="inline-flex items-center gap-1 text-xs font-mono tabular-nums px-2 py-0.5 rounded-sm border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 text-slate-700 dark:text-slate-300">
+                        <Package className="h-3 w-3 text-slate-400" />
                         {stats.items}
                       </span>
                     </TableCell>
 
                     {/* Waybills */}
-                    <TableCell className="py-3.5 text-center">
-                      <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-foreground">
-                        <FileText className="h-3.5 w-3.5 text-muted-foreground" />
+                    <TableCell className="py-2.5 text-center">
+                      <span className="inline-flex items-center gap-1 text-xs font-mono tabular-nums px-2 py-0.5 rounded-sm border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 text-slate-700 dark:text-slate-300">
+                        <FileText className="h-3 w-3 text-slate-400" />
                         {stats.waybills}
                       </span>
                     </TableCell>
 
                     {/* Action */}
-                    <TableCell className="py-3.5 text-right pr-6">
+                    <TableCell className="py-2.5 text-right pr-4">
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-8 px-2.5 text-xs font-semibold text-muted-foreground group-hover:text-primary group-hover:bg-primary/10 gap-1 rounded-lg transition-colors"
+                        className="h-6 px-2 text-[11px] font-semibold text-slate-600 dark:text-slate-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 gap-1 rounded-sm transition-colors"
                         onClick={(e) => {
                           e.stopPropagation();
                           setInventorySite({ site, q: q || null });
                         }}
                       >
-                        <Eye className="h-3.5 w-3.5" />
+                        <Eye className="h-3 w-3" />
                         View
                       </Button>
                     </TableCell>
@@ -403,15 +390,15 @@ export function SiteManager() {
           </Table>
 
           {filteredSites.length === 0 && (
-            <div className="py-16 flex flex-col items-center gap-3 text-muted-foreground">
-              <MapPin className="h-10 w-10 opacity-20" />
-              <p className="text-sm font-medium">No matching sites found.</p>
+            <div className="py-12 flex flex-col items-center gap-2 text-slate-400">
+              <MapPin className="h-8 w-8 opacity-30" />
+              <p className="text-xs font-medium">No matching sites found.</p>
             </div>
           )}
         </div>
       ) : (
         /* ── Site Grid ──────────────────────────────────────── */
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
           {filteredSites.map((site) => {
             const q = pendingSites.find(ps => ps.siteName === site.name || ps.siteId === site.id);
             const stats = getSiteStats(site);
@@ -423,37 +410,30 @@ export function SiteManager() {
               <Card
                 key={site.id}
                 className={cn(
-                  'border shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden rounded-xl cursor-pointer group relative',
-                  cfg.cardBorder,
-                  cfg.cardBg,
-                  cfg.glowClass
+                  'border border-slate-200 dark:border-slate-800 overflow-hidden rounded-md cursor-pointer group relative bg-white dark:bg-slate-900 hover:border-blue-500/50 dark:hover:border-blue-500/50 transition-colors'
                 )}
                 onClick={() => setInventorySite({ site, q: q || null })}
               >
                 {/* Colored top strip */}
-                <div className={cn('h-1.5 w-full', cfg.stripColor)} />
+                <div className={cn('h-1 w-full', cfg.stripColor)} />
 
-                <CardContent className="p-5">
+                <CardContent className="p-4">
                   {/* Header */}
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex gap-3 min-w-0 flex-1">
-                      {/* Gradient icon circle */}
-                      <div className={cn(
-                        'h-11 w-11 rounded-xl flex items-center justify-center shrink-0 shadow-md bg-gradient-to-br',
-                        cfg.gradient
-                      )}>
-                        <MapPin className="h-5 w-5 text-white drop-shadow" />
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex gap-2.5 min-w-0 flex-1">
+                      <div className="h-8 w-8 rounded-sm flex items-center justify-center shrink-0 border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 text-blue-600 dark:text-blue-400">
+                        <MapPin className="h-4 w-4" />
                       </div>
 
                       <div className="min-w-0 flex-1">
-                        <h3 className="text-sm font-black text-foreground uppercase truncate leading-tight mb-1.5" title={site.name}>
+                        <h3 className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase truncate leading-tight mb-1" title={site.name}>
                           {site.name}
                         </h3>
 
                         {/* Status badge */}
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <span className={cn(
-                            'inline-flex items-center gap-1 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border',
+                            'inline-flex items-center gap-1 text-[9px] font-bold uppercase font-mono tracking-wider px-1.5 py-0.5 rounded-sm border',
                             cfg.badgeBg
                           )}>
                             {cfg.pulse && (
@@ -462,7 +442,7 @@ export function SiteManager() {
                                 <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
                               </span>
                             )}
-                            <StatusIcon className="h-2.5 w-2.5" />
+                            <StatusIcon className="h-2 w-2" />
                             {cfg.label}
                           </span>
                           {(() => {
@@ -470,8 +450,8 @@ export function SiteManager() {
                             const holdDays = activeHold ? Math.max(1, Math.round((new Date().getTime() - new Date(activeHold.holdStart).getTime()) / 86400000)) : 0;
                             if (!activeHold) return null;
                             return (
-                              <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-700/60 shadow-sm" title={`On Hold: ${activeHold.holdNote}`}>
-                                <PauseCircle className="h-2.5 w-2.5" />
+                              <span className="inline-flex items-center gap-1 text-[9px] font-bold uppercase font-mono tracking-wider px-1.5 py-0.5 rounded-sm border bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-800" title={`On Hold: ${activeHold.holdNote}`}>
+                                <PauseCircle className="h-2 w-2" />
                                 On Hold ({holdDays}d)
                               </span>
                             );
@@ -484,56 +464,46 @@ export function SiteManager() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      className={cn(
-                        'h-8 w-8 rounded-full transition-all opacity-0 group-hover:opacity-100',
-                        status === 'Active'
-                          ? 'text-emerald-600 hover:bg-emerald-100 dark:hover:bg-emerald-900/40'
-                          : status === 'Ended'
-                          ? 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'
-                          : 'text-amber-600 hover:bg-amber-100 dark:hover:bg-amber-900/40'
-                      )}
+                      className="h-7 w-7 rounded-sm text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
                       onClick={(e) => {
                         e.stopPropagation();
                         setInventorySite({ site, q: q || null });
                       }}
                     >
-                      <MoreVertical className="h-4 w-4" />
+                      <MoreVertical className="h-3.5 w-3.5" />
                     </Button>
                   </div>
 
                   {/* Client */}
-                  <div className="flex items-center gap-1.5 mb-3">
-                    <Building2 className="h-3.5 w-3.5 text-muted-foreground/70 shrink-0" />
-                    <span className="text-xs font-semibold text-muted-foreground truncate" title={site.client}>
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <Building2 className="h-3 w-3 text-slate-400 shrink-0" />
+                    <span className="text-[11px] font-normal text-slate-500 dark:text-slate-400 truncate" title={site.client}>
                       {site.client}
                     </span>
                   </div>
 
                   {/* Scope description */}
-                  <div className="text-xs text-muted-foreground leading-relaxed min-h-[36px] line-clamp-2 mb-4">
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed min-h-[32px] line-clamp-2 mb-3">
                     {q?.phase4?.scopeOfWorkSummary || 'Project assessment and technical proposal pending detailed documentation.'}
                   </div>
 
                   {/* Footer stats */}
-                  <div className="flex items-center justify-between pt-3 border-t border-black/5 dark:border-white/10">
-                    <div className="flex items-center gap-4">
-                      <div className="flex items-center gap-1.5">
-                        <Package className="h-3.5 w-3.5 text-muted-foreground/70" />
-                        <span className="text-xs font-bold text-muted-foreground">{stats.items}</span>
-                        <span className="text-[10px] text-muted-foreground/60">items</span>
+                  <div className="flex items-center justify-between pt-2.5 border-t border-slate-100 dark:border-slate-800">
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-1">
+                        <Package className="h-3 w-3 text-slate-400" />
+                        <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 font-mono tabular-nums">{stats.items}</span>
+                        <span className="text-[10px] text-slate-400">items</span>
                       </div>
-                      <div className="flex items-center gap-1.5">
-                        <FileText className="h-3.5 w-3.5 text-muted-foreground/70" />
-                        <span className="text-xs font-bold text-muted-foreground">{stats.waybills}</span>
-                        <span className="text-[10px] text-muted-foreground/60">waybills</span>
+                      <div className="flex items-center gap-1">
+                        <FileText className="h-3 w-3 text-slate-400" />
+                        <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 font-mono tabular-nums">{stats.waybills}</span>
+                        <span className="text-[10px] text-slate-400">waybills</span>
                       </div>
                     </div>
 
                     {/* "Go" arrow that appears on hover */}
-                    <div className={cn(
-                      'flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider transition-all translate-x-1 opacity-0 group-hover:translate-x-0 group-hover:opacity-100',
-                      status === 'Active' ? 'text-emerald-600' : status === 'Ended' ? 'text-slate-500' : 'text-amber-600'
-                    )}>
+                    <div className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 transition-all opacity-0 group-hover:opacity-100">
                       <Eye className="h-3 w-3" />
                       View
                     </div>
@@ -544,9 +514,9 @@ export function SiteManager() {
           })}
 
           {filteredSites.length === 0 && (
-            <div className="col-span-full py-16 flex flex-col items-center gap-3 text-muted-foreground">
-              <MapPin className="h-10 w-10 opacity-20" />
-              <p className="text-sm font-medium">No matching sites found.</p>
+            <div className="col-span-full py-12 flex flex-col items-center gap-2 text-slate-400">
+              <MapPin className="h-8 w-8 opacity-30" />
+              <p className="text-xs font-medium">No matching sites found.</p>
             </div>
           )}
         </div>

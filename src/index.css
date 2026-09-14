@@ -1,19 +1,25 @@
 @import "tailwindcss";
 
 @theme {
+  --color-slate-950: var(--theme-slate-950, #020617);
+  --color-slate-900: var(--theme-slate-900, #0f172a);
+  --color-slate-800: var(--theme-slate-800, #1e293b);
+  --color-slate-700: var(--theme-slate-700, #334155);
+  --color-slate-600: var(--theme-slate-600, #475569);
+
   --font-sans: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-  --color-indigo-50: var(--theme-primary-50, #eef2ff);
-  --color-indigo-100: var(--theme-primary-100, #e0e7ff);
-  --color-indigo-200: var(--theme-primary-200, #c7d2fe);
-  --color-indigo-300: var(--theme-primary-300, #a5b4fc);
-  --color-indigo-400: var(--theme-primary-400, #818cf8);
-  --color-indigo-500: var(--theme-primary-500, #6366f1);
-  --color-indigo-600: var(--theme-primary-600, #4f46e5);
-  --color-indigo-700: var(--theme-primary-700, #4338ca);
-  --color-indigo-800: var(--theme-primary-800, #3730a3);
-  --color-indigo-900: var(--theme-primary-900, #312e81);
-  --color-indigo-950: var(--theme-primary-950, #1e1b4b);
+  --color-indigo-50: var(--theme-primary-50, #eff6ff);
+  --color-indigo-100: var(--theme-primary-100, #dbeafe);
+  --color-indigo-200: var(--theme-primary-200, #bfdbfe);
+  --color-indigo-300: var(--theme-primary-300, #93c5fd);
+  --color-indigo-400: var(--theme-primary-400, #60a5fa);
+  --color-indigo-500: var(--theme-primary-500, #3b82f6);
+  --color-indigo-600: var(--theme-primary-600, #2563eb);
+  --color-indigo-700: var(--theme-primary-700, #1d4ed8);
+  --color-indigo-800: var(--theme-primary-800, #1e40af);
+  --color-indigo-900: var(--theme-primary-900, #1e3a8a);
+  --color-indigo-950: var(--theme-primary-950, #172554);
 
   --color-blue-50: var(--theme-primary-50, #eff6ff);
   --color-blue-100: var(--theme-primary-100, #dbeafe);
@@ -29,6 +35,12 @@
 }
 
 :root {
+  --theme-slate-950: #020617;
+  --theme-slate-900: #0f172a;
+  --theme-slate-800: #1e293b;
+  --theme-slate-700: #334155;
+  --theme-slate-600: #475569;
+
   font-family: var(--font-sans, "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -37,6 +49,12 @@
 
 body, button, input, select, textarea {
   font-family: inherit;
+}
+
+/* ── Tabular figures for numerical precision and alignment ─────────── */
+.tabular-nums, table, [data-metric], .font-mono {
+  font-feature-settings: "tnum" 1;
+  font-variant-numeric: tabular-nums;
 }
 
 /* ── Class-based dark mode (Tailwind v4) ─────────────────────────────
@@ -239,44 +257,44 @@ body, button, input, select, textarea {
    so themes INSTANTLY and RELIABLY pop across the entire application!
    ══════════════════════════════════════════════════════════════════════ */
 
-/* ── Default (Indigo) ── */
+/* ── Default (Technical Cobalt Blue) ── */
 html.theme-default, :root.theme-default, .theme-default {
-  --theme-primary-50: #eef2ff;
-  --theme-primary-100: #e0e7ff;
-  --theme-primary-200: #c7d2fe;
-  --theme-primary-300: #a5b4fc;
-  --theme-primary-400: #818cf8;
-  --theme-primary-500: #6366f1;
-  --theme-primary-600: #4f46e5;
-  --theme-primary-700: #4338ca;
-  --theme-primary-800: #3730a3;
-  --theme-primary-900: #312e81;
-  --theme-primary-950: #1e1b4b;
-  --color-primary: 79 70 229;
-  --color-ring: 99 102 241;
+  --theme-primary-50: #eff6ff;
+  --theme-primary-100: #dbeafe;
+  --theme-primary-200: #bfdbfe;
+  --theme-primary-300: #93c5fd;
+  --theme-primary-400: #60a5fa;
+  --theme-primary-500: #3b82f6;
+  --theme-primary-600: #2563eb;
+  --theme-primary-700: #1d4ed8;
+  --theme-primary-800: #1e40af;
+  --theme-primary-900: #1e3a8a;
+  --theme-primary-950: #172554;
+  --color-primary: 37 99 235;
+  --color-ring: 59 130 246;
 
-  --color-indigo-50: #eef2ff;
-  --color-indigo-100: #e0e7ff;
-  --color-indigo-200: #c7d2fe;
-  --color-indigo-300: #a5b4fc;
-  --color-indigo-400: #818cf8;
-  --color-indigo-500: #6366f1;
-  --color-indigo-600: #4f46e5;
-  --color-indigo-700: #4338ca;
-  --color-indigo-800: #3730a3;
-  --color-indigo-900: #312e81;
-  --color-indigo-950: #1e1b4b;
-  --color-blue-50: #eef2ff;
-  --color-blue-100: #e0e7ff;
-  --color-blue-200: #c7d2fe;
-  --color-blue-300: #a5b4fc;
-  --color-blue-400: #818cf8;
-  --color-blue-500: #6366f1;
-  --color-blue-600: #4f46e5;
-  --color-blue-700: #4338ca;
-  --color-blue-800: #3730a3;
-  --color-blue-900: #312e81;
-  --color-blue-950: #1e1b4b;
+  --color-indigo-50: #eff6ff;
+  --color-indigo-100: #dbeafe;
+  --color-indigo-200: #bfdbfe;
+  --color-indigo-300: #93c5fd;
+  --color-indigo-400: #60a5fa;
+  --color-indigo-500: #3b82f6;
+  --color-indigo-600: #2563eb;
+  --color-indigo-700: #1d4ed8;
+  --color-indigo-800: #1e40af;
+  --color-indigo-900: #1e3a8a;
+  --color-indigo-950: #172554;
+  --color-blue-50: #eff6ff;
+  --color-blue-100: #dbeafe;
+  --color-blue-200: #bfdbfe;
+  --color-blue-300: #93c5fd;
+  --color-blue-400: #60a5fa;
+  --color-blue-500: #3b82f6;
+  --color-blue-600: #2563eb;
+  --color-blue-700: #1d4ed8;
+  --color-blue-800: #1e40af;
+  --color-blue-900: #1e3a8a;
+  --color-blue-950: #172554;
 }
 
 /* ── Ocean (Blue) ── */
@@ -439,21 +457,21 @@ html.theme-rose, :root.theme-rose, .theme-rose {
   --color-blue-950: #4c0519;
 }
 
-/* ── Violet (Purple) ── */
-html.theme-violet, :root.theme-violet, .theme-violet {
-  --theme-primary-50: #f5f3ff;
-  --theme-primary-100: #ede9fe;
-  --theme-primary-200: #ddd6fe;
-  --theme-primary-300: #c4b5fd;
-  --theme-primary-400: #a78bfa;
-  --theme-primary-500: #8b5cf6;
-  --theme-primary-600: #7c3aed;
-  --theme-primary-700: #6d28d9;
-  --theme-primary-800: #5b21b6;
-  --theme-primary-900: #4c1d95;
-  --theme-primary-950: #2e1065;
-  --color-primary: 124 58 237;
-  --color-ring: 139 92 246;
+/* ── Sky (Blue) ── */
+html.theme-sky, :root.theme-sky, .theme-sky {
+  --theme-primary-50: #f0f9ff;
+  --theme-primary-100: #e0f2fe;
+  --theme-primary-200: #bae6fd;
+  --theme-primary-300: #7dd3fc;
+  --theme-primary-400: #38bdf8;
+  --theme-primary-500: #0ea5e9;
+  --theme-primary-600: #0284c7;
+  --theme-primary-700: #0369a1;
+  --theme-primary-800: #075985;
+  --theme-primary-900: #0c4a6e;
+  --theme-primary-950: #082f49;
+  --color-primary: 2 132 199;
+  --color-ring: 14 165 233;
 
   --color-indigo-50: #f5f3ff;
   --color-indigo-100: #ede9fe;
@@ -1087,6 +1105,18 @@ html.dark.ui-brutalism {
 
 /* ── Default (Indigo) (Dark IDE) ── */
 html.dark.theme-default, :root.dark.theme-default, .dark.theme-default {
+  --theme-slate-950:        #090b16;
+  --theme-slate-900:        #101426;
+  --theme-slate-800:        #19203c;
+  --theme-slate-700:        #232d54;
+  --theme-slate-600:        #313e73;
+
+  --color-slate-950:        #090b16;
+  --color-slate-900:        #101426;
+  --color-slate-800:        #19203c;
+  --color-slate-700:        #232d54;
+  --color-slate-600:        #313e73;
+
   --color-background:       9 11 22;
   --color-foreground:       226 232 240;
   --color-card:             16 20 38;
@@ -1103,6 +1133,18 @@ html.dark.theme-default, :root.dark.theme-default, .dark.theme-default {
 
 /* ── Ocean Blue (Dark IDE) ── */
 html.dark.theme-ocean, :root.dark.theme-ocean, .dark.theme-ocean {
+  --theme-slate-950:        #030e1c;
+  --theme-slate-900:        #071830;
+  --theme-slate-800:        #0e264a;
+  --theme-slate-700:        #163868;
+  --theme-slate-600:        #1f4d8c;
+
+  --color-slate-950:        #030e1c;
+  --color-slate-900:        #071830;
+  --color-slate-800:        #0e264a;
+  --color-slate-700:        #163868;
+  --color-slate-600:        #1f4d8c;
+
   --color-background:       3 14 28;
   --color-foreground:       224 242 254;
   --color-card:             7 24 48;
@@ -1119,6 +1161,18 @@ html.dark.theme-ocean, :root.dark.theme-ocean, .dark.theme-ocean {
 
 /* ── Forest Green (Dark IDE) ── */
 html.dark.theme-forest, :root.dark.theme-forest, .dark.theme-forest {
+  --theme-slate-950:        #02140d;
+  --theme-slate-900:        #052418;
+  --theme-slate-800:        #0b3826;
+  --theme-slate-700:        #124f37;
+  --theme-slate-600:        #1a6b4c;
+
+  --color-slate-950:        #02140d;
+  --color-slate-900:        #052418;
+  --color-slate-800:        #0b3826;
+  --color-slate-700:        #124f37;
+  --color-slate-600:        #1a6b4c;
+
   --color-background:       2 20 13;
   --color-foreground:       236 253 245;
   --color-card:             5 36 24;
@@ -1135,6 +1189,18 @@ html.dark.theme-forest, :root.dark.theme-forest, .dark.theme-forest {
 
 /* ── Sunset Amber (Dark IDE) ── */
 html.dark.theme-sunset, :root.dark.theme-sunset, .dark.theme-sunset {
+  --theme-slate-950:        #140c03;
+  --theme-slate-900:        #241505;
+  --theme-slate-800:        #3b2209;
+  --theme-slate-700:        #57330d;
+  --theme-slate-600:        #7a4713;
+
+  --color-slate-950:        #140c03;
+  --color-slate-900:        #241505;
+  --color-slate-800:        #3b2209;
+  --color-slate-700:        #57330d;
+  --color-slate-600:        #7a4713;
+
   --color-background:       20 12 3;
   --color-foreground:       254 243 199;
   --color-card:             36 21 5;
@@ -1151,6 +1217,18 @@ html.dark.theme-sunset, :root.dark.theme-sunset, .dark.theme-sunset {
 
 /* ── Rose Pink (Dark IDE) ── */
 html.dark.theme-rose, :root.dark.theme-rose, .dark.theme-rose {
+  --theme-slate-950:        #170308;
+  --theme-slate-900:        #290610;
+  --theme-slate-800:        #400a1a;
+  --theme-slate-700:        #5c1027;
+  --theme-slate-600:        #7d1636;
+
+  --color-slate-950:        #170308;
+  --color-slate-900:        #290610;
+  --color-slate-800:        #400a1a;
+  --color-slate-700:        #5c1027;
+  --color-slate-600:        #7d1636;
+
   --color-background:       23 3 8;
   --color-foreground:       255 228 230;
   --color-card:             41 6 16;
@@ -1165,56 +1243,104 @@ html.dark.theme-rose, :root.dark.theme-rose, .dark.theme-rose {
   --color-popover-foreground:255 228 230;
 }
 
-/* ── Royal Violet (Dark IDE) ── */
-html.dark.theme-violet, :root.dark.theme-violet, .dark.theme-violet {
-  --color-background:       14 4 28;
-  --color-foreground:       245 243 255;
-  --color-card:             27 10 51;
-  --color-card-foreground:  245 243 255;
-  --color-muted:            42 18 78;
-  --color-muted-foreground: 221 214 254;
-  --color-border:           61 27 110;
-  --color-input:            61 27 110;
-  --color-ring:             139 92 246;
-  --color-primary:          139 92 246;
-  --color-popover:          27 10 51;
-  --color-popover-foreground:245 243 255;
+/* ── Sky Blue (Dark IDE) ── */
+html.dark.theme-sky, :root.dark.theme-sky, .dark.theme-sky {
+  --theme-slate-950:        #031628;
+  --theme-slate-900:        #082038;
+  --theme-slate-800:        #0c2f50;
+  --theme-slate-700:        #154572;
+  --theme-slate-600:        #1e5f9c;
+
+  --color-slate-950:        #031628;
+  --color-slate-900:        #082038;
+  --color-slate-800:        #0c2f50;
+  --color-slate-700:        #154572;
+  --color-slate-600:        #1e5f9c;
+
+  --color-background:       3 22 40;
+  --color-foreground:       240 249 255;
+  --color-card:             8 32 56;
+  --color-card-foreground:  240 249 255;
+  --color-muted:            12 47 80;
+  --color-muted-foreground: 186 230 253;
+  --color-border:           21 69 114;
+  --color-input:            21 69 114;
+  --color-ring:             14 165 233;
+  --color-primary:          14 165 233;
+  --color-popover:          8 32 56;
+  --color-popover-foreground:240 249 255;
 }
 
 /* ── Slate Gray (Dark IDE) ── */
 html.dark.theme-slate, :root.dark.theme-slate, .dark.theme-slate {
+  --theme-slate-950:        #090d14;
+  --theme-slate-900:        #111622;
+  --theme-slate-800:        #1c2333;
+  --theme-slate-700:        #2a344a;
+  --theme-slate-600:        #3a4763;
+
+  --color-slate-950:        #090d14;
+  --color-slate-900:        #111622;
+  --color-slate-800:        #1c2333;
+  --color-slate-700:        #2a344a;
+  --color-slate-600:        #3a4763;
+
   --color-background:       9 13 20;
   --color-foreground:       241 245 249;
-  --color-card:             17 24 39;
+  --color-card:             17 22 34;
   --color-card-foreground:  241 245 249;
-  --color-muted:            31 41 61;
+  --color-muted:            28 35 51;
   --color-muted-foreground: 203 213 225;
-  --color-border:           45 58 82;
-  --color-input:            45 58 82;
-  --color-ring:             100 116 139;
-  --color-primary:          100 116 139;
-  --color-popover:          17 24 39;
+  --color-border:           42 52 74;
+  --color-input:            42 52 74;
+  --color-ring:             148 163 184;
+  --color-primary:          148 163 184;
+  --color-popover:          17 22 34;
   --color-popover-foreground:241 245 249;
 }
 
 /* ── Burgundy IDE (Dark IDE) ── */
 html.dark.theme-burgundy, :root.dark.theme-burgundy, .dark.theme-burgundy {
-  --color-background:       28 2 6;
-  --color-foreground:       255 220 220;
-  --color-card:             46 4 11;
-  --color-card-foreground:  255 220 220;
-  --color-muted:            71 8 19;
+  --theme-slate-950:        #160408;
+  --theme-slate-900:        #260810;
+  --theme-slate-800:        #3d0d1b;
+  --theme-slate-700:        #581427;
+  --theme-slate-600:        #771b35;
+
+  --color-slate-950:        #160408;
+  --color-slate-900:        #260810;
+  --color-slate-800:        #3d0d1b;
+  --color-slate-700:        #581427;
+  --color-slate-600:        #771b35;
+
+  --color-background:       22 4 8;
+  --color-foreground:       255 228 230;
+  --color-card:             38 8 16;
+  --color-card-foreground:  255 228 230;
+  --color-muted:            61 13 27;
   --color-muted-foreground: 254 205 211;
-  --color-border:           102 12 29;
-  --color-input:            102 12 29;
-  --color-ring:             225 29 72;
-  --color-primary:          225 29 72;
-  --color-popover:          46 4 11;
-  --color-popover-foreground:255 220 220;
+  --color-border:           88 20 39;
+  --color-input:            88 20 39;
+  --color-ring:             244 63 94;
+  --color-primary:          244 63 94;
+  --color-popover:          38 8 16;
+  --color-popover-foreground:255 228 230;
 }
 
 /* ── Midnight IDE (Dark IDE) ── */
 html.dark.theme-midnight, :root.dark.theme-midnight, .dark.theme-midnight {
+  --theme-slate-950:        #001020;
+  --theme-slate-900:        #001c38;
+  --theme-slate-800:        #002b54;
+  --theme-slate-700:        #003d75;
+  --theme-slate-600:        #00539c;
+
+  --color-slate-950:        #001020;
+  --color-slate-900:        #001c38;
+  --color-slate-800:        #002b54;
+  --color-slate-700:        #003d75;
+  --color-slate-600:        #00539c;
+
   --color-background:       0 16 32;
   --color-foreground:       220 235 255;
   --color-card:             0 28 56;
@@ -1231,6 +1357,18 @@ html.dark.theme-midnight, :root.dark.theme-midnight, .dark.theme-midnight {
 
 /* ── Monokai IDE (Dark IDE) ── */
 html.dark.theme-monokai, :root.dark.theme-monokai, .dark.theme-monokai {
+  --theme-slate-950:        #1e1f1c;
+  --theme-slate-900:        #272822;
+  --theme-slate-800:        #3e3d32;
+  --theme-slate-700:        #545244;
+  --theme-slate-600:        #6d6b59;
+
+  --color-slate-950:        #1e1f1c;
+  --color-slate-900:        #272822;
+  --color-slate-800:        #3e3d32;
+  --color-slate-700:        #545244;
+  --color-slate-600:        #6d6b59;
+
   --color-background:       30 31 28;
   --color-foreground:       248 248 242;
   --color-card:             39 40 34;
@@ -1247,6 +1385,18 @@ html.dark.theme-monokai, :root.dark.theme-monokai, .dark.theme-monokai {
 
 /* ── Solarized Dark (Dark IDE) ── */
 html.dark.theme-solarized, :root.dark.theme-solarized, .dark.theme-solarized {
+  --theme-slate-950:        #00212b;
+  --theme-slate-900:        #002b36;
+  --theme-slate-800:        #073642;
+  --theme-slate-700:        #0c4959;
+  --theme-slate-600:        #125e73;
+
+  --color-slate-950:        #00212b;
+  --color-slate-900:        #002b36;
+  --color-slate-800:        #073642;
+  --color-slate-700:        #0c4959;
+  --color-slate-600:        #125e73;
+
   --color-background:       0 33 43;
   --color-foreground:       253 246 227;
   --color-card:             0 43 54;
@@ -1263,6 +1413,18 @@ html.dark.theme-solarized, :root.dark.theme-solarized, .dark.theme-solarized {
 
 /* ── Tokyo Night (Dark IDE) ── */
 html.dark.theme-tokyo-night, :root.dark.theme-tokyo-night, .dark.theme-tokyo-night {
+  --theme-slate-950:        #16161e;
+  --theme-slate-900:        #1a1b26;
+  --theme-slate-800:        #24283b;
+  --theme-slate-700:        #343b59;
+  --theme-slate-600:        #475078;
+
+  --color-slate-950:        #16161e;
+  --color-slate-900:        #1a1b26;
+  --color-slate-800:        #24283b;
+  --color-slate-700:        #343b59;
+  --color-slate-600:        #475078;
+
   --color-background:       22 22 30;
   --color-foreground:       169 177 214;
   --color-card:             26 27 38;
@@ -1287,20 +1449,32 @@ html.dark.theme-tokyo-night, :root.dark.theme-tokyo-night, .dark.theme-tokyo-nig
   color-scheme: dark;
 }
 
-/* Background surfaces */
+/* Background surfaces: HTML, body, root, main layout wrapper */
+.dark,
+.dark body,
+.dark #root,
+.dark #layout-content-wrapper,
+.dark main,
 .dark .bg-slate-950,
 .dark.bg-slate-950,
 .dark [class*="bg-slate-950"],
 .dark [class*="dark:bg-slate-950"] {
-  background-color: rgb(var(--color-background)) !important;
+  background-color: var(--color-slate-950) !important;
 }
 
-/* Card, Sidebar, Header & Modal surfaces */
+/* Card, Sidebar, Header, Modal & Floating surfaces */
+.dark header,
 .dark .bg-slate-900,
 .dark.bg-slate-900,
 .dark [class*="bg-slate-900"],
 .dark [class*="dark:bg-slate-900"] {
-  background-color: rgb(var(--color-card)) !important;
+  background-color: var(--color-slate-900) !important;
+}
+
+/* Dark mode sidebar specific container and nav */
+.dark [class*="fixed lg:relative flex h-full"] {
+  background-color: var(--color-slate-900) !important;
+  border-color: var(--color-slate-700) !important;
 }
 
 /* Muted / hover / nested surfaces */
@@ -1308,7 +1482,7 @@ html.dark.theme-tokyo-night, :root.dark.theme-tokyo-night, .dark.theme-tokyo-nig
 .dark.bg-slate-800,
 .dark [class*="bg-slate-800"],
 .dark [class*="dark:bg-slate-800"] {
-  background-color: rgb(var(--color-muted)) !important;
+  background-color: var(--color-slate-800) !important;
 }
 
 /* Borders & Dividers */
@@ -1318,9 +1492,8 @@ html.dark.theme-tokyo-night, :root.dark.theme-tokyo-night, .dark.theme-tokyo-nig
 .dark .border-slate-700,
 .dark [class*="border-slate-700"],
 .dark [class*="dark:border-slate-700"] {
-  border-color: rgb(var(--color-border)) !important;
+  border-color: var(--color-slate-700) !important;
 }
-
 
 /* ══════════════════════════════════════════════════════════════════════
    UI INTERACTION STYLES (Classic, Modern, Glass, Neo-Brutalism, Minimalist)

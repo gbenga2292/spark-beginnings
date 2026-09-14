@@ -211,6 +211,10 @@ export function dbToPayment(r: any): Payment {
     vat: Number(r.vat), amountForVat: Number(r.amount_for_vat),
     damages: r.damages != null ? Number(r.damages) : undefined,
     paidTo: r.paid_to || undefined,
+    invoiceId: r.invoice_id || undefined,
+    invoiceNumber: r.invoice_number || undefined,
+    allocations: Array.isArray(r.allocations) ? r.allocations : (typeof r.allocations === 'string' ? JSON.parse(r.allocations || '[]') : []),
+    unappliedAmount: r.unapplied_amount != null ? Number(r.unapplied_amount) : 0,
   };
 }
 
@@ -862,6 +866,10 @@ function paymentToDb(p: Payment) {
     vat: p.vat, amount_for_vat: p.amountForVat,
     damages: p.damages || 0,
     paid_to: p.paidTo || null,
+    invoice_id: p.invoiceId || null,
+    invoice_number: p.invoiceNumber || null,
+    allocations: p.allocations || [],
+    unapplied_amount: p.unappliedAmount || 0,
   };
 }
 
@@ -1105,6 +1113,13 @@ export async function fetchAllAppData(privs?: any) {
     // Allow fetching dependent data for General Reports if they have the reports privilege
     if (privs?.reports?.canView === true) {
       if (['employees', 'attendance', 'leaves', 'invoices', 'payments', 'ledger'].includes(mod)) {
+        return true;
+      }
+    }
+
+    // Allow fetching invoices for Payments module to link payments to invoices
+    if (privs?.payments?.canView === true) {
+      if (['invoices', 'pending_invoices'].includes(mod)) {
         return true;
       }
     }
@@ -2034,6 +2049,10 @@ export const db = {
     if (p.vat !== undefined) update.vat = p.vat;
     if (p.amountForVat !== undefined) update.amount_for_vat = p.amountForVat;
     if (p.paidTo !== undefined) update.paid_to = p.paidTo;
+    if (p.invoiceId !== undefined) update.invoice_id = p.invoiceId;
+    if (p.invoiceNumber !== undefined) update.invoice_number = p.invoiceNumber;
+    if (p.allocations !== undefined) update.allocations = p.allocations;
+    if (p.unappliedAmount !== undefined) update.unapplied_amount = p.unappliedAmount;
     const { error } = await supabase.from('payments').update(update).eq('id', id);
     if (error) { console.error('Database error:', error); throw error; }
   },

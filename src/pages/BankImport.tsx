@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { useAppStore } from '@/src/store/appStore';
@@ -39,7 +39,18 @@ import {
   Pencil,
   ChevronUp,
   ChevronDown,
-  ChevronsUpDown
+  ChevronsUpDown,
+  FileUp,
+  Download,
+  AlertCircle,
+  Clock,
+  ArrowRight,
+  ExternalLink,
+  ChevronRight,
+  ShieldCheck,
+  Zap,
+  Edit2,
+  Filter
 } from 'lucide-react';
 import { Button } from '@/src/components/ui/button';
 import { toast } from '@/src/components/ui/toast';
@@ -47,6 +58,7 @@ import {
   parsePdfStatementWithAI,
   parseImageWithAI,
   detectProvider,
+  getWorkspaceAiKey,
   ExtractedTransaction
 } from '@/src/lib/aiImportService';
 
@@ -158,31 +170,35 @@ export default function BankImport() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
-  // Fetch the default API Key from Supabase on mount
-  useEffect(() => {
-    async function fetchApiKey() {
-      setIsKeyLoading(true);
-      try {
-        const { data } = await supabase
-          .from('api_keys')
-          .select('key_value,provider,default_model')
-          .eq('workspace_id', workspaceId)
-          .eq('is_default', true)
-          .maybeSingle();
-
-        if (data) {
-          setApiKey(data.key_value);
-          setKeyProvider(data.provider);
-          setApiModel(data.default_model || '');
-        }
-      } catch (err) {
-        console.error('Error fetching API key:', err);
-      } finally {
-        setIsKeyLoading(false);
+  // Fetch the active API Key from Settings on mount and when window regains focus
+  const fetchApiKey = useCallback(async () => {
+    setIsKeyLoading(true);
+    try {
+      const config = await getWorkspaceAiKey(workspaceId);
+      if (config) {
+        setApiKey(config.apiKey);
+        setKeyProvider(config.provider);
+        setApiModel(config.model || '');
+      } else {
+        setApiKey('');
+        setKeyProvider('unknown');
+        setApiModel('');
       }
+    } catch (err) {
+      console.error('Error fetching API key:', err);
+    } finally {
+      setIsKeyLoading(false);
     }
-    fetchApiKey();
   }, [workspaceId]);
+
+  useEffect(() => {
+    fetchApiKey();
+
+    // Re-fetch key automatically if user switches back to this tab/window after saving in Settings
+    const handleFocus = () => fetchApiKey();
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [fetchApiKey]);
 
   // Fetch saved audit drafts on mount
   const fetchSavedAudits = async () => {
@@ -455,7 +471,8 @@ export default function BankImport() {
         try {
           const extracted = await parsePdfStatementWithAI(
             file, apiKey, categoriesList, password, apiModel,
-            (status, pct) => setImportProgress({ status, pct })
+            (status, pct) => setImportProgress({ status, pct }),
+            keyProvider
           );
           const rows: ReviewRow[] = extracted.map(tx => {
             const matchedEntries = auditWithLedger ? findAutoMatch(tx.date, tx.amount) : [];
@@ -846,7 +863,7 @@ export default function BankImport() {
         <div className="space-y-6">
           
           {/* Key configuration alert banner */}
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 md:p-6 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md p-4 md:p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-sm">
             <div>
               <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
                 <Sparkles className="h-4 w-4 text-amber-500 animate-pulse" />
@@ -854,24 +871,34 @@ export default function BankImport() {
               </h3>
               <p className="text-xs text-slate-500 mt-1">
                 {isKeyLoading ? (
-                  <span className="flex items-center gap-1"><RefreshCw className="h-3 w-3 animate-spin" /> Fetching key...</span>
+                  <span className="flex items-center gap-1"><RefreshCw className="h-3 w-3 animate-spin" /> Fetching key from settings...</span>
                 ) : apiKey ? (
-                  <span className="text-emerald-600 font-medium">✓ Default Workspace API key loaded (Provider: <span className="capitalize">{keyProvider}</span>)</span>
+                  <span className="text-emerald-600 font-medium">✓ Default Workspace API key loaded (Provider: <span className="capitalize">{keyProvider}</span>{apiModel ? ` · Model: ${apiModel}` : ''})</span>
                 ) : (
-                  <span className="text-amber-600">No active AI API Key found. You can enter one temporarily to scan documents.</span>
+                  <span className="text-amber-600">No active AI API Key found. You can configure one in Settings or enter one temporarily.</span>
                 )}
               </p>
             </div>
-            {!isKeyLoading && !apiKey && !showTempKeyInput && (
-              <Button size="sm" onClick={() => setShowTempKeyInput(true)} className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shrink-0">
-                Provide API Key
+            <div className="flex items-center gap-2 shrink-0">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate('/settings?tab=ai')}
+                className="text-xs font-semibold h-8 border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200"
+              >
+                AI Settings
               </Button>
-            )}
+              {!isKeyLoading && !apiKey && !showTempKeyInput && (
+                <Button size="sm" onClick={() => setShowTempKeyInput(true)} className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shrink-0 h-8">
+                  Provide API Key
+                </Button>
+              )}
+            </div>
           </div>
 
           {/* Temp Key input form */}
           {showTempKeyInput && (
-            <form onSubmit={handleTempKeySubmit} className="bg-amber-50/55 border border-amber-200/60 dark:bg-slate-900 dark:border-slate-800 rounded-2xl p-5 space-y-4">
+            <form onSubmit={handleTempKeySubmit} className="bg-amber-50/55 border border-amber-200/60 dark:bg-slate-900 dark:border-slate-800 rounded-md p-5 space-y-4">
               <div className="flex justify-between items-center">
                 <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Provide Temporary API Key</h4>
                 <button type="button" onClick={() => setShowTempKeyInput(false)} className="text-slate-400 hover:text-slate-655"><X className="h-4 w-4" /></button>
@@ -883,10 +910,10 @@ export default function BankImport() {
                   placeholder="Paste Key (e.g. AIzaSy... or sk-...)"
                   value={tempApiKeyInput}
                   onChange={(e) => setTempApiKeyInput(e.target.value)}
-                  className="flex-1 h-9 px-3 text-xs bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg outline-none"
+                  className="flex-1 h-9 px-3 text-xs bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-sm outline-none"
                   autoFocus
                 />
-                <Button type="submit" size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs h-9">
+                <Button type="submit" size="sm" className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs h-9">
                   Apply Key
                 </Button>
               </div>
@@ -895,9 +922,9 @@ export default function BankImport() {
 
           {/* Saved Audits list (shows active drafts) */}
           {savedAudits.length > 0 && (
-            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 space-y-3 shadow-sm">
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md p-5 space-y-3 border border-slate-200 dark:border-slate-800">
               <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-                <FolderOpen className="h-4 w-4 text-indigo-600" />
+                <FolderOpen className="h-4 w-4 text-blue-600" />
                 Active Statement Audit Drafts ({savedAudits.filter(a => a.status === 'draft').length})
               </h3>
               <p className="text-xs text-slate-500">Click a session to resume. Use the pencil to rename or the trash icon to delete.</p>
@@ -907,10 +934,10 @@ export default function BankImport() {
                   <div
                     key={audit.id}
                     onClick={() => renamingAuditId !== audit.id && handleLoadAudit(audit)}
-                    className={`p-3.5 border rounded-xl transition-all flex flex-col justify-between ${
+                    className={`p-3.5 border rounded-md transition-all flex flex-col justify-between ${
                       audit.status === 'completed'
                         ? 'border-slate-200 dark:border-slate-800 opacity-60 cursor-pointer hover:opacity-80'
-                        : 'border-indigo-100 dark:border-indigo-950 bg-indigo-50/5 hover:border-indigo-400 cursor-pointer'
+                        : 'border-blue-200 dark:border-blue-800 dark:border-blue-950 bg-blue-50/5 hover:border-blue-400 cursor-pointer'
                     }`}
                   >
                     <div>
@@ -925,7 +952,7 @@ export default function BankImport() {
                               if (e.key === 'Enter') handleRenameAudit(audit.id, (e.target as HTMLInputElement).value);
                               if (e.key === 'Escape') setRenamingAuditId(null);
                             }}
-                            className="flex-1 text-xs font-bold border-b border-indigo-400 outline-none bg-transparent text-slate-800 dark:text-slate-200"
+                            className="flex-1 text-xs font-bold border-b border-blue-400 outline-none bg-transparent text-slate-800 dark:text-slate-200"
                           />
                         ) : (
                           <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate flex-1">{audit.name}</h4>
@@ -947,7 +974,7 @@ export default function BankImport() {
                           <button
                             title="Rename"
                             onClick={() => { setRenamingAuditId(audit.id); setRenamingAuditValue(audit.name); }}
-                            className="text-slate-400 hover:text-indigo-650 transition-colors"
+                            className="text-slate-400 hover:text-blue-600 transition-colors"
                           >
                             <Pencil className="h-3 w-3" />
                           </button>
@@ -991,7 +1018,7 @@ export default function BankImport() {
             <select
               value={defaultBank}
               onChange={(e) => setDefaultBank(e.target.value)}
-              className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 h-9 px-3 rounded-lg text-xs font-bold text-slate-700 dark:text-slate-200 w-full outline-none shadow-sm"
+              className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 h-9 px-3 rounded-sm text-xs font-bold text-slate-700 dark:text-slate-200 w-full outline-none"
             >
               <option value="">Select Bank / Source...</option>
               {ledgerBanks.map(b => (
@@ -1014,12 +1041,12 @@ export default function BankImport() {
                   toast.error("You don't have permission to upload bank statements.");
                 }
               }}
-              className={`border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl p-10 flex flex-col items-center justify-center text-center transition-colors bg-white dark:bg-slate-900/40 min-h-[220px] ${
-                priv.canUpload ? 'hover:border-indigo-500 cursor-pointer' : 'opacity-50 cursor-not-allowed'
+              className={`border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-md p-10 flex flex-col items-center justify-center text-center transition-colors bg-white dark:bg-slate-900/40 min-h-[220px] ${
+                priv.canUpload ? 'hover:border-blue-500 cursor-pointer' : 'opacity-50 cursor-not-allowed'
               }`}
             >
-              <div className="bg-indigo-50 dark:bg-slate-850 p-4 rounded-full mb-4">
-                <Upload className="h-7 w-7 text-indigo-655" />
+              <div className="bg-blue-50 dark:bg-blue-950/40 dark:bg-slate-850 p-4 rounded-full mb-4">
+                <Upload className="h-7 w-7 text-blue-600" />
               </div>
               <h4 className="text-sm font-bold text-slate-800 dark:text-slate-100">Drop PDF or Spreadsheet statement</h4>
               <p className="text-xs text-slate-500 mt-1 max-w-[280px]">Supports bank statement PDF files, or Excel/CSV ledger exports (.xlsx, .xls, .csv)</p>
@@ -1041,7 +1068,7 @@ export default function BankImport() {
                   toast.error("You don't have permission to scan statement photos.");
                 }
               }}
-              className={`border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl p-10 flex flex-col items-center justify-center text-center transition-colors bg-white dark:bg-slate-900/40 min-h-[220px] ${
+              className={`border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-md p-10 flex flex-col items-center justify-center text-center transition-colors bg-white dark:bg-slate-900/40 min-h-[220px] ${
                 priv.canUpload ? 'hover:border-emerald-500 cursor-pointer' : 'opacity-50 cursor-not-allowed'
               }`}
             >
@@ -1065,11 +1092,11 @@ export default function BankImport() {
           {/* Loader Overlay — with live progress bar */}
           {loading && !pdfPasswordModalOpen && (
             <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-50 flex items-center justify-center">
-              <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-2xl max-w-sm w-full mx-4 flex flex-col gap-4 border border-slate-200 dark:border-slate-800">
+              <div className="bg-white dark:bg-slate-900 rounded-md p-6 shadow-2xl max-w-sm w-full mx-4 flex flex-col gap-4 border border-slate-200 dark:border-slate-800">
                 {/* Header */}
                 <div className="flex items-center gap-3">
-                  <div className="bg-indigo-100 dark:bg-indigo-900/40 p-2 rounded-lg shrink-0">
-                    <Sparkles className="h-5 w-5 text-indigo-600 animate-pulse" />
+                  <div className="bg-blue-100 dark:bg-blue-950/60 dark:bg-blue-950/40 p-2 rounded-sm shrink-0">
+                    <Sparkles className="h-5 w-5 text-blue-600 animate-pulse" />
                   </div>
                   <div>
                     <h4 className="text-sm font-bold text-slate-800 dark:text-slate-100">Scanning Statement...</h4>
@@ -1083,24 +1110,24 @@ export default function BankImport() {
                     <p className="text-[11px] font-semibold text-slate-600 dark:text-slate-300 leading-snug flex-1 pr-2">
                       {importProgress?.status || progressText || 'Preparing...'}
                     </p>
-                    <span className="text-xs font-black text-indigo-600 shrink-0 tabular-nums">
+                    <span className="text-xs font-mono font-bold text-blue-600 dark:text-blue-400 shrink-0 tabular-nums">
                       {importProgress ? `${importProgress.pct}%` : ''}
                     </span>
                   </div>
-                  <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2.5 overflow-hidden">
+                  <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-sm h-2 overflow-hidden">
                     <div
-                      className="h-full bg-gradient-to-r from-indigo-500 to-violet-500 rounded-full transition-all duration-500 ease-out"
+                      className="h-full bg-blue-600 transition-all duration-500 ease-out"
                       style={{ width: `${importProgress?.pct ?? 5}%` }}
                     />
                   </div>
                 </div>
 
                 {/* Phase indicators */}
-                <div className="flex justify-between text-[9px] font-bold text-slate-400 uppercase tracking-wider px-0.5">
-                  <span className={(importProgress?.pct ?? 0) >= 10 ? 'text-indigo-500' : ''}>Decrypt</span>
-                  <span className={(importProgress?.pct ?? 0) >= 30 ? 'text-indigo-500' : ''}>Parse</span>
-                  <span className={(importProgress?.pct ?? 0) >= 70 ? 'text-indigo-500' : ''}>AI Scan</span>
-                  <span className={(importProgress?.pct ?? 0) >= 95 ? 'text-emerald-500' : ''}>Done</span>
+                <div className="flex justify-between text-[9px] font-mono font-bold text-slate-400 uppercase tracking-wider px-0.5">
+                  <span className={(importProgress?.pct ?? 0) >= 10 ? 'text-blue-600 dark:text-blue-400' : ''}>Decrypt</span>
+                  <span className={(importProgress?.pct ?? 0) >= 30 ? 'text-blue-600 dark:text-blue-400' : ''}>Parse</span>
+                  <span className={(importProgress?.pct ?? 0) >= 70 ? 'text-blue-600 dark:text-blue-400' : ''}>AI Scan</span>
+                  <span className={(importProgress?.pct ?? 0) >= 95 ? 'text-emerald-600 dark:text-emerald-400' : ''}>Done</span>
                 </div>
               </div>
             </div>
@@ -1119,7 +1146,7 @@ export default function BankImport() {
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
               <h3 className="text-base font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-                <FolderOpen className="h-5 w-5 text-indigo-600" />
+                <FolderOpen className="h-5 w-5 text-blue-600" />
                 {auditName ? `Audit Session: ${auditName}` : 'Ledger Audit & Reconciliation Board'}
               </h3>
               <p className="text-xs text-slate-500 mt-0.5">
@@ -1129,12 +1156,12 @@ export default function BankImport() {
 
             {/* Toggle view mode: Grid vs Summary report */}
             <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
-              <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200 shadow-sm shrink-0">
+              <div className="flex bg-slate-100 p-0.5 rounded-sm border border-slate-200 shrink-0">
                 <button
                   type="button"
                   onClick={() => setViewMode('grid')}
                   className={`px-3 py-1.5 rounded-md text-[10px] uppercase tracking-wider font-extrabold transition-all duration-200 ${
-                    viewMode === 'grid' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-indigo-600'
+                    viewMode === 'grid' ? 'bg-white text-blue-700 ' : 'text-slate-500 hover:text-blue-600'
                   }`}
                 >
                   Grid View
@@ -1143,7 +1170,7 @@ export default function BankImport() {
                   type="button"
                   onClick={() => setViewMode('summary')}
                   className={`px-3 py-1.5 rounded-md text-[10px] uppercase tracking-wider font-extrabold transition-all duration-200 ${
-                    viewMode === 'summary' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-indigo-600'
+                    viewMode === 'summary' ? 'bg-white text-blue-700 ' : 'text-slate-500 hover:text-blue-600'
                   }`}
                 >
                   Summary Report
@@ -1157,7 +1184,7 @@ export default function BankImport() {
                   type="button"
                   size="sm"
                   onClick={handleImportSubmit}
-                  className="h-9 font-bold text-[11px] uppercase tracking-tight bg-indigo-600 hover:bg-indigo-700 text-white flex-1 md:flex-initial gap-1.5 shadow-sm"
+                  className="h-9 font-bold text-[11px] uppercase tracking-tight bg-blue-600 hover:bg-blue-700 text-white flex-1 md:flex-initial gap-1.5"
                 >
                   <Check className="h-4 w-4" /> Post to Ledger
                 </Button>
@@ -1171,7 +1198,7 @@ export default function BankImport() {
                     setAuditName(auditName || selectedFile?.name.replace(/\.[^/.]+$/, "") || 'Statement Audit');
                     setShowSaveModal(true);
                   }}
-                  className="h-9 font-bold text-[11px] uppercase tracking-tight border-slate-200 bg-white hover:bg-slate-50 flex-1 md:flex-initial gap-1.5 shadow-sm"
+                  className="h-9 font-bold text-[11px] uppercase tracking-tight border-slate-200 bg-white hover:bg-slate-50 flex-1 md:flex-initial gap-1.5"
                 >
                   <Save className="h-4 w-4 text-slate-500" /> Save Draft
                 </Button>
@@ -1198,14 +1225,14 @@ export default function BankImport() {
           {viewMode === 'grid' && (
             <div className="space-y-4 animate-in fade-in duration-200">
               {/* Audit Legend Panel */}
-              <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-[11px] text-slate-650 dark:text-slate-400 flex flex-wrap gap-x-6 gap-y-2">
+              <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md p-3 text-[11px] text-slate-650 dark:text-slate-400 flex flex-wrap gap-x-6 gap-y-2">
                 <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-slate-400" /> New / Unmatched (Inserts record)</span>
                 <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-emerald-555" /> Balanced Match (Linked entries equal statement amount)</span>
                 <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-amber-500" /> Partial Match / Mismatch (Split amounts do not balance statement)</span>
               </div>
 
               {/* Bank Source Toolbar */}
-              <div className="flex flex-wrap items-center gap-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 shadow-sm">
+              <div className="flex flex-wrap items-center gap-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md px-4 py-3 border border-slate-200 dark:border-slate-800">
                 <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-widest shrink-0">Bank Source</span>
                 <div className="flex flex-wrap items-center gap-2 flex-1">
                   <select
@@ -1216,7 +1243,7 @@ export default function BankImport() {
                         setReviewRows(prev => prev.map(r => ({ ...r, bank: e.target.value })));
                       }
                     }}
-                    className="h-8 px-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-lg text-xs font-semibold text-slate-700 dark:text-slate-200 outline-none shadow-sm"
+                    className="h-8 px-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-sm text-xs font-semibold text-slate-700 dark:text-slate-200 outline-none"
                   >
                     <option value="">Select registered bank...</option>
                     {ledgerBanks.map(b => (
@@ -1229,7 +1256,7 @@ export default function BankImport() {
                     <input
                       type="text"
                       placeholder="Enter external source name (e.g. Cash, Petty Cash)"
-                      className="h-8 px-2 border border-indigo-300 dark:border-indigo-700 bg-white dark:bg-slate-800 rounded-lg text-xs font-semibold text-slate-700 dark:text-slate-200 outline-none w-64"
+                      className="h-8 px-2 border border-blue-300 dark:border-blue-700 bg-white dark:bg-slate-800 rounded-sm text-xs font-semibold text-slate-700 dark:text-slate-200 outline-none w-64"
                       onBlur={(e) => {
                         const val = e.target.value.trim();
                         if (val) {
@@ -1258,7 +1285,7 @@ export default function BankImport() {
               </div>
 
               {/* Grid Table */}
-              <div className="bg-white dark:bg-slate-900 border border-slate-250 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden overflow-x-auto">
+              <div className="bg-white dark:bg-slate-900 border border-slate-250 dark:border-slate-800 rounded-md border border-slate-200 dark:border-slate-800 overflow-hidden overflow-x-auto">
                 <table className="w-full text-xs font-medium text-slate-700 dark:text-slate-350">
                   <thead className="bg-slate-50 dark:bg-slate-855 text-slate-500 border-b border-slate-200 dark:border-slate-800">
                     <tr>
@@ -1269,7 +1296,7 @@ export default function BankImport() {
                           onChange={(e) =>
                             setReviewRows((prev) => prev.map((r) => ({ ...r, selected: e.target.checked })))
                           }
-                          className="h-3.5 w-3.5 rounded border-slate-350 accent-indigo-600 cursor-pointer"
+                          className="h-3.5 w-3.5 rounded border-slate-350 accent-blue-600 cursor-pointer"
                         />
                       </th>
                       <th
@@ -1279,7 +1306,7 @@ export default function BankImport() {
                         <div className="flex items-center gap-1">
                           Date
                           {gridSort?.field === 'date' ? (
-                            gridSort.dir === 'asc' ? <ChevronUp className="h-3 w-3 text-indigo-600" /> : <ChevronDown className="h-3 w-3 text-indigo-600" />
+                            gridSort.dir === 'asc' ? <ChevronUp className="h-3 w-3 text-blue-600" /> : <ChevronDown className="h-3 w-3 text-blue-600" />
                           ) : (
                             <ChevronsUpDown className="h-3 w-3 text-slate-400" />
                           )}
@@ -1292,7 +1319,7 @@ export default function BankImport() {
                         <div className="flex items-center gap-1">
                           Description
                           {gridSort?.field === 'description' ? (
-                            gridSort.dir === 'asc' ? <ChevronUp className="h-3 w-3 text-indigo-600" /> : <ChevronDown className="h-3 w-3 text-indigo-600" />
+                            gridSort.dir === 'asc' ? <ChevronUp className="h-3 w-3 text-blue-600" /> : <ChevronDown className="h-3 w-3 text-blue-600" />
                           ) : (
                             <ChevronsUpDown className="h-3 w-3 text-slate-400" />
                           )}
@@ -1305,7 +1332,7 @@ export default function BankImport() {
                         <div className="flex items-center justify-end gap-1">
                           Amount
                           {gridSort?.field === 'amount' ? (
-                            gridSort.dir === 'asc' ? <ChevronUp className="h-3 w-3 text-indigo-600" /> : <ChevronDown className="h-3 w-3 text-indigo-600" />
+                            gridSort.dir === 'asc' ? <ChevronUp className="h-3 w-3 text-blue-600" /> : <ChevronDown className="h-3 w-3 text-blue-600" />
                           ) : (
                             <ChevronsUpDown className="h-3 w-3 text-slate-400" />
                           )}
@@ -1318,7 +1345,7 @@ export default function BankImport() {
                         <div className="flex items-center gap-1">
                           Type
                           {gridSort?.field === 'type' ? (
-                            gridSort.dir === 'asc' ? <ChevronUp className="h-3 w-3 text-indigo-600" /> : <ChevronDown className="h-3 w-3 text-indigo-600" />
+                            gridSort.dir === 'asc' ? <ChevronUp className="h-3 w-3 text-blue-600" /> : <ChevronDown className="h-3 w-3 text-blue-600" />
                           ) : (
                             <ChevronsUpDown className="h-3 w-3 text-slate-400" />
                           )}
@@ -1331,7 +1358,7 @@ export default function BankImport() {
                         <div className="flex items-center gap-1">
                           Ledger Category
                           {gridSort?.field === 'category' ? (
-                            gridSort.dir === 'asc' ? <ChevronUp className="h-3 w-3 text-indigo-600" /> : <ChevronDown className="h-3 w-3 text-indigo-600" />
+                            gridSort.dir === 'asc' ? <ChevronUp className="h-3 w-3 text-blue-600" /> : <ChevronDown className="h-3 w-3 text-blue-600" />
                           ) : (
                             <ChevronsUpDown className="h-3 w-3 text-slate-400" />
                           )}
@@ -1345,7 +1372,7 @@ export default function BankImport() {
                           <div className="flex items-center gap-1">
                             Audit Link
                             {gridSort?.field === 'linkedEntries' ? (
-                              gridSort.dir === 'asc' ? <ChevronUp className="h-3 w-3 text-indigo-600" /> : <ChevronDown className="h-3 w-3 text-indigo-600" />
+                              gridSort.dir === 'asc' ? <ChevronUp className="h-3 w-3 text-blue-600" /> : <ChevronDown className="h-3 w-3 text-blue-600" />
                             ) : (
                               <ChevronsUpDown className="h-3 w-3 text-slate-400" />
                             )}
@@ -1370,7 +1397,7 @@ export default function BankImport() {
                               type="checkbox"
                               checked={row.selected}
                               onChange={(e) => updateRow(row.id, 'selected', e.target.checked)}
-                              className="h-3.5 w-3.5 rounded border-slate-350 accent-indigo-600 cursor-pointer"
+                              className="h-3.5 w-3.5 rounded border-slate-350 accent-blue-600 cursor-pointer"
                             />
                           </td>
 
@@ -1433,7 +1460,7 @@ export default function BankImport() {
                                 }}
                                 className={`bg-transparent outline-none py-1 text-slate-800 dark:text-slate-200 w-full truncate border-b border-dashed ${
                                   !row.category
-                                    ? 'border-indigo-400 font-extrabold text-indigo-700 dark:text-indigo-400'
+                                    ? 'border-blue-400 font-extrabold text-blue-700 dark:text-blue-400'
                                     : 'border-slate-200 dark:border-slate-700'
                                 } ${!priv.canReconcile ? 'opacity-60 cursor-not-allowed' : ''}`}
                               >
@@ -1445,7 +1472,7 @@ export default function BankImport() {
                               </select>
                               {row.linkedEntries.length > 0 && (
                                 <div className="flex justify-between text-[10px] font-medium text-slate-450 leading-none">
-                                  <span>Perceived: <strong className="text-indigo-650 dark:text-indigo-400">{row.scannedCategory}</strong></span>
+                                  <span>Perceived: <strong className="text-blue-600 dark:text-blue-400">{row.scannedCategory}</strong></span>
                                   {hasCategoryMismatch && <span className="text-amber-500 font-bold">Changed ✓</span>}
                                 </div>
                               )}
@@ -1518,7 +1545,7 @@ export default function BankImport() {
               
               {/* Summary Cards */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-sm flex items-center gap-4">
+                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-md border border-slate-200 dark:border-slate-800 flex items-center gap-4">
                   <div className="p-3 bg-emerald-50 dark:bg-slate-850 rounded-full text-emerald-600">
                     <TrendingUp className="h-6 w-6" />
                   </div>
@@ -1530,7 +1557,7 @@ export default function BankImport() {
                   </div>
                 </div>
 
-                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-sm flex items-center gap-4">
+                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-md border border-slate-200 dark:border-slate-800 flex items-center gap-4">
                   <div className="p-3 bg-rose-50 dark:bg-slate-850 rounded-full text-rose-600">
                     <TrendingDown className="h-6 w-6" />
                   </div>
@@ -1542,7 +1569,7 @@ export default function BankImport() {
                   </div>
                 </div>
 
-                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-sm flex items-center gap-4">
+                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-md border border-slate-200 dark:border-slate-800 flex items-center gap-4">
                   <div className={`p-3 rounded-full ${summaryStats.netBalance >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
                     {summaryStats.netBalance >= 0 ? <TrendingUp className="h-6 w-6" /> : <TrendingDown className="h-6 w-6" />}
                   </div>
@@ -1559,9 +1586,9 @@ export default function BankImport() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 
                 {/* Audit Coverage card */}
-                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-sm space-y-4">
+                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-md border border-slate-200 dark:border-slate-800 space-y-4">
                   <h4 className="text-sm font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-                    <Percent className="h-4.5 w-4.5 text-indigo-600" />
+                    <Percent className="h-4.5 w-4.5 text-blue-600" />
                     Ledger Reconciliation Coverage
                   </h4>
                   <div className="space-y-2">
@@ -1571,7 +1598,7 @@ export default function BankImport() {
                     </div>
                     <div className="w-full bg-slate-100 dark:bg-slate-800 h-2.5 rounded-full overflow-hidden">
                       <div
-                        className="bg-indigo-650 h-full rounded-full transition-all duration-500"
+                        className="bg-blue-600 h-full rounded-full transition-all duration-500"
                         style={{ width: `${summaryStats.coveragePercent}%` }}
                       />
                     </div>
@@ -1582,7 +1609,7 @@ export default function BankImport() {
                 </div>
 
                 {/* Cash Flow Projections Card */}
-                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-sm space-y-4">
+                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-md border border-slate-200 dark:border-slate-800 space-y-4">
                   <h4 className="text-sm font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
                     <Calendar className="h-4.5 w-4.5 text-emerald-600" />
                     Statement Cash Flow Projections
@@ -1591,7 +1618,7 @@ export default function BankImport() {
                     <p className="text-slate-500">
                       Based on a statement duration of <strong>{summaryStats.spanDays} days</strong> (from <strong className="text-slate-650">{summaryStats.minDate || '—'}</strong> to <strong className="text-slate-650">{summaryStats.maxDate || '—'}</strong>):
                     </p>
-                    <div className="bg-slate-50 dark:bg-slate-950 p-3.5 rounded-xl space-y-1.5">
+                    <div className="bg-slate-50 dark:bg-slate-950 p-3.5 rounded-md space-y-1.5">
                       <div className="flex justify-between">
                         <span className="text-slate-500">Average Weekly Outflow:</span>
                         <strong className="text-rose-600">₦{Math.round(summaryStats.totalOutflow / summaryStats.spanDays * 7).toLocaleString()}</strong>
@@ -1612,7 +1639,7 @@ export default function BankImport() {
               </div>
 
               {/* Category Spending Breakdown table */}
-              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden p-5 space-y-3">
+              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md border border-slate-200 dark:border-slate-800 overflow-hidden p-5 space-y-3">
                 <h4 className="text-sm font-bold text-slate-800 dark:text-slate-100">Category Expense Outflows</h4>
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs">
@@ -1655,7 +1682,7 @@ export default function BankImport() {
           STEP 3 — Success / Audit Summary Screen
       ================================================================ */}
       {step === 'done' && (
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-10 flex flex-col items-center justify-center text-center shadow-sm max-w-lg mx-auto space-y-6">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md p-10 flex flex-col items-center justify-center text-center max-w-lg mx-auto space-y-6">
           <div className="bg-emerald-50 dark:bg-slate-850 p-4 rounded-full border border-emerald-100 dark:border-emerald-950">
             <CheckCircle2 className="h-12 w-12 text-emerald-600" />
           </div>
@@ -1664,9 +1691,9 @@ export default function BankImport() {
             <p className="text-xs text-slate-550 mt-2 max-w-[320px]">
               Audit Actions completed:
             </p>
-            <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-lg mt-3 text-xs text-left max-w-xs mx-auto space-y-1">
+            <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-sm mt-3 text-xs text-left max-w-xs mx-auto space-y-1">
               <p className="text-slate-650 flex justify-between"><span>New Vouchers Generated:</span> <strong className="text-slate-800 font-bold">{importedCount}</strong></p>
-              <p className="text-slate-650 flex justify-between"><span>Reconciled/Updated Vouchers:</span> <strong className="text-indigo-600 font-bold">{reconciledCount}</strong></p>
+              <p className="text-slate-650 flex justify-between"><span>Reconciled/Updated Vouchers:</span> <strong className="text-blue-600 font-bold">{reconciledCount}</strong></p>
               <p className="text-slate-650 flex justify-between"><span>Total Audit Actions:</span> <strong className="text-slate-800 font-bold">{importedCount + reconciledCount}</strong></p>
             </div>
           </div>
@@ -1675,7 +1702,7 @@ export default function BankImport() {
             <Button variant="outline" onClick={() => { setStep('upload'); setReviewRows([]); setActiveAuditId(null); setAuditName(''); }} className="flex-1 font-bold text-xs h-10 border-slate-200">
               Audit Another Statement
             </Button>
-            <Button onClick={() => navigate('/ledger')} className="flex-1 font-bold text-xs h-10 bg-indigo-600 hover:bg-indigo-700 text-white">
+            <Button onClick={() => navigate('/ledger')} className="flex-1 font-bold text-xs h-10 bg-blue-600 hover:bg-blue-700 text-white">
               Go To Ledger
             </Button>
           </div>
@@ -1689,11 +1716,11 @@ export default function BankImport() {
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <form
             onSubmit={handleSaveAuditSession}
-            className="bg-white dark:bg-slate-900 border border-slate-250 dark:border-slate-800 rounded-3xl max-w-sm w-full p-6 space-y-4 shadow-2xl animate-in fade-in zoom-in-95 duration-200"
+            className="bg-white dark:bg-slate-900 border border-slate-250 dark:border-slate-800 rounded-md max-w-sm w-full p-6 space-y-4 shadow-2xl animate-in fade-in zoom-in-95 duration-200"
           >
             <div className="flex justify-between items-center">
               <h4 className="text-xs font-black text-slate-750 uppercase tracking-wider flex items-center gap-1.5">
-                <Save className="h-4.5 w-4.5 text-indigo-600" /> Save Audit Session Draft
+                <Save className="h-4.5 w-4.5 text-blue-600" /> Save Audit Session Draft
               </h4>
               <button
                 type="button"
@@ -1713,7 +1740,7 @@ export default function BankImport() {
               placeholder="e.g. Zenith July Reconciliation"
               value={auditName}
               onChange={(e) => setAuditName(e.target.value)}
-              className="w-full h-10 px-3 bg-white dark:bg-slate-800 border border-slate-350 dark:border-slate-700 rounded-xl outline-none text-xs font-semibold"
+              className="w-full h-10 px-3 bg-white dark:bg-slate-800 border border-slate-350 dark:border-slate-700 rounded-md outline-none text-xs font-semibold"
               autoFocus
               required
             />
@@ -1731,7 +1758,7 @@ export default function BankImport() {
               <Button
                 type="submit"
                 size="sm"
-                className="h-9 text-xs font-bold px-4 bg-indigo-600 hover:bg-indigo-700 text-white"
+                className="h-9 text-xs font-bold px-4 bg-blue-600 hover:bg-blue-700 text-white"
               >
                 Save Session
               </Button>
@@ -1745,13 +1772,13 @@ export default function BankImport() {
       ================================================================ */}
       {activeLinkRowId && activeRow && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 border border-slate-250 dark:border-slate-800 rounded-3xl max-w-3xl w-full flex flex-col max-h-[85vh] shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+          <div className="bg-white dark:bg-slate-900 border border-slate-250 dark:border-slate-800 rounded-md max-w-3xl w-full flex flex-col max-h-[85vh] shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
             
             {/* Modal Header */}
             <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex justify-between items-start">
               <div>
                 <h3 className="text-base font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-                  <LinkIcon className="h-5 w-5 text-indigo-600" />
+                  <LinkIcon className="h-5 w-5 text-blue-600" />
                   Link Ledger Entries to Statement Row
                 </h3>
                 <p className="text-xs text-slate-500 mt-1 max-w-xl">
@@ -1760,7 +1787,7 @@ export default function BankImport() {
               </div>
               <button
                 onClick={() => setActiveLinkRowId(null)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-650 dark:hover:text-slate-200 transition-colors"
+                className="p-1 rounded-sm text-slate-400 hover:text-slate-650 dark:hover:text-slate-200 transition-colors"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -1839,7 +1866,7 @@ export default function BankImport() {
                     placeholder="Search desc, amount, voucher..."
                     value={ledgerSearch}
                     onChange={(e) => setLedgerSearch(e.target.value)}
-                    className="w-full h-9 pl-9 pr-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs outline-none"
+                    className="w-full h-9 pl-9 pr-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-sm text-xs outline-none"
                   />
                 </div>
                 {/* Category Filter */}
@@ -1854,7 +1881,7 @@ export default function BankImport() {
                         setModalSelectedCategory(e.target.value);
                       }
                     }}
-                    className="w-full h-9 px-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs outline-none font-semibold text-slate-700 dark:text-slate-300"
+                    className="w-full h-9 px-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-sm text-xs outline-none font-semibold text-slate-700 dark:text-slate-300"
                   >
                     <option value="__new_filter__">+ Create New Category...</option>
                     <option value="all">All Categories</option>
@@ -1892,7 +1919,7 @@ export default function BankImport() {
                   <button
                     type="button"
                     onClick={handleClearModalFilters}
-                    className="flex items-center gap-1.5 px-3 h-8 border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-800 rounded-md font-bold text-[10px] uppercase text-slate-655 hover:bg-slate-50 tracking-wider shadow-sm transition-all"
+                    className="flex items-center gap-1.5 px-3 h-8 border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-800 rounded-md font-bold text-[10px] uppercase text-slate-655 hover:bg-slate-50 tracking-wider transition-all"
                   >
                     <SlidersHorizontal className="h-3.5 w-3.5" /> Reset Filters
                   </button>
@@ -1925,7 +1952,7 @@ export default function BankImport() {
                         isLinkedElsewhere
                           ? 'opacity-45 cursor-not-allowed bg-slate-50/60 dark:bg-slate-800/10'
                           : isChecked
-                            ? 'bg-indigo-50/20 dark:bg-indigo-950/20 cursor-pointer hover:bg-indigo-50/40'
+                            ? 'bg-blue-50/20 dark:bg-blue-950/20 cursor-pointer hover:bg-blue-50/40'
                             : 'cursor-pointer hover:bg-slate-50/50 dark:hover:bg-slate-800/20'
                       }`}
                     >
@@ -1935,7 +1962,7 @@ export default function BankImport() {
                           checked={isChecked}
                           disabled={isLinkedElsewhere}
                           onChange={() => {}}
-                          className="h-4 w-4 mt-0.5 rounded border-slate-350 accent-indigo-650 shrink-0 pointer-events-none"
+                          className="h-4 w-4 mt-0.5 rounded border-slate-350 accent-blue-600 shrink-0 pointer-events-none"
                         />
                         <div className="min-w-0">
                           <p className="text-xs font-bold text-slate-800 dark:text-slate-100 flex flex-wrap items-center gap-2">
@@ -1944,7 +1971,7 @@ export default function BankImport() {
                               Voucher: {entry.voucherNo}
                             </span>
                             {isChecked && (
-                              <span className="text-[9px] font-extrabold text-indigo-600 bg-indigo-50 dark:bg-indigo-900/30 px-1.5 py-0.5 rounded-full leading-none border border-indigo-200 dark:border-indigo-800">
+                              <span className="text-[9px] font-extrabold text-blue-600 bg-blue-50 dark:bg-blue-950/40 px-1.5 py-0.5 rounded-full leading-none border border-blue-200 dark:border-blue-800">
                                 ✓ Selected
                               </span>
                             )}
@@ -1986,7 +2013,7 @@ export default function BankImport() {
               <Button
                 size="sm"
                 onClick={() => setActiveLinkRowId(null)}
-                className="h-9 text-xs font-bold px-4 bg-indigo-600 hover:bg-indigo-700 text-white"
+                className="h-9 text-xs font-bold px-4 bg-blue-600 hover:bg-blue-700 text-white"
               >
                 Confirm Reconciliation
               </Button>
@@ -2011,7 +2038,7 @@ export default function BankImport() {
                 handleProcess(pendingFileToUnlock, 'pdf', pdfPassword);
               }
             }}
-            className="bg-white dark:bg-slate-900 border border-slate-250 dark:border-slate-800 rounded-3xl max-w-sm w-full p-6 space-y-4 shadow-2xl animate-in fade-in zoom-in-95 duration-200"
+            className="bg-white dark:bg-slate-900 border border-slate-250 dark:border-slate-800 rounded-md max-w-sm w-full p-6 space-y-4 shadow-2xl animate-in fade-in zoom-in-95 duration-200"
           >
             <div className="flex justify-between items-center">
               <h4 className="text-xs font-black text-slate-750 uppercase tracking-wider flex items-center gap-1.5">
@@ -2037,7 +2064,7 @@ export default function BankImport() {
             </p>
 
             {pdfPasswordError && (
-              <div className="bg-rose-550/10 border border-rose-200 text-rose-600 text-[10px] font-bold p-2.5 rounded-lg flex items-center gap-1.5">
+              <div className="bg-rose-550/10 border border-rose-200 text-rose-600 text-[10px] font-bold p-2.5 rounded-sm flex items-center gap-1.5">
                 <AlertTriangle className="h-3.5 w-3.5" /> {pdfPasswordError}
               </div>
             )}
@@ -2048,7 +2075,7 @@ export default function BankImport() {
                 placeholder="Enter PDF password..."
                 value={pdfPassword}
                 onChange={(e) => setPdfPassword(e.target.value)}
-                className="w-full h-10 pl-3 pr-10 bg-white dark:bg-slate-800 border border-slate-350 dark:border-slate-700 rounded-xl outline-none text-xs font-semibold"
+                className="w-full h-10 pl-3 pr-10 bg-white dark:bg-slate-800 border border-slate-350 dark:border-slate-700 rounded-md outline-none text-xs font-semibold"
                 autoFocus
                 required
               />
@@ -2080,7 +2107,7 @@ export default function BankImport() {
               <Button
                 type="submit"
                 size="sm"
-                className="h-9 text-xs font-bold px-4 bg-indigo-600 hover:bg-indigo-700 text-white"
+                className="h-9 text-xs font-bold px-4 bg-blue-600 hover:bg-blue-700 text-white"
               >
                 Decrypt PDF
               </Button>
@@ -2097,7 +2124,7 @@ export default function BankImport() {
         <div className="fixed inset-0 bg-slate-955/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <form
             onSubmit={handleAddNewCategory}
-            className="bg-white dark:bg-slate-900 border border-slate-255 dark:border-slate-800 rounded-2xl max-w-sm w-full p-5 space-y-4 shadow-xl animate-in fade-in zoom-in-95 duration-200"
+            className="bg-white dark:bg-slate-900 border border-slate-255 dark:border-slate-800 rounded-md max-w-sm w-full p-5 space-y-4 shadow-xl animate-in fade-in zoom-in-95 duration-200"
           >
             <div className="flex justify-between items-center">
               <h4 className="text-xs font-extrabold text-slate-750 uppercase tracking-wider">Create New Ledger Category</h4>
@@ -2121,7 +2148,7 @@ export default function BankImport() {
               placeholder="e.g. Taxes, Custom Duties, Security"
               value={newCategoryName}
               onChange={(e) => setNewCategoryName(e.target.value)}
-              className="w-full h-9 px-3 text-xs bg-white dark:bg-slate-800 border border-slate-350 dark:border-slate-700 rounded-lg outline-none font-semibold"
+              className="w-full h-9 px-3 text-xs bg-white dark:bg-slate-800 border border-slate-350 dark:border-slate-700 rounded-sm outline-none font-semibold"
               autoFocus
               required
             />
@@ -2142,7 +2169,7 @@ export default function BankImport() {
               <Button
                 type="submit"
                 size="sm"
-                className="h-9 text-xs font-bold px-4 bg-indigo-600 hover:bg-indigo-700 text-white"
+                className="h-9 text-xs font-bold px-4 bg-blue-600 hover:bg-blue-700 text-white"
               >
                 Add Category
               </Button>
@@ -2155,10 +2182,10 @@ export default function BankImport() {
       ================================================================ */}
       {showConfigModal && pendingFile && (
         <div className="fixed inset-0 bg-slate-950/65 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 border border-slate-250 dark:border-slate-800 rounded-3xl max-w-sm w-full p-5 space-y-5 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+          <div className="bg-white dark:bg-slate-900 border border-slate-250 dark:border-slate-800 rounded-md max-w-sm w-full p-5 space-y-5 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
             <div className="flex justify-between items-center">
               <h4 className="text-xs font-black text-slate-750 uppercase tracking-wider flex items-center gap-1.5">
-                <Sparkles className="h-4 w-4 text-indigo-500 animate-pulse" /> Import Configuration
+                <Sparkles className="h-4 w-4 text-blue-600 animate-pulse" /> Import Configuration
               </h4>
               <button
                 type="button"
@@ -2174,7 +2201,7 @@ export default function BankImport() {
             </div>
 
             <div className="space-y-3.5">
-              <div className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-150 dark:border-slate-800/80">
+              <div className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-md border border-slate-150 dark:border-slate-800/80">
                 <p className="text-xs text-slate-500 truncate">
                   File: <strong className="text-slate-700 dark:text-slate-200">{pendingFile.name}</strong>
                 </p>
@@ -2185,14 +2212,14 @@ export default function BankImport() {
 
               {/* Option 1: Audit with Ledger */}
               <div
-                className="flex items-start gap-3 p-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/20 rounded-xl transition-colors cursor-pointer select-none"
+                className="flex items-start gap-3 p-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/20 rounded-md transition-colors cursor-pointer select-none"
                 onClick={() => setAuditWithLedger(!auditWithLedger)}
               >
                 <input
                   type="checkbox"
                   checked={auditWithLedger}
                   onChange={() => {}}
-                  className="h-4 w-4 mt-0.5 rounded border-slate-350 accent-indigo-650 shrink-0 pointer-events-none"
+                  className="h-4 w-4 mt-0.5 rounded border-slate-350 accent-blue-600 shrink-0 pointer-events-none"
                 />
                 <div>
                   <label className="text-xs font-bold text-slate-800 dark:text-slate-200 cursor-pointer">
@@ -2207,14 +2234,14 @@ export default function BankImport() {
               {/* Option 2: Auto add unmatched */}
               {auditWithLedger && (
                 <div
-                  className="flex items-start gap-3 p-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/20 rounded-xl transition-colors cursor-pointer select-none ml-4 border-l-2 border-slate-100 dark:border-slate-800"
+                  className="flex items-start gap-3 p-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/20 rounded-md transition-colors cursor-pointer select-none ml-4 border-l-2 border-slate-100 dark:border-slate-800"
                   onClick={() => setAutoAddUnmatched(!autoAddUnmatched)}
                 >
                   <input
                     type="checkbox"
                     checked={autoAddUnmatched}
                     onChange={() => {}}
-                    className="h-4 w-4 mt-0.5 rounded border-slate-350 accent-indigo-650 shrink-0 pointer-events-none"
+                    className="h-4 w-4 mt-0.5 rounded border-slate-350 accent-blue-600 shrink-0 pointer-events-none"
                   />
                   <div>
                     <label className="text-xs font-bold text-slate-800 dark:text-slate-200 cursor-pointer">
@@ -2251,7 +2278,7 @@ export default function BankImport() {
                     handleProcess(pendingFile, pendingScanType);
                   }
                 }}
-                className="h-9 text-xs font-bold px-4 bg-indigo-600 hover:bg-indigo-700 text-white"
+                className="h-9 text-xs font-bold px-4 bg-blue-600 hover:bg-blue-700 text-white"
               >
                 Start Import
               </Button>

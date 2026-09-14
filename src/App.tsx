@@ -1,6 +1,6 @@
-import { useEffect, lazy, Suspense } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 
-import { HashRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import { useDataLoader, useRealtimeData } from './hooks/useDataLoader';
 import { Layout } from './components/layout/Layout';
@@ -17,6 +17,7 @@ import { PageErrorBoundary } from './components/common/PageErrorBoundary';
 import { TaskProvider } from '@/src/contexts/AppDataContext';
 import { PageProvider } from './contexts/PageContext';
 import { ProtectedRoute } from './components/common/ProtectedRoute';
+import { PageSkeleton } from './components/common/PageSkeleton';
 import { IS_LIMITED_WEB_WEB } from './lib/utils';
 
 // ── Lazy-loaded pages ─────────────────────────────────────────────────────────
@@ -86,7 +87,7 @@ function PageLoader() {
   return (
     <div className="flex items-center justify-center h-64">
       <div className="flex flex-col items-center gap-3">
-        <div className="w-7 h-7 border-3 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
+        <div className="w-7 h-7 border-2 border-slate-200 border-t-blue-600 dark:border-slate-800 dark:border-t-blue-500 rounded-full animate-spin"></div>
         <p className="text-xs text-slate-400">Loading…</p>
       </div>
     </div>
@@ -114,12 +115,30 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-// Helper: wrap a lazy page in its own Suspense + scoped error boundary
-const Page = ({ children, label }: { children: React.ReactNode; label?: string }) => (
-  <PageErrorBoundary label={label}>
-    <Suspense fallback={<PageLoader />}>{children}</Suspense>
-  </PageErrorBoundary>
-);
+// Helper: wrap a lazy page in its own Suspense + scoped error boundary with 1-frame paint yield
+function Page({ children, label }: { children: React.ReactNode; label?: string }) {
+  const location = useLocation();
+  const [mountedPath, setMountedPath] = useState(location.pathname);
+
+  useEffect(() => {
+    if (mountedPath !== location.pathname) {
+      const frame = requestAnimationFrame(() => {
+        setMountedPath(location.pathname);
+      });
+      return () => cancelAnimationFrame(frame);
+    }
+  }, [location.pathname, mountedPath]);
+
+  const isReady = mountedPath === location.pathname;
+
+  return (
+    <PageErrorBoundary label={label}>
+      <Suspense fallback={<PageSkeleton label={label} />}>
+        {isReady ? children : <PageSkeleton label={label} />}
+      </Suspense>
+    </PageErrorBoundary>
+  );
+}
 
 import { useUserStore } from './store/userStore';
 

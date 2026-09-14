@@ -94,28 +94,28 @@ export function ExportAssetsDialog({ onClose }: ExportAssetsDialogProps) {
 
   return (
     <Dialog open onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl p-0 overflow-hidden rounded-2xl bg-card border border-border shadow-2xl flex flex-col max-h-[85vh]">
-        <DialogHeader className="px-6 py-4 border-b border-border bg-gradient-to-r from-primary/5 to-transparent flex-shrink-0">
+      <DialogContent className="max-w-4xl p-0 overflow-hidden rounded-md bg-card border border-slate-200 dark:border-slate-800 shadow-lg flex flex-col max-h-[85vh]">
+        <DialogHeader className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-muted/30 flex-shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-              <Download className="h-5 w-5 text-primary" />
+            <div className="w-10 h-10 rounded-md bg-blue-50 dark:bg-blue-900/30 border border-slate-200 dark:border-slate-800 flex items-center justify-center">
+              <Download className="h-5 w-5 text-blue-600" />
             </div>
             <div>
               <DialogTitle className="text-base font-semibold text-foreground">Export Inventory</DialogTitle>
-              <p className="text-sm text-muted-foreground mt-0.5">Select scope and preview data before exporting</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Select scope and preview data before exporting</p>
             </div>
           </div>
           <DialogClose className="absolute right-4 top-4" />
         </DialogHeader>
 
         <div className="flex flex-col flex-1 min-h-0">
-          <div className="p-4 border-b border-border bg-muted/20 flex flex-col sm:flex-row gap-4 items-end sm:items-center justify-between">
+          <div className="p-4 border-b border-slate-200 dark:border-slate-800 bg-muted/20 flex flex-col sm:flex-row gap-4 items-end sm:items-center justify-between">
             <div className="flex-1 w-full max-w-sm">
               <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">Export Scope</label>
               <select 
                 value={exportScope} 
                 onChange={e => setExportScope(e.target.value)}
-                className="w-full flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                className="w-full flex h-9 items-center justify-between rounded-md border border-slate-200 dark:border-slate-800 bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-600"
               >
                 <option value="all">All Assets</option>
                 <option value="low_stock">Low Stock & Critical</option>
@@ -139,7 +139,7 @@ export function ExportAssetsDialog({ onClose }: ExportAssetsDialogProps) {
             </div>
 
             <div className="flex items-center gap-2">
-              <div className="px-3 py-1.5 rounded-lg bg-primary/10 border border-primary/20 text-primary text-sm font-semibold whitespace-nowrap">
+              <div className="px-3 py-1.5 rounded-md bg-blue-50 dark:bg-blue-900/30 border border-slate-200 dark:border-slate-800 text-blue-600 dark:text-blue-400 text-sm font-semibold font-mono tabular-nums whitespace-nowrap">
                 {filteredAssets.length} Assets Selected
               </div>
             </div>
@@ -153,8 +153,8 @@ export function ExportAssetsDialog({ onClose }: ExportAssetsDialogProps) {
               </div>
             ) : (
               <table className="w-full text-left border-collapse text-sm">
-                <thead className="sticky top-0 bg-white dark:bg-slate-900 shadow-sm border-b border-border z-10">
-                  <tr className="text-muted-foreground font-semibold text-xs uppercase tracking-wider">
+                <thead className="sticky top-0 bg-blue-600 border-b border-blue-700 text-white z-10">
+                  <tr className="text-white/90 font-semibold text-xs uppercase tracking-wider">
                     <th className="px-4 py-3">Asset Name</th>
                     <th className="px-4 py-3 text-center">Category / Type</th>
                     <th className="px-4 py-3 text-center">Total</th>
@@ -169,10 +169,10 @@ export function ExportAssetsDialog({ onClose }: ExportAssetsDialogProps) {
                       <td className="px-4 py-2.5 text-center">
                         <span className="capitalize text-xs font-medium text-slate-600 dark:text-slate-400">{asset.category} &bull; {asset.type}</span>
                       </td>
-                      <td className="px-4 py-2.5 text-center font-bold text-slate-700 dark:text-slate-200">{asset.quantity}</td>
-                      <td className="px-4 py-2.5 text-center font-bold text-blue-600 dark:text-blue-400">{asset.availableQuantity}</td>
+                      <td className="px-4 py-2.5 text-center font-mono tabular-nums font-bold text-slate-700 dark:text-slate-200">{asset.quantity}</td>
+                      <td className="px-4 py-2.5 text-center font-mono tabular-nums font-bold text-blue-600 dark:text-blue-400">{asset.availableQuantity}</td>
                       <td className="px-4 py-2.5 text-center text-xs">
-                         <span className="capitalize px-2 py-0.5 rounded-full border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">{asset.status}</span>
+                         <span className="capitalize px-2 py-0.5 rounded-sm text-[10px] border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">{asset.status}</span>
                       </td>
                     </tr>
                   ))}
@@ -182,13 +182,13 @@ export function ExportAssetsDialog({ onClose }: ExportAssetsDialogProps) {
           </div>
         </div>
 
-        <DialogFooter className="px-6 py-4 border-t border-border bg-card flex items-center justify-between flex-shrink-0 sm:justify-between">
-          <Button variant="ghost" onClick={onClose} className="mr-auto">Cancel</Button>
+        <DialogFooter className="px-6 py-4 border-t border-slate-200 dark:border-slate-800 bg-muted/30 flex items-center justify-between flex-shrink-0 sm:justify-between">
+          <Button variant="ghost" onClick={onClose} className="mr-auto rounded-md">Cancel</Button>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={handleExportPDF} disabled={filteredAssets.length === 0} className="gap-2">
+            <Button variant="outline" onClick={handleExportPDF} disabled={filteredAssets.length === 0} className="gap-2 rounded-md border-slate-200 dark:border-slate-800">
               <FileText className="h-4 w-4 text-rose-500" /> Export PDF
             </Button>
-            <Button onClick={handleExportExcel} disabled={filteredAssets.length === 0} className="gap-2 bg-green-600 hover:bg-green-700 text-white">
+            <Button onClick={handleExportExcel} disabled={filteredAssets.length === 0} className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md">
               <FileSpreadsheet className="h-4 w-4" /> Export Excel
             </Button>
           </div>

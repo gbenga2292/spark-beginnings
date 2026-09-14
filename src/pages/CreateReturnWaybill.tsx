@@ -336,13 +336,13 @@ export function CreateReturnWaybill({ site, inventoryItems, onBack, editWaybill 
         <Button 
           variant="outline" 
           onClick={onBack} 
-          className="gap-2 text-slate-600 font-bold h-9"
+          className="gap-2 text-slate-600 font-semibold h-9 rounded-md border-slate-200 dark:border-slate-800"
         >
           Cancel
         </Button>
         <Button
           onClick={handleSubmit}
-          className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white shadow-md font-semibold h-9"
+          className="gap-2 bg-blue-600 hover:bg-blue-700 text-white shadow-none font-semibold h-9 rounded-md"
         >
           <Package className="h-4 w-4" /> {isEditing ? 'Save Changes' : 'Create Return'}
         </Button>
@@ -352,20 +352,20 @@ export function CreateReturnWaybill({ site, inventoryItems, onBack, editWaybill 
   );
 
   return (
-    <div className="flex flex-col h-full bg-slate-50/30">
+    <div className="flex flex-col h-full bg-background">
 
       {/* Scrollable Content */}
       <div className="flex-1 overflow-y-auto w-full">
         <div className="p-6 md:p-8 max-w-5xl mx-auto">
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 sm:p-8 space-y-8">
+          <div className="bg-card rounded-md border border-slate-200 dark:border-slate-800 p-6 sm:p-8 space-y-8">
           {/* Driver & Vehicle */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
-              <Label className="text-xs font-bold text-slate-700">Driver *</Label>
+              <Label className="text-xs font-bold text-foreground">Driver *</Label>
               <div className="relative" ref={driverComboRef}>
                 {/* Combobox input — shows selected name or lets user type */}
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
                   <input
                     type="text"
                     placeholder="Select or type driver name…"
@@ -383,11 +383,11 @@ export function CreateReturnWaybill({ site, inventoryItems, onBack, editWaybill 
                       // small delay so click on option registers first
                       setTimeout(() => setDriverDropdownOpen(false), 150);
                     }}
-                    className="w-full h-11 rounded-xl border border-slate-200 bg-slate-50/50 pl-9 pr-10 text-sm font-semibold text-slate-800 transition-colors focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                    className="w-full h-10 rounded-md border border-slate-200 dark:border-slate-800 bg-background pl-9 pr-10 text-sm font-semibold text-foreground transition-colors focus:outline-none focus:ring-1 focus:ring-blue-600 focus:border-blue-600"
                   />
                   <ChevronDown
                     className={cn(
-                      "absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 cursor-pointer transition-transform",
+                      "absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground cursor-pointer transition-transform",
                       driverDropdownOpen && "rotate-180"
                     )}
                     onMouseDown={e => {
@@ -400,10 +400,10 @@ export function CreateReturnWaybill({ site, inventoryItems, onBack, editWaybill 
 
                 {/* Dropdown list */}
                 {driverDropdownOpen && (
-                  <div className="absolute z-50 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden">
+                  <div className="absolute z-50 mt-1 w-full bg-card border border-slate-200 dark:border-slate-800 rounded-md shadow-lg overflow-hidden">
                     <div className="max-h-52 overflow-y-auto">
                       {filteredDrivers.length === 0 ? (
-                        <div className="px-4 py-3 text-xs text-slate-400 font-medium">
+                        <div className="px-4 py-3 text-xs text-muted-foreground font-medium">
                           No match — "{driverSearch}" will be used as the driver name.
                         </div>
                       ) : (
@@ -417,8 +417,8 @@ export function CreateReturnWaybill({ site, inventoryItems, onBack, editWaybill 
                               setDriverDropdownOpen(false);
                             }}
                             className={cn(
-                              "w-full text-left px-4 py-2.5 text-sm font-semibold transition-colors hover:bg-blue-50 hover:text-blue-700",
-                              driverName === d ? "bg-blue-50 text-blue-700" : "text-slate-800"
+                              "w-full text-left px-4 py-2.5 text-sm font-semibold transition-colors hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-600",
+                              driverName === d ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600" : "text-foreground"
                             )}
                           >
                             {d}
@@ -432,7 +432,7 @@ export function CreateReturnWaybill({ site, inventoryItems, onBack, editWaybill 
             </div>
             
             <div className="space-y-2">
-              <Label className="text-xs font-bold text-slate-700">Vehicle *</Label>
+              <Label className="text-xs font-bold text-foreground">Vehicle *</Label>
               <div className="relative">
                 <select
                   value={vehicleIsCustom ? '__custom__' : vehicleName}
@@ -445,7 +445,7 @@ export function CreateReturnWaybill({ site, inventoryItems, onBack, editWaybill 
                       setVehicleName(e.target.value);
                     }
                   }}
-                  className="w-full h-11 rounded-xl border border-slate-200 bg-slate-50/50 px-4 text-sm font-semibold text-slate-800 transition-colors focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 appearance-none"
+                  className="w-full h-10 rounded-md border border-slate-200 dark:border-slate-800 bg-background px-3 text-sm font-semibold text-foreground focus:outline-none focus:ring-1 focus:ring-blue-600 focus:border-blue-600 appearance-none"
                 >
                   <option value="">Select Vehicle</option>
                   {vehicles.map(v => {
@@ -458,7 +458,7 @@ export function CreateReturnWaybill({ site, inventoryItems, onBack, editWaybill 
                   })}
                   <option value="__custom__">— Type vehicle manually —</option>
                 </select>
-                <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+                <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
               </div>
               {vehicleIsCustom && (
                 <Input
@@ -466,7 +466,7 @@ export function CreateReturnWaybill({ site, inventoryItems, onBack, editWaybill 
                   placeholder="Enter vehicle name or number plate…"
                   value={vehicleName}
                   onChange={e => setVehicleName(e.target.value)}
-                  className="h-11 rounded-xl border-slate-200 bg-slate-50/50 text-sm font-semibold text-slate-800"
+                  className="h-10 rounded-md border-slate-200 dark:border-slate-800 bg-background text-sm font-semibold text-foreground focus-visible:ring-1 focus-visible:ring-blue-600"
                 />
               )}
             </div>
@@ -475,33 +475,33 @@ export function CreateReturnWaybill({ site, inventoryItems, onBack, editWaybill 
           {/* Purpose, Service, Date */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="space-y-2">
-              <Label className="text-xs font-bold text-slate-700">Purpose</Label>
+              <Label className="text-xs font-bold text-foreground">Purpose</Label>
               <Input
                 value={purpose}
                 onChange={e => setPurpose(e.target.value)}
-                className="h-11 rounded-xl shadow-none border-slate-200 bg-slate-50/50 text-sm font-semibold text-slate-800 focus-visible:bg-white focus-visible:ring-blue-500/20 focus-visible:border-blue-500"
+                className="h-10 rounded-md shadow-none border-slate-200 dark:border-slate-800 bg-background text-sm font-semibold text-foreground focus-visible:ring-1 focus-visible:ring-blue-600"
               />
             </div>
             <div className="space-y-2">
-              <Label className="text-xs font-bold text-slate-700">Service</Label>
+              <Label className="text-xs font-bold text-foreground">Service</Label>
               <div className="relative">
                 <select
                   value={service}
                   onChange={e => setService(e.target.value)}
-                  className="w-full h-11 rounded-xl border shadow-none border-slate-200 bg-slate-50/50 px-4 text-sm font-semibold text-slate-800 transition-colors focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 appearance-none"
+                  className="w-full h-10 rounded-md border shadow-none border-slate-200 dark:border-slate-800 bg-background px-3 text-sm font-semibold text-foreground focus:outline-none focus:ring-1 focus:ring-blue-600 appearance-none"
                 >
                   {SERVICES.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
-                <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+                <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
               </div>
             </div>
             <div className="space-y-2">
-              <Label className="text-xs font-bold text-slate-700">Expected Return Date</Label>
+              <Label className="text-xs font-bold text-foreground">Expected Return Date</Label>
               <Input
                 type="date"
                 value={expectedReturnDate}
                 onChange={e => setExpectedReturnDate(e.target.value)}
-                className="h-11 rounded-xl shadow-none border-slate-200 bg-slate-50/50 text-sm font-semibold text-slate-800 focus-visible:bg-white focus-visible:ring-blue-500/20 focus-visible:border-blue-500"
+                className="h-10 rounded-md shadow-none border-slate-200 dark:border-slate-800 bg-background text-sm font-semibold text-foreground focus-visible:ring-1 focus-visible:ring-blue-600"
               />
             </div>
           </div>
@@ -509,12 +509,12 @@ export function CreateReturnWaybill({ site, inventoryItems, onBack, editWaybill 
           {/* Materials */}
           <div className="space-y-4 pt-2">
             <div className="flex items-center justify-between">
-              <h3 className="text-[15px] font-bold text-slate-800">Select Materials to Return</h3>
+              <h3 className="text-[15px] font-bold text-foreground">Select Materials to Return</h3>
               {returnableItems.length > 0 && (
                 <button
                   type="button"
                   onClick={toggleSelectAll}
-                  className="flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:text-blue-800 transition-colors select-none"
+                  className="flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:text-blue-700 transition-colors select-none"
                 >
                   {allSelected ? (
                     <>
@@ -532,8 +532,8 @@ export function CreateReturnWaybill({ site, inventoryItems, onBack, editWaybill 
             </div>
             <div className="space-y-3">
               {resolvedInventoryItems.filter(i => (i.quantity - (i.pendingReturnQuantity || 0)) > 0).length === 0 ? (
-                <div className="p-8 text-center border-2 border-dashed border-slate-100 rounded-xl">
-                  <p className="text-slate-400 font-medium">No returnable materials currently logged at this site.</p>
+                <div className="p-8 text-center border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-md">
+                  <p className="text-muted-foreground font-medium">No returnable materials currently logged at this site.</p>
                 </div>
               ) : resolvedInventoryItems.filter(i => (i.quantity - (i.pendingReturnQuantity || 0)) > 0).map(item => {
                 const isSelected = !!selectedItems[item.assetId];
@@ -542,19 +542,19 @@ export function CreateReturnWaybill({ site, inventoryItems, onBack, editWaybill 
                   <label 
                     key={item.assetId} 
                     className={cn(
-                      "flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-xl cursor-pointer transition-all gap-4",
+                      "flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-md cursor-pointer transition-all gap-4",
                       isSelected 
-                        ? "border-blue-200 bg-blue-50/30" 
-                        : "border-slate-200 hover:border-blue-200 hover:bg-slate-50/50"
+                        ? "border-blue-300 dark:border-blue-800 bg-blue-50/40 dark:bg-blue-950/20" 
+                        : "border-slate-200 dark:border-slate-800 hover:border-blue-200 hover:bg-muted/30"
                     )}
                   >
                     <div className="flex items-center gap-3">
                       <div className="shrink-0" onClick={() => toggleItem(item)}>
-                        {isSelected ? <CheckCircle2 className="h-5 w-5 text-blue-500" /> : <Circle className="h-5 w-5 text-slate-300" />}
+                        {isSelected ? <CheckCircle2 className="h-5 w-5 text-blue-600" /> : <Circle className="h-5 w-5 text-muted-foreground" />}
                       </div>
                       <div onClick={() => toggleItem(item)}>
-                        <p className="text-sm font-bold text-slate-800">{item.assetName}</p>
-                        <p className="text-xs font-medium text-slate-500">
+                        <p className="text-sm font-bold text-foreground">{item.assetName}</p>
+                        <p className="text-xs font-medium text-muted-foreground font-mono tabular-nums">
                           At Site: {item.quantity} {formatUnit(item.unit)}
                           {item.pendingReturnQuantity && item.pendingReturnQuantity > 0 ? ` (${item.pendingReturnQuantity} pending return)` : ''}
                         </p>
@@ -562,14 +562,14 @@ export function CreateReturnWaybill({ site, inventoryItems, onBack, editWaybill 
                     </div>
                     {isSelected && (
                       <div className="flex items-center gap-2" onClick={(e) => e.preventDefault()}>
-                        <Label className="text-xs font-bold text-slate-500">Qty to Return:</Label>
+                        <Label className="text-xs font-bold text-muted-foreground">Qty to Return:</Label>
                         <Input
                           type="number"
                           min={1}
                           max={availableToReturn}
                           value={selectedItems[item.assetId] || 1}
                           onChange={(e) => updateItemReturnQty(item.assetId, parseInt(e.target.value) || 1, availableToReturn)}
-                          className="w-20 h-9 font-bold text-center"
+                          className="w-20 h-8 rounded-md font-mono tabular-nums font-bold text-center border-slate-200 dark:border-slate-800"
                         />
                       </div>
                     )}
@@ -581,7 +581,7 @@ export function CreateReturnWaybill({ site, inventoryItems, onBack, editWaybill 
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
             <div className="space-y-2">
-              <Label className="text-xs font-bold text-slate-700">Return To</Label>
+              <Label className="text-xs font-bold text-foreground">Return To</Label>
               <div className="relative">
                 <select
                   value={returnTo}
@@ -591,24 +591,24 @@ export function CreateReturnWaybill({ site, inventoryItems, onBack, editWaybill 
                       setDestinationSiteId('');
                     }
                   }}
-                  className="w-full h-11 rounded-xl border border-slate-200 bg-slate-50/50 px-4 text-sm font-semibold text-slate-800 transition-colors focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 appearance-none"
+                  className="w-full h-10 rounded-md border border-slate-200 dark:border-slate-800 bg-background px-3 text-sm font-semibold text-foreground focus:outline-none focus:ring-1 focus:ring-blue-600 appearance-none"
                 >
                   <option value="Office">Office</option>
                   <option value="Main Warehouse">Main Warehouse</option>
                   <option value="Other Site">Other Site</option>
                 </select>
-                <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+                <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
               </div>
             </div>
 
             {returnTo === 'Other Site' && (
               <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-200">
-                <Label className="text-xs font-bold text-slate-700">Destination Site *</Label>
+                <Label className="text-xs font-bold text-foreground">Destination Site *</Label>
                 <div className="relative">
                   <select
                     value={destinationSiteId}
                     onChange={e => setDestinationSiteId(e.target.value)}
-                    className="w-full h-11 rounded-xl border border-slate-200 bg-slate-50/50 px-4 text-sm font-semibold text-slate-800 transition-colors focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 appearance-none"
+                    className="w-full h-10 rounded-md border border-slate-200 dark:border-slate-800 bg-background px-3 text-sm font-semibold text-foreground focus:outline-none focus:ring-1 focus:ring-blue-600 appearance-none"
                   >
                     <option value="">Select Destination Site</option>
                     {filterOperationalSites(sites)
@@ -617,7 +617,7 @@ export function CreateReturnWaybill({ site, inventoryItems, onBack, editWaybill 
                         <option key={s.id} value={s.id}>🟢 {s.name} ({s.client})</option>
                       ))}
                   </select>
-                  <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+                  <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
                 </div>
               </div>
             )}
@@ -633,8 +633,8 @@ export function CreateReturnWaybill({ site, inventoryItems, onBack, editWaybill 
             }}
             className="flex items-center gap-2 cursor-pointer w-fit pt-2 select-none"
           >
-            {addSignature ? <CheckCircle2 className="h-5 w-5 text-blue-500" /> : <Circle className="h-5 w-5 text-slate-300" />}
-            <span className="text-sm font-bold text-slate-700 pb-0.5">Add my signature to return waybill PDF</span>
+            {addSignature ? <CheckCircle2 className="h-5 w-5 text-blue-600" /> : <Circle className="h-5 w-5 text-muted-foreground" />}
+            <span className="text-sm font-semibold text-foreground pb-0.5">Add my signature to return waybill PDF</span>
           </div>
 
           </div>

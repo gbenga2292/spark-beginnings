@@ -838,36 +838,36 @@ export function Leaves() {
       {/* ── Mobile Actions Removed ── */}
 
       {/* ─── Leave Records Table ─── */}
-      <Card className="border-none shadow-sm overflow-hidden bg-white dark:bg-slate-900 flex-1 flex flex-col min-h-[500px]">
-        <div className="border-b border-slate-100 dark:border-slate-800/60 p-4 sm:p-5 flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center bg-slate-50/50 dark:bg-slate-900/50">
+      <Card className="border border-slate-200 dark:border-slate-800 rounded-md shadow-none overflow-hidden bg-white dark:bg-slate-900 flex-1 flex flex-col min-h-[500px]">
+        <div className="border-b border-slate-200 dark:border-slate-800 p-4 sm:p-5 flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center bg-slate-50/50 dark:bg-slate-900/50">
           <div className="flex items-center gap-2 ml-1">
-            <div className="h-8 w-8 rounded-lg bg-teal-100 dark:bg-teal-900/40 flex items-center justify-center text-teal-600 dark:text-teal-400">
+            <div className="h-8 w-8 rounded-md bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-600 dark:text-slate-300">
               <ListFilter className="h-4 w-4" />
             </div>
             <p className="font-semibold text-slate-700 dark:text-slate-200 text-sm">Leave Records <span className="text-slate-400 dark:text-slate-500 font-normal">({filteredLeaves.length})</span></p>
           </div>
 
           <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-            <div className="flex bg-slate-200/50 dark:bg-slate-800/50 p-1 rounded-lg">
+            <div className="flex bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-1 rounded-md">
               {(['All', 'Active', 'Completed', 'Cancelled'] as const).map(tab => (
                 <button
                   key={tab}
-                  className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${filterView === tab ? 'bg-white dark:bg-slate-700 text-teal-700 dark:text-teal-300 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${filterView === tab ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
                   onClick={() => setFilterView(tab)}
                 >{tab}</button>
               ))}
             </div>
             <div className="relative w-full sm:w-72">
               <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-              <Input placeholder="Search staff or reason..." className="pl-9 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 dark:text-slate-100 h-9 text-sm focus-visible:ring-teal-500/50 rounded-lg shadow-sm" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+              <Input placeholder="Search staff or reason..." className="pl-9 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 dark:text-slate-100 h-9 text-xs focus-visible:ring-blue-500 rounded-md shadow-none" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
             </div>
           </div>
         </div>
 
         <div className="hidden md:block overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+          <table className="w-full text-left border-collapse text-xs">
             <thead>
-              <tr className="bg-teal-700 border-b border-teal-800 dark:bg-teal-950/40 dark:border-teal-900/40 text-teal-50 dark:text-teal-100 uppercase text-[11px] tracking-wider font-bold">
+              <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 uppercase text-[11px] tracking-wider font-semibold">
                 <th className="px-5 py-4 whitespace-nowrap">Name</th>
                 <th className="px-5 py-4 whitespace-nowrap">Leave Type</th>
                 <th className="px-5 py-4 whitespace-nowrap">Start</th>
@@ -900,14 +900,14 @@ export function Leaves() {
                   <tr key={leave.id} className={`hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors group ${leave.status === 'Cancelled' ? 'opacity-60' : ''}`}>
                     <td className="px-5 py-4 font-bold text-slate-800 dark:text-slate-200 uppercase text-xs">{leave.employeeName}</td>
                     <td className="px-5 py-4">
-                      <span className="inline-block px-2 py-1 text-[11px] font-semibold bg-teal-50 text-teal-700 border border-teal-200 dark:bg-teal-500/20 dark:text-teal-400 dark:border-teal-500/30 rounded-full whitespace-nowrap">
+                      <span className="inline-block px-2 py-0.5 text-[11px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-sm whitespace-nowrap">
                         {leave.leaveType || '—'}
                       </span>
                     </td>
                     <td className="px-5 py-4 font-medium text-slate-600 dark:text-slate-300 whitespace-nowrap">
                       {leave.startDate ? format(parseISO(leave.startDate), 'dd-MMM-yy') : '—'}
                     </td>
-                    <td className="px-5 py-4 font-bold text-slate-700 dark:text-slate-200">{leave.duration}</td>
+                    <td className="px-5 py-4 font-semibold tabular-nums text-slate-700 dark:text-slate-200">{leave.duration}</td>
                     <td className="px-5 py-4 font-medium text-slate-600 dark:text-slate-300 whitespace-nowrap">
                       {leave.expectedEndDate ? format(parseISO(leave.expectedEndDate), 'dd-MMM-yy') : '—'}
                     </td>
@@ -916,7 +916,7 @@ export function Leaves() {
                     </td>
                     <td className="px-5 py-4 max-w-xs text-slate-700 dark:text-slate-300 text-xs hidden sm:table-cell">{leave.reason}</td>
                     <td className="px-5 py-4 text-center hidden md:table-cell">
-                      <span className={`text-xs font-bold ${leave.canBeContacted === 'Yes' ? 'text-teal-600 dark:text-teal-400' : 'text-slate-400 dark:text-slate-500'}`}>{leave.canBeContacted}</span>
+                      <span className={`text-xs font-bold ${leave.canBeContacted === 'Yes' ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400 dark:text-slate-500'}`}>{leave.canBeContacted}</span>
                     </td>
                     {/* Approver column */}
                     <td className="px-5 py-4 text-center whitespace-nowrap hidden lg:table-cell">
@@ -965,7 +965,7 @@ export function Leaves() {
                     <td className="px-5 py-4 text-center hidden sm:table-cell">
                       {leave.nasFilePath ? (
                         <button
-                          className="text-indigo-600 hover:text-indigo-800 flex items-center justify-center gap-1 mx-auto text-xs font-semibold"
+                          className="text-blue-600 hover:text-blue-800 flex items-center justify-center gap-1 mx-auto text-xs font-semibold"
                           onClick={() => handleOpenNasFile(leave.nasFilePath!)}
                         >
                           <Eye className="h-4 w-4" /> Open
@@ -986,12 +986,12 @@ export function Leaves() {
                             <DropdownMenuItem className="text-slate-600 cursor-pointer gap-2" onClick={() => openPrintPreview(leave)}>
                               <Printer className="h-4 w-4" /> Print Preview
                             </DropdownMenuItem>
-                            <DropdownMenuItem className="text-purple-600 focus:text-purple-600 cursor-pointer gap-2" onClick={() => setManageWorkflowLeave(leave)}>
+                            <DropdownMenuItem className="text-sky-600 focus:text-sky-600 cursor-pointer gap-2" onClick={() => setManageWorkflowLeave(leave)}>
                               <CheckCircle2 className="h-4 w-4" /> Manage Workflow
                             </DropdownMenuItem>
                             
                             {priv.canEdit && (
-                              <DropdownMenuItem className="text-indigo-600 focus:text-indigo-600 cursor-pointer gap-2" onClick={() => handleEdit(leave)}>
+                              <DropdownMenuItem className="text-blue-600 focus:text-blue-600 cursor-pointer gap-2" onClick={() => handleEdit(leave)}>
                                 <Edit className="h-4 w-4" /> Edit
                               </DropdownMenuItem>
                             )}
@@ -1040,7 +1040,7 @@ export function Leaves() {
                 <div className="flex flex-col">
                   <span className="font-bold text-slate-800 dark:text-slate-200 uppercase text-sm">{leave.employeeName}</span>
                   <div className="mt-1">
-                    <span className="inline-block px-2 py-0.5 text-[10px] font-semibold bg-teal-50 text-teal-700 border border-teal-200 dark:bg-teal-500/20 dark:text-teal-400 dark:border-teal-500/30 rounded-full whitespace-nowrap">
+                    <span className="inline-block px-2 py-0.5 text-[10px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-sm whitespace-nowrap">
                       {leave.leaveType || '—'}
                     </span>
                   </div>
@@ -1073,11 +1073,11 @@ export function Leaves() {
                       <DropdownMenuItem className="text-slate-600 cursor-pointer gap-2" onClick={() => openPrintPreview(leave)}>
                         <Printer className="h-4 w-4" /> Print Preview
                       </DropdownMenuItem>
-                      <DropdownMenuItem className="text-purple-600 focus:text-purple-600 cursor-pointer gap-2" onClick={() => setManageWorkflowLeave(leave)}>
+                      <DropdownMenuItem className="text-sky-600 focus:text-sky-600 cursor-pointer gap-2" onClick={() => setManageWorkflowLeave(leave)}>
                         <CheckCircle2 className="h-4 w-4" /> Manage Workflow
                       </DropdownMenuItem>
                       {priv.canEdit && (
-                        <DropdownMenuItem className="text-indigo-600 focus:text-indigo-600 cursor-pointer gap-2" onClick={() => handleEdit(leave)}>
+                        <DropdownMenuItem className="text-blue-600 focus:text-blue-600 cursor-pointer gap-2" onClick={() => handleEdit(leave)}>
                           <Edit className="h-4 w-4" /> Edit
                         </DropdownMenuItem>
                       )}
@@ -1217,32 +1217,32 @@ export function Leaves() {
 
         return (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-white dark:bg-slate-900 max-w-4xl w-full rounded-2xl shadow-2xl overflow-hidden max-h-[95vh] flex flex-col">
+            <div className="bg-white dark:bg-slate-900 max-w-4xl w-full rounded-md border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden max-h-[95vh] flex flex-col">
               {/* Modal header */}
-              <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center bg-slate-50 shrink-0">
-                <h2 className="text-base font-bold text-slate-800 flex flex-wrap items-center gap-2">
-                  <Printer className="h-5 w-5 text-teal-600" /> Staff Leave Application Form
+              <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center bg-slate-50 dark:bg-slate-900/50 shrink-0">
+                <h2 className="text-base font-bold text-slate-800 dark:text-slate-100 flex flex-wrap items-center gap-2">
+                  <Printer className="h-5 w-5 text-blue-600 dark:text-blue-400" /> Staff Leave Application Form
                   {isPreviewLocked && (
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-600">LOCKED — Leave Elapsed</span>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-rose-100 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400">LOCKED — Leave Elapsed</span>
                   )}
                   {wfRejected && (
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700">REJECTED</span>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-400">REJECTED</span>
                   )}
                   {wfStep === 5 && (
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">FULLY APPROVED ✓</span>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400">FULLY APPROVED ✓</span>
                   )}
                   {formId && wfStep > 0 && wfStep < 5 && !wfRejected && (
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">Step {wfStep}/4 Pending</span>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400">Step {wfStep}/4 Pending</span>
                   )}
                 </h2>
                 <div className="flex flex-wrap sm:flex-nowrap gap-2 w-full sm:w-auto justify-start sm:justify-end">
                   <button type="button" onClick={handleCreateOrUpdate}
-                    className="flex items-center gap-1.5 px-3 h-9 rounded-lg border border-teal-300 bg-teal-50 hover:bg-teal-100 text-teal-700 text-xs font-bold">
+                    className="flex items-center gap-1.5 px-3 h-9 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-none transition-colors">
                     <CheckCircle2 className="h-3.5 w-3.5" /> {formId ? 'Update Leave' : 'Submit Application'}
                   </button>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button className="bg-teal-600 hover:bg-teal-700 text-white gap-2 h-9 text-sm">
+                      <Button className="bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:hover:bg-white dark:text-slate-900 gap-2 h-9 text-xs rounded-md shadow-none font-semibold">
                         <Printer className="h-4 w-4" /> Print <ChevronDown className="h-3 w-3 ml-1" />
                       </Button>
                     </DropdownMenuTrigger>
@@ -1527,16 +1527,16 @@ export function Leaves() {
 
                     {/* NAS File Reference */}
                     {nasFilePath && (
-                      <div className="mt-3 flex items-center gap-2 p-2 rounded bg-indigo-50 border border-indigo-200">
-                        <FileText className="h-3.5 w-3.5 text-indigo-500 shrink-0" />
+                      <div className="mt-3 flex items-center gap-2 p-2 rounded-md bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                        <FileText className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
                         <span style={{ fontSize: 9, color: '#444' }}>NAS: {nasFilePath}</span>
-                        <button type="button" onClick={() => handleOpenNasFile(nasFilePath!)} className="ml-auto text-[9px] font-bold text-indigo-600 hover:underline">Open on PC</button>
+                        <button type="button" onClick={() => handleOpenNasFile(nasFilePath!)} className="ml-auto text-[9px] font-bold text-blue-600 hover:underline">Open on PC</button>
                       </div>
                     )}
 
                     {/* Elapsed lock notice */}
                     {isPreviewLocked && (
-                      <div className="mt-3 flex items-center gap-2 px-3 py-2 rounded-lg bg-rose-50 border border-rose-200 text-rose-600 text-xs font-semibold">
+                      <div className="mt-3 flex items-center gap-2 px-3 py-2 rounded-md bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/40 text-rose-600 dark:text-rose-400 text-xs font-semibold">
                         <Ban className="h-3.5 w-3.5" /> This form is read-only. The leave period has elapsed. Contact an admin to edit.
                       </div>
                     )}
@@ -1551,26 +1551,26 @@ export function Leaves() {
       {/* Fallback HoD Picker Modal */}
       {hodPickerPending && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden border border-slate-200">
-            <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-indigo-50/50">
+          <div className="bg-white dark:bg-slate-900 rounded-md shadow-xl w-full max-w-md overflow-hidden border border-slate-200 dark:border-slate-800">
+            <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-800/50">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-indigo-100 text-indigo-600 rounded-lg">
+                <div className="p-2 bg-slate-100 dark:bg-slate-800 text-blue-600 dark:text-blue-400 rounded-md border border-slate-200 dark:border-slate-700">
                   <UserPlus className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-slate-800 tracking-tight">Select HoD Approver</h3>
-                  <p className="text-xs text-slate-500">Auto-resolution failed. Choose the system user to assign Step 2.</p>
+                  <h3 className="text-base font-bold text-slate-800 dark:text-slate-100 tracking-tight">Select HoD Approver</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Auto-resolution failed. Choose the system user to assign Step 2.</p>
                 </div>
               </div>
               <button 
                 onClick={() => setHodPickerPending(null)}
-                className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
             
-            <div className="p-4 bg-slate-50 border-b border-slate-100">
+            <div className="p-3 bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                 <input
@@ -1578,44 +1578,44 @@ export function Leaves() {
                   placeholder="Search active users..."
                   value={hodPickerSearch}
                   onChange={e => setHodPickerSearch(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 text-sm bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                  className="w-full pl-9 pr-3 py-1.5 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all"
                 />
               </div>
             </div>
 
-            <div className="max-h-64 overflow-y-auto p-2">
+            <div className="max-h-64 overflow-y-auto p-2 divide-y divide-slate-100 dark:divide-slate-800">
               {approverOptions
                 .filter(u => u.name?.toLowerCase().includes(hodPickerSearch.toLowerCase()))
                 .map(user => (
                   <button
                     key={user.id}
                     onClick={() => resumeSubmissionWithHod(user.id)}
-                    className="w-full flex items-center gap-3 p-3 text-left rounded-xl hover:bg-indigo-50 transition-colors"
+                    className="w-full flex items-center gap-3 p-2.5 text-left rounded-md hover:bg-slate-100 dark:hover:bg-slate-800/60 transition-colors"
                   >
-                    <div className="w-8 h-8 rounded-full bg-slate-200 flex flex-shrink-0 items-center justify-center text-slate-500 font-bold text-xs">
+                    <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 flex flex-shrink-0 items-center justify-center text-slate-600 dark:text-slate-300 font-bold text-xs">
                       {(user.name || 'U').substring(0, 2).toUpperCase()}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-slate-800 truncate">{user.name}</p>
-                      <p className="text-[10px] font-medium text-slate-500 truncate">{user.department || 'No department'}</p>
+                      <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">{user.name}</p>
+                      <p className="text-[10px] font-medium text-slate-500 dark:text-slate-400 truncate">{user.department || 'No department'}</p>
                     </div>
-                    <ChevronRight className="w-4 h-4 text-slate-300 flex-shrink-0" />
+                    <ChevronRight className="w-4 h-4 text-slate-300 dark:text-slate-600 flex-shrink-0" />
                   </button>
               ))}
               {approverOptions.length > 0 && approverOptions.filter(u => u.name?.toLowerCase().includes(hodPickerSearch.toLowerCase())).length === 0 && (
-                <div className="text-center py-6 text-slate-500 text-sm">No users match "{hodPickerSearch}"</div>
+                <div className="text-center py-6 text-slate-500 text-xs">No users match "{hodPickerSearch}"</div>
               )}
             </div>
-            <div className="p-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
+            <div className="p-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 flex items-center justify-between">
               <button
                 onClick={() => setHodPickerPending(null)}
-                className="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-200 rounded-xl transition-colors"
+                className="px-3 py-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-md transition-colors"
               >
                 Cancel Submission
               </button>
               <button
                 onClick={() => resumeSubmissionWithHod(null)}
-                className="px-4 py-2 text-sm font-semibold bg-white border border-slate-200 shadow-sm text-slate-700 hover:bg-slate-50 hover:border-slate-300 rounded-xl transition-all"
+                className="px-3 py-1.5 text-xs font-semibold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-none text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-md transition-all"
               >
                 Skip (No System User)
               </button>

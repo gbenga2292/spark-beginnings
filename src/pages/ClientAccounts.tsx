@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useUserStore } from '../store/userStore';
+import { useAppStore } from '../store/appStore';
 import { lazy, Suspense } from 'react';
 
 const Billing = lazy(() => import('./Billing').then(m => ({ default: m.Billing })));
@@ -30,6 +31,15 @@ export function ClientAccounts() {
   const [searchTerm, setSearchTerm] = useState('');
   const [fullPageContent, setFullPageContent] = useState<React.ReactNode | null>(null);
 
+  const activePaymentModalTarget = useAppStore((s) => s.activePaymentModalTarget);
+
+  // Auto-switch to Payment tab if recording payment for an invoice
+  useEffect(() => {
+    if (activePaymentModalTarget && canViewPayment) {
+      setActiveTab('payment');
+    }
+  }, [activePaymentModalTarget, canViewPayment]);
+
   // If permissions change and active tab is no longer available, switch to first available
   useEffect(() => {
     if (tabs.length > 0 && !tabs.find(t => t.id === activeTab)) {
@@ -59,7 +69,7 @@ export function ClientAccounts() {
           isDark ? "border-slate-800 bg-slate-900/50" : "bg-white border-slate-200"
       )}>
         <div className="flex items-center justify-between gap-4 w-full">
-          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar w-full sm:w-auto pb-1">
+          <div className="flex items-center gap-1 overflow-x-auto no-scrollbar w-full sm:w-auto pb-1">
             {tabs.map((tab) => {
               const isActive = activeTab === tab.id;
               return (
@@ -67,9 +77,9 @@ export function ClientAccounts() {
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
                   className={cn(
-                    "flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold transition-all rounded-t-lg border-b-2 whitespace-nowrap",
+                    "flex items-center justify-center gap-2 px-4 py-2 text-xs font-semibold transition-all rounded-t-md border-b-2 whitespace-nowrap",
                     isActive 
-                      ? (isDark ? "border-indigo-400 text-indigo-400 bg-indigo-950/20" : "border-indigo-600 text-indigo-700 bg-indigo-50/50") 
+                      ? (isDark ? "border-blue-500 text-blue-400 bg-blue-950/20" : "border-blue-600 text-blue-600 bg-blue-50/50") 
                       : (isDark ? "border-transparent text-slate-400 hover:text-slate-300 hover:bg-slate-800/50" : "border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50")
                   )}
                 >
@@ -87,10 +97,10 @@ export function ClientAccounts() {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className={cn(
-                "w-full pl-9 pr-4 py-2 text-sm rounded-lg border outline-none transition-all",
+                "w-full pl-9 pr-4 py-1.5 text-xs rounded-md border outline-none transition-all",
                 isDark 
-                  ? "bg-slate-900 border-slate-700 text-slate-200 placeholder:text-slate-500 focus:border-indigo-500" 
-                  : "bg-white border-slate-300 text-slate-900 placeholder:text-slate-400 focus:border-indigo-500"
+                  ? "bg-slate-900 border-slate-700 text-slate-200 placeholder:text-slate-500 focus:border-blue-500" 
+                  : "bg-white border-slate-300 text-slate-900 placeholder:text-slate-400 focus:border-blue-500"
               )}
             />
           </div>
@@ -105,10 +115,10 @@ export function ClientAccounts() {
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className={cn(
-              "w-full pl-9 pr-4 py-2.5 text-sm rounded-xl border outline-none transition-all",
+              "w-full pl-9 pr-4 py-2 text-xs rounded-md border outline-none transition-all",
               isDark 
-                ? "bg-slate-900 border-slate-700 text-slate-200 placeholder:text-slate-500 focus:border-indigo-500" 
-                : "bg-white border-slate-300 text-slate-900 placeholder:text-slate-400 focus:border-indigo-500"
+                ? "bg-slate-900 border-slate-700 text-slate-200 placeholder:text-slate-500 focus:border-blue-500" 
+                : "bg-white border-slate-300 text-slate-900 placeholder:text-slate-400 focus:border-blue-500"
             )}
           />
         </div>

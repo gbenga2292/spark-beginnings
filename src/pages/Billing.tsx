@@ -5,7 +5,7 @@ import InvoiceLogo from '../../logo/logo-2.png';
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction, AlertDialogCancel } from '@/src/components/task_ui/alert-dialog';
 import { useAppStore, PendingInvoice, Invoice, InvoiceVatableSections, AuxiliaryEquipmentItem } from '@/src/store/appStore';
 import { toast, showConfirm } from '@/src/components/ui/toast';
-import { Trash2, Edit, CheckCircle, Plus, X, ArrowRightCircle, Upload, Download, Mail, ChevronUp, ChevronDown, ChevronRight, Printer, PlusCircle, ArrowLeft, Save, FileText, Layers, Users, Settings, Truck, Info, Calculator, History, Calendar } from 'lucide-react';
+import { Trash2, Edit, CheckCircle, Plus, X, ArrowRightCircle, Upload, Download, Mail, ChevronUp, ChevronDown, ChevronRight, Printer, PlusCircle, ArrowLeft, Save, FileText, Layers, Users, Settings, Truck, Info, Calculator, History, Calendar, CreditCard, MoreVertical } from 'lucide-react';
 import { Input } from '@/src/components/ui/input';
 import { Button } from '@/src/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
@@ -21,6 +21,7 @@ import { supabase } from '@/src/integrations/supabase/client';
 import { InvoiceDetailDialog } from './InvoiceDetailDialog';
 import { fetchInvoicesData } from '@/src/lib/supabaseService';
 import { useOperations } from '@/src/contexts/OperationsContext';
+import { getInvoiceSettlement, buildSettlementMap } from '@/src/lib/settlementUtils';
 
 
 export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: string; setFullPageContent?: (content: React.ReactNode) => void }) {
@@ -28,6 +29,8 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
   const pendingSites = useAppStore((state) => state.pendingSites);
   const pendingInvoices = useAppStore((state) => state.pendingInvoices);
   const invoices = useAppStore((state) => state.invoices);
+  const payments = useAppStore((state) => state.payments);
+  const openPaymentModalForInvoice = useAppStore((state) => state.openPaymentModalForInvoice);
   const addPendingInvoice = useAppStore(state => state.addPendingInvoice);
   const updatePendingInvoice = useAppStore(state => state.updatePendingInvoice);
   const deletePendingInvoice = useAppStore(state => state.deletePendingInvoice);
@@ -36,6 +39,10 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
   const deleteInvoice = useAppStore(state => state.deleteInvoice);
   const vatRate = useAppStore(state => state.payrollVariables.vatRate);
   const defaultVatableSections = useAppStore(state => state.payrollVariables?.defaultVatableSections);
+
+  const settlementMap = useMemo(() => {
+    return buildSettlementMap([...invoices, ...pendingInvoices], payments);
+  }, [invoices, pendingInvoices, payments]);
 
   const handleSyncInvoiceDates = async (invoiceId: string, newEndDate: string) => {
     const inv = invoices.find(i => i.id === invoiceId);
@@ -59,7 +66,6 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'quotations' | 'all' | 'active' | 'unpaid' | 'completed'>('all');
   const [showFilters, setShowFilters] = useState(false);
-  const payments = useAppStore(state => state.payments);
   const ledgerBanks = useAppStore(state => state.ledgerBanks);
   const ledgerBeneficiaryBanks = useAppStore(state => state.ledgerBeneficiaryBanks);
   const { dailyMachineLogs } = useOperations();
@@ -1726,24 +1732,23 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
         (inv.siteName || '').trim().toLowerCase() === (site.name || '').trim().toLowerCase() && 
         (inv.client || '').trim().toLowerCase() === (site.client || '').trim().toLowerCase()
       );
-      const sitePayments = payments.filter(p => 
-        (p.site || '').trim().toLowerCase() === (site.name || '').trim().toLowerCase() && 
-        (p.client || '').trim().toLowerCase() === (site.client || '').trim().toLowerCase()
-      );
       
       const totalInvoiceAmount = siteInvoices.reduce((sum, inv) => sum + (inv.totalCharge || inv.amount || 0), 0);
-      const totalPaymentAmount = sitePayments.reduce((sum, p) => sum + (p.amount || 0), 0);
+      const totalSettledAmount = siteInvoices.reduce((sum, inv) => {
+        const s = settlementMap.get(inv.id);
+        return sum + (s ? s.totalSettled : 0);
+      }, 0);
       
       return {
         ...site,
         invoices: siteInvoices,
         totalInvoiceAmount,
-        totalPaymentAmount,
-        isCompleted: site.status === 'Ended' && totalPaymentAmount >= totalInvoiceAmount && totalInvoiceAmount > 0,
-        isUnpaid: totalPaymentAmount < totalInvoiceAmount && totalInvoiceAmount > 0
+        totalPaymentAmount: totalSettledAmount,
+        isCompleted: site.status === 'Ended' && totalSettledAmount >= (totalInvoiceAmount * 0.99) && totalInvoiceAmount > 0,
+        isUnpaid: totalSettledAmount < (totalInvoiceAmount * 0.99) && totalInvoiceAmount > 0
       };
     });
-  }, [sites, invoices, payments]);
+  }, [sites, invoices, settlementMap]);
 
   const completedSites = useMemo(() => {
     let list = siteStats.filter(s => s.isCompleted);
@@ -1886,14 +1891,14 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
       )}
       {priv.canImport && (
         <label className="flex items-center gap-2 px-3 h-9 bg-white rounded-md border border-slate-200 text-slate-600 text-[11px] font-bold uppercase tracking-tight cursor-pointer hover:bg-slate-50 transition-all shadow-sm">
-          <Download className="h-3.5 w-3.5 text-indigo-500" /> <span className="hidden sm:inline">Import</span>
+          <Download className="h-3.5 w-3.5 text-blue-500" /> <span className="hidden sm:inline">Import</span>
           <input type="file" accept=".csv" className="hidden" onChange={handleImportCSVSelected} />
         </label>
       )}
       {priv.canCreate && (
         <Button 
           size="sm" 
-          className="gap-2 h-9 px-3 sm:px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] uppercase tracking-tight shadow-md transition-all active:scale-95"
+          className="gap-2 h-9 px-3 sm:px-4 bg-blue-600 hover:bg-blue-700 text-white font-bold text-[11px] uppercase tracking-tight rounded-sm transition-all active:scale-95"
           onClick={() => { handleClear(); setIsModalOpen(true); }}
         >
           <Plus className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Create Invoice</span>
@@ -1912,39 +1917,39 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 overflow-x-auto no-scrollbar w-full pb-1">
           <div className="flex bg-slate-200/50 p-1 rounded-lg shrink-0">
             <button
-              className={`flex items-center px-4 py-1.5 text-sm font-semibold rounded-md transition-all whitespace-nowrap ${activeTab === 'all' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              className={`flex items-center px-4 py-1.5 text-sm font-semibold rounded-md transition-all whitespace-nowrap ${activeTab === 'all' ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'}`}
               onClick={() => setActiveTab('all')}
             >
               All Invoices
-              <Badge variant="outline" className={`ml-2 text-[10px] px-1.5 py-0 font-mono border-slate-300 ${activeTab === 'all' ? 'bg-indigo-100/50 text-indigo-700' : 'bg-slate-100 text-slate-500'}`}>{invoices.length}</Badge>
+              <Badge variant="outline" className={`ml-2 text-[10px] px-1.5 py-0 font-mono border-slate-300 ${activeTab === 'all' ? 'bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}>{invoices.length}</Badge>
             </button>
             <button
-              className={`flex items-center px-4 py-1.5 text-sm font-semibold rounded-md transition-all whitespace-nowrap ${activeTab === 'quotations' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              className={`flex items-center px-4 py-1.5 text-sm font-semibold rounded-md transition-all whitespace-nowrap ${activeTab === 'quotations' ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'}`}
               onClick={() => setActiveTab('quotations')}
             >
               Quotations
-              <Badge variant="outline" className={`ml-2 text-[10px] px-1.5 py-0 font-mono border-slate-300 ${activeTab === 'quotations' ? 'bg-indigo-100/50 text-indigo-700' : 'bg-slate-100 text-slate-500'}`}>{pendingInvoices.length}</Badge>
+              <Badge variant="outline" className={`ml-2 text-[10px] px-1.5 py-0 font-mono border-slate-300 ${activeTab === 'quotations' ? 'bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}>{pendingInvoices.length}</Badge>
             </button>
             <button
-              className={`flex items-center px-4 py-1.5 text-sm font-semibold rounded-md transition-all whitespace-nowrap ${activeTab === 'active' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              className={`flex items-center px-4 py-1.5 text-sm font-semibold rounded-md transition-all whitespace-nowrap ${activeTab === 'active' ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'}`}
               onClick={() => setActiveTab('active')}
             >
               Active Invoices
-              <Badge variant="outline" className={`ml-2 text-[10px] px-1.5 py-0 font-mono border-slate-300 ${activeTab === 'active' ? 'bg-indigo-100/50 text-indigo-700' : 'bg-slate-100 text-slate-500'}`}>{invoices.filter(i => { const s = sites.find(site => site.name === i.siteName && site.client === i.client); return s && s.status !== 'Ended'; }).length}</Badge>
+              <Badge variant="outline" className={`ml-2 text-[10px] px-1.5 py-0 font-mono border-slate-300 ${activeTab === 'active' ? 'bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}>{invoices.filter(i => { const s = sites.find(site => site.name === i.siteName && site.client === i.client); return s && s.status !== 'Ended'; }).length}</Badge>
             </button>
             <button
-              className={`flex items-center px-4 py-1.5 text-sm font-semibold rounded-md transition-all whitespace-nowrap ${activeTab === 'unpaid' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              className={`flex items-center px-4 py-1.5 text-sm font-semibold rounded-md transition-all whitespace-nowrap ${activeTab === 'unpaid' ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'}`}
               onClick={() => setActiveTab('unpaid')}
             >
               Unpaid Invoices
-              <Badge variant="outline" className={`ml-2 text-[10px] px-1.5 py-0 font-mono border-slate-300 ${activeTab === 'unpaid' ? 'bg-indigo-100/50 text-indigo-700' : 'bg-slate-100 text-slate-500'}`}>{unpaidSites.length}</Badge>
+              <Badge variant="outline" className={`ml-2 text-[10px] px-1.5 py-0 font-mono border-slate-300 ${activeTab === 'unpaid' ? 'bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}>{unpaidSites.length}</Badge>
             </button>
             <button
-              className={`flex items-center px-4 py-1.5 text-sm font-semibold rounded-md transition-all whitespace-nowrap ${activeTab === 'completed' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              className={`flex items-center px-4 py-1.5 text-sm font-semibold rounded-md transition-all whitespace-nowrap ${activeTab === 'completed' ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'}`}
               onClick={() => setActiveTab('completed')}
             >
               Completed Invoice
-              <Badge variant="outline" className={`ml-2 text-[10px] px-1.5 py-0 font-mono border-slate-300 ${activeTab === 'completed' ? 'bg-indigo-100/50 text-indigo-700' : 'bg-slate-100 text-slate-500'}`}>{completedSites.length}</Badge>
+              <Badge variant="outline" className={`ml-2 text-[10px] px-1.5 py-0 font-mono border-slate-300 ${activeTab === 'completed' ? 'bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}>{completedSites.length}</Badge>
             </button>
           </div>
 
@@ -1985,7 +1990,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                               type="month" 
                               value={filterFromMonth} 
                               onChange={(e) => setFilterFromMonth(e.target.value)} 
-                              className="h-8 flex-1 sm:w-36 text-xs border-slate-200 bg-white focus:ring-1 focus:ring-indigo-500 shadow-sm" 
+                              className="h-8 flex-1 sm:w-36 text-xs border-slate-200 bg-white focus:ring-1 focus:ring-blue-500 rounded-sm" 
                           />
                         </div>
                         <div className="flex items-center gap-2 w-full sm:w-auto">
@@ -1994,7 +1999,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                               type="month" 
                               value={filterToMonth} 
                               onChange={(e) => setFilterToMonth(e.target.value)} 
-                              className="h-8 flex-1 sm:w-36 text-xs border-slate-200 bg-white focus:ring-1 focus:ring-indigo-500 shadow-sm" 
+                              className="h-8 flex-1 sm:w-36 text-xs border-slate-200 bg-white focus:ring-1 focus:ring-blue-500 rounded-sm" 
                           />
                         </div>
                         {(filterFromMonth || filterToMonth) && (
@@ -2012,7 +2017,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                             onClick={() => setShowActions(!showActions)}
                             className="group relative inline-flex h-5 w-10 flex-shrink-0 cursor-pointer items-center justify-center rounded-full focus:outline-none"
                         >
-                            <span className={`absolute h-4 w-9 rounded-full transition-colors duration-200 ease-in-out ${showActions ? 'bg-indigo-600' : 'bg-slate-200'}`} />
+                            <span className={`absolute h-4 w-9 rounded-full transition-colors duration-200 ease-in-out ${showActions ? 'bg-blue-600' : 'bg-slate-200 dark:bg-slate-700'}`} />
                             <span
                                 className={`absolute left-0 inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out`}
                                 style={{ transform: `translateX(${showActions ? '20px' : '2px'})` }}
@@ -2027,7 +2032,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                     onClick={() => setShowFilters(!showFilters)}
                     className={cn(
                       "h-9 w-9 rounded-lg border transition-all",
-                      showFilters ? "bg-indigo-50 border-indigo-200 text-indigo-600" : "bg-white border-slate-200 text-slate-500"
+                      showFilters ? "bg-blue-50 border-blue-200 text-blue-600 dark:bg-blue-950/40 dark:border-blue-800 dark:text-blue-400" : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400"
                     )}
                   >
                     <Plus className={cn("h-4 w-4 transition-transform", showFilters && "rotate-45")} />
@@ -2040,7 +2045,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
             <style>{`
                 .overflow-x-auto {
                     scrollbar-width: thin;
-                    scrollbar-color: #6366f1 #f1f5f9;
+                    scrollbar-color: #2563eb #f1f5f9;
                 }
                 .overflow-x-auto::-webkit-scrollbar {
                     height: 10px;
@@ -2051,12 +2056,12 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                     border-radius: 10px;
                 }
                 .overflow-x-auto::-webkit-scrollbar-thumb {
-                    background-color: #6366f1;
+                    background-color: #2563eb;
                     border-radius: 10px;
                     border: 2px solid #f1f5f9;
                 }
                 .overflow-x-auto::-webkit-scrollbar-thumb:hover {
-                    background-color: #4f46e5;
+                    background-color: #1d4ed8;
                 }
             `}</style>
             <Table className="whitespace-nowrap min-w-full text-xs sm:text-sm hidden md:table">
@@ -2064,8 +2069,8 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                 <TableRow className="bg-slate-100/80 border-b border-slate-200">
                   <TableHead colSpan={2} className="px-6 py-2.5">
                     <div className="flex items-center gap-2">
-                        <div className="w-1.5 h-4 bg-indigo-500 rounded-full"></div>
-                        <span className="text-[10px] font-black uppercase tracking-widest text-indigo-900">Aggregate Totals</span>
+                        <div className="w-1.5 h-4 bg-blue-500 rounded-full"></div>
+                        <span className="text-[10px] font-black uppercase tracking-widest text-blue-900 dark:text-blue-200">Aggregate Totals</span>
                     </div>
                   </TableHead>
                   <TableHead className="px-4 py-2.5 text-right"></TableHead>
@@ -2085,7 +2090,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                       <div className="text-[9px] font-bold text-slate-400 uppercase">
                         {activeTab === 'completed' || activeTab === 'unpaid' ? 'Amount Paid' : 'Gross Sum'}
                       </div>
-                      <div className="text-[12px] font-mono font-black text-indigo-700 bg-white px-2 py-0.5 rounded border border-indigo-100 shadow-sm">
+                      <div className="text-[12px] font-mono tabular-nums font-black text-blue-700 dark:text-blue-300 bg-white dark:bg-slate-900 px-2 py-0.5 rounded-sm border border-slate-200 dark:border-slate-800">
                         ₦{formatSum(activeTab === 'completed' || activeTab === 'unpaid' ? tableSums.amountPaid : tableSums.totalCost)}
                       </div>
                     </div>
@@ -2094,7 +2099,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                 </TableRow>
                 <TableRow className="border-b-0">
                   <TableHead 
-                    className="font-semibold px-4 py-3 text-slate-500 uppercase text-[10px] tracking-wider select-none cursor-pointer hover:bg-slate-100 hover:text-indigo-600 transition-colors"
+                    className="font-semibold px-4 py-3 text-slate-500 uppercase text-[10px] tracking-wider select-none cursor-pointer hover:bg-slate-100 hover:text-blue-600 transition-colors"
                     onClick={() => handleSort('invoiceNo')}
                     onMouseDown={(e) => e.stopPropagation()}
                   >
@@ -2103,7 +2108,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                     </div>
                   </TableHead>
                   <TableHead 
-                    className="font-semibold px-4 py-3 text-slate-500 uppercase text-[10px] tracking-wider select-none cursor-pointer hover:bg-slate-100 hover:text-indigo-600 transition-colors"
+                    className="font-semibold px-4 py-3 text-slate-500 uppercase text-[10px] tracking-wider select-none cursor-pointer hover:bg-slate-100 hover:text-blue-600 transition-colors"
                     onClick={() => handleSort('client')}
                     onMouseDown={(e) => e.stopPropagation()}
                   >
@@ -2117,7 +2122,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                     </div>
                   </TableHead>
                   <TableHead 
-                    className="font-semibold px-4 py-3 text-right text-slate-500 uppercase text-[10px] tracking-wider select-none cursor-pointer hover:bg-slate-100 hover:text-indigo-600 transition-colors"
+                    className="font-semibold px-4 py-3 text-right text-slate-500 uppercase text-[10px] tracking-wider select-none cursor-pointer hover:bg-slate-100 hover:text-blue-600 transition-colors"
                     onClick={() => handleSort('equipment')}
                     onMouseDown={(e) => e.stopPropagation()}
                   >
@@ -2128,7 +2133,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                     </div>
                   </TableHead>
                   <TableHead 
-                    className="font-semibold px-4 py-3 text-right text-slate-500 uppercase text-[10px] tracking-wider select-none cursor-pointer hover:bg-slate-100 hover:text-indigo-600 transition-colors"
+                    className="font-semibold px-4 py-3 text-right text-slate-500 uppercase text-[10px] tracking-wider select-none cursor-pointer hover:bg-slate-100 hover:text-blue-600 transition-colors"
                     onClick={() => handleSort('startDate')}
                     onMouseDown={(e) => e.stopPropagation()}
                   >
@@ -2139,7 +2144,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                     </div>
                   </TableHead>
                   <TableHead 
-                    className="font-semibold px-4 py-3 text-right text-slate-500 uppercase text-[10px] tracking-wider select-none cursor-pointer hover:bg-slate-100 hover:text-indigo-600 transition-colors"
+                    className="font-semibold px-4 py-3 text-right text-slate-500 uppercase text-[10px] tracking-wider select-none cursor-pointer hover:bg-slate-100 hover:text-blue-600 transition-colors"
                     onClick={() => handleSort('costBkdn')}
                     onMouseDown={(e) => e.stopPropagation()}
                   >
@@ -2150,7 +2155,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                     </div>
                   </TableHead>
                   <TableHead 
-                    className="font-semibold px-4 py-3 text-right text-slate-500 uppercase text-[10px] tracking-wider select-none cursor-pointer hover:bg-slate-100 hover:text-indigo-600 transition-colors"
+                    className="font-semibold px-4 py-3 text-right text-slate-500 uppercase text-[10px] tracking-wider select-none cursor-pointer hover:bg-slate-100 hover:text-blue-600 transition-colors"
                     onClick={() => handleSort('totals')}
                     onMouseDown={(e) => e.stopPropagation()}
                   >
@@ -2161,7 +2166,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                     </div>
                   </TableHead>
                   {showActions && (priv.canEdit || priv.canDelete) && (
-                    <TableHead className="font-semibold px-4 py-3 text-center sticky right-0 bg-slate-50 shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)] uppercase text-[10px] tracking-wider">Actions</TableHead>
+                    <TableHead className="font-semibold px-3 py-3 text-center sticky right-0 bg-slate-50 shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)] uppercase text-[10px] tracking-wider w-14">Actions</TableHead>
                   )}
                 </TableRow>
               </TableHeader>
@@ -2181,8 +2186,8 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                         <TableCell className="px-4 py-3 font-bold text-slate-700">
                           <div className="flex items-center gap-2">
                             {isExpanded
-                              ? <ChevronDown className="w-4 h-4 text-indigo-500 flex-shrink-0" />
-                              : <ChevronRight className="w-4 h-4 text-slate-400 flex-shrink-0 group-hover:text-indigo-400 transition-colors" />}
+                              ? <ChevronDown className="w-4 h-4 text-blue-500 flex-shrink-0" />
+                              : <ChevronRight className="w-4 h-4 text-slate-400 flex-shrink-0 group-hover:text-blue-400 transition-colors" />}
                             <span className="font-mono">{site.client}</span>
                           </div>
                         </TableCell>
@@ -2203,7 +2208,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                         <TableCell className="px-4 py-3 text-right text-slate-600 font-mono">
                           {priv?.canViewAmounts === false ? '***' : `₦${site.totalInvoiceAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                         </TableCell>
-                        <TableCell className="px-4 py-3 text-right font-bold text-indigo-700 font-mono">
+                        <TableCell className="px-4 py-3 text-right font-bold text-slate-900 dark:text-white font-mono tabular-nums">
                           {priv?.canViewAmounts === false ? '***' : `₦${site.totalPaymentAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                         </TableCell>
                       </TableRow>
@@ -2215,8 +2220,8 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                         </TableRow>
                       )}
                       {isExpanded && site.invoices.map((inv: any) => (
-                        <TableRow key={inv.id} className="bg-indigo-50/30 border-l-4 border-l-indigo-400 hover:bg-indigo-50/60 transition-colors">
-                          <TableCell className="px-10 py-2.5 font-mono text-xs font-bold text-indigo-700">
+                        <TableRow key={inv.id} className="bg-slate-50/60 dark:bg-slate-900/60 border-l-2 border-l-blue-500 hover:bg-slate-100/60 dark:hover:bg-slate-800/60 transition-colors">
+                          <TableCell className="px-10 py-2.5 font-mono tabular-nums text-xs font-bold text-blue-600 dark:text-blue-400">
                             {inv.invoiceNumber || inv.invoiceNo || '—'}
                           </TableCell>
                           <TableCell className="px-4 py-2.5 text-xs text-slate-600">
@@ -2249,8 +2254,8 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                       <TableRow 
                         onDoubleClick={() => { if (activeTab !== 'quotations') setDetailInvoice(inv); }}
                         className={cn(
-                          "group hover:bg-indigo-50/20 transition-colors cursor-pointer border-b border-slate-100/80",
-                          detailInvoice?.id === inv.id && "bg-indigo-50/40"
+                          "group hover:bg-slate-50/50 dark:hover:bg-slate-850/50 transition-colors cursor-pointer border-b border-slate-100/80 dark:border-slate-800",
+                          detailInvoice?.id === inv.id && "bg-blue-50/30 dark:bg-blue-950/20"
                         )}
                         onClick={() => {
                           if (activeTab === 'quotations') {
@@ -2352,7 +2357,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                         <TableCell className="px-4 py-3 text-right text-slate-600">
                           <div><span className="text-slate-400">Rent:</span> {priv?.canViewAmounts === false ? '***' : (inv.rentalCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                           {(inv.auxiliaryCost ?? 0) > 0 && (
-                            <div><span className="text-indigo-500 font-medium">Aux:</span> {priv?.canViewAmounts === false ? '***' : (inv.auxiliaryCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                            <div><span className="text-blue-500 font-medium">Aux:</span> {priv?.canViewAmounts === false ? '***' : (inv.auxiliaryCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                           )}
                           <div><span className="text-slate-400">Fuel:</span> {priv?.canViewAmounts === false ? '***' : (inv.dieselCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                           <div><span className="text-slate-400">Other:</span> {priv?.canViewAmounts === false ? '***' : ((inv.techniciansCost || 0) + (inv.installation || 0) + (inv.mobDemob || 0) + (inv.damages || 0)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
@@ -2360,36 +2365,135 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                         <TableCell className="px-4 py-3 text-right">
                           <div className="text-slate-500 text-xs">Gross: {priv?.canViewAmounts === false ? '***' : (inv.totalCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                           <div className="text-slate-500 text-xs">VAT: {priv?.canViewAmounts === false ? '***' : (inv.vat || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                          <div className="font-bold text-indigo-700 mt-1">{priv?.canViewAmounts === false ? '***' : (inv.totalCharge || inv.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                          <div className="font-bold text-blue-700 dark:text-blue-300 font-mono tabular-nums mt-1">{priv?.canViewAmounts === false ? '***' : (inv.totalCharge || inv.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                          {activeTab !== 'quotations' && (() => {
+                            const s = settlementMap.get(inv.id);
+                            if (!s) return null;
+                            const isPaid = s.isPaid;
+                            const isPartial = s.status === 'Partially Paid';
+                            const isOverdue = s.status === 'Overdue';
+                            return (
+                              <div className="mt-1.5 flex justify-end">
+                                <Badge className={cn(
+                                  'text-[10px] font-bold px-1.5 py-0.5 rounded border',
+                                  isPaid ? 'bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800' :
+                                  isPartial ? 'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800' :
+                                  isOverdue ? 'bg-rose-100 text-rose-800 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800' :
+                                  'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700'
+                                )}>
+                                  {s.status}
+                                  {isPartial && ` (Bal: ₦${Math.round(s.remainingBalance).toLocaleString()})`}
+                                </Badge>
+                              </div>
+                            );
+                          })()}
                         </TableCell>
                         {showActions && (priv.canEdit || priv.canDelete) && (
-                          <TableCell className="px-4 py-3 text-center sticky right-0 bg-white/95 backdrop-blur shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]">
-                            <div className="flex items-center justify-center gap-1">
-                              {activeTab === 'quotations' && priv.canEdit && (
-                                <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleMakeActive(inv); }} className="h-8 w-8 text-emerald-600 hover:bg-emerald-50" title="Move to Active">
-                                  <ArrowRightCircle className="w-4 h-4" />
-                                </Button>
-                              )}
-                              {priv.canEdit && (
-                                <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleEdit(inv); }} className="h-8 w-8 text-indigo-600 hover:bg-indigo-50" title="Edit row">
-                                  <Edit className="w-4 h-4" />
-                                </Button>
-                              )}
-                              {priv.canEdit && activeTab !== 'quotations' && (
-                                <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleGenerateNext(inv); }} className="h-8 w-8 text-orange-600 hover:bg-orange-50" title="Generate Next Invoice">
-                                  <PlusCircle className="w-4 h-4" />
-                                </Button>
-                              )}
-                              {priv.canEdit && (
-                                <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setPrintInvoiceTarget(inv); }} className="h-8 w-8 text-blue-600 hover:bg-blue-50" title="Print Invoice">
-                                  <Printer className="w-4 h-4" />
-                                </Button>
-                              )}
-                              {priv.canDelete && (
-                                <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleDelete(inv.id); }} className="h-8 w-8 text-rose-600 hover:bg-rose-50" title="Delete row">
-                                  <Trash2 className="w-4 h-4" />
-                                </Button>
-                              )}
+                          <TableCell className="px-3 py-2.5 text-center sticky right-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)] w-14">
+                            <div className="flex items-center justify-center">
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="h-8 w-8 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-sm"
+                                    title="Actions"
+                                  >
+                                    <MoreVertical className="w-4 h-4" />
+                                    <span className="sr-only">Actions</span>
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-48 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-lg rounded-md p-1 z-50">
+                                  {activeTab !== 'quotations' && priv.canEdit && (
+                                    <DropdownMenuItem
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        const s = settlementMap.get(inv.id);
+                                        openPaymentModalForInvoice({
+                                          client: inv.client,
+                                          site: inv.siteName || (inv as any).site || '',
+                                          invoiceId: inv.id,
+                                          invoiceNumber: inv.invoiceNumber || (inv as any).invoiceNo || inv.id,
+                                          amount: s ? s.remainingBalance : Number(inv.totalCharge || inv.amount || 0)
+                                        });
+                                      }}
+                                      className="flex items-center gap-2 px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer rounded-sm"
+                                    >
+                                      <CreditCard className="w-3.5 h-3.5 text-emerald-600" />
+                                      <span>Record Payment</span>
+                                    </DropdownMenuItem>
+                                  )}
+
+                                  {activeTab === 'quotations' && priv.canEdit && (
+                                    <DropdownMenuItem
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleMakeActive(inv);
+                                      }}
+                                      className="flex items-center gap-2 px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer rounded-sm"
+                                    >
+                                      <ArrowRightCircle className="w-3.5 h-3.5 text-emerald-600" />
+                                      <span>Move to Active</span>
+                                    </DropdownMenuItem>
+                                  )}
+
+                                  {priv.canEdit && (
+                                    <DropdownMenuItem
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleEdit(inv);
+                                      }}
+                                      className="flex items-center gap-2 px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer rounded-sm"
+                                    >
+                                      <Edit className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                                      <span>Edit Invoice</span>
+                                    </DropdownMenuItem>
+                                  )}
+
+                                  {priv.canEdit && activeTab !== 'quotations' && (
+                                    <DropdownMenuItem
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleGenerateNext(inv);
+                                      }}
+                                      className="flex items-center gap-2 px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer rounded-sm"
+                                    >
+                                      <PlusCircle className="w-3.5 h-3.5 text-orange-600" />
+                                      <span>Generate Next</span>
+                                    </DropdownMenuItem>
+                                  )}
+
+                                  {priv.canEdit && (
+                                    <DropdownMenuItem
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setPrintInvoiceTarget(inv);
+                                      }}
+                                      className="flex items-center gap-2 px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer rounded-sm"
+                                    >
+                                      <Printer className="w-3.5 h-3.5 text-blue-600" />
+                                      <span>Print Invoice</span>
+                                    </DropdownMenuItem>
+                                  )}
+
+                                  {priv.canDelete && (
+                                    <>
+                                      <DropdownMenuSeparator className="my-1 bg-slate-100 dark:bg-slate-800" />
+                                      <DropdownMenuItem
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleDelete(inv.id);
+                                        }}
+                                        className="flex items-center gap-2 px-2.5 py-1.5 text-xs text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 cursor-pointer rounded-sm focus:text-rose-600 focus:bg-rose-50 dark:focus:bg-rose-950/40"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                                        <span>Delete</span>
+                                      </DropdownMenuItem>
+                                    </>
+                                  )}
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                             </div>
                           </TableCell>
                         )}
@@ -2445,7 +2549,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                       <div className="p-3 border-b border-slate-100 flex justify-between items-start bg-slate-50/50">
                         <div className="flex items-center gap-2">
                           {expandedSiteKey === siteKey 
-                            ? <ChevronDown className="w-3.5 h-3.5 text-indigo-500" /> 
+                            ? <ChevronDown className="w-3.5 h-3.5 text-blue-500" /> 
                             : <ChevronRight className="w-3.5 h-3.5 text-slate-400" />}
                           <div>
                             <div className="font-bold text-slate-800 text-sm leading-tight">{site.client}</div>
@@ -2474,7 +2578,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                         </div>
                         <div className="text-right">
                           <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wide">Amount Paid</p>
-                          <p className="font-mono font-bold text-indigo-700">₦{formatSum(site.totalPaymentAmount)}</p>
+                          <p className="font-mono tabular-nums font-bold text-blue-700 dark:text-blue-300">₦{formatSum(site.totalPaymentAmount)}</p>
                         </div>
                       </div>
 
@@ -2487,7 +2591,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                             site.invoices.map((inv: any) => (
                               <div 
                                 key={inv.id} 
-                                className="bg-white p-3 rounded-lg border border-slate-200 flex justify-between items-center active:bg-indigo-50 transition-colors cursor-pointer"
+                                className="bg-white dark:bg-slate-900 p-3 rounded-md border border-slate-200 dark:border-slate-800 flex justify-between items-center active:bg-blue-50 dark:active:bg-blue-950/40 transition-colors cursor-pointer"
                                 role="button"
                                 tabIndex={0}
                                 onClick={(e) => {
@@ -2496,7 +2600,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                                 }}
                               >
                                 <div>
-                                  <div className="text-[11px] font-bold text-indigo-700 font-mono">{inv.invoiceNumber || inv.invoiceNo}</div>
+                                  <div className="text-[11px] font-bold text-blue-700 dark:text-blue-300 font-mono tabular-nums">{inv.invoiceNumber || inv.invoiceNo}</div>
                                   <div className="text-[10px] text-slate-500 mt-0.5">{formatDisplayDate(inv.date || inv.startDate)}</div>
                                 </div>
                                 <div className="text-right">
@@ -2525,7 +2629,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                     {/* Status accent bar */}
                     <div className={cn(
                       "absolute left-0 top-0 bottom-0 w-1",
-                      activeTab === 'quotations' ? "bg-amber-400" : "bg-indigo-500"
+                      activeTab === 'quotations' ? "bg-amber-400" : "bg-blue-500"
                     )} />
                     
                     <div className="p-3 pl-4 border-b border-slate-100 flex justify-between items-start">
@@ -2534,7 +2638,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                         <div className="text-slate-500 text-xs mt-0.5 line-clamp-1">{inv.site || inv.siteName}</div>
                       </div>
                       <div className="text-right shrink-0">
-                        <div className="font-mono font-bold text-indigo-700 text-[13px]">₦{formatSum(inv.totalCharge || inv.amount || 0)}</div>
+                        <div className="font-mono tabular-nums font-bold text-blue-700 dark:text-blue-300 text-[13px]">₦{formatSum(inv.totalCharge || inv.amount || 0)}</div>
                         <Badge variant="outline" className="mt-1 text-[9px] px-1.5 py-0 font-mono text-slate-500 bg-slate-50">
                           {inv.invoiceNo || inv.invoiceNumber || 'DRAFT'}
                         </Badge>
@@ -2587,7 +2691,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                       <div className="col-span-2 mt-2 pt-2 border-t border-slate-50 flex flex-wrap gap-x-4 gap-y-1">
                         <span className="text-[10px] text-slate-500"><b className="text-slate-400 font-normal">Rent:</b> ₦{formatSum(inv.rentalCost || 0)}</span>
                         {(inv.auxiliaryCost ?? 0) > 0 && (
-                          <span className="text-[10px] text-indigo-600 dark:text-indigo-400"><b className="text-slate-400 font-normal">Aux:</b> ₦{formatSum(inv.auxiliaryCost || 0)}</span>
+                          <span className="text-[10px] text-blue-600 dark:text-blue-400"><b className="text-slate-400 font-normal">Aux:</b> ₦{formatSum(inv.auxiliaryCost || 0)}</span>
                         )}
                         <span className="text-[10px] text-slate-500"><b className="text-slate-400 font-normal">Fuel:</b> ₦{formatSum(inv.dieselCost || 0)}</span>
                         <span className="text-[10px] text-slate-500"><b className="text-slate-400 font-normal">Other:</b> ₦{formatSum((inv.techniciansCost || 0) + (inv.installation || 0) + (inv.mobDemob || 0) + (inv.damages || 0))}</span>
@@ -2604,7 +2708,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                           </Button>
                         )}
                         {priv.canEdit && (
-                          <Button variant="ghost" size="sm" onClick={() => handleEdit(inv)} className="h-8 w-8 p-0 text-indigo-600 hover:bg-indigo-100 rounded-md">
+                          <Button variant="ghost" size="sm" onClick={() => handleEdit(inv)} className="h-8 w-8 p-0 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/50 rounded-sm">
                             <Edit className="w-4 h-4" />
                           </Button>
                         )}
@@ -2679,7 +2783,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                   <select
                     value={form.destination}
                     onChange={e => handleChange('destination', e.target.value)}
-                    className="flex h-8 w-36 rounded-lg border border-slate-350 dark:border-slate-800 bg-white dark:bg-slate-900 px-2.5 py-0.5 text-xs outline-none font-bold text-slate-800 dark:text-white shadow-xs focus:ring-2 focus:ring-indigo-500/20"
+                    className="flex h-8 w-36 rounded-sm border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2.5 py-0.5 text-xs outline-none font-bold text-slate-800 dark:text-white shadow-xs focus:ring-2 focus:ring-blue-500/20"
                   >
                     <option value="Pending">Quotation</option>
                     <option value="Active">Active Invoice</option>
@@ -2696,9 +2800,9 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
               <div className="space-y-6">
                 
                 {/* Section 1: Client & Invoice Info */}
-                <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-850 overflow-hidden">
+                <div className="bg-white dark:bg-slate-900 rounded-md border border-slate-200 dark:border-slate-800 overflow-hidden">
                   <div className="bg-slate-50/50 dark:bg-slate-900/50 px-6 py-4 border-b border-slate-155 dark:border-slate-850 flex items-center gap-3">
-                    <div className="p-2 bg-indigo-50 dark:bg-indigo-950/40 rounded-lg text-indigo-650 dark:text-indigo-400">
+                    <div className="p-2 bg-blue-50 dark:bg-blue-950/40 rounded-sm text-blue-600 dark:text-blue-400">
                       <FileText className="w-4 h-4" />
                     </div>
                     <div>
@@ -2723,7 +2827,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                               vatInc: siteForClient ? siteForClient.vat : f.vatInc
                             }));
                           }}
-                          className="flex h-11 w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-sm font-semibold text-slate-800 dark:text-white"
+                          className="flex h-11 w-full rounded-sm border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500/20 shadow-sm font-semibold text-slate-800 dark:text-white"
                         >
                           <option value="">Select Client...</option>
                           {uniqueClients.map((c, i) => <option key={i} value={c}>{c}</option>)}
@@ -2775,7 +2879,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                             }));
                           }}
                           disabled={!form.client}
-                          className="flex h-11 w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-sm font-semibold text-slate-800 dark:text-white disabled:opacity-60 disabled:cursor-not-allowed"
+                          className="flex h-11 w-full rounded-sm border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500/20 shadow-sm font-semibold text-slate-800 dark:text-white disabled:opacity-60 disabled:cursor-not-allowed"
                         >
                           <option value="">Select Site...</option>
                           {sitesBySelectedClient.map((s, i) => <option key={i} value={s.name}>{s.name} ({s.type})</option>)}
@@ -2788,13 +2892,13 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                       <div className={cn(
                         "rounded-xl border p-3.5 transition-all",
                         lastInvoiceForSelectedSite 
-                          ? "bg-gradient-to-r from-indigo-50/70 via-slate-50 to-blue-50/60 dark:from-indigo-950/30 dark:via-slate-900/60 dark:to-blue-950/20 border-indigo-200/80 dark:border-indigo-900/50"
+                          ? "bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800"
                           : "bg-slate-50/60 dark:bg-slate-900/40 border-slate-200 dark:border-slate-800"
                       )}>
                         {lastInvoiceForSelectedSite ? (
                           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
                             <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 rounded-lg bg-indigo-600/10 dark:bg-indigo-500/20 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0">
+                              <div className="w-8 h-8 rounded-sm bg-blue-50 dark:bg-blue-950/50 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0">
                                 <History className="w-4 h-4" />
                               </div>
                               <div className="space-y-0.5">
@@ -2802,7 +2906,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                                   <span className="font-bold text-slate-700 dark:text-slate-200">
                                     Last {lastInvoiceForSelectedSite.isQuotation ? 'Quotation' : 'Invoice'}:
                                   </span>
-                                  <span className="font-mono font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-100/80 dark:bg-indigo-950/70 px-1.5 py-0.5 rounded text-[11px]">
+                                  <span className="font-mono tabular-nums font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/70 px-1.5 py-0.5 rounded-sm text-[11px] border border-blue-200 dark:border-blue-800">
                                     #{lastInvoiceForSelectedSite.invoiceNumber || '—'}
                                   </span>
                                 </div>
@@ -2826,7 +2930,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                                   size="sm"
                                   variant="outline"
                                   onClick={() => handleChange('startDate', lastInvoiceForSelectedSite.suggestedNextStartDate)}
-                                  className="h-8 px-2.5 text-[11px] font-semibold bg-white dark:bg-slate-900 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800 shadow-2xs gap-1.5 transition-all"
+                                  className="h-8 px-2.5 text-[11px] font-semibold bg-white dark:bg-slate-900 hover:bg-blue-50 dark:hover:bg-blue-950/50 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800 rounded-sm gap-1.5 transition-all"
                                   title={`Set Start Date to ${formatDisplayDate(lastInvoiceForSelectedSite.suggestedNextStartDate)}`}
                                 >
                                   <Calendar className="w-3.5 h-3.5" />
@@ -2877,7 +2981,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                             <button
                               type="button"
                               onClick={() => handleChange('startDate', lastInvoiceForSelectedSite.suggestedNextStartDate)}
-                              className="text-indigo-600 dark:text-indigo-400 hover:underline font-semibold cursor-pointer"
+                              className="text-blue-600 dark:text-blue-400 hover:underline font-semibold cursor-pointer"
                             >
                               Set to {formatDisplayDate(lastInvoiceForSelectedSite.suggestedNextStartDate)}
                             </button>
@@ -2892,7 +2996,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                           type="checkbox" 
                           checked={!!form.countOffDays} 
                           onChange={e => handleChange('countOffDays', e.target.checked)} 
-                          className="mt-0.5 h-4.5 w-4.5 rounded border-slate-300 dark:border-slate-700 text-indigo-650 focus:ring-indigo-500 accent-indigo-650" 
+                          className="mt-0.5 h-4.5 w-4.5 rounded-sm border-slate-300 dark:border-slate-700 text-blue-600 focus:ring-blue-500 accent-blue-600" 
                         />
                         <div>
                           <span className="text-xs font-bold text-slate-700 dark:text-slate-205 block">Count off-days as billed days</span>
@@ -2902,13 +3006,13 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
 
                       <div className="flex flex-col sm:items-end gap-1 shrink-0">
                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">VAT Scope</span>
-                        <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-lg border border-slate-200 dark:border-slate-700">
+                        <div className="flex bg-slate-100 dark:bg-slate-800 p-0.5 rounded-sm border border-slate-200 dark:border-slate-700">
                           <button
                             type="button"
                             onClick={() => handleChange('vatScope', 'overall')}
-                            className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${
+                            className={`px-3 py-1 text-xs font-bold rounded-sm transition-all ${
                               form.vatScope !== 'per_section'
-                                ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
+                                ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400'
                                 : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'
                             }`}
                           >
@@ -2917,9 +3021,9 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                           <button
                             type="button"
                             onClick={() => handleChange('vatScope', 'per_section')}
-                            className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${
+                            className={`px-3 py-1 text-xs font-bold rounded-sm transition-all ${
                               form.vatScope === 'per_section'
-                                ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
+                                ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400'
                                 : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'
                             }`}
                           >
@@ -2932,7 +3036,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                 </div>
 
                 {/* Section 2: Equipment & Machinery */}
-                <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-850 overflow-hidden">
+                <div className="bg-white dark:bg-slate-900 rounded-md border border-slate-200 dark:border-slate-800 overflow-hidden">
                   <div className="bg-slate-50/50 dark:bg-slate-900/50 px-6 py-4 border-b border-slate-155 dark:border-slate-850 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="p-2 bg-blue-50 dark:bg-blue-950/40 rounded-lg text-blue-650 dark:text-blue-400">
@@ -2992,8 +3096,8 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                     {machineConfigs.length > 0 && (
                       <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 p-4 space-y-3">
                         <div className="flex justify-between items-center pb-2 border-b border-slate-200 dark:border-slate-800">
-                          <p className="text-xs font-bold text-indigo-700 dark:text-indigo-400 uppercase tracking-wide">Machine Configuration Matrix</p>
-                          <span className="text-[10px] bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 px-2.5 py-0.5 rounded-full font-bold">{machineConfigs.length} Pumps Active</span>
+                          <p className="text-xs font-bold text-blue-700 dark:text-blue-400 uppercase tracking-wide">Machine Configuration Matrix</p>
+                          <span className="text-[10px] bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 px-2.5 py-0.5 rounded-sm font-bold font-mono tabular-nums">{machineConfigs.length} Pumps Active</span>
                         </div>
                         
                         <div className="space-y-3">
@@ -3008,12 +3112,12 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                                 <div className="flex items-center justify-between">
                                   <span className="text-[10px] text-slate-450 font-bold uppercase tracking-wider">Daily Rental (₦)</span>
                                   {idx > 0 && (
-                                    <label className="flex items-center gap-1 text-[10px] text-indigo-650 dark:text-indigo-455 cursor-pointer select-none font-bold">
+                                    <label className="flex items-center gap-1 text-[10px] text-blue-600 dark:text-blue-400 cursor-pointer select-none font-bold">
                                       <input
                                         type="checkbox"
                                         checked={row.sameRateAsFirst}
                                         onChange={e => handleMachineSameToggle(idx, 'rate', e.target.checked)}
-                                        className="accent-indigo-650 w-3 h-3 rounded border-slate-350"
+                                        className="accent-blue-600 w-3 h-3 rounded-sm border-slate-300"
                                       />
                                       Link to #1
                                     </label>
@@ -3035,12 +3139,12 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                                 <div className="flex items-center justify-between">
                                   <span className="text-[10px] text-slate-455 font-bold uppercase tracking-wider">Lease Duration (Days)</span>
                                   {idx > 0 && (
-                                    <label className="flex items-center gap-1 text-[10px] text-indigo-655 dark:text-indigo-455 cursor-pointer select-none font-bold">
+                                    <label className="flex items-center gap-1 text-[10px] text-blue-600 dark:text-blue-400 cursor-pointer select-none font-bold">
                                       <input
                                         type="checkbox"
                                         checked={row.sameDurationAsFirst}
                                         onChange={e => handleMachineSameToggle(idx, 'duration', e.target.checked)}
-                                        className="accent-indigo-650 w-3 h-3 rounded border-slate-350"
+                                        className="accent-blue-600 w-3 h-3 rounded-sm border-slate-300"
                                       />
                                       Link to #1
                                     </label>
@@ -3061,12 +3165,12 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                                 <div className="flex items-center justify-between">
                                   <span className="text-[10px] text-slate-455 font-bold uppercase tracking-wider">Daily Fuel Usage (L/day)</span>
                                   {idx > 0 && (
-                                    <label className="flex items-center gap-1 text-[10px] text-indigo-655 dark:text-indigo-455 cursor-pointer select-none font-bold">
+                                    <label className="flex items-center gap-1 text-[10px] text-blue-600 dark:text-blue-400 cursor-pointer select-none font-bold">
                                       <input
                                         type="checkbox"
                                         checked={!!row.sameUsageAsFirst}
                                         onChange={e => handleMachineSameToggle(idx, 'dailyUsage', e.target.checked)}
-                                        className="accent-indigo-650 w-3 h-3 rounded border-slate-350"
+                                        className="accent-blue-600 w-3 h-3 rounded-sm border-slate-300"
                                       />
                                       Link to #1
                                     </label>
@@ -3094,7 +3198,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                           <div className="flex items-center gap-2">
                             <span className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wide">Auxiliary Equipment &amp; Non-Fuel Assets</span>
                             {(form.auxiliaryEquipment?.length || 0) > 0 && (
-                              <span className="text-[10px] bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 rounded-full font-bold">
+                              <span className="text-[10px] bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-sm font-bold font-mono tabular-nums">
                                 {form.auxiliaryEquipment.length} {form.auxiliaryEquipment.length === 1 ? 'Asset' : 'Assets'}
                               </span>
                             )}
@@ -3119,7 +3223,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                           variant="outline"
                           size="sm"
                           onClick={handleAddAuxiliaryItem}
-                          className="h-8 px-3 text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 border-dashed border-indigo-300 dark:border-indigo-800 rounded-lg flex items-center gap-1.5 shrink-0"
+                          className="h-8 px-3 text-xs font-bold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/50 border-dashed border-blue-300 dark:border-blue-800 rounded-sm flex items-center gap-1.5 shrink-0"
                         >
                           <Plus className="w-3.5 h-3.5" />
                           Add Auxiliary Asset
@@ -3142,10 +3246,10 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                               >
                                 <div className="flex items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-2">
                                   <div className="flex items-center gap-2">
-                                    <span className="w-2 h-2 rounded-full bg-indigo-500" />
+                                    <span className="w-2 h-2 rounded-full bg-blue-500" />
                                     <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Auxiliary Item #{idx + 1}</span>
                                     {lineTotal > 0 && (
-                                      <span className="text-[11px] font-mono font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-2 py-0.5 rounded-md">
+                                      <span className="text-[11px] font-mono tabular-nums font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded-sm">
                                         Total: ₦{lineTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                       </span>
                                     )}
@@ -3215,7 +3319,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                                       <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                                         Duration (Days)
                                       </label>
-                                      <label className="flex items-center gap-1 text-[10px] text-indigo-655 dark:text-indigo-400 cursor-pointer select-none font-bold">
+                                      <label className="flex items-center gap-1 text-[10px] text-blue-600 dark:text-blue-400 cursor-pointer select-none font-bold">
                                         <input
                                           type="checkbox"
                                           checked={!!item.sameDurationAsInvoice}
@@ -3227,7 +3331,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                                               duration: isChecked ? invoiceDur : item.duration,
                                             });
                                           }}
-                                          className="accent-indigo-650 w-3 h-3 rounded"
+                                          className="accent-blue-600 w-3 h-3 rounded-sm"
                                         />
                                         Same as Invoice
                                       </label>
@@ -3267,7 +3371,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                 </div>
 
                 {/* Section 3: Crew / Dewatering Staff */}
-                <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-850 overflow-hidden">
+                <div className="bg-white dark:bg-slate-900 rounded-md border border-slate-200 dark:border-slate-800 overflow-hidden">
                   <div className="bg-slate-50/50 dark:bg-slate-900/50 px-6 py-4 border-b border-slate-155 dark:border-slate-850 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="p-2 bg-amber-50 dark:bg-amber-950/40 rounded-lg text-amber-600 dark:text-amber-400">
@@ -3334,12 +3438,12 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                           <div className="space-y-1.5">
                             <div className="flex items-center justify-between">
                               <label className="text-[10px] font-bold text-slate-455 uppercase tracking-wider">Day Duration (Days)</label>
-                              <label className="flex items-center gap-1 text-[10px] text-indigo-600 dark:text-indigo-400 cursor-pointer select-none font-bold">
+                              <label className="flex items-center gap-1 text-[10px] text-blue-600 dark:text-blue-400 cursor-pointer select-none font-bold">
                                 <input
                                   type="checkbox"
                                   checked={form.technicianDurationSameAsMachine}
                                   onChange={e => handleChange('technicianDurationSameAsMachine', e.target.checked)}
-                                  className="accent-indigo-650 w-3 h-3 rounded"
+                                  className="accent-blue-600 w-3 h-3 rounded-sm"
                                 />
                                 Link to M-1
                               </label>
@@ -3368,12 +3472,12 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                           <div className="space-y-1.5">
                             <div className="flex items-center justify-between">
                               <label className="text-[10px] font-bold text-slate-455 uppercase tracking-wider">Night Shift Technicians</label>
-                              <label className="flex items-center gap-1 text-[10px] text-indigo-600 dark:text-indigo-400 cursor-pointer select-none font-bold">
+                              <label className="flex items-center gap-1 text-[10px] text-blue-600 dark:text-blue-400 cursor-pointer select-none font-bold">
                                 <input
                                   type="checkbox"
                                   checked={form.technicianNightCountSameAsDay}
                                   onChange={e => handleChange('technicianNightCountSameAsDay', e.target.checked)}
-                                  className="accent-indigo-650 w-3 h-3 rounded"
+                                  className="accent-blue-600 w-3 h-3 rounded-sm"
                                 />
                                 Same as Day Shift
                               </label>
@@ -3405,12 +3509,12 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                           <div className="space-y-1.5">
                             <div className="flex items-center justify-between">
                               <label className="text-[10px] font-bold text-slate-455 uppercase tracking-wider">Night Duration (Nights)</label>
-                              <label className="flex items-center gap-1 text-[10px] text-indigo-600 dark:text-indigo-400 cursor-pointer select-none font-bold">
+                              <label className="flex items-center gap-1 text-[10px] text-blue-600 dark:text-blue-400 cursor-pointer select-none font-bold">
                                 <input
                                   type="checkbox"
                                   checked={form.technicianNightDurationSameAsMachine}
                                   onChange={e => handleChange('technicianNightDurationSameAsMachine', e.target.checked)}
-                                  className="accent-indigo-650 w-3 h-3 rounded"
+                                  className="accent-blue-600 w-3 h-3 rounded-sm"
                                 />
                                 Link to M-1
                               </label>
@@ -3467,12 +3571,12 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                     </div>
 
                     {/* Effective Rate Bar */}
-                    <div className="p-4 rounded-xl bg-indigo-50/40 dark:bg-indigo-950/20 border border-indigo-100/60 dark:border-indigo-900/60 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div className="p-4 rounded-md bg-blue-50/40 dark:bg-blue-950/20 border border-blue-100/60 dark:border-blue-900/60 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                       <div>
-                        <span className="text-[10px] font-black uppercase tracking-wider text-indigo-700 dark:text-indigo-400">Effective Daily Rate per Crew Member</span>
+                        <span className="text-[10px] font-black uppercase tracking-wider text-blue-700 dark:text-blue-400">Effective Daily Rate per Crew Member</span>
                         <p className="text-[10.5px] text-slate-500 dark:text-slate-400 mt-0.5">Sum of Day Rate + Night Rate + Accommodation Rate per technician per day.</p>
                       </div>
-                      <div className="h-10 px-4 rounded-lg bg-white dark:bg-slate-900 border border-indigo-200 dark:border-indigo-955 flex items-center justify-center font-mono font-bold text-indigo-700 dark:text-indigo-300 text-sm shadow-sm shrink-0">
+                      <div className="h-10 px-4 rounded-sm bg-white dark:bg-slate-900 border border-blue-200 dark:border-blue-900 flex items-center justify-center font-mono tabular-nums font-bold text-blue-700 dark:text-blue-300 text-sm shrink-0">
                         ₦{livePreview.effectiveTechDailyRate.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </div>
                     </div>
@@ -3480,7 +3584,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                 </div>
 
                 {/* Section 4: Fuel & Logistics Extra Services */}
-                <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-850 overflow-hidden">
+                <div className="bg-white dark:bg-slate-900 rounded-md border border-slate-200 dark:border-slate-800 overflow-hidden">
                   <div className="bg-slate-50/50 dark:bg-slate-900/50 px-6 py-4 border-b border-slate-155 dark:border-slate-850 flex items-center gap-3">
                     <div className="p-2 bg-orange-50 dark:bg-orange-950/40 rounded-lg text-orange-655 dark:text-orange-400">
                       <Truck className="w-4 h-4" />
@@ -3502,7 +3606,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                             <span 
                               className={`text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0 ml-1 border ${
                                 (form.vatableSections?.diesel ?? true)
-                                  ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 border-indigo-200 dark:border-indigo-800/60'
+                                  ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800/60 rounded-sm font-mono tabular-nums'
                                   : 'text-slate-400 bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700'
                               }`}
                               title="Tax status configured in Settings"
@@ -3531,7 +3635,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                             <span 
                               className={`text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0 ml-1 border ${
                                 (form.vatableSections?.mobDemob ?? true)
-                                  ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 border-indigo-200 dark:border-indigo-800/60'
+                                  ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800/60 rounded-sm font-mono tabular-nums'
                                   : 'text-slate-400 bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700'
                               }`}
                               title="Tax status configured in Settings"
@@ -3560,7 +3664,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                             <span 
                               className={`text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0 ml-1 border ${
                                 (form.vatableSections?.installation ?? true)
-                                  ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 border-indigo-200 dark:border-indigo-800/60'
+                                  ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800/60 rounded-sm font-mono tabular-nums'
                                   : 'text-slate-400 bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700'
                               }`}
                               title="Tax status configured in Settings"
@@ -3589,7 +3693,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                             <span 
                               className={`text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0 ml-1 border ${
                                 (form.vatableSections?.damages ?? false)
-                                  ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 border-indigo-200 dark:border-indigo-800/60'
+                                  ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800/60 rounded-sm font-mono tabular-nums'
                                   : 'text-slate-400 bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700'
                               }`}
                               title="Tax status configured in Settings"
@@ -3630,7 +3734,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                 </div>
 
                 {/* Section 5: Reminders & Alerts */}
-                <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-850 overflow-hidden">
+                <div className="bg-white dark:bg-slate-900 rounded-md border border-slate-200 dark:border-slate-800 overflow-hidden">
                   <div className="bg-slate-50/50 dark:bg-slate-900/50 px-6 py-4 border-b border-slate-155 dark:border-slate-850 flex items-center gap-3">
                     <div className="p-2 bg-slate-100 dark:bg-slate-800 rounded-lg text-slate-650 dark:text-slate-350">
                       <Settings className="w-4 h-4" />
@@ -3648,7 +3752,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                           type="checkbox" 
                           checked={!!form.createReminder} 
                           onChange={e => handleChange('createReminder', e.target.checked)} 
-                          className="mt-1 h-5 w-5 rounded border-slate-300 dark:border-slate-700 text-indigo-650 focus:ring-indigo-500 accent-indigo-650" 
+                          className="mt-1 h-5 w-5 rounded-sm border-slate-300 dark:border-slate-700 text-blue-600 focus:ring-blue-500 accent-blue-600" 
                         />
                         <div>
                           <span className="text-sm font-bold text-slate-800 dark:text-slate-200 block">Create Automated Dashboard Reminder</span>
@@ -3661,10 +3765,10 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                             type="checkbox" 
                             checked={!!form.sendEmailNotification} 
                             onChange={e => handleChange('sendEmailNotification', e.target.checked)} 
-                            className="h-4.5 w-4.5 rounded border-slate-300 dark:border-slate-700 text-indigo-650 focus:ring-indigo-500 accent-indigo-650" 
+                            className="h-4.5 w-4.5 rounded-sm border-slate-300 dark:border-slate-700 text-blue-600 focus:ring-blue-500 accent-blue-600" 
                           />
                           <span className="text-xs font-semibold text-slate-655 dark:text-slate-300 flex items-center gap-2">
-                            <Mail className="w-4.5 h-4.5 text-indigo-550 dark:text-indigo-400 animate-bounce" /> 
+                            <Mail className="w-4.5 h-4.5 text-blue-600 dark:text-blue-400" /> 
                             Send email notification copy along with the dashboard reminder
                           </span>
                         </label>
@@ -3674,11 +3778,11 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                 </div>
 
                 {/* Form Footer Action Bar */}
-                <div className="bg-slate-200/50 dark:bg-slate-900 border border-slate-250 dark:border-slate-800 p-4 rounded-2xl flex gap-4 shadow-sm">
+                <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-md flex gap-4">
                   <Button variant="outline" className="flex-1 bg-white dark:bg-slate-950 border-slate-300 dark:border-slate-800 h-12 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-900 font-bold" onClick={handleRequestCloseModal}>
                     Leave / Close
                   </Button>
-                  <Button onClick={handleSubmit} className="flex-1 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-600 dark:hover:bg-indigo-700 text-white gap-2 h-12 shadow-md font-bold text-sm">
+                  <Button onClick={handleSubmit} className="flex-1 bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-700 text-white gap-2 h-12 rounded-sm font-bold text-sm">
                     <CheckCircle className="w-5 h-5" /> {selectedId ? 'Update & Save Changes' : 'Publish Document'}
                   </Button>
                 </div>
@@ -3686,11 +3790,11 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
 
               {/* Live Calculation Sidebar */}
               <div className="flex flex-col gap-4 sticky top-4">
-                <div className="bg-slate-900 dark:bg-slate-950 rounded-2xl p-6 shadow-xl border border-slate-800">
+                <div className="bg-slate-900 dark:bg-slate-950 rounded-md p-5 border border-slate-800">
                   <div className="flex justify-between items-center mb-5">
                     <span className="text-slate-400 text-xs font-black uppercase tracking-widest">Live Auto-Calc</span>
                     <Badge variant="outline" className={`text-[10px] uppercase font-bold tracking-wider rounded-sm px-2.5 py-0.5 border-slate-700 ${
-                      livePreview.vatInc === 'Yes' ? 'text-indigo-400 bg-indigo-950/50 border-indigo-900' :
+                      livePreview.vatInc === 'Yes' ? 'text-blue-400 bg-blue-950/50 border-blue-900' :
                       livePreview.vatInc === 'Add' ? 'text-amber-400 bg-amber-950/50 border-amber-900' :
                       'text-slate-450 bg-slate-800 border-slate-700'
                     }`}>
@@ -3713,7 +3817,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                         <div className="space-y-2">
                           <div className="flex justify-between items-center">
                             <span className="text-slate-400 text-[10px] uppercase font-black tracking-wider">Vatable Base</span>
-                            <span className="font-mono text-indigo-300 font-bold text-base">
+                            <span className="font-mono tabular-nums text-blue-300 font-bold text-base">
                               ₦{priv?.canViewAmounts === false ? '***' : (livePreview.vatableAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </span>
                           </div>
@@ -3748,13 +3852,13 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                             {livePreview.mobDemobVat > 0 && (
                               <div className="flex justify-between text-xs text-slate-350">
                                 <span>• Mob / Demob VAT:</span>
-                                <span className="font-mono font-bold text-indigo-300">₦{livePreview.mobDemobVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                <span className="font-mono tabular-nums font-bold text-blue-300">₦{livePreview.mobDemobVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                               </div>
                             )}
                             {livePreview.installationVat > 0 && (
                               <div className="flex justify-between text-xs text-slate-350">
                                 <span>• Installation VAT:</span>
-                                <span className="font-mono font-bold text-indigo-300">₦{livePreview.installationVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                <span className="font-mono tabular-nums font-bold text-blue-300">₦{livePreview.installationVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                               </div>
                             )}
                             {livePreview.damagesVat > 0 && (
@@ -3793,7 +3897,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                     <div className="h-px bg-slate-800" />
                     <div className="flex flex-col">
                       <span className="text-slate-500 text-[10px] uppercase font-black tracking-wider mb-1">Tax (VAT {livePreview.vatInc}{livePreview.vatScope === 'per_section' ? ' • Itemized' : ''})</span>
-                      <span className="font-mono text-indigo-400 font-bold text-lg">
+                      <span className="font-mono tabular-nums text-blue-400 font-bold text-lg">
                         ₦{priv?.canViewAmounts === false ? '***' : livePreview.vat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </span>
                     </div>
@@ -3809,9 +3913,9 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
 
                 {/* Tech cost breakdown card */}
                 {(parseFloat(form.noOfTechnician) > 0) && (
-                  <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-850 p-5 shadow-sm space-y-4">
+                  <div className="bg-white dark:bg-slate-900 rounded-md border border-slate-200 dark:border-slate-800 p-5 space-y-4">
                     <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-2">
-                      <p className="text-[10px] font-black uppercase tracking-wider text-indigo-650 dark:text-indigo-400">Crew Cost Formula</p>
+                      <p className="text-[10px] font-black uppercase tracking-wider text-blue-600 dark:text-blue-400">Crew Cost Formula</p>
                       {livePreview.vatScope === 'per_section' && (
                         <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${(livePreview.vatableSections?.technicians ?? false) ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}>
                           {(livePreview.vatableSections?.technicians ?? false) ? `VAT: ${vatRate}%` : 'Exempt'}
@@ -3864,7 +3968,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
 
                       {/* Total Tech line */}
                       <div className="h-px bg-slate-200 dark:bg-slate-800 my-2" />
-                      <div className="flex justify-between font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-50/50 dark:bg-indigo-950/20 p-2.5 rounded-lg border border-indigo-100 dark:border-indigo-900">
+                      <div className="flex justify-between font-bold text-blue-700 dark:text-blue-300 bg-blue-50/50 dark:bg-blue-950/20 p-2.5 rounded-sm border border-blue-100 dark:border-blue-900">
                         <span>Total Crew Cost</span>
                         <span className="font-mono">
                           ₦{livePreview.techniciansCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -3887,7 +3991,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
 
                 {/* Diesel Calculation breakdown card */}
                 {(livePreview.dieselCost > 0) && (
-                  <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-850 p-5 shadow-sm space-y-4">
+                  <div className="bg-white dark:bg-slate-900 rounded-md border border-slate-200 dark:border-slate-800 p-5 space-y-4">
                     <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-2">
                       <p className="text-[10px] font-black uppercase tracking-wider text-orange-600 dark:text-orange-400">Diesel Calculation</p>
                       {livePreview.vatScope === 'per_section' && (
@@ -3949,7 +4053,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
 
                 {/* Machine Rental breakdown card */}
                 {(livePreview.rentalCost > 0) && (
-                  <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-850 p-5 shadow-sm space-y-4">
+                  <div className="bg-white dark:bg-slate-900 rounded-md border border-slate-200 dark:border-slate-800 p-5 space-y-4">
                     <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-2">
                       <p className="text-[10px] font-black uppercase tracking-wider text-emerald-700 dark:text-emerald-400">Machine Calculation</p>
                       {livePreview.vatScope === 'per_section' && (
@@ -4008,11 +4112,11 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
 
                 {/* Auxiliary Assets breakdown card */}
                 {(livePreview.auxiliaryCost > 0) && (
-                  <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-850 p-5 shadow-sm space-y-4">
+                  <div className="bg-white dark:bg-slate-900 rounded-md border border-slate-200 dark:border-slate-800 p-5 space-y-4">
                     <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-2">
-                      <p className="text-[10px] font-black uppercase tracking-wider text-indigo-650 dark:text-indigo-400">Auxiliary Equipment Lease</p>
+                      <p className="text-[10px] font-black uppercase tracking-wider text-blue-600 dark:text-blue-400">Auxiliary Equipment Lease</p>
                       {livePreview.vatScope === 'per_section' && (
-                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${(livePreview.vatableSections?.equipment ?? true) ? 'bg-indigo-100 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}>
+                        <span className={`text-[10px] px-2 py-0.5 rounded-sm font-bold ${(livePreview.vatableSections?.equipment ?? true) ? 'bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}>
                           {(livePreview.vatableSections?.equipment ?? true) ? `VAT: ${vatRate}%` : 'Exempt'}
                         </span>
                       )}
@@ -4040,7 +4144,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                         );
                       })}
                       <div className="h-px bg-slate-200 dark:bg-slate-800 my-2" />
-                      <div className="flex justify-between font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-50/50 dark:bg-indigo-950/20 p-2.5 rounded-lg border border-indigo-100 dark:border-indigo-900">
+                      <div className="flex justify-between font-bold text-blue-700 dark:text-blue-300 bg-blue-50/50 dark:bg-blue-950/20 p-2.5 rounded-sm border border-blue-100 dark:border-blue-900">
                         <span>Total Auxiliary Cost</span>
                         <span className="font-mono">₦{livePreview.auxiliaryCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                       </div>
@@ -4050,7 +4154,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
 
                 {/* Other Charges breakdown card (Mob/Demob, Installation, Damages) */}
                 {(livePreview.mobDemob > 0 || livePreview.installation > 0 || livePreview.damages > 0) && (
-                  <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-850 p-5 shadow-sm space-y-4">
+                  <div className="bg-white dark:bg-slate-900 rounded-md border border-slate-200 dark:border-slate-800 p-5 space-y-4">
                     <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-2">
                       <p className="text-[10px] font-black uppercase tracking-wider text-rose-600 dark:text-rose-400">Other Charges</p>
                       {livePreview.vatScope === 'per_section' && (
@@ -4066,7 +4170,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                             <span className="font-bold text-slate-705 dark:text-slate-350 flex items-center gap-1.5">
                               Mob / Demob
                               {livePreview.vatScope === 'per_section' && (
-                                <span className={`text-[9px] px-1 rounded font-semibold ${(livePreview.vatableSections?.mobDemob ?? true) ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50' : 'text-slate-400 bg-slate-100 dark:bg-slate-800'}`}>
+                                <span className={`text-[9px] px-1 rounded-sm font-semibold ${(livePreview.vatableSections?.mobDemob ?? true) ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/50' : 'text-slate-400 bg-slate-100 dark:bg-slate-800'}`}>
                                   {(livePreview.vatableSections?.mobDemob ?? true) ? 'VAT' : 'Exempt'}
                                 </span>
                               )}
@@ -4084,7 +4188,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                             <span className="font-bold text-slate-705 dark:text-slate-350 flex items-center gap-1.5">
                               Installation
                               {livePreview.vatScope === 'per_section' && (
-                                <span className={`text-[9px] px-1 rounded font-semibold ${(livePreview.vatableSections?.installation ?? true) ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50' : 'text-slate-400 bg-slate-100 dark:bg-slate-800'}`}>
+                                <span className={`text-[9px] px-1 rounded-sm font-semibold ${(livePreview.vatableSections?.installation ?? true) ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/50' : 'text-slate-400 bg-slate-100 dark:bg-slate-800'}`}>
                                   {(livePreview.vatableSections?.installation ?? true) ? 'VAT' : 'Exempt'}
                                 </span>
                               )}
@@ -4102,7 +4206,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                             <span className="font-bold text-slate-705 dark:text-slate-350 flex items-center gap-1.5">
                               Damages
                               {livePreview.vatScope === 'per_section' && (
-                                <span className={`text-[9px] px-1 rounded font-semibold ${(livePreview.vatableSections?.damages ?? false) ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50' : 'text-slate-400 bg-slate-100 dark:bg-slate-800'}`}>
+                                <span className={`text-[9px] px-1 rounded-sm font-semibold ${(livePreview.vatableSections?.damages ?? false) ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/50' : 'text-slate-400 bg-slate-100 dark:bg-slate-800'}`}>
                                   {(livePreview.vatableSections?.damages ?? false) ? 'VAT' : 'Exempt'}
                                 </span>
                               )}
@@ -4143,8 +4247,8 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
         {/* Next Invoice Machine Selection Dialog */}
          {nextInvoiceDialog && nextInvoiceSource && (
            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
-               <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+             <div className="bg-white dark:bg-slate-900 rounded-md border border-slate-200 dark:border-slate-800 shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+               <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-900">
                  <h3 className="font-bold text-slate-800 uppercase tracking-tight text-sm flex items-center gap-2">
                    <PlusCircle className="w-4 h-4 text-orange-500" /> Select Machines
                  </h3>
@@ -4192,7 +4296,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                    ))}
                  </div>
                </div>
-               <div className="p-4 bg-slate-50 border-t border-slate-100 flex gap-3">
+               <div className="p-4 bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex gap-3">
                  <Button variant="outline" className="flex-1 h-10 text-xs font-bold uppercase tracking-tight" onClick={() => setNextInvoiceDialog(false)}>Cancel</Button>
                  <Button 
                    className="flex-1 h-10 bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold uppercase tracking-tight shadow-md disabled:opacity-50"
@@ -4210,13 +4314,13 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
         {importFile && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center">
             <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setImportFile(null)} />
-            <div className="relative bg-white rounded-xl shadow-2xl p-6 w-full max-w-md mx-4 border border-slate-200">
+            <div className="relative bg-white dark:bg-slate-900 rounded-md shadow-2xl p-6 w-full max-w-md mx-4 border border-slate-200 dark:border-slate-800">
               <h3 className="text-xl font-bold text-slate-900 mb-2">Import Policy</h3>
               <p className="text-sm text-slate-500 leading-relaxed mb-6">
                 How would you like to process the {activeTab === 'active' ? 'Active' : 'Pending'} Invoice records from this CSV file?
               </p>
               <div className="flex flex-col gap-3">
-                <Button onClick={() => processImport(importFile, 'update')} className="bg-indigo-600 hover:bg-indigo-700 text-white h-auto py-3 flex-col items-center justify-center">
+                <Button onClick={() => processImport(importFile, 'update')} className="bg-blue-600 hover:bg-blue-700 text-white h-auto py-3 flex-col items-center justify-center rounded-sm">
                   <span className="font-semibold block text-base">Update & Add (Recommended)</span>
                   <span className="block text-xs opacity-80 mt-1 font-normal text-center">Modifies matching IDs. Adds missing ones. Leaves others alone.</span>
                 </Button>
@@ -4408,67 +4512,13 @@ export function InvoicePrintModal({ invoice, onClose, ledgerBanks, ledgerBenefic
     if (invoice.printLayout?.paymentsCredits !== undefined) {
       return invoice.printLayout.paymentsCredits;
     }
-
     const allPayments = useAppStore.getState().payments || [];
-    const invClient = (invoice.client || '').trim().toLowerCase();
-    const invSite = ((invoice as any).siteName || (invoice as any).site || '').trim().toLowerCase();
-    
-    // Filter payments for this client and site
-    const clientSitePayments = allPayments.filter(p => 
-      p.client?.trim().toLowerCase() === invClient &&
-      p.site?.trim().toLowerCase() === invSite
-    );
-
-    if (clientSitePayments.length === 0) return 0;
-
-    // Filter all invoices for this client and site
     const allInvoices = [
       ...(useAppStore.getState().invoices || []),
       ...(useAppStore.getState().pendingInvoices || [])
     ];
-    
-    const clientSiteInvoices = allInvoices.filter(i => 
-      i.client?.trim().toLowerCase() === invClient &&
-      (((i as any).siteName || (i as any).site || '').trim().toLowerCase() === invSite)
-    );
-
-    // Sort chronologically by date
-    const sortedInvs = [...clientSiteInvoices].sort((a, b) => {
-      const dateAStr = (a as any).date || (a as any).startDate || '';
-      const dateBStr = (b as any).date || (b as any).startDate || '';
-      const dateA = dateAStr ? new Date(normalizeDate(dateAStr)).getTime() : 0;
-      const dateB = dateBStr ? new Date(normalizeDate(dateBStr)).getTime() : 0;
-      return dateA - dateB;
-    });
-
-    const curIndex = sortedInvs.findIndex(i => i.id === invoice.id);
-    if (curIndex === -1) return 0;
-
-    const curInvDateStr = (sortedInvs[curIndex] as any).date || (sortedInvs[curIndex] as any).startDate || '';
-    const curInvDate = curInvDateStr ? new Date(normalizeDate(curInvDateStr)).getTime() : 0;
-    
-    // Window starts 5 days before this invoice date
-    const windowStart = curInvDate - (5 * 24 * 60 * 60 * 1000);
-    
-    // Window ends 5 days before the next invoice date (if one exists)
-    let windowEnd = Infinity;
-    if (curIndex < sortedInvs.length - 1) {
-      const nextInvDateStr = (sortedInvs[curIndex + 1] as any).date || (sortedInvs[curIndex + 1] as any).startDate || '';
-      const nextInvDate = nextInvDateStr ? new Date(normalizeDate(nextInvDateStr)).getTime() : 0;
-      windowEnd = nextInvDate - (5 * 24 * 60 * 60 * 1000);
-    }
-
-    // Filter payments in this window
-    const matchedPayments = clientSitePayments.filter(p => {
-      const pDate = p.date ? new Date(normalizeDate(p.date)).getTime() : 0;
-      return pDate >= windowStart && pDate < windowEnd;
-    });
-
-    if (matchedPayments.length > 0) {
-      return matchedPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
-    }
-
-    return 0;
+    const settlement = getInvoiceSettlement(invoice, allInvoices, allPayments);
+    return settlement.totalSettled;
   };
 
   const [billedToInput, setBilledToInput] = useState(getInitialBilledTo());

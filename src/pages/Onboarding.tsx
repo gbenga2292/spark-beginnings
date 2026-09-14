@@ -143,7 +143,7 @@ function SubSection({
   const [open, setOpen] = useState(true);
   if (locked) {
     return (
-      <div className="rounded-2xl border border-slate-200/50 overflow-hidden opacity-40 mt-2">
+      <div className="rounded-md border border-slate-200/50 overflow-hidden opacity-40 mt-2">
         <div className="flex items-center justify-between px-4 py-2.5 bg-slate-50 text-slate-400 text-[10px] font-black uppercase tracking-widest">
           <span className="flex items-center gap-2"><Lock className="h-3.5 w-3.5" />{label}</span>
           <span className="italic opacity-50">{lockMsg || 'PENDING'}</span>
@@ -152,7 +152,7 @@ function SubSection({
     );
   }
   return (
-    <div className={`rounded-2xl border transition-all mt-2 ${done ? 'border-emerald-100 bg-emerald-50/10' : 'border-slate-100 dark:border-slate-800'}`}>
+    <div className={`rounded-md border transition-all mt-2 ${done ? 'border-emerald-100 bg-emerald-50/10' : 'border-slate-100 dark:border-slate-800'}`}>
       <button
         className={`w-full flex items-center justify-between px-4 py-2.5 text-[11px] font-black uppercase tracking-widest gap-2 transition-all hover:brightness-95 ${done ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-400'}`}
         onClick={() => setOpen(o => !o)}
@@ -177,7 +177,7 @@ function CheckRow({ label, checked, onChange, disabled, hint }: {
       <label className={`flex items-center gap-3 cursor-pointer group ${disabled ? 'opacity-40 pointer-events-none' : ''}`}>
         <div
           className={`h-5 w-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors
-            ${checked ? 'bg-emerald-500 border-emerald-500' : 'border-slate-300 bg-white dark:bg-slate-800 group-hover:border-indigo-400'}
+            ${checked ? 'bg-emerald-500 border-emerald-500' : 'border-slate-300 bg-white dark:bg-slate-800 group-hover:border-blue-400'}
             ${disabled ? 'border-slate-200 bg-slate-50' : ''}`}
           onClick={() => !disabled && onChange(!checked)}
         >
@@ -864,14 +864,14 @@ export function Onboarding() {
           className="gap-2 h-9 px-3" 
           onClick={() => navigate('/onboarding/contract')}
         >
-          <FileText className="h-4 w-4 text-indigo-500" /> 
+          <FileText className="h-4 w-4 text-blue-600" /> 
           <span className="hidden lg:inline">Contract</span>
         </Button>
       )}
       {priv.canAdd && (
         <Button 
           size="sm"
-          className="gap-2 h-9 px-3 bg-indigo-600 hover:bg-indigo-700 text-white" 
+          className="gap-2 h-9 px-3 bg-blue-600 hover:bg-blue-700 text-white" 
           onClick={() => navigate('/onboarding/new')}
         >
           <UserPlus className="h-4 w-4" /> 
@@ -898,7 +898,7 @@ export function Onboarding() {
       <div className="flex sm:hidden flex-wrap gap-2 px-1">
         {priv.canAdd && (
           <Button
-            className="flex-1 gap-2 bg-indigo-600 hover:bg-indigo-700 text-white"
+            className="flex-1 gap-2 bg-blue-600 hover:bg-blue-700 text-white"
             onClick={() => navigate('/onboarding/new')}
           >
             <UserPlus className="h-4 w-4" /> Start New Hire
@@ -910,7 +910,7 @@ export function Onboarding() {
             className="flex-1 gap-2"
             onClick={() => navigate('/onboarding/contract')}
           >
-            <FileText className="h-4 w-4 text-indigo-500" /> Contract
+            <FileText className="h-4 w-4 text-blue-600" /> Contract
           </Button>
         )}
         {priv.canDelete && (
@@ -927,7 +927,7 @@ export function Onboarding() {
       {/* Stats */}
       <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
         {[
-          { label: 'Total Employed', value: employees.filter(e => e.staffType === 'FIELD' || e.staffType === 'OFFICE').length, icon: Users, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+          { label: 'Total Employed', value: employees.filter(e => e.staffType === 'FIELD' || e.staffType === 'OFFICE').length, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50' },
           { label: 'Active Staff', value: activeEmployees.length, icon: Activity, color: 'text-emerald-600', bg: 'bg-emerald-50' },
           { label: 'Pending Hires', value: pendingEmployees.length, icon: CalendarDays, color: 'text-amber-600', bg: 'bg-amber-50' },
           { label: 'Terminated', value: terminatedEmployees.length, icon: UserMinus, color: 'text-rose-600', bg: 'bg-rose-50' },
@@ -976,7 +976,7 @@ export function Onboarding() {
                     Mark All Complete
                   </Button>
                 )}
-                <Badge variant="secondary" className="bg-indigo-100 text-indigo-700 rounded-full px-2.5">
+                <Badge variant="secondary" className="bg-blue-50 text-blue-700 border border-blue-200 rounded-full px-2.5">
                   {leftTab === 'Active' ? activeEmployees.length : leftTab === 'Pending' ? pendingEmployees.length : terminatedEmployees.length}
                 </Badge>
               </div>
@@ -984,7 +984,7 @@ export function Onboarding() {
             <div className="flex p-1 bg-slate-200/50 rounded-lg">
               {(['Active', 'Pending', 'Terminated'] as const).map(tab => (
                 <button key={tab}
-                  className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-colors relative ${leftTab === tab ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-700 dark:text-indigo-300' : 'text-slate-500 hover:text-slate-700'}`}
+                  className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-colors relative ${leftTab === tab ? 'bg-white dark:bg-slate-700 shadow-sm text-blue-700 dark:text-blue-300' : 'text-slate-500 hover:text-slate-700'}`}
                   onClick={() => {
                     setLeftTab(tab);
                     setViewingPendingArchive(false);
@@ -1044,10 +1044,10 @@ export function Onboarding() {
                   const empCl = emp.onboardingChecklist;
                   const hasPostPending = empCl && (!empCl.orientationDone || !empCl.ppeHandbookIssued);
                   return (
-                    <div key={emp.id} className={`p-4 hover:bg-slate-50 cursor-pointer transition-colors ${selectedEmployeeId === emp.id ? 'bg-indigo-50/50 outline outline-1 outline-indigo-200' : ''}`} onClick={() => handleSelectEmployee(emp)}>
+                    <div key={emp.id} className={`p-4 hover:bg-slate-50 cursor-pointer transition-colors ${selectedEmployeeId === emp.id ? 'bg-blue-50/50 outline outline-1 outline-blue-200' : ''}`} onClick={() => handleSelectEmployee(emp)}>
                       <div className="flex items-center gap-3">
                         <div className="relative shrink-0">
-                          <div className="h-10 w-10 rounded-full bg-gradient-to-tr from-indigo-100 to-blue-50 flex items-center justify-center text-indigo-700 font-bold text-sm border border-indigo-100/50 shadow-sm">{emp.firstname.charAt(0)}{emp.surname.charAt(0)}</div>
+                          <div className="h-10 w-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-700 font-bold text-sm border border-blue-100">{emp.firstname.charAt(0)}{emp.surname.charAt(0)}</div>
                           {hasPostPending && <span className="absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full bg-amber-400 border-2 border-white" title="Post-activation tasks pending" />}
                         </div>
                         <div className="flex-1 overflow-hidden"><p className="font-semibold text-slate-800 text-sm truncate">{emp.surname} {emp.firstname}</p><p className="text-[11px] text-slate-500 uppercase tracking-widest mt-0.5 truncate">{emp.position}</p></div>
@@ -1155,7 +1155,7 @@ export function Onboarding() {
                             <div className={`h-10 w-10 rounded-full flex items-center justify-center font-bold text-sm border shadow-sm mt-0.5 ${
                               suspended
                                 ? 'bg-slate-200 text-slate-500 border-slate-300 grayscale'
-                                : 'bg-gradient-to-tr from-amber-100 to-yellow-50 text-amber-700 border-amber-100/50'
+                                : 'bg-amber-50 text-amber-700 border-amber-100'
                             }`}>{emp.firstname.charAt(0)}{emp.surname.charAt(0)}</div>
                             {/* Pending tasks dot */}
                             {!suspended && hasPendingTasks && (
@@ -1172,7 +1172,7 @@ export function Onboarding() {
                           {priv.canEdit && (
                             <div className="flex gap-1 shrink-0" onClick={e => e.stopPropagation()}>
                               <button
-                                className="h-7 w-7 rounded-md flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                                className="h-7 w-7 rounded-md flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
                                 title="Edit new hire details"
                                 onClick={e => openEdit(emp, e)}
                               >
@@ -1245,7 +1245,7 @@ export function Onboarding() {
                                   <>
                                     <span>Tasks: {completed}/{empSubs.length}</span>
                                     <div className="w-16 h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                                      <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${pct}%` }}></div>
+                                      <div className="h-full bg-blue-500 rounded-full" style={{ width: `${pct}%` }}></div>
                                     </div>
                                   </>
                                 );
@@ -1267,7 +1267,7 @@ export function Onboarding() {
                 return (
                   <div key={emp.id} className={`p-4 hover:bg-slate-50 cursor-pointer transition-colors ${selectedEmployeeId === emp.id ? 'bg-red-50/50 outline outline-1 outline-red-200' : ''}`} onClick={() => handleSelectEmployee(emp)}>
                     <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-full bg-gradient-to-tr from-slate-100 to-slate-200 flex items-center justify-center text-slate-600 font-bold text-sm shrink-0 grayscale">{emp.firstname.charAt(0)}{emp.surname.charAt(0)}</div>
+                      <div className="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold text-sm shrink-0 border border-slate-200">{emp.firstname.charAt(0)}{emp.surname.charAt(0)}</div>
                       <div className="flex-1 overflow-hidden"><p className="font-semibold text-sm truncate text-slate-700">{emp.surname} {emp.firstname}</p><p className="text-[11px] text-slate-500 uppercase tracking-widest mt-0.5 truncate">{emp.position}</p></div>
                     </div>
                     <div className="mt-2">
@@ -1286,13 +1286,13 @@ export function Onboarding() {
         <Card className="md:col-span-7 lg:col-span-8 border-none shadow-lg bg-white dark:bg-slate-900 overflow-hidden min-h-[720px] flex flex-col ring-1 ring-slate-100">
           <CardHeader className="border-b border-slate-100 bg-white/50 dark:bg-slate-900/80 sticky top-0 z-10 p-5 flex flex-col sm:flex-row sm:items-start justify-between gap-4">
             <div className="space-y-1 flex-1">
-              <Badge variant="outline" className={`rounded-md font-bold text-[10px] tracking-widest uppercase border-0 text-white ${isHistory ? 'bg-emerald-500' : isOffboarding ? 'bg-rose-500' : isOnboarding ? 'bg-indigo-500' : 'bg-slate-400'}`}>
+              <Badge variant="outline" className={`rounded-md font-bold text-[10px] tracking-widest uppercase border-0 text-white ${isHistory ? 'bg-emerald-500' : isOffboarding ? 'bg-rose-500' : isOnboarding ? 'bg-blue-500' : 'bg-slate-400'}`}>
                 {activeTaskType || 'Action Center'}
               </Badge>
               <CardTitle className="text-xl font-black text-slate-800 flex items-center flex-wrap gap-2">
                 {isOnboarding ? 'Onboarding Checklist' : isHistory ? 'Onboarding History' : isOffboarding ? 'Offboarding Tasks' : 'Select an Employee'}
                 {selectedEmployee && (
-                  <span className={`text-base font-medium px-3 py-1 rounded-lg ${selectedEmployee.status === 'Onboarding' ? 'text-indigo-500 bg-indigo-50' : selectedEmployee.status === 'Terminated' ? 'text-rose-500 bg-rose-50' : 'text-emerald-500 bg-emerald-50'}`}>
+                  <span className={`text-base font-medium px-3 py-1 rounded-lg ${selectedEmployee.status === 'Onboarding' ? 'text-blue-600 bg-blue-50' : selectedEmployee.status === 'Terminated' ? 'text-rose-500 bg-rose-50' : 'text-emerald-500 bg-emerald-50'}`}>
                     ({selectedEmployee.firstname} {selectedEmployee.surname})
                   </span>
                 )}
@@ -1300,7 +1300,7 @@ export function Onboarding() {
               {selectedEmployee?.status === 'Onboarding' && (
                 <p className="text-xs text-slate-500">
                   Tentative Start: <strong>{selectedEmployee.tentativeStartDate || selectedEmployee.startDate}</strong>
-                  {selectedEmployee.probationPeriod && <span className="ml-3 text-indigo-600 font-semibold">Probation: {selectedEmployee.probationPeriod} days</span>}
+                  {selectedEmployee.probationPeriod && <span className="ml-3 text-blue-600 font-semibold">Probation: {selectedEmployee.probationPeriod} days</span>}
                   {selectedEmployee.noOfGuarantors && <span className="ml-3 text-amber-600 font-semibold">Guarantors Required: {selectedEmployee.noOfGuarantors}</span>}
                 </p>
               )}
@@ -1356,7 +1356,7 @@ export function Onboarding() {
                     <Section icon={Star} label="Interview Insights & Background" color="bg-amber-50 text-amber-700" defaultOpen={false}>
                       <div className="space-y-6">
                         {selectedEmployee.onboardingNotes && (
-                          <div className="p-4 bg-amber-50/50 rounded-2xl border border-amber-100">
+                          <div className="p-4 bg-amber-50/50 rounded-md border border-amber-100">
                             <p className="text-[10px] font-black text-amber-700 uppercase tracking-widest mb-2 flex items-center gap-2"><FileText className="h-3 w-3" /> Interviewer Notes</p>
                             <p className="text-xs text-amber-900 font-medium whitespace-pre-line leading-relaxed">{selectedEmployee.onboardingNotes}</p>
                           </div>
@@ -1391,15 +1391,15 @@ export function Onboarding() {
                   )}
 
                   {/* ─ Task 1 ─ */}
-                <Section icon={Mail} label={l['1'] || "1. Send Necessary Information (Forms)"} color="bg-indigo-50 text-indigo-700"
+                <Section icon={Mail} label={l['1'] || "1. Send Necessary Information (Forms)"} color="bg-blue-50 text-blue-700"
                   defaultOpen={!t1Done}>
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-xs text-slate-500">All forms must be sent and acknowledged before Task 2 unlocks.</span>
                     <DoneBadge done={t1Done} />
                   </div>
                   <p className="text-[11px] text-slate-500 mb-2">Tick after sending all necessary forms to the employee.</p>
-                  <div className="ml-2 space-y-2 border-l-2 border-indigo-100 pl-3">
-                    <p className="text-xs font-semibold text-indigo-600">Employee Forms</p>
+                  <div className="ml-2 space-y-2 border-l-2 border-blue-100 pl-3">
+                    <p className="text-xs font-semibold text-blue-600">Employee Forms</p>
                     <CheckRow
                       label="All necessary forms sent to employee (Employee Forms + Guarantor Forms)"
                       checked={cl.emailFormsSent}
@@ -1418,7 +1418,7 @@ export function Onboarding() {
                 </Section>
 
                 {/* ─ Task 2 ─ */}
-                <Section icon={RotateCcw} label={l['2'] || "2. Return of Forms"} color="bg-violet-50 text-violet-700"
+                <Section icon={RotateCcw} label={l['2'] || "2. Return of Forms"} color="bg-sky-50 text-sky-700"
                   locked={!t2Unlocked} lockMsg="Complete Task 1 first" defaultOpen={t1Done && !t2FullDone}>
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-xs text-slate-500">Tick when each form and passport photo has been received.</span>
@@ -1426,14 +1426,14 @@ export function Onboarding() {
                   </div>
 
                   {/* Guarantor Form block */}
-                  <div className="rounded-lg border border-violet-100 bg-violet-50/30 p-3 space-y-2">
-                    <p className="text-xs font-bold text-violet-700">Guarantor Form</p>
+                  <div className="rounded-lg border border-sky-100 bg-sky-50/30 p-3 space-y-2">
+                    <p className="text-xs font-bold text-sky-700">Guarantor Form</p>
                     <CheckRow
                       label="Guarantor form(s) returned"
                       checked={cl.guarantorFormsReturned}
                       onChange={v => updateCL({ guarantorFormsReturned: v, guarantorPassportReturned: cl.guarantorPassportReturned && v })}
                     />
-                    <div className="ml-6 space-y-1 border-l-2 border-violet-100 pl-3">
+                    <div className="ml-6 space-y-1 border-l-2 border-sky-100 pl-3">
                       <CheckRow
                         label="With passport photograph"
                         checked={cl.guarantorPassportReturned}
@@ -1451,14 +1451,14 @@ export function Onboarding() {
                   </div>
 
                   {/* Personal Employee Form block */}
-                  <div className="rounded-lg border border-violet-100 bg-violet-50/30 p-3 space-y-2 mt-2">
-                    <p className="text-xs font-bold text-violet-700">Personal Employee Form</p>
+                  <div className="rounded-lg border border-sky-100 bg-sky-50/30 p-3 space-y-2 mt-2">
+                    <p className="text-xs font-bold text-sky-700">Personal Employee Form</p>
                     <CheckRow
                       label="Personal employee form returned"
                       checked={cl.personalEmployeeFormReturned}
                       onChange={v => updateCL({ personalEmployeeFormReturned: v, personalEmployeePassportReturned: cl.personalEmployeePassportReturned && v })}
                     />
-                    <div className="ml-6 space-y-1 border-l-2 border-violet-100 pl-3">
+                    <div className="ml-6 space-y-1 border-l-2 border-sky-100 pl-3">
                       <CheckRow
                         label="With passport photograph"
                         checked={cl.personalEmployeePassportReturned}
@@ -1710,7 +1710,7 @@ export function Onboarding() {
                     <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2 flex items-center gap-2">
                       <Siren className="h-3.5 w-3.5 text-orange-500" /> Post-Activation Tasks
                     </p>
-                    <Section icon={GraduationCap} label="6. Orientation" color="bg-purple-50 text-purple-700" defaultOpen={!cl.orientationDone}>
+                    <Section icon={GraduationCap} label="6. Orientation" color="bg-sky-50 text-sky-700" defaultOpen={!cl.orientationDone}>
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-xs text-slate-500">All orientations must be completed.</span>
                         <DoneBadge done={!!(cl.hrOrientation && cl.departmentOrientation && cl.siteOrientation && cl.hseOrientation)} />
@@ -1768,8 +1768,8 @@ export function Onboarding() {
                 ) : (
                   <div className="space-y-2 opacity-50 pointer-events-none mt-6">
                     <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2"><Siren className="h-3.5 w-3.5" />Post-Activation Tasks (Available after employee is activated)</p>
-                    <Section icon={GraduationCap} label={l['6'] || "6. Orientation"} color="bg-purple-50 text-purple-700" defaultOpen={false}>
-                      <p className="text-xs text-purple-600">Unlocks after activation. Includes HR, Department, Site, and HSE orientations.</p>
+                    <Section icon={GraduationCap} label={l['6'] || "6. Orientation"} color="bg-sky-50 text-sky-700" defaultOpen={false}>
+                      <p className="text-xs text-sky-600">Unlocks after activation. Includes HR, Department, Site, and HSE orientations.</p>
                     </Section>
                     <Section icon={Package} label={l['7'] || "7. Provision of PPE, Handbook & Requirements"} color="bg-orange-50 text-orange-700" defaultOpen={false}>
                       <p className="text-xs text-orange-600">Unlocks after activation. Includes PPE issuance, handbook, and other requirements.</p>
@@ -1898,7 +1898,7 @@ export function Onboarding() {
 
                 {/* ── Closing Remarks ── */}
                 {offTasks.length > 0 && (
-                  <div className="mt-4 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 space-y-2">
+                  <div className="mt-4 p-4 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 space-y-2">
                     <label className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-500">
                       <FileText className="h-3.5 w-3.5 text-rose-400" />
                       Closing Remarks
@@ -1925,7 +1925,7 @@ export function Onboarding() {
                 </div>
                 <h3 className="text-xl font-bold text-slate-700 mb-2">No active roadmap mapped.</h3>
                 <p className="text-slate-500 text-sm max-w-sm mb-8 leading-relaxed">Select an employee from the directory on the left or start a new hire.</p>
-                <Button variant="outline" className="text-slate-600 border-slate-200 hover:bg-slate-50 hover:text-indigo-600" onClick={() => navigate('/onboarding/new')}>Start New Hire</Button>
+                <Button variant="outline" className="text-slate-600 border-slate-200 hover:bg-slate-50 hover:text-blue-600" onClick={() => navigate('/onboarding/new')}>Start New Hire</Button>
               </div>
             )}
           </CardContent>
@@ -1935,10 +1935,10 @@ export function Onboarding() {
       {/* ── Edit Modal ────────────────────────────────────── */}
       {editEmp && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-md border border-slate-200 dark:border-slate-700 overflow-hidden">
+          <div className="bg-white dark:bg-slate-900 rounded-md shadow-2xl w-full max-w-md border border-slate-200 dark:border-slate-700 overflow-hidden">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/60">
               <div>
-                <p className="text-xs font-bold uppercase tracking-widest text-indigo-600">Edit New Hire Details</p>
+                <p className="text-xs font-bold uppercase tracking-widest text-blue-600">Edit New Hire Details</p>
                 <h3 className="text-lg font-black text-slate-800 mt-0.5">{editEmp.firstname} {editEmp.surname}</h3>
                 <p className="text-[11px] text-slate-400 mt-0.5">Full name is not editable here</p>
               </div>
@@ -1985,7 +1985,7 @@ export function Onboarding() {
             </div>
             <div className="flex gap-3 px-6 pb-6">
               <Button variant="outline" className="flex-1" onClick={closeEdit}>Cancel</Button>
-              <Button className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white" onClick={saveEdit}><Check className="h-4 w-4 mr-1.5" />Save Changes</Button>
+              <Button className="flex-1 bg-blue-600 hover:bg-blue-700 text-white" onClick={saveEdit}><Check className="h-4 w-4 mr-1.5" />Save Changes</Button>
             </div>
           </div>
         </div>

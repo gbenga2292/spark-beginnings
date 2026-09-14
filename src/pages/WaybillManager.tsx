@@ -30,7 +30,7 @@ function WaybillManagerHeader({ onCreate, activeTab }: { onCreate: () => void, a
     'Track and manage asset deliveries (Waybills) and site returns',
     <div className="flex items-center gap-2 md:gap-3">
       {activeTab === 'waybill' && (
-        <Button size="sm" className="gap-2 bg-blue-600 hover:bg-blue-700 text-white h-9 px-2 sm:px-3" onClick={onCreate}>
+        <Button size="sm" className="gap-2 bg-blue-600 hover:bg-blue-700 text-white h-9 px-2 sm:px-3 rounded-md shadow-none" onClick={onCreate}>
           <Plus className="h-4 w-4" /> <span className="hidden sm:inline">Create Waybill</span>
         </Button>
       )}
@@ -94,10 +94,10 @@ export function WaybillManager() {
 
   const getStatusBadge = (status: WaybillStatus) => {
     switch (status) {
-      case 'outstanding': return <Badge variant="outline" className="bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border-amber-200 font-semibold px-2 py-0.5 rounded-full text-[11px]">Outstanding</Badge>;
-      case 'sent_to_site': return <Badge variant="outline" className="bg-teal-50 dark:bg-teal-900/20 text-teal-700 dark:text-teal-400 border-teal-200 font-semibold px-2 py-0.5 rounded-full text-[11px]">Sent to Site</Badge>;
-      case 'return_completed': return <Badge variant="outline" className="bg-emerald-100 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border-emerald-200 font-semibold px-2 py-0.5 rounded-full text-[11px]">Completed</Badge>;
-      default: return <Badge variant="outline" className="bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 font-semibold px-2 py-0.5 rounded-full text-[11px]">{status}</Badge>;
+      case 'outstanding': return <Badge variant="outline" className="bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800 font-semibold px-2 py-0.5 rounded-sm text-[10px]">Outstanding</Badge>;
+      case 'sent_to_site': return <Badge variant="outline" className="bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800 font-semibold px-2 py-0.5 rounded-sm text-[10px]">Sent to Site</Badge>;
+      case 'return_completed': return <Badge variant="outline" className="bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800 font-semibold px-2 py-0.5 rounded-sm text-[10px]">Completed</Badge>;
+      default: return <Badge variant="outline" className="bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 font-semibold px-2 py-0.5 rounded-sm text-[10px]">{status}</Badge>;
     }
   };
 
@@ -154,18 +154,18 @@ export function WaybillManager() {
     return (
       <th
         onClick={() => handleSort(field)}
-        className="px-5 py-4 whitespace-nowrap cursor-pointer select-none hover:bg-blue-800 transition-colors group/header"
+        className="px-5 py-3.5 whitespace-nowrap cursor-pointer select-none hover:bg-blue-700 transition-colors group/header"
       >
         <div className="flex items-center gap-1.5">
           <span>{label}</span>
           {isSorted ? (
             sortOrder === 'asc' ? (
-              <ArrowUp className="h-3.5 w-3.5 text-blue-200" />
+              <ArrowUp className="h-3.5 w-3.5 text-blue-100" />
             ) : (
-              <ArrowDown className="h-3.5 w-3.5 text-blue-200" />
+              <ArrowDown className="h-3.5 w-3.5 text-blue-100" />
             )
           ) : (
-            <ArrowUpDown className="h-3.5 w-3.5 text-blue-200/50 group-hover/header:text-blue-200 transition-colors" />
+            <ArrowUpDown className="h-3.5 w-3.5 text-blue-200/60 group-hover/header:text-blue-100 transition-colors" />
           )}
         </div>
       </th>
@@ -241,38 +241,38 @@ export function WaybillManager() {
 
 
       {/* Table Card */}
-      <Card className="border-none shadow-sm overflow-hidden bg-white dark:bg-slate-900 flex-1 flex flex-col min-h-[500px]">
-        <div className="border-b border-slate-100 dark:border-slate-800 p-4 sm:p-5 flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center bg-slate-50/50 dark:bg-slate-800/30">
+      <Card className="border border-slate-200 dark:border-slate-800 rounded-md shadow-none overflow-hidden bg-card flex-1 flex flex-col min-h-[500px]">
+        <div className="border-b border-slate-200 dark:border-slate-800 p-4 sm:p-5 flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center bg-muted/30">
           <div className="flex items-center gap-2 ml-1">
-            <div className="h-8 w-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600">
+            <div className="h-8 w-8 rounded-md bg-blue-50 dark:bg-blue-900/30 border border-slate-200 dark:border-slate-800 flex items-center justify-center text-blue-600">
               <ListFilter className="h-4 w-4" />
             </div>
-            <p className="font-semibold text-slate-700 dark:text-slate-200 text-sm">
-              {activeTab === 'waybill' ? 'Waybills' : 'Returns'} <span className="text-slate-400 font-normal">({currentItems.length})</span>
+            <p className="font-semibold text-foreground text-sm">
+              {activeTab === 'waybill' ? 'Waybills' : 'Returns'} <span className="text-muted-foreground font-normal font-mono tabular-nums">({currentItems.length})</span>
             </p>
           </div>
 
           <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-            <div className="flex bg-slate-200/50 dark:bg-slate-800 p-1 rounded-lg">
+            <div className="flex bg-muted/50 border border-slate-200 dark:border-slate-800 p-0.5 rounded-md">
               {[
                 { id: 'waybill' as const, label: 'Waybills', count: outgoingWaybills.length },
                 { id: 'return' as const, label: 'Returns', count: incomingReturns.length },
               ].map(tab => (
                 <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-                  className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all flex items-center gap-1.5 ${
-                    activeTab === tab.id ? 'bg-white dark:bg-slate-700 text-blue-700 dark:text-blue-400 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-sm transition-all flex items-center gap-1.5 ${
+                    activeTab === tab.id ? 'bg-card text-blue-600 dark:text-blue-400 shadow-sm' : 'text-muted-foreground hover:text-foreground'
                   }`}
                 >
                   {tab.label}
-                  <span className={cn("px-1.5 py-0.5 rounded text-[10px] font-bold",
-                    activeTab === tab.id ? "bg-blue-100 dark:bg-blue-900/30 text-blue-700" : "bg-slate-100 dark:bg-slate-700 text-slate-500"
+                  <span className={cn("px-1.5 py-0.5 rounded-sm text-[10px] font-bold font-mono tabular-nums",
+                    activeTab === tab.id ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600" : "bg-muted text-muted-foreground"
                   )}>{tab.count}</span>
                 </button>
               ))}
             </div>
             <div className="relative w-full sm:w-72">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-              <Input placeholder="Search by ID, driver, vehicle, site, or date..." className="pl-9 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 h-9 text-sm focus-visible:ring-blue-500/50 rounded-lg shadow-sm"
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input placeholder="Search by ID, driver, vehicle, site, or date..." className="pl-9 bg-background border-slate-200 dark:border-slate-800 h-9 text-sm focus-visible:ring-1 focus-visible:ring-blue-600 rounded-md shadow-none"
                 value={currentSearch} onChange={e => setCurrentSearch(e.target.value)} />
             </div>
           </div>
@@ -281,23 +281,23 @@ export function WaybillManager() {
         <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-blue-700 border-b border-blue-800 text-blue-50 uppercase text-[11px] tracking-wider font-bold">
+              <tr className="bg-blue-600 border-b border-blue-700 text-white uppercase text-[11px] tracking-wider font-semibold">
                 {renderSortHeader('id', activeTab === 'waybill' ? 'Waybill ID' : 'Return ID')}
                 {renderSortHeader('driver', 'Driver & Vehicle')}
                 {renderSortHeader('site', activeTab === 'waybill' ? 'Destination' : 'Source Site')}
                 {renderSortHeader('date', 'Date')}
                 {renderSortHeader('status', 'Status')}
-                <th className="px-5 py-4 min-w-[150px]">Items Summary</th>
-                <th className="px-5 py-4 whitespace-nowrap text-center">Actions</th>
+                <th className="px-5 py-3.5 min-w-[150px]">Items Summary</th>
+                <th className="px-5 py-3.5 whitespace-nowrap text-center">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-sm">
+            <tbody className="divide-y divide-slate-200 dark:divide-slate-800 text-sm">
               {sortedItems.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-5 py-12 text-center text-slate-500">
+                  <td colSpan={7} className="px-5 py-12 text-center text-muted-foreground">
                     <div className="flex flex-col items-center gap-3">
-                      <div className="h-12 w-12 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center border dark:border-slate-700">
-                        <Truck className="h-5 w-5 text-slate-400" />
+                      <div className="h-12 w-12 rounded-md bg-muted/30 flex items-center justify-center border border-slate-200 dark:border-slate-800">
+                        <Truck className="h-5 w-5 text-muted-foreground" />
                       </div>
                       <p>No {activeTab === 'waybill' ? 'waybills' : 'returns'} found.</p>
                     </div>
@@ -305,18 +305,18 @@ export function WaybillManager() {
                 </tr>
               ) : (
                 sortedItems.map((wb) => (
-                  <tr key={wb.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors group">
-                    <td className="px-5 py-4 font-bold text-slate-800 dark:text-slate-200">{wb.id}</td>
+                  <tr key={wb.id} className="hover:bg-muted/30 transition-colors group">
+                    <td className="px-5 py-4 font-bold font-mono tabular-nums text-foreground">{wb.id}</td>
                     <td className="px-5 py-4">
                       <div className="flex flex-col">
-                        <span className="font-semibold text-slate-700 dark:text-slate-200 text-sm">{wb.driverName}</span>
-                        <span className="text-xs text-slate-400 font-medium">{wb.vehicle || '—'}</span>
+                        <span className="font-semibold text-foreground text-sm">{wb.driverName}</span>
+                        <span className="text-xs text-muted-foreground font-medium">{wb.vehicle || '—'}</span>
                       </div>
                     </td>
                     <td className="px-5 py-4">
                       <div className="flex flex-col">
-                        <span className="font-semibold text-slate-700 dark:text-slate-200 text-xs">{wb.siteName}</span>
-                        <span className="text-xs text-slate-400">
+                        <span className="font-semibold text-foreground text-xs">{wb.siteName}</span>
+                        <span className="text-xs text-muted-foreground">
                           {wb.transferSiteName 
                             ? (wb.type === 'waybill' ? `from ${wb.transferSiteName}` : `to ${wb.transferSiteName}`)
                             : (wb.type === 'waybill' ? 'from Warehouse' : 'to Warehouse')
@@ -324,11 +324,11 @@ export function WaybillManager() {
                         </span>
                       </div>
                     </td>
-                    <td className="px-5 py-4 font-medium text-slate-600 dark:text-slate-300 whitespace-nowrap text-xs">
+                    <td className="px-5 py-4 font-medium text-muted-foreground whitespace-nowrap text-xs font-mono tabular-nums">
                       {formatDisplayDate(wb.sentToSiteDate || wb.issueDate)}
                     </td>
                     <td className="px-5 py-4">{getStatusBadge(wb.status)}</td>
-                    <td className="px-5 py-4 max-w-xs text-slate-600 dark:text-slate-400 text-xs">
+                    <td className="px-5 py-4 max-w-xs text-muted-foreground text-xs">
                       {(() => {
                         const pumps = wb.items.filter(i => /pump/i.test(i.assetName));
                         const others = wb.items.filter(i => !/pump/i.test(i.assetName));
@@ -347,14 +347,14 @@ export function WaybillManager() {
                     </td>
                     <td className="px-5 py-4">
                       <div className="flex items-center justify-center gap-1">
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-md text-muted-foreground hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20"
                           onClick={() => setViewingWaybill(wb)}>
                           <Eye className="h-4 w-4" />
                         </Button>
                         {activeTab === 'waybill' ? (
                           <>
                             {wb.status === 'outstanding' && (
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-md text-muted-foreground hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20"
                                 onClick={() => setEditingWaybill(wb)}>
                                 <Edit2 className="h-4 w-4" />
                               </Button>
@@ -362,19 +362,19 @@ export function WaybillManager() {
                             {wb.status === 'outstanding' && (
                               <Button 
                                 size="sm" 
-                                className="h-8 gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs ml-1"
+                                className="h-8 gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs ml-1 rounded-md shadow-none"
                                 onClick={() => handleOpenSendDialog(wb)}>
                                 <Calendar className="h-3.5 w-3.5" /> Send
                               </Button>
                             )}
                             {wb.status === 'outstanding' && (
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20"
+                              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-md text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20"
                                 onClick={() => deleteWaybill(wb.id)}>
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             )}
                             {wb.status === 'sent_to_site' && canUndo && (
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20"
+                              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-md text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20"
                                 title="Undo Send"
                                 onClick={() => updateWaybillStatus(wb.id, 'outstanding')}>
                                 <RotateCcw className="h-4 w-4" />
@@ -384,7 +384,7 @@ export function WaybillManager() {
                         ) : (
                           <>
                             {wb.status === 'outstanding' && (
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-md text-muted-foreground hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20"
                                 onClick={() => setEditingWaybill(wb)}>
                                 <Edit2 className="h-4 w-4" />
                               </Button>
@@ -392,19 +392,19 @@ export function WaybillManager() {
                             {wb.status === 'outstanding' && (
                               <Button 
                                 size="sm" 
-                                className="h-8 gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs ml-1"
+                                className="h-8 gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs ml-1 rounded-md shadow-none"
                                 onClick={() => handleOpenProcessReturn(wb)}>
                                 <RotateCcw className="h-3.5 w-3.5" /> Process
                               </Button>
                             )}
                             {wb.status === 'outstanding' && (
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20"
+                              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-md text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20"
                                 onClick={() => deleteWaybill(wb.id)}>
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             )}
                             {wb.status === 'return_completed' && canUndo && (
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20"
+                              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-md text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20"
                                 title="Undo Return Process"
                                 onClick={() => updateWaybillStatus(wb.id, 'outstanding')}>
                                 <RotateCcw className="h-4 w-4" />
@@ -434,11 +434,11 @@ export function WaybillManager() {
             </div>
           ) : (
             sortedItems.map((wb) => (
-              <div key={`mobile-${wb.id}`} className="p-4 flex flex-col gap-3 hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors">
+              <div key={`mobile-${wb.id}`} className="p-4 flex flex-col gap-3 hover:bg-muted/30 transition-colors">
                 <div className="flex items-start justify-between">
                   <div className="flex flex-col">
-                    <span className="font-bold text-slate-800 dark:text-slate-200">{wb.id}</span>
-                    <span className="text-xs text-slate-400 font-medium">{formatDisplayDate(wb.sentToSiteDate || wb.issueDate)}</span>
+                    <span className="font-bold font-mono tabular-nums text-foreground">{wb.id}</span>
+                    <span className="text-xs text-muted-foreground font-medium font-mono tabular-nums">{formatDisplayDate(wb.sentToSiteDate || wb.issueDate)}</span>
                   </div>
                   <div>
                     {getStatusBadge(wb.status)}
@@ -447,14 +447,14 @@ export function WaybillManager() {
 
                 <div className="grid grid-cols-2 gap-2 text-sm mt-1">
                   <div className="flex flex-col">
-                    <span className="text-[10px] uppercase font-bold text-slate-400">Driver & Vehicle</span>
-                    <span className="font-semibold text-slate-700 dark:text-slate-200 text-xs mt-0.5">{wb.driverName}</span>
-                    <span className="text-xs text-slate-400">{wb.vehicle || '—'}</span>
+                    <span className="text-[10px] uppercase font-bold text-muted-foreground">Driver & Vehicle</span>
+                    <span className="font-semibold text-foreground text-xs mt-0.5">{wb.driverName}</span>
+                    <span className="text-xs text-muted-foreground">{wb.vehicle || '—'}</span>
                   </div>
                   <div className="flex flex-col">
-                    <span className="text-[10px] uppercase font-bold text-slate-400">{activeTab === 'waybill' ? 'Destination' : 'Source Site'}</span>
-                    <span className="font-semibold text-slate-700 dark:text-slate-200 text-xs mt-0.5 truncate">{wb.siteName}</span>
-                    <span className="text-xs text-slate-400">
+                    <span className="text-[10px] uppercase font-bold text-muted-foreground">{activeTab === 'waybill' ? 'Destination' : 'Source Site'}</span>
+                    <span className="font-semibold text-foreground text-xs mt-0.5 truncate">{wb.siteName}</span>
+                    <span className="text-xs text-muted-foreground">
                       {wb.transferSiteName 
                         ? (wb.type === 'waybill' ? `from ${wb.transferSiteName}` : `to ${wb.transferSiteName}`)
                         : (wb.type === 'waybill' ? 'from Warehouse' : 'to Warehouse')
@@ -464,8 +464,8 @@ export function WaybillManager() {
                 </div>
                 
                 <div className="flex flex-col">
-                    <span className="text-[10px] uppercase font-bold text-slate-400 mb-1">Items Summary</span>
-                    <span className="text-slate-600 dark:text-slate-400 text-xs">
+                    <span className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Items Summary</span>
+                    <span className="text-muted-foreground text-xs">
                       {(() => {
                         const pumps = wb.items.filter(i => /pump/i.test(i.assetName));
                         const others = wb.items.filter(i => !/pump/i.test(i.assetName));
@@ -480,15 +480,15 @@ export function WaybillManager() {
                     </span>
                 </div>
 
-                <div className="flex items-center justify-end gap-1 mt-2 border-t border-slate-100 dark:border-slate-800 pt-3">
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                <div className="flex items-center justify-end gap-1 mt-2 border-t border-slate-200 dark:border-slate-800 pt-3">
+                  <Button variant="ghost" size="icon" className="h-8 w-8 rounded-md text-muted-foreground hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20"
                     onClick={() => setViewingWaybill(wb)}>
                     <Eye className="h-4 w-4" />
                   </Button>
                   {activeTab === 'waybill' ? (
                     <>
                       {wb.status === 'outstanding' && (
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-md text-muted-foreground hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20"
                           onClick={() => setEditingWaybill(wb)}>
                           <Edit2 className="h-4 w-4" />
                         </Button>
@@ -496,19 +496,19 @@ export function WaybillManager() {
                       {wb.status === 'outstanding' && (
                         <Button 
                           size="sm" 
-                          className="h-8 gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs ml-1"
+                          className="h-8 gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs ml-1 rounded-md shadow-none"
                           onClick={() => handleOpenSendDialog(wb)}>
                           <Calendar className="h-3.5 w-3.5" /> Send
                         </Button>
                       )}
                       {wb.status === 'outstanding' && (
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20"
+                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-md text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20"
                           onClick={() => deleteWaybill(wb.id)}>
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       )}
                       {wb.status === 'sent_to_site' && canUndo && (
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20"
+                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-md text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20"
                           title="Undo Send"
                           onClick={() => updateWaybillStatus(wb.id, 'outstanding')}>
                           <RotateCcw className="h-4 w-4" />
@@ -518,7 +518,7 @@ export function WaybillManager() {
                   ) : (
                     <>
                       {wb.status === 'outstanding' && (
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-md text-muted-foreground hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20"
                           onClick={() => setEditingWaybill(wb)}>
                           <Edit2 className="h-4 w-4" />
                         </Button>
@@ -526,19 +526,19 @@ export function WaybillManager() {
                       {wb.status === 'outstanding' && (
                         <Button 
                           size="sm" 
-                          className="h-8 gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs ml-1"
+                          className="h-8 gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs ml-1 rounded-md shadow-none"
                           onClick={() => handleOpenProcessReturn(wb)}>
                           <RotateCcw className="h-3.5 w-3.5" /> Process
                         </Button>
                       )}
                       {wb.status === 'outstanding' && (
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20"
+                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-md text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20"
                           onClick={() => deleteWaybill(wb.id)}>
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       )}
                       {wb.status === 'return_completed' && canUndo && (
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20"
+                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-md text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20"
                           title="Undo Return Process"
                           onClick={() => updateWaybillStatus(wb.id, 'outstanding')}>
                           <RotateCcw className="h-4 w-4" />
@@ -557,13 +557,13 @@ export function WaybillManager() {
       {/* ── Process Return Dialog ─────────────────────────────────────────────────── */}
       {waybillToProcess && (
         <Dialog open onOpenChange={() => setWaybillToProcess(null)}>
-          <DialogContent className="sm:max-w-[450px] p-6 rounded-2xl max-h-[80vh] overflow-auto">
+          <DialogContent className="sm:max-w-[450px] p-6 rounded-md border border-slate-200 dark:border-slate-800 shadow-lg bg-card max-h-[80vh] overflow-auto">
             <div className="space-y-6">
               <div>
-                <h2 className="text-xl font-bold text-slate-800 dark:text-white">
+                <h2 className="text-base font-semibold text-foreground">
                   {waybillToProcess.transferSiteName ? 'Process Site Transfer' : 'Process Return Sheet'}
                 </h2>
-                <p className="text-sm text-slate-500 mt-1">
+                <p className="text-xs text-muted-foreground mt-1">
                   {waybillToProcess.transferSiteName
                     ? `Confirm that materials have left ${waybillToProcess.siteName} for ${waybillToProcess.transferSiteName}. The receiving site waybill must be confirmed separately.`
                     : 'Record the condition of items being returned to the warehouse.'}
@@ -571,26 +571,26 @@ export function WaybillManager() {
               </div>
 
               <div className="space-y-2">
-                <Label className="text-xs font-bold text-slate-700">Return Date</Label>
+                <Label className="text-xs font-bold text-foreground">Return Date</Label>
                 <Input 
                   type="date"
                   value={sentDate}
                   onChange={(e) => setSentDate(e.target.value)}
-                  className="h-11 rounded-xl"
+                  className="h-10 rounded-md border-slate-200 dark:border-slate-800 bg-background text-sm"
                 />
               </div>
 
               <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
-                <Label className="text-xs font-bold text-slate-700 border-b pb-2 block">Item Conditions</Label>
+                <Label className="text-xs font-bold text-foreground border-b border-slate-200 dark:border-slate-800 pb-2 block">Item Conditions</Label>
                 {waybillToProcess.items.map(item => (
-                  <div key={item.assetId} className="p-3 bg-slate-50 dark:bg-slate-800 rounded-lg space-y-3 border border-slate-100 dark:border-slate-700">
+                  <div key={item.assetId} className="p-3 bg-muted/20 rounded-md space-y-3 border border-slate-200 dark:border-slate-800">
                     <div className="flex justify-between items-center">
-                      <span className="text-sm font-semibold text-slate-800 dark:text-slate-200 truncate pr-2">{item.assetName}</span>
-                      <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 font-bold">Total: {item.quantity}</Badge>
+                      <span className="text-sm font-semibold text-foreground truncate pr-2">{item.assetName}</span>
+                      <Badge variant="outline" className="bg-blue-50 dark:bg-blue-900/30 text-blue-600 border-blue-200 dark:border-blue-800 font-bold font-mono tabular-nums rounded-sm text-[10px]">Total: {item.quantity}</Badge>
                     </div>
                     <div className="grid grid-cols-3 gap-2">
                       <div className="space-y-1">
-                        <Label className="text-[10px] uppercase font-black text-emerald-600">Good</Label>
+                        <Label className="text-[10px] uppercase font-bold text-emerald-600">Good</Label>
                         <Input 
                           type="number" 
                           min={0}
@@ -599,11 +599,11 @@ export function WaybillManager() {
                             ...prev,
                             [item.assetId]: { ...prev[item.assetId], good: parseInt(e.target.value) || 0 }
                           }))}
-                          className="h-9 text-sm border-emerald-100 focus-visible:ring-emerald-500 rounded-lg"
+                          className="h-8 text-sm font-mono tabular-nums border-slate-200 dark:border-slate-800 focus-visible:ring-1 focus-visible:ring-emerald-500 rounded-md"
                         />
                       </div>
                       <div className="space-y-1">
-                        <Label className="text-[10px] uppercase font-black text-amber-600">Damaged</Label>
+                        <Label className="text-[10px] uppercase font-bold text-amber-600">Damaged</Label>
                         <Input 
                           type="number" 
                           min={0}
@@ -612,11 +612,11 @@ export function WaybillManager() {
                             ...prev,
                             [item.assetId]: { ...prev[item.assetId], damaged: parseInt(e.target.value) || 0 }
                           }))}
-                          className="h-9 text-sm border-amber-100 focus-visible:ring-amber-500 rounded-lg"
+                          className="h-8 text-sm font-mono tabular-nums border-slate-200 dark:border-slate-800 focus-visible:ring-1 focus-visible:ring-amber-500 rounded-md"
                         />
                       </div>
                       <div className="space-y-1">
-                        <Label className="text-[10px] uppercase font-black text-rose-600">Missing</Label>
+                        <Label className="text-[10px] uppercase font-bold text-rose-600">Missing</Label>
                         <Input 
                           type="number" 
                           min={0}
@@ -625,7 +625,7 @@ export function WaybillManager() {
                             ...prev,
                             [item.assetId]: { ...prev[item.assetId], missing: parseInt(e.target.value) || 0 }
                           }))}
-                          className="h-9 text-sm border-rose-100 focus-visible:ring-rose-500 rounded-lg"
+                          className="h-8 text-sm font-mono tabular-nums border-slate-200 dark:border-slate-800 focus-visible:ring-1 focus-visible:ring-rose-500 rounded-md"
                         />
                       </div>
                     </div>
@@ -634,10 +634,10 @@ export function WaybillManager() {
               </div>
 
               <div className="flex gap-3 justify-end pt-4">
-                <Button variant="ghost" onClick={() => setWaybillToProcess(null)} className="rounded-xl font-semibold">
+                <Button variant="ghost" onClick={() => setWaybillToProcess(null)} className="rounded-md font-medium">
                   Cancel
                 </Button>
-                <Button onClick={handleCompleteReturn} className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl gap-2 font-semibold">
+                <Button onClick={handleCompleteReturn} className="bg-blue-600 hover:bg-blue-700 text-white rounded-md gap-2 font-semibold shadow-none">
                   <RotateCcw className="h-4 w-4" /> Complete Return
                 </Button>
               </div>
@@ -648,30 +648,30 @@ export function WaybillManager() {
 
       {waybillToSend && (
         <Dialog open onOpenChange={() => setWaybillToSend(null)}>
-          <DialogContent className="sm:max-w-[425px] p-6 rounded-2xl">
+          <DialogContent className="sm:max-w-[425px] p-6 rounded-md border border-slate-200 dark:border-slate-800 shadow-lg bg-card">
             <div className="space-y-6">
               <div>
-                <h2 className="text-xl font-bold text-slate-800 dark:text-white">Send Waybill to Site</h2>
-                <p className="text-sm text-slate-500 mt-1">
+                <h2 className="text-base font-semibold text-foreground">Send Waybill to Site</h2>
+                <p className="text-xs text-muted-foreground mt-1">
                   Select the date the assets were delivered to the site.
                 </p>
               </div>
 
               <div className="space-y-2">
-                <Label className="text-xs font-bold text-slate-700">Delivery Date</Label>
+                <Label className="text-xs font-bold text-foreground">Delivery Date</Label>
                 <Input 
                   type="date"
                   value={sentDate}
                   onChange={(e) => setSentDate(e.target.value)}
-                  className="h-11 rounded-xl"
+                  className="h-10 rounded-md border-slate-200 dark:border-slate-800 bg-background text-sm"
                 />
               </div>
 
               <div className="flex gap-3 justify-end pt-4">
-                <Button variant="ghost" onClick={() => setWaybillToSend(null)} className="rounded-xl">
+                <Button variant="ghost" onClick={() => setWaybillToSend(null)} className="rounded-md font-medium">
                   Cancel
                 </Button>
-                <Button onClick={handleSendWaybill} className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl gap-2">
+                <Button onClick={handleSendWaybill} className="bg-blue-600 hover:bg-blue-700 text-white rounded-md gap-2 font-semibold shadow-none">
                   <Calendar className="h-4 w-4" /> Confirm Send
                 </Button>
               </div>

@@ -212,7 +212,7 @@ export function Organogram() {
         >
           {/* Header - Department Name */}
           <div className="bg-slate-900 text-white p-3 flex flex-col items-center text-center relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500"></div>
+            <div className="absolute top-0 left-0 w-full h-1 bg-blue-600"></div>
             <h3 className="font-extrabold text-sm uppercase tracking-wider mb-0.5">{node.name}</h3>
             <div className="flex items-center gap-2 opacity-70">
               <Users className="h-3 w-3" />
@@ -222,23 +222,23 @@ export function Organogram() {
 
           {/* HOD SECTION (Level 2) */}
           {node.hods.length > 0 && (
-            <div className="bg-indigo-50/50 border-b border-indigo-100 p-3">
-              <div className="text-[9px] font-black text-indigo-400 uppercase tracking-[0.2em] text-center mb-2">Head of Department</div>
+            <div className="bg-slate-50 border-b border-slate-200 p-3">
+              <div className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] text-center mb-2">Head of Department</div>
               <div className="flex flex-col gap-2">
                 {node.hods.map(hod => (
-                  <div key={hod.id} className="bg-white border-2 border-indigo-200 rounded-lg p-2.5 shadow-sm flex items-center gap-3">
+                  <div key={hod.id} className="bg-white border border-slate-200 rounded-lg p-2.5 shadow-sm flex items-center gap-3">
                     {hod.avatar ? (
                       <img src={hod.avatar} alt="" className="w-9 h-9 rounded-full object-cover ring-2 ring-white shadow-sm" />
                     ) : (
-                      <div className="w-9 h-9 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold text-sm shadow-sm">
+                      <div className="w-9 h-9 rounded-full bg-slate-900 text-white flex items-center justify-center font-bold text-sm shadow-sm">
                         {hod.firstname.charAt(0)}{hod.surname.charAt(0)}
                       </div>
                     )}
                     <div className="flex-1 min-w-0 text-left">
                       <div className="text-[11px] font-bold text-slate-900 truncate">{hod.firstname} {hod.surname}</div>
-                      <div className="text-[9px] text-indigo-600 font-bold uppercase truncate">{hod.position}</div>
+                      <div className="text-[9px] text-blue-600 font-bold uppercase truncate">{hod.position}</div>
                     </div>
-                    <div className="bg-indigo-100 text-indigo-700 text-[9px] font-black px-1.5 py-0.5 rounded shadow-sm border border-indigo-200">LVL 2</div>
+                    <div className="bg-blue-50 text-blue-700 text-[9px] font-black px-1.5 py-0.5 rounded shadow-sm border border-blue-200">LVL 2</div>
                   </div>
                 ))}
               </div>
@@ -347,14 +347,14 @@ export function Organogram() {
         <motion.div
           initial={{ y: 15, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          className={`w-60 bg-white border ${isCEO ? 'border-slate-800 ring-4 ring-slate-100' : isHOD ? 'border-indigo-300 shadow-indigo-100/50' : 'border-slate-200'} rounded-xl shadow-md hover:shadow-lg transition-all z-10 overflow-hidden relative group`}
+          className={`w-60 bg-white border ${isCEO ? 'border-slate-800 ring-4 ring-slate-100' : isHOD ? 'border-blue-300 shadow-sm' : 'border-slate-200'} rounded-xl shadow-md hover:shadow-lg transition-all z-10 overflow-hidden relative group`}
         >
-          <div className={`h-1.5 w-full ${isCEO ? 'bg-slate-900' : isHOD ? 'bg-indigo-500' : node.staffType === 'FIELD' ? 'bg-amber-400' : 'bg-blue-500'}`}></div>
+          <div className={`h-1.5 w-full ${isCEO ? 'bg-slate-900' : isHOD ? 'bg-blue-600' : node.staffType === 'FIELD' ? 'bg-amber-400' : 'bg-blue-500'}`}></div>
           <div className="bg-slate-50 border-b border-slate-100 p-4 flex flex-col items-center text-center">
             {node.avatar ? (
               <img src={node.avatar} alt="Avatar" className={`w-14 h-14 rounded-full mb-3 object-cover shadow-md border-2 ${isCEO ? 'border-slate-800' : 'border-white'}`} />
             ) : (
-              <div className={`w-14 h-14 rounded-full mb-3 flex items-center justify-center font-bold text-xl shadow-md border-2 border-white ${isCEO ? 'bg-slate-900 text-white' : isHOD ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-600'}`}>
+              <div className={`w-14 h-14 rounded-full mb-3 flex items-center justify-center font-bold text-xl shadow-md border-2 border-white ${isCEO ? 'bg-slate-900 text-white' : isHOD ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-600'}`}>
                 {node.firstname.charAt(0)}{node.surname.charAt(0)}
               </div>
             )}
@@ -416,7 +416,7 @@ export function Organogram() {
       <div className="flex bg-slate-100 p-1 rounded-lg">
         <button
           onClick={() => setViewMode('department')}
-          className={`px-3 py-1.5 text-[10px] font-bold rounded-md flex items-center gap-1.5 transition-all ${viewMode === 'department' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+          className={`px-3 py-1.5 text-[10px] font-bold rounded-md flex items-center gap-1.5 transition-all ${viewMode === 'department' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
         >
           <Building2 className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Dept</span>
         </button>
@@ -452,7 +452,7 @@ export function Organogram() {
             <ZoomOut className="h-5 w-5" />
           </Button>
         </div>
-        <Button onClick={() => navigate('/employees')} className="h-12 w-12 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-xl flex items-center justify-center sm:hidden">
+        <Button onClick={() => navigate('/employees')} className="h-12 w-12 rounded-xl bg-slate-900 hover:bg-blue-700 text-white shadow-xl flex items-center justify-center sm:hidden">
           <ArrowLeft className="h-5 w-5" />
         </Button>
       </div>
@@ -481,7 +481,7 @@ export function Organogram() {
             <motion.div 
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              className={`rounded-2xl shadow-xl p-8 z-20 relative flex flex-col items-center border-[6px] ring-8 ${viewMode === 'department' ? 'bg-slate-900 border-slate-800 ring-indigo-50/30' : 'bg-slate-900 border-slate-800 ring-emerald-50/30'}`}
+              className={`rounded-2xl shadow-xl p-8 z-20 relative flex flex-col items-center border-[6px] ring-8 ${viewMode === 'department' ? 'bg-slate-900 border-slate-800 ring-blue-50/30' : 'bg-slate-900 border-slate-800 ring-emerald-50/30'}`}
             >
               {ceoEmployee ? (
                 <div className="flex flex-col items-center">
@@ -494,13 +494,13 @@ export function Organogram() {
                    )}
                    <h2 className="text-white text-2xl font-black tracking-tight">{ceoEmployee.firstname} {ceoEmployee.surname}</h2>
                    <div className="flex items-center gap-2 mt-2">
-                     <span className="text-indigo-400 text-xs font-black uppercase tracking-[0.2em]">CEO / Head of Company</span>
+                     <span className="text-slate-500 text-xs font-black uppercase tracking-[0.2em]">CEO / Head of Company</span>
                    </div>
                 </div>
               ) : (
                 <div className="flex flex-col items-center">
                   <div className="p-4 rounded-full bg-slate-800 mb-4 border-2 border-slate-700">
-                    {viewMode === 'department' ? <Building2 className="h-10 w-10 text-indigo-400" /> : <Network className="h-10 w-10 text-emerald-400" />}
+                    {viewMode === 'department' ? <Building2 className="h-10 w-10 text-slate-500" /> : <Network className="h-10 w-10 text-emerald-400" />}
                   </div>
                   <h2 className="text-white text-2xl font-black tracking-tight uppercase leading-none">{viewMode === 'department' ? 'Company Structure' : 'Employee Hierarchy'}</h2>
                   <span className="text-slate-500 text-xs mt-3 font-bold uppercase tracking-[0.3em]">{activeEmployees.length} Active System Staff</span>

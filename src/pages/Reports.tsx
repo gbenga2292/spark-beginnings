@@ -358,12 +358,12 @@ export function Reports() {
   // ── Site color palette ──
   const SITE_COLORS: Record<string, { bg: string; text: string; border: string }> = useMemo(() => {
     const palette = [
-      { bg: '#6366f1', text: '#fff', border: '#4f46e5' },
+      { bg: '#2563eb', text: '#fff', border: '#1d4ed8' },
       { bg: '#10b981', text: '#fff', border: '#059669' },
       { bg: '#f59e0b', text: '#fff', border: '#d97706' },
       { bg: '#3b82f6', text: '#fff', border: '#2563eb' },
       { bg: '#ec4899', text: '#fff', border: '#db2777' },
-      { bg: '#8b5cf6', text: '#fff', border: '#7c3aed' },
+      { bg: '#0284c7', text: '#fff', border: '#0369a1' },
       { bg: '#14b8a6', text: '#fff', border: '#0d9488' },
       { bg: '#f97316', text: '#fff', border: '#ea580c' },
     ];
@@ -995,7 +995,7 @@ export function Reports() {
   const REPORT_FIELD_GROUPS = [
     {
       group: 'Identity',
-      color: 'indigo',
+      color: 'blue',
       fields: ['Employee ID', 'Full Name', 'Surname', 'Firstname', 'Phone', 'Email'],
     },
     {
@@ -1011,7 +1011,7 @@ export function Reports() {
     },
     {
       group: 'Compliance',
-      color: 'violet',
+      color: 'sky',
       fields: ['Tax Type', 'Withholding Tax', 'Withholding Tax Rate', 'PAYE Tax', 'PAYE Number'],
     },
     {
@@ -1146,7 +1146,7 @@ export function Reports() {
           <DialogHeader className="px-6 py-4 bg-slate-50/50 border-b">
             <div className="flex items-center justify-between w-full">
               <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-xl bg-indigo-100 flex items-center justify-center text-indigo-600">
+                <div className="h-10 w-10 rounded-md bg-blue-100 dark:bg-blue-950/60 flex items-center justify-center text-blue-600">
                   <Eye className="w-5 h-5" />
                 </div>
                 <div>
@@ -1154,14 +1154,14 @@ export function Reports() {
                   <p className="text-sm text-slate-500 font-medium">Previewing report content before export</p>
                 </div>
               </div>
-              <Badge className="bg-indigo-600 text-white font-bold uppercase tracking-wider px-3 py-1">
+              <Badge className="bg-blue-600 text-white font-bold uppercase tracking-wider px-3 py-1">
                 {previewModal.type.toUpperCase()}
               </Badge>
             </div>
           </DialogHeader>
 
           <div className="flex-1 overflow-auto p-6">
-            <div className="bg-slate-50 rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+            <div className="bg-slate-50 rounded-md border border-slate-200 overflow-hidden ">
               <div className="overflow-x-auto">
                 <Table className="text-[11px] whitespace-nowrap">
                   <TableHeader className="bg-slate-900 sticky top-0 z-10">
@@ -1191,9 +1191,9 @@ export function Reports() {
               </div>
             </div>
             
-            <div className="mt-4 p-4 rounded-xl border border-indigo-100 bg-indigo-50/30 flex items-start gap-3">
-              <AlertCircle className="h-5 w-5 text-indigo-500 shrink-0 mt-0.5" />
-              <div className="text-xs text-indigo-900 font-medium leading-relaxed">
+            <div className="mt-4 p-4 rounded-md border border-blue-200 dark:border-blue-800 bg-blue-50/30 dark:bg-blue-950/20 flex items-start gap-3">
+              <AlertCircle className="h-5 w-5 text-blue-600 shrink-0 mt-0.5" />
+              <div className="text-xs text-slate-900 dark:text-slate-100 font-medium leading-relaxed">
                 Verification complete: Clicking save will generate the full document as {previewModal.filename}.
               </div>
             </div>
@@ -1209,7 +1209,7 @@ export function Reports() {
             </Button>
             <div className="flex gap-3">
               <Button 
-                className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold shadow-lg shadow-indigo-200"
+                className="gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold "
                 onClick={() => {
                   previewModal.onConfirm();
                   setPreviewModal(prev => ({ ...prev, isOpen: false }));
@@ -1296,7 +1296,7 @@ export function Reports() {
     'Workforce insights, attendance trends, and HR compliance reports',
     <div className="flex items-center gap-2">
       {selectedFields.length > 0 && priv.canExport && (
-        <div className="flex items-center gap-2 p-1 bg-slate-100 rounded-lg border border-slate-200 shadow-sm animate-in fade-in zoom-in-95">
+        <div className="flex items-center gap-2 p-1 bg-slate-100 rounded-lg border border-slate-200  animate-in fade-in zoom-in-95">
           <Button 
             variant="outline" 
             size="sm" 
@@ -1307,7 +1307,7 @@ export function Reports() {
           </Button>
           <Button 
             size="sm" 
-            className="h-7 text-[10px] font-bold uppercase tracking-wider bg-indigo-600 hover:bg-indigo-700 text-white gap-1.5 px-2" 
+            className="h-7 text-[10px] font-bold uppercase tracking-wider bg-blue-600 hover:bg-blue-700 text-white gap-1.5 px-2" 
             onClick={generateReportPdf}
           >
             <FileText className="h-3 w-3" /> PDF
@@ -1324,14 +1324,14 @@ export function Reports() {
 
       {/* High-Density Summary Metrics */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card className="border-indigo-100 bg-indigo-50/50 shadow-none border">
+        <Card className="border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/30 shadow-none border">
           <CardHeader className="flex flex-row items-center justify-between p-3 pb-1">
-            <CardTitle className="text-xs font-bold text-indigo-900 uppercase tracking-wider opacity-70">Total Workforce</CardTitle>
-            <Users className="h-3.5 w-3.5 text-indigo-500" />
+            <CardTitle className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider opacity-70">Total Workforce</CardTitle>
+            <Users className="h-3.5 w-3.5 text-blue-600" />
           </CardHeader>
           <CardContent className="p-3 pt-0">
-            <div className="text-2xl font-bold text-indigo-900 leading-none">{totalEmployees}</div>
-            <p className="text-[10px] text-indigo-600 mt-1 opacity-80 font-medium">{activeEmployees} Active, {inactiveEmployees} Inactive</p>
+            <div className="text-2xl font-bold text-slate-900 dark:text-slate-100 leading-none">{totalEmployees}</div>
+            <p className="text-[10px] text-blue-600 mt-1 opacity-80 font-medium">{activeEmployees} Active, {inactiveEmployees} Inactive</p>
           </CardContent>
         </Card>
 
@@ -1373,10 +1373,10 @@ export function Reports() {
 
       {/* Charts */}
       <div className="grid gap-6 md:grid-cols-2">
-        <Card className="shadow-sm bg-white border-slate-200">
+        <Card className=" bg-white border-slate-200">
           <CardHeader className="border-b border-slate-100 pb-4">
             <CardTitle className="text-lg flex items-center gap-2 text-slate-900">
-              <Activity className="h-5 w-5 text-indigo-600" /> Employees by Department
+              <Activity className="h-5 w-5 text-blue-600" /> Employees by Department
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-6">
@@ -1394,8 +1394,8 @@ export function Reports() {
                     domain={[0, (dataMax: number) => (dataMax <= 5 ? dataMax + 2 : Math.ceil(dataMax * 1.2))]}
                   />
                   <RechartsTooltip cursor={{ fill: 'transparent' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-                  <Bar dataKey="count" fill="#4f46e5" radius={[4, 4, 0, 0]} name="Employees">
-                    <LabelList dataKey="count" position="top" offset={4} style={{ fontSize: 11, fontWeight: 700, fill: '#4f46e5' }} formatter={(v: any) => v > 0 ? v : ''} />
+                  <Bar dataKey="count" fill="#2563eb" radius={[4, 4, 0, 0]} name="Employees">
+                    <LabelList dataKey="count" position="top" offset={4} style={{ fontSize: 11, fontWeight: 700, fill: '#2563eb' }} formatter={(v: any) => v > 0 ? v : ''} />
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
@@ -1403,7 +1403,7 @@ export function Reports() {
           </CardContent>
         </Card>
 
-        <Card className="shadow-sm bg-white border-slate-200">
+        <Card className=" bg-white border-slate-200">
           <CardHeader className="border-b border-slate-100 pb-4">
             <CardTitle className="text-lg flex items-center gap-2 text-slate-900">
               <PieChartIcon className="h-5 w-5 text-emerald-600" /> Headcount Status
@@ -1426,7 +1426,7 @@ export function Reports() {
       </div>
       
       <div className="grid gap-6 md:grid-cols-1">
-        <Card className="shadow-sm bg-white border-slate-200">
+        <Card className=" bg-white border-slate-200">
           <CardHeader className="border-b border-slate-100 pb-4">
             <div className="flex flex-col sm:flex-row gap-4 justify-between sm:items-center w-full">
               <CardTitle className="text-lg flex items-center gap-2 text-slate-900">
@@ -1435,7 +1435,7 @@ export function Reports() {
               </CardTitle>
               <div className="flex gap-2 items-center">
                 <select
-                  className="h-8 rounded-md border border-slate-200 text-sm px-2 bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="h-8 rounded-md border border-slate-200 text-sm px-2 bg-slate-50 outline-none focus:ring-2 focus:ring-blue-500"
                   value={meritFilter}
                   onChange={(e) => setMeritFilter(e.target.value as any)}
                 >
@@ -1446,7 +1446,7 @@ export function Reports() {
 
                 {(meritFilter === 'Year' || meritFilter === 'Month') && (
                   <select
-                    className="h-8 rounded-md border border-slate-200 text-sm px-2 bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="h-8 rounded-md border border-slate-200 text-sm px-2 bg-slate-50 outline-none focus:ring-2 focus:ring-blue-500"
                     value={meritFilterYear}
                     onChange={(e) => setMeritFilterYear(Number(e.target.value))}
                   >
@@ -1459,7 +1459,7 @@ export function Reports() {
 
                 {meritFilter === 'Month' && (
                   <select
-                    className="h-8 rounded-md border border-slate-200 text-sm px-2 bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="h-8 rounded-md border border-slate-200 text-sm px-2 bg-slate-50 outline-none focus:ring-2 focus:ring-blue-500"
                     value={meritFilterMonth}
                     onChange={(e) => setMeritFilterMonth(Number(e.target.value))}
                   >
@@ -1498,10 +1498,10 @@ export function Reports() {
 
       {/* Quick Export Cards */}
       <div className="grid gap-6 md:grid-cols-2">
-        <Card className="hover:shadow-md transition-shadow bg-white border-slate-200">
+        <Card className="hover: transition-shadow bg-white border-slate-200">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-lg font-semibold text-slate-900">Headcount & Turnover</CardTitle>
-            <Users className="h-5 w-5 text-indigo-600" />
+            <Users className="h-5 w-5 text-blue-600" />
           </CardHeader>
           <CardContent>
             <p className="text-sm text-slate-500 mb-4 h-10">Employee demographics, growth, and retention rates.</p>
@@ -1520,7 +1520,7 @@ export function Reports() {
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-md transition-shadow bg-white border-slate-200">
+        <Card className="hover: transition-shadow bg-white border-slate-200">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-lg font-semibold text-slate-900">Attendance & Leave</CardTitle>
             <CalendarClock className="h-5 w-5 text-amber-500" />
@@ -1548,7 +1548,7 @@ export function Reports() {
         <CardHeader className={`border-b border-slate-100 pb-4 shrink-0 ${fullScreenTable === 'site-work' ? 'hidden' : ''}`}>
           <div className="flex items-center justify-between">
             <CardTitle className="text-slate-900 flex items-center gap-2">
-              <Building2 className="h-5 w-5 text-indigo-600" />
+              <Building2 className="h-5 w-5 text-blue-600" />
               Staff Site Work Report
             </CardTitle>
             <div className="flex items-center gap-2">
@@ -1558,7 +1558,7 @@ export function Reports() {
                   onClick={() => setSiteChartView('table')}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
                     siteChartView === 'table'
-                      ? 'bg-white text-indigo-700 shadow-sm'
+                      ? 'bg-white text-blue-700 '
                       : 'text-slate-500 hover:text-slate-700'
                   }`}
                 >
@@ -1568,7 +1568,7 @@ export function Reports() {
                   onClick={() => setSiteChartView('gantt')}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
                     siteChartView === 'gantt'
-                      ? 'bg-white text-indigo-700 shadow-sm'
+                      ? 'bg-white text-blue-700 '
                       : 'text-slate-500 hover:text-slate-700'
                   }`}
                 >
@@ -1587,7 +1587,7 @@ export function Reports() {
           <Button
             variant="default"
             size="icon"
-            className="fixed top-4 right-4 z-[110] rounded-full shadow-2xl bg-indigo-600 hover:bg-indigo-700 text-white w-12 h-12"
+            className="fixed top-4 right-4 z-[110] rounded-full shadow-2xl bg-blue-600 hover:bg-blue-700 text-white w-12 h-12"
             onClick={() => toggleFullScreen('site-work')}
             title="Exit Full Screen"
           >
@@ -1603,7 +1603,7 @@ export function Reports() {
               <select
                 value={selectedMonth}
                 onChange={(e) => setSelectedMonth(Number(e.target.value))}
-                className="h-9 px-3 rounded-md border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                className="h-9 px-3 rounded-md border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
               >
                 {months.map(m => (
                   <option key={m.value} value={m.value}>{m.label}</option>
@@ -1615,7 +1615,7 @@ export function Reports() {
               <select
                 value={selectedYear}
                 onChange={(e) => setSelectedYear(Number(e.target.value))}
-                className="h-9 px-3 rounded-md border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                className="h-9 px-3 rounded-md border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
               >
                 {years.map(y => (
                   <option key={y} value={y}>{y}</option>
@@ -1627,7 +1627,7 @@ export function Reports() {
               <select
                 value={siteStaffTypeFilter}
                 onChange={(e) => setSiteStaffTypeFilter(e.target.value as any)}
-                className="h-9 px-3 rounded-md border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                className="h-9 px-3 rounded-md border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
               >
                 <option value="All">All</option>
                 <option value="OFFICE">Office</option>
@@ -1649,10 +1649,10 @@ export function Reports() {
                 ? [...activeSitesForMonth, officeSite]
                 : activeSitesForMonth;
               return (
-            <div className={`rounded-xl border border-slate-200 shadow-sm overflow-hidden ${fullScreenTable === 'site-work' ? 'flex-1 flex flex-col min-h-0' : ''}`}>
+            <div className={`rounded-md border border-slate-200  overflow-hidden ${fullScreenTable === 'site-work' ? 'flex-1 flex flex-col min-h-0' : ''}`}>
                   <Table className={fullScreenTable === 'site-work' ? 'flex-1' : "max-h-[420px]"}>
                     <TableHeader>
-                      <TableRow className="bg-gradient-to-r from-slate-800 to-slate-700 sticky top-0 z-10">
+                      <TableRow className="bg-slate-800 dark:bg-slate-900 sticky top-0 z-10">
                         <TableHead className="text-left font-semibold text-white py-2 px-3 whitespace-nowrap">Employee</TableHead>
                         {tableSites.map(site => (
                           <TableHead
@@ -1662,7 +1662,7 @@ export function Reports() {
                             }`}
                           >{site.name}</TableHead>
                         ))}
-                        <TableHead className="text-center font-semibold text-white bg-indigo-700/60 py-2 px-3 whitespace-nowrap">Total Days</TableHead>
+                        <TableHead className="text-center font-semibold text-white bg-slate-800/60 py-2 px-3 whitespace-nowrap">Total Days</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1678,7 +1678,7 @@ export function Reports() {
                           const totalDays = Object.values(empSiteCounts).reduce((sum: number, count) => sum + (count as number), 0);
                           const isOffice = emp.staffType?.toUpperCase() === 'OFFICE';
                           return (
-                            <TableRow key={emp.id} className={`hover:bg-indigo-50/40 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'}`}>
+                            <TableRow key={emp.id} className={`hover:bg-blue-50/40 dark:bg-blue-950/30 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'}`}>
                               <TableCell className="font-medium text-slate-800 py-1.5 px-3">
                                 <div className="text-sm leading-tight">{emp.surname} {emp.firstname}</div>
                                 <div className="text-xs text-slate-400 leading-tight">{emp.position}</div>
@@ -1710,7 +1710,7 @@ export function Reports() {
                                 );
                               })}
                               <TableCell className="text-center py-1.5 px-3">
-                                <span className="inline-flex items-center justify-center min-w-[2rem] h-6 rounded-md bg-indigo-100 text-indigo-800 text-xs font-bold px-2">{totalDays}</span>
+                                <span className="inline-flex items-center justify-center min-w-[2rem] h-6 rounded-md bg-blue-100 dark:bg-blue-950/60 text-blue-800 text-xs font-bold px-2">{totalDays}</span>
                               </TableCell>
                             </TableRow>
                           );
@@ -1723,14 +1723,14 @@ export function Reports() {
             })()
           ) : (
             /* ── GANTT / SCHEDULE CHART VIEW ── */
-            <div className={`rounded-xl border border-slate-200 shadow-sm overflow-hidden ${fullScreenTable === 'site-work' ? 'flex-1 flex flex-col min-h-0' : ''}`}>
+            <div className={`rounded-md border border-slate-200  overflow-hidden ${fullScreenTable === 'site-work' ? 'flex-1 flex flex-col min-h-0' : ''}`}>
               {/* Legend — click chips to filter rows */}
               <div className="flex flex-wrap items-center gap-2 px-4 py-3 bg-slate-50 border-b border-slate-200">
                 <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide mr-1">Legend:</span>
                 {ganttSiteFilter.size > 0 && (
                   <button
                     onClick={() => setGanttSiteFilter(new Set())}
-                    className="flex items-center gap-1 text-[10px] font-semibold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-full px-2 py-0.5 transition-colors"
+                    className="flex items-center gap-1 text-[10px] font-semibold text-blue-600 hover:text-blue-800 bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-100 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 rounded-full px-2 py-0.5 transition-colors"
                     title="Clear all filters"
                   >
                     ✕ Clear filter
@@ -1742,7 +1742,7 @@ export function Reports() {
                     onClick={() => toggleGanttSiteFilter('OFFICE')}
                     className={`flex items-center gap-1.5 text-xs font-medium rounded-full px-2.5 py-1 border transition-all select-none ${
                       ganttSiteFilter.has('OFFICE')
-                        ? 'ring-2 ring-offset-1 opacity-100 shadow-sm'
+                        ? 'ring-2 ring-offset-1 opacity-100 '
                         : ganttSiteFilter.size > 0
                         ? 'opacity-40 hover:opacity-70'
                         : 'hover:opacity-80'
@@ -1769,22 +1769,22 @@ export function Reports() {
                       onClick={() => toggleGanttSiteFilter(site.name)}
                       className={`flex items-center gap-1.5 text-xs font-medium rounded-full px-2.5 py-1 border transition-all select-none ${
                         isActive
-                          ? 'opacity-100 shadow-sm'
+                          ? 'opacity-100 '
                           : isDimmed
                           ? 'opacity-40 hover:opacity-70'
                           : 'hover:opacity-80'
                       }`}
                       style={{
-                        color: color?.bg ?? '#6366f1',
-                        backgroundColor: `${color?.bg ?? '#6366f1'}15`,
-                        borderColor: `${color?.bg ?? '#6366f1'}50`,
-                        ...(isActive ? { boxShadow: `0 0 0 2px ${color?.bg ?? '#6366f1'}` } : {}),
+                        color: color?.bg ?? '#2563eb',
+                        backgroundColor: `${color?.bg ?? '#2563eb'}15`,
+                        borderColor: `${color?.bg ?? '#2563eb'}50`,
+                        ...(isActive ? { boxShadow: `0 0 0 2px ${color?.bg ?? '#2563eb'}` } : {}),
                       }}
                       title={`Click to filter by ${site.name}`}
                     >
                       <span
                         className="inline-block w-2.5 h-2.5 rounded-sm flex-shrink-0"
-                        style={{ backgroundColor: color?.bg ?? '#6366f1' }}
+                        style={{ backgroundColor: color?.bg ?? '#2563eb' }}
                       ></span>
                       {site.name}
                       {isActive && <span className="ml-0.5 text-[9px]">✓</span>}
@@ -1832,7 +1832,7 @@ export function Reports() {
                         );
                       })}
                       {/* Total column */}
-                      <div className="flex-shrink-0 w-12 text-center px-1 py-2 bg-indigo-900/60">
+                      <div className="flex-shrink-0 w-12 text-center px-1 py-2 bg-slate-900/60">
                         <span className="text-xs font-semibold text-slate-200">Days</span>
                       </div>
                     </div>
@@ -1872,7 +1872,7 @@ export function Reports() {
                                 opacity: empMatchesFilter ? 1 : 0.25,
                                 transition: 'opacity 0.2s ease',
                               }}
-                              className={`flex border-b border-slate-100 last:border-0 hover:bg-indigo-50/30 transition-colors ${
+                              className={`flex border-b border-slate-100 last:border-0 hover:bg-blue-50/30 dark:bg-blue-950/20 transition-colors ${
                                 idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'
                               }`}
                             >
@@ -1901,7 +1901,7 @@ export function Reports() {
                                 >
                                   {siteName && siteName !== '' ? (
                                     <div
-                                      className="w-6 h-6 rounded-md flex items-center justify-center text-[9px] font-bold shadow-sm"
+                                      className="w-6 h-6 rounded-md flex items-center justify-center text-[9px] font-bold "
                                       style={{
                                         backgroundColor: color?.bg ?? '#e2e8f0',
                                         color: color?.text ?? '#1e293b',
@@ -1918,8 +1918,8 @@ export function Reports() {
                             })}
 
                             {/* Totals */}
-                            <div className="flex-shrink-0 w-12 h-10 flex flex-col items-center justify-center bg-indigo-50/40">
-                              <span className="text-[10px] font-bold text-indigo-700">{totalAssigned}</span>
+                            <div className="flex-shrink-0 w-12 h-10 flex flex-col items-center justify-center bg-blue-50/40 dark:bg-blue-950/30">
+                              <span className="text-[10px] font-bold text-blue-700">{totalAssigned}</span>
                               {totalAbsent > 0 && <span className="text-[9px] font-semibold text-red-400">{totalAbsent}A</span>}
                             </div>
                           </div>
@@ -1946,7 +1946,7 @@ export function Reports() {
         <CardHeader className={`border-b border-slate-100 pb-4 shrink-0 ${fullScreenTable === 'monthly-summary' ? 'hidden' : ''}`}>
           <div className="flex items-center justify-between flex-wrap gap-3">
             <CardTitle className="text-slate-900 flex items-center gap-2">
-              <CalendarClock className="h-5 w-5 text-indigo-600" />
+              <CalendarClock className="h-5 w-5 text-blue-600" />
               Staff Monthly Work Summary
             </CardTitle>
             <div className="flex items-center gap-2">
@@ -1955,7 +1955,7 @@ export function Reports() {
                 <button
                   onClick={() => setSummaryChartView('table')}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
-                    summaryChartView === 'table' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                    summaryChartView === 'table' ? 'bg-white text-blue-700 ' : 'text-slate-500 hover:text-slate-700'
                   }`}
                 >
                   <LayoutGrid className="h-3.5 w-3.5" /> Table
@@ -1963,7 +1963,7 @@ export function Reports() {
                 <button
                   onClick={() => setSummaryChartView('heatmap')}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
-                    summaryChartView === 'heatmap' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                    summaryChartView === 'heatmap' ? 'bg-white text-blue-700 ' : 'text-slate-500 hover:text-slate-700'
                   }`}
                 >
                   <Flame className="h-3.5 w-3.5" /> Heat Map
@@ -1971,7 +1971,7 @@ export function Reports() {
                 <button
                   onClick={() => setSummaryChartView('bar')}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
-                    summaryChartView === 'bar' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                    summaryChartView === 'bar' ? 'bg-white text-blue-700 ' : 'text-slate-500 hover:text-slate-700'
                   }`}
                 >
                   <BarChart2 className="h-3.5 w-3.5" /> Bar Chart
@@ -1989,7 +1989,7 @@ export function Reports() {
           <Button
             variant="default"
             size="icon"
-            className="fixed top-4 right-4 z-[110] rounded-full shadow-2xl bg-indigo-600 hover:bg-indigo-700 text-white w-12 h-12"
+            className="fixed top-4 right-4 z-[110] rounded-full shadow-2xl bg-blue-600 hover:bg-blue-700 text-white w-12 h-12"
             onClick={() => toggleFullScreen('monthly-summary')}
             title="Exit Full Screen"
           >
@@ -2005,7 +2005,7 @@ export function Reports() {
               <select
                 value={summaryYear}
                 onChange={(e) => setSummaryYear(Number(e.target.value))}
-                className="h-9 px-3 rounded-md border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                className="h-9 px-3 rounded-md border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
               >
                 {years.map(y => (
                   <option key={y} value={y}>{y}</option>
@@ -2017,7 +2017,7 @@ export function Reports() {
               <select
                 value={summaryStaffTypeFilter}
                 onChange={(e) => setSummaryStaffTypeFilter(e.target.value as any)}
-                className="h-9 px-3 rounded-md border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                className="h-9 px-3 rounded-md border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
               >
                 <option value="All">All</option>
                 <option value="OFFICE">Office</option>
@@ -2036,17 +2036,17 @@ export function Reports() {
 
           {summaryChartView === 'table' ? (
             /* ── TABLE VIEW ── */
-            <div className={`rounded-xl border border-slate-200 shadow-sm overflow-hidden ${fullScreenTable === 'monthly-summary' ? 'flex-1 flex flex-col min-h-0' : ''}`}>
+            <div className={`rounded-md border border-slate-200  overflow-hidden ${fullScreenTable === 'monthly-summary' ? 'flex-1 flex flex-col min-h-0' : ''}`}>
                   <Table className={fullScreenTable === 'monthly-summary' ? 'flex-1' : "max-h-[420px]"}>
                     <TableHeader className="sticky top-0 z-10">
-                      <TableRow className="bg-gradient-to-r from-slate-800 to-slate-700">
+                      <TableRow className="bg-slate-800 dark:bg-slate-900">
                         <TableHead rowSpan={2} className="text-left font-semibold text-white align-middle py-2 px-3 whitespace-nowrap sticky left-0 bg-slate-800 z-20">Full Name</TableHead>
                         {months.map(m => (
                           <TableHead key={m.value} colSpan={3} className="text-center font-semibold text-white border-l border-slate-600 py-1.5 px-1 text-xs">
                             {m.label.substring(0, 3)}
                           </TableHead>
                         ))}
-                        <TableHead rowSpan={2} className="text-center font-semibold text-white bg-indigo-700/60 align-middle py-2 px-2 whitespace-nowrap">Total</TableHead>
+                        <TableHead rowSpan={2} className="text-center font-semibold text-white bg-slate-800/60 align-middle py-2 px-2 whitespace-nowrap">Total</TableHead>
                       </TableRow>
                       <TableRow className="bg-slate-700">
                         {months.map(m => (
@@ -2071,7 +2071,7 @@ export function Reports() {
                             const data = monthlyWorkSummary[emp.id];
                             const totals = staffTotals[emp.id];
                             return (
-                              <TableRow key={emp.id} className={`hover:bg-indigo-50/40 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'}`}>
+                              <TableRow key={emp.id} className={`hover:bg-blue-50/40 dark:bg-blue-950/30 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'}`}>
                                 <TableCell className={`font-medium text-slate-800 sticky left-0 py-1.5 px-3 text-sm whitespace-nowrap ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}`}>
                                   {data?.name || `${emp.surname} ${emp.firstname}`}
                                 </TableCell>
@@ -2120,7 +2120,7 @@ export function Reports() {
                                 </TableCell>
                               </React.Fragment>
                             ))}
-                            <TableCell className="text-center text-white bg-indigo-900/60 py-2 px-2">
+                            <TableCell className="text-center text-white bg-slate-900/60 py-2 px-2">
                               <span className="inline-flex items-center gap-0.5 text-xs font-bold">
                                 <span>{grandTotals.totalDaysWorked}</span>
                                 <span className="text-slate-500">/</span>
@@ -2168,7 +2168,7 @@ export function Reports() {
               };
 
               return (
-                <div className={`rounded-xl border border-slate-200 shadow-sm overflow-hidden ${fullScreenTable === 'monthly-summary' ? 'flex-1 flex flex-col min-h-0' : ''}`}>
+                <div className={`rounded-md border border-slate-200  overflow-hidden ${fullScreenTable === 'monthly-summary' ? 'flex-1 flex flex-col min-h-0' : ''}`}>
                   {/* Legend */}
                   <div className="flex flex-wrap items-center gap-4 px-4 py-3 bg-slate-50 border-b border-slate-200">
                     <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Legend:</span>
@@ -2207,7 +2207,7 @@ export function Reports() {
                               <div className="text-xs font-bold text-slate-200">{m.label.substring(0, 3)}</div>
                             </div>
                           ))}
-                          <div className="flex-shrink-0 w-28 text-center py-2.5 bg-indigo-900/60 border-l border-slate-700">
+                          <div className="flex-shrink-0 w-28 text-center py-2.5 bg-slate-900/60 border-l border-slate-700">
                             <span className="text-xs font-semibold text-slate-200">Annual Totals</span>
                           </div>
                         </div>
@@ -2288,7 +2288,7 @@ export function Reports() {
                                 })}
 
                                 {/* Annual totals */}
-                                <div className="flex-shrink-0 w-28 py-2 px-2 flex flex-col items-center justify-center bg-indigo-50/40 border-l border-indigo-100">
+                                <div className="flex-shrink-0 w-28 py-2 px-2 flex flex-col items-center justify-center bg-blue-50/40 dark:bg-blue-950/30 border-l border-blue-200 dark:border-blue-800">
                                   <div className="flex items-center gap-1 text-xs">
                                     <span className="font-bold text-emerald-700">{(totals?.totalDaysWorked || 0) + (totals?.totalOTDays || 0)}</span>
                                     <span className="text-slate-300 text-[10px]">wk</span>
@@ -2321,7 +2321,7 @@ export function Reports() {
                               )}
                             </div>
                           ))}
-                          <div className="flex-shrink-0 w-28 text-center py-2 bg-indigo-900/60 border-l border-slate-700">
+                          <div className="flex-shrink-0 w-28 text-center py-2 bg-slate-900/60 border-l border-slate-700">
                             <div className="text-xs font-bold text-white">{grandTotals.totalDaysWorked + grandTotals.totalOTDays}</div>
                             <div className="text-[9px] text-red-300">{grandTotals.totalDaysAbsent}A</div>
                           </div>
@@ -2346,7 +2346,7 @@ export function Reports() {
               }));
 
               return (
-                <div className="rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="rounded-md border border-slate-200  overflow-hidden">
                   <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center gap-6">
                     <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Team Monthly Totals</span>
                     <span className="flex items-center gap-1.5 text-xs text-emerald-700 font-medium">
@@ -2432,7 +2432,7 @@ export function Reports() {
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setSelectedFields(selectedFields.length === ALL_REPORT_FIELDS.length ? [] : ALL_REPORT_FIELDS)}
-                className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 underline underline-offset-2 transition-colors"
+                className="text-xs font-semibold text-blue-600 hover:text-blue-800 underline underline-offset-2 transition-colors"
               >
                 {selectedFields.length === ALL_REPORT_FIELDS.length ? 'Deselect All' : 'Select All'}
               </button>
@@ -2453,13 +2453,13 @@ export function Reports() {
                     onClick={() => setActiveEmpBuilderTab(group.group)}
                     className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-t-lg transition-colors whitespace-nowrap border-b-2 ${
                       isActive 
-                        ? 'border-indigo-600 text-indigo-700 bg-indigo-50/50' 
+                        ? 'border-blue-600 text-blue-700 bg-blue-50/50 dark:bg-blue-950/30' 
                         : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50'
                     }`}
                   >
                     {group.group}
                     {groupSelectedCount > 0 && (
-                      <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-indigo-100 text-indigo-800 text-[10px]">
+                      <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-950/60 text-blue-800 text-[10px]">
                         {groupSelectedCount}
                       </span>
                     )}
@@ -2471,10 +2471,10 @@ export function Reports() {
             {/* Active Tab Content */}
             {REPORT_FIELD_GROUPS.filter(g => g.group === activeEmpBuilderTab).map(group => {
               const checkColor: Record<string, string> = {
-                indigo:  'accent-indigo-600',
+                blue:    'accent-blue-600',
                 emerald: 'accent-emerald-600',
                 amber:   'accent-amber-500',
-                violet:  'accent-violet-600',
+                sky:     'accent-sky-600',
                 rose:    'accent-rose-600',
               };
 
@@ -2493,14 +2493,14 @@ export function Reports() {
                           setSelectedFields(prev => [...new Set([...prev, ...group.fields])]);
                         }
                       }}
-                      className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition-colors"
+                      className="text-xs font-semibold text-blue-600 hover:text-blue-800 transition-colors"
                     >
                       {allGroupSelected ? '- Deselect Group' : '+ Select Group'}
                     </button>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 bg-slate-50 p-5 rounded-xl border border-slate-100">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 bg-slate-50 p-5 rounded-md border border-slate-100">
                     {group.fields.map((field) => (
-                      <label key={field} className="flex items-start gap-3 text-sm font-medium text-slate-700 cursor-pointer hover:text-slate-900 transition-colors bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
+                      <label key={field} className="flex items-start gap-3 text-sm font-medium text-slate-700 cursor-pointer hover:text-slate-900 transition-colors bg-white p-3 rounded-lg border border-slate-200 ">
                         <input
                           type="checkbox"
                           checked={selectedFields.includes(field)}
@@ -2517,11 +2517,11 @@ export function Reports() {
 
             {/* Selected Count & Preview banner */}
             {selectedFields.length > 0 && (
-              <div className="flex items-start sm:items-center gap-3 text-xs text-slate-500 bg-indigo-50/50 border border-indigo-100 rounded-lg p-3 sm:px-4 sm:py-3 animate-in fade-in">
-                <CheckCircle2 className="h-5 w-5 text-indigo-500 flex-shrink-0 mt-0.5 sm:mt-0" />
+              <div className="flex items-start sm:items-center gap-3 text-xs text-slate-500 bg-blue-50/50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3 sm:px-4 sm:py-3 animate-in fade-in">
+                <CheckCircle2 className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5 sm:mt-0" />
                 <div>
-                  Report will include <strong className="text-indigo-700">{selectedFields.length} field{selectedFields.length > 1 ? 's' : ''}</strong> as columns. 
-                  <div className="text-indigo-600/80 italic mt-0.5">({selectedFields.slice(0, 5).join(', ')}{selectedFields.length > 5 ? ` +${selectedFields.length - 5} more` : ''})</div>
+                  Report will include <strong className="text-blue-700">{selectedFields.length} field{selectedFields.length > 1 ? 's' : ''}</strong> as columns. 
+                  <div className="text-blue-600/80 italic mt-0.5">({selectedFields.slice(0, 5).join(', ')}{selectedFields.length > 5 ? ` +${selectedFields.length - 5} more` : ''})</div>
                 </div>
               </div>
             )}
@@ -2537,7 +2537,7 @@ export function Reports() {
                 <FileSpreadsheet className="h-4 w-4" /> Export CSV
               </Button>
               <Button
-                className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white"
+                className="gap-2 bg-blue-600 hover:bg-blue-700 text-white"
                 onClick={generateReportPdf}
                 disabled={selectedFields.length === 0}
               >
@@ -2562,7 +2562,7 @@ export function Reports() {
                 <button
                   onClick={() => setOtChartView('table')}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
-                    otChartView === 'table' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                    otChartView === 'table' ? 'bg-white text-blue-700 ' : 'text-slate-500 hover:text-slate-700'
                   }`}
                 >
                   <LayoutGrid className="h-3.5 w-3.5" /> Table
@@ -2570,7 +2570,7 @@ export function Reports() {
                 <button
                   onClick={() => setOtChartView('heatmap')}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
-                    otChartView === 'heatmap' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                    otChartView === 'heatmap' ? 'bg-white text-blue-700 ' : 'text-slate-500 hover:text-slate-700'
                   }`}
                 >
                   <Flame className="h-3.5 w-3.5" /> Heat Map
@@ -2578,7 +2578,7 @@ export function Reports() {
                 <button
                   onClick={() => setOtChartView('bar')}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
-                    otChartView === 'bar' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                    otChartView === 'bar' ? 'bg-white text-blue-700 ' : 'text-slate-500 hover:text-slate-700'
                   }`}
                 >
                   <BarChart2 className="h-3.5 w-3.5" /> Bar Chart
@@ -2596,7 +2596,7 @@ export function Reports() {
           <Button
             variant="default"
             size="icon"
-            className="fixed top-4 right-4 z-[110] rounded-full shadow-2xl bg-indigo-600 hover:bg-indigo-700 text-white w-12 h-12"
+            className="fixed top-4 right-4 z-[110] rounded-full shadow-2xl bg-blue-600 hover:bg-blue-700 text-white w-12 h-12"
             onClick={() => toggleFullScreen('overtime-detail')}
             title="Exit Full Screen"
           >
@@ -2611,7 +2611,7 @@ export function Reports() {
               <select
                 value={otYear}
                 onChange={(e) => setOtYear(Number(e.target.value))}
-                className="h-9 px-3 rounded-md border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                className="h-9 px-3 rounded-md border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
               >
                 {years.map(y => (
                   <option key={y} value={y}>{y}</option>
@@ -2623,7 +2623,7 @@ export function Reports() {
               <select
                 value={otStaffTypeFilter}
                 onChange={(e) => setOtStaffTypeFilter(e.target.value as any)}
-                className="h-9 px-3 rounded-md border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                className="h-9 px-3 rounded-md border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
               >
                 <option value="All">All</option>
                 <option value="OFFICE">Office</option>
@@ -2638,10 +2638,10 @@ export function Reports() {
           </div>
 
           {otChartView === 'table' ? (
-            <div className={`rounded-xl border border-slate-200 shadow-sm overflow-hidden ${fullScreenTable === 'overtime-detail' ? 'flex-1 flex flex-col min-h-0' : ''}`}>
+            <div className={`rounded-md border border-slate-200  overflow-hidden ${fullScreenTable === 'overtime-detail' ? 'flex-1 flex flex-col min-h-0' : ''}`}>
               <Table className={fullScreenTable === 'overtime-detail' ? 'flex-1' : "max-h-[420px]"}>
                 <TableHeader className="sticky top-0 z-10">
-                  <TableRow className="bg-gradient-to-r from-slate-800 to-slate-700">
+                  <TableRow className="bg-slate-800 dark:bg-slate-900">
                     <TableHead className="text-left font-semibold text-white py-2 px-3 whitespace-nowrap sticky left-0 bg-slate-800 z-20">Full Name</TableHead>
                     {months.map(m => (
                       <TableHead key={m.value} className="text-center font-semibold text-white border-l border-slate-600 py-1.5 px-1 text-xs">
@@ -2712,7 +2712,7 @@ export function Reports() {
                 });
 
                 return (
-                  <div className={`rounded-xl border border-slate-200 shadow-sm overflow-hidden ${fullScreenTable === 'overtime-detail' ? 'flex-1 flex flex-col min-h-0' : ''}`}>
+                  <div className={`rounded-md border border-slate-200  overflow-hidden ${fullScreenTable === 'overtime-detail' ? 'flex-1 flex flex-col min-h-0' : ''}`}>
                     <div className={`overflow-x-auto ${fullScreenTable === 'overtime-detail' ? 'flex-1' : ''}`}>
                       <div className="overflow-y-auto" style={{ maxHeight: fullScreenTable === 'overtime-detail' ? 'none' : '480px' }}>
                         <div style={{ minWidth: '720px' }}>
@@ -2785,7 +2785,7 @@ export function Reports() {
               });
 
               return (
-                <div className={`rounded-xl border border-slate-200 shadow-sm overflow-hidden ${fullScreenTable === 'overtime-detail' ? 'flex-1 flex flex-col min-h-0' : ''}`}>
+                <div className={`rounded-md border border-slate-200  overflow-hidden ${fullScreenTable === 'overtime-detail' ? 'flex-1 flex flex-col min-h-0' : ''}`}>
                   <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center gap-6">
                     <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Team Monthly Overtime</span>
                     <span className="flex items-center gap-1.5 text-xs text-amber-600 font-medium">
@@ -2865,7 +2865,7 @@ export function Reports() {
                 onClick={() => setHrTab('history')}
                 className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
                   hrTab === 'history'
-                    ? 'bg-white text-rose-700 shadow-sm'
+                    ? 'bg-white text-rose-700 '
                     : 'text-slate-500 hover:text-slate-700'
                 }`}
               >
@@ -2875,7 +2875,7 @@ export function Reports() {
                 onClick={() => setHrTab('sick')}
                 className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
                   hrTab === 'sick'
-                    ? 'bg-white text-rose-700 shadow-sm'
+                    ? 'bg-white text-rose-700 '
                     : 'text-slate-500 hover:text-slate-700'
                 }`}
               >
@@ -2914,10 +2914,10 @@ export function Reports() {
             leaves.length === 0 ? (
               <div className="text-center py-12 text-slate-400 text-sm">No leave records found.</div>
             ) : (
-              <div className="rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="rounded-md border border-slate-200  overflow-hidden">
                 <Table className="max-h-[420px]">
                   <TableHeader className="sticky top-0 z-10">
-                    <TableRow className="bg-gradient-to-r from-rose-700 to-rose-600">
+                    <TableRow className="bg-rose-700 dark:bg-rose-900">
                       <TableHead className="text-white font-semibold py-2 px-3 whitespace-nowrap">Employee</TableHead>
                       <TableHead className="text-white font-semibold py-2 px-3 whitespace-nowrap">Start Date</TableHead>
                       <TableHead className="text-white font-semibold py-2 px-3 whitespace-nowrap text-center">Duration</TableHead>
@@ -2973,10 +2973,10 @@ export function Reports() {
             sickLeaveTrackerData.length === 0 ? (
               <div className="text-center py-12 text-slate-400 text-sm">No sick leave records found.</div>
             ) : (
-              <div className="rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="rounded-md border border-slate-200  overflow-hidden">
                 <Table className="max-h-[420px]">
                   <TableHeader className="sticky top-0 z-10">
-                    <TableRow className="bg-gradient-to-r from-rose-700 to-rose-600">
+                    <TableRow className="bg-rose-700 dark:bg-rose-900">
                       <TableHead className="text-white font-semibold py-2 px-3 whitespace-nowrap">Employee</TableHead>
                       <TableHead className="text-white font-semibold py-2 px-3 whitespace-nowrap">Department</TableHead>
                       <TableHead className="text-white font-semibold py-2 px-3 whitespace-nowrap">Position</TableHead>

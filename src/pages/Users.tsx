@@ -14,9 +14,9 @@ import { toast, showConfirm } from '@/src/components/ui/toast';
 
 /* ── Color map for module badges ──────────────────────────────── */
 const MODULE_COLORS: Record<string, string> = {
-  Dashboard:     'bg-indigo-100 text-indigo-700',
+  Dashboard:     'bg-blue-50 text-blue-700 border border-blue-200',
   HR:            'bg-teal-100 text-teal-700',
-  Clients:       'bg-indigo-100 text-indigo-700',
+  Clients:       'bg-blue-50 text-blue-700 border border-blue-200',
   Account:       'bg-amber-100 text-amber-700',
   Tasks:         'bg-blue-100 text-blue-700',
   Operations:    'bg-orange-100 text-orange-700',
@@ -106,14 +106,14 @@ export function Users() {
     'User Management',
     'Configure system users and granular page privileges',
     <div className="flex items-center gap-2 md:gap-3">
-      <label className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-slate-500 border border-slate-200 rounded-lg px-2 sm:px-3 py-1.5 bg-white shadow-sm cursor-pointer select-none transition-all hover:border-indigo-200 mb-0">
+      <label className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-slate-500 border border-slate-200 rounded-sm px-2 sm:px-3 py-1.5 bg-white cursor-pointer select-none transition-all hover:border-blue-300 mb-0">
         <button type="button" onClick={() => setSuperAdminSignupEnabled(!superAdminSignupEnabled)}
-          className={`relative inline-flex h-4 w-8 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none ${superAdminSignupEnabled ? 'bg-indigo-600' : 'bg-slate-300'}`}>
+          className={`relative inline-flex h-4 w-8 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none ${superAdminSignupEnabled ? 'bg-blue-600' : 'bg-slate-300'}`}>
           <span className={`pointer-events-none inline-block h-3 w-3 rounded-full bg-white shadow transition ${superAdminSignupEnabled ? 'translate-x-4' : 'translate-x-0'}`} />
         </button>
         <span className="hidden sm:inline">Signup Toggle</span>
       </label>
-      <Button onClick={() => navigate('/users/new')} size="sm" className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm h-9 px-2 sm:px-3">
+      <Button onClick={() => navigate('/users/new')} size="sm" className="gap-2 bg-blue-600 hover:bg-blue-700 text-white h-9 px-2 sm:px-3 rounded-sm">
         <Plus className="h-4 w-4" /> <span className="hidden sm:inline">New User</span>
       </Button>
     </div>
@@ -127,22 +127,22 @@ export function Users() {
       <div className="relative max-w-md">
         <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
         <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search users…"
-          className="w-full h-9 pl-9 pr-3 rounded-lg border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 shadow-sm" />
+          className="w-full h-9 pl-9 pr-3 rounded-sm border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
       </div>
 
       {/* ── User Grid ──────────────────────────────────────── */}
       {filtered.length === 0 ? (
-        <div className="flex-1 flex flex-col items-center justify-center bg-white rounded-xl border border-dashed border-slate-200 py-20">
+        <div className="flex-1 flex flex-col items-center justify-center bg-white rounded-md border border-dashed border-slate-200 py-20">
           <UsersIcon className="h-10 w-10 text-slate-300 mb-4" />
           <p className="text-sm text-slate-400 mb-4">{users.length === 0 ? 'No users yet. Create your first user.' : 'No users match your search.'}</p>
           {users.length === 0 && (
-            <Button onClick={() => navigate('/users/new')} className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white">
+            <Button onClick={() => navigate('/users/new')} className="gap-2 bg-blue-600 hover:bg-blue-700 text-white rounded-sm">
               <UserPlus className="h-4 w-4" /> Create First User
             </Button>
           )}
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex-1 flex flex-col min-h-0">
+        <div className="bg-white rounded-md border border-slate-200 overflow-hidden flex-1 flex flex-col min-h-0">
           {/* ── Desktop Table View ── */}
           <div className="hidden md:block overflow-auto flex-1 custom-scrollbar">
             <table className="w-full min-w-[900px] text-sm text-left">
@@ -163,11 +163,11 @@ export function Users() {
                     <tr key={u.id} onClick={() => navigate(`/users/${u.id}/edit`)} className="group hover:bg-slate-50/70 transition-colors cursor-pointer">
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-indigo-700 flex items-center justify-center text-white font-bold text-xs shrink-0 shadow-sm">
+                          <div className="w-10 h-10 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-white font-bold text-xs shrink-0">
                             {u.name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()}
                           </div>
                           <div className="min-w-0">
-                            <p className="font-bold text-slate-900 group-hover:text-indigo-600 transition-colors truncate">{u.name}</p>
+                            <p className="font-bold text-slate-900 group-hover:text-blue-600 transition-colors truncate">{u.name}</p>
                             <p className="text-slate-500 text-xs truncate">{u.email}</p>
                           </div>
                         </div>
@@ -195,14 +195,14 @@ export function Users() {
                       </td>
                       <td className="px-4 py-4">
                         <div className="flex items-center gap-1.5 text-slate-600">
-                          <Shield className="h-3.5 w-3.5 text-indigo-400" />
+                          <Shield className="h-3.5 w-3.5 text-blue-500" />
                           <span className="text-xs font-semibold">{permCount}</span>
                         </div>
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end gap-1">
                           <button onClick={(e) => { e.stopPropagation(); navigate(`/users/${u.id}/edit`); }}
-                            className="px-3 py-1.5 rounded-md text-xs font-semibold text-indigo-600 hover:bg-indigo-50 transition-colors">
+                            className="px-3 py-1.5 rounded-md text-xs font-semibold text-blue-600 hover:bg-blue-50 transition-colors rounded-sm">
                             Edit
                           </button>
                           <button onClick={(e) => { e.stopPropagation(); updateUser(u.id, { isActive: !u.isActive }); }}
@@ -228,10 +228,10 @@ export function Users() {
               const modules = getActiveModules(u.privileges);
               const permCount = countPermissions(u.privileges);
               return (
-                <div key={u.id} onClick={() => navigate(`/users/${u.id}/edit`)} className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm active:scale-[0.98] transition-transform cursor-pointer">
+                <div key={u.id} onClick={() => navigate(`/users/${u.id}/edit`)} className="bg-white border border-slate-200 rounded-md p-4 active:scale-[0.98] transition-transform cursor-pointer">
                   <div className="flex justify-between items-start mb-3">
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-indigo-700 flex items-center justify-center text-white font-bold text-xs shrink-0 shadow-sm">
+                      <div className="w-10 h-10 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-white font-bold text-xs shrink-0">
                         {u.name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()}
                       </div>
                       <div className="min-w-0">
@@ -246,10 +246,10 @@ export function Users() {
                     )}
                   </div>
                   
-                  <div className="flex items-center justify-between mb-3 bg-slate-50 rounded-lg p-2.5 border border-slate-100">
+                  <div className="flex items-center justify-between mb-3 bg-slate-50 rounded-sm p-2.5 border border-slate-100">
                      <div className="text-xs font-semibold text-slate-500 uppercase tracking-widest">Permissions</div>
                      <div className="flex items-center gap-1.5 text-slate-700">
-                       <Shield className="h-3.5 w-3.5 text-indigo-400" />
+                       <Shield className="h-3.5 w-3.5 text-blue-500" />
                        <span className="text-sm font-bold">{permCount}</span>
                      </div>
                   </div>
@@ -272,7 +272,7 @@ export function Users() {
 
                   <div className="flex items-center justify-between pt-3 border-t border-slate-100">
                     <button onClick={(e) => { e.stopPropagation(); navigate(`/users/${u.id}/edit`); }}
-                      className="px-4 py-2 rounded-md text-xs font-bold uppercase tracking-wider bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-colors">
+                      className="px-4 py-2 rounded-md text-xs font-bold uppercase tracking-wider bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors rounded-sm border border-blue-200">
                       Edit User
                     </button>
                     <div className="flex items-center gap-2">

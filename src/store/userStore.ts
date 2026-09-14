@@ -471,12 +471,20 @@ export const useUserStore = create<UserStore>()(
   )
 );
 
-function deepMergePrivileges(defaults: UserPrivileges, stored: Partial<UserPrivileges>): UserPrivileges {
+export function backfillPrivileges(
+  defaults: UserPrivileges,
+  stored: Partial<UserPrivileges>
+): UserPrivileges {
   const isAdmin = stored?.users?.canManage === true;
   const actualDefaults = isAdmin ? FULL_ACCESS : defaults;
   const result = { ...actualDefaults };
   for (const key of Object.keys(actualDefaults) as (keyof UserPrivileges)[]) {
-    result[key] = { ...actualDefaults[key], ...(stored[key] ?? {}) } as any;
+    result[key] = { ...actualDefaults[key], ...(stored?.[key] ?? {}) } as any;
   }
   return result;
 }
+
+function deepMergePrivileges(defaults: UserPrivileges, stored: Partial<UserPrivileges>): UserPrivileges {
+  return backfillPrivileges(defaults, stored);
+}
+

@@ -5,6 +5,7 @@ import { Bot, FlaskConical, TrendingUp, Clock, Wrench, AlertTriangle, CheckCircl
 import { Button } from '@/src/components/ui/button';
 import { Badge } from '@/src/components/ui/badge';
 import { toast } from '@/src/components/ui/toast';
+import { getWorkspaceAiKey } from '@/src/lib/aiImportService';
 
 interface MachineReconPanelProps {
   siteId: string;
@@ -112,16 +113,11 @@ export function MachineReconPanel({ siteId, siteName, clientName, workspaceId }:
 
     if (analysisMode === 'hybrid') {
       try {
-        // Fetch the default API key
-        const { data: keyRow } = await supabase
-          .from('api_keys')
-          .select('key_value, provider')
-          .eq('workspace_id', workspaceId)
-          .eq('is_default', true)
-          .maybeSingle();
+        // Fetch the active AI key
+        const aiConfig = await getWorkspaceAiKey(workspaceId);
 
-        if (!keyRow) {
-          toast.error('No default API key set. Go to Settings → AI Settings to add one.');
+        if (!aiConfig?.apiKey) {
+          toast.error('No active API key set. Go to Settings → AI Settings to add one.');
           setIsRunning(false);
           return;
         }
@@ -143,9 +139,10 @@ Provide:
 
         let aiText = '';
 
-        if (keyRow.provider === 'gemini') {
+        if (aiConfig.provider === 'gemini') {
+          const modelName = aiConfig.model || 'gemini-2.0-flash';
           const res = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${keyRow.key_value}`,
+            `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${aiConfig.apiKey}`,
             {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -154,12 +151,13 @@ Provide:
           );
           const data = await res.json();
           aiText = data?.candidates?.[0]?.content?.parts?.[0]?.text || 'No insight returned.';
-        } else if (keyRow.provider === 'groq') {
+        } else if (aiConfig.provider === 'groq') {
+          const modelName = aiConfig.model || 'llama-3.3-70b-versatile';
           const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${keyRow.key_value}` },
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${aiConfig.apiKey}` },
             body: JSON.stringify({
-              model: 'llama3-8b-8192',
+              model: modelName,
               messages: [{ role: 'user', content: prompt }],
               max_tokens: 300,
             }),
@@ -167,7 +165,7 @@ Provide:
           const data = await res.json();
           aiText = data?.choices?.[0]?.message?.content || 'No insight returned.';
         } else {
-          aiText = `[Provider "${keyRow.provider}" not yet wired up for direct calls. Analytics data is shown above.]`;
+          aiText = `[Provider "${aiConfig.provider}" not yet wired up for direct calls. Analytics data is shown above.]`;
         }
 
         setAiInsight(aiText);

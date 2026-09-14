@@ -648,7 +648,7 @@ export function Budget() {
         {priv.canAdd && (
           <Button
             onClick={openAdd}
-            className="bg-emerald-600 hover:bg-emerald-500 text-white gap-1.5 h-10 px-4 text-sm font-semibold active:scale-[0.98] transition-transform rounded-xl shrink-0 whitespace-nowrap"
+            className="bg-emerald-600 hover:bg-emerald-500 text-white gap-1.5 h-10 px-4 text-sm font-semibold active:scale-[0.98] transition-transform rounded-md shrink-0 whitespace-nowrap"
           >
             <Plus className="w-4 h-4" /> Add Item
           </Button>
@@ -657,7 +657,7 @@ export function Budget() {
           <Search className={cn("absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4", isDark ? "text-white/40" : "text-slate-400")} />
           <input
             className={cn(
-              "w-full pl-10 pr-10 py-2.5 rounded-xl text-sm border focus:outline-none focus:ring-2 h-10",
+              "w-full pl-10 pr-10 py-2.5 rounded-md text-sm border focus:outline-none focus:ring-2 h-10",
               isDark
                 ? "bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:ring-emerald-500/30"
                 : "bg-white border-slate-200 text-slate-800 placeholder:text-slate-400 focus:ring-emerald-500/20"
@@ -693,7 +693,7 @@ export function Budget() {
                   { label: 'Awaiting Budget',        value: thisWeek.rows.filter(r => r.rowType === 'budgetItem').length,               color: 'rose',    isCount: true },
                   { label: 'Pending Task Approval',  value: thisWeek.rows.filter(r => r.rowType === 'subtask').length,                  color: 'blue',    isCount: true },
                 ].map(({ label, value, color, isCount }) => (
-                  <Card key={label} className={cn("border rounded-xl shadow-sm", isDark ? "bg-white/[0.03] border-white/10" : "bg-white border-slate-200")}>
+                  <Card key={label} className={cn("border rounded-md ", isDark ? "bg-white/[0.03] border-white/10" : "bg-white border-slate-200")}>
                     <CardContent className="p-4">
                       <p className={cn("text-xs mb-1 font-semibold", isDark ? "text-white/50" : "text-slate-500")}>{label}</p>
                       <p className={cn('text-lg font-bold', isCount ? '' : 'font-mono', {
@@ -713,7 +713,7 @@ export function Budget() {
 
           {/* Empty state */}
           {requestedGroups.length === 0 && (
-            <Card className={cn("border shadow-sm", isDark ? "border-white/10 bg-white/[0.03]" : "border-slate-200 bg-white")}>
+            <Card className={cn("border ", isDark ? "border-white/10 bg-white/[0.03]" : "border-slate-200 bg-white")}>
               <CardContent className="py-16 text-center">
                 <ListChecks className={cn("w-12 h-12 mx-auto mb-3", isDark ? "text-white/20" : "text-slate-300")} />
                 <p className={cn("text-sm font-semibold mb-1", isDark ? "text-white/60" : "text-slate-600")}>No budget requests yet</p>
@@ -741,7 +741,7 @@ export function Budget() {
                   <button
                     onClick={() => setShowBacklog(v => !v)}
                     className={cn(
-                      "flex items-center gap-2 px-4 py-2.5 rounded-xl border text-xs font-semibold transition-all w-full",
+                      "flex items-center gap-2 px-4 py-2.5 rounded-md border text-xs font-semibold transition-all w-full",
                       showBacklog
                         ? (isDark ? "bg-rose-500/10 border-rose-500/25 text-rose-300 hover:bg-rose-500/15" : "bg-rose-50 border-rose-200 text-rose-700 hover:bg-rose-100")
                         : (isDark ? "bg-white/5 border-white/10 text-white/50 hover:bg-white/10" : "bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100")
@@ -812,7 +812,7 @@ export function Budget() {
                           const dateAdded = row.createdAt ? (() => { try { return format(parseISO(row.createdAt!), 'd MMM yyyy'); } catch { return '—'; } })() : '—';
                           return (
                             <div key={row.id} className={cn(
-                              'rounded-xl border p-4 mb-2 space-y-3',
+                              'rounded-md border p-4 mb-2 space-y-3',
                               isBacklog
                                 ? (isDark ? 'border-rose-500/20 bg-rose-500/[0.06]' : 'border-rose-200 bg-rose-50/60')
                                 : (isDark ? 'border-white/8 bg-white/[0.02]' : 'border-slate-200 bg-white')
@@ -823,7 +823,7 @@ export function Budget() {
                                   <div className="flex items-center gap-1.5 flex-wrap">
                                     <span className={cn('font-semibold text-sm', isDark ? 'text-white/90' : 'text-slate-700')}>{row.title}</span>
                                     <span className={cn('text-[10px] px-1.5 py-0.5 rounded-full border font-medium',
-                                      row.source === 'task' ? 'bg-indigo-500/10 text-indigo-500 border-indigo-500/20' : (isDark ? 'bg-white/5 text-white/40 border-white/10' : 'bg-slate-100 text-slate-500 border-slate-200')
+                                      row.source === 'task' ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20' : (isDark ? 'bg-white/5 text-white/40 border-white/10' : 'bg-slate-100 text-slate-500 border-slate-200')
                                     )}>{row.source === 'task' ? 'Task' : 'Manual'}</span>
                                   </div>
                                   {row.mainTaskTitle && <div className={cn('text-[11px] mt-0.5 flex items-center gap-1', isDark ? 'text-white/35' : 'text-slate-400')}><ClipboardList className="w-3 h-3 shrink-0" />{row.mainTaskTitle}</div>}
@@ -890,7 +890,7 @@ export function Budget() {
                 </div>
 
                 {/* ── REQUESTS: Desktop table ── */}
-                <Card className={cn("hidden md:block border rounded-xl overflow-hidden shadow-sm", isDark ? "border-white/10" : "border-slate-200")}>
+                <Card className={cn("hidden md:block border rounded-md overflow-hidden ", isDark ? "border-white/10" : "border-slate-200")}>
                   <div className="overflow-x-auto">
                     <Table>
                       <TableHeader>
@@ -982,7 +982,7 @@ export function Budget() {
                                     <TableCell className={cn("font-medium text-sm py-3", isDark ? "text-white/90" : "text-slate-700")}>
                                       <div className="flex items-center gap-2">
                                         <span className="font-semibold">{row.title}</span>
-                                        <span className={cn('text-[10px] px-1.5 py-0.5 rounded-full border font-medium', row.source === 'task' ? 'bg-indigo-500/10 text-indigo-500 border-indigo-500/20' : (isDark ? 'bg-white/5 text-white/40 border-white/10' : 'bg-slate-100 text-slate-500 border-slate-200'))}>{row.source === 'task' ? 'Task' : 'Manual'}</span>
+                                        <span className={cn('text-[10px] px-1.5 py-0.5 rounded-full border font-medium', row.source === 'task' ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20' : (isDark ? 'bg-white/5 text-white/40 border-white/10' : 'bg-slate-100 text-slate-500 border-slate-200'))}>{row.source === 'task' ? 'Task' : 'Manual'}</span>
                                       </div>
                                       {row.mainTaskTitle && <div className={cn('text-[11px] mt-0.5 flex items-center gap-1', isDark ? 'text-white/35' : 'text-slate-400')}><ClipboardList className="w-3 h-3 shrink-0" />{row.mainTaskTitle}</div>}
                                       {row.description && <div className={cn('text-[11px] mt-1.5 leading-relaxed', isDark ? 'text-white/50' : 'text-slate-500')}>{row.description}</div>}
@@ -1056,7 +1056,7 @@ export function Budget() {
                   { label: 'Actually Spent',      value: thisWeek.totals.actuallySpent, color: 'rose'    },
                   { label: 'Remaining',           value: left,                           color: left >= 0 ? 'emerald' : 'red' },
                 ].map(({ label, value, color }) => (
-                  <Card key={label} className={cn("border rounded-xl shadow-sm", isDark ? "bg-white/[0.03] border-white/10" : "bg-white border-slate-200")}>
+                  <Card key={label} className={cn("border rounded-md ", isDark ? "bg-white/[0.03] border-white/10" : "bg-white border-slate-200")}>
                     <CardContent className="p-4">
                       <p className={cn("text-xs mb-1 font-semibold", isDark ? "text-white/50" : "text-slate-500")}>{label}</p>
                       <p className={cn('text-lg font-bold font-mono', {
@@ -1077,7 +1077,7 @@ export function Budget() {
 
           {/* Empty state */}
           {grouped.length === 0 && (
-            <Card className={cn("border shadow-sm", isDark ? "border-white/10 bg-white/[0.03]" : "border-slate-200 bg-white")}>
+            <Card className={cn("border ", isDark ? "border-white/10 bg-white/[0.03]" : "border-slate-200 bg-white")}>
               <CardContent className="py-16 text-center">
                 <PiggyBank className={cn("w-12 h-12 mx-auto mb-3", isDark ? "text-white/20" : "text-slate-300")} />
                 <p className={cn("text-sm font-semibold mb-1", isDark ? "text-white/60" : "text-slate-600")}>No budget items yet</p>
@@ -1102,7 +1102,7 @@ export function Budget() {
 
         return (
           <Card key={weekStart} className={cn(
-            "border rounded-xl overflow-hidden shadow-sm",
+            "border rounded-md overflow-hidden shadow-sm",
             isCurrent
               ? (isDark ? 'border-emerald-500/30' : 'border-emerald-500/40 bg-emerald-50/[0.02]')
               : (isDark ? 'border-white/10' : 'border-slate-200'),
@@ -1144,7 +1144,7 @@ export function Budget() {
                     const isBEditing = budgetedEdit?.id === item.id;
                     const mainTask = item.source === 'task' ? mainTasks.find(m => m.id === item.mainTaskId || m.id === (item as any).main_task_id) : null;
                     return (
-                      <div key={item.id} className={cn('rounded-xl border p-4 space-y-3 relative', isDark ? 'border-white/8 bg-white/[0.02]' : 'border-slate-200 bg-white')}>
+                      <div key={item.id} className={cn('rounded-md border p-4 space-y-3 relative', isDark ? 'border-white/8 bg-white/[0.02]' : 'border-slate-200 bg-white')}>
                         <div className="flex items-start justify-between gap-2">
                           {priv.canEdit && (
                             <div className="pt-0.5 shrink-0">
@@ -1201,7 +1201,7 @@ export function Budget() {
                           </div>
                         </div>
                         <div className={cn('grid grid-cols-2 gap-2 pt-2 border-t', isDark ? 'border-white/5' : 'border-slate-100')}>
-                          <div><div className={cn('text-[10px] uppercase tracking-wider mb-0.5', isDark ? 'text-white/30' : 'text-slate-400')}>Requested</div><div className="font-mono font-medium text-amber-600 dark:text-amber-400 text-sm">{fmt(item.requested)}</div></div>
+                          <div><div className={cn('text-[10px] uppercase tracking-wider mb-0.5', isDark ? 'text-white/30' : 'text-slate-400')}>Requested</div><div className="font-mono tabular-nums font-medium text-amber-600 dark:text-amber-400 text-sm">{fmt(item.requested)}</div></div>
                           <div>
                             <div className={cn('text-[10px] uppercase tracking-wider mb-0.5', isDark ? 'text-white/30' : 'text-slate-400')}>Budgeted</div>
                             {isBEditing ? (
@@ -1210,10 +1210,10 @@ export function Budget() {
                               <button disabled={!priv.canSetBudgeted} onClick={() => priv.canSetBudgeted && setBudgetedEdit({ id: item.id, val: item.budgeted != null ? String(item.budgeted) : '' })} className={cn('font-mono font-medium text-sm text-blue-600 dark:text-blue-400', priv.canSetBudgeted ? 'hover:underline cursor-pointer' : 'cursor-default')}>{item.budgeted != null ? fmt(item.budgeted) : <span className={cn('text-xs italic', isDark ? 'text-white/20' : 'text-slate-300')}>set amount</span>}</button>
                             )}
                           </div>
-                          <div><div className={cn('text-[10px] uppercase tracking-wider mb-0.5', isDark ? 'text-white/30' : 'text-slate-400')}>Spent</div><div className="font-mono font-medium text-rose-500 dark:text-rose-400 text-sm">{fmt(spent)}</div></div>
+                          <div><div className={cn('text-[10px] uppercase tracking-wider mb-0.5', isDark ? 'text-white/30' : 'text-slate-400')}>Spent</div><div className="font-mono tabular-nums font-medium text-rose-500 dark:text-rose-400 text-sm">{fmt(spent)}</div></div>
                           <div><div className={cn('text-[10px] uppercase tracking-wider mb-0.5', isDark ? 'text-white/30' : 'text-slate-400')}>Left</div><div className={cn('font-mono font-medium text-sm', left >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400')}>{fmt(left)}</div></div>
                         </div>
-                        <span className={cn('inline-block text-xs px-2 py-0.5 rounded-full border font-medium', item.source === 'task' ? 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20' : (isDark ? 'bg-white/5 text-white/40 border-white/10' : 'bg-slate-100 text-slate-500 border-slate-200'))}>{item.source === 'task' ? 'Task' : 'Manual'}</span>
+                        <span className={cn('inline-block text-xs px-2 py-0.5 rounded-full border font-medium', item.source === 'task' ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20' : (isDark ? 'bg-white/5 text-white/40 border-white/10' : 'bg-slate-100 text-slate-500 border-slate-200'))}>{item.source === 'task' ? 'Task' : 'Manual'}</span>
                       </div>
                     );
                   })}
@@ -1403,7 +1403,7 @@ export function Budget() {
                             <span className={cn(
                               'text-xs px-2 py-0.5 rounded-full border font-medium',
                               item.source === 'task'
-                                ? 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20'
+                                ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20'
                                 : (isDark ? 'bg-white/5 text-white/40 border-white/10' : 'bg-slate-100 text-slate-500 border-slate-200'),
                             )}>
                               {item.source === 'task' ? 'Task' : 'Manual'}
@@ -1480,18 +1480,18 @@ export function Budget() {
       {/* ── Add / Edit Dialog ─────────────────────────────── */}
       <Dialog open={formOpen} onOpenChange={setFormOpen}>
         <DialogContent className={cn(
-          "max-w-md border shadow-2xl rounded-2xl overflow-hidden p-0",
+          "max-w-md border shadow-2xl rounded-md overflow-hidden p-0",
           isDark ? "bg-[#18181b] border-white/10 text-white" : "bg-white border-slate-200 text-slate-900"
         )}>
           {/* Coloured header band */}
           <div className={cn(
             "px-6 pt-6 pb-4 border-b",
-            isDark ? "bg-white/[0.02] border-white/10" : "bg-gradient-to-r from-emerald-50 to-teal-50/60 border-slate-100"
+            isDark ? "bg-white/[0.02] border-white/10" : "bg-emerald-50/60 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-800"
           )}>
             <div className="flex items-center gap-3">
               <div className={cn(
-                "p-2 rounded-xl border shrink-0",
-                isDark ? "bg-emerald-500/20 border-emerald-500/30" : "bg-white border-emerald-200 shadow-sm"
+                "p-2 rounded-sm border shrink-0",
+                isDark ? "bg-emerald-500/20 border-emerald-500/30" : "bg-white border-emerald-200"
               )}>
                 <PiggyBank className="w-5 h-5 text-emerald-500" />
               </div>
@@ -1513,11 +1513,11 @@ export function Budget() {
               const subtask = subtasks.find(s => s.id === editItem.subtaskId || s.id === (editItem as any).subtask_id);
               return (
                 <div className={cn(
-                  "p-4 rounded-2xl border text-xs space-y-2.5",
-                  isDark ? "bg-indigo-500/10 border-indigo-500/20 text-indigo-300" : "bg-indigo-50 border-indigo-100 text-indigo-800"
+                  "p-4 rounded-md border text-xs space-y-2.5",
+                  isDark ? "bg-blue-500/10 border-blue-500/20 text-blue-300" : "bg-blue-50 border-blue-200 text-blue-800"
                 )}>
                   <div className="flex items-center gap-1.5 font-bold uppercase tracking-wider text-[10px]">
-                    <span className="w-2 h-2 rounded-full bg-indigo-500 inline-block animate-pulse" />
+                    <span className="w-2 h-2 rounded-full bg-blue-600 inline-block animate-pulse" />
                     Linked to Task Approval
                   </div>
                   <div>
@@ -1547,7 +1547,7 @@ export function Budget() {
                 placeholder="e.g. Office supplies purchase"
                 disabled={editItem?.source === 'task'}
                 className={cn(
-                  "h-10 rounded-xl",
+                  "h-10 rounded-sm",
                   isDark ? "bg-white/5 border-white/10 text-white placeholder:text-white/25" : "bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400 focus:bg-white"
                 )}
               />
@@ -1556,7 +1556,7 @@ export function Budget() {
             {/* Description */}
             <div className="space-y-1.5">
               <label className={cn("text-xs font-semibold flex items-center gap-1.5", isDark ? "text-white/60" : "text-slate-500")}>
-                <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 inline-block" />
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-600 inline-block" />
                 Details (Optional)
               </label>
               <textarea
@@ -1566,7 +1566,7 @@ export function Budget() {
                 disabled={editItem?.source === 'task'}
                 rows={2}
                 className={cn(
-                  "w-full rounded-xl text-sm p-3 focus:outline-none focus:ring-2 border resize-none",
+                  "w-full rounded-sm text-sm p-3 focus:outline-none focus:ring-2 border resize-none",
                   isDark
                     ? "bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:ring-emerald-500/30"
                     : "bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400 focus:bg-white focus:ring-emerald-500/20"
@@ -1588,7 +1588,7 @@ export function Budget() {
                   onChange={(e) => handleWeekChange(e.target.value)}
                   disabled={editItem?.source === 'task'}
                   className={cn(
-                    "w-full pl-9 pr-3 h-10 rounded-xl text-sm focus:outline-none focus:ring-2 border",
+                    "w-full pl-9 pr-3 h-10 rounded-sm text-sm focus:outline-none focus:ring-2 border",
                     isDark
                       ? "bg-white/5 border-white/10 text-white focus:ring-emerald-500/30 [color-scheme:dark] disabled:opacity-50"
                       : "bg-slate-50 border-slate-200 text-slate-900 focus:ring-emerald-500/20 focus:bg-white disabled:bg-slate-100 disabled:text-slate-400"
@@ -1625,7 +1625,7 @@ export function Budget() {
                     placeholder="0.00"
                     disabled={editItem?.source === 'task'}
                     className={cn(
-                      "h-10 pl-7 rounded-xl font-mono",
+                      "h-10 pl-7 rounded-sm font-mono tabular-nums",
                       isDark ? "bg-white/5 border-white/10 text-amber-300 placeholder:text-white/20" : "bg-slate-50 border-slate-200 text-amber-700 placeholder:text-slate-400 focus:bg-white"
                     )}
                   />
@@ -1650,7 +1650,7 @@ export function Budget() {
                       onChange={(e) => setForm((f) => ({ ...f, budgeted: e.target.value }))}
                       placeholder="0.00"
                       className={cn(
-                        "h-10 pl-7 rounded-xl font-mono",
+                        "h-10 pl-7 rounded-sm font-mono tabular-nums",
                         isDark ? "bg-white/5 border-white/10 text-blue-300 placeholder:text-white/20" : "bg-slate-50 border-slate-200 text-blue-700 placeholder:text-slate-400 focus:bg-white"
                       )}
                     />
@@ -1669,7 +1669,7 @@ export function Budget() {
               variant="ghost"
               onClick={() => setFormOpen(false)}
               className={cn(
-                "h-9 px-4 rounded-xl font-semibold text-sm",
+                "h-9 px-4 rounded-sm font-semibold text-sm",
                 isDark ? "text-white/60 hover:text-white hover:bg-white/5" : "text-slate-500 hover:text-slate-800 hover:bg-slate-200"
               )}
             >
@@ -1677,7 +1677,7 @@ export function Budget() {
             </Button>
             <Button
               onClick={handleSubmit}
-              className="h-9 px-5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm gap-2 active:scale-[0.98] transition-all"
+              className="h-9 px-5 rounded-sm bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm gap-2 active:scale-[0.98] transition-all"
             >
               {editItem ? (
                 <><CheckCheck className="w-4 h-4" /> Save Changes</>
@@ -1866,7 +1866,7 @@ export function Budget() {
 
       {/* Bulk Edit Dialog */}
       <Dialog open={bulkOpen} onOpenChange={setBulkOpen}>
-        <DialogContent className={cn("max-w-md border shadow-2xl rounded-2xl", isDark ? "bg-[#18181b] border-white/10 text-white" : "bg-white border-slate-200 text-slate-900")}>
+        <DialogContent className={cn("max-w-md border shadow-2xl rounded-md", isDark ? "bg-[#18181b] border-white/10 text-white" : "bg-white border-slate-200 text-slate-900")}>
           <DialogHeader>
             <DialogTitle className="text-lg font-bold">Bulk Edit ({selectedBudgetIds.size} Items)</DialogTitle>
           </DialogHeader>
@@ -1885,7 +1885,7 @@ export function Budget() {
                   value={bulkWeekStart}
                   onChange={(e) => handleBulkWeekChange(e.target.value)}
                   className={cn(
-                    "w-full pl-9 pr-3 h-10 rounded-xl text-sm focus:outline-none focus:ring-2 border",
+                    "w-full pl-9 pr-3 h-10 rounded-sm text-sm focus:outline-none focus:ring-2 border",
                     isDark
                       ? "bg-white/5 border-white/10 text-white focus:ring-emerald-500/30 [color-scheme:dark]"
                       : "bg-slate-50 border-slate-200 text-slate-900 focus:ring-emerald-500/20 focus:bg-white"
@@ -1920,7 +1920,7 @@ export function Budget() {
                     onChange={(e) => setBulkBudgeted(e.target.value)}
                     placeholder="e.g. 15000"
                     className={cn(
-                      "pl-8 h-10 rounded-xl",
+                      "pl-8 h-10 rounded-sm",
                       isDark ? "bg-white/5 border-white/10 text-white placeholder:text-white/25" : "bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400 focus:bg-white"
                     )}
                   />
@@ -1930,8 +1930,8 @@ export function Budget() {
           </div>
 
           <DialogFooter className="gap-2">
-            <Button variant="ghost" onClick={() => setBulkOpen(false)} className="rounded-xl">Cancel</Button>
-            <Button onClick={handleBulkUpdate} className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white">Apply Changes</Button>
+            <Button variant="ghost" onClick={() => setBulkOpen(false)} className="rounded-sm">Cancel</Button>
+            <Button onClick={handleBulkUpdate} className="rounded-sm bg-emerald-600 hover:bg-emerald-700 text-white">Apply Changes</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

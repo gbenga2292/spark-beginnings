@@ -740,7 +740,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
             className={cn(
               "h-9 px-3 gap-2 border shadow-sm font-medium text-xs rounded-lg transition-colors w-full md:w-auto justify-between md:justify-center",
               isDark ? "bg-slate-900 border-slate-700 text-white hover:bg-slate-800" : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50",
-              (filterMonth !== 'all' || filterYear !== 'all') && "border-indigo-500 text-indigo-600 dark:text-indigo-400"
+              (filterMonth !== 'all' || filterYear !== 'all') && "border-blue-500 text-blue-600 dark:text-blue-400"
             )}
           >
             <div className="flex items-center gap-2">
@@ -748,7 +748,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
               <span>Filter</span>
             </div>
             {(filterMonth !== 'all' || filterYear !== 'all') && (
-              <span className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse" />
+              <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
             )}
           </Button>
 
@@ -762,7 +762,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                 {(filterMonth !== 'all' || filterYear !== 'all') && (
                   <button 
                     onClick={() => { setFilterMonth('all'); setFilterYear('all'); }} 
-                    className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline"
+                    className="text-[10px] font-semibold text-blue-600 dark:text-blue-400 hover:underline"
                   >
                     Reset
                   </button>
@@ -772,7 +772,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
               <div>
                 <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">Month</label>
                 <div className={cn("flex items-center px-2 py-1.5 rounded-lg border shadow-sm transition-colors", 
-                  isDark ? "bg-slate-800 border-slate-700 focus-within:border-indigo-500" : "bg-slate-50 border-slate-200 focus-within:border-indigo-300"
+                  isDark ? "bg-slate-800 border-slate-700 focus-within:border-blue-500" : "bg-slate-50 border-slate-200 focus-within:border-blue-300"
                 )}>
                   <div className="relative w-full">
                     <select
@@ -796,7 +796,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
               <div>
                 <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">Year</label>
                 <div className={cn("flex items-center px-2 py-1.5 rounded-lg border shadow-sm transition-colors", 
-                  isDark ? "bg-slate-800 border-slate-700 focus-within:border-indigo-500" : "bg-slate-50 border-slate-200 focus-within:border-indigo-300"
+                  isDark ? "bg-slate-800 border-slate-700 focus-within:border-blue-500" : "bg-slate-50 border-slate-200 focus-within:border-blue-300"
                 )}>
                   <div className="relative w-full">
                     <select
@@ -819,7 +819,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
 
               <Button 
                 size="sm" 
-                className="w-full bg-indigo-600 hover:bg-indigo-500 text-white text-xs h-8 mt-2" 
+                className="w-full bg-blue-600 hover:bg-blue-500 text-white text-xs h-8 mt-2" 
                 onClick={() => setShowFilterMenu(false)}
               >
                 Apply Filters
@@ -831,9 +831,9 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
 
       {/* Client Selector */}
       <div className={cn("flex items-center gap-2 px-3 py-1.5 rounded-lg border shadow-sm transition-colors", 
-        isDark ? "bg-slate-900 border-slate-700 hover:border-indigo-500" : "bg-white border-slate-200 hover:border-indigo-300"
+        isDark ? "bg-slate-900 border-slate-700 hover:border-blue-500" : "bg-white border-slate-200 hover:border-blue-300"
       )}>
-        <Building2 className="w-4 h-4 text-indigo-600 shrink-0" />
+        <Building2 className="w-4 h-4 text-blue-600 shrink-0" />
         <div className="relative w-full md:w-auto">
           <select
             value={selectedClient}
@@ -1824,20 +1824,20 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setClientEditOpen(false)} />
           <div className={cn('relative z-10 w-full max-w-md rounded-3xl shadow-2xl p-5 sm:p-6 max-h-[90vh] flex flex-col', isDark ? 'bg-slate-900 border border-slate-700' : 'bg-white border border-slate-200')}>
             <div className="flex justify-between items-center mb-5 shrink-0">
-              <h2 className="text-lg font-black flex items-center gap-2"><Edit2 className="w-5 h-5 text-indigo-600" /> Edit Client</h2>
+              <h2 className="text-lg font-black flex items-center gap-2"><Edit2 className="w-5 h-5 text-blue-600" /> Edit Client</h2>
               <Button variant="ghost" size="icon" onClick={() => setClientEditOpen(false)} className="h-8 w-8"><X className="w-4 h-4" /></Button>
             </div>
             <div className="space-y-4 overflow-y-auto pr-1 flex-1 style-scroll mb-4">
               <div><label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Client Name</label><input value={clientEditForm.name || ''} readOnly disabled className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none cursor-not-allowed opacity-70', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-100 border-slate-200 text-slate-500')} /></div>
               <div><label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">TIN Number</label><input value={clientEditForm.tinNumber || ''} readOnly disabled placeholder="Optional" className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none cursor-not-allowed opacity-70', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-100 border-slate-200 text-slate-500')} /></div>
-              <div><label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Address</label><textarea value={clientEditForm.address || ''} onChange={e => setClientEditForm(f => ({ ...f, address: e.target.value }))} rows={2} placeholder="e.g. 5 Marina Road, Lagos Island" className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')} /></div>
-              <div><label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Main Contact Person</label><input value={clientEditForm.mainContactPerson || ''} onChange={e => setClientEditForm(f => ({ ...f, mainContactPerson: e.target.value }))} placeholder="e.g. John Doe" className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')} /></div>
-              <div><label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Contact Phone Number</label><input value={clientEditForm.contactPhone || ''} onChange={e => setClientEditForm(f => ({ ...f, contactPhone: e.target.value }))} placeholder="e.g. +234 801 234 5678" className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')} /></div>
+              <div><label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Address</label><textarea value={clientEditForm.address || ''} onChange={e => setClientEditForm(f => ({ ...f, address: e.target.value }))} rows={2} placeholder="e.g. 5 Marina Road, Lagos Island" className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')} /></div>
+              <div><label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Main Contact Person</label><input value={clientEditForm.mainContactPerson || ''} onChange={e => setClientEditForm(f => ({ ...f, mainContactPerson: e.target.value }))} placeholder="e.g. John Doe" className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')} /></div>
+              <div><label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Contact Phone Number</label><input value={clientEditForm.contactPhone || ''} onChange={e => setClientEditForm(f => ({ ...f, contactPhone: e.target.value }))} placeholder="e.g. +234 801 234 5678" className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')} /></div>
               <div><label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Start Date</label><input type="date" value={clientEditForm.startDate || ''} readOnly disabled className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none cursor-not-allowed opacity-70', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-100 border-slate-200 text-slate-500')} /></div>
             </div>
             <div className="flex gap-3 shrink-0 pt-3 border-t border-slate-100 dark:border-slate-800">
               <Button variant="outline" onClick={() => setClientEditOpen(false)} className="flex-1 rounded-xl">Cancel</Button>
-              <Button onClick={saveClientEdit} className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl">Save Changes</Button>
+              <Button onClick={saveClientEdit} className="flex-1 bg-blue-600 hover:bg-blue-500 text-white rounded-xl">Save Changes</Button>
             </div>
           </div>
         </div>
@@ -1849,18 +1849,18 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setSiteEditTarget(null)} />
           <div className={cn('relative z-10 w-full max-w-md rounded-3xl shadow-2xl p-5 sm:p-6 max-h-[90vh] flex flex-col', isDark ? 'bg-slate-900 border border-slate-700' : 'bg-white border border-slate-200')}>
             <div className="flex justify-between items-center mb-5 shrink-0">
-              <h2 className="text-lg font-black flex items-center gap-2"><Edit2 className="w-5 h-5 text-indigo-600" /> Edit Site</h2>
+              <h2 className="text-lg font-black flex items-center gap-2"><Edit2 className="w-5 h-5 text-blue-600" /> Edit Site</h2>
               <Button variant="ghost" size="icon" onClick={() => setSiteEditTarget(null)} className="h-8 w-8"><X className="w-4 h-4" /></Button>
             </div>
             <div className="space-y-4 overflow-y-auto pr-1 flex-1 style-scroll mb-4">
-              <div><label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Address</label><textarea value={siteEditForm.address || ''} onChange={e => setSiteEditForm(f => ({ ...f, address: e.target.value }))} rows={2} placeholder="e.g. 5 Marina Road, Lagos Island" className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')} /></div>
-              <div><label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Main Contact Person</label><input value={siteEditForm.mainContactPerson || ''} onChange={e => setSiteEditForm(f => ({ ...f, mainContactPerson: e.target.value }))} placeholder="e.g. John Doe" className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')} /></div>
-              <div><label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Contact Phone Number</label><input value={siteEditForm.contactPhone || ''} onChange={e => setSiteEditForm(f => ({ ...f, contactPhone: e.target.value }))} placeholder="e.g. +234 801 234 5678" className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')} /></div>
-              <div><label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Position</label><input value={siteEditForm.position || ''} onChange={e => setSiteEditForm(f => ({ ...f, position: e.target.value }))} placeholder="e.g. Site Manager" className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')} /></div>
+              <div><label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Address</label><textarea value={siteEditForm.address || ''} onChange={e => setSiteEditForm(f => ({ ...f, address: e.target.value }))} rows={2} placeholder="e.g. 5 Marina Road, Lagos Island" className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')} /></div>
+              <div><label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Main Contact Person</label><input value={siteEditForm.mainContactPerson || ''} onChange={e => setSiteEditForm(f => ({ ...f, mainContactPerson: e.target.value }))} placeholder="e.g. John Doe" className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')} /></div>
+              <div><label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Contact Phone Number</label><input value={siteEditForm.contactPhone || ''} onChange={e => setSiteEditForm(f => ({ ...f, contactPhone: e.target.value }))} placeholder="e.g. +234 801 234 5678" className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')} /></div>
+              <div><label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Position</label><input value={siteEditForm.position || ''} onChange={e => setSiteEditForm(f => ({ ...f, position: e.target.value }))} placeholder="e.g. Site Manager" className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')} /></div>
             </div>
             <div className="flex gap-3 shrink-0 pt-3 border-t border-slate-100 dark:border-slate-800">
               <Button variant="outline" onClick={() => setSiteEditTarget(null)} className="flex-1 rounded-xl">Cancel</Button>
-              <Button onClick={saveSiteEdit} className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl">Save Changes</Button>
+              <Button onClick={saveSiteEdit} className="flex-1 bg-blue-600 hover:bg-blue-500 text-white rounded-xl">Save Changes</Button>
             </div>
           </div>
         </div>
@@ -1872,7 +1872,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setCommDialogOpen(false)} />
           <div className={cn('relative z-10 w-full max-w-lg rounded-3xl shadow-2xl p-5 sm:p-6 max-h-[92vh] flex flex-col', isDark ? 'bg-slate-900 border border-slate-700' : 'bg-white border border-slate-200')}>
             <div className="flex justify-between items-center mb-5 shrink-0">
-              <h2 className="text-lg font-black flex items-center gap-2"><MessagesSquare className="w-5 h-5 text-indigo-600" /> Log Communication</h2>
+              <h2 className="text-lg font-black flex items-center gap-2"><MessagesSquare className="w-5 h-5 text-blue-600" /> Log Communication</h2>
               <Button variant="ghost" size="icon" onClick={() => setCommDialogOpen(false)} className="h-8 w-8"><X className="w-4 h-4" /></Button>
             </div>
             
@@ -1883,7 +1883,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                   <select 
                     value={commForm.direction} 
                     onChange={e => setCommForm(f => ({ ...f, direction: e.target.value as any }))}
-                    className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
+                    className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
                   >
                     <option value="Incoming">📥 Incoming</option>
                     <option value="Outgoing">📤 Outgoing</option>
@@ -1894,7 +1894,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                   <select 
                     value={commForm.channel} 
                     onChange={e => setCommForm(f => ({ ...f, channel: e.target.value as any }))}
-                    className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
+                    className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
                   >
                     <option value="Phone">📞 Phone Call</option>
                     <option value="WhatsApp">💬 WhatsApp</option>
@@ -1933,7 +1933,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                 <select 
                   value={commForm.siteOption} 
                   onChange={e => setCommForm(f => ({ ...f, siteOption: e.target.value }))}
-                  className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
+                  className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
                 >
                   <option value="">Select site...</option>
                   <option value="NEW_ONBOARDING">+ Create new site onboarding...</option>
@@ -1966,7 +1966,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                   value={commForm.subject} 
                   onChange={e => setCommForm(f => ({ ...f, subject: e.target.value }))}
                   placeholder="e.g. Onboarding kickoff, Site update"
-                  className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
+                  className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
                 />
               </div>
 
@@ -1978,7 +1978,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                   rows={3} 
                   required
                   placeholder="Details of the conversation..."
-                  className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
+                  className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
                 />
               </div>
 
@@ -1991,7 +1991,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                       value={commForm.contactPerson} 
                       onChange={e => setCommForm(f => ({ ...f, contactPerson: e.target.value }))}
                       placeholder="e.g. Mr. Adeyemi, Site Manager"
-                      className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
+                      className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
                     />
                   ) : !isManualContact ? (
                     <select
@@ -2007,7 +2007,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                           setCommForm(f => ({ ...f, contactPerson: val }));
                         }
                       }}
-                      className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
+                      className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
                     >
                       <option value="">Select contact...</option>
                       {activeClientContacts.map(c => (
@@ -2028,7 +2028,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                         value={commForm.contactPerson} 
                         onChange={e => setCommForm(f => ({ ...f, contactPerson: e.target.value }))}
                         placeholder="Type contact name..."
-                        className={cn('flex-1 rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
+                        className={cn('flex-1 rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
                       />
                       <Button 
                         type="button"
@@ -2051,7 +2051,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                     value={commForm.outcome} 
                     onChange={e => setCommForm(f => ({ ...f, outcome: e.target.value }))}
                     placeholder="e.g. Move to site next week"
-                    className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
+                    className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
                   />
                 </div>
               </div>
@@ -2062,7 +2062,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
                   type="date" 
                   value={commForm.followUpDate} 
                   onChange={e => setCommForm(f => ({ ...f, followUpDate: e.target.value }))}
-                  className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
+                  className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
                 />
               </div>
 
@@ -2070,19 +2070,19 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
               <label className={cn(
                 'flex items-center gap-2.5 text-sm cursor-pointer select-none px-3 py-2.5 rounded-xl border transition-colors',
                 commForm.createTask
-                  ? (isDark ? 'bg-indigo-950/40 border-indigo-700/80 text-indigo-300' : 'bg-indigo-50 border-indigo-200 text-indigo-700')
+                  ? (isDark ? 'bg-blue-950/40 border-blue-700/80 text-blue-300' : 'bg-blue-50 border-blue-200 text-blue-700')
                   : (isDark ? 'border-slate-800 text-slate-400 hover:border-slate-700 bg-slate-900/50' : 'border-slate-200 text-slate-500 hover:border-slate-300 bg-slate-50/50')
               )}>
                 <input
                   type="checkbox"
                   checked={commForm.createTask}
                   onChange={e => setCommForm(f => ({ ...f, createTask: e.target.checked }))}
-                  className="rounded-lg border-slate-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer"
+                  className="rounded-lg border-slate-300 text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
                 />
                 <Building2 className="w-4 h-4 flex-shrink-0" />
                 <span className="font-semibold">Create a task from this communication log</span>
                 {commForm.createTask && (
-                  <span className={cn('text-xs ml-1 font-medium', isDark ? 'text-indigo-400' : 'text-indigo-500')}>
+                  <span className={cn('text-xs ml-1 font-medium', isDark ? 'text-blue-400' : 'text-blue-500')}>
                     — task dialog opens after saving
                   </span>
                 )}
@@ -2090,7 +2090,7 @@ Be extremely concise. If the user asks about invoices, machines, staff, material
 
               <div className="flex gap-3 shrink-0 pt-3 border-t border-slate-100 dark:border-slate-800">
                 <Button type="button" variant="outline" onClick={() => setCommDialogOpen(false)} className="flex-1 rounded-xl">Cancel</Button>
-                <Button type="submit" className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl">Save Log</Button>
+                <Button type="submit" className="flex-1 bg-blue-600 hover:bg-blue-500 text-white rounded-xl">Save Log</Button>
               </div>
             </form>
           </div>

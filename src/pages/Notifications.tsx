@@ -81,7 +81,7 @@ export function NotificationsPage() {
         notifs.push({
           id: `rem-${r.id}`, icon: AtSign, text: r.body || r.title,
           time: r.createdAt ? format(new Date(r.createdAt), 'MMM d, h:mm a') : 'New',
-          color: 'text-indigo-500', bg: 'bg-indigo-50',
+          color: 'text-blue-600', bg: 'bg-blue-50',
           url: r.subtaskId ? `/tasks?open=${r.subtaskId}` : r.mainTaskId ? `/tasks?openTask=${r.mainTaskId}` : undefined,
           priority: 1, category: 'mention',
         });
@@ -98,8 +98,8 @@ export function NotificationsPage() {
           id: `rem-${r.id}`, icon: isPast ? AlertCircle : BellRing,
           text: `Reminder: ${r.title}`,
           time: isPast ? 'Overdue' : format(remDate, 'MMM d, h:mm a'),
-          color: isPast ? 'text-rose-500' : 'text-indigo-500',
-          bg: isPast ? 'bg-rose-50' : 'bg-indigo-50',
+          color: isPast ? 'text-rose-500' : 'text-blue-600',
+          bg: isPast ? 'bg-rose-50' : 'bg-blue-50',
           url: r.subtaskId ? `/tasks?open=${r.subtaskId}` : r.mainTaskId ? `/tasks?openTask=${r.mainTaskId}` : '/tasks/reminders',
           priority: isPast ? 0 : 2, category: 'reminder',
         });
@@ -130,7 +130,7 @@ export function NotificationsPage() {
       notifs.push({ id: `lashma-overdue-${e.id}`, icon: ShieldCheck, text: `LASHMA Expired: ${e.firstname} ${e.surname} — renew immediately`, time: e.lashmaExpiryDate!, color: 'text-rose-600', bg: 'bg-rose-50', url: '/tasks/reminders', priority: 0, category: 'hr' });
     });
     commLogs.filter(c => c.followUpDate && !c.followUpDone && isPastOrToday(c.followUpDate)).forEach(c => {
-      notifs.push({ id: `comm-${c.id}`, icon: Clock, text: `Follow-up due: ${c.subject || 'Communication'}`, time: c.followUpDate!, color: 'text-indigo-400', bg: 'bg-indigo-50', url: '/sites', priority: 2, category: 'hr' });
+      notifs.push({ id: `comm-${c.id}`, icon: Clock, text: `Follow-up due: ${c.subject || 'Communication'}`, time: c.followUpDate!, color: 'text-blue-600', bg: 'bg-blue-50', url: '/sites', priority: 2, category: 'hr' });
     });
     sites.filter(s => s.status === 'Active' && s.endDate && isWithinDays(s.endDate, 7)).forEach(s => {
       notifs.push({ id: `site-end-${s.id}`, icon: MapPin, text: `Site ending soon: ${s.name}`, time: s.endDate!, color: 'text-rose-400', bg: 'bg-rose-50', url: '/sites', priority: 1, category: 'hr' });
@@ -148,7 +148,7 @@ export function NotificationsPage() {
       const end = new Date(start.getTime() + e.probationPeriod! * 86400000);
       const endStr = end.toISOString().split('T')[0];
       if (isWithinDays(endStr, 14)) {
-        notifs.push({ id: `prob-${e.id}`, icon: Users, text: `Probation ending: ${e.firstname} ${e.surname}`, time: endStr, color: 'text-indigo-400', bg: 'bg-indigo-50', url: '/employees', priority: 3, category: 'hr' });
+        notifs.push({ id: `prob-${e.id}`, icon: Users, text: `Probation ending: ${e.firstname} ${e.surname}`, time: endStr, color: 'text-blue-600', bg: 'bg-blue-50', url: '/employees', priority: 3, category: 'hr' });
       }
     });
 
@@ -225,7 +225,7 @@ export function NotificationsPage() {
       <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-6">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-indigo-600 flex items-center justify-center shadow-sm">
+            <div className="w-10 h-10 rounded-2xl bg-blue-600 flex items-center justify-center shadow-sm">
               <Bell className="w-5 h-5 text-white" />
             </div>
             <div>
@@ -262,7 +262,7 @@ export function NotificationsPage() {
                 onClick={() => setActiveCategory(key)}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
                   activeCategory === key
-                    ? 'bg-indigo-600 text-white shadow-sm'
+                    ? 'bg-blue-600 text-white shadow-sm'
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                 }`}
               >
@@ -296,7 +296,7 @@ export function NotificationsPage() {
                 <div
                   key={n.id}
                   onClick={() => handleAction(n)}
-                  className={`group flex items-start gap-4 p-4 bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all relative overflow-hidden ${n.url ? 'cursor-pointer hover:border-indigo-200' : ''}`}
+                  className={`group flex items-start gap-4 p-4 bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all relative overflow-hidden ${n.url ? 'cursor-pointer hover:border-blue-200' : ''}`}
                 >
                   {/* Priority bar */}
                   {n.priority <= 1 && (
@@ -332,7 +332,7 @@ export function NotificationsPage() {
                     </div>
                     <p className="text-sm font-semibold text-slate-800 mt-1 leading-snug">{n.text}</p>
                     {n.url && (
-                      <div className="mt-2 flex items-center gap-1 text-[11px] text-indigo-500 font-bold group-hover:gap-2 transition-all">
+                      <div className="mt-2 flex items-center gap-1 text-[11px] text-blue-600 font-bold group-hover:gap-2 transition-all">
                         Take Action <ChevronRight className="w-3 h-3" />
                       </div>
                     )}

@@ -48,7 +48,7 @@ interface ContactFormProps {
 
 const ContactForm = ({ draft, setDraft, isDark, clientSites, onSave, onCancel, toggleSite }: ContactFormProps) => {
   const inputCls = cn(
-    'flex h-9 w-full rounded-md border px-3 py-1 text-sm shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500',
+    'flex h-9 w-full rounded-md border px-3 py-1 text-sm shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500',
     isDark ? 'bg-slate-800 border-slate-600 text-slate-100 placeholder:text-slate-500' : 'bg-white border-slate-200 text-slate-900 placeholder:text-slate-400'
   );
   const labelCls = cn('text-xs font-semibold mb-1', isDark ? 'text-slate-400' : 'text-slate-500');
@@ -114,7 +114,7 @@ const ContactForm = ({ draft, setDraft, isDark, clientSites, onSave, onCancel, t
                   key={s.id}
                   type="button"
                   onClick={() => toggleSite(s, draft.siteIds || [], draft.siteNames || [])}
-                  className={cn('text-xs px-2.5 py-1 rounded-full border font-medium transition-all', selected ? 'bg-indigo-600 text-white border-indigo-600' : isDark ? 'bg-slate-700 border-slate-600 text-slate-300 hover:border-indigo-500' : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-400')}
+                  className={cn('text-xs px-2.5 py-1 rounded-full border font-medium transition-all', selected ? 'bg-blue-600 text-white border-blue-600' : isDark ? 'bg-slate-700 border-slate-600 text-slate-300 hover:border-blue-500' : 'bg-white border-slate-200 text-slate-600 hover:border-blue-400')}
                 >
                   📍 {s.name}
                 </button>
@@ -144,7 +144,7 @@ const ContactForm = ({ draft, setDraft, isDark, clientSites, onSave, onCancel, t
         </button>
       </div>
       <div className="flex gap-2 pt-1">
-        <Button onClick={onSave} className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2 flex-1 h-9 text-xs">
+        <Button onClick={onSave} className="bg-blue-600 hover:bg-blue-700 text-white gap-2 flex-1 h-9 text-xs">
           <Save className="w-3.5 h-3.5" /> Save Contact
         </Button>
         <Button variant="outline" onClick={onCancel} className="h-9 text-xs px-4"><X className="w-3.5 h-3.5" /></Button>
@@ -244,7 +244,7 @@ export function ClientContactsPanel({ clientName, onClose, inline = false, siteI
           {!contact.isPrincipal && (contact.siteNames?.length ?? 0) > 0 && (
             <div className="flex flex-wrap gap-1 mt-1">
               {contact.siteNames!.map((s, i) => (
-                <span key={i} className={cn('text-[10px] px-1.5 py-0.5 rounded font-medium', isDark ? 'bg-indigo-900/40 text-indigo-300' : 'bg-indigo-50 text-indigo-700')}>
+                <span key={i} className={cn('text-[10px] px-1.5 py-0.5 rounded font-medium', isDark ? 'bg-blue-900/40 text-blue-300' : 'bg-blue-50 text-blue-700')}>
                   📍 {s}
                 </span>
               ))}
@@ -255,7 +255,7 @@ export function ClientContactsPanel({ clientName, onClose, inline = false, siteI
           )}
         </div>
         <div className="flex gap-1 shrink-0">
-          <button onClick={() => startEdit(contact)} className={cn('p-1.5 rounded-lg transition-colors', isDark ? 'text-slate-400 hover:bg-slate-700 hover:text-indigo-400' : 'text-slate-400 hover:bg-slate-100 hover:text-indigo-600')} title="Edit">
+          <button onClick={() => startEdit(contact)} className={cn('p-1.5 rounded-lg transition-colors', isDark ? 'text-slate-400 hover:bg-slate-700 hover:text-blue-400' : 'text-slate-400 hover:bg-slate-100 hover:text-blue-600')} title="Edit">
             <Pencil className="w-3.5 h-3.5" />
           </button>
           <button
@@ -353,7 +353,7 @@ export function ClientContactsPanel({ clientName, onClose, inline = false, siteI
     <div className={cn('flex items-center justify-between px-5 py-4 border-b flex-shrink-0', isDark ? 'border-slate-700' : 'border-slate-100')}>
       <div>
         <h2 className={cn('text-base font-semibold flex items-center gap-2', isDark ? 'text-slate-100' : 'text-slate-900')}>
-          <UserCheck className="w-4 h-4 text-indigo-500" />
+          <UserCheck className="w-4 h-4 text-blue-500" />
           Client Contacts — {clientName}
         </h2>
         <p className={cn('text-xs mt-0.5', isDark ? 'text-slate-400' : 'text-slate-500')}>

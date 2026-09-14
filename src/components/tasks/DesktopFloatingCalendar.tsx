@@ -15,11 +15,28 @@ export function DesktopFloatingCalendar() {
   const [showCompleted, setShowCompleted] = useState(true);
   const [viewMode, setViewMode] = useState<'calendar' | 'split' | 'ai'>(() => {
     try {
+      if (typeof window !== 'undefined' && window.innerWidth < 768) {
+        return 'calendar';
+      }
       const saved = localStorage.getItem('operations_studio_view_mode');
-      if (saved === 'calendar' || saved === 'split' || saved === 'ai') return saved;
+      if (saved === 'calendar' || saved === 'split' || saved === 'ai') {
+        return saved === 'split' && typeof window !== 'undefined' && window.innerWidth < 768 ? 'calendar' : saved;
+      }
     } catch {}
     return 'calendar'; // Default: Calendar is the first and default view
   });
+
+  // Switch out of split view if viewport is resized to mobile
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth < 768 && viewMode === 'split') {
+        setViewMode('calendar');
+      }
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [viewMode]);
   const [splitPercent, setSplitPercent] = useState<number>(() => {
     try {
       const saved = localStorage.getItem('operations_studio_split');
@@ -186,20 +203,20 @@ export function DesktopFloatingCalendar() {
               {/* ── Studio Top Header Bar ── */}
               <div
                 style={{ WebkitAppRegion: 'drag' } as any}
-                className={`relative flex flex-wrap items-center justify-between py-2 px-4 flex-shrink-0 bg-slate-50 dark:bg-[#0b0f19] border-b border-slate-200 dark:border-white/10 ${isMac ? 'pl-[90px] pr-20' : 'pl-4 sm:pl-6 pr-36'}`}
+                className={`relative flex items-center justify-between py-2 px-3 sm:px-4 flex-shrink-0 bg-slate-50 dark:bg-[#0b0f19] border-b border-slate-200 dark:border-white/10 ${isMac ? 'pl-[90px] pr-14 sm:pr-20' : 'pl-3 sm:pl-6 pr-12 sm:pr-36'}`}
               >
                 {/* Left: Studio Identity */}
                 <div
-                  className="flex items-center gap-2.5 no-drag select-none"
+                  className="flex items-center gap-2 sm:gap-2.5 no-drag select-none min-w-0"
                   style={{ WebkitAppRegion: 'no-drag' } as any}
                 >
-                  <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-600/30 border border-indigo-200 dark:border-indigo-500/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
-                    <Columns className="w-4 h-4" />
+                  <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-indigo-50 dark:bg-indigo-600/30 border border-indigo-200 dark:border-indigo-500/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0">
+                    <Columns className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   </div>
-                  <div>
-                    <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                      <span>Operations Studio</span>
-                      <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-slate-200/80 dark:bg-white/10 text-slate-600 dark:text-slate-300">
+                  <div className="min-w-0">
+                    <h2 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5 sm:gap-2">
+                      <span className="truncate">Operations Studio</span>
+                      <span className="hidden md:inline-block text-[10px] font-mono px-1.5 py-0.2 rounded bg-slate-200/80 dark:bg-white/10 text-slate-600 dark:text-slate-300 whitespace-nowrap">
                         {viewMode === 'split' ? `Split View (${Math.round(splitPercent)}% / ${100 - Math.round(splitPercent)}%)` : viewMode === 'calendar' ? 'Calendar Focused' : 'AI Copilot Focused'}
                       </span>
                     </h2>
@@ -208,10 +225,10 @@ export function DesktopFloatingCalendar() {
 
                 {/* Center / Right: Studio Layout View Toggles */}
                 <div
-                  className="flex items-center gap-3 no-drag z-30 relative"
+                  className="flex items-center gap-1.5 sm:gap-3 no-drag z-30 relative shrink-0"
                   style={{ WebkitAppRegion: 'no-drag' } as any}
                 >
-                  {/* View Mode Switcher: Calendar first, Split View second, AI Copilot third */}
+                  {/* View Mode Switcher: Calendar first, Split View (desktop only), AI Copilot */}
                   <div
                     className="flex items-center bg-slate-200/60 dark:bg-white/5 p-0.5 rounded-lg border border-slate-200 dark:border-white/10 text-xs no-drag"
                     style={{ WebkitAppRegion: 'no-drag' } as any}
@@ -224,7 +241,7 @@ export function DesktopFloatingCalendar() {
                         try { localStorage.setItem('operations_studio_view_mode', 'calendar'); } catch {}
                       }}
                       className={cn(
-                        "px-2.5 py-1 rounded-md font-semibold transition-all flex items-center gap-1.5 text-xs cursor-pointer select-none no-drag",
+                        "px-2 sm:px-2.5 py-1 rounded-md font-semibold transition-all flex items-center gap-1 sm:gap-1.5 text-xs cursor-pointer select-none no-drag",
                         viewMode === 'calendar'
                           ? "bg-indigo-600 text-white shadow-xs"
                           : "text-slate-600 dark:text-white/60 hover:text-slate-900 dark:hover:text-white"
@@ -233,10 +250,10 @@ export function DesktopFloatingCalendar() {
                       title="Calendar & Tasks (Primary Fullscreen)"
                     >
                       <CalendarIcon className="w-3.5 h-3.5" />
-                      <span className="hidden sm:inline">Calendar</span>
+                      <span className="hidden xs:inline sm:inline">Calendar</span>
                     </button>
 
-                    {/* 2. Split View */}
+                    {/* 2. Split View - Hidden on Mobile */}
                     <button
                       type="button"
                       onClick={() => {
@@ -244,7 +261,7 @@ export function DesktopFloatingCalendar() {
                         try { localStorage.setItem('operations_studio_view_mode', 'split'); } catch {}
                       }}
                       className={cn(
-                        "px-2.5 py-1 rounded-md font-semibold transition-all flex items-center gap-1.5 text-xs cursor-pointer select-none no-drag",
+                        "hidden md:flex px-2.5 py-1 rounded-md font-semibold transition-all items-center gap-1.5 text-xs cursor-pointer select-none no-drag",
                         viewMode === 'split'
                           ? "bg-indigo-600 text-white shadow-xs"
                           : "text-slate-600 dark:text-white/60 hover:text-slate-900 dark:hover:text-white"
@@ -253,7 +270,7 @@ export function DesktopFloatingCalendar() {
                       title="Split View (Calendar 75% + AI Copilot 25%)"
                     >
                       <Columns className="w-3.5 h-3.5" />
-                      <span className="hidden sm:inline">Split View</span>
+                      <span className="hidden lg:inline">Split View</span>
                     </button>
 
                     {/* 3. AI Copilot */}
@@ -264,7 +281,7 @@ export function DesktopFloatingCalendar() {
                         try { localStorage.setItem('operations_studio_view_mode', 'ai'); } catch {}
                       }}
                       className={cn(
-                        "px-2.5 py-1 rounded-md font-semibold transition-all flex items-center gap-1.5 text-xs cursor-pointer select-none no-drag",
+                        "px-2 sm:px-2.5 py-1 rounded-md font-semibold transition-all flex items-center gap-1 sm:gap-1.5 text-xs cursor-pointer select-none no-drag",
                         viewMode === 'ai'
                           ? "bg-indigo-600 text-white shadow-xs"
                           : "text-slate-600 dark:text-white/60 hover:text-slate-900 dark:hover:text-white"
@@ -273,7 +290,7 @@ export function DesktopFloatingCalendar() {
                       title="AI Operations Copilot Fullscreen"
                     >
                       <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                      <span className="hidden sm:inline">AI Copilot</span>
+                      <span className="hidden xs:inline sm:inline">AI Copilot</span>
                     </button>
                   </div>
 
@@ -310,7 +327,7 @@ export function DesktopFloatingCalendar() {
                   <button
                     type="button"
                     onClick={() => setOpen(false)}
-                    className="h-full w-12 flex justify-center items-center transition-colors hover:bg-red-500 hover:text-white text-slate-400 dark:text-white/60 cursor-pointer no-drag"
+                    className="h-full w-10 sm:w-12 flex justify-center items-center transition-colors hover:bg-red-500 hover:text-white text-slate-400 dark:text-white/60 cursor-pointer no-drag"
                     style={{ WebkitAppRegion: 'no-drag' } as any}
                     title="Close Studio (Esc)"
                   >

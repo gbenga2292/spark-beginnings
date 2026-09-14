@@ -17,10 +17,10 @@ function StatCard({ label, value, sub, color = 'slate' }: { label: string; value
     emerald: 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400',
   };
   return (
-    <div className={cn('rounded-xl border p-3.5 flex flex-col gap-1', colors[color] || colors.slate)}>
+    <div className={cn('rounded-md border p-3 flex flex-col gap-1', colors[color] || colors.slate)}>
       <p className="text-[10px] font-black uppercase tracking-widest opacity-60">{label}</p>
-      <p className="text-xl font-black leading-none">{value}</p>
-      {sub && <p className="text-[10px] font-semibold opacity-50">{sub}</p>}
+      <p className="text-xl font-bold leading-none font-mono tabular-nums">{value}</p>
+      {sub && <p className="text-[10px] font-semibold opacity-50 font-mono">{sub}</p>}
     </div>
   );
 }
@@ -79,7 +79,7 @@ function EquipmentAnalytics({ asset }: { asset: Asset }) {
       {/* Stock breakdown */}
       <div>
         <SectionTitle icon={<Package className="h-4 w-4" />} label="Stock Breakdown" />
-        <div className="space-y-3 rounded-xl border border-border bg-muted/20 p-4">
+        <div className="space-y-3 rounded-md border border-border bg-muted/20 p-3.5">
           {[
             { label: 'Available', val: available, max: total, color: 'blue' },
             { label: 'Reserved', val: reserved, max: total, color: 'blue' },
@@ -90,7 +90,7 @@ function EquipmentAnalytics({ asset }: { asset: Asset }) {
             <div key={row.label} className="space-y-1">
               <div className="flex justify-between text-xs font-semibold text-muted-foreground">
                 <span>{row.label}</span>
-                <span className="font-black text-foreground">{row.val} <span className="text-muted-foreground font-normal">/ {total}</span></span>
+                <span className="font-bold text-foreground font-mono tabular-nums">{row.val} <span className="text-muted-foreground font-normal">/ {total}</span></span>
               </div>
               <ProgressBar value={row.val} max={total} color={row.color} />
             </div>
@@ -103,7 +103,7 @@ function EquipmentAnalytics({ asset }: { asset: Asset }) {
         <SectionTitle icon={<Cpu className="h-4 w-4" />} label="Equipment Details" />
         <div className="grid grid-cols-2 gap-2">
           {asset.powerSource && (
-            <div className="rounded-xl border border-border bg-muted/30 p-3 flex items-center gap-2.5">
+            <div className="rounded-md border border-border bg-muted/30 p-2.5 flex items-center gap-2.5">
               <Zap className="h-4 w-4 text-amber-500 shrink-0" />
               <div>
                 <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest">Power Source</p>
@@ -111,21 +111,21 @@ function EquipmentAnalytics({ asset }: { asset: Asset }) {
               </div>
             </div>
           )}
-          <div className="rounded-xl border border-border bg-muted/30 p-3 flex items-center gap-2.5">
+          <div className="rounded-md border border-border bg-muted/30 p-2.5 flex items-center gap-2.5">
             <MapPin className="h-4 w-4 text-blue-500 shrink-0" />
             <div>
               <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest">Location</p>
               <p className="text-sm font-bold text-foreground">{asset.location || 'Not set'}</p>
             </div>
           </div>
-          <div className="rounded-xl border border-border bg-muted/30 p-3 flex items-center gap-2.5">
+          <div className="rounded-md border border-border bg-muted/30 p-2.5 flex items-center gap-2.5">
             <Clock className="h-4 w-4 text-blue-500 shrink-0" />
             <div>
               <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest">Daily Logging</p>
               <p className="text-sm font-bold text-foreground">{asset.requiresLogging ? 'Required' : 'Not Required'}</p>
             </div>
           </div>
-          <div className="rounded-xl border border-border bg-muted/30 p-3 flex items-center gap-2.5">
+          <div className="rounded-md border border-border bg-muted/30 p-2.5 flex items-center gap-2.5">
             <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
             <div>
               <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest">Condition</p>
@@ -165,7 +165,7 @@ function ToolsAnalytics({ asset }: { asset: Asset }) {
       {/* Checkout state breakdown */}
       <div>
         <SectionTitle icon={<Wrench className="h-4 w-4" />} label="Inventory State" />
-        <div className="space-y-3 rounded-xl border border-border bg-muted/20 p-4">
+        <div className="space-y-3 rounded-md border border-border bg-muted/20 p-3.5">
           {[
             { label: 'Available', val: available, max: total, color: 'blue' },
             { label: 'Reserved', val: reserved, max: total, color: 'blue' },
@@ -176,7 +176,7 @@ function ToolsAnalytics({ asset }: { asset: Asset }) {
             <div key={row.label} className="space-y-1">
               <div className="flex justify-between text-xs font-semibold text-muted-foreground">
                 <span>{row.label}</span>
-                <span className="font-black text-foreground">{row.val}</span>
+                <span className="font-bold text-foreground font-mono tabular-nums">{row.val}</span>
               </div>
               <ProgressBar value={row.val} max={total} color={row.color} />
             </div>
@@ -188,14 +188,14 @@ function ToolsAnalytics({ asset }: { asset: Asset }) {
       <div>
         <SectionTitle icon={<AlertTriangle className="h-4 w-4" />} label="Stock Alert Thresholds" />
         <div className="grid grid-cols-2 gap-2">
-          <div className="rounded-xl border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-900/10 p-3">
+          <div className="rounded-md border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-900/10 p-3">
             <p className="text-[10px] font-black uppercase tracking-widest text-amber-600">Low Stock Alert</p>
-            <p className="text-xl font-black text-amber-600 dark:text-amber-400">{asset.lowStockLevel ?? '—'}</p>
+            <p className="text-xl font-bold font-mono tabular-nums text-amber-600 dark:text-amber-400">{asset.lowStockLevel ?? '—'}</p>
             <p className="text-[10px] text-amber-500/70 font-semibold">units trigger</p>
           </div>
-          <div className="rounded-xl border border-rose-200 dark:border-rose-900 bg-rose-50 dark:bg-rose-900/10 p-3">
+          <div className="rounded-md border border-rose-200 dark:border-rose-900 bg-rose-50 dark:bg-rose-900/10 p-3">
             <p className="text-[10px] font-black uppercase tracking-widest text-rose-600">Critical Alert</p>
-            <p className="text-xl font-black text-rose-600 dark:text-rose-400">{asset.criticalStockLevel ?? '—'}</p>
+            <p className="text-xl font-bold font-mono tabular-nums text-rose-600 dark:text-rose-400">{asset.criticalStockLevel ?? '—'}</p>
             <p className="text-[10px] text-rose-500/70 font-semibold">units trigger</p>
           </div>
         </div>
@@ -231,7 +231,7 @@ function ReusablesAnalytics({ asset }: { asset: Asset }) {
       {/* Flow breakdown */}
       <div>
         <SectionTitle icon={<Package className="h-4 w-4" />} label="Circulation Breakdown" />
-        <div className="space-y-3 rounded-xl border border-border bg-muted/20 p-4">
+        <div className="space-y-3 rounded-md border border-slate-200 dark:border-slate-800 bg-muted/20 p-4">
           {[
             { label: 'Available (in)', val: available, max: total, color: 'blue' },
             { label: 'Out / Reserved', val: reserved, max: total, color: 'blue' },
@@ -241,7 +241,7 @@ function ReusablesAnalytics({ asset }: { asset: Asset }) {
             <div key={row.label} className="space-y-1">
               <div className="flex justify-between text-xs font-semibold text-muted-foreground">
                 <span>{row.label}</span>
-                <span className="font-black text-foreground">{row.val}</span>
+                <span className="font-mono tabular-nums font-bold text-foreground">{row.val}</span>
               </div>
               <ProgressBar value={row.val} max={row.max} color={row.color} />
             </div>
@@ -253,21 +253,21 @@ function ReusablesAnalytics({ asset }: { asset: Asset }) {
       <div>
         <SectionTitle icon={<MapPin className="h-4 w-4" />} label="Location & Condition" />
         <div className="grid grid-cols-2 gap-2">
-          <div className="rounded-xl border border-border bg-muted/30 p-3">
-            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Current Location</p>
-            <p className="text-sm font-bold text-foreground mt-1">{asset.location || 'Not set'}</p>
+          <div className="rounded-md border border-slate-200 dark:border-slate-800 bg-muted/30 p-3">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Current Location</p>
+            <p className="text-sm font-semibold text-foreground mt-1">{asset.location || 'Not set'}</p>
           </div>
-          <div className="rounded-xl border border-border bg-muted/30 p-3">
-            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Condition</p>
+          <div className="rounded-md border border-slate-200 dark:border-slate-800 bg-muted/30 p-3">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Condition</p>
             <p className={cn(
-              'text-sm font-bold mt-1 capitalize',
+              'text-sm font-semibold mt-1 capitalize',
               asset.condition === 'good' || asset.condition === 'fair' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
             )}>{asset.condition}</p>
           </div>
-          <div className="rounded-xl border border-border bg-muted/30 p-3 col-span-2">
-            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">Restock History</p>
-            <p className="text-sm font-bold text-foreground">
-              {asset.restockHistory?.length ?? 0} restock event(s) recorded
+          <div className="rounded-md border border-slate-200 dark:border-slate-800 bg-muted/30 p-3 col-span-2">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Restock History</p>
+            <p className="text-sm font-semibold text-foreground">
+              <span className="font-mono tabular-nums">{asset.restockHistory?.length ?? 0}</span> restock event(s) recorded
             </p>
           </div>
         </div>
@@ -298,7 +298,7 @@ function ConsumableAnalytics({ asset }: { asset: Asset }) {
 
       <div>
         <SectionTitle icon={<Package className="h-4 w-4" />} label="Stock Level" />
-        <div className="rounded-xl border border-border bg-muted/20 p-4 space-y-3">
+        <div className="rounded-md border border-slate-200 dark:border-slate-800 bg-muted/20 p-4 space-y-3">
           {[
             { label: 'Available', val: available, max: total, color: 'blue' },
             { label: 'Consumed', val: used, max: total, color: 'amber' },
@@ -306,7 +306,7 @@ function ConsumableAnalytics({ asset }: { asset: Asset }) {
             <div key={row.label} className="space-y-1">
               <div className="flex justify-between text-xs font-semibold text-muted-foreground">
                 <span>{row.label}</span>
-                <span className="font-black text-foreground">{row.val}</span>
+                <span className="font-mono tabular-nums font-bold text-foreground">{row.val}</span>
               </div>
               <ProgressBar value={row.val} max={total} color={row.color} />
             </div>
@@ -317,18 +317,18 @@ function ConsumableAnalytics({ asset }: { asset: Asset }) {
       {latest && (
         <div>
           <SectionTitle icon={<Clock className="h-4 w-4" />} label="Last Restock" />
-          <div className="rounded-xl border border-border bg-muted/20 p-4 grid grid-cols-3 gap-3">
+          <div className="rounded-md border border-slate-200 dark:border-slate-800 bg-muted/20 p-4 grid grid-cols-3 gap-3">
             <div>
-              <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Qty Added</p>
-              <p className="text-lg font-black text-foreground">{latest.quantity}</p>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Qty Added</p>
+              <p className="text-lg font-mono tabular-nums font-bold text-foreground">{latest.quantity}</p>
             </div>
             <div>
-              <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Unit Cost</p>
-              <p className="text-lg font-black text-foreground">₦{latest.unitCost.toFixed(0)}</p>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Unit Cost</p>
+              <p className="text-lg font-mono tabular-nums font-bold text-foreground">₦{latest.unitCost.toFixed(0)}</p>
             </div>
             <div>
-              <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Date</p>
-              <p className="text-sm font-bold text-foreground">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Date</p>
+              <p className="text-sm font-mono tabular-nums font-medium text-foreground">
                 {new Date(latest.date).toLocaleDateString('en-NG', { day: 'numeric', month: 'short' })}
               </p>
             </div>
@@ -341,10 +341,10 @@ function ConsumableAnalytics({ asset }: { asset: Asset }) {
 
 /* ─── TYPE CONFIG ─────────────────────────────────────────────── */
 const typeConfig = {
-  equipment: { icon: <Cpu className="h-4 w-4 text-primary" />, bg: 'bg-primary/10', label: 'Equipment Analytics' },
-  tools: { icon: <Wrench className="h-4 w-4 text-blue-600" />, bg: 'bg-blue-500/10', label: 'Tools Analytics' },
-  reusables: { icon: <RefreshCw className="h-4 w-4 text-emerald-600" />, bg: 'bg-emerald-500/10', label: 'Reusables Analytics' },
-  consumable: { icon: <Package className="h-4 w-4 text-amber-600" />, bg: 'bg-amber-500/10', label: 'Consumable Analytics' },
+  equipment: { icon: <Cpu className="h-4 w-4 text-blue-600" />, bg: 'bg-blue-50 dark:bg-blue-900/30', label: 'Equipment Analytics' },
+  tools: { icon: <Wrench className="h-4 w-4 text-blue-600" />, bg: 'bg-blue-50 dark:bg-blue-900/30', label: 'Tools Analytics' },
+  reusables: { icon: <RefreshCw className="h-4 w-4 text-emerald-600" />, bg: 'bg-emerald-50 dark:bg-emerald-900/30', label: 'Reusables Analytics' },
+  consumable: { icon: <Package className="h-4 w-4 text-amber-600" />, bg: 'bg-amber-50 dark:bg-amber-900/30', label: 'Consumable Analytics' },
   'non-consumable': { icon: <Package className="h-4 w-4 text-muted-foreground" />, bg: 'bg-muted', label: 'Asset Analytics' },
 };
 
@@ -356,12 +356,12 @@ export function AssetAnalyticsDialog({ asset, onClose }: AssetAnalyticsDialogPro
     <Dialog open onOpenChange={onClose}>
       <DialogContent
         aria-describedby={undefined}
-        className="max-w-lg p-0 overflow-hidden rounded-2xl bg-card border border-border shadow-2xl"
+        className="max-w-lg p-0 overflow-hidden rounded-md bg-card border border-slate-200 dark:border-slate-800 shadow-lg"
       >
         {/* Header */}
-        <DialogHeader className="flex flex-row items-center justify-between space-y-0 px-6 py-4 border-b border-border bg-gradient-to-r from-primary/5 to-transparent">
+        <DialogHeader className="flex flex-row items-center justify-between space-y-0 px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-muted/30">
           <div className="flex items-center gap-3">
-            <div className={cn('w-9 h-9 rounded-xl flex items-center justify-center', cfg.bg)}>
+            <div className={cn('w-9 h-9 rounded-md flex items-center justify-center border border-slate-200 dark:border-slate-800', cfg.bg)}>
               {cfg.icon}
             </div>
             <div>

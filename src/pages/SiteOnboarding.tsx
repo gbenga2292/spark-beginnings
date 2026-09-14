@@ -49,7 +49,7 @@ function PhaseCheck({
         type="checkbox"
         checked={checked}
         onChange={e => onChange(e.target.checked)}
-        className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+        className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
       />
       <span className={`${checked ? 'text-slate-700' : 'text-slate-500'} group-hover:text-slate-700`}>
         {label}
@@ -758,12 +758,12 @@ export function SiteOnboarding() {
         <>
           {form.status === 'Active' && projects.some(p => p.name === form.siteName || p.id === form.siteName || p.title === form.siteName) ? (
             <Button onClick={() => navigate(`/tasks?scope=projects&openProject=${encodeURIComponent(form.siteName)}`)}
-              className="bg-indigo-100 hover:bg-indigo-200 text-indigo-700 border-indigo-200 gap-2 font-medium shadow-none h-9">
+              className="bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200 gap-2 font-medium shadow-none h-9">
               <LayoutGrid className="h-4 w-4" /> View Workspace
             </Button>
           ) : form.status === 'Active' ? (
             <Button onClick={() => setShowProjectDialog(true)}
-              className="bg-indigo-100 hover:bg-indigo-200 text-indigo-700 border-indigo-200 gap-2 font-medium shadow-none h-9">
+              className="bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200 gap-2 font-medium shadow-none h-9">
               <LayoutGrid className="h-4 w-4" /> Create Workspace
             </Button>
           ) : null}
@@ -857,7 +857,7 @@ export function SiteOnboarding() {
                       <div className="space-y-1">
                         <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Contact Person</label>
                         <select
-                          className="flex h-10 w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+                          className="flex h-10 w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
                           value={selectedContactId}
                           onChange={e => handleContactSelect(e.target.value)}
                         >
@@ -914,7 +914,7 @@ export function SiteOnboarding() {
                     <Button variant="outline" size="sm" onClick={() => { setForm(initialForm); setIsEditingHeader(false); }} className="h-8 text-xs font-semibold">
                       Cancel
                     </Button>
-                    <Button size="sm" onClick={() => { executeSave(); setIsEditingHeader(false); }} className="h-8 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-bold">
+                    <Button size="sm" onClick={() => { executeSave(); setIsEditingHeader(false); }} className="h-8 text-xs bg-blue-600 hover:bg-blue-700 text-white font-bold">
                       Save Details
                     </Button>
                   </div>
@@ -928,21 +928,21 @@ export function SiteOnboarding() {
                       variant="outline"
                       className="text-xs gap-1.5 h-8 border-slate-200 text-slate-700 hover:bg-slate-50 font-bold"
                     >
-                      <Edit2 className="w-3.5 h-3.5 text-indigo-650" />
+                      <Edit2 className="w-3.5 h-3.5 text-blue-600" />
                       <span>Edit Info</span>
                     </Button>
                   </div>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
                     <div className="flex items-start gap-3">
-                      <div className="p-2 rounded-lg bg-indigo-50 flex-shrink-0">
-                        <User className="h-4 w-4 text-indigo-600" />
+                      <div className="p-2 rounded-lg bg-blue-50 flex-shrink-0">
+                        <User className="h-4 w-4 text-blue-600" />
                       </div>
                       <div className="space-y-0.5">
                         <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Client</p>
                         {form.clientName ? (
                           <button
                             onClick={() => navigate(`/sites?client=${encodeURIComponent(form.clientName)}`)}
-                            className="text-sm font-medium text-indigo-600 hover:text-indigo-800 hover:underline underline-offset-2 transition-colors text-left bg-transparent border-0 p-0 cursor-pointer"
+                            className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline underline-offset-2 transition-colors text-left bg-transparent border-0 p-0 cursor-pointer"
                           >
                             {form.clientName}
                           </button>
@@ -993,7 +993,7 @@ export function SiteOnboarding() {
                 return (
                   <div
                     key={p}
-                    className={`h-2 flex-1 rounded-full transition-colors ${done ? 'bg-emerald-500' : p === activePhase ? 'bg-indigo-200' : 'bg-slate-100'}`}
+                    className={`h-2 flex-1 rounded-full transition-colors ${done ? 'bg-emerald-500' : p === activePhase ? 'bg-blue-200' : 'bg-slate-100'}`}
                   />
                 );
               })}
@@ -1064,7 +1064,7 @@ export function SiteOnboarding() {
               <div className="space-y-1">
                 <label className="text-sm font-medium text-slate-700">Initial Contact Person</label>
                 <select
-                  className="flex h-10 w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+                  className="flex h-10 w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
                   value={selectedContactId}
                   onChange={e => handleContactSelect(e.target.value)}
                 >
@@ -1125,11 +1125,11 @@ export function SiteOnboarding() {
                 type="checkbox"
                 checked={wantsProject}
                 onChange={e => setWantsProject(e.target.checked)}
-                className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer"
+                className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
               />
               Create a Project Task across the application for this site?
             </label>
-            <Button onClick={handleSave} className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2">
+            <Button onClick={handleSave} className="bg-blue-600 hover:bg-blue-700 text-white gap-2">
               <Save className="h-4 w-4" /> Save & Start Onboarding
             </Button>
           </div>
@@ -1151,7 +1151,7 @@ export function SiteOnboarding() {
                   className={`flex-1 py-3 px-3 text-xs font-medium border-b-2 whitespace-nowrap
                     transition-colors flex flex-col items-center gap-0.5 min-w-[100px] sm:min-w-[120px]
                     ${!showDocuments && activePhase === phase
-                      ? 'border-indigo-600 text-indigo-700 bg-indigo-50/40'
+                      ? 'border-blue-600 text-blue-700 bg-blue-50/40'
                       : done
                         ? 'border-emerald-400 text-emerald-700 hover:bg-emerald-50/30'
                         : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
@@ -1174,7 +1174,7 @@ export function SiteOnboarding() {
               className={`flex-1 py-3 px-3 text-xs font-medium border-b-2 whitespace-nowrap
                 transition-colors flex flex-col items-center gap-0.5 min-w-[100px] sm:min-w-[120px]
                 ${showDocuments
-                  ? 'border-indigo-600 text-indigo-700 bg-indigo-50/40'
+                  ? 'border-blue-600 text-blue-700 bg-blue-50/40'
                   : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
                 }`}
             >
@@ -1182,7 +1182,7 @@ export function SiteOnboarding() {
                 <Paperclip className="h-3 w-3" />
                 <span>Documents</span>
                 {(form.attachments?.length ?? 0) > 0 && (
-                  <span className="bg-indigo-100 text-indigo-700 text-[9px] font-black px-1.5 rounded-full">
+                  <span className="bg-blue-50 text-blue-700 border border-blue-200 text-[9px] font-black px-1.5 rounded-full">
                     {form.attachments!.length}
                   </span>
                 )}
@@ -1210,8 +1210,8 @@ export function SiteOnboarding() {
                   onClick={() => fileInputRef.current?.click()}
                   className={`relative border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all
                     ${isDraggingOver
-                      ? 'border-indigo-400 bg-indigo-50'
-                      : 'border-slate-200 hover:border-indigo-300 hover:bg-slate-50'
+                      ? 'border-blue-400 bg-blue-50'
+                      : 'border-slate-200 hover:border-blue-300 hover:bg-slate-50'
                     }`}
                 >
                   <input
@@ -1224,8 +1224,8 @@ export function SiteOnboarding() {
                   />
                   {isUploadingFile ? (
                     <div className="flex flex-col items-center gap-2">
-                      <Loader2 className="h-8 w-8 text-indigo-500 animate-spin" />
-                      <p className="text-sm font-medium text-indigo-600">Uploading files…</p>
+                      <Loader2 className="h-8 w-8 text-blue-500 animate-spin" />
+                      <p className="text-sm font-medium text-blue-600">Uploading files…</p>
                     </div>
                   ) : (
                     <div className="flex flex-col items-center gap-2">
@@ -1249,7 +1249,7 @@ export function SiteOnboarding() {
                           className="flex items-center gap-3 p-3 rounded-xl border border-slate-100 bg-slate-50 hover:bg-white hover:shadow-sm transition-all group"
                         >
                           <div className={`h-9 w-9 rounded-lg flex items-center justify-center shrink-0 ${
-                            isImage ? 'bg-sky-100 text-sky-600' : 'bg-indigo-100 text-indigo-600'
+                            isImage ? 'bg-sky-100 text-sky-600' : 'bg-blue-100 text-blue-600'
                           }`}>
                             <FileTextIcon className="h-4 w-4" />
                           </div>
@@ -1281,7 +1281,7 @@ export function SiteOnboarding() {
                                         setEditingAttachmentId(null);
                                       }
                                     }}
-                                    className="text-[11px] border border-indigo-200 rounded px-2 py-0.5 w-full focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white font-medium text-slate-700 animate-in fade-in slide-in-from-top-1 duration-100"
+                                    className="text-[11px] border border-blue-200 rounded px-2 py-0.5 w-full focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white font-medium text-slate-700 animate-in fade-in slide-in-from-top-1 duration-100"
                                   />
                                   <button
                                     onClick={() => handleSaveCaption(att.id, editCaptionText)}
@@ -1315,7 +1315,7 @@ export function SiteOnboarding() {
                                       setEditingAttachmentId(att.id);
                                       setEditCaptionText(att.caption || '');
                                     }}
-                                    className="p-1 rounded text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                                    className="p-1 rounded text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
                                     title="Edit Caption"
                                   >
                                     <Edit2 className="h-3 w-3" />
@@ -1328,7 +1328,7 @@ export function SiteOnboarding() {
                             {att.url && (
                               <button
                                 onClick={e => { e.stopPropagation(); setPreviewDoc(att); }}
-                                className="h-8 w-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                                className="h-8 w-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
                                 title="Preview"
                               >
                                 <Eye className="h-3.5 w-3.5" />
@@ -1340,7 +1340,7 @@ export function SiteOnboarding() {
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 onClick={e => e.stopPropagation()}
-                                className="h-8 w-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                                className="h-8 w-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
                                 title="Open in new tab"
                               >
                                 <ExternalLink className="h-3.5 w-3.5" />
@@ -1366,7 +1366,7 @@ export function SiteOnboarding() {
                     <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-6 max-w-lg w-full max-h-[85vh] flex flex-col">
                       <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-100">
                         <h3 className="text-base font-black text-slate-850 flex items-center gap-2">
-                          <UploadCloud className="h-5 w-5 text-indigo-600" />
+                          <UploadCloud className="h-5 w-5 text-blue-600" />
                           Caption & Upload Files
                         </h3>
                         <button
@@ -1382,7 +1382,7 @@ export function SiteOnboarding() {
                         {pendingUploads.map((item, idx) => (
                           <div key={idx} className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2 text-left">
                             <div className="flex items-start gap-2.5 min-w-0">
-                              <div className="h-8 w-8 rounded bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0 mt-0.5">
+                              <div className="h-8 w-8 rounded bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 mt-0.5">
                                 <FileTextIcon className="h-4 w-4" />
                               </div>
                               <div className="min-w-0 flex-1">
@@ -1411,11 +1411,11 @@ export function SiteOnboarding() {
                       </div>
 
                       {isUploadingFile && (
-                        <div className="mt-3 bg-indigo-50 border border-indigo-100 rounded-xl p-3 flex items-center gap-3 animate-in slide-in-from-bottom-2 duration-200 text-left">
-                          <Loader2 className="h-5 w-5 text-indigo-600 animate-spin shrink-0" />
+                        <div className="mt-3 bg-blue-50 border border-blue-100 rounded-xl p-3 flex items-center gap-3 animate-in slide-in-from-bottom-2 duration-200 text-left">
+                          <Loader2 className="h-5 w-5 text-blue-600 animate-spin shrink-0" />
                           <div className="flex-1 min-w-0">
-                            <p className="text-xs font-bold text-indigo-950">Uploading to media server...</p>
-                            <p className="text-[10px] text-indigo-600 mt-0.5">Please wait, saving document securely.</p>
+                            <p className="text-xs font-bold text-blue-950">Uploading to media server...</p>
+                            <p className="text-[10px] text-blue-600 mt-0.5">Please wait, saving document securely.</p>
                           </div>
                         </div>
                       )}
@@ -1431,7 +1431,7 @@ export function SiteOnboarding() {
                         </Button>
                         <Button
                           onClick={() => handleFileUpload(pendingUploads)}
-                          className="flex-1 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center gap-1.5"
+                          className="flex-1 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center gap-1.5"
                           disabled={isUploadingFile}
                         >
                           {isUploadingFile ? (
@@ -1758,7 +1758,7 @@ export function SiteOnboarding() {
 
                 {/* Activation CTA — only when conditions met and still pending */}
                 {canActivate && (
-                  <div className="p-5 bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl">
+                  <div className="p-5 bg-emerald-50 border border-emerald-200 rounded-xl">
                     <div className="flex items-start gap-3">
                       <CheckCircle2 className="h-6 w-6 text-emerald-600 mt-0.5 flex-shrink-0" />
                       <div>
@@ -1780,17 +1780,17 @@ export function SiteOnboarding() {
 
                 {/* Already-active notice */}
                 {form.status === 'Active' && (
-                  <div className="p-4 bg-indigo-50 border border-indigo-200 rounded-xl flex items-center justify-between gap-3">
+                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
-                      <CheckCircle2 className="h-5 w-5 text-indigo-600 flex-shrink-0" />
-                      <p className="text-sm text-indigo-800 font-medium">
+                      <CheckCircle2 className="h-5 w-5 text-blue-600 flex-shrink-0" />
+                      <p className="text-sm text-blue-800 font-medium">
                         This site was activated via Phase 4. You can still update any phase fields above and save.
                       </p>
                     </div>
                     <Button 
                       variant="outline" 
                       size="sm" 
-                      className="border-indigo-300 text-indigo-700 hover:bg-indigo-100"
+                      className="border-blue-300 text-blue-700 hover:bg-blue-100"
                       onClick={() => {
                         if (confirm("Are you sure you want to revert this site to Pending? Note: This will not delete the generated active site if one was created.")) {
                           const dataToSave = { ...form, status: 'Pending' as const, siteId: undefined };

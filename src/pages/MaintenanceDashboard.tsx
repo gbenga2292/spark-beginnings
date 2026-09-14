@@ -94,7 +94,7 @@ export function MaintenanceDashboard() {
     { label: period === 'all' ? 'Total Cost' : period === 'year' ? 'This Year' : 'This Month', value: `₦${stats.periodCost.toLocaleString()}`, sub: 'Maintenance cost', icon: DollarSign, color: 'text-emerald-600' },
   ];
 
-  const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
+  const COLORS = ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#06b6d4'];
 
   return (
     <div className="space-y-6">
@@ -107,7 +107,7 @@ export function MaintenanceDashboard() {
                 <select 
                   value={selectedMonth} 
                   onChange={(e) => setSelectedMonth(Number(e.target.value))}
-                  className="h-8 sm:h-[34px] rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[11px] sm:text-xs font-semibold px-2 sm:px-3 outline-none text-slate-700 dark:text-slate-300 cursor-pointer"
+                  className="h-8 rounded-md bg-background border border-slate-200 dark:border-slate-700 text-xs font-medium px-2.5 outline-none text-slate-700 dark:text-slate-300 cursor-pointer"
                 >
                   {Array.from({ length: 12 }).map((_, i) => {
                     const d = new Date(); d.setMonth(i);
@@ -118,7 +118,7 @@ export function MaintenanceDashboard() {
               <select 
                 value={selectedYear} 
                 onChange={(e) => setSelectedYear(Number(e.target.value))}
-                className="h-8 sm:h-[34px] rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[11px] sm:text-xs font-semibold px-2 sm:px-3 outline-none text-slate-700 dark:text-slate-300 cursor-pointer"
+                className="h-8 rounded-md bg-background border border-slate-200 dark:border-slate-700 text-xs font-medium px-2.5 outline-none text-slate-700 dark:text-slate-300 cursor-pointer"
               >
                 {Array.from({ length: 5 }).map((_, i) => {
                   const y = new Date().getFullYear() - i;
@@ -129,12 +129,12 @@ export function MaintenanceDashboard() {
           )}
         </div>
         
-        <div className="flex bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg border border-slate-200 dark:border-slate-700 shrink-0 ml-2">
+        <div className="flex bg-slate-100 dark:bg-slate-800 p-0.5 rounded-md border border-slate-200 dark:border-slate-700 shrink-0 ml-2">
           {(['month', 'year', 'all'] as const).map(r => (
             <button key={r} onClick={() => setPeriod(r)}
               className={cn(
-                'px-2.5 py-1 sm:px-4 sm:py-1.5 rounded-md text-[10px] sm:text-[11px] font-bold uppercase transition-all',
-                period === r ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300'
+                'px-2.5 py-1 sm:px-3 sm:py-1 rounded-sm text-[10px] sm:text-[11px] font-bold uppercase transition-all',
+                period === r ? 'bg-background text-blue-600 dark:text-blue-400 shadow-none font-bold' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300'
               )}>
               {r}
             </button>
@@ -143,21 +143,18 @@ export function MaintenanceDashboard() {
       </div>
 
       {/* Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {mainStats.map((stat, i) => (
-          <Card key={i} className={cn(
-            "rounded-xl border shadow-sm overflow-hidden transition-all hover:shadow-md",
-            isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
-          )}>
-            <CardContent className="p-5 sm:p-6">
+          <Card key={i} className="rounded-md border border-slate-200 dark:border-slate-800 shadow-none overflow-hidden bg-card">
+            <CardContent className="p-4 sm:p-5">
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{stat.label}</p>
-                  <h3 className={cn("text-2xl sm:text-3xl font-bold mt-1", stat.color)}>{stat.value}</h3>
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{stat.label}</p>
+                  <h3 className={cn("text-2xl font-bold font-mono tabular-nums mt-1", stat.color)}>{stat.value}</h3>
                   <p className="text-xs font-medium mt-1 text-slate-400">{stat.sub}</p>
                 </div>
-                <div className={cn("h-10 w-10 rounded-xl flex items-center justify-center bg-slate-50 dark:bg-slate-800/50", stat.color)}>
-                  <stat.icon className="h-5 w-5" />
+                <div className="h-9 w-9 rounded-md flex items-center justify-center bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 text-slate-500">
+                  <stat.icon className="h-4 w-4" />
                 </div>
               </div>
             </CardContent>
@@ -167,14 +164,14 @@ export function MaintenanceDashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Highest Costing Machines Chart */}
-        <Card className={cn("rounded-xl border shadow-sm", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
-          <CardHeader className="p-5 sm:p-6 pb-2 border-b border-border/50">
-            <CardTitle className="text-sm font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-2">
-              <Activity className="h-4 w-4 text-blue-500" />
+        <Card className="rounded-md border border-slate-200 dark:border-slate-800 shadow-none bg-card overflow-hidden">
+          <CardHeader className="p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30">
+            <CardTitle className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-2">
+              <Activity className="h-4 w-4 text-blue-600" />
               Highest Costing Machines
             </CardTitle>
           </CardHeader>
-          <CardContent className="p-5 sm:p-6">
+          <CardContent className="p-4 sm:p-5">
             <div className="h-[250px]">
               {topCostingMachines.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
@@ -184,10 +181,10 @@ export function MaintenanceDashboard() {
                     <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748b', fontWeight: 600 }} width={100} />
                     <Tooltip
                       cursor={{ fill: isDark ? '#1e293b' : '#f8fafc' }}
-                      contentStyle={{ borderRadius: '10px', border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`, backgroundColor: isDark ? '#0f172a' : '#fff', fontSize: '12px', fontWeight: 600 }}
+                      contentStyle={{ borderRadius: '6px', border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`, backgroundColor: isDark ? '#0f172a' : '#fff', fontSize: '12px', fontWeight: 600 }}
                       formatter={(value: number) => [`₦${value.toLocaleString()}`, 'Cost']}
                     />
-                    <Bar dataKey="cost" fill="#3b82f6" radius={[0, 4, 4, 0]} barSize={24} isAnimationActive={false} />
+                    <Bar dataKey="cost" fill="#2563eb" radius={[0, 4, 4, 0]} barSize={20} isAnimationActive={false} />
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
@@ -200,27 +197,27 @@ export function MaintenanceDashboard() {
         </Card>
 
         {/* Most Used Parts */}
-        <Card className={cn("rounded-xl border shadow-sm", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
-          <CardHeader className="p-5 sm:p-6 pb-2 border-b border-border/50">
-            <CardTitle className="text-sm font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-2">
+        <Card className="rounded-md border border-slate-200 dark:border-slate-800 shadow-none bg-card overflow-hidden">
+          <CardHeader className="p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30">
+            <CardTitle className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-2">
               <Package className="h-4 w-4 text-amber-500" />
               Most Used Parts
             </CardTitle>
           </CardHeader>
-          <CardContent className="p-5 sm:p-6">
+          <CardContent className="p-4 sm:p-5">
             <div className="h-auto min-h-[250px] flex flex-col sm:flex-row items-center gap-6 sm:gap-0 pt-2 sm:pt-0">
               {topPartsUsed.length > 0 ? (
                 <>
                   <div className="w-full sm:flex-1 h-[200px] sm:h-[250px]">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
-                        <Pie data={topPartsUsed} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="count" isAnimationActive={false}>
+                        <Pie data={topPartsUsed} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={4} dataKey="count" isAnimationActive={false}>
                           {topPartsUsed.map((entry, index) => (
                             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                           ))}
                         </Pie>
                         <Tooltip
-                          contentStyle={{ borderRadius: '10px', border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`, backgroundColor: isDark ? '#0f172a' : '#fff', fontSize: '12px', fontWeight: 600 }}
+                          contentStyle={{ borderRadius: '6px', border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`, backgroundColor: isDark ? '#0f172a' : '#fff', fontSize: '12px', fontWeight: 600 }}
                           formatter={(value: number) => [value, 'Quantity']}
                         />
                       </PieChart>
@@ -230,10 +227,10 @@ export function MaintenanceDashboard() {
                     {topPartsUsed.map((part, idx) => (
                       <div key={idx} className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: COLORS[idx % COLORS.length] }} />
-                          <span className="text-xs font-bold text-slate-600 dark:text-slate-300 truncate max-w-[100px]" title={part.name}>{part.name}</span>
+                          <div className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: COLORS[idx % COLORS.length] }} />
+                          <span className="text-xs font-medium text-slate-700 dark:text-slate-300 truncate max-w-[120px]" title={part.name}>{part.name}</span>
                         </div>
-                        <span className="text-xs font-black text-slate-800 dark:text-white">{part.count}</span>
+                        <span className="text-xs font-bold font-mono tabular-nums text-slate-900 dark:text-white">{part.count}</span>
                       </div>
                     ))}
                   </div>
@@ -250,19 +247,19 @@ export function MaintenanceDashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Activity Summary */}
-        <Card className={cn("rounded-xl border shadow-sm p-5 sm:p-6", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
-          <h3 className="text-sm font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-5">Period Activity</h3>
-          <div className="space-y-4">
+        <Card className="rounded-md border border-slate-200 dark:border-slate-800 shadow-none p-4 sm:p-5 bg-card">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-4">Period Activity</h3>
+          <div className="space-y-3">
             {[
               { label: 'Unscheduled Repairs', value: stats.unscheduled },
               { label: 'Machine Shutdowns', value: stats.shutdowns },
               { label: 'Total Sessions', value: filteredSessions.length },
             ].map((item, i) => (
               <div key={i} className="flex items-center justify-between group">
-                <span className="text-sm font-semibold text-slate-500 dark:text-slate-400 group-hover:text-foreground transition-colors">{item.label}</span>
+                <span className="text-xs font-medium text-slate-600 dark:text-slate-400 group-hover:text-foreground transition-colors">{item.label}</span>
                 <span className={cn(
-                  "px-4 py-1 rounded-full text-xs font-bold",
-                  isDark ? "bg-slate-800 text-slate-300" : "bg-slate-50 text-slate-600 border border-slate-100"
+                  "px-2.5 py-0.5 rounded-sm text-xs font-mono tabular-nums font-bold",
+                  isDark ? "bg-slate-800 text-slate-300" : "bg-slate-100 text-slate-700 border border-slate-200"
                 )}>{item.value}</span>
               </div>
             ))}
@@ -270,9 +267,9 @@ export function MaintenanceDashboard() {
         </Card>
 
         {/* Status Distribution */}
-        <Card className={cn("rounded-xl border shadow-sm p-5 sm:p-6", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
-          <h3 className="text-sm font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-5">Current Fleet Status</h3>
-          <div className="space-y-4">
+        <Card className="rounded-md border border-slate-200 dark:border-slate-800 shadow-none p-4 sm:p-5 bg-card">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-4">Current Fleet Status</h3>
+          <div className="space-y-3">
             {[
               { icon: CheckCircle2, label: 'OK (Active & Maintained)', color: 'text-emerald-500', value: stats.ok },
               { icon: Clock, label: 'Due Soon (Next 14 Days)', color: 'text-amber-500', value: stats.dueSoon },
@@ -281,11 +278,11 @@ export function MaintenanceDashboard() {
               <div key={i} className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <item.icon className={cn("h-4 w-4", item.color)} />
-                  <span className="text-sm font-semibold text-slate-500 dark:text-slate-400">{item.label}</span>
+                  <span className="text-xs font-medium text-slate-600 dark:text-slate-400">{item.label}</span>
                 </div>
                 <span className={cn(
-                  "px-3 py-1 rounded-full text-xs font-bold",
-                  isDark ? "bg-slate-800 text-slate-300" : "bg-slate-100 text-slate-600"
+                  "px-2.5 py-0.5 rounded-sm text-xs font-mono tabular-nums font-bold",
+                  isDark ? "bg-slate-800 text-slate-300" : "bg-slate-100 text-slate-700 border border-slate-200"
                 )}>{item.value}</span>
               </div>
             ))}

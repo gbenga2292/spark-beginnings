@@ -47,17 +47,17 @@ const STATUS_STYLES: Record<string, { bg: string, label: string, icon: any }> = 
     icon: CheckSquare,
   },
   not_started: {
-    bg: 'bg-indigo-500', // Blue
+    bg: 'bg-blue-600',
     label: 'To Start',
     icon: CheckSquare,
   },
   reminder: {
-    bg: 'bg-purple-600',
+    bg: 'bg-sky-600',
     label: 'Reminders',
     icon: Bell,
   },
   journal: {
-    bg: 'bg-gradient-to-r from-amber-400 to-orange-400',
+    bg: 'bg-amber-500',
     label: 'Daily Journal',
     icon: BookOpen,
   },
@@ -466,53 +466,69 @@ export default function CalendarPage({ onNavigate, showCompleted: externalShowCo
   return (
     <div className="h-full flex flex-col">
       {/* ─── Top Bar ─── */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between px-3 sm:px-5 py-2.5 border-b border-slate-200 dark:border-white/10 flex-shrink-0 gap-2 sm:gap-0 bg-slate-50/50 dark:bg-transparent">
-        <div className="flex items-center gap-2">
-          {viewMode === 'day' && (
-            <button onClick={() => setViewMode('month')} className="p-1.5 rounded-lg hover:bg-slate-200/60 dark:hover:bg-white/10 transition-colors text-slate-500 dark:text-white/60">
-              <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between px-3 sm:px-5 py-2 sm:py-2.5 border-b border-slate-200 dark:border-white/10 flex-shrink-0 gap-2 sm:gap-0 bg-slate-50/50 dark:bg-transparent">
+        {/* Month Navigation & Mobile Mode Toggle */}
+        <div className="flex items-center justify-between w-full sm:w-auto">
+          <div className="flex items-center gap-1 sm:gap-2 min-w-0">
+            {viewMode === 'day' && (
+              <button onClick={() => setViewMode('month')} className="p-1 sm:p-1.5 rounded-lg hover:bg-slate-200/60 dark:hover:bg-white/10 transition-colors text-slate-500 dark:text-white/60 shrink-0">
+                <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
+              </button>
+            )}
+            <button onClick={handlePrev} className="p-1 sm:p-1.5 rounded-lg hover:bg-slate-200/60 dark:hover:bg-white/10 transition-colors text-slate-500 dark:text-white/60 shrink-0">
+              <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
-          )}
-          <button onClick={handlePrev} className="p-1.5 rounded-lg hover:bg-slate-200/60 dark:hover:bg-white/10 transition-colors text-slate-500 dark:text-white/60">
-            <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" />
-          </button>
-          <button onClick={handleNext} className="p-1.5 rounded-lg hover:bg-slate-200/60 dark:hover:bg-white/10 transition-colors text-slate-500 dark:text-white/60">
-            <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
-          </button>
-          <h1 className="text-base sm:text-xl font-heading font-semibold text-slate-900 dark:text-white">
-            {format(viewMode === 'day' ? selectedDate : calMonth, viewMode === 'day' ? 'EEE, MMM d, yyyy' : 'MMMM yyyy')}
-          </h1>
+            <button onClick={handleNext} className="p-1 sm:p-1.5 rounded-lg hover:bg-slate-200/60 dark:hover:bg-white/10 transition-colors text-slate-500 dark:text-white/60 shrink-0">
+              <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
+            </button>
+            <h1 className="text-sm sm:text-xl font-heading font-semibold text-slate-900 dark:text-white truncate">
+              {format(viewMode === 'day' ? selectedDate : calMonth, viewMode === 'day' ? 'EEE, MMM d, yyyy' : 'MMMM yyyy')}
+            </h1>
+          </div>
+
+          {/* Month / Day Toggle on Mobile */}
+          <div className="flex sm:hidden items-center bg-slate-200/70 dark:bg-white/10 rounded-lg p-0.5 border border-slate-200 dark:border-transparent shrink-0">
+            <button onClick={() => setViewMode('month')}
+              className={`px-2 py-1 rounded-md text-xs font-medium transition-colors ${viewMode === 'month' ? 'bg-white dark:bg-white/20 text-slate-900 dark:text-white shadow-xs' : 'text-slate-600 dark:text-white/50 hover:text-slate-900 dark:hover:text-white'}`}>
+              Month
+            </button>
+            <button onClick={() => setViewMode('day')}
+              className={`px-2 py-1 rounded-md text-xs font-medium transition-colors ${viewMode === 'day' ? 'bg-white dark:bg-white/20 text-slate-900 dark:text-white shadow-xs' : 'text-slate-600 dark:text-white/50 hover:text-slate-900 dark:hover:text-white'}`}>
+              Day
+            </button>
+          </div>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
+        {/* Filter, Today Button & Desktop View Toggle */}
+        <div className="flex items-center gap-2 w-full sm:w-auto">
           {!hideHeaderToggle && (
             <button
               onClick={() => setShowCompleted(!showCompleted)}
-              className={`px-3 py-1.5 rounded-lg border text-xs sm:text-sm font-medium transition-all flex items-center gap-2 ${
+              className={`px-2.5 sm:px-3 py-1.5 rounded-lg border text-xs sm:text-sm font-medium transition-all flex items-center gap-1.5 shrink-0 ${
                 showCompleted 
                   ? 'bg-emerald-50 dark:bg-emerald-500/20 border-emerald-300 dark:border-emerald-500/50 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-500/30' 
                   : 'bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-500 dark:text-white/40 hover:bg-slate-200 dark:hover:bg-white/10'
               }`}
             >
               <CheckSquare className="w-3.5 h-3.5" />
-              {showCompleted ? 'Showing Done' : 'Hidden Done'}
+              <span className="hidden xs:inline">{showCompleted ? 'Showing Done' : 'Hidden Done'}</span>
             </button>
           )}
           <select
             value={filterMode}
             onChange={(e) => setFilterMode(e.target.value as FilterMode)}
-            className="bg-white dark:bg-white/10 text-slate-800 dark:text-white border border-slate-200 dark:border-white/20 text-xs sm:text-sm rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer shadow-xs"
+            className="flex-1 sm:flex-none min-w-0 bg-white dark:bg-white/10 text-slate-800 dark:text-white border border-slate-200 dark:border-white/20 text-xs sm:text-sm rounded-lg px-2 sm:px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer truncate"
           >
-            <option value="all" className="bg-white dark:bg-[#0f111a] text-slate-800 dark:text-white">All Tasks, Reminders & Daily Journal</option>
+            <option value="all" className="bg-white dark:bg-[#0f111a] text-slate-800 dark:text-white">All Tasks, Reminders & Journal</option>
             <option value="all_tasks" className="bg-white dark:bg-[#0f111a] text-slate-800 dark:text-white">All Tasks</option>
             <option value="all_reminders" className="bg-white dark:bg-[#0f111a] text-slate-800 dark:text-white">All Reminders</option>
             <option value="journal" className="bg-white dark:bg-[#0f111a] text-slate-800 dark:text-white">All Daily Journal</option>
           </select>
           <button onClick={goToToday}
-            className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-white/20 text-xs sm:text-sm font-medium text-slate-700 dark:text-white bg-white dark:bg-transparent hover:bg-slate-50 dark:hover:bg-white/10 transition-colors shadow-xs">
+            className="shrink-0 px-2.5 sm:px-3 py-1.5 rounded-lg border border-slate-200 dark:border-white/20 text-xs sm:text-sm font-medium text-slate-700 dark:text-white bg-white dark:bg-transparent hover:bg-slate-50 dark:hover:bg-white/10 transition-colors">
             Today
           </button>
-          <div className="flex items-center bg-slate-200/70 dark:bg-white/10 rounded-lg p-0.5 border border-slate-200 dark:border-transparent">
+          <div className="hidden sm:flex items-center bg-slate-200/70 dark:bg-white/10 rounded-lg p-0.5 border border-slate-200 dark:border-transparent shrink-0">
             <button onClick={() => setViewMode('month')}
               className={`px-2.5 sm:px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-colors ${viewMode === 'month' ? 'bg-white dark:bg-white/20 text-slate-900 dark:text-white shadow-xs' : 'text-slate-600 dark:text-white/50 hover:text-slate-900 dark:hover:text-white'}`}>
               Month
@@ -526,17 +542,17 @@ export default function CalendarPage({ onNavigate, showCompleted: externalShowCo
       </div>
 
       {/* ─── Legend ─── */}
-      <div className="flex items-center gap-3 sm:gap-4 px-3 sm:px-5 py-2 border-b border-slate-200 dark:border-white/10 flex-shrink-0 flex-wrap min-h-[37px] transition-all duration-300 bg-slate-50/30 dark:bg-transparent">
+      <div className="flex items-center gap-2 sm:gap-4 px-3 sm:px-5 py-1.5 sm:py-2 border-b border-slate-200 dark:border-white/10 flex-shrink-0 overflow-x-auto no-scrollbar flex-nowrap sm:flex-wrap min-h-[32px] sm:min-h-[37px] transition-all duration-300 bg-slate-50/30 dark:bg-transparent">
         {Object.entries(STATUS_STYLES)
           .filter(([key]) => visibleLegendKeys.has(key))
           .map(([key, style]) => (
             <div 
               key={key} 
               onClick={() => handleLegendClick(key)}
-              className={`flex items-center gap-1.5 animate-in fade-in slide-in-from-left-1 duration-200 rounded px-1.5 py-1 -ml-1.5 transition-colors ${viewMode === 'day' ? 'cursor-pointer hover:bg-slate-100 dark:hover:bg-white/10' : ''}`}
+              className={`flex items-center gap-1.5 animate-in fade-in slide-in-from-left-1 duration-200 rounded px-1.5 py-0.5 sm:py-1 transition-colors whitespace-nowrap shrink-0 ${viewMode === 'day' ? 'cursor-pointer hover:bg-slate-100 dark:hover:bg-white/10' : ''}`}
               title={viewMode === 'day' ? `Click to find the next ${style.label} event today` : ''}
             >
-              <span className={`w-2.5 h-2.5 rounded-full ${key === 'journal' ? 'bg-gradient-to-r from-amber-400 to-orange-400' : style.bg}`} />
+              <span className={`w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full ${key === 'journal' ? 'bg-amber-500' : style.bg}`} />
               <span className="text-[10px] sm:text-xs text-slate-600 dark:text-white/70 font-medium select-none">{style.label}</span>
             </div>
           ))}
@@ -547,8 +563,9 @@ export default function CalendarPage({ onNavigate, showCompleted: externalShowCo
         <div className="flex-1 flex flex-col min-h-0 bg-white dark:bg-transparent">
           <div className="grid grid-cols-7 border-b border-slate-200 dark:border-white/10 flex-shrink-0 bg-slate-50/50 dark:bg-transparent">
             {WEEKDAYS_FULL.map(d => (
-              <div key={d} className="text-center text-[10px] sm:text-xs font-semibold text-slate-500 dark:text-white/40 py-2 border-r border-slate-100 dark:border-white/5 last:border-r-0">
-                {d}
+              <div key={d} className="text-center text-[10px] sm:text-xs font-semibold text-slate-500 dark:text-white/40 py-1.5 sm:py-2 border-r border-slate-100 dark:border-white/5 last:border-r-0">
+                <span className="hidden sm:inline">{d}</span>
+                <span className="sm:hidden">{d[0]}</span>
               </div>
             ))}
           </div>
@@ -572,7 +589,7 @@ export default function CalendarPage({ onNavigate, showCompleted: externalShowCo
                 >
                   <div className="flex items-center justify-center mb-0.5 mt-1">
                     <span className={`text-[10px] sm:text-base font-medium sm:font-bold w-6 h-6 sm:w-8 sm:h-8 flex items-center justify-center rounded-full
-                      ${isTodayDay ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' : 'text-slate-700 dark:text-white/80'}
+                      ${isTodayDay ? 'bg-blue-600 text-white' : 'text-slate-700 dark:text-white/80'}
                     `}>
                       {day.getDate()}
                     </span>
@@ -645,12 +662,12 @@ export default function CalendarPage({ onNavigate, showCompleted: externalShowCo
                       <button key={day.toISOString()} onClick={() => setSelectedDate(day)}
                         className={`relative w-full aspect-square flex items-center justify-center text-[10px] font-medium rounded-full transition-all
                           ${!isCurrentMonth ? 'text-slate-300 dark:text-white/15' : 'text-slate-700 dark:text-white/70'}
-                          ${isTodayDay && !isSelected ? 'text-indigo-600 dark:text-indigo-400 font-bold' : ''}
-                          ${isSelected ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' : 'hover:bg-slate-200/60 dark:hover:bg-white/10'}
+                          ${isTodayDay && !isSelected ? 'text-blue-600 dark:text-blue-400 font-bold' : ''}
+                          ${isSelected ? 'bg-blue-600 text-white' : 'hover:bg-slate-200/60 dark:hover:bg-white/10'}
                         `}>
                         {day.getDate()}
                         {hasEvents && !isSelected && (
-                          <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-indigo-500" />
+                          <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-blue-600" />
                         )}
                       </button>
                     );
@@ -733,15 +750,15 @@ export default function CalendarPage({ onNavigate, showCompleted: externalShowCo
         <DialogContent className="sm:max-w-[400px] bg-white dark:bg-[#0f111a] border-slate-200 dark:border-[#2a2e3d] rounded-2xl shadow-2xl text-slate-900 dark:text-white p-0 overflow-hidden">
           <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-white/5 bg-white dark:bg-[#0f111a]">
             <DialogTitle className="text-slate-900 dark:text-white font-bold text-lg">{previewEvent?.title || "Event Details"}</DialogTitle>
-            <DialogClose className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 flex items-center justify-center text-slate-500 dark:text-white/50 hover:text-slate-900 dark:hover:text-white transition-colors" />
+            <DialogClose className="w-8 h-8 rounded-md bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 flex items-center justify-center text-slate-500 dark:text-white/50 hover:text-slate-900 dark:hover:text-white transition-colors" />
           </div>
           <div className="p-5 flex flex-col gap-4 overflow-y-auto min-h-0 custom-scrollbar max-h-[60vh]">
             <div className="text-sm text-slate-500 dark:text-white/50 font-medium flex items-center gap-2 shrink-0">
-              <Clock className="w-4 h-4 text-indigo-500 dark:text-indigo-400" />
+              <Clock className="w-4 h-4 text-blue-600 dark:text-blue-400" />
               {previewEvent && format(previewEvent.time, "EEEE, MMMM d, yyyy 'at' h:mm a")}
             </div>
             
-            <div className="bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl p-4 shrink-0">
+            <div className="bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-md p-4 shrink-0">
               <p className="text-sm text-slate-800 dark:text-white/90 whitespace-pre-wrap leading-relaxed">
                 {previewEvent?.body || (previewEvent?.type === 'task' ? 'This is a scheduled task that requires your attention.' : 'No description provided.')}
               </p>
@@ -769,7 +786,7 @@ export default function CalendarPage({ onNavigate, showCompleted: externalShowCo
               }
               setPreviewEvent(null);
               onNavigate?.();
-            }} className="bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm border-0 font-medium">
+            }} className="bg-blue-600 hover:bg-blue-700 text-white rounded-sm border-0 font-medium">
               Go to {previewEvent?.type === 'reminder' ? 'Reminder' : previewEvent?.type === 'journal' ? 'Journal' : 'Task'}
             </Button>
           </div>
@@ -781,7 +798,7 @@ export default function CalendarPage({ onNavigate, showCompleted: externalShowCo
         <DialogContent className="sm:max-w-[400px] bg-white dark:bg-[#0f111a] border-slate-200 dark:border-[#2a2e3d] rounded-2xl shadow-2xl text-slate-900 dark:text-white p-0 overflow-hidden">
           <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-white/5 bg-white dark:bg-[#0f111a]">
             <DialogTitle className="text-slate-900 dark:text-white font-bold text-lg">Add New</DialogTitle>
-            <DialogClose className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 flex items-center justify-center text-slate-500 dark:text-white/50 hover:text-slate-900 dark:hover:text-white transition-colors" />
+            <DialogClose className="w-8 h-8 rounded-md bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 flex items-center justify-center text-slate-500 dark:text-white/50 hover:text-slate-900 dark:hover:text-white transition-colors" />
           </div>
           <div className="p-5 flex flex-col gap-3">
             <p className="text-sm text-slate-600 dark:text-white/60 mb-3">
@@ -792,10 +809,10 @@ export default function CalendarPage({ onNavigate, showCompleted: externalShowCo
                 setAddEventDialogOpen(false);
                 setShowCreateTask(true);
               }}
-              className="flex items-center gap-3 w-full p-3 rounded-xl bg-slate-50 hover:bg-slate-100 dark:bg-[#1a1d27] dark:hover:bg-[#232736] transition-colors border border-slate-200 dark:border-white/5 text-left group"
+              className="flex items-center gap-3 w-full p-3 rounded-md bg-slate-50 hover:bg-slate-100 dark:bg-[#1a1d27] dark:hover:bg-[#232736] transition-colors border border-slate-200 dark:border-white/5 text-left group"
             >
-              <div className="w-10 h-10 rounded-lg bg-indigo-50 dark:bg-[#2a2e3d] group-hover:bg-indigo-100 dark:group-hover:bg-[#34394c] flex items-center justify-center shrink-0 transition-colors">
-                <CheckSquare className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+              <div className="w-10 h-10 rounded-lg bg-blue-50 dark:bg-blue-950/40 group-hover:bg-blue-100 dark:group-hover:bg-blue-900/40 flex items-center justify-center shrink-0 transition-colors">
+                <CheckSquare className="w-5 h-5 text-blue-600 dark:text-blue-400" />
               </div>
               <div>
                 <p className="text-sm font-semibold text-slate-900 dark:text-white">Task</p>
@@ -807,10 +824,10 @@ export default function CalendarPage({ onNavigate, showCompleted: externalShowCo
                 setAddEventDialogOpen(false);
                 setShowCreateReminder(true);
               }}
-              className="flex items-center gap-3 w-full p-3 rounded-xl bg-slate-50 hover:bg-slate-100 dark:bg-[#1a1d27] dark:hover:bg-[#232736] transition-colors border border-slate-200 dark:border-white/5 text-left group"
+              className="flex items-center gap-3 w-full p-3 rounded-md bg-slate-50 hover:bg-slate-100 dark:bg-[#1a1d27] dark:hover:bg-[#232736] transition-colors border border-slate-200 dark:border-white/5 text-left group"
             >
-              <div className="w-10 h-10 rounded-lg bg-purple-50 dark:bg-[#2a2e3d] group-hover:bg-purple-100 dark:group-hover:bg-[#34394c] flex items-center justify-center shrink-0 transition-colors">
-                <Bell className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+              <div className="w-10 h-10 rounded-lg bg-sky-50 dark:bg-sky-950/40 group-hover:bg-sky-100 dark:group-hover:bg-sky-900/40 flex items-center justify-center shrink-0 transition-colors">
+                <Bell className="w-5 h-5 text-sky-600 dark:text-sky-400" />
               </div>
               <div>
                 <p className="text-sm font-semibold text-slate-900 dark:text-white">Reminder</p>
@@ -822,7 +839,7 @@ export default function CalendarPage({ onNavigate, showCompleted: externalShowCo
                 setAddEventDialogOpen(false);
                 setShowCreateDailyJournal(true);
               }}
-              className="flex items-center gap-3 w-full p-3 rounded-xl bg-slate-50 hover:bg-slate-100 dark:bg-[#1a1d27] dark:hover:bg-[#232736] transition-colors border border-slate-200 dark:border-white/5 text-left group"
+              className="flex items-center gap-3 w-full p-3 rounded-md bg-slate-50 hover:bg-slate-100 dark:bg-[#1a1d27] dark:hover:bg-[#232736] transition-colors border border-slate-200 dark:border-white/5 text-left group"
             >
               <div className="w-10 h-10 rounded-lg bg-amber-50 dark:bg-[#2a2e3d] group-hover:bg-amber-100 dark:group-hover:bg-[#34394c] flex items-center justify-center shrink-0 transition-colors">
                 <BookOpen className="w-5 h-5 text-amber-600 dark:text-amber-400" />

@@ -125,7 +125,7 @@ export function MaintenanceManager() {
     const sectionTitle = (t: string) =>
       `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
         <p style="font-size:11pt;font-weight:900;text-transform:uppercase;letter-spacing:0.2em;color:#0a1628;white-space:nowrap;flex-shrink:0">${t}</p>
-        <div style="flex:1;height:1px;background:linear-gradient(to right,rgba(10,22,40,0.3),transparent)"></div>
+        <div style="flex:1;height:1px;background:#cbd5e1"></div>
       </div>`;
 
     const th = (label: string, extra = '') =>
@@ -197,7 +197,7 @@ export function MaintenanceManager() {
         </div>
       </div>
       <div style="text-align:center;margin-top:2px">
-        <div style="height:2px;background:linear-gradient(to right,transparent,rgba(201,168,76,0.6),transparent);margin-bottom:8px"></div>
+        <div style="height:2px;background:#cbd5e1;margin-bottom:8px"></div>
         <h2 style="font-size:16pt;font-weight:900;color:#0a1628;text-transform:uppercase;letter-spacing:0.15em">Equipment Certification</h2>
         <p style="font-size:10pt;color:#6b7280;margin-top:2px;font-style:italic;font-family:Georgia,serif">An official document for maintaining compliance with equipment operational and safety regulations</p>
       </div>
@@ -374,7 +374,7 @@ export function MaintenanceManager() {
               <span>{tab.label}</span>
               {tab.count !== undefined && (
                 <span className={cn(
-                  "px-1.5 py-0.5 rounded-lg text-[10px]",
+                  "px-1.5 py-0.5 rounded-sm text-[10px] font-mono tabular-nums font-bold",
                   activeTab === tab.id ? "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400" : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
                 )}>
                   {tab.count}
@@ -423,12 +423,12 @@ export function MaintenanceManager() {
             {/* Header */}
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-lg font-bold text-slate-800 dark:text-white">Issued Certificates</h2>
-                <p className="text-xs text-slate-400 mt-0.5">{maintenanceCertificates.length} certificate{maintenanceCertificates.length !== 1 ? 's' : ''} on record</p>
+                <h2 className="text-base font-bold text-slate-900 dark:text-white">Issued Certificates</h2>
+                <p className="text-xs text-slate-500 mt-0.5"><span className="font-mono tabular-nums">{maintenanceCertificates.length}</span> certificate{maintenanceCertificates.length !== 1 ? 's' : ''} on record</p>
               </div>
               <Button
                 size="sm"
-                className="gap-2 h-9 bg-blue-600 hover:bg-blue-700 text-white shadow-sm font-bold"
+                className="gap-2 h-9 bg-blue-600 hover:bg-blue-700 text-white shadow-none font-medium rounded-md"
                 onClick={() => { setAssetSearch(''); setShowAssetPicker(true); }}
               >
                 <Plus className="h-4 w-4" /> Generate Certificate
@@ -437,64 +437,62 @@ export function MaintenanceManager() {
 
             {maintenanceCertificates.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-24 text-center">
-                <div className="h-16 w-16 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-4">
-                  <Award className="h-8 w-8 text-slate-300 dark:text-slate-600" />
+                <div className="h-14 w-14 rounded-md bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 flex items-center justify-center mb-4">
+                  <Award className="h-7 w-7 text-slate-400 dark:text-slate-500" />
                 </div>
-                <p className="text-sm font-bold text-slate-500 dark:text-slate-400">No certificates issued yet</p>
+                <p className="text-sm font-bold text-slate-700 dark:text-slate-300">No certificates issued yet</p>
                 <p className="text-xs text-slate-400 mt-1 max-w-xs">
-                  Click <span className="font-bold text-amber-600">Generate Certificate</span> above to issue your first one.
+                  Click <span className="font-semibold text-blue-600">Generate Certificate</span> above to issue your first one.
                 </p>
                 <Button
                   size="sm"
-                  className="mt-4 gap-2 h-9 bg-blue-600 hover:bg-blue-700 text-white shadow-sm font-bold"
+                  className="mt-4 gap-2 h-9 bg-blue-600 hover:bg-blue-700 text-white shadow-none font-medium rounded-md"
                   onClick={() => { setAssetSearch(''); setShowAssetPicker(true); }}
                 >
                   <Plus className="h-4 w-4" /> Generate Certificate
                 </Button>
               </div>
             ) : (
-              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+              <div className="bg-card rounded-md border border-slate-200 dark:border-slate-800 overflow-hidden shadow-none">
                 <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse text-sm">
                     <thead>
                       <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800">
-                        <th className="px-5 py-3.5 text-[10px] font-black uppercase tracking-wider text-slate-400">Certificate No.</th>
-                        <th className="px-5 py-3.5 text-[10px] font-black uppercase tracking-wider text-slate-400">Asset</th>
-                        <th className="px-5 py-3.5 text-[10px] font-black uppercase tracking-wider text-slate-400">Issued By</th>
-                        <th className="px-5 py-3.5 text-[10px] font-black uppercase tracking-wider text-slate-400">Issue Date</th>
-                        <th className="px-5 py-3.5 text-[10px] font-black uppercase tracking-wider text-slate-400">Expiry Date</th>
-                        <th className="px-5 py-3.5 text-[10px] font-black uppercase tracking-wider text-slate-400">Status</th>
-                        <th className="px-5 py-3.5 text-[10px] font-black uppercase tracking-wider text-slate-400"></th>
+                        <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-slate-500">Certificate No.</th>
+                        <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-slate-500">Asset</th>
+                        <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-slate-500">Issued By</th>
+                        <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-slate-500">Issue Date</th>
+                        <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-slate-500">Expiry Date</th>
+                        <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-slate-500">Status</th>
+                        <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-slate-500"></th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                       {maintenanceCertificates.map(cert => {
                         const isExpired = new Date(cert.expiryDate) < new Date();
                         const relatedAsset = maintenanceAssets.find(a => a.id === cert.machineId);
-                        const relatedSessions = maintenanceSessions.filter(
-                          s => s.assets.some(a => a.assetId === cert.machineId)
-                        );
                         return (
-                          <tr key={cert.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors group">
-                            <td className="px-5 py-3.5 font-mono text-xs font-bold text-blue-600 dark:text-blue-400">{cert.certNumber}</td>
-                            <td className="px-5 py-3.5">
-                              <p className="font-semibold text-slate-800 dark:text-slate-200 text-sm">{cert.machineName}</p>
+                          <tr key={cert.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors group">
+                            <td className="px-4 py-3 font-mono tabular-nums text-xs font-bold text-blue-600 dark:text-blue-400">{cert.certNumber}</td>
+                            <td className="px-4 py-3">
+                              <p className="font-semibold text-slate-900 dark:text-slate-100 text-sm">{cert.machineName}</p>
                               <p className="text-[10px] text-slate-400 capitalize">{cert.machineCategory} · {cert.machineSite}</p>
                             </td>
-                            <td className="px-5 py-3.5">
+                            <td className="px-4 py-3">
                               <p className="font-medium text-slate-700 dark:text-slate-300 text-xs">{cert.issuedByName}</p>
                               {cert.issuedByDesignation && <p className="text-[10px] text-slate-400">{cert.issuedByDesignation}</p>}
                             </td>
-                            <td className="px-5 py-3.5 text-xs text-slate-500">{formatDisplayDate(cert.issuedDate)}</td>
-                            <td className="px-5 py-3.5 text-xs">
+                            <td className="px-4 py-3 text-xs font-mono tabular-nums text-slate-500">{formatDisplayDate(cert.issuedDate)}</td>
+                            <td className="px-4 py-3 text-xs font-mono tabular-nums">
                               <span className={isExpired ? 'text-rose-500 font-bold' : 'text-slate-500'}>
                                 {formatDisplayDate(cert.expiryDate)}
                               </span>
                             </td>
-                            <td className="px-5 py-3.5">
+                            <td className="px-4 py-3">
                               <Badge
+                                variant="outline"
                                 className={cn(
-                                  'text-[10px] px-2 py-0.5 font-bold border rounded-full',
+                                  'text-[10px] px-1.5 py-0.5 font-bold uppercase tracking-wider rounded-sm',
                                   isExpired
                                     ? 'bg-rose-50 text-rose-600 border-rose-200 dark:bg-rose-900/20 dark:text-rose-400'
                                     : 'bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400'
@@ -503,12 +501,12 @@ export function MaintenanceManager() {
                                 {isExpired ? 'Expired' : 'Valid'}
                               </Badge>
                             </td>
-                            <td className="px-5 py-3.5">
+                            <td className="px-4 py-3">
                               <div className="flex items-center justify-end gap-2">
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  className="h-8 gap-1.5 text-xs font-semibold opacity-0 group-hover:opacity-100 transition-opacity"
+                                  className="h-7 rounded-md gap-1.5 text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity"
                                   onClick={() => {
                                     if (relatedAsset) {
                                       setRegenCert(cert);
@@ -522,7 +520,7 @@ export function MaintenanceManager() {
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  className="h-8 gap-1.5 text-xs font-semibold opacity-0 group-hover:opacity-100 transition-opacity"
+                                  className="h-7 rounded-md gap-1.5 text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity"
                                   onClick={() => handleDirectPrint(cert)}
                                 >
                                   <Printer className="h-3 w-3" /> Print
@@ -544,15 +542,15 @@ export function MaintenanceManager() {
       {/* Asset Picker Modal */}
       {showAssetPicker && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => setShowAssetPicker(false)}>
-          <div className="bg-white dark:bg-[#0d1117] rounded-2xl border border-slate-200 dark:border-white/10 shadow-2xl w-full max-w-md mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
+          <div className="bg-card rounded-md border border-slate-200 dark:border-slate-800 shadow-2xl w-full max-w-md mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
             {/* Header */}
-            <div className="px-5 py-4 border-b border-slate-100 dark:border-white/5 flex items-center justify-between">
+            <div className="px-4 py-3.5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/50">
               <div>
-                <p className="font-black text-slate-900 dark:text-white text-sm">Select Asset</p>
-                <p className="text-[11px] text-slate-400 mt-0.5">Choose a machine or vehicle to certify</p>
+                <p className="font-bold text-slate-900 dark:text-white text-sm">Select Asset</p>
+                <p className="text-[11px] text-slate-500 mt-0.5">Choose a machine or vehicle to certify</p>
               </div>
-              <button onClick={() => setShowAssetPicker(false)} className="h-7 w-7 rounded-lg bg-slate-100 dark:bg-white/5 hover:bg-slate-200 flex items-center justify-center">
-                <span className="text-slate-500 text-lg leading-none">&times;</span>
+              <button onClick={() => setShowAssetPicker(false)} className="h-7 w-7 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center">
+                <span className="text-slate-500 text-base leading-none">&times;</span>
               </button>
             </div>
             {/* Search */}
@@ -564,7 +562,7 @@ export function MaintenanceManager() {
                   value={assetSearch}
                   onChange={e => setAssetSearch(e.target.value)}
                   placeholder="Search machines & vehicles..."
-                  className="w-full pl-9 pr-4 py-2 rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 outline-none focus:border-blue-500/60"
+                  className="w-full pl-9 pr-4 py-1.5 rounded-md border border-slate-200 dark:border-slate-700 bg-background text-xs text-slate-900 dark:text-white placeholder:text-slate-400 outline-none focus:border-blue-500"
                 />
               </div>
             </div>
@@ -576,20 +574,20 @@ export function MaintenanceManager() {
                   <button
                     key={asset.id}
                     onClick={() => { setGenerateCertAsset(asset.id); setShowAssetPicker(false); }}
-                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-blue-50 dark:hover:bg-blue-900/10 text-left transition-colors group"
+                    className="w-full flex items-center gap-3 px-3 py-2 rounded-sm hover:bg-blue-50 dark:hover:bg-blue-900/10 text-left transition-colors group"
                   >
-                    <div className="h-9 w-9 rounded-lg bg-slate-100 dark:bg-white/5 flex items-center justify-center shrink-0 group-hover:bg-blue-100 dark:group-hover:bg-blue-900/20 transition-colors">
+                    <div className="h-8 w-8 rounded-md bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0 group-hover:bg-blue-100 dark:group-hover:bg-blue-900/20 transition-colors">
                       {asset.category === 'vehicle' ? <Truck className="h-4 w-4 text-slate-500 group-hover:text-blue-600" /> : <Activity className="h-4 w-4 text-slate-500 group-hover:text-blue-600" />}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-slate-800 dark:text-white truncate group-hover:text-blue-700 dark:group-hover:text-blue-400" title={asset.name}>{asset.name}</p>
+                      <p className="text-xs font-semibold text-slate-800 dark:text-white truncate group-hover:text-blue-600 dark:group-hover:text-blue-400" title={asset.name}>{asset.name}</p>
                       <p className="text-[11px] text-slate-400 capitalize">{asset.category} · {asset.site}</p>
                     </div>
-                    <Award className="h-4 w-4 text-slate-300 group-hover:text-blue-500 shrink-0" />
+                    <Award className="h-4 w-4 text-slate-300 group-hover:text-blue-600 shrink-0" />
                   </button>
                 ))}
               {maintenanceAssets.filter(a => a.name.toLowerCase().includes(assetSearch.toLowerCase())).length === 0 && (
-                <p className="text-center text-sm text-slate-400 py-8">No assets found</p>
+                <p className="text-center text-xs text-slate-400 py-8">No assets found</p>
               )}
             </div>
           </div>

@@ -6,7 +6,7 @@ import {
 import {
   Clock, CheckCircle2, AlertTriangle, Building2, MapPin, ExternalLink,
   Minimize2, Maximize2, PauseCircle, PlayCircle, Filter, Calendar, ArrowUpDown,
-  ArrowUp, ArrowDown
+  ArrowUp, ArrowDown, LayoutGrid, Search, X, RotateCw, RotateCcw, Smartphone
 } from 'lucide-react';
 import { useAppStore, Site } from '@/src/store/appStore';
 import { useOperations } from '@/src/contexts/OperationsContext';
@@ -58,6 +58,12 @@ export function ClientSitesTimeline({ selectedClient, onOpenSite360 }: Props) {
   const [datePreset, setDatePreset] = useState<DatePreset>('all');
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
   const [userZoomSelected, setUserZoomSelected] = useState(false);
+  const [viewType, setViewType] = useState<'cards' | 'gantt'>(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      return 'cards';
+    }
+    return 'gantt';
+  });
 
   // Drag-to-Scroll (Hand Pan) State & Handlers
   const timelineScrollRef = useRef<HTMLDivElement>(null);
@@ -116,11 +122,37 @@ export function ClientSitesTimeline({ selectedClient, onOpenSite360 }: Props) {
     window.addEventListener('mouseup', onMouseUp);
   };
 
+  // Fullscreen / 90-degree landscape toggle
+  const toggleFullscreen = async () => {
+    if (isFullscreen) {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen().catch(() => {});
+      }
+      if ('orientation' in screen && 'unlock' in (screen.orientation as any)) {
+        try {
+          (screen.orientation as any).unlock();
+        } catch {}
+      }
+      setIsFullscreen(false);
+    } else {
+      setIsFullscreen(true);
+      const el = document.documentElement;
+      if (el.requestFullscreen) {
+        await el.requestFullscreen().catch(() => {});
+        if ('orientation' in screen && 'lock' in (screen.orientation as any)) {
+          try {
+            await (screen.orientation as any).lock('landscape');
+          } catch {}
+        }
+      }
+    }
+  };
+
   // Escape key handler for fullscreen
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isFullscreen) {
-        setIsFullscreen(false);
+        toggleFullscreen();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -129,13 +161,17 @@ export function ClientSitesTimeline({ selectedClient, onOpenSite360 }: Props) {
 
   const isAll = selectedClient === 'ALL' || selectedClient === 'All Clients' || !selectedClient;
 
-  // 1. Filter target sites
-  const targetSites = useMemo(() => {
+  // Base client sites
+  const clientSites = useMemo(() => {
     return sites.filter(s => {
       if (!s.client || s.client.toUpperCase() === 'DCEL') return false;
-      const matchesClient = isAll || s.client.trim().toLowerCase() === selectedClient.trim().toLowerCase();
-      if (!matchesClient) return false;
+      return isAll || s.client.trim().toLowerCase() === selectedClient.trim().toLowerCase();
+    });
+  }, [sites, selectedClient, isAll]);
 
+  // 1. Filter target sites
+  const targetSites = useMemo(() => {
+    return clientSites.filter(s => {
       if (siteFilter === 'active' && s.status !== 'Active') return false;
       if (siteFilter === 'ended' && s.status !== 'Ended') return false;
 
@@ -147,7 +183,7 @@ export function ClientSitesTimeline({ selectedClient, onOpenSite360 }: Props) {
       }
       return true;
     });
-  }, [sites, selectedClient, isAll, siteFilter, searchQuery]);
+  }, [clientSites, siteFilter, searchQuery]);
 
   // 2. Synthesize ONE clean continuous project bar per site (StartDate -> EndDate)
   const siteBars = useMemo(() => {
@@ -392,172 +428,413 @@ export function ClientSitesTimeline({ selectedClient, onOpenSite360 }: Props) {
     };
   };
 
-  // Summary Metrics
+  // Summary Metrics (based on client's portfolio)
   const summary = useMemo(() => {
-    const activeCount = targetSites.filter(s => s.status === 'Active').length;
-    const endedCount = targetSites.filter(s => s.status === 'Ended').length;
+    const totalSites = clientSites.length;
+    const activeCount = clientSites.filter(s => s.status === 'Active').length;
+    const endedCount = clientSites.filter(s => s.status === 'Ended').length;
     let totalPumping = 0;
     let totalDiesel = 0;
 
-    targetSites.forEach(s => {
+    clientSites.forEach(s => {
       const logs = dailyMachineLogs.filter(l => l.siteId === s.id);
       totalPumping += logs.filter(l => l.isActive && l.operationalDay !== 'none').length;
       totalDiesel += logs.reduce((sum, l) => sum + (l.dieselUsage || 0), 0);
     });
 
     return {
-      totalSites: targetSites.length,
+      totalSites,
       activeCount,
       endedCount,
       totalPumping,
       totalDiesel,
     };
-  }, [targetSites, dailyMachineLogs]);
+  }, [clientSites, dailyMachineLogs]);
 
   return (
     <div className={cn(
-      "space-y-5 transition-all duration-200",
-      isFullscreen && "fixed inset-0 z-50 p-4 md:p-6 bg-slate-100/95 dark:bg-slate-950/98 backdrop-blur-xl overflow-y-auto"
+      "space-y-4 transition-all duration-200",
+      isFullscreen && (
+        "fixed z-[100] m-0 bg-slate-100 dark:bg-slate-950 border-none " +
+        "md:inset-0 md:w-screen md:h-screen md:flex md:flex-col md:p-5 md:overflow-hidden md:rotate-0 " +
+        "landscape:inset-0 landscape:w-screen landscape:h-screen landscape:flex landscape:flex-col landscape:p-3 landscape:overflow-hidden landscape:rotate-0 " +
+        "portrait:top-1/2 portrait:left-1/2 portrait:w-[100vh] portrait:h-[100vw] portrait:-translate-x-1/2 portrait:-translate-y-1/2 portrait:rotate-90 portrait:flex portrait:flex-col portrait:p-3 portrait:overflow-hidden"
+      )
     )}>
-      {/* ── Single Compact Header & Control Bar (One Succinct Row) ── */}
-      <div className="flex flex-wrap items-center justify-between gap-2.5 p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm text-xs">
-        
-        {/* Left Side: Client Identity & Compact KPI Badges */}
-        <div className="flex flex-wrap items-center gap-2 min-w-0">
-          {/* Client Title */}
-          <div className="flex items-center gap-1.5 font-bold text-slate-900 dark:text-white shrink-0 pr-1">
-            <Building2 className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-            <span className="truncate max-w-[180px]">{isAll ? 'All Clients' : selectedClient}</span>
-            <span className="text-[11px] font-semibold text-slate-400">({summary.totalSites})</span>
-          </div>
+      {/* Floating Exit Button for Fullscreen / 90° Rotated View */}
+      {isFullscreen && (
+        <Button
+          type="button"
+          variant="default"
+          size="sm"
+          className="fixed top-3 right-3 z-[120] rounded-full shadow-2xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs gap-1.5 px-3 h-8 cursor-pointer"
+          onClick={toggleFullscreen}
+          title="Exit Landscape Mode"
+        >
+          <RotateCcw className="w-3.5 h-3.5" />
+          <span className="portrait:inline landscape:inline md:hidden">Exit 90°</span>
+          <span className="hidden md:inline">Exit Full Page</span>
+        </Button>
+      )}
 
-          {/* Compact Metric Badges (Pills) */}
-          <div className="hidden sm:flex items-center gap-1.5 pl-2 border-l border-slate-200 dark:border-slate-700">
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 font-semibold text-[11px] border border-emerald-200 dark:border-emerald-800">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-              {summary.activeCount} Active
-            </span>
-
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 font-semibold text-[11px] border border-slate-200 dark:border-slate-700">
-              {summary.endedCount} Ended
-            </span>
-
-            <span className="hidden md:inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300 font-semibold text-[11px] border border-sky-200 dark:border-sky-800">
-              {summary.totalPumping}d Pumping
-            </span>
-
-            <span className="hidden lg:inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 font-semibold text-[11px] border border-indigo-200 dark:border-indigo-800">
-              {summary.totalDiesel.toLocaleString()}L Fuel
-            </span>
-          </div>
-        </div>
-
-        {/* Right Side: Search, Filter, Sort, Range, Scale, Fullscreen */}
-        <div className="flex flex-wrap items-center gap-2 shrink-0">
-          {/* Quick Search */}
-          <Input
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            placeholder="Search site..."
-            className="h-7 rounded-lg text-xs bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 w-[120px] sm:w-[140px] px-2"
-          />
-
-          {/* Status Filter */}
-          <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs shrink-0">
-            {(['all', 'active', 'ended'] as const).map(f => (
+      {/* ── Control Bar: Structured 2-Tier Layout for Clean Hierarchy ── */}
+      <div className={cn(
+        "rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs p-3 space-y-3",
+        isFullscreen && "p-2.5 space-y-2 rounded-xl"
+      )}>
+        {/* Tier 1: Primary View Switcher & Contextual Tools */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          {/* Left: Cards vs Gantt Switcher + Status Chips */}
+          <div className="flex items-center gap-2.5 flex-wrap">
+            {/* View Switcher Toggle */}
+            <div className="inline-flex items-center bg-slate-100 dark:bg-slate-800/80 p-0.5 rounded-xl border border-slate-200/80 dark:border-slate-700/80 text-xs">
               <button
-                key={f}
-                onClick={() => setSiteFilter(f)}
+                type="button"
+                onClick={() => setViewType('cards')}
                 className={cn(
-                  "px-2 py-0.5 rounded-md font-semibold text-[11px] capitalize transition-colors",
-                  siteFilter === f
+                  "flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold text-xs transition-all cursor-pointer",
+                  viewType === 'cards'
                     ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs"
-                    : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
                 )}
               >
-                {f}
+                <LayoutGrid className="w-3.5 h-3.5 text-sky-500" />
+                <span>Cards</span>
               </button>
-            ))}
-          </div>
-
-          {/* Sort By Start Date Toggle */}
-          <button
-            onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
-            className={cn(
-              "flex items-center gap-1 h-7 px-2 rounded-lg border text-[11px] font-semibold transition-colors cursor-pointer shrink-0",
-              isDark ? "bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700" : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100"
-            )}
-            title={`Sort by Start Date: currently ${sortOrder === 'asc' ? 'Earliest First (Chronological)' : 'Newest First'}`}
-          >
-            <ArrowUpDown className="w-3 h-3 text-indigo-500 shrink-0" />
-            <span className="hidden sm:inline">Start Date:</span>
-            <span>{sortOrder === 'asc' ? 'Earliest' : 'Newest'}</span>
-          </button>
-
-          {/* Period Range Presets */}
-          <select
-            value={datePreset}
-            onChange={e => setDatePreset(e.target.value as DatePreset)}
-            className="h-7 text-[11px] font-semibold px-2 py-0.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 cursor-pointer focus:outline-none"
-          >
-            <option value="all">All-Time</option>
-            <option value="30days">Last 30d</option>
-            <option value="90days">Last 90d</option>
-            <option value="6months">Last 6m</option>
-            <option value="thisYear">This Year</option>
-          </select>
-
-          {/* Scale Control */}
-          <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs shrink-0">
-            {(['months', 'weeks', 'days'] as const).map(scale => (
               <button
-                key={scale}
-                onClick={() => {
-                  setZoomScale(scale);
-                  setUserZoomSelected(true);
-                }}
+                type="button"
+                onClick={() => setViewType('gantt')}
                 className={cn(
-                  "px-2 py-0.5 rounded-md font-semibold text-[11px] capitalize transition-colors",
-                  zoomScale === scale
-                    ? "bg-indigo-600 text-white shadow-xs"
-                    : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
+                  "flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold text-xs transition-all cursor-pointer",
+                  viewType === 'gantt'
+                    ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs"
+                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
                 )}
               >
-                {scale === 'days' ? 'Days' : scale === 'weeks' ? 'Weeks' : 'Months'}
+                <Calendar className="w-3.5 h-3.5 text-blue-500" />
+                <span>Gantt</span>
               </button>
-            ))}
+            </div>
+
+            {/* KPI Badges */}
+            <div className="flex items-center gap-1.5 flex-wrap text-xs">
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold border border-slate-200 dark:border-slate-700">
+                <Building2 className="w-3.5 h-3.5 text-sky-500" />
+                <span>{summary.totalSites} Site{summary.totalSites === 1 ? '' : 's'}</span>
+              </span>
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 font-semibold text-xs border border-emerald-500/20">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span>{summary.activeCount} Active</span>
+              </span>
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-500/10 text-slate-600 dark:text-slate-400 font-medium text-xs border border-slate-300/40 dark:border-slate-700">
+                <span>{summary.endedCount} Ended</span>
+              </span>
+              {summary.totalPumping > 0 && (
+                <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-sky-500/10 text-sky-700 dark:text-sky-300 font-medium text-xs border border-sky-500/20">
+                  <span>{summary.totalPumping}d Pumping</span>
+                </span>
+              )}
+              {summary.totalDiesel > 0 && (
+                <span className="hidden md:inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-500/10 text-amber-700 dark:text-amber-300 font-medium text-xs border border-amber-500/20">
+                  <span>{summary.totalDiesel.toLocaleString()}L Fuel</span>
+                </span>
+              )}
+            </div>
           </div>
 
-          {/* Full Page Button */}
-          <Button
-            onClick={() => setIsFullscreen(!isFullscreen)}
-            variant="outline"
-            size="sm"
-            className="rounded-lg text-[11px] gap-1 font-semibold border-slate-200 dark:border-slate-700 h-7 px-2"
-          >
-            {isFullscreen ? (
-              <>
-                <Minimize2 className="w-3 h-3 text-amber-600" />
-                <span className="hidden sm:inline">Exit</span>
-              </>
-            ) : (
-              <>
-                <Maximize2 className="w-3 h-3 text-slate-500" />
-                <span className="hidden sm:inline">Full Page</span>
-              </>
-            )}
-          </Button>
+          {/* Right: Gantt Viewport Tools */}
+          {viewType === 'gantt' && (
+            <div className="flex items-center gap-2 flex-wrap ml-auto">
+              {/* Preset Selector */}
+              <select
+                value={datePreset}
+                onChange={e => setDatePreset(e.target.value as DatePreset)}
+                className="h-8 text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 cursor-pointer focus:outline-none"
+              >
+                <option value="all">All-Time</option>
+                <option value="30days">Last 30d</option>
+                <option value="90days">Last 90d</option>
+                <option value="6months">Last 6m</option>
+                <option value="thisYear">This Year</option>
+              </select>
+
+              {/* Zoom Scale Segmented Buttons */}
+              <div className="flex items-center bg-slate-100 dark:bg-slate-800/80 p-0.5 rounded-xl border border-slate-200/80 dark:border-slate-700/80 text-xs shrink-0">
+                {(['months', 'weeks', 'days'] as const).map(scale => (
+                  <button
+                    key={scale}
+                    type="button"
+                    onClick={() => {
+                      setZoomScale(scale);
+                      setUserZoomSelected(true);
+                    }}
+                    className={cn(
+                      "px-2.5 py-1 rounded-lg font-bold text-[11px] capitalize transition-all cursor-pointer",
+                      zoomScale === scale
+                        ? "bg-gradient-to-r from-sky-500 to-blue-600 text-white shadow-xs"
+                        : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
+                    )}
+                  >
+                    {scale === 'days' ? 'Days' : scale === 'weeks' ? 'Weeks' : 'Months'}
+                  </button>
+                ))}
+              </div>
+
+              {/* Full Page / Rotate 90° Button */}
+              <Button
+                type="button"
+                onClick={toggleFullscreen}
+                variant="outline"
+                size="sm"
+                className={cn(
+                  "rounded-lg text-xs gap-1.5 font-bold transition-colors h-8 px-2.5",
+                  isFullscreen
+                    ? "bg-amber-500/10 border-amber-500/30 text-amber-700 dark:text-amber-400"
+                    : "border-sky-200 dark:border-sky-800 bg-sky-50/80 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 hover:bg-sky-100 dark:hover:bg-sky-900/60 shadow-xs"
+                )}
+                title={isFullscreen ? "Exit Landscape View" : "Rotate 90° for Landscape Gantt View"}
+              >
+                {isFullscreen ? (
+                  <>
+                    <RotateCcw className="w-3.5 h-3.5 text-amber-600" />
+                    <span className="sm:hidden">Exit 90°</span>
+                    <span className="hidden sm:inline">Exit Full Page</span>
+                  </>
+                ) : (
+                  <>
+                    <RotateCw className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" />
+                    <span className="sm:hidden">Rotate 90°</span>
+                    <span className="hidden sm:inline">Full Page</span>
+                  </>
+                )}
+              </Button>
+            </div>
+          )}
         </div>
+
+        {/* Tier 2: Search Bar, Status Filter Tabs & Sorting (Hidden in fullscreen on mobile for max chart space) */}
+        {!isFullscreen && (
+          <div className="flex flex-wrap items-center justify-between gap-2.5 pt-2.5 border-t border-slate-100 dark:border-slate-800/80">
+            {/* Left: Search Input & Status Filter Tabs */}
+            <div className="flex flex-wrap items-center gap-2.5 flex-1 min-w-[280px]">
+              {/* Search Input with Search Icon & Clear Button */}
+              <div className="relative flex-1 min-w-[180px] max-w-sm">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <Input
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  placeholder="Search site..."
+                  className="h-8 pl-8 pr-7 text-xs bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 rounded-lg w-full"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-0.5 cursor-pointer"
+                    title="Clear search"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+
+              {/* Status Filter Tabs */}
+              <div className="flex items-center bg-slate-100 dark:bg-slate-800/80 p-0.5 rounded-xl border border-slate-200/80 dark:border-slate-700/80 text-xs shrink-0">
+                {(['all', 'active', 'ended'] as const).map(f => {
+                  const count = f === 'all' ? summary.totalSites : f === 'active' ? summary.activeCount : summary.endedCount;
+                  return (
+                    <button
+                      key={f}
+                      type="button"
+                      onClick={() => setSiteFilter(f)}
+                      className={cn(
+                        "flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-semibold text-xs capitalize transition-colors cursor-pointer",
+                        siteFilter === f
+                          ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs"
+                          : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+                      )}
+                    >
+                      <span>{f}</span>
+                      <span className={cn(
+                        "text-[10px] px-1 py-0.2 rounded-full font-mono font-bold",
+                        siteFilter === f
+                          ? "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300"
+                          : "text-slate-400"
+                      )}>
+                        {count}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Right: Sort Order Button & Active Count Indicator */}
+            <div className="flex items-center gap-2.5 shrink-0 ml-auto">
+              {(searchQuery || siteFilter !== 'all') && (
+                <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium hidden sm:inline">
+                  Showing {targetSites.length} of {summary.totalSites}
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
+                className={cn(
+                  "flex items-center gap-1.5 h-8 px-2.5 rounded-lg border text-xs font-semibold transition-colors cursor-pointer",
+                  isDark
+                    ? "bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700"
+                    : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100"
+                )}
+                title={`Sort by Start Date: currently ${sortOrder === 'asc' ? 'Earliest First (Chronological)' : 'Newest First'}`}
+              >
+                <ArrowUpDown className="w-3.5 h-3.5 text-sky-500 shrink-0" />
+                <span className="hidden sm:inline">Start Date:</span>
+                <span className="font-bold text-slate-900 dark:text-white">{sortOrder === 'asc' ? 'Earliest' : 'Newest'}</span>
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
+      {/* Mobile Portrait Quick Rotate Prompt Banner (shown in Gantt view when not rotated) */}
+      {viewType === 'gantt' && !isFullscreen && (
+        <div
+          onClick={toggleFullscreen}
+          className="sm:hidden flex items-center justify-between p-2.5 rounded-xl bg-gradient-to-r from-sky-500/10 via-blue-500/10 to-indigo-500/10 border border-sky-300/60 dark:border-sky-800 text-xs cursor-pointer hover:bg-sky-500/15 transition-all shadow-xs group"
+        >
+          <div className="flex items-center gap-2 text-sky-900 dark:text-sky-200 font-semibold min-w-0">
+            <div className="p-1 rounded-lg bg-sky-500/20 text-sky-600 dark:text-sky-400 shrink-0 group-hover:rotate-90 transition-transform duration-300">
+              <RotateCw className="w-4 h-4" />
+            </div>
+            <span className="truncate">Rotate 90° for full landscape view</span>
+          </div>
+          <span className="px-2.5 py-1 rounded-lg bg-sky-600 hover:bg-sky-700 text-white font-bold text-[11px] shadow-xs shrink-0 flex items-center gap-1">
+            <Smartphone className="w-3 h-3 rotate-90" />
+            Rotate 90°
+          </span>
+        </div>
+      )}
+
+      {/* ── Cards View for Mobile & Compact Screens ── */}
+      {viewType === 'cards' && (
+        <div className="space-y-3">
+          {siteBars.length === 0 ? (
+            <div className="p-8 text-center bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs">
+              <Building2 className="w-8 h-8 text-slate-300 dark:text-slate-600 mx-auto mb-2" />
+              <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">No sites found</p>
+              <p className="text-xs text-slate-400 mt-0.5">Try adjusting your search or filters</p>
+            </div>
+          ) : (
+            siteBars.map(bar => (
+              <div
+                key={bar.id}
+                onClick={() => setSelectedBar(bar)}
+                className="p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs hover:shadow-md transition-all active:scale-[0.99] cursor-pointer space-y-2.5"
+              >
+                {/* Site Header: Name, Status & Duration */}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <h3 className="font-bold text-sm text-slate-900 dark:text-white truncate">
+                        {bar.siteName}
+                      </h3>
+                      <span className={cn(
+                        "px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 border inline-flex items-center gap-1",
+                        bar.status === 'Active' ? "bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800" :
+                        bar.status === 'On Hold' ? "bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800" :
+                        "bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700"
+                      )}>
+                        {bar.status === 'Active' && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />}
+                        {bar.status}
+                      </span>
+                    </div>
+                    {isAll && (
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 truncate flex items-center gap-1">
+                        <Building2 className="w-3 h-3 text-slate-400 shrink-0" />
+                        <span className="truncate">{bar.clientName}</span>
+                      </p>
+                    )}
+                  </div>
+                  <div className="text-right shrink-0">
+                    <span className="text-xs font-mono font-bold text-sky-600 dark:text-sky-400">
+                      {bar.durationDays}d
+                    </span>
+                    <span className="text-[10px] text-slate-400 block font-medium">duration</span>
+                  </div>
+                </div>
+
+                {/* Timeline Dates and Progress Bar */}
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                    <span className="flex items-center gap-1">
+                      <Calendar className="w-3 h-3 text-slate-400" />
+                      {format(bar.startDate, 'MMM d, yyyy')}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      ➔ {format(bar.endDate, 'MMM d, yyyy')}
+                    </span>
+                  </div>
+                  <div className="h-1.5 w-full rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden relative">
+                    <div
+                      className={cn("h-full rounded-full transition-all", bar.status === 'Active' ? "bg-emerald-500" : bar.status === 'On Hold' ? "bg-amber-500" : "bg-slate-500")}
+                      style={{ width: '100%' }}
+                    />
+                  </div>
+                </div>
+
+                {/* Operational Quick Metrics */}
+                <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-100 dark:border-slate-800/80 text-xs">
+                  <div className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 dark:bg-slate-800/40">
+                    <Clock className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                    <div className="min-w-0">
+                      <span className="text-[10px] text-slate-400 block font-bold uppercase">Pumping</span>
+                      <span className="font-semibold text-slate-800 dark:text-slate-200 truncate block">
+                        {bar.activePumpingDays} Days
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 dark:bg-slate-800/40">
+                    <span className="text-amber-500 font-bold text-xs shrink-0">⛽</span>
+                    <div className="min-w-0">
+                      <span className="text-[10px] text-slate-400 block font-bold uppercase">Fuel</span>
+                      <span className="font-semibold text-slate-800 dark:text-slate-200 truncate block">
+                        {bar.totalDiesel.toLocaleString()} L
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Card Footer Actions */}
+                {onOpenSite360 && (
+                  <div className="pt-1 flex items-center justify-end">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onOpenSite360(bar.siteObj);
+                      }}
+                      className="text-xs font-semibold text-sky-600 dark:text-sky-400 hover:text-sky-700 dark:hover:text-sky-300 flex items-center gap-1 transition-colors"
+                    >
+                      <span>Open Site 360</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
       {/* ── Multi-Site Master Gantt Chart (One Bar Per Site) ── */}
+      {viewType === 'gantt' && (
       <div
         ref={timelineScrollRef}
         onMouseDown={handleTimelineMouseDown}
         className={cn(
           "rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm overflow-auto style-scroll relative",
           isDragging ? "cursor-grabbing select-none" : "cursor-grab",
-          isFullscreen ? "max-h-[calc(100vh-140px)]" : "max-h-[calc(100vh-230px)] min-h-[520px]"
+          isFullscreen ? "flex-1 min-h-0 h-full" : "max-h-[calc(100vh-230px)] min-h-[420px] sm:min-h-[520px]"
         )}
       >
         <div style={{ minWidth: `${gridContainerWidth + 240}px` }}>
@@ -567,15 +844,15 @@ export function ClientSitesTimeline({ selectedClient, onOpenSite360 }: Props) {
             {/* Sticky Top-Left Corner Box (Fixed on both X and Y axes) */}
             <div className="p-3 text-xs font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider border-r border-slate-200 dark:border-slate-700 flex items-center justify-between sticky left-0 top-0 z-40 bg-slate-100 dark:bg-slate-800 shadow-xs">
                 <div className="flex items-center gap-2">
-                  <Building2 className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                  <Building2 className="w-4 h-4 text-sky-600 dark:text-sky-400" />
                   <span>Sites ({targetSites.length})</span>
                 </div>
                 <button
                   onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
-                  className="text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors p-1 rounded"
+                  className="text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 transition-colors p-1 rounded"
                   title={`Toggle Sort (${sortOrder === 'asc' ? 'Earliest Start First' : 'Newest Start First'})`}
                 >
-                  {sortOrder === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-indigo-500" /> : <ArrowDown className="w-3.5 h-3.5 text-indigo-500" />}
+                  {sortOrder === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-sky-500" /> : <ArrowDown className="w-3.5 h-3.5 text-sky-500" />}
                 </button>
               </div>
 
@@ -761,6 +1038,7 @@ export function ClientSitesTimeline({ selectedClient, onOpenSite360 }: Props) {
             </div>
           </div>
         </div>
+      )}
 
       {/* ── Site Project Summary Detail Modal ── */}
       {selectedBar && (

@@ -484,15 +484,15 @@ export function VatPayments({ setPreviewModal, searchTerm = '' }: { setPreviewMo
                 </Button>
             )}
             {priv.canImport && (
-                <label className="flex items-center gap-2 px-2 sm:px-3 h-9 bg-white rounded-md border border-slate-200 text-slate-600 text-[11px] font-bold uppercase tracking-tight cursor-pointer hover:bg-slate-50 transition-all shadow-sm mb-0">
-                    <Download className="h-3.5 w-3.5 text-indigo-500" /> <span className="hidden sm:inline">Import</span>
+                <label className="flex items-center gap-2 px-2 sm:px-3 h-9 bg-white dark:bg-slate-900 rounded-md border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 text-[11px] font-bold uppercase tracking-tight cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors mb-0">
+                    <Download className="h-3.5 w-3.5 text-blue-600" /> <span className="hidden sm:inline">Import</span>
                     <input type="file" accept=".csv" className="hidden" onChange={handleImportCSVSelected} />
                 </label>
             )}
             {priv.canManageVat && (
                 <Button
                     size="sm"
-                    className="h-9 px-2 sm:px-4 gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] uppercase tracking-tight shadow-md transition-all active:scale-95"
+                    className="h-9 px-2 sm:px-4 gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-[11px] uppercase tracking-tight rounded-md transition-colors"
                     onClick={() => { handleClear(); setIsModalOpen(true); }}
                 >
                     <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Add VAT Payment</span>
@@ -505,18 +505,16 @@ export function VatPayments({ setPreviewModal, searchTerm = '' }: { setPreviewMo
         <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
             <div className="flex flex-col flex-1 h-full w-full animate-in fade-in duration-300 gap-6">
 
-
-
                 <div className="flex flex-1 gap-6 items-start flex-col">
                     <div className="flex-1 w-full flex flex-col gap-6 min-w-0">
-                        <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col flex-1">
-                            <div className="border-b border-slate-100 p-4 bg-slate-50/50 flex justify-between items-center">
+                        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md overflow-hidden flex flex-col flex-1">
+                            <div className="border-b border-slate-100 dark:border-slate-800 p-4 bg-slate-50/50 dark:bg-slate-800/30 flex justify-between items-center">
                                 <div className="flex items-center gap-2">
-                                    <span className="w-2 h-5 rounded-sm bg-indigo-500"></span>
-                                    <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wide">
+                                    <span className="w-1.5 h-4 rounded-sm bg-blue-600"></span>
+                                    <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wide">
                                         VAT Payment Entries
                                     </h3>
-                                    <Badge variant="secondary" className="ml-2 font-mono bg-indigo-100 text-indigo-800 border-indigo-200">{vatPayments.length}</Badge>
+                                    <Badge variant="secondary" className="ml-2 font-mono rounded-sm bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800">{vatPayments.length}</Badge>
                                 </div>
 
                                 <div className="flex items-center gap-2">
@@ -525,14 +523,14 @@ export function VatPayments({ setPreviewModal, searchTerm = '' }: { setPreviewMo
                                       showFilters ? "flex" : "hidden sm:flex"
                                   )}>
                                       {/* Filter input */}
-                                      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:border-r border-slate-200 sm:pr-4 w-full sm:w-auto">
+                                      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:border-r border-slate-200 dark:border-slate-800 sm:pr-4 w-full sm:w-auto">
                                           <div className="flex items-center gap-2 w-full sm:w-auto">
                                             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider min-w-[32px]">From</span>
                                             <Input 
                                                 type="month" 
                                                 value={filterFromMonth} 
                                                 onChange={(e) => setFilterFromMonth(e.target.value)} 
-                                                className="h-8 flex-1 sm:w-36 text-xs border-slate-200 bg-white focus:ring-1 focus:ring-indigo-500 shadow-sm" 
+                                                className="h-8 flex-1 sm:w-36 text-xs border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 focus:ring-1 focus:ring-blue-500 rounded-sm" 
                                             />
                                           </div>
                                           <div className="flex items-center gap-2 w-full sm:w-auto">
@@ -541,7 +539,7 @@ export function VatPayments({ setPreviewModal, searchTerm = '' }: { setPreviewMo
                                                 type="month" 
                                                 value={filterToMonth} 
                                                 onChange={(e) => setFilterToMonth(e.target.value)} 
-                                                className="h-8 flex-1 sm:w-36 text-xs border-slate-200 bg-white focus:ring-1 focus:ring-indigo-500 shadow-sm" 
+                                                className="h-8 flex-1 sm:w-36 text-xs border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 focus:ring-1 focus:ring-blue-500 rounded-sm" 
                                             />
                                           </div>
                                           {(filterFromMonth || filterToMonth) && (
@@ -553,13 +551,13 @@ export function VatPayments({ setPreviewModal, searchTerm = '' }: { setPreviewMo
                                       </div>
 
                                       {/* Toggle for Actions Column */}
-                                      <div className="flex items-center justify-between sm:justify-start gap-3 w-full sm:w-auto py-2 sm:py-0 border-t sm:border-t-0 border-slate-100">
+                                      <div className="flex items-center justify-between sm:justify-start gap-3 w-full sm:w-auto py-2 sm:py-0 border-t sm:border-t-0 border-slate-100 dark:border-slate-800">
                                           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Show Actions</span>
                                           <button
                                               onClick={() => setShowActions(!showActions)}
                                               className={`group relative inline-flex h-5 w-10 flex-shrink-0 cursor-pointer items-center justify-center rounded-full focus:outline-none`}
                                           >
-                                              <span className={`absolute h-4 w-9 rounded-full transition-colors duration-200 ease-in-out ${showActions ? 'bg-indigo-600' : 'bg-slate-200'}`} />
+                                              <span className={`absolute h-4 w-9 rounded-full transition-colors duration-200 ease-in-out ${showActions ? 'bg-blue-600' : 'bg-slate-200 dark:bg-slate-700'}`} />
                                               <span
                                                   className={`absolute left-0 inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${showActions ? 'translate-x-5' : 'translate-x-0.5'}`}
                                               />
@@ -572,8 +570,8 @@ export function VatPayments({ setPreviewModal, searchTerm = '' }: { setPreviewMo
                                       size="icon" 
                                       onClick={() => setShowFilters(!showFilters)}
                                       className={cn(
-                                        "h-9 w-9 rounded-lg border transition-all",
-                                        showFilters ? "bg-indigo-50 border-indigo-200 text-indigo-600" : "bg-white border-slate-200 text-slate-500"
+                                        "h-9 w-9 rounded-md border transition-all",
+                                        showFilters ? "bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800 text-blue-600" : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500"
                                       )}
                                     >
                                       <Plus className={cn("h-4 w-4 transition-transform", showFilters && "rotate-45")} />
@@ -586,54 +584,53 @@ export function VatPayments({ setPreviewModal, searchTerm = '' }: { setPreviewMo
                                 <style>{`
                                     .overflow-x-auto {
                                         scrollbar-width: thin;
-                                        scrollbar-color: #6366f1 #f1f5f9;
+                                        scrollbar-color: #2563eb #f1f5f9;
                                     }
                                     .overflow-x-auto::-webkit-scrollbar {
-                                        height: 10px;
+                                        height: 8px;
                                         display: block !important;
                                     }
                                     .overflow-x-auto::-webkit-scrollbar-track {
                                         background: #f1f5f9;
-                                        border-radius: 10px;
+                                        border-radius: 4px;
                                     }
                                     .overflow-x-auto::-webkit-scrollbar-thumb {
-                                        background-color: #6366f1;
-                                        border-radius: 10px;
-                                        border: 2px solid #f1f5f9;
+                                        background-color: #2563eb;
+                                        border-radius: 4px;
                                     }
                                     .overflow-x-auto::-webkit-scrollbar-thumb:hover {
-                                        background-color: #4f46e5;
+                                        background-color: #1d4ed8;
                                     }
                                 `}</style>
 
                                 {/* MOBILE CARDS */}
-                                <div className="md:hidden flex flex-col p-4 bg-slate-50 border-b border-slate-100">
+                                <div className="md:hidden flex flex-col p-4 bg-slate-50 dark:bg-slate-800/30 border-b border-slate-100 dark:border-slate-800">
                                     <h4 className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">Total Remitted</h4>
-                                    <div className="bg-white p-2 rounded border border-emerald-100 shadow-sm inline-block w-max">
-                                        <p className="text-sm font-mono font-black text-emerald-600">₦{formatSum(vatPaymentsSum)}</p>
+                                    <div className="bg-white dark:bg-slate-800 p-2 rounded-sm border border-emerald-100 dark:border-emerald-900/40 inline-block w-max">
+                                        <p className="text-sm font-mono font-bold text-emerald-600">₦{formatSum(vatPaymentsSum)}</p>
                                     </div>
                                 </div>
-                                <div className="md:hidden divide-y divide-slate-100 px-4">
+                                <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800 px-4">
                                     {sortedVatPayments.map((p: VatPayment) => (
-                                        <div key={p.id} className="py-4 bg-white hover:bg-slate-50 transition-colors">
+                                        <div key={p.id} className="py-4 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
                                             <div className="flex justify-between items-start mb-2">
                                                 <div className="min-w-0">
-                                                    <h3 className="font-bold text-slate-900 truncate">{p.client}</h3>
+                                                    <h3 className="font-bold text-slate-900 dark:text-slate-100 truncate">{p.client}</h3>
                                                     <p className="text-xs text-slate-500">VAT Period: {p.month} {p.year} | Paid: {formatDisplayDate(p.date)}</p>
                                                 </div>
                                                 <div className="text-right ml-4 shrink-0">
                                                     <p className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Amount for VAT</p>
-                                                    <p className="font-semibold text-slate-500 font-mono text-xs mb-1">₦{priv?.canViewAmounts === false ? '***' : ((p.amount || 0) !== 0 && vatRate > 0 ? ((p.amount / (vatRate / 100)) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-')}</p>
+                                                    <p className="font-semibold text-slate-500 dark:text-slate-400 font-mono text-xs mb-1">₦{priv?.canViewAmounts === false ? '***' : ((p.amount || 0) !== 0 && vatRate > 0 ? ((p.amount / (vatRate / 100)) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-')}</p>
                                                     <p className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">VAT Paid</p>
                                                     <p className="font-bold text-emerald-600 font-mono text-sm">₦{priv?.canViewAmounts === false ? '***' : (p.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                                                 </div>
                                             </div>
                                             {showActions && priv.canManageVat && (
-                                                <div className="flex items-center justify-end gap-1 mt-2 pt-2 border-t border-slate-50">
-                                                    <Button variant="outline" size="sm" onClick={() => handleEdit(p)} className="h-7 text-indigo-600 px-2 text-xs">
+                                                <div className="flex items-center justify-end gap-1 mt-2 pt-2 border-t border-slate-50 dark:border-slate-800">
+                                                    <Button variant="outline" size="sm" onClick={() => handleEdit(p)} className="h-7 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950/40 px-2 text-xs rounded-sm border-slate-200 dark:border-slate-700">
                                                         <Edit className="w-3 h-3 mr-1" /> Edit
                                                     </Button>
-                                                    <Button variant="outline" size="sm" onClick={() => handleDelete(p.id)} className="h-7 text-rose-600 px-2 text-xs">
+                                                    <Button variant="outline" size="sm" onClick={() => handleDelete(p.id)} className="h-7 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 px-2 text-xs rounded-sm border-slate-200 dark:border-slate-700">
                                                         <Trash2 className="w-3 h-3 mr-1" /> Delete
                                                     </Button>
                                                 </div>
@@ -648,25 +645,25 @@ export function VatPayments({ setPreviewModal, searchTerm = '' }: { setPreviewMo
                                 </div>
 
                                 <Table className="hidden md:table whitespace-nowrap min-w-full text-sm">
-                                    <TableHeader className="bg-slate-50 sticky top-0 z-20">
-                                        <TableRow className="bg-slate-100/80 border-b border-slate-200">
+                                    <TableHeader className="bg-slate-50 dark:bg-slate-800/60 sticky top-0 z-20">
+                                        <TableRow className="bg-slate-100/80 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700">
                                             <TableHead colSpan={4} className="px-6 py-2.5">
                                                 <div className="flex items-center gap-2">
-                                                    <div className="w-1.5 h-4 bg-indigo-500 rounded-full"></div>
-                                                    <span className="text-[10px] font-black uppercase tracking-widest text-indigo-900">Total Remitted</span>
+                                                    <div className="w-1.5 h-4 bg-blue-600 rounded-sm"></div>
+                                                    <span className="text-[10px] font-bold uppercase tracking-widest text-slate-900 dark:text-slate-100">Total Remitted</span>
                                                 </div>
                                             </TableHead>
                                             <TableHead className="px-4 py-2.5 text-right">
-                                                <div className="text-[11px] font-mono font-bold text-slate-500 bg-white px-2 py-1 rounded border border-slate-100 shadow-sm inline-block">
+                                                <div className="text-[11px] font-mono font-bold text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-800 px-2 py-1 rounded-sm border border-slate-200 dark:border-slate-700 inline-block">
                                                     ₦{formatSum(vatPaymentsSum !== 0 && vatRate > 0 ? vatPaymentsSum / (vatRate / 100) : 0)}
                                                 </div>
                                             </TableHead>
                                             <TableHead className="px-4 py-2.5 text-right">
-                                                <div className="text-[12px] font-mono font-black text-emerald-600 bg-white px-3 py-1 rounded border border-emerald-100 shadow-sm inline-block">
+                                                <div className="text-[12px] font-mono font-bold text-emerald-600 bg-white dark:bg-slate-800 px-3 py-1 rounded-sm border border-emerald-200 dark:border-emerald-800 inline-block">
                                                     ₦{formatSum(vatPaymentsSum)}
                                                 </div>
                                             </TableHead>
-                                            {showActions && priv.canManageVat && <TableHead className="sticky right-0 bg-slate-100/80 p-0 w-20" />}
+                                            {showActions && priv.canManageVat && <TableHead className="sticky right-0 bg-slate-100/80 dark:bg-slate-800/80 p-0 w-20" />}
                                         </TableRow>
                                         <TableRow className="border-b-0">
                                             {[
@@ -679,7 +676,7 @@ export function VatPayments({ setPreviewModal, searchTerm = '' }: { setPreviewMo
                                             ].map((col) => (
                                                 <TableHead
                                                     key={col.field}
-                                                    className={`font-semibold px-4 py-3 text-slate-500 uppercase text-[10px] tracking-wider select-none ${col.align === 'center' ? 'text-center' : col.align === 'right' ? 'text-right' : ''} cursor-pointer hover:bg-slate-100 hover:text-indigo-600 transition-colors`}
+                                                    className={`font-semibold px-4 py-3 text-slate-500 uppercase text-[10px] tracking-wider select-none ${col.align === 'center' ? 'text-center' : col.align === 'right' ? 'text-right' : ''} cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-blue-600 transition-colors`}
                                                     onClick={() => handleEntriesSort(col.field)}
                                                     onMouseDown={(e) => e.stopPropagation()}
                                                 >
@@ -690,30 +687,30 @@ export function VatPayments({ setPreviewModal, searchTerm = '' }: { setPreviewMo
                                                 </TableHead>
                                             ))}
                                             {showActions && priv.canManageVat && (
-                                                <TableHead className="font-semibold px-4 py-3 text-center sticky right-0 bg-slate-50 shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)] uppercase text-[10px] tracking-wider">Actions</TableHead>
+                                                <TableHead className="font-semibold px-4 py-3 text-center sticky right-0 bg-slate-50 dark:bg-slate-800 uppercase text-[10px] tracking-wider">Actions</TableHead>
                                             )}
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
                                         {sortedVatPayments.map((p: VatPayment) => (
-                                            <TableRow key={p.id} className={`hover:bg-slate-50 transition-colors ${selectedId === p.id ? 'bg-indigo-50/50' : ''}`}>
-                                                <TableCell className="px-4 py-3 text-slate-500">{formatDisplayDate(p.date)}</TableCell>
-                                                <TableCell className="px-4 py-3 font-semibold text-slate-800">{p.client}</TableCell>
-                                                <TableCell className="px-4 py-3 text-slate-600">{p.month}</TableCell>
-                                                <TableCell className="px-4 py-3 text-center text-slate-600">{p.year}</TableCell>
-                                                <TableCell className="px-4 py-3 text-right font-mono text-slate-600/70 text-xs">
+                                            <TableRow key={p.id} className={`hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors ${selectedId === p.id ? 'bg-blue-50/40 dark:bg-blue-950/20' : ''}`}>
+                                                <TableCell className="px-4 py-3 text-slate-500 dark:text-slate-400 font-mono text-xs">{formatDisplayDate(p.date)}</TableCell>
+                                                <TableCell className="px-4 py-3 font-semibold text-slate-800 dark:text-slate-200">{p.client}</TableCell>
+                                                <TableCell className="px-4 py-3 text-slate-600 dark:text-slate-400">{p.month}</TableCell>
+                                                <TableCell className="px-4 py-3 text-center text-slate-600 dark:text-slate-400 font-mono text-xs">{p.year}</TableCell>
+                                                <TableCell className="px-4 py-3 text-right font-mono text-slate-600 dark:text-slate-400 text-xs">
                                                     {priv?.canViewAmounts === false ? '***' : ((p.amount || 0) !== 0 && vatRate > 0 ? ((p.amount / (vatRate / 100)) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-')}
                                                 </TableCell>
                                                 <TableCell className="px-4 py-3 text-right font-mono font-bold text-emerald-600">
                                                     {priv?.canViewAmounts === false ? '***' : (p.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                 </TableCell>
                                                 {showActions && priv.canManageVat && (
-                                                    <TableCell className="px-4 py-3 text-center sticky right-0 bg-white/95 backdrop-blur shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]">
+                                                    <TableCell className="px-4 py-3 text-center sticky right-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur">
                                                         <div className="flex items-center justify-center gap-1">
-                                                            <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleEdit(p); }} className="h-8 w-8 text-indigo-600 hover:bg-indigo-50" title="Edit">
+                                                            <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleEdit(p); }} className="h-8 w-8 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 rounded-sm" title="Edit">
                                                                 <Edit className="w-4 h-4" />
                                                             </Button>
-                                                            <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleDelete(p.id); }} className="h-8 w-8 text-rose-600 hover:bg-rose-50" title="Delete record">
+                                                            <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleDelete(p.id); }} className="h-8 w-8 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-sm" title="Delete record">
                                                                 <Trash2 className="w-4 h-4" />
                                                             </Button>
                                                         </div>
@@ -733,66 +730,66 @@ export function VatPayments({ setPreviewModal, searchTerm = '' }: { setPreviewMo
                             </div>
                         </div>
 
-                        <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col flex-1">
-                            <div className="border-b border-slate-100 p-4 bg-slate-50/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md overflow-hidden flex flex-col flex-1">
+                            <div className="border-b border-slate-100 dark:border-slate-800 p-4 bg-slate-50/50 dark:bg-slate-800/30 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                                 <div className="flex items-center gap-2">
-                                    <span className="w-2 h-5 rounded-sm bg-rose-500"></span>
-                                    <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wide">
+                                    <span className="w-1.5 h-4 rounded-sm bg-rose-500"></span>
+                                    <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wide">
                                         Client & Total Balances
                                     </h3>
                                 </div>
                                 <div className="flex gap-4 font-mono text-sm">
                                     <div className="flex flex-col items-end">
                                         <span className="text-slate-400 text-xs font-sans tracking-tight">Total VAT</span>
-                                        <span className="text-slate-800 font-bold">₦{priv?.canViewAmounts === false ? '***' : overallTotals.vat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                        <span className="text-slate-800 dark:text-slate-200 font-bold tabular-nums">₦{priv?.canViewAmounts === false ? '***' : overallTotals.vat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                     </div>
-                                    <div className="h-8 w-px bg-slate-300 mx-2 hidden sm:block"></div>
+                                    <div className="h-8 w-px bg-slate-300 dark:bg-slate-700 mx-2 hidden sm:block"></div>
                                     <div className="flex flex-col items-end">
                                         <span className="text-slate-400 text-xs font-sans tracking-tight">Total Balance</span>
-                                        <span className="text-rose-600 font-bold">₦{priv?.canViewAmounts === false ? '***' : overallTotals.vatBalanceToPay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                        <span className="text-rose-600 font-bold tabular-nums">₦{priv?.canViewAmounts === false ? '***' : overallTotals.vatBalanceToPay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                     </div>
                                 </div>
                             </div>
 
                             <div className="flex-1 overflow-x-auto [scrollbar-gutter:stable] min-h-[250px] max-h-[350px]">
                                 {/* MOBILE CARDS */}
-                                <div className="md:hidden flex flex-col p-4 bg-slate-50 border-b border-slate-100">
+                                <div className="md:hidden flex flex-col p-4 bg-slate-50 dark:bg-slate-800/30 border-b border-slate-100 dark:border-slate-800">
                                     <h4 className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-3">Aggregate Balances</h4>
                                     <div className="grid grid-cols-2 gap-2">
-                                        <div className="bg-white p-2 rounded border border-slate-100 shadow-sm min-w-0">
+                                        <div className="bg-white dark:bg-slate-800 p-2 rounded-sm border border-slate-200 dark:border-slate-700 min-w-0">
                                             <p className="text-[10px] text-slate-400 font-bold uppercase truncate">Total Paid</p>
-                                            <p className="text-[11px] sm:text-xs font-mono font-bold text-slate-600 break-all" title={'₦' + formatSum(overallTotals.totalPaid)}>₦{formatSum(overallTotals.totalPaid)}</p>
+                                            <p className="text-[11px] sm:text-xs font-mono font-bold text-slate-600 dark:text-slate-300 break-all" title={'₦' + formatSum(overallTotals.totalPaid)}>₦{formatSum(overallTotals.totalPaid)}</p>
                                         </div>
-                                        <div className="bg-white p-2 rounded border border-slate-100 shadow-sm min-w-0">
+                                        <div className="bg-white dark:bg-slate-800 p-2 rounded-sm border border-slate-200 dark:border-slate-700 min-w-0">
                                             <p className="text-[10px] text-slate-400 font-bold uppercase truncate">VAT Value</p>
-                                            <p className="text-[11px] sm:text-xs font-mono font-bold text-slate-600 break-all" title={'₦' + formatSum(overallTotals.vat)}>₦{formatSum(overallTotals.vat)}</p>
+                                            <p className="text-[11px] sm:text-xs font-mono font-bold text-slate-600 dark:text-slate-300 break-all" title={'₦' + formatSum(overallTotals.vat)}>₦{formatSum(overallTotals.vat)}</p>
                                         </div>
-                                        <div className="bg-white p-2 rounded border border-slate-100 shadow-sm min-w-0">
+                                        <div className="bg-white dark:bg-slate-800 p-2 rounded-sm border border-emerald-100 dark:border-emerald-900/40 min-w-0">
                                             <p className="text-[10px] text-slate-400 font-bold uppercase truncate">VAT Remitted</p>
                                             <p className="text-[11px] sm:text-xs font-mono font-bold text-emerald-600 break-all" title={'₦' + formatSum(overallTotals.vatPaid)}>₦{formatSum(overallTotals.vatPaid)}</p>
                                         </div>
-                                        <div className="bg-white p-2 rounded border border-rose-100 shadow-sm min-w-0">
+                                        <div className="bg-white dark:bg-slate-800 p-2 rounded-sm border border-rose-100 dark:border-rose-900/40 min-w-0">
                                             <p className="text-[10px] text-slate-400 font-bold uppercase truncate">Balance to Pay</p>
-                                            <p className="text-[11px] sm:text-xs font-mono font-black text-rose-600 break-all" title={'₦' + formatSum(overallTotals.vatBalanceToPay)}>₦{formatSum(overallTotals.vatBalanceToPay)}</p>
+                                            <p className="text-[11px] sm:text-xs font-mono font-bold text-rose-600 break-all" title={'₦' + formatSum(overallTotals.vatBalanceToPay)}>₦{formatSum(overallTotals.vatBalanceToPay)}</p>
                                         </div>
-                                        <div className="bg-white p-2 rounded border border-indigo-50 shadow-sm col-span-2 min-w-0">
+                                        <div className="bg-white dark:bg-slate-800 p-2 rounded-sm border border-slate-200 dark:border-slate-700 col-span-2 min-w-0">
                                             <p className="text-[10px] text-slate-400 font-bold uppercase truncate">Amount for VAT</p>
-                                            <p className="text-[11px] sm:text-xs font-mono font-bold text-indigo-600 break-all" title={'₦' + formatSum(overallTotals.principleOnVatDue)}>₦{formatSum(overallTotals.principleOnVatDue)}</p>
+                                            <p className="text-[11px] sm:text-xs font-mono font-bold text-blue-600 break-all" title={'₦' + formatSum(overallTotals.principleOnVatDue)}>₦{formatSum(overallTotals.principleOnVatDue)}</p>
                                         </div>
                                     </div>
                                 </div>
-                                <div className="md:hidden divide-y divide-slate-100 px-4">
+                                <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800 px-4">
                                     {totalsData.map((t, i) => (
-                                        <div key={i} className="py-4 bg-white hover:bg-slate-50 transition-colors">
-                                            <h3 className="font-bold text-slate-900 mb-2">{t.client}</h3>
+                                        <div key={i} className="py-4 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                                            <h3 className="font-bold text-slate-900 dark:text-slate-100 mb-2">{t.client}</h3>
                                             <div className="grid grid-cols-2 gap-y-2 gap-x-4">
                                                 <div className="flex justify-between">
                                                     <span className="text-[10px] text-slate-500 uppercase">Paid</span>
-                                                    <span className="text-xs font-mono text-slate-600">{t.totalPaid ? t.totalPaid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</span>
+                                                    <span className="text-xs font-mono text-slate-600 dark:text-slate-400">{t.totalPaid ? t.totalPaid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</span>
                                                 </div>
                                                 <div className="flex justify-between">
                                                     <span className="text-[10px] text-slate-500 uppercase">VAT</span>
-                                                    <span className="text-xs font-mono text-slate-600">{t.vat ? t.vat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</span>
+                                                    <span className="text-xs font-mono text-slate-600 dark:text-slate-400">{t.vat ? t.vat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</span>
                                                 </div>
                                                 <div className="flex justify-between">
                                                     <span className="text-[10px] text-slate-500 uppercase">VAT Paid</span>
@@ -802,9 +799,9 @@ export function VatPayments({ setPreviewModal, searchTerm = '' }: { setPreviewMo
                                                     <span className="text-[10px] text-slate-500 uppercase">Balance</span>
                                                     <span className="text-xs font-mono font-bold text-rose-600">{t.vatBalanceToPay ? t.vatBalanceToPay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</span>
                                                 </div>
-                                                <div className="flex justify-between col-span-2 border-t border-slate-50 pt-1 mt-1">
+                                                <div className="flex justify-between col-span-2 border-t border-slate-50 dark:border-slate-800 pt-1 mt-1">
                                                     <span className="text-[10px] text-slate-500 uppercase">Amount for VAT</span>
-                                                    <span className="text-xs font-mono font-medium text-indigo-600">{t.principleOnVatDue ? t.principleOnVatDue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</span>
+                                                    <span className="text-xs font-mono font-medium text-blue-600">{t.principleOnVatDue ? t.principleOnVatDue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -816,36 +813,36 @@ export function VatPayments({ setPreviewModal, searchTerm = '' }: { setPreviewMo
                                     )}
                                 </div>
                                 <Table className="hidden md:table whitespace-nowrap min-w-full text-sm">
-                                    <TableHeader className="bg-slate-50 sticky top-0 z-20">
-                                        <TableRow className="bg-slate-100/80 border-b border-slate-200">
+                                    <TableHeader className="bg-slate-50 dark:bg-slate-800/60 sticky top-0 z-20">
+                                        <TableRow className="bg-slate-100/80 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700">
                                             <TableHead className="px-6 py-2.5">
                                                 <div className="flex items-center gap-2">
-                                                    <div className="w-1.5 h-4 bg-rose-500 rounded-full"></div>
-                                                    <span className="text-[10px] font-black uppercase tracking-widest text-rose-900">Aggregate Balances</span>
+                                                    <div className="w-1.5 h-4 bg-rose-500 rounded-sm"></div>
+                                                    <span className="text-[10px] font-bold uppercase tracking-widest text-slate-900 dark:text-slate-100">Aggregate Balances</span>
                                                 </div>
                                             </TableHead>
                                             <TableHead className="px-4 py-2.5 text-right">
-                                                <div className="text-[11px] font-mono font-bold text-slate-600 bg-white px-2 py-1 rounded border border-slate-100 shadow-sm inline-block">
+                                                <div className="text-[11px] font-mono font-bold text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800 px-2 py-1 rounded-sm border border-slate-200 dark:border-slate-700 inline-block">
                                                     ₦{formatSum(overallTotals.totalPaid)}
                                                 </div>
                                             </TableHead>
                                             <TableHead className="px-4 py-2.5 text-right">
-                                                <div className="text-[11px] font-mono font-bold text-slate-600 bg-white px-2 py-1 rounded border border-slate-100 shadow-sm inline-block">
+                                                <div className="text-[11px] font-mono font-bold text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800 px-2 py-1 rounded-sm border border-slate-200 dark:border-slate-700 inline-block">
                                                     ₦{formatSum(overallTotals.vat)}
                                                 </div>
                                             </TableHead>
                                             <TableHead className="px-4 py-2.5 text-right">
-                                                <div className="text-[11px] font-mono font-bold text-emerald-600 bg-white px-2 py-1 rounded border border-emerald-50 shadow-sm inline-block">
+                                                <div className="text-[11px] font-mono font-bold text-emerald-600 bg-white dark:bg-slate-800 px-2 py-1 rounded-sm border border-emerald-200 dark:border-emerald-800 inline-block">
                                                     ₦{formatSum(overallTotals.vatPaid)}
                                                 </div>
                                             </TableHead>
                                             <TableHead className="px-4 py-2.5 text-right">
-                                                <div className="text-[11px] font-mono font-black text-rose-600 bg-white px-2 py-1 rounded border border-rose-100 shadow-sm inline-block">
+                                                <div className="text-[11px] font-mono font-bold text-rose-600 bg-white dark:bg-slate-800 px-2 py-1 rounded-sm border border-rose-200 dark:border-rose-800 inline-block">
                                                     ₦{formatSum(overallTotals.vatBalanceToPay)}
                                                 </div>
                                             </TableHead>
                                             <TableHead className="px-4 py-2.5 text-right">
-                                                <div className="text-[11px] font-mono font-bold text-indigo-600 bg-white px-2 py-1 rounded border border-indigo-50 shadow-sm inline-block">
+                                                <div className="text-[11px] font-mono font-bold text-blue-600 bg-white dark:bg-slate-800 px-2 py-1 rounded-sm border border-blue-200 dark:border-blue-800 inline-block">
                                                     ₦{formatSum(overallTotals.principleOnVatDue)}
                                                 </div>
                                             </TableHead>
@@ -857,11 +854,11 @@ export function VatPayments({ setPreviewModal, searchTerm = '' }: { setPreviewMo
                                                 { field: 'vat',               label: 'VAT Value', align: 'right' },
                                                 { field: 'vatPaid',           label: 'VAT Remitted', align: 'right' },
                                                 { field: 'vatBalanceToPay',   label: 'Balance to Pay', align: 'right', className: 'text-rose-600' },
-                                                { field: 'principleOnVatDue', label: 'Amount for VAT', align: 'right', className: 'text-indigo-600' },
+                                                { field: 'principleOnVatDue', label: 'Amount for VAT', align: 'right', className: 'text-blue-600' },
                                             ].map((col) => (
                                                 <TableHead
                                                     key={col.field}
-                                                    className={`font-semibold px-4 py-3 uppercase text-[10px] tracking-wider select-none ${col.className || 'text-slate-500'} ${col.align === 'right' ? 'text-right' : ''} cursor-pointer hover:bg-slate-100 hover:text-indigo-600 transition-colors`}
+                                                    className={`font-semibold px-4 py-3 uppercase text-[10px] tracking-wider select-none ${col.className || 'text-slate-500'} ${col.align === 'right' ? 'text-right' : ''} cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-blue-600 transition-colors`}
                                                     onClick={() => handleTotalsSort(col.field)}
                                                     onMouseDown={(e) => e.stopPropagation()}
                                                 >
@@ -875,12 +872,12 @@ export function VatPayments({ setPreviewModal, searchTerm = '' }: { setPreviewMo
                                     </TableHeader>
                                     <TableBody>
                                         {totalsData.map((t, i) => (
-                                            <TableRow key={i} className="hover:bg-slate-50 transition-colors">
-                                                <TableCell className="px-4 py-3 font-semibold text-slate-800">{t.client}</TableCell>
-                                                <TableCell className="px-4 py-3 text-right text-slate-600 font-mono">
+                                            <TableRow key={i} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors">
+                                                <TableCell className="px-4 py-3 font-semibold text-slate-800 dark:text-slate-200">{t.client}</TableCell>
+                                                <TableCell className="px-4 py-3 text-right text-slate-600 dark:text-slate-400 font-mono">
                                                     {t.totalPaid ? t.totalPaid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}
                                                 </TableCell>
-                                                <TableCell className="px-4 py-3 text-right text-slate-600 font-mono">
+                                                <TableCell className="px-4 py-3 text-right text-slate-600 dark:text-slate-400 font-mono">
                                                     {t.vat ? t.vat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}
                                                 </TableCell>
                                                 <TableCell className="px-4 py-3 text-right text-emerald-600 font-mono">
@@ -889,7 +886,7 @@ export function VatPayments({ setPreviewModal, searchTerm = '' }: { setPreviewMo
                                                 <TableCell className="px-4 py-3 text-right text-rose-600 font-mono font-bold">
                                                     {t.vatBalanceToPay ? t.vatBalanceToPay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}
                                                 </TableCell>
-                                                <TableCell className="px-4 py-3 text-right text-indigo-600 font-mono font-medium">
+                                                <TableCell className="px-4 py-3 text-right text-blue-600 font-mono font-medium">
                                                     {t.principleOnVatDue ? t.principleOnVatDue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}
                                                 </TableCell>
                                             </TableRow>
@@ -909,50 +906,50 @@ export function VatPayments({ setPreviewModal, searchTerm = '' }: { setPreviewMo
                 </div>
 
                 {isModalOpen && (
-                    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                        <div className="bg-white max-w-sm w-full rounded-2xl shadow-2xl overflow-hidden flex flex-col">
-                            <div className="bg-slate-50/50 p-5 border-b border-slate-100 flex justify-between items-center">
+                    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                        <div className="bg-white dark:bg-slate-900 max-w-sm w-full rounded-md border border-slate-200 dark:border-slate-800 shadow-xl overflow-hidden flex flex-col">
+                            <div className="bg-slate-50/50 dark:bg-slate-800/40 p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
                                 <div>
-                                    <h2 className="text-lg font-bold text-slate-800">{selectedId ? 'Edit VAT' : 'Create VAT Payment'}</h2>
+                                    <h2 className="text-base font-bold text-slate-800 dark:text-slate-200">{selectedId ? 'Edit VAT' : 'Create VAT Payment'}</h2>
                                     <p className="text-xs text-slate-500">Record VAT remittances to FIRS.</p>
                                 </div>
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-slate-800" onClick={() => setIsModalOpen(false)}>
-                                    <X className="w-5 h-5" />
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200" onClick={() => setIsModalOpen(false)}>
+                                    <X className="w-4 h-4" />
                                 </Button>
                             </div>
 
-                            <div className="p-6 overflow-y-auto space-y-5 flex-1">
-                                <div className="space-y-1.5">
+                            <div className="p-5 overflow-y-auto space-y-4 flex-1">
+                                <div className="space-y-1">
                                     <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Client</label>
                                     <select
                                         value={form.client}
                                         onChange={e => handleChange('client', e.target.value)}
-                                        className="flex h-11 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-sm"
+                                        className="flex h-9 w-full rounded-sm border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-sm outline-none focus:ring-1 focus:ring-blue-500 text-slate-800 dark:text-slate-200"
                                     >
                                         <option value="">Select Client...</option>
                                         {uniqueClients.map((c, i) => <option key={i} value={c}>{c}</option>)}
                                     </select>
                                 </div>
 
-                                <div className="space-y-1.5">
+                                <div className="space-y-1">
                                     <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Date</label>
-                                    <Input type="date" value={form.date} onChange={e => handleChange('date', e.target.value)} className="bg-slate-50 h-11" />
+                                    <Input type="date" value={form.date} onChange={e => handleChange('date', e.target.value)} className="bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 h-9 rounded-sm font-mono text-xs" />
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-3">
-                                    <div className="space-y-1.5 flex-1">
+                                    <div className="space-y-1 flex-1">
                                         <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Month Coverage</label>
                                         <div className="relative">
-                                            <select value={form.month} onChange={e => handleChange('month', e.target.value)} className="flex h-11 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none appearance-none font-semibold text-slate-700">
+                                            <select value={form.month} onChange={e => handleChange('month', e.target.value)} className="flex h-9 w-full rounded-sm border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-1.5 text-xs focus:bg-white dark:focus:bg-slate-900 focus:ring-1 focus:ring-blue-500 outline-none appearance-none font-semibold text-slate-700 dark:text-slate-300">
                                                 <option value="" disabled>Select...</option>
                                                 {MONTHS.map(m => <option key={m} value={m}>{m}</option>)}
                                             </select>
                                         </div>
                                     </div>
-                                    <div className="space-y-1.5 flex-1">
+                                    <div className="space-y-1 flex-1">
                                         <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Year Coverage</label>
                                         <div className="relative">
-                                            <select value={form.year} onChange={e => handleChange('year', e.target.value)} className="flex h-11 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none appearance-none font-semibold text-slate-700">
+                                            <select value={form.year} onChange={e => handleChange('year', e.target.value)} className="flex h-9 w-full rounded-sm border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-1.5 text-xs focus:bg-white dark:focus:bg-slate-900 focus:ring-1 focus:ring-blue-500 outline-none appearance-none font-semibold text-slate-700 dark:text-slate-300 font-mono">
                                                 <option value="" disabled>Select...</option>
                                                 {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
                                             </select>
@@ -960,17 +957,17 @@ export function VatPayments({ setPreviewModal, searchTerm = '' }: { setPreviewMo
                                     </div>
                                 </div>
 
-                                <div className="space-y-1.5">
+                                <div className="space-y-1">
                                     <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Amount Paid (₦)</label>
-                                    <NumericFormat customInput={Input} thousandSeparator decimalScale={2} value={form.amount} onValueChange={(v) => handleChange('amount', v.value || '')} className="font-mono bg-slate-50 font-bold text-lg text-indigo-700 h-11" />
+                                    <NumericFormat customInput={Input} thousandSeparator decimalScale={2} value={form.amount} onValueChange={(v) => handleChange('amount', v.value || '')} className="font-mono bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 font-bold text-base text-blue-600 h-9 rounded-sm" />
                                 </div>
                             </div>
 
-                            <div className="p-5 border-t border-slate-100 bg-slate-50 flex gap-3">
-                                <Button variant="outline" className="flex-1 border-slate-300 h-11 text-slate-600 hover:bg-slate-100" onClick={() => setIsModalOpen(false)}>
+                            <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 flex gap-3">
+                                <Button variant="outline" className="flex-1 border-slate-300 dark:border-slate-700 h-9 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md text-xs font-medium" onClick={() => setIsModalOpen(false)}>
                                     Cancel
                                 </Button>
-                                <Button onClick={handleSubmit} className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white gap-2 h-11 shadow-md">
+                                <Button onClick={handleSubmit} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white gap-2 h-9 rounded-md text-xs font-medium">
                                     <CheckCircle className="w-4 h-4" /> {selectedId ? 'Update VAT' : 'Submit VAT'}
                                 </Button>
                             </div>
@@ -980,27 +977,27 @@ export function VatPayments({ setPreviewModal, searchTerm = '' }: { setPreviewMo
 
                 {/* Import Modal Options */}
                 {importFile && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center">
-                        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setImportFile(null)} />
-                        <div className="relative bg-white rounded-xl shadow-2xl p-6 w-full max-w-md mx-4 border border-slate-200">
-                            <h3 className="text-xl font-bold text-slate-900 mb-2">Import Policy</h3>
-                            <p className="text-sm text-slate-500 leading-relaxed mb-6">
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setImportFile(null)} />
+                        <div className="relative bg-white dark:bg-slate-900 rounded-md shadow-2xl p-6 w-full max-w-md border border-slate-200 dark:border-slate-800">
+                            <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-2">Import Policy</h3>
+                            <p className="text-xs text-slate-500 leading-relaxed mb-6">
                                 How would you like to process the VAT payment records from this CSV file?
                             </p>
-                            <div className="flex flex-col gap-3">
-                                <Button onClick={() => processImport(importFile, 'update')} className="bg-indigo-600 hover:bg-indigo-700 text-white h-auto py-3 flex-col items-center justify-center">
-                                    <span className="font-semibold block text-base">Update & Add (Recommended)</span>
-                                    <span className="block text-xs opacity-80 mt-1 font-normal text-center">Modifies matching IDs. Adds missing ones. Leaves others alone.</span>
+                            <div className="flex flex-col gap-2.5">
+                                <Button onClick={() => processImport(importFile, 'update')} className="bg-blue-600 hover:bg-blue-700 text-white h-auto py-2.5 flex-col items-center justify-center rounded-md">
+                                    <span className="font-semibold block text-sm">Update & Add (Recommended)</span>
+                                    <span className="block text-[11px] opacity-80 mt-0.5 font-normal text-center">Modifies matching IDs. Adds missing ones. Leaves others alone.</span>
                                 </Button>
-                                <Button onClick={() => processImport(importFile, 'append')} variant="outline" className="border-slate-200 h-auto py-3 text-slate-700 hover:bg-slate-50 flex-col items-center justify-center">
-                                    <span className="font-semibold block text-base">Append Only</span>
-                                    <span className="block text-xs text-slate-500 mt-1 font-normal text-center">Adds every row as a brand new record, completely ignoring current IDs.</span>
+                                <Button onClick={() => processImport(importFile, 'append')} variant="outline" className="border-slate-200 dark:border-slate-700 h-auto py-2.5 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 flex-col items-center justify-center rounded-md">
+                                    <span className="font-semibold block text-sm">Append Only</span>
+                                    <span className="block text-[11px] text-slate-500 mt-0.5 font-normal text-center">Adds every row as a brand new record, completely ignoring current IDs.</span>
                                 </Button>
-                                <Button onClick={() => processImport(importFile, 'replace')} variant="outline" className="border-rose-200 h-auto py-3 text-rose-600 hover:bg-rose-50 flex-col items-center justify-center">
-                                    <span className="font-semibold block text-base">Replace Entire List</span>
-                                    <span className="block text-xs text-rose-500/80 mt-1 font-normal text-center">Deletes current records that are NOT in this CSV. Updates matches. Adds new ones.</span>
+                                <Button onClick={() => processImport(importFile, 'replace')} variant="outline" className="border-rose-200 dark:border-rose-900/40 h-auto py-2.5 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 flex-col items-center justify-center rounded-md">
+                                    <span className="font-semibold block text-sm">Replace Entire List</span>
+                                    <span className="block text-[11px] text-rose-500/80 mt-0.5 font-normal text-center">Deletes current records that are NOT in this CSV. Updates matches. Adds new ones.</span>
                                 </Button>
-                                <Button onClick={() => setImportFile(null)} variant="ghost" className="text-slate-400 hover:text-slate-600 mt-2">
+                                <Button onClick={() => setImportFile(null)} variant="ghost" className="text-slate-400 hover:text-slate-600 mt-1 h-8 text-xs">
                                     Cancel
                                 </Button>
                             </div>

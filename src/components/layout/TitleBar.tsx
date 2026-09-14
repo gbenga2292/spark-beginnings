@@ -91,8 +91,8 @@ export function TitleBar() {
       >
         <div className={`h-5 w-5 rounded-md flex items-center justify-center flex-shrink-0 transition-all duration-200 ${
           isDark
-            ? 'bg-transparent border border-white/40 shadow-none'
-            : 'bg-gradient-to-br from-indigo-500 to-indigo-700 shadow-sm'
+            ? 'bg-transparent border border-white/40'
+            : 'bg-blue-600'
         }`}>
           <span className={`text-[9px] font-black tracking-tighter ${isDark ? 'text-white' : 'text-white'}`}>DC</span>
         </div>

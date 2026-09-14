@@ -278,16 +278,16 @@ function PersonalTasksView() {
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-52">
           {SORT_OPTIONS.map(opt => (
-            <DropdownMenuItem key={opt.value} onClick={() => setSortBy(opt.value)} className={sortBy === opt.value ? 'bg-indigo-50 text-indigo-700 font-bold' : ''}>
+            <DropdownMenuItem key={opt.value} onClick={() => setSortBy(opt.value)} className={sortBy === opt.value ? 'bg-blue-50 text-blue-700 font-bold' : ''}>
               {opt.label}
             </DropdownMenuItem>
           ))}
         </DropdownMenuContent>
       </DropdownMenu>
-      <Button size="sm" variant="outline" title="Archive" onClick={() => navigate('/tasks/archive')} className="h-9 w-9 p-0 border-slate-200 text-slate-600 shadow-sm hover:bg-slate-50 transition-all">
+      <Button size="sm" variant="outline" title="Archive" onClick={() => navigate('/tasks/archive')} className="h-9 w-9 p-0 border-slate-200 text-slate-600 hover:bg-slate-50 transition-all">
         <Archive className="w-4 h-4 text-slate-400" />
       </Button>
-      <Button size="sm" onClick={() => setShowCreate(true)} className="h-9 px-2 sm:px-3 gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] uppercase tracking-tight shadow-md transition-all active:scale-95">
+      <Button size="sm" onClick={() => setShowCreate(true)} className="h-9 px-2 sm:px-3 gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-[11px] uppercase tracking-tight transition-all active:scale-95 rounded-sm">
         <Plus className="w-4 h-4" />
         <span className="hidden sm:inline">New Task</span>
       </Button>
@@ -308,7 +308,7 @@ function PersonalTasksView() {
         <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
         <Input
           placeholder="Search tasks..."
-          className="pl-9 h-10 text-sm border-slate-200 bg-white shadow-sm transition-all hover:bg-slate-50 focus:bg-white"
+          className="pl-9 h-10 text-sm border-slate-200 bg-white transition-all hover:bg-slate-50 focus:bg-white"
           value={search}
           onChange={e => setSearch(e.target.value)}
         />
@@ -389,12 +389,12 @@ function PersonalTasksView() {
               if (tab.value !== 'all' && count === 0) return null;
               return (
                 <button key={tab.value} onClick={() => setStatusFilter(tab.value)}
-                  className={`relative px-4 py-2 text-sm font-medium transition-colors rounded-t-md whitespace-nowrap flex-shrink-0 ${isActive ? "text-indigo-600 dark:text-indigo-400" : "text-muted-foreground hover:text-foreground hover:bg-muted/50"}`}>
+                  className={`relative px-4 py-2 text-sm font-medium transition-colors rounded-t-md whitespace-nowrap flex-shrink-0 ${isActive ? "text-blue-600 dark:text-blue-400" : "text-muted-foreground hover:text-foreground hover:bg-muted/50"}`}>
                   {tab.label}
                   {count > 0 && (
-                    <span className={`ml-1.5 text-[11px] font-semibold px-1.5 py-0.5 rounded-full ${isActive ? "bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400" : "bg-muted text-muted-foreground"}`}>{count}</span>
+                    <span className={`ml-1.5 text-[11px] font-semibold px-1.5 py-0.5 rounded-full ${isActive ? "bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950/40 dark:text-blue-400" : "bg-muted text-muted-foreground"}`}>{count}</span>
                   )}
-                  {isActive && <motion.div layoutId="personal-status-indicator" className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-500 rounded-full" />}
+                  {isActive && <motion.div layoutId="personal-status-indicator" className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 rounded-full" />}
                 </button>
               );
             })}
@@ -403,12 +403,12 @@ function PersonalTasksView() {
           {/* Task list */}
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
             {filtered.length === 0 ? (
-              <div className="text-center py-24 bg-card border border-indigo-100 dark:border-indigo-900/30 rounded-xl">
+              <div className="text-center py-24 bg-card border border-slate-200 dark:border-slate-800 rounded-md">
                 <p className="text-4xl mb-3">📋</p>
                 <p className="text-base font-medium text-foreground">No personal tasks yet</p>
                 <p className="text-sm text-muted-foreground mt-1">Create your first private task to get started.</p>
                 <button onClick={() => setShowCreate(true)}
-                  className="mt-4 px-5 py-2 rounded-full bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-500 transition-colors">
+                  className="mt-4 px-5 py-2 rounded-full bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors rounded-sm">
                   + New Task
                 </button>
               </div>
@@ -424,12 +424,12 @@ function PersonalTasksView() {
 
                   return (
                     <div key={mt.id} id={`task-row-${mt.id}`}
-                      className={`bg-card border rounded-xl overflow-visible hover:shadow-sm transition-all border-l-4 ${mt.priority ? PRIORITY_CONFIG[mt.priority as TaskPriority].border : 'border-l-indigo-300 dark:border-l-indigo-700'} border-indigo-100 dark:border-indigo-900/30`}>
+                      className={`bg-card border rounded-md overflow-visible hover: transition-all border-l-4 ${mt.priority ? PRIORITY_CONFIG[mt.priority as TaskPriority].border : 'border-l-blue-400 dark:border-l-blue-600'} border-slate-200 dark:border-slate-800`}>
                       {/* Task header */}
                       <div role="button" tabIndex={0}
                         onClick={() => toggle(mt.id)}
                         onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && toggle(mt.id)}
-                        className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-indigo-50/50 dark:hover:bg-indigo-950/20 transition-colors text-left cursor-pointer">
+                        className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-blue-50/50 dark:hover:bg-blue-950/20 transition-colors text-left cursor-pointer">
                         <div className="text-muted-foreground flex-shrink-0">
                           {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                         </div>
@@ -441,7 +441,7 @@ function PersonalTasksView() {
                           <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
                             <span className="whitespace-nowrap">{progress.completed}/{progress.total} tasks</span>
                             <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden hidden sm:block">
-                              <div className="h-full rounded-full bg-indigo-400 dark:bg-indigo-500" style={{ width: `${pct}%` }} />
+                              <div className="h-full rounded-full bg-blue-600" style={{ width: `${pct}%` }} />
                             </div>
                             <span className="font-medium hidden sm:inline">{pct}%</span>
                           </div>
@@ -461,7 +461,7 @@ function PersonalTasksView() {
                                     </span>
                                   )}
                                   {assignee && (
-                                    <span className="flex items-center gap-1 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 px-1.5 py-0.5 rounded-full" title="Assigned to">
+                                    <span className="flex items-center gap-1 bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 px-1.5 py-0.5 rounded-full" title="Assigned to">
                                       <div className={`w-3.5 h-3.5 rounded-full ${assignee.avatarColor} flex items-center justify-center text-white text-[7px] font-bold`}>
                                         {assignee.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2)}
                                       </div>
@@ -482,7 +482,7 @@ function PersonalTasksView() {
                           <div onClick={e => e.stopPropagation()} className="flex-shrink-0">
                             <PriorityPicker value={mt.priority} onChange={p => updateMainTask(mt.id, { priority: p })} />
                           </div>
-                          <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap shadow-sm ${sc?.pillClass || 'bg-slate-100 text-slate-500'}`}>
+                          <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap  ${sc?.pillClass || 'bg-slate-100 text-slate-500'}`}>
                             {sc?.label || status}
                           </span>
                         </div>
@@ -496,12 +496,12 @@ function PersonalTasksView() {
                             animate={{ height: "auto", opacity: 1, transitionEnd: { overflow: "visible" } }}
                             exit={{ height: 0, opacity: 0, overflow: "hidden" }} 
                             transition={{ duration: 0.2 }}>
-                            <div className="border-t border-indigo-100 dark:border-indigo-900/30">
+                            <div className="border-t border-slate-200 dark:border-slate-800">
                               {subs.length === 0 && (
                                 <p className="px-5 py-4 text-xs text-muted-foreground italic">No subtasks yet.</p>
                               )}
 
-                              <div className="divide-y divide-indigo-50 dark:divide-indigo-900/20">
+                              <div className="divide-y divide-slate-100 dark:divide-slate-800">
                                 {subs.map((sub, i) => {
                                   const sc2 = statusConfig[sub.status as SubTaskStatus];
                                   const isOverdue = sub.deadline && isPast(new Date(sub.deadline)) && sub.status !== "completed";
@@ -510,11 +510,11 @@ function PersonalTasksView() {
                                       initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
                                       transition={{ delay: i * 0.03, duration: 0.25 }}
                                       onClick={() => setOpenSubtaskId(sub.id ?? null)}
-                                      className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 px-5 py-3 hover:bg-indigo-50/60 dark:hover:bg-indigo-950/30 transition-colors cursor-pointer group relative">
+                                      className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 px-5 py-3 hover:bg-blue-50/60 dark:hover:bg-blue-950/30 transition-colors cursor-pointer group relative">
                                       <div className="flex items-center gap-3 w-full sm:w-auto min-w-0">
                                         <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${sc2.dot}`} />
                                         <div className="min-w-0 flex-1">
-                                          <p className={`text-sm font-semibold truncate ${sub.status === "completed" ? "line-through text-muted-foreground" : "text-foreground"} group-hover:text-indigo-600 transition-colors max-w-[200px] sm:max-w-none`}>
+                                          <p className={`text-sm font-semibold truncate ${sub.status === "completed" ? "line-through text-muted-foreground" : "text-foreground"} group-hover:text-blue-600 transition-colors max-w-[200px] sm:max-w-none`}>
                                             {sub.title}
                                           </p>
                                           <div className="flex items-center gap-2 mt-0.5">
@@ -524,7 +524,7 @@ function PersonalTasksView() {
                                               try {
                                                 if (raw.trim().startsWith('{')) {
                                                   const m = JSON.parse(raw);
-                                                  if (m.narration) return <p className="text-[11px] text-indigo-500 truncate font-medium">{m.narration}</p>;
+                                                  if (m.narration) return <p className="text-[11px] text-blue-600 truncate font-medium">{m.narration}</p>;
 
                                                   if (m.refType) {
                                                     let label = '';
@@ -541,7 +541,7 @@ function PersonalTasksView() {
                                                     } else if (m.refType === 'vehicle_doc_renewal') {
                                                       label = `Vehicle Document Renewal`;
                                                     }
-                                                    if (label) return <p className="text-[11px] text-indigo-500 truncate font-medium">{label}</p>;
+                                                    if (label) return <p className="text-[11px] text-blue-600 truncate font-medium">{label}</p>;
                                                   }
                                                 }
                                               } catch { }
@@ -559,7 +559,7 @@ function PersonalTasksView() {
                                           </span>
                                         )}
                                         <div className="flex items-center gap-2 ml-auto sm:ml-0">
-                                          <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full whitespace-nowrap shadow-sm ${sc2.pillClass}`}>
+                                          <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full whitespace-nowrap  ${sc2.pillClass}`}>
                                             {sc2.label}
                                           </span>
                                           <div onClick={e => e.stopPropagation()} className="flex items-center gap-1 flex-shrink-0">
@@ -585,7 +585,7 @@ function PersonalTasksView() {
                                 })}
                               </div>
 
-                              <div className="px-5 py-3 border-t border-indigo-100 dark:border-indigo-900/30 flex items-center justify-between gap-2">
+                              <div className="px-5 py-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between gap-2">
                                 <AddSubtaskInline mainTaskId={mt.id} users={users} onAdd={sub => addSubtask(sub)} isPersonal />
                                 <div className="flex items-center gap-2">
                                   {canUserEditMainTask(mt, currentUser?.id) && (
@@ -953,23 +953,23 @@ function AdminTasksView() {
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="sm" title="Sort Tasks" className="h-9 w-9 p-0 text-slate-600 border border-slate-200 bg-white hover:bg-slate-50 transition-all">
-              <ArrowUpDown className="w-4 h-4 text-indigo-500" />
+              <ArrowUpDown className="w-4 h-4 text-blue-600" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-52">
             {SORT_OPTIONS.map(opt => (
-              <DropdownMenuItem key={opt.value} onClick={() => setSortBy(opt.value)} className={sortBy === opt.value ? 'bg-indigo-50 text-indigo-700 font-bold' : ''}>
+              <DropdownMenuItem key={opt.value} onClick={() => setSortBy(opt.value)} className={sortBy === opt.value ? 'bg-blue-50 text-blue-700 font-bold' : ''}>
                 {opt.label}
               </DropdownMenuItem>
             ))}
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleSetDefault} className="text-[10px] text-indigo-600 font-bold">SET AS DEFAULT SORT</DropdownMenuItem>
+            <DropdownMenuItem onClick={handleSetDefault} className="text-[10px] text-blue-600 font-bold">SET AS DEFAULT SORT</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-        <Button size="sm" variant="outline" title="Archive" onClick={() => navigate('/tasks/archive')} className="h-9 w-9 p-0 border-slate-200 text-slate-600 shadow-sm hover:bg-slate-50 transition-all">
+        <Button size="sm" variant="outline" title="Archive" onClick={() => navigate('/tasks/archive')} className="h-9 w-9 p-0 border-slate-200 text-slate-600 hover:bg-slate-50 transition-all">
           <Archive className="w-4 h-4 text-slate-400" />
         </Button>
-        <Button size="sm" onClick={() => scope === 'projects' ? setShowCreateProject(true) : setShowCreate(true)} className="h-9 px-2 sm:px-3 gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] uppercase tracking-tight shadow-md transition-all active:scale-95">
+        <Button size="sm" onClick={() => scope === 'projects' ? setShowCreateProject(true) : setShowCreate(true)} className="h-9 px-2 sm:px-3 gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-[11px] uppercase tracking-tight transition-all active:scale-95 rounded-sm">
           {scope === 'projects' ? <FolderOpen className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
           <span className="hidden sm:inline">{scope === 'projects' ? 'New Project' : 'New Task'}</span>
         </Button>
@@ -1001,7 +1001,7 @@ function AdminTasksView() {
         <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
         <Input
           placeholder="Search tasks..."
-          className="pl-9 h-10 text-sm border-slate-200 bg-white shadow-sm transition-all hover:bg-slate-50 focus:bg-white"
+          className="pl-9 h-10 text-sm border-slate-200 bg-white transition-all hover:bg-slate-50 focus:bg-white"
           value={scope === 'mine' ? mySearch : search}
           onChange={e => scope === 'mine' ? setMySearch(e.target.value) : setSearch(e.target.value)}
         />
@@ -1113,12 +1113,12 @@ function AdminTasksView() {
               return applySortToSubs(allSubs, sortBy);
             })();
             if (compactPool.length === 0) return (
-              <div className="text-center py-16 bg-card border border-border rounded-xl">
+              <div className="text-center py-16 bg-card border border-border rounded-md">
                 <p className="text-sm text-muted-foreground">No tasks to show.</p>
               </div>
             );
             return (
-              <div className="bg-card border border-border rounded-xl overflow-hidden divide-y divide-border">
+              <div className="bg-card border border-border rounded-md overflow-hidden divide-y divide-border">
                 {/* Compact header */}
                 <div className="grid grid-cols-[1fr_auto_auto_auto] gap-2 px-4 py-2 bg-muted/50 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                   <span>Task</span>
@@ -1180,7 +1180,7 @@ function AdminTasksView() {
           {(() => {
             const wsProjects = projects.filter(p => p.workspaceId === teamWs?.id);
             if (wsProjects.length === 0) return (
-              <div className="text-center py-16 bg-card border border-border rounded-xl">
+              <div className="text-center py-16 bg-card border border-border rounded-md">
                 <FolderOpen className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
                 <p className="text-sm font-medium text-foreground">No projects yet</p>
                 <p className="text-xs text-muted-foreground mt-1">Create a project from a preset template to get started.</p>
@@ -1203,7 +1203,7 @@ function AdminTasksView() {
                   const isOverdue = isPast(endDate) && pct < 100;
                   const isExpanded = mt ? expanded.has(mt.id) : false;
                   return (
-                    <div key={proj.id} id={`proj-card-${proj.id}`} className="bg-card border border-border rounded-xl flex flex-col overflow-visible transition-colors hover:shadow-sm">
+                    <div key={proj.id} id={`proj-card-${proj.id}`} className="bg-card border border-border rounded-md flex flex-col overflow-visible transition-colors hover:">
                       <div
                         onClick={async () => {
                           if (mt) {
@@ -1403,7 +1403,7 @@ function AdminTasksView() {
 
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
             {filteredMySubs.length === 0 ? (
-              <div className="text-center py-24 bg-card border border-border rounded-xl">
+              <div className="text-center py-24 bg-card border border-border rounded-md">
                 <p className="text-4xl mb-3">🎉</p>
                 <p className="text-base font-medium text-foreground">{mySubs.length === 0 ? 'No tasks assigned to you yet' : 'No tasks match this filter'}</p>
                 <p className="text-sm text-muted-foreground mt-1">Tasks assigned to you will appear here.</p>
@@ -1434,7 +1434,7 @@ function AdminTasksView() {
                       initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: i * 0.02, duration: 0.25 }}
                       onClick={() => setOpenSubtaskId(sub.id ?? null)}
-                      className={`flex flex-col sm:flex-row items-start sm:items-center gap-3 px-4 py-3.5 bg-card border rounded-xl hover:shadow-sm hover:border-primary/30 transition-all cursor-pointer group ${(sub as SubTask).priority && PRIORITY_CONFIG[(sub as SubTask).priority!] ? `border-l-4 ${PRIORITY_CONFIG[(sub as SubTask).priority!].border}` : ''}`}>
+                      className={`flex flex-col sm:flex-row items-start sm:items-center gap-3 px-4 py-3.5 bg-card border rounded-md hover: hover:border-primary/30 transition-all cursor-pointer group ${(sub as SubTask).priority && PRIORITY_CONFIG[(sub as SubTask).priority!] ? `border-l-4 ${PRIORITY_CONFIG[(sub as SubTask).priority!].border}` : ''}`}>
                       <div className="flex items-center gap-3 w-full sm:w-auto min-w-0">
                         <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${sc.dot}`} />
                         <div className="min-w-0 flex-1">
@@ -1443,7 +1443,7 @@ function AdminTasksView() {
                               {sub.title}
                             </p>
                             {subMentioned && (
-                              <span title="You were mentioned" className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded-full text-[9px] font-bold bg-indigo-600 text-white flex-shrink-0">
+                              <span title="You were mentioned" className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded-full text-[9px] font-bold bg-blue-600 text-white flex-shrink-0">
                                 <AtSign className="w-2.5 h-2.5" />
                               </span>
                             )}
@@ -1466,7 +1466,7 @@ function AdminTasksView() {
                           </span>
                         )}
                         <div className="flex items-center gap-2 ml-auto sm:ml-0">
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap shadow-sm ${sc.pillClass}`}>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap  ${sc.pillClass}`}>
                             {sc.label}
                           </span>
                           <div onClick={e => e.stopPropagation()} className="flex items-center gap-1 flex-shrink-0">
@@ -1510,7 +1510,7 @@ function AdminTasksView() {
       {viewMode === 'list' && scope === 'pending_review' && (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
           {pendingApprovalSubs.length === 0 ? (
-            <div className="text-center py-24 bg-card border border-border rounded-xl">
+            <div className="text-center py-24 bg-card border border-border rounded-md">
               <p className="text-4xl mb-3">✅</p>
               <p className="text-base font-medium text-foreground">All clear — nothing pending review</p>
               <p className="text-sm text-muted-foreground mt-1">When team members submit work for approval, it will appear here.</p>
@@ -1526,7 +1526,7 @@ function AdminTasksView() {
                     initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: i * 0.03, duration: 0.25 }}
                     onClick={() => setOpenSubtaskId(sub.id ?? null)}
-                    className="flex flex-col sm:flex-row items-start sm:items-center gap-3 px-4 py-3.5 bg-card border border-amber-200 dark:border-amber-800/30 rounded-xl hover:shadow-sm transition-all cursor-pointer group border-l-4 border-l-amber-400 relative">
+                    className="flex flex-col sm:flex-row items-start sm:items-center gap-3 px-4 py-3.5 bg-card border border-amber-200 dark:border-amber-800/30 rounded-md hover: transition-all cursor-pointer group border-l-4 border-l-amber-400 relative">
 
                     <div className="flex items-center gap-3 w-full sm:w-auto min-w-0">
                       <div className="w-2.5 h-2.5 rounded-full bg-amber-400 flex-shrink-0" />
@@ -1559,7 +1559,7 @@ function AdminTasksView() {
                             e.stopPropagation();
                             // Implementation for quick approve if needed
                           }}
-                          className="px-3 py-1 bg-amber-500 hover:bg-amber-600 text-white text-[10px] font-bold rounded-full transition-colors shadow-sm">
+                          className="px-3 py-1 bg-amber-500 hover:bg-amber-600 text-white text-[10px] font-bold rounded-full transition-colors">
                           Review
                         </button>
                       </div>
@@ -1599,7 +1599,7 @@ function AdminTasksView() {
 
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
           {tabFiltered.length === 0 ? (
-            <div className="text-center py-24 bg-card border border-border rounded-xl">
+            <div className="text-center py-24 bg-card border border-border rounded-md">
               <p className="text-4xl mb-3">📋</p>
               <p className="text-base font-medium text-foreground">No tasks found</p>
               <p className="text-sm text-muted-foreground mt-1">Try adjusting your filters or create a new task.</p>
@@ -1645,8 +1645,8 @@ function AdminTasksView() {
 
                 return (
                   <div key={mt.id} id={`task-row-${mt.id}`}
-                    className={`bg-card border border-border rounded-xl overflow-visible transition-colors border-l-4 ${mt.priority && PRIORITY_CONFIG[mt.priority as TaskPriority] ? PRIORITY_CONFIG[mt.priority as TaskPriority].border : 'border-l-transparent'
-                      } hover:shadow-sm`}>
+                    className={`bg-card border border-border rounded-md overflow-visible transition-colors border-l-4 ${mt.priority && PRIORITY_CONFIG[mt.priority as TaskPriority] ? PRIORITY_CONFIG[mt.priority as TaskPriority].border : 'border-l-transparent'
+                      } hover:`}>
                     {/* Main task header */}
                     <div role="button" tabIndex={0}
                       onClick={() => toggle(mt.id)}
@@ -1661,7 +1661,7 @@ function AdminTasksView() {
                           <div className="flex flex-wrap items-center gap-2">
                             <p className="text-sm text-foreground font-semibold truncate max-w-[200px] sm:max-w-none">{mt.title}</p>
                             {isMentioned && (
-                              <span title="You were mentioned" className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-600 text-white flex-shrink-0">
+                              <span title="You were mentioned" className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-600 text-white flex-shrink-0">
                                 <AtSign className="w-2.5 h-2.5" />
                               </span>
                             )}
@@ -1714,7 +1714,7 @@ function AdminTasksView() {
                           <PriorityPicker value={mt.priority} onChange={p => updateMainTask(mt.id, { priority: p })} />
                         </div>
 
-                        <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap shadow-sm ${sc?.pillClass || 'bg-slate-100 text-slate-500'}`}>
+                        <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap  ${sc?.pillClass || 'bg-slate-100 text-slate-500'}`}>
                           {sc?.label || status}
                         </span>
                       </div>
@@ -1766,7 +1766,7 @@ function AdminTasksView() {
                                           {sub.title}
                                         </p>
                                         {subMentioned && (
-                                          <span title="You were mentioned" className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded-full text-[9px] font-bold bg-indigo-600 text-white flex-shrink-0">
+                                          <span title="You were mentioned" className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded-full text-[9px] font-bold bg-blue-600 text-white flex-shrink-0">
                                             <AtSign className="w-2.5 h-2.5" />
                                           </span>
                                         )}
@@ -1783,7 +1783,7 @@ function AdminTasksView() {
                                         try {
                                           if (raw.trim().startsWith('{')) {
                                             const m = JSON.parse(raw);
-                                            if (m.narration) return <p className="text-xs text-indigo-500 truncate font-medium">{m.narration}</p>;
+                                            if (m.narration) return <p className="text-xs text-blue-600 truncate font-medium">{m.narration}</p>;
 
                                             if (m.refType) {
                                               let label = '';
@@ -1805,7 +1805,7 @@ function AdminTasksView() {
                                                 label = `Staff Status Update`;
                                               }
 
-                                              if (label) return <p className="text-xs text-indigo-500 truncate font-medium">{label}</p>;
+                                              if (label) return <p className="text-xs text-blue-600 truncate font-medium">{label}</p>;
 
                                               // If it's JSON but we don't have a label, hide it
                                               return null;
@@ -2074,16 +2074,16 @@ function EditTaskReminderSection({ taskId, assignedTo, users }: { taskId: string
   };
 
   return (
-    <div className="rounded-xl border border-border overflow-hidden">
+    <div className="rounded-md border border-border overflow-hidden">
       <button
         type="button"
         onClick={() => setEnableReminder(s => !s)}
         className="w-full flex items-center justify-between px-4 py-3 bg-muted/40 hover:bg-muted transition-colors text-left"
       >
         <span className="flex items-center gap-2 text-sm font-medium text-foreground">
-          <Bell className={`w-3.5 h-3.5 ${enableReminder ? 'text-indigo-500' : 'text-muted-foreground'}`} />
+          <Bell className={`w-3.5 h-3.5 ${enableReminder ? 'text-blue-600' : 'text-muted-foreground'}`} />
           Time &amp; Reminder
-          {enableReminder && <span className="text-[11px] bg-indigo-100 text-indigo-600 px-1.5 py-0.5 rounded-full font-semibold">On</span>}
+          {enableReminder && <span className="text-[11px] bg-blue-50 text-blue-700 border border-blue-200 px-1.5 py-0.5 rounded-sm font-semibold">On</span>}
         </span>
         <span className="text-xs text-muted-foreground">{enableReminder ? 'Hide' : 'Optional'}</span>
       </button>
@@ -2108,7 +2108,7 @@ function EditTaskReminderSection({ taskId, assignedTo, users }: { taskId: string
                   type="datetime-local"
                   value={reminderAt}
                   onChange={e => { setReminderAt(e.target.value); setSaved(false); }}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all shadow-sm"
+                  className="w-full px-3.5 py-2.5 rounded-md border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
                 />
               </div>
 
@@ -2124,8 +2124,8 @@ function EditTaskReminderSection({ taskId, assignedTo, users }: { taskId: string
                       type="button"
                       onClick={() => { setReminderFreq(f as any); setSaved(false); }}
                       className={`py-1.5 rounded-lg text-xs font-semibold border-2 transition-all ${reminderFreq === f
-                        ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700'
-                        : 'border-border text-muted-foreground hover:border-indigo-300 hover:text-foreground'
+                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700'
+                        : 'border-border text-muted-foreground hover:border-blue-300 hover:text-foreground'
                         }`}
                     >
                       {FREQ_LABELS[f]}
@@ -2147,7 +2147,7 @@ function EditTaskReminderSection({ taskId, assignedTo, users }: { taskId: string
                     return (
                       <span
                         key={id}
-                        className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800"
+                        className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800"
                       >
                         <div className={`w-3.5 h-3.5 rounded-full ${u?.avatarColor || 'bg-slate-400'} flex items-center justify-center text-white text-[7px] font-bold`}>
                           {name.split(' ').map((n: string) => n[0]).join('').slice(0, 2)}
@@ -2166,11 +2166,11 @@ function EditTaskReminderSection({ taskId, assignedTo, users }: { taskId: string
                 type="button"
                 disabled={!reminderAt || saved}
                 onClick={handleSaveReminder}
-                className={`w-full py-2 rounded-xl text-xs font-semibold transition-all shadow-sm flex items-center justify-center gap-2 ${saved
+                className={`w-full py-2 rounded-md text-xs font-semibold transition-all  flex items-center justify-center gap-2 ${saved
                   ? 'bg-green-500 text-white border border-green-500'
                   : !reminderAt
                     ? 'bg-muted text-muted-foreground border border-border cursor-not-allowed opacity-50'
-                    : 'bg-indigo-600 hover:bg-indigo-700 text-white border border-indigo-600'
+                    : 'bg-blue-600 hover:bg-blue-700 text-white border border-blue-600 rounded-sm'
                   }`}
               >
                 <Bell className="w-3.5 h-3.5" />
@@ -2330,7 +2330,7 @@ function MainTaskChatSheet({ mainTaskId, users, currentUserId, getComments, onPo
         {/* ── Header ── */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border flex-shrink-0">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+            <div className="w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center flex-shrink-0">
               <MessageSquare className="w-4 h-4 text-primary" />
             </div>
             <div className="min-w-0">
@@ -2408,7 +2408,7 @@ function MainTaskChatSheet({ mainTaskId, users, currentUserId, getComments, onPo
                       : parentSub && (
                         <button
                           onClick={(e) => { e.stopPropagation(); onOpenSubtask && parentSub.id && onOpenSubtask(parentSub.id); }}
-                          className="text-[9px] px-1.5 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-700 font-semibold hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors cursor-pointer underline underline-offset-1"
+                          className="text-[9px] px-1.5 py-0.5 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-700 font-semibold hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors cursor-pointer underline underline-offset-1"
                           title={`Open subtask: ${parentSub.title}`}
                         >#{parentSub.title}</button>
                       )
@@ -2434,7 +2434,7 @@ function MainTaskChatSheet({ mainTaskId, users, currentUserId, getComments, onPo
                                   setTimeout(() => el.classList.remove('ring-2', 'ring-blue-400', 'ring-offset-2'), 2000);
                                 }
                               }}
-                              className={`mb-2 p-2 rounded-xl border cursor-pointer flex flex-col gap-0.5 shadow-sm transition-all ${isMe ? 'bg-primary-foreground/10 border-primary-foreground/20 hover:bg-primary-foreground/20' : 'bg-slate-50 hover:bg-slate-100 border-slate-200'}`}
+                              className={`mb-2 p-2 rounded-md border cursor-pointer flex flex-col gap-0.5  transition-all ${isMe ? 'bg-primary-foreground/10 border-primary-foreground/20 hover:bg-primary-foreground/20' : 'bg-slate-50 hover:bg-slate-100 border-slate-200'}`}
                             >
                               <span className={`text-[9px] font-bold flex items-center gap-1.5 ${isMe ? 'text-primary-foreground/90' : 'text-blue-700'}`}><Reply className="w-2.5 h-2.5" /> Reply to {refAuthor?.name || 'Unknown'}</span>
                               <span className={`text-[11px] truncate ${isMe ? 'text-primary-foreground/80' : 'text-slate-500'}`}>{refComm?.text.replace(/^\[reply_to:[^\]]+\]\n/, '') || 'Message deleted'}</span>
@@ -2451,7 +2451,7 @@ function MainTaskChatSheet({ mainTaskId, users, currentUserId, getComments, onPo
                         {c.attachments.map((att: any, ai: number) => {
                           const isImg = att.type?.startsWith('image/');
                           return isImg ? (
-                            <a key={ai} href={att.url} target="_blank" rel="noopener noreferrer" className="block rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+                            <a key={ai} href={att.url} target="_blank" rel="noopener noreferrer" className="block rounded-md overflow-hidden hover: transition-shadow">
                               <img src={att.url} alt={att.name} className="max-w-[200px] max-h-[150px] object-cover" />
                             </a>
                           ) : (
@@ -2473,7 +2473,7 @@ function MainTaskChatSheet({ mainTaskId, users, currentUserId, getComments, onPo
                             <button
                               key={li}
                               onClick={() => (window as any).electronAPI.shellOpenPath(lnk)}
-                              className={`flex items-center gap-1.5 px-3 py-1.5 border hover:opacity-80 transition-colors cursor-pointer text-left shadow-sm ${isMe ? 'bg-primary-foreground/10 border-primary-foreground/20 text-primary-foreground rounded-lg' : 'bg-sky-50 border-sky-200 text-sky-700 hover:bg-sky-100 rounded-lg'}`}
+                              className={`flex items-center gap-1.5 px-3 py-1.5 border hover:opacity-80 transition-colors cursor-pointer text-left  ${isMe ? 'bg-primary-foreground/10 border-primary-foreground/20 text-primary-foreground rounded-lg' : 'bg-sky-50 border-sky-200 text-sky-700 hover:bg-sky-100 rounded-lg'}`}
                               title={`Open: ${lnk}`}
                             >
                               <LinkIcon className={`w-3.5 h-3.5 flex-shrink-0 ${isMe ? 'opacity-80' : ''}`} />
@@ -2515,7 +2515,7 @@ function MainTaskChatSheet({ mainTaskId, users, currentUserId, getComments, onPo
 
         {/* ── # Picker ── */}
         {hashQuery !== null && hashResults.length > 0 && (
-          <div className="mx-4 mb-2 rounded-xl border border-border bg-card shadow-lg overflow-hidden flex-shrink-0">
+          <div className="mx-4 mb-2 rounded-md border border-border bg-card shadow-lg overflow-hidden flex-shrink-0">
             <div className="px-3 py-1.5 border-b border-border/50 bg-muted/50 flex items-center gap-1.5">
               <span className="text-primary font-bold font-mono">#</span>
               <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Reference a Subtask</p>
@@ -2533,7 +2533,7 @@ function MainTaskChatSheet({ mainTaskId, users, currentUserId, getComments, onPo
 
         {/* ── @ Picker ── */}
         {mentionQuery !== null && mentionResults.length > 0 && (
-          <div className="mx-4 mb-2 rounded-xl border border-border bg-card shadow-lg overflow-hidden flex-shrink-0">
+          <div className="mx-4 mb-2 rounded-md border border-border bg-card shadow-lg overflow-hidden flex-shrink-0">
             <div className="px-3 py-1.5 border-b border-border/50 bg-muted/50 flex items-center gap-1.5">
               <span className="text-primary font-bold font-mono">@</span>
               <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Mention a teammate</p>
@@ -2564,7 +2564,7 @@ function MainTaskChatSheet({ mainTaskId, users, currentUserId, getComments, onPo
               className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground resize-none focus:outline-none max-h-32"
             />
             <button onClick={send} disabled={!text.trim()}
-              className="p-2 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0">
+              className="p-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0">
               <Send className="w-3.5 h-3.5" />
             </button>
           </div>
@@ -2643,11 +2643,11 @@ function EditSubtaskDialog({ subtask, users, onClose, onSave }: {
     <div className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
       <motion.div initial={{ opacity: 0, scale: 0.96, y: 8 }} animate={{ opacity: 1, scale: 1, y: 0 }}
         transition={{ duration: 0.18 }}
-        className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-gradient-to-r from-primary/5 to-transparent shrink-0">
+        className="bg-card border border-border rounded-md shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-card shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
-              <Pencil className="w-4.5 h-4.5 text-primary" />
+            <div className="w-8 h-8 rounded-md bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+              <Pencil className="w-4 h-4" />
             </div>
             <div>
               <h2 className="text-base font-semibold text-foreground">Edit Subtask</h2>
@@ -2664,20 +2664,20 @@ function EditSubtaskDialog({ subtask, users, onClose, onSave }: {
             <div>
               <label className="block text-xs font-semibold text-foreground uppercase tracking-wide mb-1.5">Title <span className="text-red-400">*</span></label>
               <input required autoFocus value={title} onChange={e => setTitle(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all shadow-sm" />
+                className="w-full px-3.5 py-2.5 rounded-md border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all" />
             </div>
             <div>
               <label className="block text-xs font-semibold text-foreground uppercase tracking-wide mb-1.5">Description</label>
               <textarea rows={2} value={description} onChange={e => setDesc(e.target.value)}
                 placeholder="Optional notes…"
-                className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none transition-all shadow-sm" />
+                className="w-full px-3.5 py-2.5 rounded-md border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none transition-all" />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-semibold text-foreground uppercase tracking-wide mb-1.5">Assigned To</label>
                 <div className="relative">
                   <button type="button" onClick={() => setOpenSubDrop(!openSubDrop)}
-                    className="w-full px-3.5 py-2.5 flex items-center justify-between gap-2 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all shadow-sm cursor-pointer overflow-hidden">
+                    className="w-full px-3.5 py-2.5 flex items-center justify-between gap-2 rounded-md border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer overflow-hidden">
                     <span className="truncate">{assignedTo.length > 0 ? `${assignedTo.length} selected` : 'Unassigned'}</span>
                     <ChevronDown className="w-3.5 h-3.5 text-muted-foreground opacity-50 shrink-0" />
                   </button>
@@ -2715,17 +2715,17 @@ function EditSubtaskDialog({ subtask, users, onClose, onSave }: {
               <div>
                 <label className="block text-xs font-semibold text-foreground uppercase tracking-wide mb-1.5">Deadline</label>
                 <input type="date" value={deadline} onChange={e => setDeadline(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all shadow-sm" />
+                  className="w-full px-3.5 py-2.5 rounded-md border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all" />
               </div>
             </div>
             <div>
               <label className="block text-xs font-semibold text-foreground uppercase tracking-wide mb-2">Priority</label>
-              <div className="flex items-center gap-2 flex-wrap bg-muted/30 p-1.5 rounded-xl border border-border/50">
+              <div className="flex items-center gap-2 flex-wrap bg-muted/30 p-1.5 rounded-md border border-border/50">
                 <button type="button" onClick={() => setPriority(undefined)}
-                  className={`flex-1 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-sm ${!priority ? 'bg-background text-foreground border border-border ring-1 ring-primary/20' : 'text-muted-foreground hover:text-foreground hover:bg-black/5'}`}>None</button>
+                  className={`flex-1 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all  ${!priority ? 'bg-background text-foreground border border-border ring-1 ring-primary/20' : 'text-muted-foreground hover:text-foreground hover:bg-black/5'}`}>None</button>
                 {PRIORITY_ORDER.map(p => (
                   <button key={p} type="button" onClick={() => setPriority(p)}
-                    className={`flex-1 flex justify-center items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-sm border ${priority === p ? `${PRIORITY_CONFIG[p].className} ring-1 ring-primary/20` : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-black/5'}`}>
+                    className={`flex-1 flex justify-center items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all  border ${priority === p ? `${PRIORITY_CONFIG[p].className} ring-1 ring-primary/20` : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-black/5'}`}>
                     <span className={`w-2 h-2 rounded-full ${PRIORITY_CONFIG[p].dot}`} />
                     {PRIORITY_CONFIG[p].label}
                   </button>
@@ -2734,10 +2734,10 @@ function EditSubtaskDialog({ subtask, users, onClose, onSave }: {
             </div>
             <div>
               <label className="block text-xs font-semibold text-foreground uppercase tracking-wide mb-2">Status</label>
-              <div className="grid grid-cols-2 gap-2 bg-muted/30 p-1.5 rounded-xl border border-border/50">
+              <div className="grid grid-cols-2 gap-2 bg-muted/30 p-1.5 rounded-md border border-border/50">
                 {statusOptions.map(opt => (
                   <button key={opt.value} type="button" onClick={() => setStatus(opt.value)}
-                    className={`py-2 px-3 rounded-xl border text-xs font-semibold transition-all shadow-sm ${status === opt.value
+                    className={`py-2 px-3 rounded-md border text-xs font-semibold transition-all  ${status === opt.value
                       ? 'bg-primary text-primary-foreground border-primary'
                       : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-black/5 bg-background'
                       }`}>
@@ -2746,7 +2746,7 @@ function EditSubtaskDialog({ subtask, users, onClose, onSave }: {
                 ))}
               </div>
             </div>
-            <div className="bg-muted/20 p-4 rounded-xl border border-border/50 space-y-3 mb-2">
+            <div className="bg-muted/20 p-4 rounded-md border border-border/50 space-y-3 mb-2">
               <label className="flex items-center gap-2 cursor-pointer group">
                 <input type="checkbox" checked={requiresApproval} onChange={e => setRequiresApproval(e.target.checked)}
                   className="w-4 h-4 rounded border-border text-primary focus:ring-primary/20 transition-all" />
@@ -2760,7 +2760,7 @@ function EditSubtaskDialog({ subtask, users, onClose, onSave }: {
                       value={approverId}
                       onChange={e => setApproverId(e.target.value)}
                       required={requiresApproval}
-                      className="w-full px-3.5 py-2 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all shadow-sm"
+                      className="w-full px-3.5 py-2 rounded-md border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
                     >
                       <option value="">Choose an approver...</option>
                       {users.filter(u => u.isActive !== false).map(u => (
@@ -2780,7 +2780,7 @@ function EditSubtaskDialog({ subtask, users, onClose, onSave }: {
                       <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1.5">Requesting Amount (₦)</label>
                       <input type="number" min="0" value={budgetRequested ?? ''} onChange={e => setBudgetRequested(e.target.value ? Number(e.target.value) : undefined)}
                         placeholder="0.00"
-                        className="w-full px-3.5 py-2 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all shadow-sm" />
+                        className="w-full px-3.5 py-2 rounded-md border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all" />
                     </div>
                   )}
                 </motion.div>
@@ -2788,7 +2788,7 @@ function EditSubtaskDialog({ subtask, users, onClose, onSave }: {
             </div>
 
             {/* Tag to Site Section */}
-            <div className={`border border-border rounded-xl transition-all ${tagToSite ? 'bg-primary/5 border-primary/20' : ''}`}>
+            <div className={`border border-border rounded-md transition-all ${tagToSite ? 'bg-primary/5 border-primary/20' : ''}`}>
                <div className="flex items-center justify-between px-4 py-3 cursor-pointer" onClick={() => setTagToSite(!tagToSite)}>
                   <div className="flex items-center gap-2.5">
                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${tagToSite ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
@@ -2800,7 +2800,7 @@ function EditSubtaskDialog({ subtask, users, onClose, onSave }: {
                      </div>
                   </div>
                   <div className={`w-10 h-6 rounded-full transition-colors relative ${tagToSite ? 'bg-primary' : 'bg-slate-200'}`}>
-                     <div className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow-sm transition-all ${tagToSite ? 'left-5' : 'left-1'}`} />
+                     <div className={`absolute top-1 w-4 h-4 rounded-full bg-white  transition-all ${tagToSite ? 'left-5' : 'left-1'}`} />
                   </div>
                </div>
                <AnimatePresence>
@@ -2810,7 +2810,7 @@ function EditSubtaskDialog({ subtask, users, onClose, onSave }: {
                            <div>
                               <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1.5">Client</label>
                               <select value={clientId} onChange={e => { setClientId(e.target.value); setSiteId(''); }}
-                                 className="w-full px-3 py-2 rounded-xl border border-border bg-background text-xs focus:outline-none focus:ring-2 focus:ring-primary/20">
+                                 className="w-full px-3 py-2 rounded-md border border-border bg-background text-xs focus:outline-none focus:ring-2 focus:ring-primary/20">
                                  <option value="">No Client</option>
                                  {clientProfiles.map(c => (
                                     <option key={c.id} value={c.id}>{c.name}</option>
@@ -2820,7 +2820,7 @@ function EditSubtaskDialog({ subtask, users, onClose, onSave }: {
                            <div>
                               <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1.5">Site</label>
                               <select value={siteId} onChange={e => setSiteId(e.target.value)} disabled={!clientId}
-                                 className="w-full px-3 py-2 rounded-xl border border-border bg-background text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50">
+                                 className="w-full px-3 py-2 rounded-md border border-border bg-background text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50">
                                  <option value="">No Site</option>
                                  {allSites.filter(s => {
                                     const cName = clientProfiles.find(c => c.id === clientId)?.name;
@@ -2839,9 +2839,9 @@ function EditSubtaskDialog({ subtask, users, onClose, onSave }: {
           
           <div className="flex justify-end gap-3 px-6 py-4 border-t border-border bg-muted/10 shrink-0">
             <Button type="button" onClick={onClose}
-              className="px-5 h-auto py-2.5 rounded-xl border border-border bg-card text-sm text-muted-foreground hover:bg-muted transition-colors">Cancel</Button>
+              className="px-5 h-auto py-2.5 rounded-md border border-border bg-card text-sm text-muted-foreground hover:bg-muted transition-colors">Cancel</Button>
             <Button type="submit" disabled={!title.trim()}
-              className="px-5 h-auto py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">
+              className="px-5 h-auto py-2.5 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
               Save Changes
             </Button>
           </div>

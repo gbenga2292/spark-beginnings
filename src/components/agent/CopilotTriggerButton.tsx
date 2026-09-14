@@ -34,17 +34,16 @@ export function CopilotTriggerButton() {
       <div className="fixed bottom-5 right-5 z-40">
         <Button
           onClick={() => setIsOpen(true)}
-          className="h-11 px-3.5 rounded-full bg-gradient-to-r from-indigo-600 via-indigo-500 to-sky-500 hover:from-indigo-500 hover:to-sky-400 text-white font-medium text-xs shadow-lg shadow-indigo-500/25 flex items-center gap-2 transition-all hover:scale-105 active:scale-95 border border-white/10 cursor-pointer"
+          className="h-11 px-4 rounded-full bg-gradient-to-r from-blue-700 via-blue-800 to-slate-900 hover:from-blue-600 hover:via-blue-700 hover:to-slate-800 dark:bg-none dark:bg-slate-900 dark:hover:bg-slate-800 text-white font-medium text-xs border border-white/15 dark:border-slate-700/80 shadow-lg shadow-blue-950/25 dark:shadow-black/40 flex items-center gap-2.5 transition-all duration-300 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] cursor-pointer group"
         >
-          <div className="relative">
-            <Bot className="w-4 h-4" />
-            <span className="absolute -top-1 -right-1 flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-sky-400"></span>
-            </span>
+          <div className="relative flex items-center justify-center">
+            <span className="absolute -inset-1 rounded-full bg-white/20 blur-xs animate-pulse opacity-75" />
+            <Bot className="w-4 h-4 text-white relative z-10 drop-shadow-xs transition-transform duration-300 group-hover:scale-110" />
           </div>
-          <span className="hidden sm:inline font-semibold">AI Co-Pilot</span>
-          <span className="hidden md:inline text-[9.5px] px-1.5 py-0.2 rounded bg-black/20 text-indigo-100 font-mono">
+          <span className="hidden sm:inline font-bold text-xs tracking-wide text-white drop-shadow-xs">
+            AI Co-Pilot
+          </span>
+          <span className="hidden md:inline-flex items-center justify-center text-[9.5px] px-1.5 py-0.5 rounded-md bg-white/10 text-white/90 font-mono font-semibold border border-white/15 shadow-xs">
             ⌘J
           </span>
         </Button>

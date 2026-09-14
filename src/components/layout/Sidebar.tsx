@@ -1,299 +1,183 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useTransition } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import { Browser } from '@capacitor/browser';
 import { cn, IS_LIMITED_WEB_WEB } from '@/src/lib/utils';
 import { prefetchRoute } from '@/src/lib/routePrefetch';
-import { useUserStore, UserPrivileges } from '@/src/store/userStore';
+import { useUserStore } from '@/src/store/userStore';
 import { useAppStore } from '@/src/store/appStore';
 import { useTheme } from '@/src/hooks/useTheme';
 import { toast, showConfirm } from '@/src/components/ui/toast';
 import { supabase } from '@/src/integrations/supabase/client';
 import logoSrc from '../../../logo/logo-2.png';
 import {
-  LayoutDashboard,
-  Users,
-  CalendarClock,
-  Wallet,
-  FileText,
-  Settings,
-  UserPlus,
-  MapPin,
-  Library,
-  Landmark,
-  ShieldCheck,
-  Building2,
-  ReceiptText,
-  BarChart3,
-  ChevronDown,
-  AlertTriangle,
-  ClipboardList,
-  BookOpen,
   PanelLeftClose,
   PanelLeftOpen,
   X,
-  ListTodo,
-  BellRing,
-  ClipboardCheck,
-  BarChart2,
-  Bell,
-  History,
-  Calculator,
-  MessageSquare,
-  Package,
-  Fuel,
-  Truck,
-  ArrowRightLeft,
-  PieChart,
-  Undo2,
-  ShoppingCart,
-  Activity,
-  DownloadCloud,
-  Info,
-  Sparkles,
+  User,
   ArrowUpCircle,
   RefreshCw,
-  FolderOpen,
-  TrendingUp,
-  HardHat,
-  PiggyBank
+  DownloadCloud,
+  ArrowLeft,
+  ChevronRight,
 } from 'lucide-react';
-import { NairaSign } from '@/src/components/ui/naira-sign';
 import { APP_VERSION } from '@/src/constants/version';
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
-  DialogDescription, 
-  DialogFooter 
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogDescription,
 } from '@/src/components/ui/dialog';
-import { Button } from '@/src/components/ui/button';
+import {
+  navigation,
+  getVisibleNavItems,
+  getFirstAccessibleHref,
+  getActiveCategory,
+  NavCategory,
+} from '@/src/constants/navigation';
 
 interface SidebarProps {
   isOpen?: boolean;
   setIsOpen?: (open: boolean) => void;
 }
 
-interface NavItem {
-  name: string;
-  href: string;
-  icon: any;
-  privKey: keyof UserPrivileges | 'custom';
-  privField: string;
-  visible?: (user: any) => boolean;
-  /** For tab-shell pages: auto-sets the initial tab via router state */
-  activeTab?: string;
-  subItems?: NavItem[];
-}
-
-interface NavCategory {
-  name: string;
-  icon: any;
-  items: NavItem[];
-  /** If true, renders as a direct link (no dropdown) */
-  standalone?: boolean;
-  standaloneHref?: string;
-}
-
-const navigation: NavCategory[] = [
-  // ── Dashboard — standalone direct link ───────────────────────────────────
-  {
-    name: 'Dashboard',
-    icon: LayoutDashboard,
-    standalone: true,
-    standaloneHref: '/tasks/dashboard',
-    items: [
-      { name: 'Dashboard', href: '/tasks/dashboard', icon: LayoutDashboard, privKey: 'tasks', privField: 'canViewDashboard' },
-    ],
-  },
-  // ── Client 360 — standalone direct link ──────────────────────────────────
-  {
-    name: 'Client 360',
-    icon: Sparkles,
-    standalone: true,
-    standaloneHref: '/client-360',
-    items: [
-      { name: 'Client 360', href: '/client-360', icon: Sparkles, privKey: 'sites', privField: 'canView' },
-    ],
-  },
-  // ── Site Analytics — standalone direct link ──────────────────────────────
-  {
-    name: 'Site Analytics',
-    icon: BarChart3,
-    standalone: true,
-    standaloneHref: '/operations/site-analytics',
-    items: [
-      { name: 'Site Analytics', href: '/operations/site-analytics', icon: BarChart3, privKey: 'operations', privField: 'canView' },
-    ],
-  },
-  // ── Simulator — standalone direct link ──────────────────────────────────
-  {
-    name: 'Simulator',
-    icon: HardHat,
-    standalone: true,
-    standaloneHref: '/operations/simulator',
-    items: [
-      { name: 'Simulator', href: '/operations/simulator', icon: HardHat, privKey: 'simulator', privField: 'canView' },
-    ],
-  },
-  // ── Machine Reconciliation — standalone direct link ─────────────────────
-  {
-    name: 'Machine Recon',
-    icon: Package,
-    standalone: true,
-    standaloneHref: '/operations/machine-reconciliation',
-    items: [
-      { name: 'Machine Recon', href: '/operations/machine-reconciliation', icon: Package, privKey: 'opsMachineRecon', privField: 'canView' },
-    ],
-  },
-  // ── Logistics Estimator — standalone direct link ────────────────────────
-  {
-    name: 'Logistics Estimator',
-    icon: Calculator,
-    standalone: true,
-    standaloneHref: '/operations/estimator',
-    items: [
-      { name: 'Logistics Estimator', href: '/operations/estimator', icon: Calculator, privKey: 'simulator', privField: 'canView' },
-    ],
-  },
-  // ── Tasks ────────────────────────────────────────────────────────
-  {
-    name: 'Tasks',
-    icon: ListTodo,
-    items: [
-      { name: 'Task Register', href: '/tasks', icon: ClipboardCheck, privKey: 'tasks', privField: 'canViewMyTasks' },
-      { name: 'Reminders', href: '/tasks/reminders', icon: Bell, privKey: 'tasks', privField: 'canViewReminders' },
-    ],
-  },
-  // ── Comms & Journals ──────────────────────────────────────────────────────
-  {
-    name: 'Comms & Journals',
-    icon: MessageSquare,
-    items: [
-      { name: 'External Comms', href: '/comm-log', icon: MessageSquare, privKey: 'commLog', privField: 'canView' },
-      { name: 'Daily Journal', href: '/daily-journal', icon: BookOpen, privKey: 'dailyJournal', privField: 'canView' },
-    ],
-  },
-  // ── HR ───────────────────────────────────────────────────────────────────
-  {
-    name: 'HR',
-    icon: Users,
-    items: [
-      { name: 'HR Dashboard', href: '/hr-dashboard', icon: LayoutDashboard, privKey: 'dashboard', privField: 'canView' },
-      { name: 'Daily Register', href: '/attendance', icon: CalendarClock, privKey: 'attendance', privField: 'canView' },
-      { name: 'Employees', href: '/employees', icon: Users, privKey: 'employees', privField: 'canView' },
-      { name: 'Onboarding', href: '/onboarding', icon: UserPlus, privKey: 'onboarding', privField: 'canView' },
-      { name: 'Leaves', href: '/leaves', icon: CalendarClock, privKey: 'leaves', privField: 'canView' },
-      { name: 'Salary & Loan Advance', href: '/salary-loans', icon: NairaSign, privKey: 'salaryLoans', privField: 'canView' },
-      { name: 'HMO Management', href: '/hmo', icon: ShieldCheck, privKey: 'hmo', privField: 'canView' },
-      { name: 'Evaluations', href: '/evaluations', icon: ClipboardList, privKey: 'evaluations', privField: 'canView' },
-      { name: 'Interviews', href: '/interviews', icon: Users, privKey: 'interviews', privField: 'canView' },
-      { name: 'Performance & Conduct', href: '/performance-conduct', icon: AlertTriangle, privKey: 'disciplinary', privField: 'canView' },
-    ],
-  },
-  // ── Operations ───────────────────────────────────────────────────────────
-  {
-    name: 'Operations',
-    icon: Package,
-    items: [
-      { name: 'Overview', href: '/operations', icon: LayoutDashboard, privKey: 'operations', privField: 'canView' },
-      { name: 'Inventory', href: '/operations/assets', icon: Package, privKey: 'opsInventory', privField: 'canView' },
-      { name: 'Waybills', href: '/operations/waybills', icon: FileText, privKey: 'opsWaybills', privField: 'canView' },
-      { name: 'Quick Checkout', href: '/operations/checkout', icon: ShoppingCart, privKey: 'opsCheckout', privField: 'canView' },
-      { name: 'Maintenance', href: '/operations/maintenance', icon: Activity, privKey: 'opsMaintenance', privField: 'canView' },
-      { name: 'Diesel Refill', href: '/operations/diesel', icon: Fuel, privKey: 'opsDiesel', privField: 'canView' },
-      { name: 'Vehicles', href: '/operations/vehicles', icon: Truck, privKey: 'opsVehicles', privField: 'canView' },
-      { name: 'Sites', href: '/operations/sites', icon: MapPin, privKey: 'opsSites', privField: 'canView' },
-      { name: 'Site Analytics', href: '/operations/site-analytics', icon: BarChart3, privKey: 'operations', privField: 'canView' },
-    ],
-  },
-  // ── Account ───────────────────────────────────────────────────────────────
-  {
-    name: 'Account',
-    icon: Landmark,
-    items: [
-      { name: 'Client Accounts', href: '/client-accounts', icon: ReceiptText, privKey: 'custom', privField: '', visible: (user: any) => user?.privileges?.billing?.canView || user?.privileges?.payments?.canView || user?.privileges?.payments?.canViewVat },
-      { name: 'Payroll', href: '/payroll', icon: Wallet, privKey: 'payroll', privField: 'canView' },
-      { name: 'Non-Employee Directory', href: '/beneficiaries', icon: Users, privKey: 'beneficiaries', privField: 'canView' },
-      { name: 'Ledger', href: '/ledger', icon: BookOpen, privKey: 'ledger', privField: 'canView' },
-      { name: 'Bank AI Import', href: '/bank-import', icon: Sparkles, privKey: 'bankImport', privField: 'canView' },
-      { name: 'Company Expenses', href: '/company-expenses', icon: BookOpen, privKey: 'ledger', privField: 'canView' },
-      { name: 'Budget', href: '/budget', icon: PiggyBank, privKey: 'budget', privField: 'canView' },
-    ],
-  },
-  // ── Reports ──────────────────────────────────────────────────────────────
-  {
-    name: 'Reports',
-    icon: FolderOpen,
-    items: [
-      { name: 'HR Reports', href: '/reports', icon: FileText, privKey: 'reports', privField: 'canView' },
-      { name: 'Account Reports', href: '/financial-reports', icon: BarChart3, privKey: 'financialReports', privField: 'canView' },
-      { name: 'Task Reports', href: '/tasks/reports', icon: ClipboardList, privKey: 'tasks', privField: 'canViewReports' },
-      { name: 'Weekly Report', href: '/weekly-report', icon: BarChart2, privKey: 'weeklyReport', privField: 'canView' },
-    ],
-  },
-  {
-    name: 'Setting',
-    icon: Settings,
-    items: [
-      { name: 'User Management', href: '/users', icon: ShieldCheck, privKey: 'users', privField: 'canView' },
-      { name: 'Settings', href: '/settings', icon: Settings, privKey: 'variables', privField: 'canView' },
-      { name: 'Activity Log', href: '/activity-log', icon: History, privKey: 'activityLog', privField: 'canView' },
-    ],
-  },
-];
+// Flat list of all hrefs that appear in navigation — statically computed once
+const ALL_SIDEBAR_HREFS = navigation.flatMap(cat =>
+  cat.standaloneHref ? [cat.standaloneHref] : cat.items.map(item => item.href)
+);
 
 export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
   const location = useLocation();
   const currentUser = useUserStore((s) => s.getCurrentUser());
-  const pendingLedgerEntries = useAppStore((s) => s.pendingLedgerEntries);
   const commLogs = useAppStore((s) => s.commLogs);
   const commLogReads = useAppStore((s) => s.commLogReads);
   const { isDark } = useTheme();
   const navigate = useNavigate();
-  const [expandedCategories, setExpandedCategories] = useState<string[]>([]);
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [pendingHref, setPendingHref] = useState<string | null>(null);
+  const [, startTransition] = useTransition();
+
+  // Clear optimistic pending path once location changes
+  useEffect(() => {
+    setPendingHref(null);
+  }, [location.pathname]);
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const p = window.location.pathname;
+      return p === '/tasks/archive' || p.startsWith('/tasks/archive/');
+    }
+    return false;
+  });
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 1024);
+
+  // Category drill-down state
+  const [drilledCategory, setDrilledCategory] = useState<NavCategory | null>(null);
+  const [isRootView, setIsRootView] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const p = window.location.pathname;
+      return p === '/tasks/dashboard' || p.startsWith('/tasks/dashboard/') || p === '/home' || p === '/';
+    }
+    return false;
+  });
+
+  // Modern matchMedia listener: 0 CPU cycles while resizing within the same desktop or mobile bracket
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const mql = window.matchMedia('(max-width: 1023px)');
+    const onChange = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mql.addEventListener('change', onChange);
+    return () => mql.removeEventListener('change', onChange);
+  }, []);
+
+  // Collapse only applies to desktop screens. Mobile drawer must always show full navigation.
+  const effectiveCollapsed = isCollapsed && !isMobile;
+
+  const canViewCommLog = useMemo(() => {
+    if (!currentUser) return false;
+    if (currentUser?.privileges?.users?.canManage === true) return true;
+    return currentUser?.privileges?.commLog?.canView === true;
+  }, [currentUser]);
 
   const unreadCommCount = useMemo(() => {
-    if (!currentUser?.id) return 0;
-    return (commLogs || []).filter(
-      l => l.loggedBy !== currentUser.name &&
-      !(commLogReads || []).some(r => r.logId === l.id && r.userId === currentUser.id)
-    ).length;
-  }, [commLogs, commLogReads, currentUser]);
+    if (!canViewCommLog || !currentUser?.id || !commLogs?.length) return 0;
+    const readSet = new Set(
+      commLogReads
+        ? commLogReads.filter(r => r.userId === currentUser.id).map(r => r.logId)
+        : []
+    );
+    return commLogs.filter(l => l.loggedBy !== currentUser.name && !readSet.has(l.id)).length;
+  }, [canViewCommLog, commLogs, commLogReads, currentUser]);
 
   // Track whether collapse was triggered automatically (non-sidebar page)
   // vs manually by the user. We only auto-restore on auto-collapse.
   const autoCollapsedRef = useRef(false);
 
-  // Flat list of all hrefs that appear in the sidebar navigation
-  const allSidebarHrefs = navigation.flatMap(cat =>
-    cat.standaloneHref ? [cat.standaloneHref] : cat.items.map(item => item.href)
-  );
+  // Determine active category based on the current pathname
+  const activeCategory = useMemo(() => {
+    return getActiveCategory(location.pathname, navigation);
+  }, [location.pathname]);
+
+  // Current category to display: if in root view, null; otherwise drilledCategory or activeCategory
+  const currentCategory = useMemo(() => {
+    if (isRootView) return null;
+    if (drilledCategory) return drilledCategory;
+    if (activeCategory && !activeCategory.standalone) return activeCategory;
+    return null;
+  }, [isRootView, drilledCategory, activeCategory]);
+
+  const accessibleCategories = useMemo(() => {
+    return navigation.filter(cat => {
+      const visible = getVisibleNavItems(cat.items, currentUser);
+      return visible.length > 0;
+    });
+  }, [currentUser]);
+
+  const categoryVisibleItems = useMemo(() => {
+    if (!currentCategory) return [];
+    return getVisibleNavItems(currentCategory.items, currentUser);
+  }, [currentCategory, currentUser]);
 
   useEffect(() => {
-    const isOnSidebarPage = allSidebarHrefs.some(href =>
+    const isTaskDashboardPage = location.pathname === '/tasks/dashboard' ||
+      location.pathname.startsWith('/tasks/dashboard/');
+
+    if (isTaskDashboardPage) {
+      autoCollapsedRef.current = false;
+      setIsCollapsed(false);
+      setIsRootView(true);
+      setDrilledCategory(null);
+      return;
+    }
+
+    const matched = getActiveCategory(location.pathname, navigation);
+    if (matched && !matched.standalone) {
+      setDrilledCategory(matched);
+      setIsRootView(false);
+    }
+
+    const isOnSidebarPage = ALL_SIDEBAR_HREFS.some(href =>
       location.pathname === href ||
       (href !== '/' && location.pathname.startsWith(href + '/'))
     );
 
-    // Simulator, Machine Recon, Client 360 and Site 360 get the full canvas — collapse the sidebar automatically
-    const isFullCanvasPage = location.pathname === '/operations/simulator' ||
-      location.pathname.startsWith('/operations/simulator/') ||
-      location.pathname === '/operations/machine-reconciliation' ||
-      location.pathname.startsWith('/operations/machine-reconciliation') ||
-      location.pathname === '/client-360' ||
-      location.pathname.startsWith('/client-360/');
+    const isTaskArchivePage = location.pathname === '/tasks/archive' ||
+      location.pathname.startsWith('/tasks/archive/');
+
+    const isReportsPage = matched?.name === 'Reports' ||
+      location.pathname === '/reports' ||
+      location.pathname.startsWith('/reports/') ||
+      location.pathname === '/financial-reports' ||
+      location.pathname.startsWith('/financial-reports/') ||
+      location.pathname === '/tasks/reports' ||
+      location.pathname.startsWith('/tasks/reports/') ||
+      location.pathname === '/weekly-report' ||
+      location.pathname.startsWith('/weekly-report/');
+
+    const isFullCanvasPage = isTaskArchivePage || isReportsPage;
 
     if (!isOnSidebarPage || isFullCanvasPage) {
-      // Auto-collapse when on a non-sidebar page, Simulator, or Machine Recon
-      if (!isCollapsed) {
-        autoCollapsedRef.current = true;
-        setIsCollapsed(true);
-      }
+      autoCollapsedRef.current = true;
+      setIsCollapsed(true);
     } else {
-      // Restore only if we were the ones who auto-collapsed it
       if (autoCollapsedRef.current) {
         autoCollapsedRef.current = false;
         setIsCollapsed(false);
@@ -323,17 +207,15 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
       window.removeEventListener('sidebar:restore', handleRestoreEvent);
     };
   }, []);
-  
+
   // ── Platform Detection ─────────────────────────────────────────────────
-  // We only want to show the APK update UI on the actual Android device.
-  // Capacitor.getPlatform() returns 'android', 'ios', or 'web'.
   const isAndroidNative = Capacitor.getPlatform() === 'android';
   const isElectron = !!(window as any).electronAPI?.isElectron;
 
   // ── Android Auto-Update Logic (mobile-only) ────────────────────────────
   const CURRENT_VERSION = APP_VERSION;
   const UPDATE_SERVER_URL = import.meta.env.VITE_UPDATE_SERVER_URL || 'https://dewaterconstruct.com/app-updates';
-  
+
   const [updateInfo, setUpdateInfo] = useState<{ version: string; url: string; notes: string } | null>(null);
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -342,21 +224,18 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
     try {
       setIsDownloading(true);
       let finalUrl = url;
-      
-      // If the URL looks like a filename (not a full HTTP link), we assume it's in our private Supabase bucket
+
       if (!url.startsWith('http')) {
         const { data, error } = await supabase.storage
           .from('app-updates')
-          .createSignedUrl(url, 60); // Link expires in 60 seconds
-          
+          .createSignedUrl(url, 60);
+
         if (error) throw error;
         if (data?.signedUrl) {
           finalUrl = data.signedUrl;
         }
       }
 
-      // Trigger direct download without opening the Android external file browser
-      // Using the short-lived signed URL protects the private APK from the public web
       await Browser.open({ url: finalUrl });
       setIsUpdateModalOpen(false);
       toast.success('Download started! Track progress in your notification bar, then tap the APK to install.');
@@ -369,14 +248,10 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
   };
 
   useEffect(() => {
-    // ONLY check for updates if we are on a native Android platform and NOT Electron
     if (!isAndroidNative || isElectron) return;
 
     const checkForUpdates = async () => {
       try {
-        // CapacitorHttp makes a true native HTTP request — it bypasses WebView CORS completely.
-        // fetch() from a WebView (origin: https://localhost) would be blocked by the server's
-        // missing Access-Control-Allow-Origin header. CapacitorHttp has no such restriction.
         const response = await CapacitorHttp.get({
           url: `${UPDATE_SERVER_URL}/version.json?t=${Date.now()}`,
           headers: { 'Cache-Control': 'no-cache' },
@@ -387,7 +262,7 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
         const normalizeVersion = (v: string) => v.replace(/^v/i, '').trim();
         const cParts = normalizeVersion(CURRENT_VERSION).split('.').map(Number);
         const rParts = normalizeVersion(data.version).split('.').map(Number);
-        
+
         let isNewer = false;
         for (let i = 0; i < Math.max(cParts.length, rParts.length); i++) {
           const c = cParts[i] || 0;
@@ -405,13 +280,36 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
     };
 
     checkForUpdates();
-    // Re-check every 4 hours if the app stays open
     const interval = setInterval(checkForUpdates, 4 * 60 * 60 * 1000);
     return () => clearInterval(interval);
   }, [isAndroidNative, isElectron]);
 
   const handleLinkClick = async (e: React.MouseEvent, href: string) => {
-    const { isVariablesDirty, setVariablesDirty, isLedgerDirty, setLedgerDirty, isEmployeeFormDirty, setEmployeeFormDirty, isDailyLogFormDirty, setDailyLogFormDirty, isSimulatorDirty, setSimulatorDirty } = useAppStore.getState();
+    // If opening in new tab or using non-left click, allow default browser behavior
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) {
+      return;
+    }
+
+    // Don't re-navigate if already on this exact route
+    if (location.pathname === href) {
+      e.preventDefault();
+      setIsOpen?.(false);
+      return;
+    }
+
+    const {
+      pendingLedgerEntries,
+      isVariablesDirty,
+      setVariablesDirty,
+      isLedgerDirty,
+      setLedgerDirty,
+      isEmployeeFormDirty,
+      setEmployeeFormDirty,
+      isDailyLogFormDirty,
+      setDailyLogFormDirty,
+      isSimulatorDirty,
+      setSimulatorDirty,
+    } = useAppStore.getState();
 
     if (isDailyLogFormDirty) {
       e.preventDefault();
@@ -419,12 +317,15 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
         title: 'Unsaved Changes',
         confirmLabel: 'Discard & Leave',
         cancelLabel: 'Keep Editing',
-        variant: 'danger'
+        variant: 'danger',
       });
       if (ok) {
         setDailyLogFormDirty(false);
+        setPendingHref(href);
         setIsOpen?.(false);
-        navigate(href);
+        startTransition(() => {
+          navigate(href);
+        });
       }
       return;
     }
@@ -435,28 +336,34 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
         title: 'Unsaved Changes',
         confirmLabel: 'Discard & Leave',
         cancelLabel: 'Stay Here',
-        variant: 'danger'
+        variant: 'danger',
       });
       if (ok) {
         setSimulatorDirty(false);
+        setPendingHref(href);
         setIsOpen?.(false);
-        navigate(href);
+        startTransition(() => {
+          navigate(href);
+        });
       }
       return;
     }
 
-    if (location.pathname === '/ledger' && (pendingLedgerEntries.length > 0 || isLedgerDirty) && href !== '/ledger') {
+    if (location.pathname === '/ledger' && ((pendingLedgerEntries?.length ?? 0) > 0 || isLedgerDirty) && href !== '/ledger') {
       e.preventDefault();
       const ok = await showConfirm('You have unsaved entries in the ledger. Do you want to discard them and leave?', {
         title: 'Unsaved Changes',
         confirmLabel: 'Discard & Leave',
         cancelLabel: 'Stay Here',
-        variant: 'danger'
+        variant: 'danger',
       });
       if (ok) {
         setLedgerDirty(false);
+        setPendingHref(href);
         setIsOpen?.(false);
-        navigate(href);
+        startTransition(() => {
+          navigate(href);
+        });
       }
       return;
     }
@@ -467,12 +374,15 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
         title: 'Unsaved Changes',
         confirmLabel: 'Discard & Leave',
         cancelLabel: 'Stay Here',
-        variant: 'danger'
+        variant: 'danger',
       });
       if (ok) {
         setVariablesDirty(false);
+        setPendingHref(href);
         setIsOpen?.(false);
-        navigate(href);
+        startTransition(() => {
+          navigate(href);
+        });
       }
       return;
     }
@@ -483,61 +393,38 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
         title: 'Unsaved Changes',
         confirmLabel: 'Discard & Leave',
         cancelLabel: 'Stay Here',
-        variant: 'danger'
+        variant: 'danger',
       });
       if (ok) {
         setEmployeeFormDirty(false);
+        setPendingHref(href);
         setIsOpen?.(false);
-        navigate(href);
+        startTransition(() => {
+          navigate(href);
+        });
       }
       return;
     }
 
+    e.preventDefault();
+    setPendingHref(href);
     setIsOpen?.(false);
-  };
-
-  const getVisibleItems = (items: NavItem[]) => {
-    return items.filter((item) => {
-      // ── Web Version Hard Restrictions ─────────────────────────────────────
-      if (IS_LIMITED_WEB_WEB) {
-        const isTaskPath = item.href.startsWith('/tasks') || item.href === '/comm-log';
-        const isDashboardPath = item.href === '/';
-        const isCompanyExpenses = item.href === '/company-expenses';
-        const isDailyJournal = item.href === '/daily-journal';
-        
-        if (!isTaskPath && !isDashboardPath && !isCompanyExpenses && !isDailyJournal) {
-          return false;
-        }
-      }
-
-      if (!currentUser) return false;
-      if (item.visible) return item.visible(currentUser);
-      if (item.privKey === 'custom') return false;
-      
-      let pagePriv = (currentUser.privileges[item.privKey] as unknown) as Record<string, boolean>;
-      
-      if (item.privField !== 'canView' && pagePriv?.['canView'] !== true) return false;
-      return pagePriv?.[item.privField] === true;
+    startTransition(() => {
+      navigate(href);
     });
   };
 
-  const toggleCategory = (categoryName: string) => {
-    setExpandedCategories((prev) =>
-      prev.includes(categoryName)
-        ? prev.filter((name) => name !== categoryName)
-        : [...prev, categoryName]
-    );
-  };
-
-  // ── Theme tokens (shared across all categories) ────────────────────────────
-  const sidebarBg   = isDark ? 'bg-slate-900 border-slate-700/60' : 'bg-white border-slate-200';
-  const navBg       = isDark ? 'bg-slate-900' : 'bg-gradient-to-b from-indigo-600 via-indigo-700 to-indigo-800';
-  const catBtnBase  = isDark ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-white hover:bg-white/10 hover:text-white';
-  const catBtnActive = isDark ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/25 ring-1 ring-white/15 font-bold' : 'bg-white text-indigo-600 shadow-md font-bold';
-  const itemBase    = isDark ? 'text-slate-400 hover:bg-slate-800/80 hover:text-slate-100' : 'text-white/90 hover:bg-white/15 hover:text-white';
-  const itemActive  = isDark ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/30 ring-1 ring-white/20 font-bold' : 'bg-white text-indigo-600 shadow-md font-bold';
-  const iconBase    = isDark ? 'text-slate-500 group-hover:text-slate-300' : 'text-white/80 group-hover:text-inherit';
-  const iconActive  = isDark ? 'text-white' : 'text-indigo-600';
+  // ── Theme tokens ─────────────────────────────────────────────────────────
+  const sidebarBg = isDark ? 'bg-slate-900 border-slate-700/60' : 'bg-white border-slate-200';
+  const navBg = isDark ? 'bg-slate-900' : 'bg-gradient-to-b from-blue-700 via-blue-800 to-slate-900';
+  const itemBase = isDark
+    ? 'text-slate-400 hover:bg-slate-800/80 hover:text-slate-100 active:scale-[0.98] active:bg-slate-800 transition-all duration-75 cursor-pointer select-none'
+    : 'text-white/90 hover:bg-white/15 hover:text-white active:scale-[0.98] active:bg-white/25 transition-all duration-75 cursor-pointer select-none';
+  const itemActive = isDark
+    ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30 ring-1 ring-white/20 font-bold active:scale-[0.98] transition-all duration-75 cursor-pointer select-none'
+    : 'bg-white text-blue-700 shadow-md font-bold active:scale-[0.98] transition-all duration-75 cursor-pointer select-none';
+  const iconBase = isDark ? 'text-slate-400 group-hover:text-slate-200' : 'text-white/80 group-hover:text-white';
+  const iconActive = isDark ? 'text-white' : 'text-blue-700';
 
   return (
     <>
@@ -552,16 +439,16 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
       {/* Sidebar Container */}
       <div
         className={cn(
-          'fixed lg:relative flex h-full flex-col border-r transition-all duration-300 z-50',
+          'fixed lg:relative flex h-full flex-col border-r transition-[width,transform] duration-200 ease-out z-50',
           sidebarBg,
-          isCollapsed ? 'w-20' : 'w-64',
+          effectiveCollapsed ? 'w-20' : 'w-72 lg:w-64',
           isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         )}
       >
         {/* Logo Area */}
-        <div className={cn('flex h-16 shrink-0 items-center border-b border-transparent transition-all', isCollapsed ? 'px-0 justify-center' : 'px-6 justify-between')}>
-          <div className={cn('relative flex items-center gap-2 font-bold text-xl overflow-hidden transition-all duration-300', isCollapsed ? 'w-0 opacity-0 hidden' : 'w-auto opacity-100')}>
-            <div className="relative inline-flex items-center">
+        <div className={cn('flex h-16 shrink-0 items-center border-b border-transparent transition-all', effectiveCollapsed ? 'px-0 justify-center' : 'px-6 justify-between')}>
+          <div className={cn('relative flex items-center gap-2 font-bold text-xl overflow-hidden transition-all duration-300', effectiveCollapsed ? 'w-0 opacity-0 hidden' : 'w-auto opacity-100')}>
+            <div className="relative inline-flex items-center transform-gpu">
               <img
                 src={logoSrc}
                 alt="DCEL"
@@ -593,7 +480,7 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
               className={cn('hidden lg:flex p-1.5 rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors', isDark && 'hover:bg-slate-800 hover:text-slate-300')}
               title={isCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
             >
-              {isCollapsed ? <PanelLeftOpen className="h-5 w-5" /> : <PanelLeftClose className="h-5 w-5" />}
+              {effectiveCollapsed ? <PanelLeftOpen className="h-5 w-5" /> : <PanelLeftClose className="h-5 w-5" />}
             </button>
             {/* Mobile Close Button */}
             <button onClick={() => setIsOpen?.(false)} className="lg:hidden p-2 text-slate-500 hover:bg-slate-100 rounded-md">
@@ -602,175 +489,281 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
           </div>
         </div>
 
+        {/* Navigation Area */}
         <div className={cn("flex flex-1 flex-col overflow-y-auto overflow-x-hidden", navBg)}>
-          <nav className={cn('flex-1 space-y-2 py-4', isCollapsed ? 'px-2' : 'px-3')}>
-            {navigation.map((category) => {
-              // ── Web Version Category Filtering ────────────────────────────────
-              if (IS_LIMITED_WEB_WEB) {
-                const allowedCategories = ['Dashboard', 'Client 360', 'Simulator', 'Tasks', 'Account', 'Comms & Journals'];
-                if (!allowedCategories.includes(category.name)) return null;
-              }
-
-              const visibleItems = getVisibleItems(category.items);
-              if (visibleItems.length === 0) return null;
-
-              const isAnyItemActive = visibleItems.some(
-                (item) => location.pathname === item.href || (item.href !== '/' && location.pathname.startsWith(item.href + '/'))
-              );
-              const isDashboardActive = category.standalone && (location.pathname === category.standaloneHref);
-
-              // ── STANDALONE: Dashboard — single link, no dropdown ───────────
-              if (category.standalone) {
-                return (
-                  <div key={category.name} className="mb-1">
-                    <Link
-                      to={category.standaloneHref!}
-                      onClick={(e) => handleLinkClick(e, category.standaloneHref!)}
-                      onMouseEnter={() => prefetchRoute(category.standaloneHref!)}
-                      title={isCollapsed ? category.name : undefined}
-                      className={cn(
-                        'flex w-full items-center rounded-md py-2 text-sm font-semibold transition-colors',
-                        isCollapsed ? 'px-0 justify-center' : 'px-3',
-                        isDashboardActive ? catBtnActive : catBtnBase
-                      )}
-                    >
-                      <div className={cn('flex items-center', isCollapsed && 'justify-center w-full')}>
-                        <category.icon className={cn('h-5 w-5', !isCollapsed && 'mr-3')} />
-                        {!isCollapsed && category.name}
-                      </div>
-                    </Link>
-                  </div>
-                );
-              }
-
-              // ── STANDARD: Collapsible category — all categories identical ──
-              const isExpanded = isCollapsed ? isAnyItemActive : expandedCategories.includes(category.name);
-
-              return (
-                <div key={category.name} className="mb-4">
-                  {/* Category Header */}
+          <nav className={cn('flex-1 space-y-1.5 py-4', effectiveCollapsed ? 'px-2' : 'px-3')}>
+            {/* ── DRILLED CATEGORY VIEW (Back button + Category Header + Category Items) ── */}
+            {currentCategory && (
+              <div>
+                {/* ── BACK BUTTON (Replaces Home button) ──────────────── */}
+                <div className="mb-2">
                   <button
+                    type="button"
                     onClick={() => {
-                      if (isCollapsed) setIsCollapsed(false);
-                      else toggleCategory(category.name);
+                      setIsRootView(true);
+                      setDrilledCategory(null);
                     }}
                     className={cn(
-                      'flex w-full items-center justify-between px-3 py-2 text-xs font-bold uppercase tracking-wider transition-colors relative',
-                      isDark ? 'text-slate-400 hover:text-slate-200' : 'text-white/80 hover:text-white',
-                      isCollapsed && 'justify-center cursor-default'
+                      'group flex w-full items-center rounded-xl py-2 text-xs font-bold transition-all duration-75 active:scale-[0.98] cursor-pointer select-none',
+                      'bg-white/10 hover:bg-white/20 text-white border border-white/15 shadow-xs',
+                      effectiveCollapsed ? 'px-0 justify-center' : 'px-3'
                     )}
+                    title={effectiveCollapsed ? 'Back to All Categories' : undefined}
                   >
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <span>{isCollapsed ? '•••' : category.name}</span>
-                      {!isCollapsed && category.name === 'Comms & Journals' && unreadCommCount > 0 && !isExpanded && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded-full font-bold bg-indigo-500 text-white leading-none animate-pulse">
-                          {unreadCommCount}
-                        </span>
-                      )}
-                      {isCollapsed && category.name === 'Comms & Journals' && unreadCommCount > 0 && (
-                        <span className="absolute top-1 right-2 w-2 h-2 rounded-full bg-indigo-400 ring-2 ring-indigo-900 animate-pulse" />
-                      )}
+                    <div className={cn('flex items-center', effectiveCollapsed && 'justify-center w-full')}>
+                      <ArrowLeft className={cn('h-4 w-4 shrink-0 text-white transition-transform duration-200 group-hover:-translate-x-0.5', !effectiveCollapsed && 'mr-2')} />
+                      {!effectiveCollapsed && <span>Back</span>}
                     </div>
-                    {!isCollapsed && (
-                      <ChevronDown className={cn('h-3.5 w-3.5 transition-transform duration-200', isExpanded ? 'rotate-180' : '')} />
-                    )}
                   </button>
+                </div>
 
-                  {/* Sub-items */}
-                  {isExpanded && (
-                    <div className={cn('mt-1 space-y-1', isCollapsed ? 'pl-0' : 'pl-4')}>
-                      {visibleItems.map((item) => {
-                        const visibleSubItems = item.subItems ? getVisibleItems(item.subItems) : [];
-                        const isActive = location.pathname === item.href || visibleSubItems.some(sub => location.pathname === sub.href);
-                        const isCommLog = item.href === '/comm-log';
-                        const itemUnread = isCommLog ? unreadCommCount : 0;
-                        
-                        return (
-                          <div key={item.name} className="flex flex-col gap-0.5">
-                            <Link
-                              to={item.href}
-                              onClick={(e) => handleLinkClick(e, item.href)}
-                              onMouseEnter={() => prefetchRoute(item.href)}
-                              title={isCollapsed ? (itemUnread > 0 ? `${item.name} (${itemUnread} unread)` : item.name) : undefined}
+                {/* ── ACTIVE CATEGORY HEADER ──────────────────────────── */}
+                {!effectiveCollapsed ? (
+                  <div className="flex items-center gap-2 px-3 py-2 mb-2.5 rounded-xl bg-black/20 border border-white/10 shadow-inner">
+                    <div className={cn('flex h-6 w-6 items-center justify-center rounded-lg bg-gradient-to-br text-white shadow-xs shrink-0', currentCategory.color)}>
+                      <currentCategory.icon className="h-3.5 w-3.5" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <span className="text-xs font-black uppercase tracking-wider text-white block truncate">
+                        {currentCategory.name}
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex justify-center my-2" title={currentCategory.name}>
+                    <div className={cn('flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br text-white shadow-xs', currentCategory.color)}>
+                      <currentCategory.icon className="h-4 w-4" />
+                    </div>
+                  </div>
+                )}
+
+                {/* Category Items */}
+                <div className="space-y-1">
+                  {categoryVisibleItems.map((item) => {
+                    const activePath = pendingHref || location.pathname;
+                    const visibleSubItems = item.subItems ? getVisibleNavItems(item.subItems, currentUser) : [];
+                    const isActive = activePath === item.href || visibleSubItems.some(sub => activePath === sub.href);
+                    const isCommLog = item.href === '/comm-log';
+                    const itemUnread = isCommLog ? unreadCommCount : 0;
+
+                    return (
+                      <div key={item.name} className="flex flex-col gap-0.5 mb-1">
+                        <Link
+                          to={item.href}
+                          onClick={(e) => handleLinkClick(e, item.href)}
+                          onMouseEnter={() => prefetchRoute(item.href)}
+                          onTouchStart={() => prefetchRoute(item.href)}
+                          onFocus={() => prefetchRoute(item.href)}
+                          title={effectiveCollapsed ? (itemUnread > 0 ? `${item.name} (${itemUnread} unread)` : item.name) : undefined}
+                          className={cn(
+                            'group flex items-center rounded-xl py-2.5 text-sm font-medium transition-colors',
+                            effectiveCollapsed ? 'px-0 justify-center' : 'px-3',
+                            isActive ? itemActive : itemBase
+                          )}
+                        >
+                          <div className="relative flex-shrink-0">
+                            <item.icon
                               className={cn(
-                                'group flex items-center rounded-md py-2.5 text-sm font-medium transition-colors',
-                                isCollapsed ? 'px-0 justify-center' : 'px-3',
-                                isActive ? itemActive : itemBase
+                                'h-[18px] w-[18px] transition-colors',
+                                !effectiveCollapsed && 'mr-3',
+                                isActive ? iconActive : iconBase
                               )}
-                            >
-                              <div className="relative flex-shrink-0">
-                                <item.icon
-                                  className={cn(
-                                    'h-[18px] w-[18px] transition-colors',
-                                    !isCollapsed && 'mr-3',
-                                    isActive ? iconActive : iconBase
-                                  )}
-                                  aria-hidden="true"
-                                />
-                                {isCollapsed && itemUnread > 0 && (
-                                  <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-indigo-500 rounded-full ring-2 ring-white dark:ring-slate-900 animate-pulse" />
-                                )}
-                              </div>
-                              {!isCollapsed && <span className="truncate flex-1">{item.name}</span>}
-                              {!isCollapsed && itemUnread > 0 && (
-                                <span className={cn(
-                                  'ml-auto text-[11px] font-extrabold px-2 py-0.5 rounded-full shadow-sm animate-pulse',
-                                  isActive
-                                    ? (isDark ? 'bg-white text-indigo-700' : 'bg-indigo-600 text-white')
-                                    : (isDark ? 'bg-indigo-500 text-white' : 'bg-white text-indigo-700')
-                                )}>
-                                  {itemUnread}
-                                </span>
-                              )}
-                            </Link>
-
-                            {/* Rendering sub-items if not collapsed */}
-                            {!isCollapsed && visibleSubItems.length > 0 && (
-                              <div className={cn("ml-7 flex flex-col gap-0.5 border-l pl-2 mt-0.5", isDark ? "border-slate-800/50" : "border-white/10")}>
-                                {visibleSubItems.map((subItem) => {
-                                  const isSubActive = location.pathname === subItem.href;
-                                  return (
-                                    <Link
-                                      key={subItem.name}
-                                      to={subItem.href}
-                                      onClick={(e) => handleLinkClick(e, subItem.href)}
-                                      onMouseEnter={() => prefetchRoute(subItem.href)}
-                                      className={cn(
-                                        'group flex items-center rounded-md py-2 px-3 text-xs font-medium transition-colors',
-                                        isSubActive ? itemActive : itemBase
-                                      )}
-                                    >
-                                      <subItem.icon
-                                        className={cn(
-                                          'h-4 w-4 mr-2.5 transition-colors',
-                                          isSubActive ? iconActive : iconBase
-                                        )}
-                                      />
-                                      <span className="truncate">{subItem.name}</span>
-                                    </Link>
-                                  );
-                                })}
-                              </div>
+                              aria-hidden="true"
+                            />
+                            {effectiveCollapsed && itemUnread > 0 && (
+                              <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-blue-500 rounded-full ring-2 ring-white dark:ring-slate-900 animate-pulse" />
                             )}
                           </div>
-                        );
-                      })}
-                    </div>
-                  )}
+                          {!effectiveCollapsed && <span className="truncate flex-1">{item.name}</span>}
+                          {!effectiveCollapsed && itemUnread > 0 && (
+                            <span className={cn(
+                              'ml-auto text-[11px] font-extrabold px-2 py-0.5 rounded-full shadow-sm animate-pulse',
+                              isActive
+                                ? (isDark ? 'bg-white text-blue-700' : 'bg-blue-600 text-white')
+                                : (isDark ? 'bg-blue-500 text-white' : 'bg-white text-blue-700')
+                            )}>
+                              {itemUnread}
+                            </span>
+                          )}
+                        </Link>
+
+                        {/* Sub-items */}
+                        {!effectiveCollapsed && visibleSubItems.length > 0 && (
+                          <div className={cn("ml-7 flex flex-col gap-0.5 border-l pl-2 mt-0.5", isDark ? "border-slate-800/50" : "border-white/10")}>
+                            {visibleSubItems.map((subItem) => {
+                              const activePath = pendingHref || location.pathname;
+                              const isSubActive = activePath === subItem.href;
+                              return (
+                                <Link
+                                  key={subItem.name}
+                                  to={subItem.href}
+                                  onClick={(e) => handleLinkClick(e, subItem.href)}
+                                  onMouseEnter={() => prefetchRoute(subItem.href)}
+                                  onTouchStart={() => prefetchRoute(subItem.href)}
+                                  onFocus={() => prefetchRoute(subItem.href)}
+                                  className={cn(
+                                    'group flex items-center rounded-md py-2 px-3 text-xs font-medium transition-colors',
+                                    isSubActive ? itemActive : itemBase
+                                  )}
+                                >
+                                  <subItem.icon
+                                    className={cn(
+                                      'h-4 w-4 mr-2.5 transition-colors',
+                                      isSubActive ? iconActive : iconBase
+                                    )}
+                                  />
+                                  <span className="truncate">{subItem.name}</span>
+                                </Link>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
-              );
-            })}
+              </div>
+            )}
+
+            {/* ── ROOT / ALL CATEGORIES VIEW ─────────────────────────────── */}
+            {!currentCategory && (
+              <div className="space-y-1">
+                {accessibleCategories.map((cat) => {
+                  if (cat.standalone && cat.standaloneHref) {
+                    const activePath = pendingHref || location.pathname;
+                    const isActive = activePath === cat.standaloneHref ||
+                      activePath.startsWith(cat.standaloneHref + '/');
+                    return (
+                      <div key={cat.name} className="mb-1">
+                        <Link
+                          to={cat.standaloneHref}
+                          onClick={(e) => handleLinkClick(e, cat.standaloneHref!)}
+                          onMouseEnter={() => prefetchRoute(cat.standaloneHref!)}
+                          onTouchStart={() => prefetchRoute(cat.standaloneHref!)}
+                          onFocus={() => prefetchRoute(cat.standaloneHref!)}
+                          title={effectiveCollapsed ? cat.name : undefined}
+                          className={cn(
+                            'group flex items-center rounded-xl py-2.5 text-sm font-medium transition-colors',
+                            effectiveCollapsed ? 'px-0 justify-center' : 'px-3',
+                            isActive ? itemActive : itemBase
+                          )}
+                        >
+                          <div className="relative flex-shrink-0">
+                            <cat.icon
+                              className={cn(
+                                'h-[18px] w-[18px] transition-colors',
+                                !effectiveCollapsed && 'mr-3',
+                                isActive ? iconActive : iconBase
+                              )}
+                            />
+                          </div>
+                          {!effectiveCollapsed && <span className="truncate flex-1 font-semibold">{cat.name}</span>}
+                        </Link>
+                      </div>
+                    );
+                  }
+
+                  const isCurrentCatActive = activeCategory?.name === cat.name;
+                  const catUnread = cat.name === 'Communication' ? unreadCommCount : 0;
+
+                  return (
+                    <div key={cat.name} className="mb-1">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          setDrilledCategory(cat);
+                          setIsRootView(false);
+                          if (effectiveCollapsed) setIsCollapsed(false);
+
+                          const firstHref = getFirstAccessibleHref(cat, currentUser);
+                          if (firstHref) {
+                            handleLinkClick(e, firstHref);
+                          }
+                        }}
+                        onMouseEnter={() => {
+                          const firstHref = getFirstAccessibleHref(cat, currentUser);
+                          if (firstHref) prefetchRoute(firstHref);
+                        }}
+                        onTouchStart={() => {
+                          const firstHref = getFirstAccessibleHref(cat, currentUser);
+                          if (firstHref) prefetchRoute(firstHref);
+                        }}
+                        onFocus={() => {
+                          const firstHref = getFirstAccessibleHref(cat, currentUser);
+                          if (firstHref) prefetchRoute(firstHref);
+                        }}
+                        className={cn(
+                          'group flex w-full items-center rounded-xl py-2.5 text-sm font-medium transition-all duration-75 active:scale-[0.98] cursor-pointer select-none text-left',
+                          effectiveCollapsed ? 'px-0 justify-center' : 'px-3',
+                          isCurrentCatActive
+                            ? (isDark ? 'bg-slate-800/90 text-white font-bold' : 'bg-white/20 text-white font-bold')
+                            : itemBase
+                        )}
+                        title={effectiveCollapsed ? (catUnread > 0 ? `${cat.name} (${catUnread} unread)` : cat.name) : undefined}
+                      >
+                        <div className="relative flex-shrink-0">
+                          <div
+                            className={cn(
+                              'flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br text-white shadow-xs',
+                              cat.color,
+                              !effectiveCollapsed && 'mr-3'
+                            )}
+                          >
+                            <cat.icon className="h-4 w-4" />
+                          </div>
+                          {effectiveCollapsed && catUnread > 0 && (
+                            <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-blue-500 rounded-full ring-2 ring-white dark:ring-slate-900 animate-pulse" />
+                          )}
+                        </div>
+
+                        {!effectiveCollapsed && (
+                          <div className="flex-1 min-w-0 flex items-center justify-between">
+                            <span className="truncate text-sm font-semibold">{cat.name}</span>
+                            <div className="flex items-center gap-1.5 ml-2 shrink-0">
+                              {catUnread > 0 && (
+                                <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded-full bg-blue-500 text-white shadow-xs animate-pulse">
+                                  {catUnread}
+                                </span>
+                              )}
+                              <ChevronRight className="h-3.5 w-3.5 text-white/50 group-hover:text-white group-hover:translate-x-0.5 transition-transform" />
+                            </div>
+                          </div>
+                        )}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Special case: /profile page when not inside any category */}
+            {!activeCategory && (location.pathname === '/profile' || pendingHref === '/profile') && (
+              <div className="mb-1">
+                <Link
+                  to="/profile"
+                  onClick={(e) => handleLinkClick(e, '/profile')}
+                  className={cn(
+                    'group flex items-center rounded-xl py-2.5 text-sm font-medium transition-colors',
+                    effectiveCollapsed ? 'px-0 justify-center' : 'px-3',
+                    itemActive
+                  )}
+                >
+                  <User className={cn('h-[18px] w-[18px]', !effectiveCollapsed && 'mr-3', iconActive)} />
+                  {!effectiveCollapsed && <span className="truncate flex-1">Profile</span>}
+                </Link>
+              </div>
+            )}
           </nav>
 
           {/* ── Android Update Banner (hidden in Web/Electron) ────────────── */}
           {isAndroidNative && !isElectron && updateInfo && (
-            <div className={cn("mt-auto px-3 pb-4", isCollapsed ? "flex justify-center" : "")}>
+            <div className={cn("mt-auto px-3 pb-4", effectiveCollapsed ? "flex justify-center" : "")}>
               <button
                 onClick={() => setIsUpdateModalOpen(true)}
                 title={`Update v${updateInfo.version} Available`}
                 className={cn(
                   "group relative flex items-center gap-2.5 rounded-xl transition-all duration-200",
-                  isCollapsed
+                  effectiveCollapsed
                     ? "h-9 w-9 justify-center"
                     : "w-full px-3 py-2.5",
                   isDark
@@ -778,12 +771,11 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
                     : "bg-emerald-50 hover:bg-emerald-100 border border-emerald-200/80"
                 )}
               >
-                {/* Dot indicator */}
                 <span className="relative flex h-2 w-2 shrink-0">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60"></span>
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                 </span>
-                {!isCollapsed && (
+                {!effectiveCollapsed && (
                   <>
                     <span className={cn("flex-1 text-left text-xs font-semibold", isDark ? "text-emerald-400" : "text-emerald-700")}>
                       Update available
@@ -801,94 +793,87 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
           {/* ── Android Update Modal (hidden in Web/Electron) ─────────────── */}
           {isAndroidNative && !isElectron && (
             <Dialog open={isUpdateModalOpen} onOpenChange={setIsUpdateModalOpen}>
-            <DialogContent
-              className={cn(
-                "w-[calc(100vw-2rem)] max-w-sm rounded-2xl border-0 p-0 shadow-2xl overflow-hidden",
-                isDark ? "bg-slate-900" : "bg-white"
-              )}
-            >
-              {/* Header band */}
-              <div className={cn(
-                "relative px-6 pt-6 pb-5",
-                isDark ? "bg-slate-800/60" : "bg-gradient-to-br from-emerald-50 to-teal-50"
-              )}>
-                {/* Version badge */}
-                <span className={cn(
-                  "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider mb-3",
-                  isDark ? "bg-emerald-500/15 text-emerald-400" : "bg-emerald-100 text-emerald-700"
-                )}>
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
-                  v{updateInfo?.version}
-                </span>
-
-                <DialogTitle className={cn("text-lg font-bold leading-snug", isDark ? "text-white" : "text-slate-900")}>
-                  Update Ready
-                </DialogTitle>
-                <DialogDescription className={cn("mt-0.5 text-xs", isDark ? "text-slate-400" : "text-slate-500")}>
-                  A new version of the app is available to install.
-                </DialogDescription>
-              </div>
-
-              {/* Body */}
-              <div className="px-6 py-5 space-y-4">
-                {/* Release Notes */}
+              <DialogContent
+                className={cn(
+                  "w-[calc(100vw-2rem)] max-w-sm rounded-md border border-slate-200 dark:border-slate-800 p-0 shadow-xl overflow-hidden",
+                  isDark ? "bg-slate-900" : "bg-white"
+                )}
+              >
                 <div className={cn(
-                  "rounded-xl px-4 py-3 text-xs leading-relaxed",
-                  isDark ? "bg-slate-800 text-slate-300" : "bg-slate-50 text-slate-600"
+                  "relative px-6 pt-5 pb-4 border-b border-slate-100 dark:border-slate-800",
+                  isDark ? "bg-slate-800/40" : "bg-slate-50"
                 )}>
-                  <p className={cn("text-[10px] font-semibold uppercase tracking-widest mb-1.5", isDark ? "text-slate-500" : "text-slate-400")}>
-                    What's New
+                  <span className={cn(
+                    "inline-flex items-center gap-1.5 rounded-sm px-2 py-0.5 text-[10px] font-mono font-bold uppercase tracking-wider mb-2",
+                    isDark ? "bg-slate-800 text-slate-300 border border-slate-700" : "bg-slate-200 text-slate-700 border border-slate-300"
+                  )}>
+                    <span className="h-1.5 w-1.5 rounded-full bg-blue-500"></span>
+                    v{updateInfo?.version}
+                  </span>
+
+                  <DialogTitle className={cn("text-lg font-bold leading-snug", isDark ? "text-white" : "text-slate-900")}>
+                    Update Ready
+                  </DialogTitle>
+                  <DialogDescription className={cn("mt-0.5 text-xs", isDark ? "text-slate-400" : "text-slate-500")}>
+                    A new version of the app is available to install.
+                  </DialogDescription>
+                </div>
+
+                <div className="px-6 py-5 space-y-4">
+                  <div className={cn(
+                    "rounded-xl px-4 py-3 text-xs leading-relaxed",
+                    isDark ? "bg-slate-800 text-slate-300" : "bg-slate-50 text-slate-600"
+                  )}>
+                    <p className={cn("text-[10px] font-semibold uppercase tracking-widest mb-1.5", isDark ? "text-slate-500" : "text-slate-400")}>
+                      What's New
+                    </p>
+                    {updateInfo?.notes || 'General improvements and bug fixes.'}
+                  </div>
+
+                  <p className={cn("text-[10px] text-center", isDark ? "text-slate-600" : "text-slate-400")}>
+                    The APK will download via your notification bar. Tap the file to install once complete.
                   </p>
-                  {updateInfo?.notes || 'General improvements and bug fixes.'}
+
+                  <div className="flex items-center justify-between">
+                    <span className={cn("text-[10px]", isDark ? "text-slate-600" : "text-slate-400")}>
+                      Current: v{CURRENT_VERSION}
+                    </span>
+                    <span className={cn("text-[10px]", isDark ? "text-slate-600" : "text-slate-400")}>
+                      Platform: Android
+                    </span>
+                  </div>
                 </div>
 
-                {/* Download hint */}
-                <p className={cn("text-[10px] text-center", isDark ? "text-slate-600" : "text-slate-400")}>
-                  The APK will download via your notification bar. Tap the file to install once complete.
-                </p>
-
-                {/* Version row */}
-                <div className="flex items-center justify-between">
-                  <span className={cn("text-[10px]", isDark ? "text-slate-600" : "text-slate-400")}>
-                    Current: v{CURRENT_VERSION}
-                  </span>
-                  <span className={cn("text-[10px]", isDark ? "text-slate-600" : "text-slate-400")}>
-                    Platform: Android
-                  </span>
+                <div className="flex gap-2 px-6 pb-6">
+                  <button
+                    onClick={() => setIsUpdateModalOpen(false)}
+                    disabled={isDownloading}
+                    className={cn(
+                      "flex-1 rounded-xl py-2.5 text-xs font-semibold transition-colors disabled:opacity-40",
+                      isDark
+                        ? "bg-slate-800 text-slate-300 hover:bg-slate-700"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    )}
+                  >
+                    Later
+                  </button>
+                  <button
+                    onClick={() => { if (updateInfo?.url) startDownload(updateInfo.url); }}
+                    disabled={isDownloading}
+                    className={cn(
+                      "flex-[2] flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-bold text-white transition-all disabled:opacity-60",
+                      "bg-emerald-600 hover:bg-emerald-500 active:scale-[0.98]"
+                    )}
+                  >
+                    {isDownloading ? (
+                      <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <DownloadCloud className="h-3.5 w-3.5" />
+                    )}
+                    {isDownloading ? 'Opening Download...' : 'Download & Install'}
+                  </button>
                 </div>
-              </div>
-
-              {/* Footer */}
-              <div className={cn("flex gap-2 px-6 pb-6")}>
-                <button
-                  onClick={() => setIsUpdateModalOpen(false)}
-                  disabled={isDownloading}
-                  className={cn(
-                    "flex-1 rounded-xl py-2.5 text-xs font-semibold transition-colors disabled:opacity-40",
-                    isDark
-                      ? "bg-slate-800 text-slate-300 hover:bg-slate-700"
-                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                  )}
-                >
-                  Later
-                </button>
-                <button
-                  onClick={() => { if (updateInfo?.url) startDownload(updateInfo.url); }}
-                  disabled={isDownloading}
-                  className={cn(
-                    "flex-[2] flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-bold text-white transition-all disabled:opacity-60",
-                    "bg-emerald-600 hover:bg-emerald-500 active:scale-[0.98]"
-                  )}
-                >
-                  {isDownloading ? (
-                    <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <DownloadCloud className="h-3.5 w-3.5" />
-                  )}
-                  {isDownloading ? 'Opening Download...' : 'Download & Install'}
-                </button>
-              </div>
-            </DialogContent>
+              </DialogContent>
             </Dialog>
           )}
         </div>

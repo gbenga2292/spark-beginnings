@@ -44,12 +44,12 @@ function DescriptionDialog({ asset, onClose }: { asset: Asset; onClose: () => vo
     <Dialog open onOpenChange={onClose}>
       <DialogContent
         aria-describedby={undefined}
-        className="max-w-md p-0 overflow-hidden rounded-2xl bg-card border border-border shadow-2xl"
+        className="max-w-md p-0 overflow-hidden rounded-md bg-card border border-border shadow-lg"
       >
-        <DialogHeader className="flex flex-row items-center justify-between space-y-0 px-6 py-4 border-b border-border bg-gradient-to-r from-primary/5 to-transparent">
+        <DialogHeader className="flex flex-row items-center justify-between space-y-0 px-6 py-4 border-b border-border bg-muted/30">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
-              <FileText className="h-4 w-4 text-primary" />
+            <div className="w-8 h-8 rounded-md bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900 flex items-center justify-center">
+              <FileText className="h-4 w-4" />
             </div>
             <div>
               <DialogTitle className="text-base font-semibold text-foreground leading-none">Asset Details</DialogTitle>
@@ -70,14 +70,14 @@ function DescriptionDialog({ asset, onClose }: { asset: Asset; onClose: () => vo
               { label: 'Total Stock', value: dualUnit.displayText },
               { label: 'Status', value: asset.status },
             ].map(({ label, value }) => (
-              <div key={label} className="rounded-xl bg-muted/40 p-3 border border-border">
+              <div key={label} className="rounded-md bg-muted/20 p-2.5 border border-border">
                 <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{label}</p>
-                <p className="text-sm font-bold text-foreground capitalize mt-0.5 truncate">{value}</p>
+                <p className="text-sm font-bold text-foreground capitalize mt-0.5 truncate font-mono">{value}</p>
               </div>
             ))}
           </div>
           {asset.description ? (
-            <div className="rounded-xl bg-muted/40 p-4 border border-border">
+            <div className="rounded-md bg-muted/20 p-3 border border-border">
               <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-2">Notes</p>
               <p className="text-sm text-foreground/80 leading-relaxed">{asset.description}</p>
             </div>
@@ -99,12 +99,12 @@ function RestockHistoryDialog({ asset, onClose }: { asset: Asset; onClose: () =>
     <Dialog open onOpenChange={onClose}>
       <DialogContent
         aria-describedby={undefined}
-        className="max-w-md p-0 overflow-hidden rounded-2xl bg-card border border-border shadow-2xl"
+        className="max-w-md p-0 overflow-hidden rounded-md bg-card border border-border shadow-lg"
       >
-        <DialogHeader className="flex flex-row items-center justify-between space-y-0 px-6 py-4 border-b border-border bg-gradient-to-r from-primary/5 to-transparent">
+        <DialogHeader className="flex flex-row items-center justify-between space-y-0 px-6 py-4 border-b border-border bg-muted/30">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
-              <Clock className="h-4 w-4 text-primary" />
+            <div className="w-8 h-8 rounded-md bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900 flex items-center justify-center">
+              <Clock className="h-4 w-4" />
             </div>
             <div>
               <DialogTitle className="text-base font-semibold text-foreground leading-none">Restock History</DialogTitle>
@@ -124,26 +124,26 @@ function RestockHistoryDialog({ asset, onClose }: { asset: Asset; onClose: () =>
           ) : (
             <div className="space-y-2">
               {[...history].reverse().map((record, idx) => (
-                <div key={record.id} className="rounded-xl border border-border bg-muted/30 p-4 flex items-center gap-4">
-                  <div className="h-8 w-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-black text-xs shrink-0">
+                <div key={record.id} className="rounded-md border border-border bg-card p-3 flex items-center gap-4">
+                  <div className="h-7 w-7 rounded-md bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900 flex items-center justify-center font-mono font-bold text-xs shrink-0">
                     #{history.length - idx}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex justify-between items-start">
-                      <p className="text-sm font-bold text-foreground">+{record.quantity} units</p>
-                      <p className="text-[10px] text-muted-foreground font-semibold">
+                      <p className="text-sm font-bold text-foreground font-mono tabular-nums">+{record.quantity} units</p>
+                      <p className="text-[10px] text-muted-foreground font-medium">
                         {new Date(record.date).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' })}
                       </p>
                     </div>
                     {record.batchNumber && (
-                      <p className="text-[10px] text-primary font-bold">Batch: {record.batchNumber}</p>
+                      <p className="text-[10px] text-blue-600 dark:text-blue-400 font-mono font-bold">Batch: {record.batchNumber}</p>
                     )}
                     <div className="flex gap-4 mt-1">
                       <span className="text-xs text-muted-foreground font-medium">
-                        Unit: <span className="font-bold text-foreground">₦{record.unitCost.toFixed(2)}</span>
+                        Unit: <span className="font-bold text-foreground font-mono tabular-nums">₦{record.unitCost.toFixed(2)}</span>
                       </span>
                       <span className="text-xs text-muted-foreground font-medium">
-                        Total: <span className="font-bold text-primary">₦{record.totalCost.toLocaleString()}</span>
+                        Total: <span className="font-bold text-blue-600 dark:text-blue-400 font-mono tabular-nums">₦{record.totalCost.toLocaleString()}</span>
                       </span>
                     </div>
                   </div>
@@ -168,12 +168,12 @@ function AssetBatchesDialog({ asset, onClose }: { asset: Asset; onClose: () => v
     <Dialog open onOpenChange={onClose}>
       <DialogContent
         aria-describedby={undefined}
-        className="max-w-xl p-0 overflow-hidden rounded-2xl bg-card border border-border shadow-2xl"
+        className="max-w-xl p-0 overflow-hidden rounded-md bg-card border border-border shadow-lg"
       >
-        <DialogHeader className="flex flex-row items-center justify-between space-y-0 px-6 py-4 border-b border-border bg-gradient-to-r from-primary/5 to-transparent">
+        <DialogHeader className="flex flex-row items-center justify-between space-y-0 px-6 py-4 border-b border-border bg-muted/30">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
-              <Layers className="h-4 w-4 text-primary" />
+            <div className="w-8 h-8 rounded-md bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900 flex items-center justify-center">
+              <Layers className="h-4 w-4" />
             </div>
             <div>
               <DialogTitle className="text-base font-semibold text-foreground leading-none">FIFO Batches & Expiry</DialogTitle>
@@ -207,15 +207,15 @@ function AssetBatchesDialog({ asset, onClose }: { asset: Asset; onClose: () => v
               }
 
               return (
-                <div key={batch.id} className="rounded-xl border border-border bg-muted/30 p-4 space-y-2">
+                <div key={batch.id} className="rounded-md border border-border bg-card p-3 space-y-2">
                   <div className="flex items-start justify-between">
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-sm text-foreground">{batch.batchNumber || `Batch #${idx + 1}`}</span>
+                        <span className="font-bold text-sm text-foreground font-mono">{batch.batchNumber || `Batch #${idx + 1}`}</span>
                         <Badge
                           variant="outline"
                           className={cn(
-                            'text-[10px] font-bold px-2 py-0 rounded-full',
+                            'text-[10px] font-mono font-bold px-1.5 py-0.2 rounded-sm border',
                             batch.status === 'depleted'
                               ? 'bg-slate-100 dark:bg-slate-800 text-slate-500 border-slate-300'
                               : isExpired
@@ -234,10 +234,10 @@ function AssetBatchesDialog({ asset, onClose }: { asset: Asset; onClose: () => v
                     </div>
 
                     <div className="text-right">
-                      <p className="text-sm font-black text-primary">
+                      <p className="text-sm font-bold text-blue-600 dark:text-blue-400 font-mono tabular-nums">
                         {batch.remainingQuantity} / {batch.initialQuantity} {formatUnit(asset.unitOfMeasurement)}
                       </p>
-                      <p className="text-[11px] text-muted-foreground">₦{batch.unitCost.toFixed(2)}/unit</p>
+                      <p className="text-[11px] text-muted-foreground font-mono tabular-nums">₦{batch.unitCost.toFixed(2)}/unit</p>
                     </div>
                   </div>
 
@@ -270,22 +270,22 @@ function MovementTypeBadge({ type }: { type: MovementType }) {
   switch (type) {
     case 'restock':
     case 'initial':
-      return <Badge className="bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border-emerald-300 font-bold">Inbound Restock</Badge>;
+      return <Badge className="bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border-emerald-300 font-bold rounded-sm text-[11px]">Inbound Restock</Badge>;
     case 'waybill_dispatch':
-      return <Badge className="bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border-blue-300 font-bold">Waybill Dispatch</Badge>;
+      return <Badge className="bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border-blue-300 font-bold rounded-sm text-[11px]">Waybill Dispatch</Badge>;
     case 'checkout':
-      return <Badge className="bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 border-indigo-300 font-bold">Quick Checkout</Badge>;
+      return <Badge className="bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border-blue-300 font-bold rounded-sm text-[11px]">Quick Checkout</Badge>;
     case 'checkout_return':
-      return <Badge className="bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-400 border-teal-300 font-bold">Checkout Return</Badge>;
+      return <Badge className="bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-400 border-teal-300 font-bold rounded-sm text-[11px]">Checkout Return</Badge>;
     case 'consumable_burn':
-      return <Badge className="bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-300 font-bold">Consumable Burn</Badge>;
+      return <Badge className="bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-300 font-bold rounded-sm text-[11px]">Consumable Burn</Badge>;
     case 'waybill_return':
-      return <Badge className="bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 border-purple-300 font-bold">Site Return</Badge>;
+      return <Badge className="bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-400 border-cyan-300 font-bold rounded-sm text-[11px]">Site Return</Badge>;
     case 'damage_writeoff':
     case 'missing_writeoff':
-      return <Badge className="bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400 border-rose-300 font-bold">Write-off</Badge>;
+      return <Badge className="bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400 border-rose-300 font-bold rounded-sm text-[11px]">Write-off</Badge>;
     default:
-      return <Badge variant="outline" className="font-bold">Adjustment</Badge>;
+      return <Badge variant="outline" className="font-bold rounded-sm text-[11px]">Adjustment</Badge>;
   }
 }
 
@@ -306,49 +306,49 @@ function AssetActionsMenu({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button className="h-8 w-8 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center justify-center text-slate-500 transition-all shadow-sm hover:shadow-md focus:outline-none">
+        <button className="h-8 w-8 rounded-md border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center justify-center text-slate-500 transition-all focus:outline-none">
           <MoreHorizontal className="h-4 w-4" />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-48 rounded-xl border border-slate-200 dark:border-slate-700 shadow-xl p-1">
+      <DropdownMenuContent align="end" className="w-48 rounded-md border border-slate-200 dark:border-slate-800 shadow-lg p-1">
         <DropdownMenuItem
           onClick={() => onAction('edit')}
-          className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-semibold cursor-pointer text-slate-700 dark:text-slate-200 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-700 dark:hover:text-blue-400 transition-colors"
+          className="flex items-center gap-2.5 px-3 py-2 rounded-md text-xs font-semibold cursor-pointer text-slate-700 dark:text-slate-200 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-700 dark:hover:text-blue-400 transition-colors"
         >
           <Edit2 className="h-3.5 w-3.5" />
           Edit Form
         </DropdownMenuItem>
         <DropdownMenuItem
           onClick={() => onAction('batches')}
-          className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-semibold cursor-pointer text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+          className="flex items-center gap-2.5 px-3 py-2 rounded-md text-xs font-semibold cursor-pointer text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
         >
           <Layers className="h-3.5 w-3.5" />
           FIFO Batches & Expiry
         </DropdownMenuItem>
         <DropdownMenuItem
           onClick={() => onAction('movements')}
-          className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-semibold cursor-pointer text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+          className="flex items-center gap-2.5 px-3 py-2 rounded-md text-xs font-semibold cursor-pointer text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
         >
           <History className="h-3.5 w-3.5" />
           View Movements
         </DropdownMenuItem>
         <DropdownMenuItem
           onClick={() => onAction('description')}
-          className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-semibold cursor-pointer text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+          className="flex items-center gap-2.5 px-3 py-2 rounded-md text-xs font-semibold cursor-pointer text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
         >
           <FileText className="h-3.5 w-3.5" />
           Description
         </DropdownMenuItem>
         <DropdownMenuItem
           onClick={() => onAction('analytics')}
-          className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-semibold cursor-pointer text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+          className="flex items-center gap-2.5 px-3 py-2 rounded-md text-xs font-semibold cursor-pointer text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
         >
           <BarChart2 className="h-3.5 w-3.5" />
           Analytics
         </DropdownMenuItem>
         <DropdownMenuItem
           onClick={() => onAction('restock-history')}
-          className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-semibold cursor-pointer text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+          className="flex items-center gap-2.5 px-3 py-2 rounded-md text-xs font-semibold cursor-pointer text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
         >
           <Clock className="h-3.5 w-3.5" />
           Restock History
@@ -356,7 +356,7 @@ function AssetActionsMenu({
         <DropdownMenuSeparator className="my-1 border-slate-100 dark:border-slate-800" />
         <DropdownMenuItem
           onClick={onDelete}
-          className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-semibold cursor-pointer text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-colors"
+          className="flex items-center gap-2.5 px-3 py-2 rounded-md text-xs font-semibold cursor-pointer text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-colors"
         >
           <Trash2 className="h-3.5 w-3.5" />
           Delete
@@ -775,12 +775,12 @@ export function AssetManager() {
   const headerButtons = useMemo(() => (
     <div className="flex items-center gap-2 md:gap-3 select-none">
       {/* Top View Toggle Tabs with Spring Sliding Indicator */}
-      <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-0.5 rounded-xl border border-slate-200/80 dark:border-slate-700/80 mr-1 relative">
+      <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-0.5 rounded-md border border-slate-200 dark:border-slate-800 mr-1 relative">
         <button
           type="button"
           onClick={() => startTransition(() => { setActiveTab('catalog'); setLedgerSearch(''); })}
           className={cn(
-            "relative px-3 py-1.5 rounded-lg text-xs font-bold transition-colors duration-150 flex items-center gap-1.5 cursor-pointer z-10 select-none active:scale-95",
+            "relative px-3 py-1.5 rounded-sm text-xs font-bold transition-colors duration-150 flex items-center gap-1.5 cursor-pointer z-10 select-none active:scale-95",
             activeTab === 'catalog'
               ? "text-blue-600 dark:text-blue-400"
               : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
@@ -789,7 +789,7 @@ export function AssetManager() {
           {activeTab === 'catalog' && (
             <motion.div
               layoutId="inventoryTabIndicator"
-              className="absolute inset-0 bg-white dark:bg-slate-900 rounded-lg shadow-sm -z-10"
+              className="absolute inset-0 bg-white dark:bg-slate-900 rounded-sm shadow-sm -z-10"
               transition={{ type: "spring", stiffness: 500, damping: 35 }}
             />
           )}
@@ -801,7 +801,7 @@ export function AssetManager() {
           type="button"
           onClick={() => startTransition(() => { setActiveTab('deployed'); })}
           className={cn(
-            "relative px-3 py-1.5 rounded-lg text-xs font-bold transition-colors duration-150 flex items-center gap-1.5 cursor-pointer z-10 select-none active:scale-95",
+            "relative px-3 py-1.5 rounded-sm text-xs font-bold transition-colors duration-150 flex items-center gap-1.5 cursor-pointer z-10 select-none active:scale-95",
             activeTab === 'deployed'
               ? "text-blue-600 dark:text-blue-400"
               : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
@@ -810,14 +810,14 @@ export function AssetManager() {
           {activeTab === 'deployed' && (
             <motion.div
               layoutId="inventoryTabIndicator"
-              className="absolute inset-0 bg-white dark:bg-slate-900 rounded-lg shadow-sm -z-10"
+              className="absolute inset-0 bg-white dark:bg-slate-900 rounded-sm shadow-sm -z-10"
               transition={{ type: "spring", stiffness: 500, damping: 35 }}
             />
           )}
           <MapPin className="h-3.5 w-3.5" />
           <span>Deployed on Site</span>
           {deployedItems.length > 0 && (
-            <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] font-extrabold bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300">
+            <span className="ml-1 px-1.5 py-0.2 rounded-sm text-[10px] font-mono font-bold bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300">
               {deployedItems.length}
             </span>
           )}
@@ -827,7 +827,7 @@ export function AssetManager() {
           type="button"
           onClick={() => startTransition(() => { setActiveTab('ledger'); })}
           className={cn(
-            "relative px-3 py-1.5 rounded-lg text-xs font-bold transition-colors duration-150 flex items-center gap-1.5 cursor-pointer z-10 select-none active:scale-95",
+            "relative px-3 py-1.5 rounded-sm text-xs font-bold transition-colors duration-150 flex items-center gap-1.5 cursor-pointer z-10 select-none active:scale-95",
             activeTab === 'ledger'
               ? "text-blue-600 dark:text-blue-400"
               : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
@@ -836,7 +836,7 @@ export function AssetManager() {
           {activeTab === 'ledger' && (
             <motion.div
               layoutId="inventoryTabIndicator"
-              className="absolute inset-0 bg-white dark:bg-slate-900 rounded-lg shadow-sm -z-10"
+              className="absolute inset-0 bg-white dark:bg-slate-900 rounded-sm shadow-sm -z-10"
               transition={{ type: "spring", stiffness: 500, damping: 35 }}
             />
           )}
@@ -977,16 +977,16 @@ export function AssetManager() {
       {/* ─────────────────────────────────────────────────────────────── */}
       {activeTab === 'catalog' && (
         <div className="w-full flex-col flex-1 flex">
-        <Card className="border-none shadow-sm overflow-hidden bg-white dark:bg-slate-900 flex-1 flex flex-col min-h-[500px]">
+        <Card className="rounded-md border border-slate-200 dark:border-slate-800 shadow-none overflow-hidden bg-white dark:bg-slate-900 flex-1 flex flex-col min-h-[500px]">
           {/* Toolbar */}
           <div className="border-b border-slate-100 dark:border-slate-800 p-4 sm:p-5 flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center bg-slate-50/50 dark:bg-slate-800/30">
             <div className="flex items-center gap-2 ml-1 w-full justify-between sm:w-auto">
               <div className="flex items-center gap-2">
-                <div className="h-8 w-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600">
+                <div className="h-8 w-8 rounded-md bg-blue-50 dark:bg-blue-950/50 flex items-center justify-center text-blue-600 border border-blue-100 dark:border-blue-900">
                   <ListFilter className="h-4 w-4" />
                 </div>
                 <p className="font-semibold text-slate-700 dark:text-slate-200 text-sm">
-                  Assets <span className="text-slate-400 font-normal">({filtered.length})</span>
+                  Assets <span className="text-slate-400 font-mono font-normal">({filtered.length})</span>
                 </p>
               </div>
 
@@ -994,28 +994,28 @@ export function AssetManager() {
               <div className="sm:hidden">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5 shadow-sm bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700">
+                    <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5 shadow-none rounded-md bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-800">
                       <ChevronsUpDown className="h-3.5 w-3.5" />
                       Sort
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-44 rounded-xl shadow-lg border-slate-200 dark:border-slate-700 p-1">
-                    <DropdownMenuItem onClick={() => toggleSort('name')} className="text-xs font-medium cursor-pointer rounded-lg mb-0.5 justify-between">
+                  <DropdownMenuContent align="end" className="w-44 rounded-md shadow-lg border-slate-200 dark:border-slate-800 p-1">
+                    <DropdownMenuItem onClick={() => toggleSort('name')} className="text-xs font-medium cursor-pointer rounded-md mb-0.5 justify-between">
                       Name {sortKey === 'name' && (sortDir === 'asc' ? '↑' : '↓')}
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => toggleSort('quantity')} className="text-xs font-medium cursor-pointer rounded-lg mb-0.5 justify-between">
+                    <DropdownMenuItem onClick={() => toggleSort('quantity')} className="text-xs font-medium cursor-pointer rounded-md mb-0.5 justify-between">
                       Total Stock {sortKey === 'quantity' && (sortDir === 'asc' ? '↑' : '↓')}
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => toggleSort('reserved')} className="text-xs font-medium cursor-pointer rounded-lg mb-0.5 justify-between">
+                    <DropdownMenuItem onClick={() => toggleSort('reserved')} className="text-xs font-medium cursor-pointer rounded-md mb-0.5 justify-between">
                       Reserved {sortKey === 'reserved' && (sortDir === 'asc' ? '↑' : '↓')}
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => toggleSort('available')} className="text-xs font-medium cursor-pointer rounded-lg mb-0.5 justify-between">
+                    <DropdownMenuItem onClick={() => toggleSort('available')} className="text-xs font-medium cursor-pointer rounded-md mb-0.5 justify-between">
                       Available {sortKey === 'available' && (sortDir === 'asc' ? '↑' : '↓')}
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => toggleSort('location')} className="text-xs font-medium cursor-pointer rounded-lg mb-0.5 justify-between">
+                    <DropdownMenuItem onClick={() => toggleSort('location')} className="text-xs font-medium cursor-pointer rounded-md mb-0.5 justify-between">
                       Location {sortKey === 'location' && (sortDir === 'asc' ? '↑' : '↓')}
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => toggleSort('status')} className="text-xs font-medium cursor-pointer rounded-lg justify-between">
+                    <DropdownMenuItem onClick={() => toggleSort('status')} className="text-xs font-medium cursor-pointer rounded-md justify-between">
                       Status {sortKey === 'status' && (sortDir === 'asc' ? '↑' : '↓')}
                     </DropdownMenuItem>
                   </DropdownMenuContent>
@@ -1026,7 +1026,7 @@ export function AssetManager() {
             <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
               <div className="relative">
                 <select
-                  className="appearance-none bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-sm rounded-lg h-9 pl-3 pr-8 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 font-medium capitalize cursor-pointer w-full sm:w-40"
+                  className="appearance-none bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 text-sm rounded-md h-9 pl-3 pr-8 shadow-none focus:outline-none focus:ring-2 focus:ring-blue-500/50 font-medium capitalize cursor-pointer w-full sm:w-40"
                   value={filter}
                   onChange={e => { setFilter(e.target.value as any); setCatalogPage(1); }}
                 >
@@ -1043,7 +1043,7 @@ export function AssetManager() {
                   <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
                   <Input
                     placeholder="Search assets..."
-                    className="pl-9 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 h-9 text-sm focus-visible:ring-blue-500/50 rounded-lg shadow-sm"
+                    className="pl-9 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-800 h-9 text-sm focus-visible:ring-blue-500/50 rounded-md shadow-none"
                     value={search}
                     onChange={e => { setSearch(e.target.value); setCatalogPage(1); }}
                   />
@@ -1051,12 +1051,12 @@ export function AssetManager() {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="gap-2 h-9 px-3 text-slate-700 dark:text-slate-200 hover:text-slate-900 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm whitespace-nowrap font-medium"
+                  className="gap-2 h-9 px-3 text-slate-700 dark:text-slate-200 hover:text-slate-900 border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 shadow-none rounded-md whitespace-nowrap font-medium"
                   onClick={() => setShowRestockModal(true)}
                 >
                   <Package className="h-4 w-4 text-slate-500" /> Restock
                 </Button>
-                <Button size="sm" className="gap-2 bg-blue-600 hover:bg-blue-700 text-white h-9 shadow-sm whitespace-nowrap" onClick={() => setShowAddForm(true)}>
+                <Button size="sm" className="gap-2 bg-blue-600 hover:bg-blue-700 text-white h-9 shadow-none rounded-md whitespace-nowrap" onClick={() => setShowAddForm(true)}>
                   <Plus className="h-4 w-4" /> Add Asset
                 </Button>
               </div>
@@ -1067,28 +1067,28 @@ export function AssetManager() {
           <div className="hidden md:block overflow-auto max-h-[calc(100vh-210px)] relative border-b border-slate-200 dark:border-slate-800">
             <table className="w-full text-left border-collapse">
               <thead className="sticky top-0 z-20 shadow-sm">
-                <tr className="bg-blue-700 border-b border-blue-800 text-blue-50 uppercase text-[11px] tracking-wider font-bold">
-                  <th className="px-3 py-3 whitespace-nowrap cursor-pointer select-none hover:bg-blue-600 transition-colors sticky top-0 bg-blue-700 z-20" onClick={() => toggleSort('name')}>
+                <tr className="bg-blue-600 border-b border-blue-700 text-white uppercase text-[11px] tracking-wider font-bold">
+                  <th className="px-3 py-3 whitespace-nowrap cursor-pointer select-none hover:bg-blue-700 transition-colors sticky top-0 bg-blue-600 z-20" onClick={() => toggleSort('name')}>
                     Asset Name <SortIcon col="name" />
                   </th>
-                  <th className="px-2 py-3 whitespace-nowrap text-center cursor-pointer select-none hover:bg-blue-600 transition-colors sticky top-0 bg-blue-700 z-20" onClick={() => toggleSort('quantity')}>
+                  <th className="px-2 py-3 whitespace-nowrap text-center cursor-pointer select-none hover:bg-blue-700 transition-colors sticky top-0 bg-blue-600 z-20" onClick={() => toggleSort('quantity')}>
                     Total Stock & Packaging <SortIcon col="quantity" />
                   </th>
-                  <th className="px-2 py-3 whitespace-nowrap text-center cursor-pointer select-none hover:bg-blue-600 transition-colors sticky top-0 bg-blue-700 z-20" onClick={() => toggleSort('reserved')}>
+                  <th className="px-2 py-3 whitespace-nowrap text-center cursor-pointer select-none hover:bg-blue-700 transition-colors sticky top-0 bg-blue-600 z-20" onClick={() => toggleSort('reserved')}>
                     Rsvd <SortIcon col="reserved" />
                   </th>
-                  <th className="px-2 py-3 whitespace-nowrap text-center cursor-pointer select-none hover:bg-blue-600 transition-colors sticky top-0 bg-blue-700 z-20" onClick={() => toggleSort('available')}>
+                  <th className="px-2 py-3 whitespace-nowrap text-center cursor-pointer select-none hover:bg-blue-700 transition-colors sticky top-0 bg-blue-600 z-20" onClick={() => toggleSort('available')}>
                     Avail <SortIcon col="available" />
                   </th>
-                  <th className="px-2 py-3 whitespace-nowrap text-center sticky top-0 bg-blue-700 z-20">Stats (M|D|U)</th>
-                  <th className="px-2 py-3 whitespace-nowrap sticky top-0 bg-blue-700 z-20">Category/Type</th>
-                  <th className="px-2 py-3 whitespace-nowrap cursor-pointer select-none hover:bg-blue-600 transition-colors sticky top-0 bg-blue-700 z-20" onClick={() => toggleSort('location')}>
+                  <th className="px-2 py-3 whitespace-nowrap text-center sticky top-0 bg-blue-600 z-20">Stats (M|D|U)</th>
+                  <th className="px-2 py-3 whitespace-nowrap sticky top-0 bg-blue-600 z-20">Category/Type</th>
+                  <th className="px-2 py-3 whitespace-nowrap cursor-pointer select-none hover:bg-blue-700 transition-colors sticky top-0 bg-blue-600 z-20" onClick={() => toggleSort('location')}>
                     Location <SortIcon col="location" />
                   </th>
-                  <th className="px-2 py-3 whitespace-nowrap text-center cursor-pointer select-none hover:bg-blue-600 transition-colors sticky top-0 bg-blue-700 z-20" onClick={() => toggleSort('status')}>
+                  <th className="px-2 py-3 whitespace-nowrap text-center cursor-pointer select-none hover:bg-blue-700 transition-colors sticky top-0 bg-blue-600 z-20" onClick={() => toggleSort('status')}>
                     Status <SortIcon col="status" />
                   </th>
-                  <th className="px-2 py-3 text-center sticky top-0 bg-blue-700 z-20">Actions</th>
+                  <th className="px-2 py-3 text-center sticky top-0 bg-blue-600 z-20">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-sm">
@@ -1113,7 +1113,7 @@ export function AssetManager() {
                         <td className="px-3 py-3 font-bold text-slate-800 dark:text-slate-200 text-xs uppercase max-w-[170px]">
                           <span className="truncate block" title={asset.name}>{asset.name}</span>
                           {asset.hasExpiry && (
-                            <span className="inline-block mt-0.5 text-[9px] font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 px-1.5 py-0.2 rounded border border-amber-200 dark:border-amber-800">
+                            <span className="inline-block mt-0.5 text-[9px] font-mono font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 px-1.5 py-0.2 rounded-sm border border-amber-200 dark:border-amber-800">
                               FIFO Batches
                             </span>
                           )}
@@ -1124,13 +1124,13 @@ export function AssetManager() {
                           <div className="flex flex-col items-center">
                             {dualUnit.hasPackaging ? (
                               <>
-                                <span className="font-bold text-blue-600 dark:text-blue-400 text-xs">
+                                <span className="font-bold text-blue-600 dark:text-blue-400 text-xs font-mono tabular-nums">
                                   {dualUnit.packs} {asset.packUnit}s {dualUnit.singles > 0 ? `+ ${dualUnit.singles} ${formatUnit(asset.unitOfMeasurement)}` : ''}
                                 </span>
-                                <span className="text-[10px] text-slate-400 font-medium">({asset.quantity} {formatUnit(asset.unitOfMeasurement)})</span>
+                                <span className="text-[10px] text-slate-400 font-mono tabular-nums font-medium">({asset.quantity} {formatUnit(asset.unitOfMeasurement)})</span>
                               </>
                             ) : (
-                              <div>
+                              <div className="font-mono tabular-nums">
                                 <span className="font-bold text-blue-600 dark:text-blue-400 text-sm">{asset.quantity}</span>
                                 <span className="text-[10px] text-slate-400 ml-1">{formatUnit(asset.unitOfMeasurement)}</span>
                               </div>
@@ -1139,14 +1139,14 @@ export function AssetManager() {
                         </td>
 
                         {/* Reserved */}
-                        <td className="px-2 py-3 text-center font-semibold text-slate-700 dark:text-slate-300">{asset.reservedQuantity || 0}</td>
+                        <td className="px-2 py-3 text-center font-semibold text-slate-700 dark:text-slate-300 font-mono tabular-nums">{asset.reservedQuantity || 0}</td>
 
                         {/* Available */}
-                        <td className="px-2 py-3 text-center font-semibold text-slate-700 dark:text-slate-300">{asset.availableQuantity || 0}</td>
+                        <td className="px-2 py-3 text-center font-semibold text-slate-700 dark:text-slate-300 font-mono tabular-nums">{asset.availableQuantity || 0}</td>
 
                         {/* Stats M|D|U */}
                         <td className="px-2 py-3 text-center">
-                          <div className="flex flex-col items-center justify-center gap-1 text-xs font-semibold">
+                          <div className="flex flex-col items-center justify-center gap-1 text-xs font-mono tabular-nums font-semibold">
                             <span title="Missing" className={asset.missingQuantity && asset.missingQuantity > 0 ? 'text-red-500' : 'text-slate-400'}>M: {asset.missingQuantity || 0}</span>
                             <span title="Damaged" className={asset.damagedQuantity && asset.damagedQuantity > 0 ? 'text-amber-500' : 'text-slate-400'}>D: {asset.damagedQuantity || 0}</span>
                             <span title="Used" className={asset.usedQuantity && asset.usedQuantity > 0 ? 'text-blue-500' : 'text-slate-400'}>U: {asset.usedQuantity || 0}</span>
@@ -1156,8 +1156,8 @@ export function AssetManager() {
                         {/* Category | Type */}
                         <td className="px-2 py-3">
                           <div className="flex flex-col gap-1 w-fit">
-                            <span className="inline-block px-1.5 py-0.5 text-[10px] font-semibold bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-800 rounded capitalize text-center">{asset.category}</span>
-                            <span className="inline-block px-1.5 py-0.5 text-[10px] font-semibold bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 rounded capitalize text-center">{asset.type}</span>
+                            <span className="inline-block px-1.5 py-0.5 text-[10px] font-semibold bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-800 rounded-sm capitalize text-center">{asset.category}</span>
+                            <span className="inline-block px-1.5 py-0.5 text-[10px] font-semibold bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 rounded-sm capitalize text-center">{asset.type}</span>
                           </div>
                         </td>
 
@@ -1171,7 +1171,7 @@ export function AssetManager() {
                           <Badge
                             variant="outline"
                             className={cn(
-                              'rounded-full px-2 py-0.5 font-semibold text-[10px] border whitespace-nowrap',
+                              'rounded-sm px-2 py-0.5 font-mono text-[10px] border whitespace-nowrap',
                               asset.availableQuantity <= 0
                                 ? 'bg-rose-100 dark:bg-rose-900/20 text-rose-700 dark:text-rose-400 border-rose-200'
                                 : (asset.criticalStockLevel && asset.criticalStockLevel > 0 && asset.availableQuantity <= asset.criticalStockLevel)
@@ -1362,13 +1362,13 @@ export function AssetManager() {
     {/* ─────────────────────────────────────────────────────────────── */}
     {activeTab === 'deployed' && (
       <div className="w-full flex-col flex-1 flex">
-        <Card className="border-none shadow-sm overflow-hidden bg-white dark:bg-slate-900 flex-1 flex flex-col min-h-[500px]">
+        <Card className="rounded-md border border-slate-200 dark:border-slate-800 shadow-none overflow-hidden bg-white dark:bg-slate-900 flex-1 flex flex-col min-h-[500px]">
           {/* Flat Compact Toolbar Header */}
           <div className="border-b border-slate-100 dark:border-slate-800 p-3 sm:p-4 flex flex-col lg:flex-row gap-3 justify-between items-start lg:items-center bg-slate-50/50 dark:bg-slate-800/30">
             {/* Left: Title + Space-Conserving Flat Stat Chips */}
             <div className="flex flex-wrap items-center gap-2">
               <div className="flex items-center gap-2 mr-1">
-                <div className="h-7 w-7 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600">
+                <div className="h-7 w-7 rounded-md bg-blue-50 dark:bg-blue-950/50 flex items-center justify-center text-blue-600 border border-blue-100 dark:border-blue-900">
                   <MapPin className="h-3.5 w-3.5" />
                 </div>
                 <p className="font-bold text-slate-800 dark:text-slate-200 text-xs sm:text-sm leading-none whitespace-nowrap">
@@ -1378,22 +1378,22 @@ export function AssetManager() {
 
               {/* Ultra-compact Flat Metric Chips */}
               <div className="flex items-center gap-1.5 flex-wrap select-none">
-                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-300 shadow-xs">
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-300">
                   <span className="text-[10px] uppercase font-bold text-slate-400">Sites:</span>
-                  <span className="font-extrabold text-slate-800 dark:text-slate-100">{deployedMetrics.totalSites}</span>
+                  <span className="font-extrabold text-slate-800 dark:text-slate-100 font-mono tabular-nums">{deployedMetrics.totalSites}</span>
                 </div>
-                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 text-xs font-semibold text-blue-700 dark:text-blue-400 shadow-xs">
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 text-xs font-semibold text-blue-700 dark:text-blue-400">
                   <span className="text-[10px] uppercase font-bold text-blue-600">Items:</span>
-                  <span className="font-extrabold">{deployedMetrics.totalUniqueAssets}</span>
+                  <span className="font-extrabold font-mono tabular-nums">{deployedMetrics.totalUniqueAssets}</span>
                 </div>
-                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-xs font-semibold text-amber-700 dark:text-amber-400 shadow-xs">
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-xs font-semibold text-amber-700 dark:text-amber-400">
                   <span className="text-[10px] uppercase font-bold text-amber-600">Field Units:</span>
-                  <span className="font-extrabold">{deployedMetrics.totalUnits.toLocaleString()}</span>
+                  <span className="font-extrabold font-mono tabular-nums">{deployedMetrics.totalUnits.toLocaleString()}</span>
                 </div>
                 {deployedMetrics.totalVal > 0 && (
-                  <div className="hidden xl:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800 text-xs font-semibold text-purple-700 dark:text-purple-400 shadow-xs">
-                    <span className="text-[10px] uppercase font-bold text-purple-600">Field Value:</span>
-                    <span className="font-extrabold">₦{deployedMetrics.totalVal.toLocaleString()}</span>
+                  <div className="hidden xl:flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-300">
+                    <span className="text-[10px] uppercase font-bold text-slate-500">Field Value:</span>
+                    <span className="font-extrabold font-mono tabular-nums">₦{deployedMetrics.totalVal.toLocaleString()}</span>
                   </div>
                 )}
               </div>
@@ -1406,7 +1406,7 @@ export function AssetManager() {
                 <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
                 <Input
                   placeholder="Search item, site, waybill, driver..."
-                  className="pl-8 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 h-8 text-xs focus-visible:ring-blue-500/50 rounded-lg shadow-none"
+                  className="pl-8 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 h-8 text-xs focus-visible:ring-blue-500/50 rounded-md shadow-none"
                   value={deployedSearch}
                   onChange={e => { setDeployedSearch(e.target.value); setDeployedPage(1); }}
                 />
@@ -1423,7 +1423,7 @@ export function AssetManager() {
               {/* Site Filter */}
               <div className="relative">
                 <select
-                  className="appearance-none bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs rounded-lg h-8 pl-2.5 pr-7 shadow-none focus:outline-none focus:ring-2 focus:ring-blue-500/50 font-medium cursor-pointer max-w-[170px] truncate"
+                  className="appearance-none bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs rounded-md h-8 pl-2.5 pr-7 shadow-none focus:outline-none focus:ring-2 focus:ring-blue-500/50 font-medium cursor-pointer max-w-[170px] truncate"
                   value={deployedSiteFilter}
                   onChange={e => { setDeployedSiteFilter(e.target.value); setDeployedPage(1); }}
                 >
@@ -1440,7 +1440,7 @@ export function AssetManager() {
               {/* Category Filter */}
               <div className="relative">
                 <select
-                  className="appearance-none bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs rounded-lg h-8 pl-2.5 pr-7 shadow-none focus:outline-none focus:ring-2 focus:ring-blue-500/50 font-medium cursor-pointer"
+                  className="appearance-none bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs rounded-md h-8 pl-2.5 pr-7 shadow-none focus:outline-none focus:ring-2 focus:ring-blue-500/50 font-medium cursor-pointer"
                   value={deployedCategoryFilter}
                   onChange={e => { setDeployedCategoryFilter(e.target.value as any); setDeployedPage(1); }}
                 >
@@ -1455,12 +1455,12 @@ export function AssetManager() {
               </div>
 
               {/* View Mode Toggle */}
-              <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg border border-slate-200 dark:border-slate-700">
+              <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-0.5 rounded-md border border-slate-200 dark:border-slate-700">
                 <button
                   type="button"
                   onClick={() => setDeployedViewMode('table')}
                   className={cn(
-                    "px-2.5 py-1 rounded text-xs font-semibold transition-all cursor-pointer",
+                    "px-2.5 py-1 rounded-sm text-xs font-semibold transition-all cursor-pointer",
                     deployedViewMode === 'table'
                       ? "bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-xs"
                       : "text-slate-500 hover:text-slate-900 dark:hover:text-white"
@@ -1472,7 +1472,7 @@ export function AssetManager() {
                   type="button"
                   onClick={() => setDeployedViewMode('bySite')}
                   className={cn(
-                    "px-2.5 py-1 rounded text-xs font-semibold transition-all cursor-pointer",
+                    "px-2.5 py-1 rounded-sm text-xs font-semibold transition-all cursor-pointer",
                     deployedViewMode === 'bySite'
                       ? "bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-xs"
                       : "text-slate-500 hover:text-slate-900 dark:hover:text-white"
@@ -1539,7 +1539,7 @@ export function AssetManager() {
                                 {item.assetName}
                               </span>
                               <div className="flex items-center gap-1.5 mt-0.5">
-                                <span className="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 capitalize">
+                                <span className="px-1.5 py-0.2 rounded-sm text-[10px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 capitalize">
                                   {item.category}
                                 </span>
                                 <span className="text-[10px] text-slate-400 capitalize">
@@ -1559,8 +1559,8 @@ export function AssetManager() {
 
                           {/* Quantity on Site */}
                           <td className="py-2.5 px-3">
-                            <div className="flex flex-col">
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-extrabold bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300 w-fit">
+                            <div className="flex flex-col font-mono tabular-nums">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-sm text-xs font-bold bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300 w-fit">
                                 {item.unreturnedQuantity} {item.unit}
                               </span>
                               {item.totalReturned > 0 && (
@@ -1576,7 +1576,7 @@ export function AssetManager() {
                             <div className="flex flex-col gap-0.5">
                               <div className="flex items-center gap-1 flex-wrap">
                                 {item.waybillRefs.map(wbRef => (
-                                  <span key={wbRef} className="px-1.5 py-0.2 rounded font-mono text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                                  <span key={wbRef} className="px-1.5 py-0.2 rounded-sm font-mono text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
                                     {wbRef}
                                   </span>
                                 ))}
@@ -1597,7 +1597,7 @@ export function AssetManager() {
 
                           {/* Days on Site */}
                           <td className="py-2.5 px-3 whitespace-nowrap">
-                            <span className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold border", daysWarning)}>
+                            <span className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-sm text-[11px] font-mono font-bold border", daysWarning)}>
                               <Clock className="h-3 w-3" />
                               {item.daysOnSite} {item.daysOnSite === 1 ? 'day' : 'days'}
                             </span>
@@ -1608,7 +1608,7 @@ export function AssetManager() {
                             <Button
                               size="sm"
                               variant="outline"
-                              className="h-7 px-2.5 text-[11px] font-bold text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 gap-1 rounded-md"
+                              className="h-7 px-2.5 text-[11px] font-bold text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800 hover:bg-blue-50 dark:hover:bg-blue-950/40 gap-1 rounded-md"
                               onClick={() => {
                                 const siteObj = sites.find(s => s.id === item.siteId || s.name.toLowerCase() === item.siteName.toLowerCase()) || { id: item.siteId, name: item.siteName } as Site;
                                 setReturnSite(siteObj);
@@ -1630,7 +1630,7 @@ export function AssetManager() {
                   <div className="flex items-center gap-2">
                     <span>Rows per page:</span>
                     <select
-                      className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded px-1.5 py-0.5 font-medium"
+                      className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md px-1.5 py-0.5 font-medium"
                       value={deployedPageSize}
                       onChange={e => { setDeployedPageSize(Number(e.target.value)); setDeployedPage(1); }}
                     >
@@ -1639,7 +1639,7 @@ export function AssetManager() {
                       <option value={25}>25</option>
                       <option value={50}>50</option>
                     </select>
-                    <span className="text-slate-400 ml-2">
+                    <span className="text-slate-400 ml-2 font-mono">
                       Showing {Math.min((deployedPage - 1) * deployedPageSize + 1, filteredDeployedItems.length)} - {Math.min(deployedPage * deployedPageSize, filteredDeployedItems.length)} of {filteredDeployedItems.length} items
                     </span>
                   </div>
@@ -1648,19 +1648,19 @@ export function AssetManager() {
                     <Button
                       variant="outline"
                       size="sm"
-                      className="h-7 w-7 p-0"
+                      className="h-7 w-7 p-0 rounded-md"
                       disabled={deployedPage <= 1}
                       onClick={() => setDeployedPage(p => Math.max(1, p - 1))}
                     >
                       <ChevronLeft className="h-3.5 w-3.5" />
                     </Button>
-                    <span className="px-2 font-semibold text-slate-700 dark:text-slate-300">
+                    <span className="px-2 font-semibold text-slate-700 dark:text-slate-300 font-mono">
                       Page {deployedPage} of {totalDeployedPages}
                     </span>
                     <Button
                       variant="outline"
                       size="sm"
-                      className="h-7 w-7 p-0"
+                      className="h-7 w-7 p-0 rounded-md"
                       disabled={deployedPage >= totalDeployedPages}
                       onClick={() => setDeployedPage(p => Math.min(totalDeployedPages, p + 1))}
                     >
@@ -1684,19 +1684,19 @@ export function AssetManager() {
                 deployedGroupedBySite.map(siteGroup => (
                   <div 
                     key={siteGroup.siteId} 
-                    className="rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden shadow-xs"
+                    className="rounded-md border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden shadow-none"
                   >
                     {/* Site Card Header */}
                     <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 sm:p-4 bg-slate-50/80 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800">
                       <div className="flex items-center gap-2.5">
-                        <div className="h-8 w-8 rounded-lg bg-blue-100 dark:bg-blue-900/40 text-blue-600 flex items-center justify-center shrink-0">
+                        <div className="h-8 w-8 rounded-md bg-blue-50 dark:bg-blue-950/50 text-blue-600 border border-blue-100 dark:border-blue-900 flex items-center justify-center shrink-0">
                           <Building2 className="h-4 w-4" />
                         </div>
                         <div>
                           <h4 className="font-bold text-slate-900 dark:text-slate-100 text-sm">
                             {siteGroup.siteName}
                           </h4>
-                          <p className="text-[11px] text-slate-400">
+                          <p className="text-[11px] text-slate-400 font-mono">
                             {siteGroup.items.length} distinct item{siteGroup.items.length === 1 ? '' : 's'} • {siteGroup.totalUnits} total unit{siteGroup.totalUnits === 1 ? '' : 's'} on site
                           </p>
                         </div>
@@ -1705,7 +1705,7 @@ export function AssetManager() {
                       <div className="flex items-center gap-2">
                         <Button
                           size="sm"
-                          className="h-8 px-3 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white gap-1.5 shadow-xs"
+                          className="h-8 px-3 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white gap-1.5 shadow-none rounded-md"
                           onClick={() => {
                             const siteObj = siteGroup.siteObj || { id: siteGroup.siteId, name: siteGroup.siteName } as Site;
                             setReturnSite(siteObj);
@@ -1780,13 +1780,13 @@ export function AssetManager() {
     {/* ─────────────────────────────────────────────────────────────── */}
     {activeTab === 'ledger' && (
       <div className="w-full flex-col flex-1 flex">
-        <Card className="border-none shadow-sm overflow-hidden bg-white dark:bg-slate-900 flex-1 flex flex-col min-h-[500px]">
+        <Card className="rounded-md border border-slate-200 dark:border-slate-800 shadow-none overflow-hidden bg-white dark:bg-slate-900 flex-1 flex flex-col min-h-[500px]">
           {/* Flat Compact Toolbar Header */}
           <div className="border-b border-slate-100 dark:border-slate-800 p-3 sm:p-4 flex flex-col lg:flex-row gap-3 justify-between items-start lg:items-center bg-slate-50/50 dark:bg-slate-800/30">
             {/* Left: Title + Space-Conserving Flat Stat Chips */}
             <div className="flex flex-wrap items-center gap-2">
               <div className="flex items-center gap-2 mr-1">
-                <div className="h-7 w-7 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600">
+                <div className="h-7 w-7 rounded-md bg-blue-50 dark:bg-blue-950/50 flex items-center justify-center text-blue-600 border border-blue-100 dark:border-blue-900">
                   <History className="h-3.5 w-3.5" />
                 </div>
                 <p className="font-bold text-slate-800 dark:text-slate-200 text-xs sm:text-sm leading-none whitespace-nowrap">
@@ -1796,20 +1796,20 @@ export function AssetManager() {
 
               {/* Ultra-compact Flat Metric Chips (Conform directly to active search & filters) */}
               <div className="flex items-center gap-1.5 flex-wrap select-none">
-                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-300 shadow-xs">
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-300">
                   <span className="text-[10px] uppercase font-bold text-slate-400">Total:</span>
-                  <span className="font-extrabold text-slate-800 dark:text-slate-100">{filteredMovements.length}</span>
+                  <span className="font-extrabold text-slate-800 dark:text-slate-100 font-mono tabular-nums">{filteredMovements.length}</span>
                 </div>
-                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-xs font-semibold text-emerald-700 dark:text-emerald-400 shadow-xs">
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-xs font-semibold text-emerald-700 dark:text-emerald-400">
                   <span className="text-[10px] uppercase font-bold text-emerald-600">Inbound:</span>
-                  <span className="font-extrabold">+{ledgerMetrics.totalInbound.toLocaleString()}</span>
+                  <span className="font-extrabold font-mono tabular-nums">+{ledgerMetrics.totalInbound.toLocaleString()}</span>
                 </div>
-                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 text-xs font-semibold text-blue-700 dark:text-blue-400 shadow-xs">
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 text-xs font-semibold text-blue-700 dark:text-blue-400">
                   <span className="text-[10px] uppercase font-bold text-blue-600">Dispatched:</span>
-                  <span className="font-extrabold">-{ledgerMetrics.totalDispatched.toLocaleString()}</span>
+                  <span className="font-extrabold font-mono tabular-nums">-{ledgerMetrics.totalDispatched.toLocaleString()}</span>
                 </div>
                 <div className={cn(
-                  "flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-semibold shadow-xs",
+                  "flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-xs font-semibold",
                   ledgerMetrics.netBalance === 0
                     ? "bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300"
                     : ledgerMetrics.netBalance > 0
@@ -1817,18 +1817,18 @@ export function AssetManager() {
                       : "bg-orange-50 dark:bg-orange-950/40 border-orange-200 dark:border-orange-800 text-orange-700 dark:text-orange-300"
                 )}>
                   <span className="text-[10px] uppercase font-bold opacity-75">Net Flow:</span>
-                  <span className="font-extrabold">
+                  <span className="font-extrabold font-mono tabular-nums">
                     {ledgerMetrics.netBalance > 0 ? `+${ledgerMetrics.netBalance.toLocaleString()}` : ledgerMetrics.netBalance.toLocaleString()}
                   </span>
                 </div>
-                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-xs font-semibold text-amber-700 dark:text-amber-400 shadow-xs">
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-xs font-semibold text-amber-700 dark:text-amber-400">
                   <span className="text-[10px] uppercase font-bold text-amber-600">Burn:</span>
-                  <span className="font-extrabold">-{ledgerMetrics.totalBurned.toLocaleString()}</span>
+                  <span className="font-extrabold font-mono tabular-nums">-{ledgerMetrics.totalBurned.toLocaleString()}</span>
                 </div>
                 {ledgerMetrics.totalValue > 0 && (
-                  <div className="hidden xl:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800 text-xs font-semibold text-purple-700 dark:text-purple-400 shadow-xs">
-                    <span className="text-[10px] uppercase font-bold text-purple-600">Value:</span>
-                    <span className="font-extrabold">₦{ledgerMetrics.totalValue.toLocaleString()}</span>
+                  <div className="hidden xl:flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-300">
+                    <span className="text-[10px] uppercase font-bold text-slate-500">Value:</span>
+                    <span className="font-extrabold font-mono tabular-nums">₦{ledgerMetrics.totalValue.toLocaleString()}</span>
                   </div>
                 )}
               </div>
@@ -1841,7 +1841,7 @@ export function AssetManager() {
                 <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
                 <Input
                   placeholder="Search asset, site, batch..."
-                  className="pl-8 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 h-8 text-xs focus-visible:ring-blue-500/50 rounded-lg shadow-none"
+                  className="pl-8 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 h-8 text-xs focus-visible:ring-blue-500/50 rounded-md shadow-none"
                   value={ledgerSearch}
                   onChange={e => { setLedgerSearch(e.target.value); setLedgerPage(1); }}
                 />
@@ -1858,7 +1858,7 @@ export function AssetManager() {
               {/* Movement Type Filter */}
               <div className="relative">
                 <select
-                  className="appearance-none bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs rounded-lg h-8 pl-2.5 pr-7 shadow-none focus:outline-none focus:ring-2 focus:ring-blue-500/50 font-medium cursor-pointer"
+                  className="appearance-none bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs rounded-md h-8 pl-2.5 pr-7 shadow-none focus:outline-none focus:ring-2 focus:ring-blue-500/50 font-medium cursor-pointer"
                   value={ledgerTypeFilter}
                   onChange={e => { setLedgerTypeFilter(e.target.value); setLedgerPage(1); }}
                 >
@@ -1882,7 +1882,7 @@ export function AssetManager() {
               {/* Date Filter */}
               <div className="relative">
                 <select
-                  className="appearance-none bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs rounded-lg h-8 pl-2.5 pr-7 shadow-none focus:outline-none focus:ring-2 focus:ring-blue-500/50 font-medium cursor-pointer"
+                  className="appearance-none bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs rounded-md h-8 pl-2.5 pr-7 shadow-none focus:outline-none focus:ring-2 focus:ring-blue-500/50 font-medium cursor-pointer"
                   value={ledgerDateFilter}
                   onChange={e => { setLedgerDateFilter(e.target.value as any); setLedgerPage(1); }}
                 >
@@ -1902,7 +1902,7 @@ export function AssetManager() {
           <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-blue-700 border-b border-blue-800 text-blue-50 uppercase text-[11px] tracking-wider font-bold">
+                <tr className="bg-blue-600 border-b border-blue-700 text-white uppercase text-[11px] tracking-wider font-bold">
                   <th className="px-3 py-2.5 whitespace-nowrap">Timestamp</th>
                   <th className="px-3 py-2.5 whitespace-nowrap">Asset Name</th>
                   <th className="px-2 py-2.5 whitespace-nowrap text-center">Movement Type</th>
@@ -1939,7 +1939,7 @@ export function AssetManager() {
                           <span className="font-bold text-slate-700 dark:text-slate-300 block text-xs">
                             {new Date(mov.createdAt).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' })}
                           </span>
-                          <span className="text-[10px] text-slate-400 font-medium">
+                          <span className="text-[10px] text-slate-400 font-mono font-medium">
                             {new Date(mov.createdAt).toLocaleTimeString('en-NG', { hour: '2-digit', minute: '2-digit' })}
                           </span>
                         </td>
@@ -1957,7 +1957,7 @@ export function AssetManager() {
                         {/* Batch # */}
                         <td className="px-2 py-2.5 text-center whitespace-nowrap">
                           {mov.batchNumber ? (
-                            <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-1.5 py-0.5 rounded border border-indigo-200 dark:border-indigo-800">
+                            <span className="text-[10px] font-mono font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-1.5 py-0.5 rounded-sm border border-blue-200 dark:border-blue-800">
                               {mov.batchNumber}
                             </span>
                           ) : (
@@ -1968,7 +1968,7 @@ export function AssetManager() {
                         {/* Qty Delta */}
                         <td className="px-2 py-2.5 text-center whitespace-nowrap">
                           <span className={cn(
-                            'font-black text-xs inline-flex items-center gap-0.5 px-2 py-0.5 rounded-md',
+                            'font-bold text-xs inline-flex items-center gap-0.5 px-2 py-0.5 rounded-sm font-mono tabular-nums',
                             isPositive
                               ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400'
                               : 'bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400'
@@ -1978,14 +1978,14 @@ export function AssetManager() {
                         </td>
 
                         {/* Balance Flow */}
-                        <td className="px-2 py-2.5 text-center whitespace-nowrap font-medium text-slate-500 dark:text-slate-400 text-xs">
+                        <td className="px-2 py-2.5 text-center whitespace-nowrap font-mono tabular-nums text-slate-500 dark:text-slate-400 text-xs">
                           <span>{mov.previousQuantity}</span>
                           <span className="mx-1 text-slate-300 dark:text-slate-600">→</span>
                           <strong className="text-slate-800 dark:text-slate-200 font-bold">{mov.newQuantity}</strong>
                         </td>
 
                         {/* Total Value */}
-                        <td className="px-2.5 py-2.5 text-right whitespace-nowrap">
+                        <td className="px-2.5 py-2.5 text-right whitespace-nowrap font-mono tabular-nums">
                           {mov.totalCost !== undefined && mov.totalCost > 0 ? (
                             <div>
                               <span className="font-bold text-slate-800 dark:text-slate-200 text-xs">₦{mov.totalCost.toLocaleString()}</span>
@@ -2057,7 +2057,7 @@ export function AssetManager() {
                         </span>
                       </div>
                       <span className={cn(
-                        'font-black text-xs px-2 py-0.5 rounded-md',
+                        'font-bold text-xs px-2 py-0.5 rounded-sm font-mono tabular-nums',
                         isPositive
                           ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400'
                           : 'bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400'
@@ -2069,17 +2069,17 @@ export function AssetManager() {
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <MovementTypeBadge type={mov.movementType} />
                       {mov.batchNumber && (
-                        <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-1.5 py-0.2 rounded">
+                        <span className="text-[10px] font-mono font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-1.5 py-0.2 rounded-sm border border-blue-200 dark:border-blue-800">
                           {mov.batchNumber}
                         </span>
                       )}
-                      <span className="text-xs text-slate-500 font-medium">
+                      <span className="text-xs text-slate-500 font-mono tabular-nums font-medium">
                         Balance: {mov.previousQuantity} → <strong className="text-slate-800 dark:text-slate-200">{mov.newQuantity}</strong>
                       </span>
                     </div>
 
                     {(mov.siteName || mov.referenceId || mov.reasonCode) && (
-                      <div className="p-2 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-400 space-y-0.5">
+                      <div className="p-2 rounded-md bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-400 space-y-0.5">
                         {mov.siteName && <p>Site: <strong className="text-slate-800 dark:text-slate-200">{mov.siteName}</strong></p>}
                         {mov.referenceId && <p className="font-mono text-[10px]">Ref: {mov.referenceId}</p>}
                         {mov.reasonCode && <p className="italic text-[11px]">{mov.reasonCode}</p>}
@@ -2096,14 +2096,14 @@ export function AssetManager() {
             <div className="border-t border-slate-100 dark:border-slate-800 p-2.5 sm:px-4 sm:py-2 flex flex-col sm:flex-row items-center justify-between gap-2.5 text-xs text-slate-500 dark:text-slate-400 bg-slate-50/50 dark:bg-slate-800/30 select-none">
               <div className="flex items-center gap-2">
                 <span>
-                  Showing <strong className="text-slate-700 dark:text-slate-200">{(ledgerPage - 1) * ledgerPageSize + 1}</strong> to <strong className="text-slate-700 dark:text-slate-200">{Math.min(ledgerPage * ledgerPageSize, filteredMovements.length)}</strong> of <strong className="text-slate-700 dark:text-slate-200">{filteredMovements.length}</strong>
+                  Showing <strong className="text-slate-700 dark:text-slate-200 font-mono">{(ledgerPage - 1) * ledgerPageSize + 1}</strong> to <strong className="text-slate-700 dark:text-slate-200 font-mono">{Math.min(ledgerPage * ledgerPageSize, filteredMovements.length)}</strong> of <strong className="text-slate-700 dark:text-slate-200 font-mono">{filteredMovements.length}</strong>
                 </span>
                 <div className="flex items-center gap-1 ml-2">
                   <span className="text-[11px] text-slate-400">Rows:</span>
                   <select
                     value={ledgerPageSize}
                     onChange={e => { setLedgerPageSize(Number(e.target.value)); setLedgerPage(1); }}
-                    className="h-6.5 px-1.5 rounded bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-300 outline-none cursor-pointer"
+                    className="h-6.5 px-1.5 rounded-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-300 outline-none cursor-pointer"
                   >
                     {[10, 15, 25, 50, 100].map(s => (
                       <option key={s} value={s}>{s}</option>
@@ -2131,7 +2131,7 @@ export function AssetManager() {
                   <ChevronLeft className="h-3.5 w-3.5" />
                 </button>
 
-                <span className="px-2.5 py-0.5 text-xs font-bold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md">
+                <span className="px-2.5 py-0.5 text-xs font-bold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md font-mono">
                   Page {ledgerPage} of {totalLedgerPages}
                 </span>
 

@@ -207,7 +207,7 @@ export function NewHire() {
       <Button variant="outline" size="sm" onClick={() => navigate('/onboarding')} className="gap-2 border-slate-200 h-9">
         <ArrowLeft className="h-4 w-4" /> Back
       </Button>
-      <Button onClick={handleStartNewHire} disabled={isSubmitting} className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold gap-2 h-9 px-4 shadow-sm">
+      <Button onClick={handleStartNewHire} disabled={isSubmitting} className="bg-blue-600 hover:bg-blue-700 text-white font-semibold gap-2 h-9 px-4 shadow-sm">
         <ArrowRight className="h-4 w-4" /> {isSubmitting ? 'Saving...' : 'Save Pending Hire'}
       </Button>
     </div>
@@ -220,13 +220,13 @@ export function NewHire() {
         <Button variant="outline" size="sm" onClick={() => navigate('/onboarding')} className="gap-2 border-slate-200 h-9">
           <ArrowLeft className="h-4 w-4" /> Back
         </Button>
-        <Button onClick={handleStartNewHire} disabled={isSubmitting} size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold gap-2 h-9 px-4">
+        <Button onClick={handleStartNewHire} disabled={isSubmitting} size="sm" className="bg-blue-600 hover:bg-blue-700 text-white font-semibold gap-2 h-9 px-4">
           <ArrowRight className="h-4 w-4 text-[10px]" /> {isSubmitting ? '...' : 'Save'}
         </Button>
       </div>
 
       <Card className="border-none shadow-xl ring-1 ring-black/5 bg-white relative overflow-hidden">
-        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 to-blue-400"></div>
+        <div className="absolute top-0 left-0 w-full h-1 bg-blue-600"></div>
         <CardContent className="p-6 md:p-8">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6 mb-6">
             <div className="space-y-2">
@@ -240,7 +240,7 @@ export function NewHire() {
 
             <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1">Position <span className="text-rose-500">*</span></label>
-              <select className="flex h-11 w-full rounded-md border border-slate-200 bg-slate-50 focus:bg-white px-3 text-sm transition-colors outline-none focus:ring-2 focus:ring-indigo-500/20"
+              <select className="flex h-11 w-full rounded-md border border-slate-200 bg-slate-50 focus:bg-white px-3 text-sm transition-colors outline-none focus:ring-2 focus:ring-blue-500/20"
                 value={newHireData.position} onChange={(e) => {
                   const newPos = e.target.value;
                   const posObj = positions.find(p => p.title === newPos);
@@ -269,7 +269,7 @@ export function NewHire() {
             <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1">Staff Type</label>
               <select 
-                className="flex h-11 w-full rounded-md border border-slate-200 bg-slate-50 focus:bg-white px-3 text-sm transition-colors outline-none focus:ring-2 focus:ring-indigo-500/20" 
+                className="flex h-11 w-full rounded-md border border-slate-200 bg-slate-50 focus:bg-white px-3 text-sm transition-colors outline-none focus:ring-2 focus:ring-blue-500/20" 
                 value={newHireData.staffType || 'OFFICE'} 
                 onChange={e => setNewHireData({ ...newHireData, staffType: e.target.value as any })}
               >
@@ -281,7 +281,7 @@ export function NewHire() {
             <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1">Employee Level</label>
               <select 
-                className="flex h-11 w-full rounded-md border border-slate-200 bg-slate-50 focus:bg-white px-3 text-sm transition-colors outline-none focus:ring-2 focus:ring-indigo-500/20" 
+                className="flex h-11 w-full rounded-md border border-slate-200 bg-slate-50 focus:bg-white px-3 text-sm transition-colors outline-none focus:ring-2 focus:ring-blue-500/20" 
                 value={newHireData.level || 10} 
                 onChange={e => setNewHireData({ ...newHireData, level: parseInt(e.target.value) })}
               >
@@ -336,18 +336,18 @@ export function NewHire() {
             </div>
           </div>
 
-          <div className="p-4 bg-indigo-50/50 rounded-xl border border-indigo-100 flex gap-4 mt-6 items-center">
-            <div className="bg-indigo-100 p-2 rounded-lg text-indigo-600 h-10 w-10 flex items-center justify-center shrink-0">
+          <div className="p-4 bg-blue-50/50 rounded-xl border border-blue-100 flex gap-4 mt-6 items-center">
+            <div className="bg-blue-100 p-2 rounded-lg text-blue-600 h-10 w-10 flex items-center justify-center shrink-0">
               <Check className="h-5 w-5" />
             </div>
-            <p className="text-sm text-indigo-900 leading-relaxed">
+            <p className="text-sm text-blue-900 leading-relaxed">
               This profile will be saved to the database immediately with a <strong>Pending Onboarding</strong> status. The employee will not appear on active payroll or attendance until all required onboarding tasks are completed and they are formally activated.
             </p>
           </div>
 
           <div className="flex justify-end gap-3 mt-8">
             <Button variant="ghost" className="text-slate-500 hover:text-slate-700 font-medium" onClick={() => navigate('/onboarding')} disabled={isSubmitting}>Cancel</Button>
-            <Button onClick={handleStartNewHire} disabled={isSubmitting} className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold gap-2 h-10 px-6 shadow-md shadow-indigo-200">
+            <Button onClick={handleStartNewHire} disabled={isSubmitting} className="bg-blue-600 hover:bg-blue-700 text-white font-semibold gap-2 h-10 px-6 shadow-md ">
               <ArrowRight className="h-4 w-4" /> {isSubmitting ? 'Saving...' : 'Save Pending Hire'}
             </Button>
           </div>

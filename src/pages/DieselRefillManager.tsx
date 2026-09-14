@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 import { Button } from '@/src/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/src/components/ui/dialog';
 import { DieselRefill, DieselRefillAllocation } from '@/src/types/operations';
+import { MetricHeroCard } from '@/src/components/ui/MetricHeroCard';
 
 const fmt = (n: number) => n.toLocaleString('en-NG', { minimumFractionDigits: 0, maximumFractionDigits: 1 });
 const fmtCurrency = (n: number) => `₦${n.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -858,18 +859,22 @@ function RefillForm({ editing, initialLedgerEntry, onClose, onSave }: RefillForm
   };
 
   const inp = cn(
-    'w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 transition-colors',
+    'w-full rounded-md border px-3 py-2 text-sm font-mono tabular-nums focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors',
+    isDark ? 'bg-slate-800 border-slate-700 text-white placeholder:text-slate-500' : 'bg-white border-slate-200 text-slate-900 placeholder:text-slate-400'
+  );
+  const textInp = cn(
+    'w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors',
     isDark ? 'bg-slate-800 border-slate-700 text-white placeholder:text-slate-500' : 'bg-white border-slate-200 text-slate-900 placeholder:text-slate-400'
   );
   const label = 'text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 block';
 
   return (
-    <div className={cn('flex flex-col gap-5 p-6 rounded-2xl border shadow-sm', isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200')}>
+    <div className={cn('flex flex-col gap-5 p-6 rounded-md border', isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200')}>
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className="p-2 rounded-xl bg-amber-500/10">
-            <Fuel className="w-5 h-5 text-amber-500" />
+          <div className="p-2 rounded-md bg-blue-500/10">
+            <Fuel className="w-5 h-5 text-blue-600 dark:text-blue-400" />
           </div>
           <div>
             <h2 className={cn('font-bold text-base', isDark ? 'text-white' : 'text-slate-900')}>
@@ -878,17 +883,17 @@ function RefillForm({ editing, initialLedgerEntry, onClose, onSave }: RefillForm
             <p className="text-xs text-slate-500">Record a bulk diesel purchase and distribute to any machines</p>
           </div>
         </div>
-        <button onClick={onClose} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+        <button onClick={onClose} className="p-1.5 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
           <X className="w-4 h-4" />
         </button>
       </div>
 
       {/* Purchase Details */}
-      <div className={cn('p-4 rounded-xl border', isDark ? 'bg-slate-800/50 border-slate-700' : 'bg-amber-50/50 border-amber-100')}>
+      <div className={cn('p-4 rounded-md border', isDark ? 'bg-slate-800/50 border-slate-700' : 'bg-slate-50 border-slate-200')}>
         <div className="flex items-center justify-between mb-3">
-          <p className="text-xs font-bold text-amber-600 uppercase tracking-wider">Purchase Details</p>
+          <p className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Purchase Details</p>
           {initialLedgerEntry && (
-            <span className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 flex items-center gap-1">
+            <span className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 flex items-center gap-1 font-mono tabular-nums">
               <Sparkles className="w-3 h-3 text-amber-500" /> Pre-filled from {initialLedgerEntry.voucherNo}
             </span>
           )}
@@ -900,7 +905,7 @@ function RefillForm({ editing, initialLedgerEntry, onClose, onSave }: RefillForm
               type="date" 
               value={date} 
               onChange={e => handleDateChange(e.target.value)} 
-              className={cn(inp, validationErrors.date && 'border-red-500 ring-2 ring-red-500/50 bg-red-50/20')} 
+              className={cn(inp, validationErrors.date && 'border-red-500 ring-1 ring-red-500 bg-red-50/20')} 
             />
             {validationErrors.date && <p className="text-[11px] text-red-500 mt-1 font-medium">Refill date is required</p>}
           </div>
@@ -914,7 +919,7 @@ function RefillForm({ editing, initialLedgerEntry, onClose, onSave }: RefillForm
               onChange={e => handleTotalLitresChange(e.target.value)} 
               onFocus={e => e.target.select()}
               placeholder="e.g. 60" 
-              className={cn(inp, 'caret-amber-500', validationErrors.totalLitres && 'border-red-500 ring-2 ring-red-500/50 bg-red-50/20')} 
+              className={cn(inp, validationErrors.totalLitres && 'border-red-500 ring-1 ring-red-500 bg-red-50/20')} 
             />
             {validationErrors.totalLitres && <p className="text-[11px] text-red-500 mt-1 font-medium">Total litres required</p>}
           </div>
@@ -928,7 +933,7 @@ function RefillForm({ editing, initialLedgerEntry, onClose, onSave }: RefillForm
               onChange={e => handlePricePerLitreChange(e.target.value)} 
               onFocus={e => e.target.select()}
               placeholder="e.g. 950" 
-              className={cn(inp, 'caret-amber-500')} 
+              className={inp} 
             />
           </div>
           <div>
@@ -943,18 +948,18 @@ function RefillForm({ editing, initialLedgerEntry, onClose, onSave }: RefillForm
               placeholder="e.g. 150000"
               className={cn(
                 inp,
-                'caret-amber-500 font-semibold',
-                costInput ? (isDark ? 'text-amber-400' : 'text-amber-700 font-bold') : ''
+                'font-bold',
+                costInput ? (isDark ? 'text-blue-400' : 'text-blue-700') : ''
               )}
             />
           </div>
           <div>
             <label className={label}>Purchased By</label>
-            <input type="text" value={purchasedBy} onChange={e => setPurchasedBy(e.target.value)} placeholder="Person / driver" className={inp} />
+            <input type="text" value={purchasedBy} onChange={e => setPurchasedBy(e.target.value)} placeholder="Person / driver" className={textInp} />
           </div>
           <div>
             <label className={label}>Supplier / Fuel Station</label>
-            <input type="text" value={supplier} onChange={e => setSupplier(e.target.value)} placeholder="Fuel station" className={inp} />
+            <input type="text" value={supplier} onChange={e => setSupplier(e.target.value)} placeholder="Fuel station" className={textInp} />
           </div>
           <div className="col-span-2">
             <label className={label}>Reconcile Costs</label>
@@ -962,21 +967,21 @@ function RefillForm({ editing, initialLedgerEntry, onClose, onSave }: RefillForm
               type="button"
               onClick={() => setShowLedgerDialog(true)}
               className={cn(
-                "h-10 w-full rounded-xl border px-3 flex items-center justify-between text-sm font-semibold transition-all shadow-sm",
+                "h-10 w-full rounded-md border px-3 flex items-center justify-between text-sm font-semibold transition-all",
                 linkedLedgerIds.length > 0
-                  ? (isDark ? "bg-indigo-950/20 border-indigo-800/80 text-indigo-400 hover:bg-indigo-950/30" : "bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100")
+                  ? (isDark ? "bg-blue-950/20 border-blue-800/80 text-blue-400 hover:bg-blue-950/30" : "bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100")
                   : (isDark ? "bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700" : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50")
               )}
             >
               <div className="flex items-center gap-2">
-                <LinkIcon className="w-4 h-4" />
+                <LinkIcon className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                 <span>Link Financial Ledger</span>
               </div>
               <span className={cn(
-                "text-xs px-2.5 py-0.5 rounded-full font-bold",
+                "text-[10px] px-2 py-0.5 rounded-sm font-bold uppercase tracking-wider font-mono tabular-nums",
                 linkedLedgerIds.length > 0 
-                  ? (isDark ? "bg-indigo-900 text-indigo-300" : "bg-indigo-100 text-indigo-800")
-                  : (isDark ? "bg-slate-900 text-slate-400" : "bg-slate-100 text-slate-500")
+                  ? (isDark ? "bg-blue-900/60 text-blue-300 border border-blue-700/60" : "bg-blue-100 text-blue-800 border border-blue-200")
+                  : (isDark ? "bg-slate-900 text-slate-400 border border-slate-700" : "bg-slate-100 text-slate-500 border border-slate-200")
               )}>
                 {linkedLedgerIds.length} Linked ({fmtCurrency(totalLinkedAmount)})
               </span>
@@ -985,17 +990,17 @@ function RefillForm({ editing, initialLedgerEntry, onClose, onSave }: RefillForm
 
           {/* Linked Vouchers Breakdown & Auto-Fill Action Card */}
           {linkedEntries.length > 0 && (
-            <div className="col-span-2 lg:col-span-4 p-3.5 rounded-xl border bg-indigo-50/50 dark:bg-indigo-950/20 border-indigo-200/80 dark:border-indigo-900/60 space-y-2.5 shadow-xs">
+            <div className="col-span-2 lg:col-span-4 p-3.5 rounded-md border bg-blue-50/50 dark:bg-blue-950/20 border-blue-200/80 dark:border-blue-900/60 space-y-2.5">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <Receipt className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                  <span className="text-xs font-bold text-indigo-950 dark:text-indigo-200">
+                  <Receipt className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                  <span className="text-xs font-bold text-slate-900 dark:text-slate-100 font-mono tabular-nums">
                     Linked Vouchers ({linkedEntries.length}) — {fmtCurrency(totalLinkedAmount)}
                   </span>
                   <button
                     type="button"
                     onClick={handleClearAllLinked}
-                    className="text-[10px] font-semibold text-red-500 hover:text-red-700 hover:underline px-1.5 py-0.5 rounded transition-colors"
+                    className="text-[10px] font-semibold text-red-500 hover:text-red-700 hover:underline px-1.5 py-0.5 rounded-sm transition-colors uppercase tracking-wider"
                     title="Remove all linked vouchers"
                   >
                     Deselect All
@@ -1005,14 +1010,14 @@ function RefillForm({ editing, initialLedgerEntry, onClose, onSave }: RefillForm
                   <button
                     type="button"
                     onClick={() => setShowLedgerDialog(true)}
-                    className="text-xs font-semibold px-2.5 py-1 rounded-lg border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100/50 dark:hover:bg-indigo-900/40 transition-colors"
+                    className="text-xs font-semibold px-2.5 py-1 rounded-md border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 hover:bg-blue-100/50 dark:hover:bg-blue-900/40 transition-colors"
                   >
                     + Manage Links
                   </button>
                   <button
                     type="button"
                     onClick={() => syncFromLinkedEntries()}
-                    className="text-xs font-semibold px-3 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white flex items-center gap-1.5 shadow-xs transition-colors"
+                    className="text-xs font-semibold px-3 py-1 rounded-md bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-1.5 transition-colors"
                   >
                     <Sparkles className="w-3.5 h-3.5 text-amber-300" />
                     Auto-Fill Form & Load Site Machines
@@ -1025,12 +1030,12 @@ function RefillForm({ editing, initialLedgerEntry, onClose, onSave }: RefillForm
                   const rem = ledgerRemainingAmounts.get(e.id) ?? Number(e.amount) ?? 0;
                   const parsedL = parseLitresFromText(e.description);
                   return (
-                    <div key={e.id} className="p-2.5 rounded-lg bg-white dark:bg-slate-800/90 border border-indigo-100 dark:border-slate-700/80 text-xs flex flex-col justify-between gap-1 shadow-xs group/item hover:border-indigo-300 dark:hover:border-indigo-700 transition-all">
+                    <div key={e.id} className="p-2.5 rounded-md bg-white dark:bg-slate-800/90 border border-blue-100 dark:border-slate-700/80 text-xs flex flex-col justify-between gap-1 group/item hover:border-blue-300 dark:hover:border-blue-700 transition-all">
                       <div>
                         <div className="flex items-center justify-between gap-1 font-semibold text-slate-800 dark:text-slate-200">
-                          <span className="font-mono text-[11px] text-indigo-600 dark:text-indigo-400 font-bold">{e.voucherNo || 'Voucher'}</span>
+                          <span className="font-mono text-[11px] text-blue-600 dark:text-blue-400 font-bold">{e.voucherNo || 'Voucher'}</span>
                           <div className="flex items-center gap-1.5">
-                            <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">{fmtCurrency(rem)}</span>
+                            <span className="text-[11px] font-bold font-mono tabular-nums text-emerald-600 dark:text-emerald-400">{fmtCurrency(rem)}</span>
                             <button
                               type="button"
                               onClick={(evt) => {
@@ -1038,7 +1043,7 @@ function RefillForm({ editing, initialLedgerEntry, onClose, onSave }: RefillForm
                                 handleToggleLedger(e.id);
                               }}
                               title="Deselect / Unlink this voucher"
-                              className="p-0.5 rounded text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
+                              className="p-0.5 rounded-sm text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
                             >
                               <X className="w-3.5 h-3.5" />
                             </button>
@@ -1046,15 +1051,15 @@ function RefillForm({ editing, initialLedgerEntry, onClose, onSave }: RefillForm
                         </div>
                         <p className="text-[11px] text-slate-600 dark:text-slate-300 line-clamp-2 mt-0.5">{e.description}</p>
                       </div>
-                      <div className="flex items-center justify-between text-[10px] text-slate-500 border-t border-slate-100 dark:border-slate-700/60 pt-1.5 mt-1">
+                      <div className="flex items-center justify-between text-[10px] text-slate-500 border-t border-slate-100 dark:border-slate-700/60 pt-1.5 mt-1 font-mono tabular-nums">
                         <span>{new Date(e.date).toLocaleDateString('en-GB')}</span>
                         {parsedL && (
-                          <span className="font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-1 rounded">
+                          <span className="font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 px-1 rounded-sm">
                             ~{parsedL}L
                           </span>
                         )}
                         {e.site && (
-                          <span className="font-medium text-indigo-600 dark:text-indigo-400 truncate max-w-[100px]">{e.site}</span>
+                          <span className="font-medium text-slate-700 dark:text-slate-300 truncate max-w-[100px]">{e.site}</span>
                         )}
                       </div>
                     </div>
@@ -1066,7 +1071,7 @@ function RefillForm({ editing, initialLedgerEntry, onClose, onSave }: RefillForm
 
           <div className="col-span-2 lg:col-span-4">
             <label className={label}>General Notes</label>
-            <input type="text" value={notes} onChange={e => setNotes(e.target.value)} placeholder="Optional global notes" className={inp} />
+            <input type="text" value={notes} onChange={e => setNotes(e.target.value)} placeholder="Optional global notes" className={textInp} />
           </div>
         </div>
       </div>
@@ -1078,14 +1083,14 @@ function RefillForm({ editing, initialLedgerEntry, onClose, onSave }: RefillForm
             <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Machines Being Refilled</p>
             {totalL > 0 && (
               <span className={cn(
-                'text-xs font-semibold px-2 py-0.5 rounded-full',
-                remaining < -0.001 ? 'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300' :
-                remaining < 0.001 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300' :
-                'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300'
+                'text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-sm font-mono tabular-nums',
+                remaining < -0.001 ? 'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300 border border-red-200 dark:border-red-800' :
+                remaining < 0.001 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800' :
+                'bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
               )}>
-                {remaining < -0.001 ? `${fmt(Math.abs(remaining))}L over` :
-                 remaining < 0.001 ? 'Fully allocated' :
-                 `${fmt(remaining)}L remaining to allocate`}
+                {remaining < -0.001 ? `${fmt(Math.abs(remaining))}L OVER` :
+                 remaining < 0.001 ? 'FULLY ALLOCATED' :
+                 `${fmt(remaining)}L REMAINING TO ALLOCATE`}
               </span>
             )}
           </div>
@@ -1094,7 +1099,7 @@ function RefillForm({ editing, initialLedgerEntry, onClose, onSave }: RefillForm
               <button
                 type="button"
                 onClick={distributeEvenly}
-                className="h-8 px-2.5 rounded-lg border text-xs font-semibold flex items-center gap-1.5 transition-colors bg-amber-500 hover:bg-amber-600 text-white border-amber-600 shadow-xs"
+                className="h-8 px-2.5 rounded-md border text-xs font-semibold flex items-center gap-1.5 transition-colors bg-blue-600 hover:bg-blue-700 text-white border-blue-700 font-mono tabular-nums"
                 title="Distribute total purchased litres evenly across all machines"
               >
                 <Zap className="w-3.5 h-3.5" />
@@ -1104,7 +1109,7 @@ function RefillForm({ editing, initialLedgerEntry, onClose, onSave }: RefillForm
             <select
               value=""
               onChange={e => quickAddFromSite(e.target.value)}
-              className={cn('h-8 rounded-lg border px-2 text-xs focus:outline-none focus:ring-1 focus:ring-amber-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-200')}
+              className={cn('h-8 rounded-md border px-2 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-200')}
             >
               <option value="">+ Quick Add from Site...</option>
               {activeSites.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
@@ -1112,7 +1117,7 @@ function RefillForm({ editing, initialLedgerEntry, onClose, onSave }: RefillForm
             <select
               value={selectedMachineToAdd}
               onChange={e => addMachine(e.target.value)}
-              className={cn('h-8 rounded-lg border px-2 text-xs focus:outline-none focus:ring-1 focus:ring-amber-500 max-w-[240px]', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-200')}
+              className={cn('h-8 rounded-md border px-2 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 max-w-[240px]', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-200')}
             >
               <option value="">+ Add Specific Machine...</option>
               {allActiveMachines.activeOnDate.length > 0 && (
@@ -1136,12 +1141,12 @@ function RefillForm({ editing, initialLedgerEntry, onClose, onSave }: RefillForm
         </div>
 
         {allocations.length === 0 ? (
-          <div className={cn('flex items-center gap-2 p-4 rounded-xl border text-sm', isDark ? 'bg-slate-800 border-slate-700 text-slate-400' : 'bg-slate-50 border-slate-200 text-slate-500')}>
+          <div className={cn('flex items-center gap-2 p-4 rounded-md border text-sm', isDark ? 'bg-slate-800 border-slate-700 text-slate-400' : 'bg-slate-50 border-slate-200 text-slate-500')}>
             <Info className="w-4 h-4 shrink-0" />
             No machines added yet. Select machines or add from a site to log their refill.
           </div>
         ) : (
-          <div className={cn('rounded-xl border overflow-x-auto', isDark ? 'border-slate-700' : 'border-slate-200')}>
+          <div className={cn('rounded-md border overflow-x-auto', isDark ? 'border-slate-700' : 'border-slate-200')}>
             <table className="w-full text-left text-sm whitespace-nowrap min-w-[750px]">
               <thead className={cn('text-xs font-bold uppercase tracking-wider', isDark ? 'bg-slate-800 text-slate-400' : 'bg-slate-50 text-slate-500')}>
                 <tr>
@@ -1170,7 +1175,7 @@ function RefillForm({ editing, initialLedgerEntry, onClose, onSave }: RefillForm
                           type="date"
                           value={alloc.refillDate || date}
                           onChange={e => handleRowDateChange(idx, e.target.value)}
-                          className={cn('rounded-lg border px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-amber-500 w-full', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-200')}
+                          className={cn('rounded-md border px-2 py-1.5 text-xs font-mono tabular-nums focus:outline-none focus:ring-1 focus:ring-blue-500 w-full', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-200')}
                         />
                       </td>
                       <td className="px-4 py-2">
@@ -1183,7 +1188,7 @@ function RefillForm({ editing, initialLedgerEntry, onClose, onSave }: RefillForm
                           onFocus={e => e.target.select()}
                           placeholder="0"
                           className={cn(
-                            'rounded-lg border px-2.5 py-1.5 text-sm text-right w-full font-semibold focus:outline-none focus:ring-2 focus:ring-amber-500 caret-amber-500 transition-all',
+                            'rounded-md border px-2.5 py-1.5 text-sm text-right w-full font-mono tabular-nums font-semibold focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all',
                             isDark ? 'bg-slate-800 border-slate-700 text-white placeholder:text-slate-600' : 'bg-white border-slate-200 text-slate-900 placeholder:text-slate-400'
                           )}
                         />
@@ -1198,14 +1203,14 @@ function RefillForm({ editing, initialLedgerEntry, onClose, onSave }: RefillForm
                           onFocus={e => e.target.select()}
                           placeholder="0"
                           className={cn(
-                            'rounded-lg border px-2.5 py-1.5 text-sm text-right w-full font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500 caret-emerald-500 transition-all',
+                            'rounded-md border px-2.5 py-1.5 text-sm text-right w-full font-mono tabular-nums font-semibold focus:outline-none focus:ring-1 focus:ring-emerald-500 transition-all',
                             isDark ? 'bg-slate-800 border-slate-700 text-emerald-400 placeholder:text-slate-600' : 'bg-emerald-50 border-emerald-200 text-emerald-800 placeholder:text-slate-400'
                           )}
                         />
-                        <span className="absolute -top-0 -right-0 text-[8px] font-bold bg-emerald-500 text-white rounded-full px-1 py-0.5 leading-none opacity-0 group-hover:opacity-100 transition-opacity">SYNCS</span>
+                        <span className="absolute -top-0 -right-0 text-[8px] font-bold bg-emerald-500 text-white rounded-sm px-1 py-0.5 leading-none opacity-0 group-hover:opacity-100 transition-opacity">SYNCS</span>
                       </td>
                       <td className="px-4 py-2 text-right">
-                        <span className={cn('text-sm font-bold', balance > 0 ? 'text-blue-500' : balance < 0 ? 'text-red-500' : 'text-slate-400')}>
+                        <span className={cn('text-sm font-bold font-mono tabular-nums', balance > 0 ? 'text-blue-600 dark:text-blue-400' : balance < 0 ? 'text-red-500' : 'text-slate-400')}>
                           {balance > 0 ? `+${fmt(balance)}` : fmt(balance)}L
                         </span>
                       </td>
@@ -1215,7 +1220,7 @@ function RefillForm({ editing, initialLedgerEntry, onClose, onSave }: RefillForm
                           value={alloc.notes || ''}
                           onChange={e => updateAlloc(idx, 'notes', e.target.value)}
                           placeholder="Optional..."
-                          className={cn('rounded-lg border px-2 py-1.5 text-sm w-full focus:outline-none focus:ring-1 focus:ring-amber-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-200')}
+                          className={cn('rounded-md border px-2 py-1.5 text-sm w-full focus:outline-none focus:ring-1 focus:ring-blue-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-200')}
                         />
                       </td>
                       <td className="px-2 py-2">
@@ -1227,9 +1232,10 @@ function RefillForm({ editing, initialLedgerEntry, onClose, onSave }: RefillForm
                   );
                 })}
               </tbody>
-              <tfoot className={cn('border-t font-bold text-sm', isDark ? 'bg-slate-800/60 border-slate-700 text-white' : 'bg-slate-50 border-slate-200 text-slate-700')}>
+              <tfoot className={cn('border-t font-bold text-sm font-mono tabular-nums', isDark ? 'bg-slate-800/60 border-slate-700 text-white' : 'bg-slate-50 border-slate-200 text-slate-700')}>
                 <tr>
-                  <td className="px-4 py-2 text-xs uppercase text-slate-500">Totals</td>
+                  <td className="px-4 py-2 text-xs uppercase text-slate-500 font-sans">Totals</td>
+                  <td className="px-4 py-2"></td>
                   <td className="px-4 py-2 text-right">{fmt(totalAllocated)}L</td>
                   <td className="px-4 py-2 text-right text-emerald-600">{fmt(totalActual)}L</td>
                   <td className="px-4 py-2 text-right">{fmt(totalAllocated - totalActual)}L</td>
@@ -1248,10 +1254,10 @@ function RefillForm({ editing, initialLedgerEntry, onClose, onSave }: RefillForm
 
       {/* Actions */}
       <div className="flex gap-2 pt-4">
-        <Button variant="outline" onClick={onClose} className="flex-1 h-9 text-sm">Cancel</Button>
+        <Button variant="outline" onClick={onClose} className="flex-1 h-9 text-sm rounded-md">Cancel</Button>
         <Button
           onClick={handleSave} disabled={isSaving}
-          className="flex-[2] h-9 text-sm bg-amber-500 hover:bg-amber-600 text-white gap-1.5 shadow-none"
+          className="flex-[2] h-9 text-sm bg-blue-600 hover:bg-blue-700 text-white gap-1.5 shadow-none rounded-md"
         >
           <Save className="w-3.5 h-3.5" />
           {isSaving ? 'Saving…' : editing ? 'Update Refill' : 'Save Refill'}
@@ -1261,12 +1267,12 @@ function RefillForm({ editing, initialLedgerEntry, onClose, onSave }: RefillForm
       {/* Ledger Linking Dialog */}
       <Dialog open={showLedgerDialog} onOpenChange={setShowLedgerDialog}>
         <DialogContent className={cn(
-          "max-w-2xl w-full max-h-[88vh] flex flex-col p-5 sm:p-6 rounded-2xl shadow-2xl overflow-hidden",
+          "max-w-2xl w-full max-h-[88vh] flex flex-col p-5 sm:p-6 rounded-md shadow-lg overflow-hidden border",
           isDark ? "bg-slate-900 border-slate-800 text-white" : "bg-white border-slate-200 text-slate-900"
         )}>
           <DialogHeader className="pb-3 border-b border-slate-100 dark:border-slate-800 shrink-0">
             <DialogTitle className="flex items-center gap-2 text-base font-bold">
-              <LinkIcon className="w-4 h-4 text-indigo-500" />
+              <LinkIcon className="w-4 h-4 text-blue-600 dark:text-blue-400" />
               Link Financial Ledger (Re-embursables)
             </DialogTitle>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
@@ -1277,7 +1283,7 @@ function RefillForm({ editing, initialLedgerEntry, onClose, onSave }: RefillForm
           <div className="flex flex-col flex-1 min-h-0 pt-3 space-y-3">
             {totalCost !== undefined && totalCost > 0 && (
               <div className={cn(
-                "p-2.5 rounded-xl border flex items-center justify-between text-xs font-semibold shrink-0",
+                "p-2.5 rounded-md border flex items-center justify-between text-xs font-semibold shrink-0 font-mono tabular-nums",
                 totalLinkedAmount === totalCost ? (isDark ? "bg-emerald-950/40 text-emerald-400 border-emerald-800" : "bg-emerald-50 text-emerald-700 border-emerald-200") :
                 totalLinkedAmount > 0 ? (isDark ? "bg-amber-950/40 text-amber-400 border-amber-800" : "bg-amber-50 text-amber-700 border-amber-200") :
                 (isDark ? "bg-slate-800 text-slate-400 border-slate-700" : "bg-slate-50 text-slate-500 border-slate-200")
@@ -1297,7 +1303,7 @@ function RefillForm({ editing, initialLedgerEntry, onClose, onSave }: RefillForm
                   onChange={e => setLedgerSearch(e.target.value)}
                   placeholder="Search voucher by description, site, client..."
                   className={cn(
-                    "w-full h-9 pl-8 pr-8 rounded-lg text-xs border focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-colors",
+                    "w-full h-9 pl-8 pr-8 rounded-md text-xs border focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors",
                     isDark ? "bg-slate-800/90 border-slate-700 text-white placeholder-slate-500" : "bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400"
                   )}
                 />
@@ -1321,7 +1327,7 @@ function RefillForm({ editing, initialLedgerEntry, onClose, onSave }: RefillForm
                   value={ledgerMonthFilter}
                   onChange={e => setLedgerMonthFilter(e.target.value)}
                   className={cn(
-                    "h-9 rounded-lg text-xs px-2.5 border outline-none font-medium appearance-none cursor-pointer pr-7",
+                    "h-9 rounded-md text-xs px-2.5 border outline-none font-medium appearance-none cursor-pointer pr-7",
                     isDark ? "bg-slate-800/90 border-slate-700 text-white" : "bg-slate-50 border-slate-200 text-slate-700"
                   )}
                   style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E\")", backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center' }}
@@ -1348,7 +1354,7 @@ function RefillForm({ editing, initialLedgerEntry, onClose, onSave }: RefillForm
                       setLedgerDateTo('');
                     }}
                     className={cn(
-                      "h-9 px-2.5 rounded-lg text-xs border font-medium transition-colors flex items-center gap-1 shrink-0",
+                      "h-9 px-2.5 rounded-md text-xs border font-medium transition-colors flex items-center gap-1 shrink-0",
                       isDark ? "bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300" : "bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-600"
                     )}
                   >
@@ -1370,7 +1376,7 @@ function RefillForm({ editing, initialLedgerEntry, onClose, onSave }: RefillForm
                 <p className="text-sm italic">No matching ledger entries found for selected filter.</p>
               </div>
             ) : (
-              <div className="flex-1 overflow-y-auto pr-1.5 space-y-2.5 style-scroll max-h-[380px] my-1">
+              <div className="flex-1 overflow-y-auto pr-1.5 space-y-2 style-scroll max-h-[380px] my-1">
                 {filteredLedgerEntries.map(entry => {
                   const isLinked = linkedLedgerIds.includes(entry.id);
                   const rem = ledgerRemainingAmounts.get(entry.id) ?? Number(entry.amount) ?? 0;
@@ -1382,9 +1388,9 @@ function RefillForm({ editing, initialLedgerEntry, onClose, onSave }: RefillForm
                     <div
                       key={entry.id}
                       className={cn(
-                        "p-3 rounded-xl border transition-all text-xs flex flex-col gap-2 shadow-xs",
+                        "p-3 rounded-md border transition-all text-xs flex flex-col gap-2",
                         isLinked
-                          ? (isDark ? "bg-indigo-950/30 border-indigo-800/60 ring-1 ring-indigo-500/20" : "bg-indigo-50/70 border-indigo-200 ring-1 ring-indigo-500/20")
+                          ? (isDark ? "bg-blue-950/30 border-blue-800/60 ring-1 ring-blue-500/20" : "bg-blue-50/70 border-blue-200 ring-1 ring-blue-500/20")
                           : (isDark ? "bg-slate-800/80 border-slate-700/80 hover:bg-slate-800" : "bg-white border-slate-200 hover:bg-slate-50")
                       )}
                     >
@@ -1393,7 +1399,7 @@ function RefillForm({ editing, initialLedgerEntry, onClose, onSave }: RefillForm
                           type="checkbox"
                           checked={isLinked}
                           onChange={() => handleToggleLedger(entry.id)}
-                          className="w-4 h-4 mt-0.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600 cursor-pointer shrink-0"
+                          className="w-4 h-4 mt-0.5 rounded-sm border-slate-300 text-blue-600 focus:ring-blue-600 cursor-pointer shrink-0"
                         />
                         <div className="flex-1 min-w-0">
                           <div className="flex justify-between items-start gap-2">
@@ -1401,47 +1407,47 @@ function RefillForm({ editing, initialLedgerEntry, onClose, onSave }: RefillForm
                               {entry.description}
                             </p>
                             <div className="text-right shrink-0">
-                              <p className={cn("text-xs font-bold", isDark ? "text-white" : "text-slate-900")}>
+                              <p className={cn("text-xs font-bold font-mono tabular-nums", isDark ? "text-white" : "text-slate-900")}>
                                 {fmtCurrency(rem)}
                               </p>
                               {isPartial && (
-                                <p className="text-[10px] text-slate-400">Total: {fmtCurrency(total)}</p>
+                                <p className="text-[10px] text-slate-400 font-mono tabular-nums">Total: {fmtCurrency(total)}</p>
                               )}
                             </div>
                           </div>
 
                           <div className="flex items-center gap-2 mt-1.5 text-[11px] text-slate-500 flex-wrap">
-                            <span className="font-mono bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-[10px] text-slate-600 dark:text-slate-300">
+                            <span className="font-mono bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded-sm text-[10px] text-slate-600 dark:text-slate-300">
                               {entry.voucherNo}
                             </span>
                             <span>•</span>
-                            <span className="flex items-center gap-1">
+                            <span className="flex items-center gap-1 font-mono tabular-nums">
                               <Calendar className="w-3 h-3 text-slate-400" />
                               {new Date(entry.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
                             </span>
                             {entry.client && (
                               <>
                                 <span>•</span>
-                                <span className="font-medium text-amber-600 dark:text-amber-400">{entry.client}</span>
+                                <span className="font-medium text-slate-700 dark:text-slate-300">{entry.client}</span>
                               </>
                             )}
                             {entry.site && (
                               <>
                                 <span>•</span>
-                                <span className="font-medium text-indigo-600 dark:text-indigo-400">{entry.site}</span>
+                                <span className="font-medium text-blue-600 dark:text-blue-400">{entry.site}</span>
                               </>
                             )}
                             {parsedL && (
-                              <span className="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold border border-amber-500/20 text-[10px]">
+                              <span className="px-1.5 py-0.5 rounded-sm bg-blue-500/10 text-blue-600 dark:text-blue-400 font-bold border border-blue-500/20 text-[10px] font-mono tabular-nums">
                                 ~{parsedL}L detected
                               </span>
                             )}
                             {isPartial ? (
-                              <span className="px-1.5 py-0.5 rounded bg-orange-500/10 text-orange-600 dark:text-orange-400 font-medium text-[10px]">
+                              <span className="px-1.5 py-0.5 rounded-sm bg-amber-500/10 text-amber-700 dark:text-amber-400 font-medium text-[10px]">
                                 Partially Used
                               </span>
                             ) : (
-                              <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-medium text-[10px]">
+                              <span className="px-1.5 py-0.5 rounded-sm bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-medium text-[10px]">
                                 Full Balance
                               </span>
                             )}
@@ -1455,10 +1461,10 @@ function RefillForm({ editing, initialLedgerEntry, onClose, onSave }: RefillForm
                           type="button"
                           onClick={() => applyLedgerEntryToForm(entry)}
                           className={cn(
-                            "text-[10px] font-semibold px-2.5 py-1 rounded-lg flex items-center gap-1.5 transition-colors border shadow-xs",
+                            "text-[10px] font-semibold px-2.5 py-1 rounded-md flex items-center gap-1.5 transition-colors border",
                             isDark 
-                              ? "bg-slate-800 hover:bg-indigo-950/60 text-indigo-300 border-indigo-900/60" 
-                              : "bg-slate-50 hover:bg-indigo-50 text-indigo-700 border-indigo-200"
+                              ? "bg-slate-800 hover:bg-blue-950/60 text-blue-300 border-blue-900/60" 
+                              : "bg-slate-50 hover:bg-blue-50 text-blue-700 border-blue-200"
                           )}
                         >
                           <Sparkles className="w-3 h-3 text-amber-500" />
@@ -1474,9 +1480,9 @@ function RefillForm({ editing, initialLedgerEntry, onClose, onSave }: RefillForm
 
           {/* Dialog Footer with Selection Summary & Action Buttons */}
           <div className="pt-3.5 mt-2 border-t border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
-            <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+            <div className="text-xs text-slate-500 dark:text-slate-400 font-medium font-mono tabular-nums">
               {linkedLedgerIds.length > 0 ? (
-                <span>Linked: <strong className="text-indigo-600 dark:text-indigo-400">{linkedLedgerIds.length} voucher{linkedLedgerIds.length > 1 ? 's' : ''} ({fmtCurrency(totalLinkedAmount)})</strong></span>
+                <span>Linked: <strong className="text-blue-600 dark:text-blue-400">{linkedLedgerIds.length} voucher{linkedLedgerIds.length > 1 ? 's' : ''} ({fmtCurrency(totalLinkedAmount)})</strong></span>
               ) : (
                 <span>0 vouchers selected</span>
               )}
@@ -1489,16 +1495,16 @@ function RefillForm({ editing, initialLedgerEntry, onClose, onSave }: RefillForm
                     syncFromLinkedEntries();
                     setShowLedgerDialog(false);
                   }}
-                  className="h-9 px-4 bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold rounded-lg shadow-sm flex items-center gap-1.5"
+                  className="h-9 px-4 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-md shadow-none flex items-center gap-1.5"
                 >
-                  <Sparkles className="w-3.5 h-3.5" />
+                  <Sparkles className="w-3.5 h-3.5 text-amber-300" />
                   Apply & Auto-Fill Form
                 </Button>
               )}
               <Button
                 type="button"
                 onClick={() => setShowLedgerDialog(false)}
-                className="h-9 px-5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg shadow-sm"
+                className="h-9 px-5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-md shadow-none"
               >
                 Done
               </Button>
@@ -1559,10 +1565,10 @@ function RefillCard({ refill, onEdit, onDelete, canEdit, canDelete }: RefillCard
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -4 }}
       className={cn(
-        'rounded-xl border transition-all duration-150 overflow-hidden',
+        'rounded-md border transition-all duration-150 overflow-hidden',
         isDark
           ? 'bg-slate-900/90 border-slate-800 hover:border-slate-700'
-          : 'bg-white border-slate-200/90 hover:border-slate-300'
+          : 'bg-white border-slate-200 hover:border-slate-300'
       )}
     >
       {/* Card Header */}
@@ -1571,8 +1577,8 @@ function RefillCard({ refill, onEdit, onDelete, canEdit, canDelete }: RefillCard
         onClick={() => setExpanded(e => !e)}
       >
         <div className={cn(
-          'w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5 sm:mt-0',
-          isDark ? 'bg-amber-500/10 text-amber-400' : 'bg-amber-50 text-amber-600 border border-amber-200/50'
+          'w-8 h-8 rounded-md flex items-center justify-center shrink-0 mt-0.5 sm:mt-0',
+          isDark ? 'bg-blue-500/10 text-blue-400' : 'bg-blue-50 text-blue-600 border border-blue-200/50'
         )}>
           <Fuel className="w-4 h-4" />
         </div>
@@ -1586,7 +1592,7 @@ function RefillCard({ refill, onEdit, onDelete, canEdit, canDelete }: RefillCard
                   <span
                     key={name}
                     className={cn(
-                      'font-semibold text-xs sm:text-sm px-2 py-0.5 rounded-md',
+                      'font-semibold text-xs sm:text-sm px-2 py-0.5 rounded-sm',
                       isDark ? 'bg-slate-800 text-slate-100' : 'bg-slate-100 text-slate-800 font-medium'
                     )}
                   >
@@ -1601,15 +1607,15 @@ function RefillCard({ refill, onEdit, onDelete, canEdit, canDelete }: RefillCard
             )}
 
             <span className={cn(
-              'text-[11px] px-2 py-0.5 rounded-md font-bold tracking-tight border',
-              isDark ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' : 'bg-amber-50 text-amber-700 border-amber-200'
+              'text-[10px] px-2 py-0.5 rounded-sm font-bold uppercase tracking-wider border font-mono tabular-nums',
+              isDark ? 'bg-blue-950/40 text-blue-300 border-blue-800/60' : 'bg-blue-50 text-blue-700 border-blue-200'
             )}>
               {fmt(refill.totalLitres)}L
             </span>
 
             {refill.machineAllocations.length > 0 && (
               <span className={cn(
-                'text-[11px] px-1.5 py-0.5 rounded-md font-medium border',
+                'text-[10px] px-1.5 py-0.5 rounded-sm font-bold uppercase tracking-wider border font-mono tabular-nums',
                 isDark ? 'bg-slate-800/80 text-slate-400 border-slate-700/60' : 'bg-slate-50 text-slate-600 border-slate-200/60'
               )}>
                 {refill.machineAllocations.length} {refill.machineAllocations.length === 1 ? 'machine' : 'machines'}
@@ -1618,8 +1624,8 @@ function RefillCard({ refill, onEdit, onDelete, canEdit, canDelete }: RefillCard
 
             {refill.linkedLedgerIds && refill.linkedLedgerIds.length > 0 && (
               <span className={cn(
-                'text-[11px] flex items-center gap-1 px-1.5 py-0.5 rounded-md font-medium border',
-                isDark ? 'bg-indigo-950/40 text-indigo-400 border-indigo-900/60' : 'bg-indigo-50 text-indigo-700 border-indigo-200/70'
+                'text-[10px] flex items-center gap-1 px-1.5 py-0.5 rounded-sm font-bold uppercase tracking-wider border font-mono tabular-nums',
+                isDark ? 'bg-blue-950/40 text-blue-300 border-blue-800/60' : 'bg-blue-50 text-blue-700 border-blue-200/70'
               )}>
                 <LinkIcon className="w-2.5 h-2.5" />
                 {refill.linkedLedgerIds.length} {refill.linkedLedgerIds.length === 1 ? 'Ledger' : 'Ledgers'}
@@ -1629,12 +1635,12 @@ function RefillCard({ refill, onEdit, onDelete, canEdit, canDelete }: RefillCard
 
           {/* Subline: Date, Cost, Buyer & Inline Usage */}
           <div className="flex items-center gap-3 mt-1.5 text-[11px] text-slate-500 flex-wrap">
-            <span className="flex items-center gap-1">
+            <span className="flex items-center gap-1 font-mono tabular-nums">
               <Calendar className="w-3 h-3 text-slate-400" />
               {new Date(refill.date + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
             </span>
             {refill.totalCost ? (
-              <span className="font-semibold text-slate-700 dark:text-slate-300">
+              <span className="font-semibold font-mono tabular-nums text-slate-700 dark:text-slate-300">
                 {fmtCurrency(refill.totalCost)}
               </span>
             ) : null}
@@ -1643,7 +1649,7 @@ function RefillCard({ refill, onEdit, onDelete, canEdit, canDelete }: RefillCard
             )}
 
             {refill.totalLitres > 0 && enrichedAllocations.length > 0 && (
-              <span className="ml-auto hidden sm:inline-flex items-center gap-2 text-[10px]">
+              <span className="ml-auto hidden sm:inline-flex items-center gap-2 text-[10px] font-mono tabular-nums">
                 <span className="text-slate-400">Alloc: <strong className="text-slate-600 dark:text-slate-300">{fmt(totalAlloc)}L</strong></span>
                 <span className="text-slate-400">•</span>
                 <span className="text-emerald-600 dark:text-emerald-400">Used: <strong>{fmt(totalActual)}L</strong></span>
@@ -1654,17 +1660,17 @@ function RefillCard({ refill, onEdit, onDelete, canEdit, canDelete }: RefillCard
           {/* Minimalist Flat Progress Bar */}
           {refill.totalLitres > 0 && enrichedAllocations.length > 0 && (
             <div className="mt-2 flex items-center gap-2">
-              <div className="h-1 flex-1 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden relative">
+              <div className="h-1 flex-1 bg-slate-100 dark:bg-slate-800 rounded-sm overflow-hidden relative">
                 <div
-                  className="h-full bg-amber-400/80 rounded-full absolute left-0 top-0 transition-all duration-300"
+                  className="h-full bg-blue-400/80 rounded-sm absolute left-0 top-0 transition-all duration-300"
                   style={{ width: `${allocPercentage}%` }}
                 />
                 <div
-                  className="h-full bg-emerald-500 rounded-full absolute left-0 top-0 transition-all duration-300 opacity-90"
+                  className="h-full bg-emerald-500 rounded-sm absolute left-0 top-0 transition-all duration-300 opacity-90"
                   style={{ width: `${usagePercentage}%` }}
                 />
               </div>
-              <div className="sm:hidden flex items-center gap-2 text-[9px] text-slate-400 shrink-0 font-medium">
+              <div className="sm:hidden flex items-center gap-2 text-[9px] text-slate-400 shrink-0 font-medium font-mono tabular-nums">
                 <span>{fmt(totalActual)}/{fmt(refill.totalLitres)}L</span>
               </div>
             </div>
@@ -1677,7 +1683,7 @@ function RefillCard({ refill, onEdit, onDelete, canEdit, canDelete }: RefillCard
             <button
               onClick={e => { e.stopPropagation(); onEdit(); }}
               title="Edit Refill"
-              className="p-1.5 rounded-md text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              className="p-1.5 rounded-md text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
             >
               <Pencil className="w-3.5 h-3.5" />
             </button>
@@ -1712,7 +1718,7 @@ function RefillCard({ refill, onEdit, onDelete, canEdit, canDelete }: RefillCard
                 <p className="text-xs text-slate-400 italic py-2">No machine allocations recorded.</p>
               ) : (
                 <>
-                  <div className={cn('rounded-lg overflow-hidden border text-xs', isDark ? 'border-slate-800' : 'border-slate-200/80')}>
+                  <div className={cn('rounded-md overflow-hidden border text-xs', isDark ? 'border-slate-800' : 'border-slate-200/80')}>
                     <div className={cn('grid grid-cols-[1fr_80px_80px_75px] gap-2 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider', isDark ? 'bg-slate-800 text-slate-400' : 'bg-slate-100/70 text-slate-500')}>
                       <span>Machine</span>
                       <span className="text-right">Allocated</span>
@@ -1722,28 +1728,28 @@ function RefillCard({ refill, onEdit, onDelete, canEdit, canDelete }: RefillCard
                     {enrichedAllocations.map(alloc => {
                       const balance = (alloc.allocatedLitres || 0) - (alloc.actualUsed || 0);
                       return (
-                        <div key={alloc.assetId} className={cn('grid grid-cols-[1fr_80px_80px_75px] gap-2 items-center px-3 py-2 border-t', isDark ? 'border-slate-800' : 'border-slate-100')}>
-                          <div className="min-w-0 pr-1">
+                        <div key={alloc.assetId} className={cn('grid grid-cols-[1fr_80px_80px_75px] gap-2 items-center px-3 py-2 border-t font-mono tabular-nums', isDark ? 'border-slate-800' : 'border-slate-100')}>
+                          <div className="min-w-0 pr-1 font-sans">
                             <p className={cn('font-medium text-xs truncate', isDark ? 'text-slate-200' : 'text-slate-800')}>{alloc.assetName}</p>
                             {alloc.refillDate && alloc.refillDate !== refill.date && (
-                              <p className="text-[10px] text-amber-500 font-medium">
+                              <p className="text-[10px] text-blue-600 dark:text-blue-400 font-medium font-mono">
                                 {new Date(alloc.refillDate + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
                               </p>
                             )}
                           </div>
                           <span className="text-right text-slate-600 dark:text-slate-400 font-medium">{fmt(alloc.allocatedLitres)}L</span>
                           <span className="text-right text-emerald-600 dark:text-emerald-400 font-semibold">{fmt(alloc.actualUsed)}L</span>
-                          <span className={cn('text-right font-bold text-[11px]', balance > 0 ? 'text-blue-500' : balance < 0 ? 'text-red-500' : 'text-slate-400')}>
+                          <span className={cn('text-right font-bold text-[11px]', balance > 0 ? 'text-blue-600 dark:text-blue-400' : balance < 0 ? 'text-red-500' : 'text-slate-400')}>
                             {balance > 0 ? `+${fmt(balance)}` : fmt(balance)}L
                           </span>
                         </div>
                       );
                     })}
-                    <div className={cn('grid grid-cols-[1fr_80px_80px_75px] gap-2 px-3 py-1.5 border-t font-semibold text-xs', isDark ? 'bg-slate-800/80 border-slate-700/80 text-white' : 'bg-slate-100/90 border-slate-200 text-slate-800')}>
-                      <span className="text-[10px] uppercase text-slate-400">Total</span>
+                    <div className={cn('grid grid-cols-[1fr_80px_80px_75px] gap-2 px-3 py-1.5 border-t font-semibold text-xs font-mono tabular-nums', isDark ? 'bg-slate-800/80 border-slate-700/80 text-white' : 'bg-slate-100/90 border-slate-200 text-slate-800')}>
+                      <span className="text-[10px] uppercase text-slate-400 font-sans">Total</span>
                       <span className="text-right">{fmt(totalAlloc)}L</span>
                       <span className="text-right text-emerald-600 dark:text-emerald-400">{fmt(totalActual)}L</span>
-                      <span className={cn('text-right text-[11px]', (totalAlloc - totalActual) > 0 ? 'text-blue-500' : 'text-slate-500')}>
+                      <span className={cn('text-right text-[11px]', (totalAlloc - totalActual) > 0 ? 'text-blue-600 dark:text-blue-400' : 'text-slate-500')}>
                         {fmt(totalAlloc - totalActual)}L
                       </span>
                     </div>
@@ -1791,15 +1797,15 @@ function FlatPagination({
 
   return (
     <div className={cn(
-      'flex flex-col sm:flex-row items-center justify-between gap-2.5 px-3.5 py-2.5 rounded-xl border text-xs transition-colors mt-1',
-      isDark ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200/90'
+      'flex flex-col sm:flex-row items-center justify-between gap-2.5 px-3.5 py-2.5 rounded-md border text-xs transition-colors mt-1',
+      isDark ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200'
     )}>
       {/* Left: Summary and Page Size */}
       <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-start">
         <span className="text-slate-500 font-medium">
-          Showing <span className={cn('font-bold', isDark ? 'text-slate-200' : 'text-slate-800')}>{startItem}</span> to{' '}
-          <span className={cn('font-bold', isDark ? 'text-slate-200' : 'text-slate-800')}>{endItem}</span> of{' '}
-          <span className={cn('font-bold', isDark ? 'text-slate-200' : 'text-slate-800')}>{totalItems}</span> {itemName}
+          Showing <span className={cn('font-bold font-mono tabular-nums', isDark ? 'text-slate-200' : 'text-slate-800')}>{startItem}</span> to{' '}
+          <span className={cn('font-bold font-mono tabular-nums', isDark ? 'text-slate-200' : 'text-slate-800')}>{endItem}</span> of{' '}
+          <span className={cn('font-bold font-mono tabular-nums', isDark ? 'text-slate-200' : 'text-slate-800')}>{totalItems}</span> {itemName}
         </span>
 
         {onPageSizeChange && (
@@ -1810,7 +1816,7 @@ function FlatPagination({
                 onPageSizeChange(Number(e.target.value));
               }}
               className={cn(
-                'h-6 px-1.5 rounded-md border text-[11px] font-medium focus:outline-none focus:ring-1 focus:ring-amber-500 transition-colors',
+                'h-6 px-1.5 rounded-md border text-[11px] font-medium font-mono tabular-nums focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors',
                 isDark ? 'bg-slate-800 border-slate-700 text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-700'
               )}
             >
@@ -1852,7 +1858,7 @@ function FlatPagination({
           <ChevronLeft className="w-3.5 h-3.5" />
         </button>
 
-        <span className="px-2 text-[11px] font-semibold text-slate-500">
+        <span className="px-2 text-[11px] font-semibold text-slate-500 font-mono tabular-nums">
           Page <strong className={isDark ? 'text-slate-200' : 'text-slate-800'}>{currentPage}</strong> of{' '}
           <strong className={isDark ? 'text-slate-200' : 'text-slate-800'}>{totalPages}</strong>
         </span>
@@ -1946,7 +1952,7 @@ export function DieselRefillManager() {
     (!showForm && canAdd) ? (
       <Button
         onClick={() => { setEditingRefill(null); setInitialLedgerEntry(null); setShowForm(true); }}
-        className="h-8 text-xs bg-amber-500 hover:bg-amber-600 text-white gap-1.5 shadow-none rounded-lg"
+        className="h-8 text-xs bg-blue-600 hover:bg-blue-700 text-white gap-1.5 shadow-none rounded-md"
       >
         <Plus className="w-3.5 h-3.5" /> Log Refill
       </Button>
@@ -1987,7 +1993,7 @@ export function DieselRefillManager() {
   }, [dieselRefills]);
 
   const inp = cn(
-    'h-8 rounded-lg border px-2.5 text-xs focus:outline-none focus:ring-1 focus:ring-amber-500 transition-colors',
+    'h-8 rounded-md border px-2.5 text-xs font-mono tabular-nums focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors',
     isDark ? 'bg-slate-900 border-slate-800 text-slate-200' : 'bg-white border-slate-200 text-slate-700'
   );
 
@@ -2013,49 +2019,51 @@ export function DieselRefillManager() {
   return (
     <div className="flex flex-col h-full overflow-y-auto style-scroll p-3 sm:p-5 lg:p-6 gap-3.5 max-w-5xl mx-auto">
 
-      {/* Summary Cards - Flat & Minimalist */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-        {[
-          { icon: Fuel, label: 'This Month', value: `${fmt(totalThisMonth)}L`, color: 'text-amber-500', bg: 'bg-amber-500/10' },
-          { icon: Droplets, label: 'Total Cost (Mo)', value: totalSpentThisMonth > 0 ? fmtCurrency(totalSpentThisMonth) : '—', color: 'text-orange-500', bg: 'bg-orange-500/10' },
-          { icon: Package, label: 'Total Refills', value: dieselRefills.length.toString(), color: 'text-indigo-500', bg: 'bg-indigo-500/10' },
-          { icon: Building2, label: 'Sites Covered', value: new Set(dieselRefills.map(r => r.siteId)).size.toString(), color: 'text-teal-500', bg: 'bg-teal-500/10' },
-        ].map(({ icon: Icon, label, value, color, bg }) => (
-          <div
-            key={label}
-            className={cn(
-              'px-3 py-2.5 rounded-xl border transition-all flex items-center justify-between gap-2',
-              isDark ? 'bg-slate-900/90 border-slate-800' : 'bg-white border-slate-200/90'
-            )}
-          >
-            <div className="min-w-0">
-              <p className="text-[11px] font-medium text-slate-500 truncate leading-tight">{label}</p>
-              <p className={cn('text-base sm:text-lg font-bold tracking-tight truncate mt-0.5', isDark ? 'text-white' : 'text-slate-900')}>{value}</p>
-            </div>
-            <div className={cn('w-7 h-7 rounded-lg flex items-center justify-center shrink-0', bg)}>
-              <Icon className={cn('w-3.5 h-3.5', color)} />
-            </div>
-          </div>
-        ))}
-      </div>
+      {/* Primary Hero Metric + 3 Secondary Metrics */}
+      <MetricHeroCard
+        primary={{
+          label: 'Diesel Consumption',
+          value: fmt(totalThisMonth),
+          unit: 'L',
+          period: 'Current Month',
+          footnote: `${dieselRefills.filter(r => r.date.startsWith(new Date().toISOString().slice(0, 7))).length} refills logged this month`
+        }}
+        secondary={[
+          {
+            label: 'Monthly Spend',
+            value: totalSpentThisMonth > 0 ? fmtCurrency(totalSpentThisMonth) : '₦0.00',
+            period: 'Current Month'
+          },
+          {
+            label: 'Total Refills',
+            value: dieselRefills.length,
+            period: 'All-time'
+          },
+          {
+            label: 'Sites Covered',
+            value: new Set(dieselRefills.map(r => r.siteId)).size,
+            period: 'Active sites'
+          }
+        ]}
+      />
 
       {/* Financial Ledger Diesel Expenses Banner */}
       {allDieselExpenses.length > 0 && (
         <div className={cn(
-          'rounded-xl border transition-all overflow-hidden',
+          'rounded-md border transition-all overflow-hidden',
           pendingDieselExpenses.length > 0
-            ? (isDark ? 'bg-indigo-950/20 border-indigo-900/50' : 'bg-gradient-to-r from-amber-50/70 via-indigo-50/40 to-white border-amber-200/80 shadow-xs')
-            : (isDark ? 'bg-slate-900/60 border-slate-800' : 'bg-slate-50 border-slate-200/80 shadow-xs')
+            ? (isDark ? 'bg-slate-900 border-slate-800' : 'bg-amber-50/40 border-amber-200/80')
+            : (isDark ? 'bg-slate-900/60 border-slate-800' : 'bg-slate-50 border-slate-200/80')
         )}>
           <div 
             onClick={() => setShowPendingExpenses(s => !s)}
             className="p-3 sm:p-3.5 flex items-center justify-between gap-3 cursor-pointer select-none"
           >
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className={cn('w-7 h-7 rounded-lg flex items-center justify-center shrink-0', 
+              <div className={cn('w-7 h-7 rounded-md flex items-center justify-center shrink-0', 
                 pendingDieselExpenses.length > 0 
-                  ? (isDark ? 'bg-amber-500/10 text-amber-400' : 'bg-amber-500 text-white')
-                  : (isDark ? 'bg-emerald-500/10 text-emerald-400' : 'bg-emerald-500 text-white')
+                  ? (isDark ? 'bg-blue-500/10 text-blue-400' : 'bg-blue-600 text-white')
+                  : (isDark ? 'bg-emerald-500/10 text-emerald-400' : 'bg-emerald-600 text-white')
               )}>
                 {pendingDieselExpenses.length > 0 ? <Receipt className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
               </div>
@@ -2065,7 +2073,7 @@ export function DieselRefillManager() {
                     {pendingDieselExpenses.length > 0 ? 'Pending Diesel Purchases' : 'Financial Ledger Diesel Reconciled'}
                   </span>
                   <span className={cn(
-                    'px-2 py-0.5 rounded-full text-[11px] font-bold',
+                    'px-2 py-0.5 rounded-sm text-[10px] font-bold uppercase tracking-wider font-mono tabular-nums',
                     pendingDieselExpenses.length > 0
                       ? (isDark ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' : 'bg-amber-100 text-amber-800 border border-amber-200')
                       : (isDark ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-emerald-100 text-emerald-800 border border-emerald-200')
@@ -2111,8 +2119,8 @@ export function DieselRefillManager() {
                       <div
                         key={entry.id}
                         className={cn(
-                          'p-2.5 rounded-lg border flex items-center justify-between gap-3 text-xs transition-all',
-                          isDark ? 'bg-slate-900 border-slate-800 hover:border-indigo-800' : 'bg-white border-slate-200 hover:border-indigo-200 shadow-xs'
+                          'p-2.5 rounded-md border flex items-center justify-between gap-3 text-xs transition-all',
+                          isDark ? 'bg-slate-900 border-slate-800 hover:border-blue-800' : 'bg-white border-slate-200 hover:border-blue-200'
                         )}
                       >
                         <div className="min-w-0 flex-1">
@@ -2121,32 +2129,32 @@ export function DieselRefillManager() {
                               {entry.description}
                             </span>
                             {parsedL && (
-                              <span className="px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold text-[10px] border border-amber-500/20">
+                              <span className="px-1.5 py-0.5 rounded-sm bg-blue-500/10 text-blue-600 dark:text-blue-400 font-bold text-[10px] border border-blue-500/20 font-mono tabular-nums">
                                 {parsedL}L
                               </span>
                             )}
                             {isReconciled && (
-                              <span className="px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold text-[10px]">
+                              <span className="px-1.5 py-0.5 rounded-sm bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold text-[10px] uppercase tracking-wider">
                                 Fully Reconciled
                               </span>
                             )}
                           </div>
-                          <div className="flex items-center gap-1.5 mt-1 text-[10px] text-slate-400 flex-wrap">
-                            <span className="font-mono">{entry.voucherNo}</span>
+                          <div className="flex items-center gap-1.5 mt-1 text-[10px] text-slate-400 flex-wrap font-mono tabular-nums">
+                            <span>{entry.voucherNo}</span>
                             <span>•</span>
                             <span>{new Date(entry.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span>
                             {entry.site && (
                               <>
                                 <span>•</span>
-                                <span className="font-medium text-indigo-600 dark:text-indigo-400">{entry.site}</span>
+                                <span className="font-medium text-blue-600 dark:text-blue-400 font-sans">{entry.site}</span>
                               </>
                             )}
                           </div>
                         </div>
 
                         <div className="flex items-center gap-2.5 shrink-0">
-                          <div className="text-right">
-                            <p className={cn('font-bold text-xs', isReconciled ? (isDark ? 'text-slate-400' : 'text-slate-600') : (isDark ? 'text-amber-400' : 'text-amber-700'))}>
+                          <div className="text-right font-mono tabular-nums">
+                            <p className={cn('font-bold text-xs', isReconciled ? (isDark ? 'text-slate-400' : 'text-slate-600') : (isDark ? 'text-blue-400' : 'text-blue-700'))}>
                               {isReconciled ? fmtCurrency(total) : fmtCurrency(remaining)}
                             </p>
                             {isPartial && (
@@ -2162,7 +2170,7 @@ export function DieselRefillManager() {
                                 setEditingRefill(null);
                                 setShowForm(true);
                               }}
-                              className="h-7 text-xs px-2.5 bg-amber-500 hover:bg-amber-600 text-white gap-1 shadow-none rounded-md shrink-0"
+                              className="h-7 text-xs px-2.5 bg-blue-600 hover:bg-blue-700 text-white gap-1 shadow-none rounded-md shrink-0"
                             >
                               <Zap className="w-3 h-3" /> Log
                             </Button>
@@ -2181,13 +2189,13 @@ export function DieselRefillManager() {
       {/* Flat Navigation & Filter Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-0.5">
         {/* Flat Tabs Segment */}
-        <div className={cn('inline-flex p-1 rounded-lg border', isDark ? 'bg-slate-900 border-slate-800' : 'bg-slate-100/80 border-slate-200/70')}>
+        <div className={cn('inline-flex p-1 rounded-md border', isDark ? 'bg-slate-900 border-slate-800' : 'bg-slate-100/80 border-slate-200/70')}>
           <button
             onClick={() => setView('logs')}
             className={cn(
-              'flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-semibold transition-all',
+              'flex items-center gap-1.5 px-3 py-1 rounded-sm text-xs font-semibold transition-all',
               view === 'logs'
-                ? (isDark ? 'bg-slate-800 text-amber-400 shadow-xs' : 'bg-white text-amber-700 shadow-xs')
+                ? 'bg-blue-600 text-white'
                 : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
             )}
           >
@@ -2196,9 +2204,9 @@ export function DieselRefillManager() {
           <button
             onClick={() => setView('analytics')}
             className={cn(
-              'flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-semibold transition-all',
+              'flex items-center gap-1.5 px-3 py-1 rounded-sm text-xs font-semibold transition-all',
               view === 'analytics'
-                ? (isDark ? 'bg-slate-800 text-amber-400 shadow-xs' : 'bg-white text-amber-700 shadow-xs')
+                ? 'bg-blue-600 text-white'
                 : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
             )}
           >
@@ -2231,21 +2239,21 @@ export function DieselRefillManager() {
           {(filterSite || filterMonth) && (
             <button
               onClick={() => { setFilterSite(''); setFilterMonth(''); setPage(1); }}
-              className="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 flex items-center gap-1 px-1.5 py-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              className="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 flex items-center gap-1 px-1.5 py-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
             >
               <X className="w-3 h-3" /> Clear
             </button>
           )}
-          <span className="text-[11px] font-medium text-slate-400 pl-1">{filtered.length} {filtered.length === 1 ? 'record' : 'records'}</span>
+          <span className="text-[11px] font-medium text-slate-400 pl-1 font-mono tabular-nums">{filtered.length} {filtered.length === 1 ? 'record' : 'records'}</span>
         </div>
       </div>
 
       {/* Content */}
       {view === 'logs' ? (
         filtered.length === 0 ? (
-          <div className={cn('flex flex-col items-center justify-center py-12 rounded-xl border', isDark ? 'bg-slate-900/60 border-slate-800' : 'bg-white border-slate-200')}>
-            <div className="p-3 rounded-xl bg-amber-500/10 mb-2.5">
-              <Fuel className="w-6 h-6 text-amber-500" />
+          <div className={cn('flex flex-col items-center justify-center py-12 rounded-md border', isDark ? 'bg-slate-900/60 border-slate-800' : 'bg-white border-slate-200')}>
+            <div className="p-3 rounded-md bg-blue-500/10 mb-2.5">
+              <Fuel className="w-6 h-6 text-blue-600 dark:text-blue-400" />
             </div>
             <p className={cn('font-semibold text-sm', isDark ? 'text-white' : 'text-slate-900')}>No diesel refills found</p>
             <p className="text-xs text-slate-500 mt-0.5">
@@ -2456,7 +2464,7 @@ function MachineAnalyticsView({ refills }: { refills: DieselRefill[] }) {
   }, [analyticsByMachine, safeAnalyticsPage, pageSize]);
 
   const inp = cn(
-    'h-8 rounded-lg border px-2.5 text-xs focus:outline-none focus:ring-1 focus:ring-amber-500 transition-colors',
+    'h-8 rounded-md border px-2.5 text-xs font-mono tabular-nums focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors',
     isDark ? 'bg-slate-900 border-slate-800 text-slate-200' : 'bg-white border-slate-200 text-slate-700'
   );
 
@@ -2464,10 +2472,10 @@ function MachineAnalyticsView({ refills }: { refills: DieselRefill[] }) {
     return (
       <div className="flex flex-col gap-3">
         {/* Filter Toolbar */}
-        <div className={cn('p-3 rounded-xl border flex flex-wrap gap-2.5 items-center', isDark ? 'bg-slate-900/90 border-slate-800' : 'bg-white border-slate-200/90')}>
+        <div className={cn('p-3 rounded-md border flex flex-wrap gap-2.5 items-center', isDark ? 'bg-slate-900/90 border-slate-800' : 'bg-white border-slate-200')}>
           <div className="flex items-center gap-2 mr-auto">
-            <div className="p-1.5 bg-amber-500/10 rounded-lg">
-              <Gauge className="w-4 h-4 text-amber-500 shrink-0" />
+            <div className="p-1.5 bg-blue-500/10 rounded-md">
+              <Gauge className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
             </div>
             <h3 className={cn('font-semibold text-xs sm:text-sm', isDark ? 'text-white' : 'text-slate-900')}>Machine Analytics</h3>
           </div>
@@ -2515,9 +2523,9 @@ function MachineAnalyticsView({ refills }: { refills: DieselRefill[] }) {
           )}
         </div>
 
-        <div className={cn('flex flex-col items-center justify-center py-12 rounded-xl border', isDark ? 'bg-slate-900/60 border-slate-800' : 'bg-white border-slate-200')}>
-          <div className="p-3 rounded-xl bg-slate-500/10 mb-2">
-            <BarChart3 className="w-6 h-6 text-slate-400" />
+        <div className={cn('flex flex-col items-center justify-center py-12 rounded-md border', isDark ? 'bg-slate-900/60 border-slate-800' : 'bg-white border-slate-200')}>
+          <div className="p-3 rounded-md bg-blue-500/10 mb-2">
+            <BarChart3 className="w-6 h-6 text-blue-600 dark:text-blue-400" />
           </div>
           <p className={cn('font-semibold text-sm', isDark ? 'text-white' : 'text-slate-900')}>No machine analytics</p>
           <p className="text-xs text-slate-500 mt-0.5">Adjust your filters or record diesel refills to see analytics.</p>
@@ -2529,10 +2537,10 @@ function MachineAnalyticsView({ refills }: { refills: DieselRefill[] }) {
   return (
     <div className="flex flex-col gap-3 pb-8">
       {/* Filter Toolbar */}
-      <div className={cn('p-3 rounded-xl border flex flex-wrap gap-2.5 items-center', isDark ? 'bg-slate-900/90 border-slate-800' : 'bg-white border-slate-200/90')}>
+      <div className={cn('p-3 rounded-md border flex flex-wrap gap-2.5 items-center', isDark ? 'bg-slate-900/90 border-slate-800' : 'bg-white border-slate-200')}>
         <div className="flex items-center gap-2 mr-auto">
-          <div className="p-1.5 bg-amber-500/10 rounded-lg">
-            <Gauge className="w-4 h-4 text-amber-500 shrink-0" />
+          <div className="p-1.5 bg-blue-500/10 rounded-md">
+            <Gauge className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
           </div>
           <h3 className={cn('font-semibold text-xs sm:text-sm', isDark ? 'text-white' : 'text-slate-900')}>Machine Analytics</h3>
         </div>
@@ -2590,42 +2598,42 @@ function MachineAnalyticsView({ refills }: { refills: DieselRefill[] }) {
               key={machine.assetId}
               layout
               className={cn(
-                'rounded-xl border overflow-hidden transition-all duration-150',
-                isDark ? 'bg-slate-900/90 border-slate-800 hover:border-slate-700' : 'bg-white border-slate-200/90 hover:border-slate-300'
+                'rounded-md border overflow-hidden transition-all duration-150',
+                isDark ? 'bg-slate-900/90 border-slate-800 hover:border-slate-700' : 'bg-white border-slate-200 hover:border-slate-300'
               )}
             >
               {/* Header */}
               <div onClick={toggle} className="cursor-pointer p-3 sm:p-3.5 flex flex-col md:flex-row md:items-center justify-between gap-3 select-none">
                 <div className="flex items-center gap-2.5">
-                  <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center shrink-0', isDark ? 'bg-indigo-500/10 text-indigo-400' : 'bg-indigo-50 text-indigo-600 border border-indigo-200/50')}>
+                  <div className={cn('w-8 h-8 rounded-md flex items-center justify-center shrink-0', isDark ? 'bg-blue-500/10 text-blue-400' : 'bg-blue-50 text-blue-600 border border-blue-200/50')}>
                     <BarChart3 className="w-4 h-4" />
                   </div>
                   <div>
                     <h4 className={cn('font-semibold text-xs sm:text-sm', isDark ? 'text-white' : 'text-slate-900')}>{machine.assetName}</h4>
-                    <p className="text-[11px] text-slate-500">{machine.history.length} {machine.history.length === 1 ? 'record' : 'records'}</p>
+                    <p className="text-[11px] text-slate-500 font-mono tabular-nums">{machine.history.length} {machine.history.length === 1 ? 'record' : 'records'}</p>
                   </div>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-3 md:gap-4 flex-1 md:justify-end">
+                <div className="flex flex-wrap items-center gap-3 md:gap-4 flex-1 md:justify-end font-mono tabular-nums">
                   <div className="flex flex-col text-right">
-                    <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Bought</span>
+                    <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 font-sans">Bought</span>
                     <span className={cn('font-semibold text-xs sm:text-sm', isDark ? 'text-blue-400' : 'text-blue-600')}>{fmt(machine.totalAllocated)}L</span>
                   </div>
                   <div className="flex flex-col text-right">
-                    <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Used</span>
+                    <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 font-sans">Used</span>
                     <span className={cn('font-semibold text-xs sm:text-sm', isDark ? 'text-emerald-400' : 'text-emerald-600')}>{fmt(machine.totalUsed)}L</span>
                   </div>
                   <div className="flex flex-col text-right">
-                    <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Bal</span>
-                    <span className={cn('font-semibold text-xs sm:text-sm', machine.balance > 0 ? 'text-blue-500' : machine.balance < 0 ? 'text-red-500' : 'text-slate-500')}>
+                    <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 font-sans">Bal</span>
+                    <span className={cn('font-semibold text-xs sm:text-sm', machine.balance > 0 ? 'text-blue-600 dark:text-blue-400' : machine.balance < 0 ? 'text-red-500' : 'text-slate-500')}>
                       {machine.balance > 0 ? `+${fmt(machine.balance)}` : fmt(machine.balance)}L
                     </span>
                   </div>
-                  <div className={cn('px-2.5 py-1 rounded-md border flex items-center gap-1.5', isDark ? 'bg-amber-950/30 border-amber-900/50' : 'bg-amber-50 border-amber-200/80')}>
-                     <Gauge className="w-3 h-3 text-amber-600 dark:text-amber-500" />
+                  <div className={cn('px-2.5 py-1 rounded-sm border flex items-center gap-1.5', isDark ? 'bg-slate-800/80 border-slate-700' : 'bg-slate-50 border-slate-200')}>
+                     <Gauge className="w-3 h-3 text-blue-600 dark:text-blue-400" />
                      <div className="flex flex-col text-left">
-                        <span className={cn('text-[8px] font-bold uppercase tracking-wider leading-none mb-0.5', isDark ? 'text-amber-500/70' : 'text-amber-700/70')}>Avg Usage</span>
-                        <span className={cn('text-[11px] font-black leading-none', isDark ? 'text-amber-400' : 'text-amber-700')}>{fmt(machine.avgUsage)}L/d</span>
+                        <span className={cn('text-[8px] font-bold uppercase tracking-wider leading-none mb-0.5 font-sans', isDark ? 'text-slate-400' : 'text-slate-500')}>Avg Usage</span>
+                        <span className={cn('text-[11px] font-bold leading-none font-mono tabular-nums', isDark ? 'text-slate-200' : 'text-slate-800')}>{fmt(machine.avgUsage)}L/d</span>
                      </div>
                   </div>
                   <button className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
@@ -2654,21 +2662,21 @@ function MachineAnalyticsView({ refills }: { refills: DieselRefill[] }) {
                               <th className="px-4 py-2 text-right">Bought (L)</th>
                               <th className="px-4 py-2 text-right text-emerald-600 dark:text-emerald-400">Used (L)</th>
                               <th className="px-4 py-2 text-right">Record Bal</th>
-                              <th className="px-4 py-2 text-right text-indigo-500">Cumulative Bal</th>
+                              <th className="px-4 py-2 text-right text-blue-600 dark:text-blue-400">Cumulative Bal</th>
                             </tr>
                           </thead>
                           <tbody className={cn('divide-y', isDark ? 'divide-slate-800' : 'divide-slate-100')}>
                             {machine.history.map((h: any, i: number) => {
                               const recBal = h.allocated - h.used;
                               return (
-                                <tr key={i} className={cn('transition-colors', isDark ? 'hover:bg-slate-800/40' : 'hover:bg-slate-50')}>
+                                <tr key={i} className={cn('transition-colors font-mono tabular-nums', isDark ? 'hover:bg-slate-800/40' : 'hover:bg-slate-50')}>
                                   <td className="px-4 py-2 text-slate-600 dark:text-slate-300">
                                     <div className="flex items-center gap-1.5">
                                       <Calendar className="w-3 h-3 text-slate-400" />
                                       {new Date(h.date + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
                                     </div>
                                   </td>
-                                  <td className="px-4 py-2 text-slate-500 dark:text-slate-400">{h.siteName}</td>
+                                  <td className="px-4 py-2 text-slate-500 dark:text-slate-400 font-sans">{h.siteName}</td>
                                   <td className="px-4 py-2 text-right font-medium text-slate-700 dark:text-slate-300">
                                     {h.allocated > 0 ? `${fmt(h.allocated)}L` : '—'}
                                   </td>
@@ -2676,12 +2684,12 @@ function MachineAnalyticsView({ refills }: { refills: DieselRefill[] }) {
                                     {h.used > 0 ? `${fmt(h.used)}L` : '—'}
                                   </td>
                                   <td className="px-4 py-2 text-right">
-                                    <span className={cn('text-[11px] font-medium', recBal > 0 ? 'text-blue-500' : recBal < 0 ? 'text-red-500' : 'text-slate-400')}>
+                                    <span className={cn('text-[11px] font-medium', recBal > 0 ? 'text-blue-600 dark:text-blue-400' : recBal < 0 ? 'text-red-500' : 'text-slate-400')}>
                                       {recBal > 0 ? `+${fmt(recBal)}` : fmt(recBal)}L
                                     </span>
                                   </td>
                                   <td className="px-4 py-2 text-right">
-                                    <span className={cn('font-bold text-[11px]', h.cumulativeBalance > 0 ? 'text-indigo-500 dark:text-indigo-400' : h.cumulativeBalance < 0 ? 'text-red-500' : 'text-slate-400')}>
+                                    <span className={cn('font-bold text-[11px]', h.cumulativeBalance > 0 ? 'text-blue-600 dark:text-blue-400' : h.cumulativeBalance < 0 ? 'text-red-500' : 'text-slate-400')}>
                                       {h.cumulativeBalance > 0 ? `+${fmt(h.cumulativeBalance)}` : fmt(h.cumulativeBalance)}L
                                     </span>
                                   </td>
@@ -2712,4 +2720,5 @@ function MachineAnalyticsView({ refills }: { refills: DieselRefill[] }) {
     </div>
   );
 }
+
 

@@ -172,52 +172,52 @@ export function Evaluations() {
 
   const renderForm = () => (
     <div className={`flex flex-col h-full overflow-y-auto ${isDark ? 'bg-slate-950' : 'bg-slate-50'}`}>
-      <div className={`border-b px-6 py-4 flex justify-between items-center sticky top-0 z-10 shadow-sm shrink-0 ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => { setIsAdding(false); setIsEditing(false); setFormData(emptyForm); }} className="hover:bg-slate-100 rounded-full h-8 w-8">
-            <ArrowLeft className="h-4 w-4 text-slate-600" />
+      <div className={`border-b px-6 py-3 flex justify-between items-center sticky top-0 z-10 shrink-0 ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={() => { setIsAdding(false); setIsEditing(false); setFormData(emptyForm); }} className="hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md h-8 w-8">
+            <ArrowLeft className="h-4 w-4 text-slate-600 dark:text-slate-400" />
           </Button>
-          <h2 className={`text-xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
+          <h2 className={`text-base font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
             {isEditing ? 'Edit Evaluation' : 'New Performance Evaluation'}
           </h2>
         </div>
-        <Button onClick={isEditing ? handleUpdate : handleSave} className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 h-9">
-          <Save className="h-4 w-4 mr-2" /> Save Evaluation
+        <Button onClick={isEditing ? handleUpdate : handleSave} className="bg-blue-600 hover:bg-blue-700 text-white px-4 h-8 rounded-md text-xs font-semibold shadow-none">
+          <Save className="h-3.5 w-3.5 mr-1.5" /> Save Evaluation
         </Button>
       </div>
 
       <div className="p-4 md:p-6 max-w-4xl mx-auto w-full pb-20 space-y-4">
-        <Card className="shadow-sm border-slate-200">
-          <CardHeader className="bg-slate-50 border-b border-slate-100 rounded-t-xl">
-            <CardTitle className="text-slate-800">Evaluation Details</CardTitle>
+        <Card className="shadow-none border border-slate-200 dark:border-slate-800 rounded-md">
+          <CardHeader className="bg-slate-50/70 dark:bg-slate-850 border-b border-slate-200 dark:border-slate-800 rounded-t-md p-4">
+            <CardTitle className="text-sm font-semibold text-slate-800 dark:text-slate-100">Evaluation Details</CardTitle>
           </CardHeader>
-          <CardContent className="pt-6 grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div className="space-y-2 md:col-span-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Employee</label>
-              <div className="h-10 flex items-center px-3 bg-slate-100 border border-slate-200 rounded-md text-sm font-medium text-slate-700">
+          <CardContent className="pt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-1.5 md:col-span-2">
+              <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Employee</label>
+              <div className="h-9 flex items-center px-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-md text-xs font-medium text-slate-700 dark:text-slate-200">
                 {internalEmployees.find(e => e.id === formData.employeeId)?.surname} {internalEmployees.find(e => e.id === formData.employeeId)?.firstname}
               </div>
             </div>
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Date of Review</label>
-              <Input type="date" value={formData.date} onChange={e => setFormData({ ...formData, date: e.target.value })} />
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Date of Review</label>
+              <Input type="date" className="h-9 text-xs rounded-md border-slate-200 dark:border-slate-700 focus-visible:ring-blue-500" value={formData.date} onChange={e => setFormData({ ...formData, date: e.target.value })} />
             </div>
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Evaluation Type</label>
-              <select className="flex h-10 w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm focus:ring-indigo-500/20" value={formData.type} onChange={e => setFormData({ ...formData, type: e.target.value })}>
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Evaluation Type</label>
+              <select className="flex h-9 w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500" value={formData.type} onChange={e => setFormData({ ...formData, type: e.target.value })}>
                 <option value="Probation">Probation Review</option>
                 <option value="Annual">Annual Review</option>
                 <option value="Quarterly">Quarterly Check-In</option>
                 <option value="Ad-hoc">Ad-hoc Performance Note</option>
               </select>
             </div>
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Overall Score (0-100)</label>
-              <Input type="number" min="0" max="100" value={formData.overallScore} onChange={e => setFormData({ ...formData, overallScore: Number(e.target.value) })} />
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Overall Score (0-100)</label>
+              <Input type="number" min="0" max="100" className="h-9 text-xs rounded-md border-slate-200 dark:border-slate-700 focus-visible:ring-blue-500" value={formData.overallScore} onChange={e => setFormData({ ...formData, overallScore: Number(e.target.value) })} />
             </div>
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Review Status</label>
-              <select className="flex h-10 w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm focus:ring-indigo-500/20" value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value as any })}>
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Review Status</label>
+              <select className="flex h-9 w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500" value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value as any })}>
                 <option value="Draft">Draft</option>
                 <option value="Review">In Review</option>
                 <option value="Acknowledged">Acknowledged by Employee</option>
@@ -226,10 +226,10 @@ export function Evaluations() {
 
             {formData.type?.toLowerCase().includes('probation') && (
               <>
-                <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Evaluation Role</label>
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Evaluation Role</label>
                   <select 
-                    className="flex h-10 w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm focus:ring-indigo-500/20" 
+                    className="flex h-9 w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500" 
                     value={formData.evaluationRole} 
                     onChange={e => setFormData({ ...formData, evaluationRole: e.target.value as any, sessionId: formData.sessionId || crypto.randomUUID() })}
                   >
@@ -239,12 +239,12 @@ export function Evaluations() {
                   </select>
                 </div>
                 {(formData.evaluationRole === 'CONSENSUS' || formData.evaluationRole === 'PANELIST') && (
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                       {formData.evaluationRole === 'PANELIST' ? 'Your Recommendation' : 'Final Panel Conclusion'}
                     </label>
                     <select 
-                      className="flex h-10 w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm focus:ring-indigo-500/20" 
+                      className="flex h-9 w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500" 
                       value={formData.panelConclusion} 
                       onChange={e => setFormData({ ...formData, panelConclusion: e.target.value as any })}
                     >
@@ -257,21 +257,22 @@ export function Evaluations() {
                   </div>
                 )}
                 {(formData.evaluationRole === 'PANELIST' || formData.evaluationRole === 'CONSENSUS') && (
-                  <div className="space-y-2 md:col-span-2">
-                    <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Session ID (Shared with Panel)</label>
+                  <div className="space-y-1.5 md:col-span-2">
+                    <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Session ID (Shared with Panel)</label>
                     <Input 
                       value={formData.sessionId} 
                       onChange={e => setFormData({ ...formData, sessionId: e.target.value })} 
                       placeholder="Paste Session ID to group with other panelists..."
+                      className="h-9 text-xs rounded-md border-slate-200 dark:border-slate-700 focus-visible:ring-blue-500"
                     />
-                    <p className="text-[10px] text-slate-500">Share this ID with other panel members to group your evaluations together.</p>
+                    <p className="text-[10px] text-slate-400">Share this ID with other panel members to group your evaluations together.</p>
                   </div>
                 )}
               </>
             )}
-            <div className="space-y-2 md:col-span-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Manager Notes</label>
-              <textarea className="flex w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none" rows={5} value={formData.managerNotes} onChange={e => setFormData({ ...formData, managerNotes: e.target.value })} placeholder="Provide constructive feedback, areas of improvement, and goals..." />
+            <div className="space-y-1.5 md:col-span-2">
+              <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Manager Notes</label>
+              <textarea className="flex w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-xs focus:ring-1 focus:ring-blue-500 outline-none" rows={4} value={formData.managerNotes} onChange={e => setFormData({ ...formData, managerNotes: e.target.value })} placeholder="Provide constructive feedback, areas of improvement, and goals..." />
             </div>
           </CardContent>
         </Card>
@@ -304,17 +305,17 @@ export function Evaluations() {
       <div className={`p-4 border-b space-y-3 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
         <div className="flex justify-between items-center">
           <h2 className={`font-bold flex items-center gap-2 ${isDark ? 'text-slate-100' : 'text-slate-800'}`}>
-            <UserCheck className="h-5 w-5 text-indigo-600" />
+            <UserCheck className="h-5 w-5 text-blue-600" />
             Active Directory
           </h2>
-          {activeCount > 0 && <Badge variant="default" className="bg-indigo-100 text-indigo-700 hover:bg-indigo-200 px-1.5 py-0 min-w-[20px] justify-center">{activeCount}</Badge>}
+          {activeCount > 0 && <Badge variant="default" className="bg-blue-100 text-blue-700 hover:bg-blue-200 px-1.5 py-0 min-w-[20px] justify-center">{activeCount}</Badge>}
         </div>
         <div className="relative">
           <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
           <Input placeholder="Search employee..." className="pl-9 bg-slate-50 h-9" value={employeeSearch} onChange={e => setEmployeeSearch(e.target.value)} />
         </div>
         <select
-          className={`h-9 w-full rounded-md border px-3 text-sm focus:ring-indigo-500/20 ${isDark ? 'bg-slate-700 border-slate-600 text-slate-100' : 'bg-slate-50 border-slate-200 text-slate-800'}`}
+          className={`h-9 w-full rounded-md border px-3 text-sm focus:ring-blue-500/20 ${isDark ? 'bg-slate-700 border-slate-600 text-slate-100' : 'bg-slate-50 border-slate-200 text-slate-800'}`}
           value={filterDepartment}
           onChange={e => setFilterDepartment(e.target.value)}
         >
@@ -337,36 +338,36 @@ export function Evaluations() {
                 onClick={() => { setSelectedEmployeeId(emp.id); setIsAdding(false); setIsEditing(false); setIsMobileListOpen(false); }}
                 className={`p-3 border-b cursor-pointer transition-colors flex items-center justify-between ${
                   isSelected
-                    ? 'bg-indigo-50 border-l-4 border-l-indigo-600'
-                    : `border-l-4 border-l-transparent ${isDark ? 'bg-slate-900 border-slate-700/50 hover:bg-slate-800' : 'bg-white border-slate-100 hover:bg-slate-50'}`
+                    ? 'bg-blue-50/80 dark:bg-blue-950/30 border-l-2 border-l-blue-600'
+                    : `border-l-2 border-l-transparent ${isDark ? 'bg-slate-900 border-slate-800 hover:bg-slate-800/60' : 'bg-white border-slate-100 hover:bg-slate-50'}`
                 }`}
               >
                 <div className="flex items-center gap-3">
-                  <Avatar className={`h-9 w-9 border ${isDark ? 'border-slate-600' : 'border-slate-200'}`}>
+                  <Avatar className={`h-8 w-8 border ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
                     <AvatarFallback className={`font-bold text-[10px] ${
-                      isSelected ? 'bg-indigo-200 text-indigo-800' : isDark ? 'bg-slate-700 text-slate-300' : 'bg-slate-100 text-slate-600'
+                      isSelected ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300' : isDark ? 'bg-slate-700 text-slate-300' : 'bg-slate-100 text-slate-600'
                     }`}>
                       {emp.firstname.charAt(0)}{emp.surname.charAt(0)}
                     </AvatarFallback>
                   </Avatar>
                   <div>
-                    <h4 className={`text-sm font-bold truncate max-w-[160px] ${
-                      isSelected ? 'text-indigo-900' : isDark ? 'text-slate-200' : 'text-slate-700'
+                    <h4 className={`text-xs font-semibold truncate max-w-[160px] ${
+                      isSelected ? 'text-blue-900 dark:text-blue-200' : isDark ? 'text-slate-200' : 'text-slate-700'
                     }`}>{emp.surname} {emp.firstname}</h4>
                     <p className={`text-[10px] font-medium uppercase mt-0.5 ${
-                      isSelected ? 'text-indigo-600' : isDark ? 'text-slate-400' : 'text-slate-500'
+                      isSelected ? 'text-blue-600 dark:text-blue-400' : isDark ? 'text-slate-400' : 'text-slate-500'
                     }`}>{emp.position}</p>
                   </div>
                 </div>
                 {hasReviewEvent && (
-                  <div className="h-2 w-2 rounded-full bg-indigo-500 shadow-sm shrink-0" title="In Review"></div>
+                  <div className="h-1.5 w-1.5 rounded-full bg-blue-600 shrink-0" title="In Review"></div>
                 )}
               </div>
             )
           })
         }
         {internalEmployees.length === 0 && (
-          <div className="p-4 text-center text-sm text-slate-500">No employees found.</div>
+          <div className="p-4 text-center text-xs text-slate-500">No employees found.</div>
         )}
       </div>
     </div>
@@ -393,10 +394,10 @@ export function Evaluations() {
         </div>
       )}
 
-      <div className={`flex flex-1 min-h-0 rounded-2xl shadow-sm border overflow-hidden ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
+      <div className={`flex flex-1 min-h-0 rounded-md shadow-none border overflow-hidden ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
         {/* Left Sidebar - hidden on mobile */}
         {!(isAdding || isEditing) && !sidebarCollapsed && (
-        <div className={`hidden md:flex w-80 flex-shrink-0 border-r flex-col ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-slate-50/50 border-slate-200'}`}>
+        <div className={`hidden md:flex w-80 flex-shrink-0 border-r flex-col ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-slate-50/50 border-slate-200'}`}>
           <EmployeeList />
         </div>
         )}
@@ -443,40 +444,40 @@ export function Evaluations() {
                   <h3 className="font-bold text-xl text-slate-600">Action Center</h3>
                   <p className="text-sm mt-2 text-slate-500 leading-relaxed">Select an employee from the directory to review their performance or log a new evaluation.</p>
                 </div>
-                <Button className="md:hidden mt-2 bg-indigo-600 hover:bg-indigo-700 text-white" onClick={() => setIsMobileListOpen(true)}>
-                  <Users className="h-4 w-4 mr-2" /> Browse Employees
+                <Button className="md:hidden mt-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-xs font-semibold shadow-none" onClick={() => setIsMobileListOpen(true)}>
+                  <Users className="h-3.5 w-3.5 mr-1.5" /> Browse Employees
                 </Button>
             </div>
           ) : isAdding || isEditing ? (
             renderForm()
           ) : (
             <div className="flex-1 flex flex-col overflow-hidden">
-                <div className={`border-b p-4 md:p-6 flex justify-between items-center shrink-0 shadow-sm gap-2 ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
+                <div className={`border-b p-4 md:p-5 flex justify-between items-center shrink-0 gap-2 ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
                   <div className="flex items-center gap-2 min-w-0">
                     <Button variant="ghost" size="icon" className="flex md:hidden shrink-0 h-8 w-8" onClick={() => setIsMobileListOpen(true)}>
                       <Users className="h-4 w-4" />
                     </Button>
                     <div className="min-w-0">
-                      <h2 className={`text-lg md:text-2xl font-bold tracking-tight truncate ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{selectedEmp?.surname} {selectedEmp?.firstname}</h2>
+                      <h2 className={`text-base md:text-xl font-bold tracking-tight truncate ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{selectedEmp?.surname} {selectedEmp?.firstname}</h2>
                       <p className="text-[10px] md:text-[11px] font-medium text-slate-500 mt-0.5 uppercase tracking-wider">{selectedEmp?.position} &bull; {selectedEmp?.department}</p>
                     </div>
                   </div>
                   {priv.canAdd && (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button className="bg-indigo-600 hover:bg-indigo-700 shadow-sm px-3 md:px-6 shrink-0">
-                          <Plus className="h-4 w-4 md:mr-2" />
+                        <Button className="bg-blue-600 hover:bg-blue-700 text-white rounded-md shadow-none px-3 md:px-4 h-8 text-xs font-semibold shrink-0">
+                          <Plus className="h-3.5 w-3.5 md:mr-1.5" />
                           <span className="hidden md:inline">Log Evaluation</span>
-                          <ChevronDown className="h-4 w-4 md:ml-2 opacity-50" />
+                          <ChevronDown className="h-3.5 w-3.5 md:ml-1 opacity-60" />
                         </Button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-56">
-                        <DropdownMenuItem onClick={() => { setFormData({...emptyForm, employeeId: selectedEmployeeId}); setIsAdding(true); }}>
-                          <LayoutList className="h-4 w-4 mr-2 text-indigo-500" />
+                      <DropdownMenuContent align="end" className="w-52 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
+                        <DropdownMenuItem onClick={() => { setFormData({...emptyForm, employeeId: selectedEmployeeId}); setIsAdding(true); }} className="text-xs cursor-pointer">
+                          <LayoutList className="h-3.5 w-3.5 mr-2 text-blue-600" />
                           Standard Evaluation
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => { setFormData({...emptyForm, employeeId: selectedEmployeeId}); setIsAppraisalAdding(true); }}>
-                          <FileText className="h-4 w-4 mr-2 text-indigo-500" />
+                        <DropdownMenuItem onClick={() => { setFormData({...emptyForm, employeeId: selectedEmployeeId}); setIsAppraisalAdding(true); }} className="text-xs cursor-pointer">
+                          <FileText className="h-3.5 w-3.5 mr-2 text-blue-600" />
                           Appraisal Score Sheet
                         </DropdownMenuItem>
                       </DropdownMenuContent>
@@ -484,33 +485,33 @@ export function Evaluations() {
                   )}
                 </div>
                 
-                <div className="flex-1 overflow-y-auto p-6">
+                <div className="flex-1 overflow-y-auto p-4 md:p-6">
                   {empRecords.length === 0 ? (
-                    <div className={`border border-dashed rounded-xl p-12 flex flex-col items-center justify-center text-center shadow-sm ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
-                        <div className="h-16 w-16 rounded-full bg-slate-100 flex items-center justify-center mb-4 border border-slate-200">
-                          <ClipboardList className="h-8 w-8 text-slate-400" />
+                    <div className={`border border-dashed rounded-md p-10 flex flex-col items-center justify-center text-center ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
+                        <div className="h-12 w-12 rounded-md bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-3 border border-slate-200 dark:border-slate-700">
+                          <ClipboardList className="h-6 w-6 text-slate-400" />
                         </div>
-                        <h3 className={`font-bold text-lg ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>No Evaluations</h3>
-                        <p className="text-slate-500 text-sm mt-2 max-w-sm leading-relaxed">This employee does not have any recorded performance evaluations yet.</p>
+                        <h3 className={`font-semibold text-sm ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>No Evaluations</h3>
+                        <p className="text-slate-500 text-xs mt-1 max-w-sm leading-relaxed">This employee does not have any recorded performance evaluations yet.</p>
                     </div>
                   ) : (
-                    <div className={`rounded-xl shadow-sm border overflow-hidden ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
+                    <div className={`rounded-md border overflow-hidden ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
                         <div className="overflow-x-auto">
                         <Table>
                           <TableHeader>
-                              <TableRow className="bg-slate-50/80">
-                                <TableHead className="w-28">Date</TableHead>
-                                <TableHead>Outcome</TableHead>
-                                <TableHead>Panelist</TableHead>
-                                <TableHead>Type</TableHead>
-                                <TableHead>Score</TableHead>
-                                <TableHead>Status</TableHead>
-                                <TableHead className="text-right">Actions</TableHead>
+                              <TableRow className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800">
+                                <TableHead className="w-28 text-[11px] font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400">Date</TableHead>
+                                <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400">Outcome</TableHead>
+                                <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400">Panelist</TableHead>
+                                <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400">Type</TableHead>
+                                <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400">Score</TableHead>
+                                <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400">Status</TableHead>
+                                <TableHead className="text-right text-[11px] font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400">Actions</TableHead>
                               </TableRow>
                           </TableHeader>
-                          <TableBody>
+                          <TableBody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
                                {empRecords.map(r => (
-                                 <TableRow key={r.id} className="hover:bg-slate-50/50">
+                                 <TableRow key={r.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40">
                                      <TableCell className="font-mono text-[11px] text-slate-500 whitespace-nowrap">{formatDisplayDate(r.date)}</TableCell>
                                      <TableCell>
                                        {(() => {
@@ -520,7 +521,7 @@ export function Evaluations() {
                                          
                                          if (sessionOutcome) {
                                            return (
-                                             <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 font-bold text-[10px] py-0.5">
+                                             <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 font-semibold text-[10px] py-0.5 rounded-sm">
                                                {sessionOutcome}
                                              </Badge>
                                            );
@@ -536,30 +537,30 @@ export function Evaluations() {
                                      <TableCell>
                                        {r.evaluationRole === 'PANELIST' ? (
                                          <div className="flex justify-start" title={`Panelist: ${resolveCreatedBy(r.createdBy)}`}>
-                                           <div className="h-7 w-7 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center text-[10px] font-black text-indigo-600 shadow-sm hover:bg-indigo-100 transition-colors cursor-help">
+                                           <div className="h-6 w-6 rounded-md bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-[10px] font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-200 transition-colors cursor-help">
                                              {getInitials(resolveCreatedBy(r.createdBy))}
                                            </div>
                                          </div>
                                        ) : (
-                                         <Badge variant="outline" className="text-[9px] uppercase tracking-tighter px-1.5 py-0.5 font-bold">
+                                         <Badge variant="outline" className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 font-semibold rounded-sm">
                                            {r.evaluationRole || 'Individual'}
                                          </Badge>
                                        )}
                                      </TableCell>
-                                     <TableCell className="font-semibold text-slate-800 text-sm">
+                                     <TableCell className="font-semibold text-slate-800 dark:text-slate-200 text-xs">
                                        {r.sessionId || r.type === 'Probation' ? 'Probation Review' : r.type}
                                      </TableCell>
                                      <TableCell>
-                                       <span className={`font-bold ${r.overallScore >= 70 ? 'text-emerald-600' : r.overallScore >= 40 ? 'text-amber-600' : 'text-rose-600'}`}>
+                                       <span className={`font-semibold tabular-nums ${r.overallScore >= 70 ? 'text-emerald-600' : r.overallScore >= 40 ? 'text-amber-600' : 'text-rose-600'}`}>
                                          {r.overallScore}%
                                        </span>
                                      </TableCell>
                                      <TableCell>
-                                       <Badge variant={r.status === 'Acknowledged' ? 'default' : r.status === 'Review' ? 'secondary' : 'outline'} className="text-[10px]">{r.status}</Badge>
+                                       <Badge variant={r.status === 'Acknowledged' ? 'default' : r.status === 'Review' ? 'secondary' : 'outline'} className="text-[10px] rounded-sm">{r.status}</Badge>
                                      </TableCell>
                                      <TableCell className="text-right">
                                        <div className="flex justify-end gap-1">
-                                         <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50" onClick={() => { 
+                                         <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-slate-800 rounded-md" onClick={() => { 
                                            if (r.isAppraisal) {
                                              setFormData(r);
                                              setIsAppraisalAdding(true);
@@ -571,7 +572,7 @@ export function Evaluations() {
                                            <Eye className="h-4 w-4" />
                                          </Button>
                                          {priv.canEdit && (r.createdBy === currentUser?.id || r.createdBy === currentUser?.name) && (
-                                           <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50" onClick={() => startEdit(r as any)}>
+                                           <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-blue-600 hover:bg-blue-50" onClick={() => startEdit(r as any)}>
                                              <Pencil className="h-4 w-4" />
                                            </Button>
                                          )}
@@ -637,18 +638,18 @@ export function Evaluations() {
                         
                         <TabsContent active={activeDetailTab === 'main'} className="space-y-4 mt-0">
                           <div>
-                            <h5 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Final Conclusion & Recommendation</h5>
-                            <div className="bg-indigo-50/50 p-4 rounded-lg border border-indigo-100">
+                            <h5 className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-2">Final Conclusion & Recommendation</h5>
+                            <div className="bg-slate-50 dark:bg-slate-800/60 p-4 rounded-md border border-slate-200 dark:border-slate-800">
                               <div className="flex items-center justify-between mb-2">
-                                <span className="text-xs font-bold text-indigo-700">Outcome Verdict</span>
+                                <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">Outcome Verdict</span>
                                 {(() => {
                                   const consensus = records.find(rec => rec.sessionId === viewingRecord.sessionId && rec.evaluationRole === 'CONSENSUS');
                                   return consensus?.panelConclusion ? (
-                                    <Badge className="bg-indigo-600 text-white font-bold">{consensus.panelConclusion}</Badge>
-                                  ) : <Badge variant="outline">Pending Decision</Badge>;
+                                    <Badge className="bg-blue-600 text-white font-semibold rounded-sm text-xs shadow-none">{consensus.panelConclusion}</Badge>
+                                  ) : <Badge variant="outline" className="rounded-sm text-xs">Pending Decision</Badge>;
                                 })()}
                               </div>
-                              <div className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">
+                              <div className="text-xs text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">
                                 {records.find(rec => rec.sessionId === viewingRecord.sessionId && rec.evaluationRole === 'CONSENSUS')?.managerNotes || 'The final verdict and summary notes have not been recorded yet.'}
                               </div>
                             </div>
@@ -657,26 +658,26 @@ export function Evaluations() {
 
                         {panelists.map(p => (
                           <TabsContent key={p.id} active={activeDetailTab === `panelist-${p.id}`} className="space-y-4 mt-0">
-                            <div className="bg-slate-50 p-4 rounded-lg border border-slate-100">
+                            <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-md border border-slate-200 dark:border-slate-800">
                               <div className="flex justify-between items-center mb-3">
                                 <div className="flex items-center gap-2">
                                   <Users className="h-4 w-4 text-slate-400" />
-                                  <span className="font-bold text-slate-800 text-sm">{resolveCreatedBy(p.createdBy)}</span>
+                                  <span className="font-semibold text-slate-800 dark:text-slate-200 text-xs">{resolveCreatedBy(p.createdBy)}</span>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                  <span className="text-[10px] font-bold text-slate-400 uppercase">Score:</span>
-                                  <Badge variant="outline" className="text-emerald-600 border-emerald-200 bg-emerald-50 font-bold">{p.overallScore}%</Badge>
+                                  <span className="text-[10px] font-semibold text-slate-400 uppercase">Score:</span>
+                                  <Badge variant="outline" className="text-emerald-600 border-emerald-200 bg-emerald-50 font-semibold text-xs rounded-sm">{p.overallScore}%</Badge>
                                 </div>
                               </div>
-                              <div className="space-y-2">
-                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Recommendation</p>
-                                <div className="bg-white p-2 rounded border border-slate-100 text-xs font-semibold text-slate-700">
+                              <div className="space-y-1.5">
+                                <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Recommendation</p>
+                                <div className="bg-white dark:bg-slate-800 p-2 rounded-md border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200">
                                   {p.panelConclusion || 'No specific outcome recommended.'}
                                 </div>
                               </div>
-                              <div className="mt-4 space-y-2">
-                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Feedback & Notes</p>
-                                <div className="text-sm text-slate-600 italic leading-relaxed bg-white/50 p-3 rounded border border-dashed border-slate-200 whitespace-pre-wrap">
+                              <div className="mt-3 space-y-1.5">
+                                <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Feedback & Notes</p>
+                                <div className="text-xs text-slate-600 dark:text-slate-400 italic leading-relaxed bg-white/60 dark:bg-slate-800/60 p-3 rounded-md border border-dashed border-slate-200 dark:border-slate-700 whitespace-pre-wrap">
                                   {p.managerNotes || 'No qualitative feedback provided.'}
                                 </div>
                               </div>
@@ -689,14 +690,14 @@ export function Evaluations() {
                 </Tabs>
               ) : (
                 <div>
-                  <h5 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Manager Notes / Feedback</h5>
-                  <div className="bg-slate-50 p-4 rounded-lg text-sm text-slate-700 whitespace-pre-wrap border border-slate-100">
+                  <h5 className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-2">Manager Notes / Feedback</h5>
+                  <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-md text-xs text-slate-700 dark:text-slate-300 whitespace-pre-wrap border border-slate-200 dark:border-slate-800">
                     {viewingRecord.managerNotes || 'No notes provided.'}
                   </div>
                 </div>
               )}
 
-              <div className="pt-2 text-[10px] text-slate-400 border-t border-slate-100 flex items-center justify-between">
+              <div className="pt-2 text-[10px] text-slate-400 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
                 <span>Ref: {viewingRecord.id.substring(0, 8)}</span>
                 <span>Created by: {resolveCreatedBy(viewingRecord.createdBy)}</span>
               </div>
@@ -709,10 +710,10 @@ export function Evaluations() {
       {!selectedEmployeeId && !isMobileListOpen && (
         <button
           onClick={() => setIsMobileListOpen(true)}
-          className="fixed bottom-6 right-6 z-40 md:hidden flex items-center gap-2 bg-indigo-600 text-white px-4 py-3 rounded-full shadow-lg hover:bg-indigo-700 transition-colors"
+          className="fixed bottom-6 right-6 z-40 md:hidden flex items-center gap-2 bg-blue-600 text-white px-3 py-2 rounded-md shadow-lg hover:bg-blue-700 transition-colors text-xs font-semibold"
         >
-          <Users className="h-5 w-5" />
-          <span className="text-sm font-semibold">Employees</span>
+          <Users className="h-4 w-4" />
+          <span>Employees</span>
         </button>
       )}
 

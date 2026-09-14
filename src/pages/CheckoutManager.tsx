@@ -193,7 +193,7 @@ export function CheckoutManager() {
                                 className={cn(
                                   "text-[8px] h-4 px-1.5 font-black tracking-tighter uppercase",
                                   emp.staffType === 'OFFICE' 
-                                    ? "bg-purple-50 text-purple-600 border-purple-100" 
+                                    ? "bg-sky-50 text-sky-600 border-sky-100" 
                                     : "bg-blue-50 text-blue-600 border-blue-100"
                                 )}
                               >
@@ -338,20 +338,21 @@ export function CheckoutManager() {
           </Card>
 
           {/* Quick Stats Card */}
-          <Card className="border-none shadow-sm bg-gradient-to-br from-blue-600 to-blue-800 text-white overflow-hidden relative group">
-            <div className="absolute -top-10 -right-10 h-32 w-32 bg-white/10 rounded-full group-hover:scale-150 transition-transform duration-700" />
-            <CardContent className="p-5 sm:p-6 relative z-10 space-y-4">
+          <Card className="border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden">
+            <CardContent className="p-5 sm:p-6 space-y-4">
               <div className="flex items-center justify-between">
-                <ArrowRightLeft className="h-6 w-6 text-blue-200" />
-                <Badge className="bg-white/20 text-white border-0 text-[11px] font-semibold px-2 py-0.5">LIVE</Badge>
+                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Activity Metric</span>
+                <Badge variant="outline" className="text-[10px] font-mono">Today</Badge>
               </div>
               <div>
-                <h4 className="text-3xl font-bold">{checkouts.filter(c => new Date(c.checkoutDate).toDateString() === new Date().toDateString()).length}</h4>
-                <p className="text-xs text-blue-200 mt-1">Items Issued Today</p>
+                <h4 className="text-3xl font-bold font-mono tracking-tight text-slate-900 dark:text-slate-100 tabular-nums">
+                  {checkouts.filter(c => new Date(c.checkoutDate).toDateString() === new Date().toDateString()).length}
+                </h4>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Items Issued Today</p>
               </div>
-              <div className="pt-3 border-t border-white/10 flex items-center justify-between">
-                <span className="text-xs text-white/70">Efficiency</span>
-                <span className="text-sm font-bold">98.2%</span>
+              <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs font-mono">
+                <span className="text-slate-400">Dispatch Health</span>
+                <span className="font-bold text-slate-800 dark:text-slate-200 tabular-nums">98.2%</span>
               </div>
             </CardContent>
           </Card>

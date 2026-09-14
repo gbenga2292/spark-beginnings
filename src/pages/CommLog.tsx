@@ -47,7 +47,7 @@ const channelIcon = (ch: string) => {
 
 const channelColor = (ch: string) => {
   if (ch === 'Call') return 'bg-blue-100 text-blue-700';
-  if (ch === 'Email') return 'bg-purple-100 text-purple-700';
+  if (ch === 'Email') return 'bg-sky-100 text-sky-700';
   if (ch === 'WhatsApp') return 'bg-emerald-100 text-emerald-700';
   if (ch === 'Meeting') return 'bg-amber-100 text-amber-700';
   if (ch === 'SMS') return 'bg-pink-100 text-pink-700';
@@ -56,9 +56,9 @@ const channelColor = (ch: string) => {
 };
 
 const contactTypeColor = (ct: string) => {
-  if (ct === 'Client') return 'bg-indigo-100 text-indigo-700';
+  if (ct === 'Client') return 'bg-blue-100 text-blue-700';
   if (ct === 'Site') return 'bg-green-100 text-green-700';
-  if (ct === 'Both') return 'bg-violet-100 text-violet-700';
+  if (ct === 'Both') return 'bg-sky-100 text-sky-700';
   if (ct === 'Potential Client') return 'bg-orange-100 text-orange-700';
   return 'bg-slate-100 text-slate-600';
 };
@@ -291,7 +291,7 @@ function LogForm({ form, onChange, onSave, onCancel, isEdit, editingId, isDark }
 
   const inputCls = cn(
     'flex h-9 w-full rounded-md border px-3 py-1 text-sm shadow-sm transition-colors',
-    'focus:outline-none focus:ring-2 focus:ring-indigo-500',
+    'focus:outline-none focus:ring-2 focus:ring-blue-500',
     isDark
       ? 'bg-slate-800 border-slate-600 text-slate-100 placeholder:text-slate-500'
       : 'bg-white border-slate-200 text-slate-900 placeholder:text-slate-400'
@@ -392,7 +392,7 @@ function LogForm({ form, onChange, onSave, onCancel, isEdit, editingId, isDark }
             className={cn(
               'flex-1 py-1 px-3 rounded-md text-xs font-semibold transition-all',
               !form.isInternal
-                ? (isDark ? 'bg-slate-600 text-indigo-300 shadow-sm' : 'bg-white text-indigo-700 shadow-sm')
+                ? (isDark ? 'bg-slate-600 text-blue-300 shadow-sm' : 'bg-white text-blue-700 shadow-sm')
                 : (isDark ? 'text-slate-400 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700')
             )}
           >
@@ -404,7 +404,7 @@ function LogForm({ form, onChange, onSave, onCancel, isEdit, editingId, isDark }
             className={cn(
               'flex-1 py-1 px-3 rounded-md text-xs font-semibold transition-all',
               form.isInternal
-                ? (isDark ? 'bg-slate-600 text-indigo-300 shadow-sm' : 'bg-white text-indigo-700 shadow-sm')
+                ? (isDark ? 'bg-slate-600 text-blue-300 shadow-sm' : 'bg-white text-blue-700 shadow-sm')
                 : (isDark ? 'text-slate-400 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700')
             )}
           >
@@ -417,7 +417,7 @@ function LogForm({ form, onChange, onSave, onCancel, isEdit, editingId, isDark }
       </div>
 
       {form.parentId && !isEdit && (
-        <div className={cn("px-4 py-2 border-b text-xs flex items-center gap-1.5", isDark ? 'bg-indigo-950/30 text-indigo-400 border-slate-800' : 'bg-indigo-50 text-indigo-700 border-slate-100')}>
+        <div className={cn("px-4 py-2 border-b text-xs flex items-center gap-1.5", isDark ? 'bg-blue-950/30 text-blue-400 border-slate-800' : 'bg-blue-50 text-blue-700 border-slate-100')}>
           <MessageSquare className="w-3.5 h-3.5" />
           Adding a follow-up note. The client and site information have been locked to the parent log.
         </div>
@@ -639,7 +639,7 @@ function LogForm({ form, onChange, onSave, onCancel, isEdit, editingId, isDark }
               </div>
               {form.contactPerson.trim() && (
                 <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
-                  <input type="checkbox" checked={useContactPerson} onChange={e => setUseContactPerson(e.target.checked)} className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4" />
+                  <input type="checkbox" checked={useContactPerson} onChange={e => setUseContactPerson(e.target.checked)} className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-4 h-4" />
                   <span className={isDark ? 'text-slate-300' : 'text-slate-700'}>
                     Make <strong>"{form.contactPerson}"</strong> the contact person
                   </span>
@@ -706,7 +706,7 @@ function LogForm({ form, onChange, onSave, onCancel, isEdit, editingId, isDark }
                 className={cn(
                   'min-h-[36px] flex flex-wrap gap-1.5 items-center px-2 py-1.5 rounded-md border transition-colors cursor-text',
                   reportedByFocused
-                    ? 'ring-2 ring-indigo-500 border-indigo-400'
+                    ? 'ring-2 ring-blue-500 border-blue-400'
                     : isDark ? 'border-slate-600' : 'border-slate-200',
                   isDark ? 'bg-slate-800' : 'bg-white'
                 )}
@@ -721,7 +721,7 @@ function LogForm({ form, onChange, onSave, onCancel, isEdit, editingId, isDark }
                     key={i}
                     className={cn(
                       'inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium',
-                      isDark ? 'bg-indigo-900/50 text-indigo-300' : 'bg-indigo-50 text-indigo-700'
+                      isDark ? 'bg-blue-900/50 text-blue-300' : 'bg-blue-50 text-blue-700'
                     )}
                   >
                     {name}
@@ -833,7 +833,7 @@ function LogForm({ form, onChange, onSave, onCancel, isEdit, editingId, isDark }
                           className={cn(
                             'flex items-center gap-3 px-3 py-2.5 cursor-pointer transition-colors text-sm select-none',
                             isSelected
-                              ? (isDark ? 'bg-indigo-900/30' : 'bg-indigo-50')
+                              ? (isDark ? 'bg-blue-900/30' : 'bg-blue-50')
                               : (isDark ? 'hover:bg-slate-700' : 'hover:bg-slate-50')
                           )}
                         >
@@ -841,7 +841,7 @@ function LogForm({ form, onChange, onSave, onCancel, isEdit, editingId, isDark }
                           <div className={cn(
                             'w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors',
                             isSelected
-                              ? 'bg-indigo-600 border-indigo-600 text-white'
+                              ? 'bg-blue-600 border-blue-600 text-white'
                               : isDark ? 'border-slate-600' : 'border-slate-300'
                           )}>
                             {isSelected && <CheckCircle2 className="w-3 h-3" />}
@@ -886,8 +886,8 @@ function LogForm({ form, onChange, onSave, onCancel, isEdit, editingId, isDark }
                         className={cn(
                           'flex items-center gap-2.5 px-3 py-2.5 cursor-pointer transition-colors text-sm border-t select-none',
                           isDark
-                            ? 'border-slate-700 text-indigo-400 hover:bg-slate-700'
-                            : 'border-slate-100 text-indigo-600 hover:bg-indigo-50'
+                            ? 'border-slate-700 text-blue-400 hover:bg-slate-700'
+                            : 'border-slate-100 text-blue-600 hover:bg-blue-50'
                         )}
                       >
                         <ListPlus className="w-4 h-4 shrink-0" />
@@ -1032,7 +1032,7 @@ function LogForm({ form, onChange, onSave, onCancel, isEdit, editingId, isDark }
               id="follow-up-done"
               checked={form.followUpDone}
               onChange={e => onChange({ followUpDone: e.target.checked })}
-              className="w-4 h-4 accent-indigo-600 cursor-pointer"
+              className="w-4 h-4 accent-blue-600 cursor-pointer"
             />
             <label htmlFor="follow-up-done" className={cn('text-sm cursor-pointer', isDark ? 'text-slate-300' : 'text-slate-700')}>
               Follow-up done
@@ -1046,19 +1046,19 @@ function LogForm({ form, onChange, onSave, onCancel, isEdit, editingId, isDark }
         <label className={cn(
           'flex items-center gap-2.5 text-sm cursor-pointer select-none px-3 py-2 rounded-lg border transition-colors',
           form.createTask
-            ? (isDark ? 'bg-indigo-900/40 border-indigo-600 text-indigo-300' : 'bg-indigo-50 border-indigo-300 text-indigo-700')
+            ? (isDark ? 'bg-blue-900/40 border-blue-600 text-blue-300' : 'bg-blue-50 border-blue-300 text-blue-700')
             : (isDark ? 'border-slate-700 text-slate-400 hover:border-slate-600' : 'border-slate-200 text-slate-500 hover:border-slate-300')
         )}>
           <input
             type="checkbox"
             checked={form.createTask}
             onChange={e => onChange({ createTask: e.target.checked })}
-            className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer"
+            className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
           />
           <ClipboardList className="w-4 h-4 flex-shrink-0" />
           <span className="font-medium">Create a task from this communication log</span>
           {form.createTask && (
-            <span className={cn('text-xs ml-1', isDark ? 'text-indigo-400' : 'text-indigo-500')}>
+            <span className={cn('text-xs ml-1', isDark ? 'text-blue-400' : 'text-blue-500')}>
               — a task dialog will open after saving
             </span>
           )}
@@ -1122,7 +1122,7 @@ function LogForm({ form, onChange, onSave, onCancel, isEdit, editingId, isDark }
 
       {/* Actions */}
       <div className="flex gap-2 p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 rounded-b-xl shrink-0">
-        <Button onClick={onSave} className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2 flex-1">
+        <Button onClick={onSave} className="bg-blue-600 hover:bg-blue-700 text-white gap-2 flex-1">
           <Save className="w-4 h-4" /> {isEdit ? 'Update Log' : 'Save Log'}
         </Button>
       </div>
@@ -1175,7 +1175,7 @@ function LogCard({ log, onEdit, onDelete, onToggleFollowUp, onAddFollowUpNote, i
       isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200',
       'hover:shadow-md',
       isChild && (isDark ? 'ml-8 border-l-2 border-l-slate-600 bg-slate-900/50' : 'ml-8 border-l-2 border-l-slate-300 bg-slate-50'),
-      isUnread && (isDark ? 'ring-1 ring-indigo-500/50 border-indigo-500/50 bg-indigo-950/20' : 'ring-2 ring-indigo-500/20 border-indigo-300 bg-indigo-50/30')
+      isUnread && (isDark ? 'ring-1 ring-blue-500/50 border-blue-500/50 bg-blue-950/20' : 'ring-2 ring-blue-500/20 border-blue-300 bg-blue-50/30')
     )}>
       <div className={cn(
         'h-1',
@@ -1218,7 +1218,7 @@ function LogCard({ log, onEdit, onDelete, onToggleFollowUp, onAddFollowUpNote, i
                 )}
 
                 {isUnread && (
-                  <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-bold bg-indigo-600 text-white shadow-sm animate-pulse">
+                  <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-bold bg-blue-600 text-white shadow-sm animate-pulse">
                     ● New
                   </span>
                 )}
@@ -1261,7 +1261,7 @@ function LogCard({ log, onEdit, onDelete, onToggleFollowUp, onAddFollowUpNote, i
 
               {/* Row 2: Client/Site/Person text summary */}
               <div className={cn('text-[13px] mb-1.5 flex flex-wrap items-center gap-1.5', isDark ? 'text-slate-400' : 'text-slate-600')}>
-                 <div className="inline-flex items-center gap-1 font-semibold text-indigo-600 dark:text-indigo-400">
+                 <div className="inline-flex items-center gap-1 font-semibold text-blue-600 dark:text-blue-400">
                     {contactTypeIcon(log.contactType)}
                     {log.client || (log.contactType === 'Client' ? 'Existing Client' : log.contactType)}
                  </div>
@@ -1329,7 +1329,7 @@ function LogCard({ log, onEdit, onDelete, onToggleFollowUp, onAddFollowUpNote, i
               <button
                 onClick={onEdit}
                 title={isAdmin && log.loggedBy !== currentUserName ? 'Edit (Admin Override)' : 'Edit your log'}
-                className={cn('p-1.5 rounded-lg transition-colors', isDark ? 'text-slate-400 hover:bg-slate-800 hover:text-indigo-400' : 'text-slate-400 hover:bg-slate-100 hover:text-indigo-600')}
+                className={cn('p-1.5 rounded-lg transition-colors', isDark ? 'text-slate-400 hover:bg-slate-800 hover:text-blue-400' : 'text-slate-400 hover:bg-slate-100 hover:text-blue-600')}
               >
                 <Pencil className="w-4 h-4" />
               </button>
@@ -1360,7 +1360,7 @@ function LogCard({ log, onEdit, onDelete, onToggleFollowUp, onAddFollowUpNote, i
                 className={cn(
                   'flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold border transition-all',
                   isThreadCollapsed
-                    ? (isDark ? 'bg-indigo-900/40 border-indigo-700 text-indigo-300 hover:bg-indigo-900/70' : 'bg-indigo-50 border-indigo-300 text-indigo-600 hover:bg-indigo-100')
+                    ? (isDark ? 'bg-blue-900/40 border-blue-700 text-blue-300 hover:bg-blue-900/70' : 'bg-blue-50 border-blue-300 text-blue-600 hover:bg-blue-100')
                     : (isDark ? 'bg-slate-800 border-slate-600 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 border-slate-200 text-slate-600 hover:bg-slate-200')
                 )}
               >
@@ -1412,12 +1412,12 @@ function LogCard({ log, onEdit, onDelete, onToggleFollowUp, onAddFollowUpNote, i
             {/* Detailed read receipts list (avatars only) */}
             {(receipts && receipts.length > 0) && (
               <div className={cn('pt-2 mt-2 border-t flex items-center gap-2', isDark ? 'border-slate-800' : 'border-slate-100')}>
-                <span className={cn('text-xs font-semibold', isDark ? 'text-indigo-400' : 'text-indigo-600')}>Seen by:</span>
+                <span className={cn('text-xs font-semibold', isDark ? 'text-blue-400' : 'text-blue-600')}>Seen by:</span>
                 <div className="flex items-center -space-x-1.5 overflow-hidden py-0.5">
                   {receipts.map(r => {
                     const u = (users || []).find((user: any) => user.id === r.userId || user.name === r.userName);
                     const initials = (r.userName || 'U').split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase();
-                    const color = u?.avatarColor || 'bg-indigo-600';
+                    const color = u?.avatarColor || 'bg-blue-600';
                     const tooltipText = `${r.userName} (${format(parseISO(r.readAt), 'dd MMM, HH:mm')})`;
 
                     if (u?.avatar) {
@@ -1438,7 +1438,7 @@ function LogCard({ log, onEdit, onDelete, onToggleFollowUp, onAddFollowUpNote, i
                         title={tooltipText}
                         className={cn(
                           'w-5 h-5 rounded-full ring-2 ring-white dark:ring-slate-900 text-[8px] font-bold text-white flex items-center justify-center flex-shrink-0 cursor-default',
-                          color.startsWith('bg-') ? color : 'bg-indigo-600'
+                          color.startsWith('bg-') ? color : 'bg-blue-600'
                         )}
                         style={!color.startsWith('bg-') ? { backgroundColor: color } : undefined}
                       >
@@ -1536,7 +1536,7 @@ export function CommLog() {
   const [dateTo, setDateTo] = useState('');
 
   const selectCls = cn(
-    'h-9 px-3 text-sm rounded-md border shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500',
+    'h-9 px-3 text-sm rounded-md border shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500',
     isDark ? 'bg-slate-800 border-slate-600 text-slate-200' : 'bg-white border-slate-200 text-slate-700'
   );
 
@@ -1574,17 +1574,17 @@ export function CommLog() {
           <Button
             variant="outline"
             onClick={handleMarkAllAsRead}
-            className="h-9 px-2.5 sm:px-3 rounded-lg flex items-center gap-1.5 text-xs font-semibold border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 shadow-sm"
+            className="h-9 px-2.5 sm:px-3 rounded-md flex items-center gap-1.5 text-xs font-semibold border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-950/50"
             title="Mark all unread logs as read"
           >
-            <CheckCheck className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+            <CheckCheck className="w-4 h-4 text-blue-600 dark:text-blue-400" />
             <span className="hidden sm:inline">Mark All as Read ({unreadCommLogCount})</span>
             <span className="sm:hidden">({unreadCommLogCount})</span>
           </Button>
         )}
         <Button
           onClick={() => { setShowForm(true); setEditingId(null); setForm(emptyForm()); }}
-          className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm h-9 px-2 sm:px-4 rounded-lg flex items-center gap-2"
+          className="bg-blue-600 hover:bg-blue-700 text-white h-9 px-2 sm:px-4 rounded-md flex items-center gap-2"
         >
           <Plus className="w-4 h-4" /> <span className="hidden sm:inline">New Log</span>
         </Button>
@@ -1895,7 +1895,7 @@ export function CommLog() {
             onClick={() => setShowStats(!showStats)} 
             className={cn("flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border transition-all whitespace-nowrap", 
               showStats 
-                ? (isDark ? "bg-indigo-900/40 border-indigo-700 text-indigo-400 shadow-sm" : "bg-indigo-50 border-indigo-200 text-indigo-700 shadow-sm")
+                ? (isDark ? "bg-blue-900/40 border-blue-700 text-blue-400 shadow-sm" : "bg-blue-50 border-blue-200 text-blue-700 shadow-sm")
                 : (isDark ? "bg-slate-900 border-slate-800 text-slate-400 hover:bg-slate-800" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50")
             )}
           >
@@ -1907,14 +1907,14 @@ export function CommLog() {
             onClick={() => setShowSearch(!showSearch)} 
             className={cn("flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border transition-all whitespace-nowrap", 
               showSearch 
-                ? (isDark ? "bg-indigo-900/40 border-indigo-700 text-indigo-400 shadow-sm" : "bg-indigo-50 border-indigo-200 text-indigo-700 shadow-sm")
+                ? (isDark ? "bg-blue-900/40 border-blue-700 text-blue-400 shadow-sm" : "bg-blue-50 border-blue-200 text-blue-700 shadow-sm")
                 : (isDark ? "bg-slate-900 border-slate-800 text-slate-400 hover:bg-slate-800" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50")
             )}
           >
             <Search className="w-4 h-4" /> 
             Search & Filters
             {(searchTerm || filterClient !== 'All' || filterDirection !== 'All') && !showSearch && (
-              <span className="ml-1 w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
+              <span className="ml-1 w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
             )}
           </button>
         </div>
@@ -1923,16 +1923,16 @@ export function CommLog() {
         {showStats && (
           <div className="flex md:grid md:grid-cols-6 overflow-x-auto no-scrollbar gap-2 flex-shrink-0 pb-4 snap-x animate-in slide-in-from-top-2 fade-in duration-200 px-1">
           {[
-            { label: 'Total', value: stats.total, color: 'text-indigo-600', bg: 'bg-indigo-50 border-indigo-100' },
-            { label: 'Incoming', value: stats.incoming, color: 'text-emerald-600', bg: 'bg-emerald-50 border-emerald-100' },
-            { label: 'Outgoing', value: stats.outgoing, color: 'text-blue-600', bg: 'bg-blue-50 border-blue-100' },
-            { label: 'Internal', value: stats.internal, color: 'text-slate-600', bg: 'bg-slate-100 border-slate-200' },
-            { label: 'Follow-ups', value: stats.pendingFollowUp, color: 'text-amber-600', bg: 'bg-amber-50 border-amber-100' },
-            { label: 'Prospects', value: stats.potentialClients, color: 'text-orange-600', bg: 'bg-orange-50 border-orange-100' },
+            { label: 'Total Comms', value: stats.total },
+            { label: 'Incoming', value: stats.incoming },
+            { label: 'Outgoing', value: stats.outgoing },
+            { label: 'Internal', value: stats.internal },
+            { label: 'Follow-ups', value: stats.pendingFollowUp, alert: stats.pendingFollowUp > 0 },
+            { label: 'Prospects', value: stats.potentialClients },
           ].map(s => (
-            <div key={s.label} className={cn('rounded-lg border p-2 text-center min-w-[100px] flex-1 snap-center', isDark ? 'bg-slate-900 border-slate-800' : s.bg)}>
-              <div className={cn('text-xl font-bold', isDark ? 'text-slate-100' : s.color)}>{s.value}</div>
-              <div className={cn('text-xs mt-0.5', isDark ? 'text-slate-500' : 'text-slate-500')}>{s.label}</div>
+            <div key={s.label} className="rounded-md border border-slate-200 dark:border-slate-800 bg-card p-3 text-center min-w-[110px] flex-1 snap-center">
+              <div className={cn('text-2xl font-bold font-mono tracking-tight tabular-nums', s.alert ? 'text-amber-600 dark:text-amber-400' : 'text-foreground')}>{s.value}</div>
+              <div className="text-[11px] font-medium text-muted-foreground mt-0.5">{s.label}</div>
             </div>
           ))}
         </div>
@@ -2037,10 +2037,10 @@ export function CommLog() {
                   {/* Linked Tasks section */}
                   <div className={cn('rounded-xl border p-4 space-y-3', isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200')}>
                     <div className={cn('flex items-center gap-2 text-sm font-semibold', isDark ? 'text-slate-300' : 'text-slate-700')}>
-                      <ClipboardList className="w-4 h-4 text-indigo-500" />
+                      <ClipboardList className="w-4 h-4 text-blue-500" />
                       Linked Tasks
                       {linkedTasks.length > 0 && (
-                        <span className="ml-auto text-xs font-normal px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-400">
+                        <span className="ml-auto text-xs font-normal px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400">
                           {linkedTasks.length}
                         </span>
                       )}
@@ -2059,8 +2059,8 @@ export function CommLog() {
                             className={cn(
                               'w-full text-left flex items-center gap-3 p-3 rounded-lg border transition-all hover:shadow-sm',
                               isDark
-                                ? 'bg-slate-800 border-slate-700 hover:bg-slate-700 hover:border-indigo-700'
-                                : 'bg-slate-50 border-slate-200 hover:bg-indigo-50 hover:border-indigo-200'
+                                ? 'bg-slate-800 border-slate-700 hover:bg-slate-700 hover:border-blue-700'
+                                : 'bg-slate-50 border-slate-200 hover:bg-blue-50 hover:border-blue-200'
                             )}
                           >
                             <CheckCircle2 className={cn('w-4 h-4 flex-shrink-0', task.status === 'completed' ? 'text-emerald-500' : 'text-slate-400')} />
@@ -2207,7 +2207,7 @@ export function CommLog() {
                     {commLogs.length === 0 ? 'No communication logs yet' : 'No logs match your filters'}
                   </p>
                   {commLogs.length === 0 && (
-                    <Button onClick={() => setShowForm(true)} className="mt-1 bg-indigo-600 hover:bg-indigo-700 text-white gap-2 text-sm">
+                    <Button onClick={() => setShowForm(true)} className="mt-1 bg-blue-600 hover:bg-blue-700 text-white gap-2 text-sm">
                       <Plus className="w-4 h-4" /> Log your first communication
                     </Button>
                   )}
@@ -2265,13 +2265,13 @@ export function CommLog() {
                               : 'bg-slate-50 hover:bg-slate-100 border-b border-slate-200'
                           )}
                         >
-                          <Building2 className={cn('w-4 h-4 flex-shrink-0', isDark ? 'text-indigo-400' : 'text-indigo-500')} />
+                          <Building2 className={cn('w-4 h-4 flex-shrink-0', isDark ? 'text-blue-400' : 'text-blue-500')} />
                           <div className="flex items-center gap-2 flex-1 min-w-0">
                             <span className={cn('font-semibold text-sm truncate', isDark ? 'text-slate-100' : 'text-slate-800')}>
                               {clientName}
                             </span>
                             {clientUnreadCount > 0 && (
-                              <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-indigo-600 text-white shadow-sm animate-pulse leading-none flex-shrink-0">
+                              <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-blue-600 text-white shadow-sm animate-pulse leading-none flex-shrink-0">
                                 ● {clientUnreadCount} new
                               </span>
                             )}
@@ -2338,8 +2338,8 @@ export function CommLog() {
                                       className={cn(
                                         'w-full flex items-center gap-2 px-4 py-1.5 text-xs font-medium transition-colors border-t',
                                         isDark
-                                          ? 'bg-indigo-950/40 text-indigo-400 border-slate-700 hover:bg-indigo-950/60'
-                                          : 'bg-indigo-50 text-indigo-600 border-indigo-100 hover:bg-indigo-100'
+                                          ? 'bg-blue-950/40 text-blue-400 border-slate-700 hover:bg-blue-950/60'
+                                          : 'bg-blue-50 text-blue-600 border-blue-100 hover:bg-blue-100'
                                       )}
                                     >
                                       <ChevronDown className="w-3.5 h-3.5" />
@@ -2350,7 +2350,7 @@ export function CommLog() {
                                   {(!isThreadCollapsed || !isParentMatch) && children.map(child => (
                                     <div key={child.id} className={cn(
                                       isParentMatch && 'pl-2 border-l-2',
-                                      isParentMatch && (isDark ? 'border-indigo-800/60' : 'border-indigo-200')
+                                      isParentMatch && (isDark ? 'border-blue-800/60' : 'border-blue-200')
                                     )}>
                                       <LogCard
                                         log={child}

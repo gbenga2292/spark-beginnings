@@ -15,6 +15,7 @@ import {
     Tooltip, XAxis, YAxis, Legend, PieChart, Pie, Cell, LabelList
 } from 'recharts';
 import { formatDisplayDate } from '@/src/lib/dateUtils';
+import { MetricHeroCard } from '@/src/components/ui/MetricHeroCard';
 
 function computeWorkDays(year: number, monthNum: number, holidayDates: string[], workDaysPerWeek: number = 6, empStartDate?: string, empEndDate?: string): number {
     const startDate = new Date(year, monthNum - 1, 1);
@@ -59,7 +60,7 @@ const CustomHeadcountTooltip = ({ active, payload }: any) => {
         <div className="bg-slate-900/95 text-white border border-slate-700/80 rounded-xl p-3 shadow-xl backdrop-blur-md max-w-xs text-xs z-50">
           <div className="font-bold text-slate-200 flex items-center justify-between gap-3">
             <span>{data.name}</span>
-            <span className="text-indigo-400 font-mono text-xs font-bold">
+            <span className="text-blue-400 font-mono text-xs font-bold">
               Count: {data.count}
             </span>
           </div>
@@ -196,7 +197,7 @@ const MONTHS = [
     { label: 'December', value: 12, key: 'dec' },
 ];
 
-const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
+const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#2563eb', '#ec4899', '#14b8a6', '#f97316'];
 
 export function Dashboard() {
     const departments = useAppStore((state) => state.departments);
@@ -727,72 +728,64 @@ export function Dashboard() {
         [filterMonth, filterYear]
     );
 
+    const attendanceSparkline = useMemo(() => {
+        if (!attendanceTrend || attendanceTrend.length === 0) return [];
+        return attendanceTrend.map(t => t.Present || 0);
+    }, [attendanceTrend]);
+
+    const activeStaffSparkline = useMemo(() => {
+        if (!headcountChartData || headcountChartData.length === 0) return [];
+        return headcountChartData.map(h => h.Headcount || 0);
+    }, [headcountChartData]);
+
     return (
         <div className="flex flex-col gap-6 pb-10">
-            {/* TOP KPI CARDS */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
-                <Card className="shadow-sm">
-                    <CardContent className="p-3 sm:p-4 flex flex-col items-center text-center gap-1.5 sm:gap-2">
-                        <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center">
-                            <UserCheck className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-600 dark:text-emerald-400" />
-                        </div>
-                        <div className="text-2xl sm:text-3xl font-black text-emerald-600 dark:text-emerald-400">{kpiStats.totalActive}</div>
-                        <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Active Staff</div>
-                    </CardContent>
-                </Card>
+            {/* TOP METRICS: ASYMMETRIC PRIMARY HERO + SECONDARY COMPANIONS */}
+            <MetricHeroCard
+                primary={{
+                    label: "Attendance Rate",
+                    value: `${kpiStats.attendanceRate}%`,
+                    period: filterMonth
+                        ? `${MONTHS.find(m => m.value === filterMonth)?.label} ${filterYear}`
+                        : `Full Year ${filterYear}`,
+                    sparklineData: attendanceSparkline,
+                    delta: kpiStats.attendanceRate >= 90 ? "Target Met" : "Below Baseline",
+                    deltaType: kpiStats.attendanceRate >= 90 ? "positive" : "negative",
+                }}
+                secondary={[
+                    {
+                        label: "Active Workforce",
+                        value: kpiStats.totalActive,
+                        period: `${filterYear} Active Roster`,
+                        sparklineData: activeStaffSparkline,
+                    },
+                    {
+                        label: "Active Sites",
+                        value: kpiStats.activeSites,
+                        period: "In-flight Locations",
+                    },
+                    {
+                        label: "Absent Days",
+                        value: `${kpiStats.totalAbsentDays}d`,
+                        period: `${kpiStats.totalOnLeave} on approved leave`,
+                        delta: kpiStats.totalAbsentDays > 10 ? "Action Required" : "Nominal",
+                        deltaType: kpiStats.totalAbsentDays > 10 ? "negative" : "positive",
+                    },
+                ]}
+            />
 
-                <Card className="shadow-sm">
-                    <CardContent className="p-3 sm:p-4 flex flex-col items-center text-center gap-1.5 sm:gap-2">
-                        <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-amber-50 dark:bg-amber-900/30 flex items-center justify-center">
-                            <CalendarOff className="w-4 h-4 sm:w-5 sm:h-5 text-amber-600 dark:text-amber-400" />
-                        </div>
-                        <div className="text-2xl sm:text-3xl font-black text-amber-600 dark:text-amber-400">{kpiStats.totalOnLeave}</div>
-                        <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">On Leave</div>
-                    </CardContent>
-                </Card>
-
-                <Card className="shadow-sm">
-                    <CardContent className="p-3 sm:p-4 flex flex-col items-center text-center gap-1.5 sm:gap-2">
-                        <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-rose-50 dark:bg-rose-900/30 flex items-center justify-center">
-                            <UserX className="w-4 h-4 sm:w-5 sm:h-5 text-rose-600 dark:text-rose-400" />
-                        </div>
-                        <div className="text-2xl sm:text-3xl font-black text-rose-600 dark:text-rose-400">{kpiStats.totalAbsentDays}</div>
-                        <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Absent Days</div>
-                    </CardContent>
-                </Card>
-
-                <Card className="shadow-sm">
-                    <CardContent className="p-3 sm:p-4 flex flex-col items-center text-center gap-1.5 sm:gap-2">
-                        <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-violet-50 dark:bg-violet-900/30 flex items-center justify-center">
-                            <Timer className="w-4 h-4 sm:w-5 sm:h-5 text-violet-600 dark:text-violet-400" />
-                        </div>
-                        <div className="text-2xl sm:text-3xl font-black text-violet-600 dark:text-violet-400">{kpiStats.totalOTInstances}</div>
-                        <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">OT Instances</div>
-                    </CardContent>
-                </Card>
-
-
-
-                <Card className="shadow-sm">
-                    <CardContent className="p-3 sm:p-4 flex flex-col items-center text-center gap-1.5 sm:gap-2">
-                        <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center">
-                            <MapPin className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-600 dark:text-indigo-400" />
-                        </div>
-                        <div className="text-2xl sm:text-3xl font-black text-indigo-600 dark:text-indigo-400">{kpiStats.activeSites}</div>
-                        <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Active Sites</div>
-                    </CardContent>
-                </Card>
-            </div>
-
-            {/* ATTENDANCE RATE HERO + ATTENDANCE/OT TREND CHART */}
+            {/* ATTENDANCE & OT TREND CHART + OPERATIONAL STATUS */}
             <div className="grid gap-6 md:grid-cols-12">
-                <Card className="md:col-span-8 shadow-sm">
-                    <CardHeader className="border-b border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 pb-4">
-                        <CardTitle className="text-sm sm:text-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-slate-800 dark:text-slate-100">
-                            <span className="flex items-center gap-2"><BarChart3 className="h-5 w-5 text-indigo-500" /> <span className="truncate">Attendance & OT Trend</span></span>
+                <Card className="md:col-span-8">
+                    <CardHeader className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40 pb-4">
+                        <CardTitle className="text-sm sm:text-base font-semibold flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-slate-900 dark:text-slate-100">
+                            <span className="flex items-center gap-2">
+                                <BarChart3 className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+                                <span>Attendance & Overtime Distribution</span>
+                            </span>
                             <div className="flex items-center gap-2">
                                 <select
-                                    className="text-xs font-medium bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-200 py-1 px-2 rounded outline-none cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
+                                    className="text-xs font-mono font-medium bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 py-1 px-2 rounded-sm outline-none cursor-pointer"
                                     value={chartViewMode}
                                     onChange={(e) => setChartViewMode(e.target.value as any)}
                                 >
@@ -800,7 +793,7 @@ export function Dashboard() {
                                     <option value="efficiency">Efficiency Rate (%)</option>
                                     <option value="employee">Per Employee Average</option>
                                 </select>
-                                <Badge variant="outline" className="font-normal text-xs bg-white dark:bg-slate-700 dark:border-slate-600 text-slate-500 dark:text-slate-300">{filterYear}</Badge>
+                                <Badge variant="outline" className="font-mono text-xs text-slate-600 dark:text-slate-300">{filterYear}</Badge>
                             </div>
                         </CardTitle>
                     </CardHeader>
@@ -818,16 +811,16 @@ export function Dashboard() {
                                         domain={chartViewMode === 'efficiency' ? [0, 110] : [0, (dataMax: number) => (dataMax <= 5 ? dataMax + 2 : Math.ceil(dataMax * 1.25))]}
                                         allowDataOverflow={false}
                                     />
-                                    <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid rgba(148,163,184,0.2)', backgroundColor: 'rgba(30,41,59,0.95)', color: '#f1f5f9', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.4)' }} />
+                                    <Tooltip contentStyle={{ borderRadius: '4px', border: '1px solid rgba(148,163,184,0.2)', backgroundColor: 'rgba(15,23,42,0.95)', color: '#f1f5f9' }} />
                                     <Legend wrapperStyle={{ paddingTop: '10px' }} />
-                                    <Bar dataKey="Absent" fill="#ef4444" radius={[4, 4, 0, 0]}>
+                                    <Bar dataKey="Absent" fill="#ef4444" radius={[2, 2, 0, 0]}>
                                         <LabelList dataKey="Absent" position="top" offset={4} style={{ fontSize: 10, fontWeight: 700, fill: '#ef4444' }} formatter={(v: any) => v > 0 ? (chartViewMode === 'efficiency' ? `${v}%` : v) : ''} />
                                     </Bar>
-                                    <Bar dataKey="Present" fill="#10b981" radius={[4, 4, 0, 0]}>
+                                    <Bar dataKey="Present" fill="#10b981" radius={[2, 2, 0, 0]}>
                                         <LabelList dataKey="Present" position="top" offset={4} style={{ fontSize: 10, fontWeight: 700, fill: '#10b981' }} formatter={(v: any) => v > 0 ? (chartViewMode === 'efficiency' ? `${v}%` : v) : ''} />
                                     </Bar>
-                                    <Bar dataKey="Overtime" fill="#8b5cf6" radius={[4, 4, 0, 0]}>
-                                        <LabelList dataKey="Overtime" position="top" offset={4} style={{ fontSize: 10, fontWeight: 700, fill: '#8b5cf6' }} formatter={(v: any) => v > 0 ? (chartViewMode === 'efficiency' ? `${v}%` : v) : ''} />
+                                    <Bar dataKey="Overtime" fill="#f59e0b" radius={[2, 2, 0, 0]}>
+                                        <LabelList dataKey="Overtime" position="top" offset={4} style={{ fontSize: 10, fontWeight: 700, fill: '#f59e0b' }} formatter={(v: any) => v > 0 ? (chartViewMode === 'efficiency' ? `${v}%` : v) : ''} />
                                     </Bar>
                                 </BarChart>
                             </ResponsiveContainer>
@@ -835,42 +828,60 @@ export function Dashboard() {
                     </CardContent>
                 </Card>
 
-                {/* ATTENDANCE RATE + QUICK STATS */}
-                <div className="md:col-span-4 flex flex-col gap-6">
-                    <Card className="bg-gradient-to-br from-slate-900 to-indigo-900 text-white border-0 shadow-xl overflow-hidden relative flex-1">
-                        <div className="absolute right-0 top-0 opacity-10">
-                            <Users className="w-32 h-32 -mt-4 -mr-4" />
-                        </div>
-                        <CardContent className="p-6 flex flex-col items-center justify-center h-full relative z-10 gap-2">
-                            <div className="text-7xl font-black">{kpiStats.attendanceRate}%</div>
-                            <div className="text-sm font-semibold text-indigo-200 uppercase tracking-widest">Attendance Rate</div>
-                            <div className="text-[10px] text-indigo-300 mt-1">
-                                {filterMonth ? MONTHS.find(m => m.value === filterMonth)?.label : 'All Months'} {filterYear}
+                {/* OPERATIONAL CADENCE & ACTION QUEUE */}
+                <div className="md:col-span-4 flex flex-col gap-4">
+                    <Card className="flex-1 flex flex-col justify-between">
+                        <CardHeader className="border-b border-slate-200 dark:border-slate-800 pb-3">
+                            <div className="flex items-center justify-between">
+                                <span className="text-xs font-semibold tracking-wider uppercase text-slate-500 dark:text-slate-400">
+                                    Operational Cadence
+                                </span>
+                                <span className="text-[11px] font-mono text-slate-400 dark:text-slate-500 tabular-nums">
+                                    {filterYear} Cumulative
+                                </span>
                             </div>
-                            <div className="w-full bg-white/10 rounded-full h-2 mt-3">
-                                <div className="bg-emerald-400 h-2 rounded-full transition-all" style={{ width: `${kpiStats.attendanceRate}%` }}></div>
+                        </CardHeader>
+                        <CardContent className="p-5 flex flex-col justify-center gap-3">
+                            <div className="flex items-baseline justify-between">
+                                <span className="text-3xl font-bold font-mono text-slate-900 dark:text-slate-100 tabular-nums">
+                                    {elapsedWorkDaysYear}
+                                </span>
+                                <span className="text-xs text-slate-500 dark:text-slate-400 font-mono uppercase">
+                                    Workdays Logged
+                                </span>
+                            </div>
+                            <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-xs overflow-hidden">
+                                <div
+                                    className="bg-blue-600 h-1.5 transition-all"
+                                    style={{ width: `${Math.min(100, Math.round((elapsedWorkDaysYear / 312) * 100))}%` }}
+                                />
+                            </div>
+                            <div className="flex justify-between text-[11px] text-slate-400 dark:text-slate-500 font-mono">
+                                <span>Day {elapsedWorkDaysYear} of ~312</span>
+                                <span>{Math.round((elapsedWorkDaysYear / 312) * 100)}% cycle</span>
                             </div>
                         </CardContent>
                     </Card>
 
-                    <Card className="shadow-sm">
-                        <CardContent className="p-5">
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="text-center p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
-                                    <div className="text-2xl font-bold text-amber-600 dark:text-amber-400">{kpiStats.pendingLeaves}</div>
-                                    <div className="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400 mt-1">Pending Leaves</div>
+                    <Card>
+                        <CardHeader className="border-b border-slate-200 dark:border-slate-800 pb-3">
+                            <span className="text-xs font-semibold tracking-wider uppercase text-slate-500 dark:text-slate-400">
+                                Pending Action Queue
+                            </span>
+                        </CardHeader>
+                        <CardContent className="p-4">
+                            <div className="grid grid-cols-3 gap-2">
+                                <div className="p-2.5 bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800 rounded-sm">
+                                    <div className="text-xl font-bold font-mono text-slate-900 dark:text-slate-100 tabular-nums">{kpiStats.pendingLeaves}</div>
+                                    <div className="text-[10px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-tight mt-0.5">Leaves</div>
                                 </div>
-                                <div className="text-center p-3 bg-sky-50 dark:bg-sky-900/20 rounded-lg">
-                                    <div className="text-2xl font-bold text-sky-600 dark:text-sky-400">{kpiStats.pendingAdvances}</div>
-                                    <div className="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400 mt-1">Pending Advances</div>
+                                <div className="p-2.5 bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800 rounded-sm">
+                                    <div className="text-xl font-bold font-mono text-slate-900 dark:text-slate-100 tabular-nums">{kpiStats.pendingAdvances}</div>
+                                    <div className="text-[10px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-tight mt-0.5">Advances</div>
                                 </div>
-                                <div className="text-center p-3 bg-violet-50 dark:bg-violet-900/20 rounded-lg">
-                                    <div className="text-2xl font-bold text-violet-600 dark:text-violet-400">{kpiStats.activeLoans}</div>
-                                    <div className="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400 mt-1">Active Loans</div>
-                                </div>
-                                <div className="text-center p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg">
-                                    <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{elapsedWorkDaysYear}</div>
-                                    <div className="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400 mt-1">Working Days</div>
+                                <div className="p-2.5 bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800 rounded-sm">
+                                    <div className="text-xl font-bold font-mono text-slate-900 dark:text-slate-100 tabular-nums">{kpiStats.activeLoans}</div>
+                                    <div className="text-[10px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-tight mt-0.5">Loans</div>
                                 </div>
                             </div>
                         </CardContent>
@@ -880,23 +891,20 @@ export function Dashboard() {
 
             {/* ROW 3: HEADCOUNT TREND + DEPARTMENT PIE */}
             <div className="grid gap-6 md:grid-cols-12">
-                <Card className="md:col-span-7 shadow-sm">
-                    <CardHeader className="border-b border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 pb-4">
-                        <CardTitle className="text-lg flex items-center justify-between gap-2 text-slate-800 dark:text-slate-100">
-                            <span className="flex items-center gap-2"><TrendingUp className="h-5 w-5 text-indigo-500" /> Headcount Growth</span>
-                            <Badge variant="outline" className="font-normal text-xs bg-white dark:bg-slate-700 dark:border-slate-600 text-slate-500 dark:text-slate-300">{filterYear}</Badge>
+                <Card className="md:col-span-7">
+                    <CardHeader className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40 pb-4">
+                        <CardTitle className="text-sm sm:text-base font-semibold flex items-center justify-between gap-2 text-slate-900 dark:text-slate-100">
+                            <span className="flex items-center gap-2">
+                                <TrendingUp className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+                                <span>Headcount Growth</span>
+                            </span>
+                            <Badge variant="outline" className="font-mono text-xs text-slate-600 dark:text-slate-300">{filterYear}</Badge>
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="pt-6">
                         <div className="h-[220px] w-full" style={{ minWidth: 0, minHeight: '220px' }}>
                             <ResponsiveContainer minWidth={1} minHeight={1} width="100%" height="100%">
                                 <AreaChart data={headcountChartData} margin={{ top: 20, right: 10, left: -20, bottom: 0 }}>
-                                    <defs>
-                                        <linearGradient id="colorHeadcount" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-                                            <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                                        </linearGradient>
-                                    </defs>
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(148,163,184,0.15)" />
                                     <XAxis dataKey="name" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
                                     <YAxis 
@@ -907,7 +915,7 @@ export function Dashboard() {
                                         domain={[0, (dataMax: number) => (dataMax <= 5 ? dataMax + 2 : Math.ceil(dataMax * 1.15))]}
                                     />
                                     <Tooltip content={<CustomHeadcountTooltip />} />
-                                    <Area type="monotone" name="Headcount" dataKey="Headcount" stroke="#10b981" strokeWidth={2} fill="url(#colorHeadcount)">
+                                    <Area type="monotone" name="Headcount" dataKey="Headcount" stroke="#10b981" strokeWidth={1.5} fill="#10b981" fillOpacity={0.06}>
                                         <LabelList dataKey="Headcount" position="top" offset={5} style={{ fontSize: 10, fontWeight: 700, fill: '#10b981' }} />
                                     </Area>
                                 </AreaChart>
@@ -916,10 +924,11 @@ export function Dashboard() {
                     </CardContent>
                 </Card>
 
-                <Card className="md:col-span-5 shadow-sm">
-                    <CardHeader className="border-b border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 pb-4">
-                        <CardTitle className="text-lg flex items-center gap-2 text-slate-800 dark:text-slate-100">
-                            <Briefcase className="h-5 w-5 text-indigo-500" /> Staff by Department
+                <Card className="md:col-span-5">
+                    <CardHeader className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40 pb-4">
+                        <CardTitle className="text-sm sm:text-base font-semibold flex items-center gap-2 text-slate-900 dark:text-slate-100">
+                            <Briefcase className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+                            <span>Staff by Department</span>
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="pt-4">
@@ -943,10 +952,11 @@ export function Dashboard() {
 
             {/* ROW 4: POSITION STAFFING + ACTION CENTER */}
             <div className="grid gap-6 md:grid-cols-12">
-                <Card className="md:col-span-7 shadow-sm">
-                    <CardHeader className="border-b border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 pb-4">
-                        <CardTitle className="text-lg flex items-center gap-2 text-slate-800 dark:text-slate-100">
-                            <Briefcase className="h-5 w-5 text-indigo-500" /> Staff Distribution by Position
+                <Card className="md:col-span-7">
+                    <CardHeader className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40 pb-4">
+                        <CardTitle className="text-sm sm:text-base font-semibold flex items-center gap-2 text-slate-900 dark:text-slate-100">
+                            <Briefcase className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+                            <span>Staff Distribution by Position</span>
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="pt-6">
@@ -958,8 +968,8 @@ export function Dashboard() {
                                         <XAxis type="number" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
                                         <YAxis dataKey="name" type="category" stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} width={100} />
                                         <Tooltip content={<CustomHeadcountTooltip />} />
-                                        <Bar dataKey="count" name="Staff Count" fill="#6366f1" radius={[0, 4, 4, 0]} barSize={18}>
-                                            <LabelList dataKey="count" position="right" style={{ fontSize: 11, fontWeight: 700, fill: '#818cf8' }} />
+                                        <Bar dataKey="count" name="Staff Count" fill="#2563eb" radius={[0, 2, 2, 0]} barSize={16}>
+                                            <LabelList dataKey="count" position="right" style={{ fontSize: 11, fontWeight: 700, fill: '#2563eb' }} />
                                         </Bar>
                                     </BarChart>
                                 </ResponsiveContainer>
@@ -971,9 +981,12 @@ export function Dashboard() {
                 </Card>
 
                 <div className="md:col-span-5 flex flex-col gap-6">
-                    <Card className="flex-1 shadow-sm">
-                        <CardHeader className="bg-slate-50/50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-700 pb-4">
-                            <CardTitle className="text-lg flex items-center gap-2 text-slate-800 dark:text-slate-100"><Clock className="h-5 w-5 text-indigo-500" /> Action Center</CardTitle>
+                    <Card className="flex-1">
+                        <CardHeader className="bg-slate-50/50 dark:bg-slate-900/40 border-b border-slate-200 dark:border-slate-800 pb-4">
+                            <CardTitle className="text-sm sm:text-base font-semibold flex items-center gap-2 text-slate-900 dark:text-slate-100">
+                                <Clock className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+                                <span>Action Center</span>
+                            </CardTitle>
                         </CardHeader>
                         <CardContent className="pt-5 pb-5 flex flex-col gap-4">
                             <div className="space-y-3 pr-2 overflow-y-auto max-h-[280px] custom-scrollbar">

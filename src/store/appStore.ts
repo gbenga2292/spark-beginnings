@@ -757,6 +757,14 @@ export interface Loan {
   rejectionNote?: string;
 }
 
+export interface PaymentAllocation {
+  invoiceId: string;
+  invoiceNumber?: string;
+  amount: number;
+  withholdingTax?: number;
+  discount?: number;
+}
+
 export interface Payment {
   id: string;
   client: string;
@@ -770,6 +778,11 @@ export interface Payment {
   vat?: number;
   amountForVat?: number;
   paidTo?: string;
+  invoiceId?: string;
+  invoiceNumber?: string;
+  reference?: string;
+  allocations?: PaymentAllocation[];
+  unappliedAmount?: number;
 }
 
 export interface VatPayment {
@@ -889,6 +902,7 @@ interface AppState {
 
   dismissedNotifications: string[];
   dismissNotification: (id: string) => void;
+  dismissNotifications: (ids: string[]) => void;
 
   interviewCandidates: InterviewCandidate[];
   addInterviewCandidate: (candidate: InterviewCandidate) => void;
@@ -951,6 +965,9 @@ interface AppState {
   addPayment: (payment: Payment) => void;
   updatePayment: (id: string, payment: Partial<Payment>) => void;
   deletePayment: (id: string) => void;
+  activePaymentModalTarget: { client: string; site: string; invoiceId: string; invoiceNumber: string; amount?: number } | null;
+  openPaymentModalForInvoice: (target: { client: string; site: string; invoiceId: string; invoiceNumber: string; amount?: number }) => void;
+  closePaymentModalTarget: () => void;
   addVatPayment: (payment: VatPayment) => void;
   updateVatPayment: (id: string, payment: Partial<VatPayment>) => void;
   deleteVatPayment: (id: string) => void;
@@ -1496,6 +1513,9 @@ export const useAppStore = create<AppState>()(
       addPayment: (payment) => { set((s) => ({ payments: [...s.payments, payment] })); db.insertPayment(payment); },
       updatePayment: (id, updatedPayment) => { set((s) => ({ payments: s.payments.map(p => p.id === id ? { ...p, ...updatedPayment } : p) })); db.updatePayment(id, updatedPayment); },
       deletePayment: (id) => { set((s) => ({ payments: s.payments.filter(p => p.id !== id) })); db.deletePayment(id); },
+      activePaymentModalTarget: null,
+      openPaymentModalForInvoice: (target) => set({ activePaymentModalTarget: target }),
+      closePaymentModalTarget: () => set({ activePaymentModalTarget: null }),
 
       // VAT Payments
       addVatPayment: (payment) => { set((s) => ({ vatPayments: [...s.vatPayments, payment] })); db.insertVatPayment(payment); },
@@ -1883,6 +1903,11 @@ export const useAppStore = create<AppState>()(
               return { dismissedNotifications: [...s.dismissedNotifications, id] };
           }
           return s;
+      }),
+      dismissNotifications: (ids) => set(s => {
+          const newIds = ids.filter(id => !s.dismissedNotifications.includes(id));
+          if (newIds.length === 0) return s;
+          return { dismissedNotifications: [...s.dismissedNotifications, ...newIds] };
       }),
 
       // Interview Candidates

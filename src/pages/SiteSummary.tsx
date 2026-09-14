@@ -68,7 +68,7 @@ function DepartmentDropdown({
         className={`flex items-center gap-1.5 h-7 px-2.5 rounded-lg border text-[11px] font-semibold transition-all whitespace-nowrap ${
           !isFiltered
             ? 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-white'
-            : 'border-indigo-300 bg-indigo-50 text-indigo-700'
+            : 'border-blue-300 bg-blue-50 text-blue-700'
         }`}
       >
         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-0.5">Dept</span>
@@ -80,12 +80,12 @@ function DepartmentDropdown({
         <div
           ref={panelRef}
           style={{ position: 'fixed', top: pos.top, left: pos.left, zIndex: 9999 }}
-          className="bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 min-w-[180px] max-h-[300px] overflow-y-auto animate-in fade-in slide-in-from-top-1 duration-150"
+          className="bg-white rounded-md shadow-xl border border-slate-200 py-1.5 min-w-[180px] max-h-[300px] overflow-y-auto animate-in fade-in slide-in-from-top-1 duration-150"
         >
           <button 
             type="button" 
             onClick={onSelectAll} 
-            className="w-full text-left px-3 py-1 text-[11px] font-semibold text-indigo-600 hover:bg-indigo-50 transition-colors"
+            className="w-full text-left px-3 py-1 text-[11px] font-semibold text-blue-600 hover:bg-blue-50 transition-colors"
           >
             Select All
           </button>
@@ -102,9 +102,9 @@ function DepartmentDropdown({
                 type="checkbox" 
                 checked={selectedDepts.length === 0 || selectedDepts.includes(dept)} 
                 onChange={() => onToggleDept(dept)} 
-                className="w-3.5 h-3.5 rounded accent-indigo-600 cursor-pointer" 
+                className="w-3.5 h-3.5 rounded accent-blue-600 cursor-pointer" 
               />
-              <span className="text-[11px] font-semibold text-slate-700 group-hover:text-indigo-600 transition-colors">{dept}</span>
+              <span className="text-[11px] font-semibold text-slate-700 group-hover:text-blue-600 transition-colors">{dept}</span>
             </label>
           ))}
         </div>,
@@ -170,7 +170,7 @@ function EmployeeDropdown({
         className={`flex items-center gap-1.5 h-7 px-2.5 rounded-lg border text-[11px] font-semibold transition-all whitespace-nowrap ${
           !isFiltered
             ? 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-white'
-            : 'border-indigo-300 bg-indigo-50 text-indigo-700'
+            : 'border-blue-300 bg-blue-50 text-blue-700'
         }`}
       >
         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-0.5">Emp</span>
@@ -182,7 +182,7 @@ function EmployeeDropdown({
         <div
           ref={panelRef}
           style={{ position: 'fixed', top: pos.top, left: pos.left, zIndex: 9999 }}
-          className="bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 min-w-[220px] w-[260px] max-h-[350px] flex flex-col animate-in fade-in slide-in-from-top-1 duration-150"
+          className="bg-white rounded-md shadow-xl border border-slate-200 py-1.5 min-w-[220px] w-[260px] max-h-[350px] flex flex-col animate-in fade-in slide-in-from-top-1 duration-150"
         >
           <div className="px-3 pb-2 pt-1 border-b border-slate-100 shrink-0">
             <input
@@ -190,14 +190,14 @@ function EmployeeDropdown({
               placeholder="Search employees..."
               value={search}
               onChange={e => setSearch(e.target.value)}
-              className="w-full h-8 px-2.5 rounded-md border border-slate-200 text-[11px] focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              className="w-full h-8 px-2.5 rounded-md border border-slate-200 text-[11px] focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
           </div>
           <div className="overflow-y-auto flex-1 py-1">
             <button 
               type="button" 
               onClick={onSelectAll} 
-              className="w-full text-left px-3 py-1 text-[11px] font-semibold text-indigo-600 hover:bg-indigo-50 transition-colors"
+              className="w-full text-left px-3 py-1 text-[11px] font-semibold text-blue-600 hover:bg-blue-50 transition-colors"
             >
               Select All
             </button>
@@ -214,9 +214,9 @@ function EmployeeDropdown({
                   type="checkbox" 
                   checked={selectedEmployees.length === 0 || selectedEmployees.includes(emp.id)} 
                   onChange={() => onToggleEmployee(emp.id)} 
-                  className="w-3.5 h-3.5 rounded accent-indigo-600 cursor-pointer" 
+                  className="w-3.5 h-3.5 rounded accent-blue-600 cursor-pointer" 
                 />
-                <span className="text-[11px] font-semibold text-slate-700 group-hover:text-indigo-600 transition-colors truncate">{emp.name}</span>
+                <span className="text-[11px] font-semibold text-slate-700 group-hover:text-blue-600 transition-colors truncate">{emp.name}</span>
               </label>
             ))}
           </div>
@@ -764,7 +764,7 @@ export function SiteSummary({ filterYears = [], filterMonths = [] }: { filterYea
       doc.rect(0, 0, pageW, 52, 'F');
 
       // Subtle accent stripe at bottom of banner
-      doc.setFillColor(79, 70, 229); // indigo-600
+      doc.setFillColor(37, 99, 235); // cobalt blue #2563eb
       doc.rect(0, 49, pageW, 3, 'F');
 
       // Logo — give it room: left-aligned in the banner with padding
@@ -783,10 +783,10 @@ export function SiteSummary({ filterYears = [], filterMonths = [] }: { filterYea
       doc.setTextColor(255, 255, 255);
       doc.text('DCEL Office Suite', 62, 22);
 
-      // Report type — indigo accent
+      // Report type — blue accent
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(10);
-      doc.setTextColor(165, 180, 252); // indigo-300
+      doc.setTextColor(147, 197, 253); // blue-300
       doc.text(title, 62, 31);
 
       // Period & Generated — right-aligned in banner
@@ -855,7 +855,7 @@ export function SiteSummary({ filterYears = [], filterMonths = [] }: { filterYea
         head: head,
         body: tableData,
         theme: 'grid',
-        headStyles: { fillColor: [79, 70, 229] }, // Indigo 600
+        headStyles: { fillColor: [37, 99, 235] }, // Cobalt blue
         footStyles: { fillColor: [30, 41, 59] }, // Slate 800
         styles: { fontSize: 8 },
         columnStyles: {
@@ -1056,7 +1056,7 @@ export function SiteSummary({ filterYears = [], filterMonths = [] }: { filterYea
               {results.map((r, idx) => (
                 <TableRow key={idx} className="cursor-pointer hover:bg-slate-50 transition-colors group" onClick={() => setSelectedRowDetails({ client: r.client, name: r.name, staffBreakdown: r.staffBreakdown || [] })}>
                   <TableCell>{idx + 1}</TableCell>
-                  <TableCell className="font-medium text-indigo-900 group-hover:underline">{r.client}</TableCell>
+                  <TableCell className="font-medium text-slate-900 group-hover:underline">{r.client}</TableCell>
                   {!isCollapsed && <TableCell className="group-hover:underline">{r.name}</TableCell>}
                   <TableCell className="text-right font-bold text-slate-700">₦{r.cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
                   <TableCell className="text-right text-slate-600">₦{r.pension.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
@@ -1078,11 +1078,11 @@ export function SiteSummary({ filterYears = [], filterMonths = [] }: { filterYea
               <tfoot>
                 <tr className="bg-slate-50/80 font-bold border-t-2">
                   <td colSpan={isCollapsed ? 2 : 3} className="px-4 py-3 text-right">GRAND TOTAL:</td>
-                  <td className="px-4 py-3 text-right text-indigo-700 text-lg">₦{grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                  <td className="px-4 py-3 text-right text-indigo-700 text-lg">₦{grandPension.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                  <td className="px-4 py-3 text-right text-indigo-700 text-lg">₦{grandPaye.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                  <td className="px-4 py-3 text-right text-indigo-700 text-lg">₦{grandWht.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                  <td className="px-4 py-3 text-right text-indigo-700 text-lg">₦{grandLoanRepayment.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                  <td className="px-4 py-3 text-right text-blue-700 font-mono tabular-nums text-base">₦{grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                  <td className="px-4 py-3 text-right text-blue-700 font-mono tabular-nums text-base">₦{grandPension.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                  <td className="px-4 py-3 text-right text-blue-700 font-mono tabular-nums text-base">₦{grandPaye.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                  <td className="px-4 py-3 text-right text-blue-700 font-mono tabular-nums text-base">₦{grandWht.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                  <td className="px-4 py-3 text-right text-blue-700 font-mono tabular-nums text-base">₦{grandLoanRepayment.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                   <td className="px-4 py-3 text-right text-emerald-700 text-lg font-bold">₦{grandNetPay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                 </tr>
               </tfoot>
@@ -1109,15 +1109,15 @@ export function SiteSummary({ filterYears = [], filterMonths = [] }: { filterYea
                   {/* ── Option 1: Combine ── */}
                   <button
                     onClick={() => setExportSeparate(false)}
-                    className={`flex items-start gap-3 p-4 rounded-xl border text-left transition-all cursor-pointer ${
+                    className={`flex items-start gap-3 p-4 rounded-md border text-left transition-all cursor-pointer ${
                       !exportSeparate
-                        ? 'border-indigo-400 bg-indigo-50/40 ring-1 ring-indigo-300'
-                        : 'border-slate-200 hover:border-indigo-300 hover:bg-slate-50'
+                        ? 'border-blue-400 bg-blue-50/40 ring-1 ring-blue-300'
+                        : 'border-slate-200 hover:border-blue-300 hover:bg-slate-50'
                     }`}
                   >
                     {/* radio dot */}
-                    <span className={`mt-0.5 w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${!exportSeparate ? 'border-indigo-500' : 'border-slate-300'}`}>
-                      {!exportSeparate && <span className="w-2 h-2 rounded-full bg-indigo-500 block" />}
+                    <span className={`mt-0.5 w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${!exportSeparate ? 'border-blue-600' : 'border-slate-300'}`}>
+                      {!exportSeparate && <span className="w-2 h-2 rounded-full bg-blue-600 block" />}
                     </span>
                     <div>
                       <span className="font-bold text-slate-800 text-sm block">Combine all months</span>
@@ -1128,13 +1128,13 @@ export function SiteSummary({ filterYears = [], filterMonths = [] }: { filterYea
                   </button>
 
                   {/* ── Option 2: Separate ── */}
-                  <div className={`rounded-xl border transition-all ${exportSeparate ? 'border-indigo-400 bg-indigo-50/30 ring-1 ring-indigo-300' : 'border-slate-200'}`}>
+                  <div className={`rounded-md border transition-all ${exportSeparate ? 'border-blue-400 bg-blue-50/30 ring-1 ring-blue-300' : 'border-slate-200'}`}>
                     <button
                       onClick={() => setExportSeparate(true)}
                       className="flex items-start gap-3 p-4 w-full text-left cursor-pointer"
                     >
-                      <span className={`mt-0.5 w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${exportSeparate ? 'border-indigo-500' : 'border-slate-300'}`}>
-                        {exportSeparate && <span className="w-2 h-2 rounded-full bg-indigo-500 block" />}
+                      <span className={`mt-0.5 w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${exportSeparate ? 'border-blue-600' : 'border-slate-300'}`}>
+                        {exportSeparate && <span className="w-2 h-2 rounded-full bg-blue-600 block" />}
                       </span>
                       <div>
                         <span className="font-bold text-slate-800 text-sm block">Separate by month</span>
@@ -1149,7 +1149,7 @@ export function SiteSummary({ filterYears = [], filterMonths = [] }: { filterYea
 
               {/* ── Content checkboxes ── */}
               {(exportSeparate || monthsToProcess.length === 1) && (
-                <div className={`px-4 pb-4 pt-1 ${monthsToProcess.length > 1 ? 'border-t border-indigo-100' : ''}`}>
+                <div className={`px-4 pb-4 pt-1 ${monthsToProcess.length > 1 ? 'border-t border-blue-100' : ''}`}>
                   <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-2.5">Include in export:</p>
                   <div className="flex flex-col gap-2.5">
 
@@ -1158,10 +1158,10 @@ export function SiteSummary({ filterYears = [], filterMonths = [] }: { filterYea
                         type="checkbox"
                         checked={exportIncSummary}
                         onChange={e => setExportIncSummary(e.target.checked)}
-                        className="w-4 h-4 rounded accent-indigo-600 cursor-pointer"
+                        className="w-4 h-4 rounded accent-blue-600 cursor-pointer"
                       />
                       <div>
-                        <span className="text-sm font-semibold text-slate-700 group-hover:text-indigo-700 block leading-tight">Summary Table</span>
+                        <span className="text-sm font-semibold text-slate-700 group-hover:text-blue-700 block leading-tight">Summary Table</span>
                         <span className="text-xs text-slate-400">Site / client totals</span>
                       </div>
                     </label>
@@ -1171,10 +1171,10 @@ export function SiteSummary({ filterYears = [], filterMonths = [] }: { filterYea
                         type="checkbox"
                         checked={exportIncBreakdown}
                         onChange={e => setExportIncBreakdown(e.target.checked)}
-                        className="w-4 h-4 rounded accent-indigo-600 cursor-pointer"
+                        className="w-4 h-4 rounded accent-blue-600 cursor-pointer"
                       />
                       <div>
-                        <span className="text-sm font-semibold text-slate-700 group-hover:text-indigo-700 block leading-tight">Employee Breakdown</span>
+                        <span className="text-sm font-semibold text-slate-700 group-hover:text-blue-700 block leading-tight">Employee Breakdown</span>
                         <span className="text-xs text-slate-400">Per-site employee detail {exportMode === 'excel' ? '(separate sheets)' : '(extra pages)'}</span>
                       </div>
                     </label>
@@ -1207,7 +1207,7 @@ export function SiteSummary({ filterYears = [], filterMonths = [] }: { filterYea
                   }
                   setShowExportModal(false);
                 }}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white gap-1.5"
+                className="bg-blue-600 hover:bg-blue-700 text-white gap-1.5"
               >
                 Export →
               </Button>

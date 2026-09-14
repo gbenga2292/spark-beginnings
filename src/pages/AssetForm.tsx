@@ -68,9 +68,9 @@ export function AssetForm({ onClose, assetToEdit }: AssetFormProps) {
   };
 
   /* ── Shared field classes matching Task dialog style ──────────── */
-  const inputCls = "w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all shadow-sm placeholder:text-muted-foreground/50";
-  const selectCls = "w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all shadow-sm appearance-none cursor-pointer";
-  const labelCls = "block text-xs font-semibold text-foreground uppercase tracking-wide mb-1.5";
+  const inputCls = "w-full px-3.5 py-2.5 rounded-md border border-slate-200 dark:border-slate-800 bg-background text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-blue-600 focus:border-blue-600 transition-all placeholder:text-muted-foreground/50";
+  const selectCls = "w-full px-3.5 py-2.5 rounded-md border border-slate-200 dark:border-slate-800 bg-background text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-blue-600 focus:border-blue-600 transition-all appearance-none cursor-pointer";
+  const labelCls = "block text-xs font-semibold text-foreground uppercase tracking-wider mb-1.5";
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 pt-20">
@@ -78,13 +78,13 @@ export function AssetForm({ onClose, assetToEdit }: AssetFormProps) {
         initial={{ opacity: 0, scale: 0.96, y: 8 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         transition={{ duration: 0.18 }}
-        className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-2xl overflow-y-auto max-h-[85vh] flex flex-col"
+        className="bg-card border border-slate-200 dark:border-slate-800 rounded-md shadow-lg w-full max-w-2xl overflow-y-auto max-h-[85vh] flex flex-col"
       >
         {/* ── Header ─────────────────────────────────────────────── */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-gradient-to-r from-primary/5 to-transparent shrink-0">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-muted/30 shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
-              <Package className="w-4.5 h-4.5 text-primary" />
+            <div className="w-9 h-9 rounded-md bg-blue-50 dark:bg-blue-900/30 border border-slate-200 dark:border-slate-800 flex items-center justify-center">
+              <Package className="w-4.5 h-4.5 text-blue-600" />
             </div>
             <div>
               <h2 className="text-base font-semibold text-foreground">
@@ -98,7 +98,7 @@ export function AssetForm({ onClose, assetToEdit }: AssetFormProps) {
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-full hover:bg-muted transition-colors flex-shrink-0"
+            className="p-1.5 rounded-md hover:bg-muted transition-colors flex-shrink-0"
           >
             <X className="w-4 h-4 text-muted-foreground" />
           </button>
@@ -109,10 +109,10 @@ export function AssetForm({ onClose, assetToEdit }: AssetFormProps) {
 
           {/* Asset Information section */}
           <div className="space-y-4">
-            <p className="text-[10px] font-black uppercase tracking-widest text-primary/80 flex items-center gap-2">
-              <span className="h-px flex-1 bg-primary/10" />
+            <p className="text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 flex items-center gap-2">
+              <span className="h-px flex-1 bg-border" />
               Asset Information
-              <span className="h-px flex-1 bg-primary/10" />
+              <span className="h-px flex-1 bg-border" />
             </p>
 
             {/* Name */}
@@ -177,10 +177,10 @@ export function AssetForm({ onClose, assetToEdit }: AssetFormProps) {
 
           {/* Quantities & Classification */}
           <div className="space-y-4">
-            <p className="text-[10px] font-black uppercase tracking-widest text-primary/80 flex items-center gap-2">
-              <span className="h-px flex-1 bg-primary/10" />
+            <p className="text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 flex items-center gap-2">
+              <span className="h-px flex-1 bg-border" />
               Quantities & Classification
-              <span className="h-px flex-1 bg-primary/10" />
+              <span className="h-px flex-1 bg-border" />
             </p>
 
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
@@ -228,7 +228,7 @@ export function AssetForm({ onClose, assetToEdit }: AssetFormProps) {
           </div>
 
           {/* Dual-Unit Packaging & Conversion Configuration */}
-          <div className="border border-border/80 rounded-2xl bg-muted/20 p-4 space-y-3">
+          <div className="border border-slate-200 dark:border-slate-800 rounded-md bg-muted/20 p-4 space-y-3">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs font-bold text-foreground">Packaging & Dual-Unit Conversion</p>
@@ -241,7 +241,7 @@ export function AssetForm({ onClose, assetToEdit }: AssetFormProps) {
                   onChange={e => setEnablePackaging(e.target.checked)}
                   className="sr-only peer"
                 />
-                <div className="w-9 h-5 bg-muted peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
+                <div className="w-9 h-5 bg-muted peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
               </label>
             </div>
 
@@ -274,9 +274,9 @@ export function AssetForm({ onClose, assetToEdit }: AssetFormProps) {
                   />
                 </div>
                 {quantity > 0 && packSize > 1 && (
-                  <div className="sm:col-span-2 bg-primary/5 border border-primary/10 rounded-xl p-2.5 text-xs text-foreground font-medium">
-                    💡 <span className="font-bold">{quantity} {unitOfMeasurement}</span> will display as{' '}
-                    <span className="text-primary font-bold">
+                  <div className="sm:col-span-2 bg-blue-50/50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/50 rounded-md p-2.5 text-xs text-foreground font-medium">
+                    💡 <span className="font-bold font-mono tabular-nums">{quantity} {unitOfMeasurement}</span> will display as{' '}
+                    <span className="text-blue-600 dark:text-blue-400 font-bold font-mono tabular-nums">
                       {Math.floor(quantity / packSize)} {packUnit}s
                       {quantity % packSize > 0 ? ` + ${quantity % packSize} ${unitOfMeasurement}` : ''}
                     </span>
@@ -288,7 +288,7 @@ export function AssetForm({ onClose, assetToEdit }: AssetFormProps) {
 
           {/* Expiry Tracking (for Consumables / Chemicals) */}
           {assetType === 'consumable' && (
-            <div className="border border-border/80 rounded-2xl bg-muted/20 p-4 flex items-center justify-between">
+            <div className="border border-slate-200 dark:border-slate-800 rounded-md bg-muted/20 p-4 flex items-center justify-between">
               <div>
                 <p className="text-xs font-bold text-foreground">FIFO Batch & Expiry Date Tracking</p>
                 <p className="text-[11px] text-muted-foreground">Enforce FIFO depletion and track expiration dates for chemicals, primers, membranes, and cements</p>
@@ -300,7 +300,7 @@ export function AssetForm({ onClose, assetToEdit }: AssetFormProps) {
                   onChange={e => setHasExpiry(e.target.checked)}
                   className="sr-only peer"
                 />
-                <div className="w-9 h-5 bg-muted peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
+                <div className="w-9 h-5 bg-muted peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
               </label>
             </div>
           )}
@@ -337,10 +337,10 @@ export function AssetForm({ onClose, assetToEdit }: AssetFormProps) {
 
           {/* Equipment Details (conditional) */}
           {assetType === 'equipment' && (
-            <div className="border border-border rounded-xl overflow-hidden">
-              <div className="flex items-center gap-2.5 px-4 py-3 bg-muted/50 border-b border-border">
-                <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <Cpu className="h-3.5 w-3.5 text-primary" />
+            <div className="border border-slate-200 dark:border-slate-800 rounded-md overflow-hidden">
+              <div className="flex items-center gap-2.5 px-4 py-3 bg-muted/30 border-b border-slate-200 dark:border-slate-800">
+                <div className="w-7 h-7 rounded-md bg-blue-50 dark:bg-blue-900/30 border border-slate-200 dark:border-slate-800 flex items-center justify-center">
+                  <Cpu className="h-3.5 w-3.5 text-blue-600" />
                 </div>
                 <span className="text-sm font-semibold text-foreground">Equipment Details</span>
               </div>
@@ -408,7 +408,7 @@ export function AssetForm({ onClose, assetToEdit }: AssetFormProps) {
                       <div className="flex items-center justify-between">
                         <label className={labelCls}>Expected Daily Burn (L / 24h Day)</label>
                         {Number(expectedDailyBurn) > 0 && (
-                          <span className="text-[10px] font-bold text-cyan-600 dark:text-cyan-400">
+                          <span className="text-[10px] font-bold font-mono tabular-nums text-cyan-600 dark:text-cyan-400">
                             ~{(Number(expectedDailyBurn) / 24).toFixed(1)} L/hr
                           </span>
                         )}
@@ -437,14 +437,14 @@ export function AssetForm({ onClose, assetToEdit }: AssetFormProps) {
             <button
               type="button"
               onClick={onClose}
-              className="px-5 py-2.5 rounded-xl border border-border bg-card text-sm text-muted-foreground hover:bg-muted transition-colors"
+              className="px-5 py-2.5 rounded-md border border-slate-200 dark:border-slate-800 bg-card text-sm text-muted-foreground hover:bg-muted transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={!name}
-              className="px-5 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
+              className="px-5 py-2.5 rounded-md bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
             >
               <Save className="w-4 h-4" />
               {assetToEdit ? 'Save Changes' : 'Add Asset'}

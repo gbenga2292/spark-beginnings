@@ -9,6 +9,7 @@ import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { isInternalSite } from '../lib/siteUtils';
+import { getWorkspaceAiKey } from '../lib/aiImportService';
 import {
   Activity, Wrench, Package, Building2, MapPin, AlertCircle,
   AlertTriangle, TrendingDown, TrendingUp, ChevronDown, ChevronUp,
@@ -435,16 +436,18 @@ function ReconDialog({ open, onClose, maintenanceAssets, dailyMachineLogs, waybi
 
     // AI
     if (mode === 'hybrid') {
-      const { data: keyRow } = await supabase.from('api_keys').select('key_value,provider').eq('workspace_id', workspaceId).eq('is_default', true).maybeSingle();
-      if (keyRow) {
+      const aiConfig = await getWorkspaceAiKey(workspaceId);
+      if (aiConfig?.apiKey) {
         const prompt = `You are a construction operations assistant. Summary: ${activeSites.length} active sites. ${stalledCount} stalled. ${breachCount} breach risk. ${totalPumpsNeeded} pumps needed in pipeline. Recommendations: ${recs.join(' | ')}. Give a strategic summary and one bold action today.`;
         try {
           let insight = '';
-          if (keyRow.provider === 'gemini') {
-            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${keyRow.key_value}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }) });
+          if (aiConfig.provider === 'gemini') {
+            const modelName = aiConfig.model || 'gemini-2.0-flash';
+            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${aiConfig.apiKey}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }) });
             const d = await res.json(); insight = d?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-          } else if (keyRow.provider === 'groq') {
-            const res = await fetch('https://api.groq.com/openai/v1/chat/completions', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${keyRow.key_value}` }, body: JSON.stringify({ model: 'llama3-8b-8192', messages: [{ role: 'user', content: prompt }], max_tokens: 250 }) });
+          } else if (aiConfig.provider === 'groq') {
+            const modelName = aiConfig.model || 'llama-3.3-70b-versatile';
+            const res = await fetch('https://api.groq.com/openai/v1/chat/completions', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${aiConfig.apiKey}` }, body: JSON.stringify({ model: modelName, messages: [{ role: 'user', content: prompt }], max_tokens: 250 }) });
             const d = await res.json(); insight = d?.choices?.[0]?.message?.content || '';
           }
           if (insight) setAiInsight(insight);
@@ -502,7 +505,7 @@ function ReconDialog({ open, onClose, maintenanceAssets, dailyMachineLogs, waybi
                   <span>{s.progress}%</span>
                 </div>
                 <div className="w-full bg-slate-200 dark:bg-slate-750 rounded-full h-1.5 overflow-hidden">
-                  <div className="bg-indigo-600 h-full rounded-full transition-all duration-500" style={{ width: `${s.progress}%` }} />
+                  <div className="bg-blue-600 h-full rounded-full transition-all duration-500" style={{ width: `${s.progress}%` }} />
                 </div>
               </div>
               <div className="pt-2 border-t border-slate-200/60 dark:border-slate-700/60">
@@ -637,7 +640,7 @@ function ReconDialog({ open, onClose, maintenanceAssets, dailyMachineLogs, waybi
     return (
       <div className="space-y-3 pt-1">
         <p className="text-xs text-slate-655 dark:text-slate-350">
-          We have <span className="font-bold text-indigo-650">{pipelineStats.pendingCount} sites</span> in the onboarding pipeline requiring a total of <span className="font-bold text-indigo-650">{pipelineStats.totalPumpsNeeded} pumps</span>.
+          We have <span className="font-bold text-blue-600">{pipelineStats.pendingCount} sites</span> in the onboarding pipeline requiring a total of <span className="font-bold text-blue-600">{pipelineStats.totalPumpsNeeded} pumps</span>.
         </p>
         <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-3.5 border border-slate-150 flex flex-col md:flex-row gap-4 justify-between items-center">
           <div className="text-center w-full md:w-auto">
@@ -687,7 +690,7 @@ function ReconDialog({ open, onClose, maintenanceAssets, dailyMachineLogs, waybi
         <div className="flex flex-col gap-2">
           {recommendations.map((rec, i) => (
             <div key={i} className="bg-slate-50 dark:bg-slate-805 border border-slate-100 dark:border-slate-750 rounded-xl p-3 flex items-start gap-3">
-              <span className="h-6 w-6 rounded bg-indigo-50 dark:bg-indigo-900/50 flex items-center justify-center text-xs font-bold text-indigo-650 shrink-0 mt-0.5">
+              <span className="h-6 w-6 rounded bg-blue-50 dark:bg-blue-950/40 flex items-center justify-center text-xs font-bold text-blue-600 shrink-0 mt-0.5">
                 {i + 1}
               </span>
               <p className="text-xs text-slate-700 dark:text-slate-300 font-medium leading-normal">{rec}</p>
@@ -702,16 +705,16 @@ function ReconDialog({ open, onClose, maintenanceAssets, dailyMachineLogs, waybi
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4">
-      <div className="bg-white dark:bg-slate-900 w-full sm:max-w-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[95dvh] sm:max-h-[90vh] overflow-hidden">
+      <div className="bg-white dark:bg-slate-900 w-full sm:max-w-2xl sm:rounded-md shadow-2xl flex flex-col max-h-[95dvh] sm:max-h-[90vh] overflow-hidden border border-slate-200 dark:border-slate-800">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-slate-800 bg-gradient-to-r from-indigo-600 to-indigo-500 shrink-0">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-slate-800 bg-blue-600 shrink-0">
           <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-xl bg-white/20 flex items-center justify-center">
+            <div className="h-9 w-9 rounded-md bg-white/20 flex items-center justify-center">
               {mode === 'hybrid' ? <Bot className="h-5 w-5 text-white" /> : <FlaskConical className="h-5 w-5 text-white" />}
             </div>
             <div>
               <p className="font-black text-white text-sm">Machine Recon Analysis</p>
-              <p className="text-indigo-200 text-[10px]">{mode === 'hybrid' ? 'Hybrid AI + Analytic' : 'Analytic Mode'} · All Active Sites</p>
+              <p className="text-blue-100 text-[10px]">{mode === 'hybrid' ? 'Hybrid AI + Analytic' : 'Analytic Mode'} · All Active Sites</p>
             </div>
           </div>
           <button onClick={onClose} className="h-8 w-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors">
@@ -725,13 +728,13 @@ function ReconDialog({ open, onClose, maintenanceAssets, dailyMachineLogs, waybi
             const Icon = phase.icon as any;
             return (
               <div key={phase.id} className={`rounded-xl border transition-all ${
-                phase.status === 'running' ? 'border-indigo-300 bg-indigo-50 dark:border-indigo-800 dark:bg-indigo-950/30' :
+                phase.status === 'running' ? 'border-blue-300 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/30' :
                 phase.status === 'done' ? 'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900' :
                 'border-slate-100 bg-slate-50 dark:border-slate-800 dark:bg-slate-900/50'
               }`}>
                 <div className="flex items-center gap-3 px-4 py-3">
                   <div className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 ${
-                    phase.status === 'running' ? 'bg-indigo-500' :
+                    phase.status === 'running' ? 'bg-blue-500' :
                     phase.status === 'done' && (phase.findings.length > 0 || phase.risks.length > 0) ? 'bg-emerald-500' :
                     phase.status === 'done' ? 'bg-slate-400' : 'bg-slate-200 dark:bg-slate-700'
                   }`}>
@@ -748,7 +751,7 @@ function ReconDialog({ open, onClose, maintenanceAssets, dailyMachineLogs, waybi
                       phase.status === 'pending' ? 'text-slate-400' : 'text-slate-800 dark:text-slate-200'
                     }`}>{phase.label}</p>
                     {phase.status === 'running' && (
-                      <p className="text-[11px] text-indigo-500 animate-pulse">Analysing…</p>
+                      <p className="text-[11px] text-blue-500 animate-pulse">Analysing…</p>
                     )}
                   </div>
                   {phase.status === 'done' && phase.risks.length > 0 && (
@@ -807,7 +810,7 @@ function ReconDialog({ open, onClose, maintenanceAssets, dailyMachineLogs, waybi
             <Button variant="outline" onClick={() => { setPhases([]); setDone(false); setRecommendations([]); setSummary(null); setAiInsight(null); runRecon(); }} className="flex-1 h-10 text-sm font-bold">
               <FlaskConical className="h-4 w-4 mr-2" /> Re-run Analysis
             </Button>
-            <Button onClick={onClose} className="flex-1 h-10 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold">
+            <Button onClick={onClose} className="flex-1 h-10 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold">
               Close
             </Button>
           </div>
@@ -840,7 +843,7 @@ export function MachineReconciliation() {
       {/* Run Recon button */}
       <Button
         onClick={() => setShowRecon(true)}
-        className="h-9 px-4 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold gap-2 shadow-md shadow-indigo-200 w-full sm:w-auto"
+        className="h-9 px-4 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold gap-2 shadow-md  w-full sm:w-auto"
       >
         <FlaskConical className="h-3.5 w-3.5" />
         Run Analytics
@@ -852,7 +855,7 @@ export function MachineReconciliation() {
             type="date" 
             value={filterFrom} 
             onChange={e => setFilterFrom(e.target.value)}
-            className="h-8 text-xs pl-11 pr-1 w-full sm:w-[150px] bg-white border-slate-200 dark:border-slate-800 focus-visible:ring-indigo-500"
+            className="h-8 text-xs pl-11 pr-1 w-full sm:w-[150px] bg-white border-slate-200 dark:border-slate-800 focus-visible:ring-blue-500"
           />
         </div>
         <div className="relative flex-1 sm:flex-initial">
@@ -861,7 +864,7 @@ export function MachineReconciliation() {
             type="date" 
             value={filterTo} 
             onChange={e => setFilterTo(e.target.value)}
-            className="h-8 text-xs pl-8 pr-1 w-full sm:w-[130px] bg-white border-slate-200 dark:border-slate-800 focus-visible:ring-indigo-500"
+            className="h-8 text-xs pl-8 pr-1 w-full sm:w-[130px] bg-white border-slate-200 dark:border-slate-800 focus-visible:ring-blue-500"
           />
         </div>
         {hasDateFilter && (
@@ -1194,7 +1197,7 @@ export function MachineReconciliation() {
   if (!isLoaded) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-slate-500 gap-3">
-        <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
+        <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
         <p className="text-sm font-medium">Reconciling Machine Data...</p>
       </div>
     );
@@ -1216,7 +1219,7 @@ export function MachineReconciliation() {
 
       {/* Active filter banner */}
       {hasDateFilter && (
-        <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-700 text-sm dark:bg-indigo-950/30 dark:border-indigo-800 dark:text-indigo-300">
+        <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-50 border border-blue-200 text-blue-700 text-sm dark:bg-blue-950/30 dark:border-blue-800 dark:text-blue-300">
           <CalendarDays className="h-4 w-4 flex-shrink-0" />
           Showing data for <strong className="mx-1">{fmt(filterFrom)}</strong> → <strong className="mx-1">{fmt(filterTo)}</strong>.
           &nbsp;Expected machines sourced from latest invoice overlapping this period.
@@ -1284,10 +1287,10 @@ export function MachineReconciliation() {
         <Card className="p-0 overflow-hidden">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:p-4 pb-1 sm:pb-2">
             <CardTitle className="text-xs sm:text-sm font-semibold truncate pr-1">Machines Required</CardTitle>
-            <AlertCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-indigo-500 shrink-0" />
+            <AlertCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-500 shrink-0" />
           </CardHeader>
           <CardContent className="p-3 pt-0 sm:p-4 sm:pt-0">
-            <div className="text-lg sm:text-2xl font-bold text-indigo-600 dark:text-indigo-400">{totalRequiredPumps}</div>
+            <div className="text-lg sm:text-2xl font-bold text-blue-600 dark:text-blue-400">{totalRequiredPumps}</div>
             <p className="text-[10px] sm:text-xs text-muted-foreground truncate mt-0.5">For pending sites</p>
           </CardContent>
         </Card>
@@ -1358,7 +1361,7 @@ export function MachineReconciliation() {
           <CardHeader>
             <CardTitle>Active Sites & Machines Onsite</CardTitle>
             {hasDateFilter && (
-              <p className="text-xs text-indigo-600 dark:text-indigo-400 mt-1">
+              <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
                 "In Period" = machines with active logs between {fmt(filterFrom)} – {fmt(filterTo)}
               </p>
             )}
@@ -1411,7 +1414,7 @@ export function MachineReconciliation() {
                         </div>
                         {hasDateFilter && (
                           <div className="col-span-2 border-t border-border/40 pt-1.5 mt-0.5 flex justify-between items-center">
-                            <span className="text-[10px] text-indigo-600 font-bold uppercase">In Period Active</span>
+                            <span className="text-[10px] text-blue-600 font-bold uppercase">In Period Active</span>
                             {site.activeMachinesInPeriod !== undefined ? (
                               <Badge
                                 variant="outline"
@@ -1433,7 +1436,7 @@ export function MachineReconciliation() {
                       </div>
 
                       {site.invoiceNumber && (
-                        <div className="text-[11px] text-indigo-600 dark:text-indigo-400 flex items-center gap-1 font-medium pt-0.5">
+                        <div className="text-[11px] text-blue-600 dark:text-blue-400 flex items-center gap-1 font-medium pt-0.5">
                           <FileText className="h-3 w-3 shrink-0" />
                           Inv {site.invoiceNumber} ({fmt(site.invoiceStart || '')} – {fmt(site.invoiceEnd || '')})
                         </div>
@@ -1452,13 +1455,13 @@ export function MachineReconciliation() {
                         <TableHead>Status</TableHead>
                         <TableHead className="text-right">
                           Expected
-                          {hasDateFilter && <span className="block text-[10px] font-normal text-indigo-500">(Invoice)</span>}
+                          {hasDateFilter && <span className="block text-[10px] font-normal text-blue-500">(Invoice)</span>}
                         </TableHead>
                         <TableHead className="text-right">On Site</TableHead>
                         {hasDateFilter && (
                           <TableHead className="text-right">
                             In Period
-                            <span className="block text-[10px] font-normal text-indigo-500">(Active)</span>
+                            <span className="block text-[10px] font-normal text-blue-500">(Active)</span>
                           </TableHead>
                         )}
                         {hasDateFilter && (
@@ -1526,8 +1529,8 @@ export function MachineReconciliation() {
                             <TableCell className="text-left">
                               {site.invoiceNumber ? (
                                 <div className="text-xs text-slate-500 flex items-center gap-1">
-                                  <FileText className="h-3 w-3 text-indigo-400 flex-shrink-0" />
-                                  <span className="font-medium text-indigo-600">{site.invoiceNumber}</span>
+                                  <FileText className="h-3 w-3 text-blue-400 flex-shrink-0" />
+                                  <span className="font-medium text-blue-600">{site.invoiceNumber}</span>
                                   <span className="text-slate-400 hidden sm:inline">
                                     {fmt(site.invoiceStart || '')}–{fmt(site.invoiceEnd || '')}
                                   </span>
@@ -1563,7 +1566,7 @@ export function MachineReconciliation() {
                         <p className="text-xs text-muted-foreground">{site.client}</p>
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">
-                        <Badge variant="outline" className="font-bold border-indigo-200 text-indigo-700 bg-indigo-50 text-[10px]" title="Onboarding Pumps Required">
+                        <Badge variant="outline" className="font-bold border-blue-200 text-blue-700 bg-blue-50 text-[10px]" title="Onboarding Pumps Required">
                           {site.pumpsRequired} Req
                         </Badge>
                         {site.pumpsInvoice !== null && (
@@ -1593,7 +1596,7 @@ export function MachineReconciliation() {
                           <TableCell className="font-medium">{site.siteName}</TableCell>
                           <TableCell>{site.client}</TableCell>
                           <TableCell className="text-right">
-                            <Badge variant="outline" className="font-bold border-indigo-200 text-indigo-700 bg-indigo-50">
+                            <Badge variant="outline" className="font-bold border-blue-200 text-blue-700 bg-blue-50">
                               {site.pumpsRequired}
                             </Badge>
                           </TableCell>
@@ -1625,10 +1628,10 @@ export function MachineReconciliation() {
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
             <div>
               <CardTitle className="flex items-center gap-2 text-base">
-                <CalendarDays className="h-5 w-5 text-indigo-500 shrink-0" />
+                <CalendarDays className="h-5 w-5 text-blue-500 shrink-0" />
                 Machine Active Days by Site
                 {hasDateFilter && (
-                  <Badge className="bg-indigo-100 text-indigo-700 border border-indigo-200 ml-2 text-xs">
+                  <Badge className="bg-blue-100 text-blue-700 border border-blue-200 ml-2 text-xs">
                     {fmt(filterFrom)} – {fmt(filterTo)}
                   </Badge>
                 )}
@@ -1668,7 +1671,7 @@ export function MachineReconciliation() {
                     <div
                       key={machine.id}
                       className={`rounded-xl border transition-all overflow-hidden bg-card ${
-                        isExpanded ? 'border-indigo-300 dark:border-indigo-800 shadow-xs' : 'border-border/80'
+                        isExpanded ? 'border-blue-300 dark:border-blue-800 shadow-xs' : 'border-border/80'
                       }`}
                     >
                       <div
@@ -1688,16 +1691,16 @@ export function MachineReconciliation() {
                         </div>
 
                         {hasSiteHistory && (
-                          <button className="p-1 rounded-md text-slate-400 hover:text-indigo-600 shrink-0 mt-0.5">
-                            {isExpanded ? <ChevronUp className="h-4 w-4 text-indigo-500" /> : <ChevronDown className="h-4 w-4" />}
+                          <button className="p-1 rounded-md text-slate-400 hover:text-blue-600 shrink-0 mt-0.5">
+                            {isExpanded ? <ChevronUp className="h-4 w-4 text-blue-500" /> : <ChevronDown className="h-4 w-4" />}
                           </button>
                         )}
                       </div>
 
                       {/* Mobile Expanded Site Breakdown */}
                       {isExpanded && siteHistory.length > 0 && (
-                        <div className="border-t border-indigo-100 dark:border-indigo-900/60 bg-indigo-50/40 dark:bg-indigo-950/20 p-3 space-y-2.5">
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-800 dark:text-indigo-300 block">
+                        <div className="border-t border-blue-100 dark:border-blue-900/60 bg-blue-50/40 dark:bg-blue-950/20 p-3 space-y-2.5">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-blue-800 dark:text-blue-300 block">
                             Site Deployment History ({siteHistory.length} Visited)
                           </span>
                           <div className="space-y-2">
@@ -1769,7 +1772,7 @@ export function MachineReconciliation() {
                           {/* Main machine row */}
                           <TableRow
                             className={`cursor-pointer transition-colors ${isExpanded
-                              ? 'bg-indigo-50/60 dark:bg-indigo-950/20'
+                              ? 'bg-blue-50/60 dark:bg-blue-950/20'
                               : 'hover:bg-slate-50 dark:hover:bg-slate-900/50'
                               }`}
                             onClick={() => hasSiteHistory && toggleExpand(machine.id)}
@@ -1777,7 +1780,7 @@ export function MachineReconciliation() {
                             <TableCell className="text-center">
                               {hasSiteHistory ? (
                                 isExpanded
-                                  ? <ChevronUp className="h-4 w-4 text-indigo-500 mx-auto" />
+                                  ? <ChevronUp className="h-4 w-4 text-blue-500 mx-auto" />
                                   : <ChevronDown className="h-4 w-4 text-slate-400 mx-auto" />
                               ) : (
                                 <span className="text-slate-300 text-xs mx-auto block text-center">—</span>
@@ -1804,12 +1807,12 @@ export function MachineReconciliation() {
 
                           {/* Expanded: per-site breakdown */}
                           {isExpanded && siteHistory.length > 0 && (
-                            <TableRow className="bg-indigo-50/40 dark:bg-indigo-950/10">
+                            <TableRow className="bg-blue-50/40 dark:bg-blue-950/10">
                               <TableCell colSpan={7} className="p-0">
-                                <div className="mx-6 my-3 rounded-lg border border-indigo-200 dark:border-indigo-800 overflow-hidden">
+                                <div className="mx-6 my-3 rounded-lg border border-blue-200 dark:border-blue-800 overflow-hidden">
                                   <table className="w-full text-sm">
                                     <thead>
-                                      <tr className="bg-indigo-100/70 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-300">
+                                      <tr className="bg-blue-100/70 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300">
                                         <th className="text-left px-4 py-2 font-medium">Site</th>
                                         <th className="text-left px-4 py-2 font-medium">Period</th>
                                         <th className="text-right px-4 py-2 font-medium">Days Logged</th>
@@ -1826,7 +1829,7 @@ export function MachineReconciliation() {
                                         return (
                                           <tr
                                             key={idx}
-                                            className={`border-t border-indigo-100 dark:border-indigo-900 ${sh.isCurrent ? 'bg-emerald-50/60 dark:bg-emerald-950/20' : ''
+                                            className={`border-t border-blue-100 dark:border-blue-900 ${sh.isCurrent ? 'bg-emerald-50/60 dark:bg-emerald-950/20' : ''
                                               }`}
                                           >
                                             <td className="px-4 py-2.5 font-medium text-slate-800 dark:text-slate-200">

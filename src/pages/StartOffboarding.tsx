@@ -120,7 +120,7 @@ export function StartOffboarding() {
       </div>
 
       <Card className="border-none shadow-xl ring-1 ring-black/5 bg-white relative overflow-hidden animate-in slide-in-from-bottom-4 fade-in duration-500">
-        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-600 to-rose-400"></div>
+        <div className="absolute top-0 left-0 w-full h-1 bg-rose-600"></div>
         <CardContent className="p-8">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6 mb-6">
             <div className="space-y-2">

@@ -34,7 +34,7 @@ const PRIV_GROUPS: PG[] = [
     ]
   },
   {
-    name: 'Client 360', icon: Sparkles, color: 'indigo',
+    name: 'Client 360', icon: Sparkles, color: 'blue',
     pages: [
       { key: 'clients', label: 'Clients Directory', parentKey: 'clients', masterField: 'canView',
         fields: [
@@ -255,7 +255,7 @@ const PRIV_GROUPS: PG[] = [
     ],
   },
   {
-    name: 'AI Co-Pilot', icon: Bot, color: 'indigo',
+    name: 'AI Co-Pilot', icon: Bot, color: 'blue',
     pages: [
       { key: 'aiCopilot', label: 'Spark AI Assistant', parentKey: 'aiCopilot', masterField: 'canAccess',
         fields: [
@@ -266,11 +266,10 @@ const PRIV_GROUPS: PG[] = [
 ];
 
 const COLORS: Record<string, { bg: string; text: string; border: string; badge: string }> = {
-  indigo:  { bg: 'bg-indigo-50',  text: 'text-indigo-700',  border: 'border-indigo-200',  badge: 'bg-indigo-100 text-indigo-700' },
+  blue:    { bg: 'bg-blue-50',    text: 'text-blue-700',    border: 'border-blue-200',    badge: 'bg-blue-50 text-blue-700 border border-blue-200' },
   teal:    { bg: 'bg-teal-50',    text: 'text-teal-700',    border: 'border-teal-200',    badge: 'bg-teal-100 text-teal-700' },
   amber:   { bg: 'bg-amber-50',   text: 'text-amber-700',   border: 'border-amber-200',   badge: 'bg-amber-100 text-amber-700' },
   emerald: { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', badge: 'bg-emerald-100 text-emerald-700' },
-  blue:    { bg: 'bg-blue-50',    text: 'text-blue-700',    border: 'border-blue-200',    badge: 'bg-blue-100 text-blue-700' },
   orange:  { bg: 'bg-orange-50',  text: 'text-orange-700',  border: 'border-orange-200',  badge: 'bg-orange-100 text-orange-700' },
   slate:   { bg: 'bg-slate-100',  text: 'text-slate-700',   border: 'border-slate-300',   badge: 'bg-slate-200 text-slate-700' },
 };
@@ -288,7 +287,7 @@ function Sw({ on, set, disabled, size = 'md' }: { on: boolean; set: (v: boolean)
   const t = size === 'sm' ? 'translate-x-3' : 'translate-x-4';
   return (
     <button type="button" onClick={() => !disabled && set(!on)}
-      className={`relative inline-flex ${h} shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none ${on ? 'bg-indigo-600' : 'bg-slate-300'} ${disabled ? 'opacity-40 cursor-not-allowed' : ''}`}>
+      className={`relative inline-flex ${h} shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none ${on ? 'bg-blue-600' : 'bg-slate-300'} ${disabled ? 'opacity-40 cursor-not-allowed' : ''}`}>
       <span className={`pointer-events-none inline-block ${dot} rounded-full bg-white shadow transition ${on ? t : 'translate-x-0'}`} />
     </button>
   );
@@ -450,7 +449,7 @@ export function UserForm() {
     isEdit ? `Modifying ${editingUser?.name || 'user details'}` : 'Assign system permissions',
     <div className="flex items-center gap-2">
       <Button variant="outline" onClick={() => navigate('/users')} className="h-8 text-xs">Cancel</Button>
-      <Button disabled={isSaving} onClick={handleSave} className="h-8 text-xs bg-indigo-600 hover:bg-indigo-700 text-white gap-1.5 shadow-sm">
+      <Button disabled={isSaving} onClick={handleSave} className="h-8 text-xs bg-blue-600 hover:bg-blue-700 text-white gap-1.5 rounded-sm">
         <Save className="h-3 w-3" /> {isEdit ? 'Save Changes' : (isSaving ? 'Creating...' : 'Create User')}
       </Button>
     </div>
@@ -466,7 +465,7 @@ export function UserForm() {
     <div className="max-w-4xl mx-auto pb-8 pt-2">
 
       {/* User Details Card */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 mb-6">
+      <div className="bg-white rounded-md border border-slate-200 p-6 mb-6">
         <h2 className="text-sm font-bold text-slate-700 uppercase tracking-wider mb-4">User Details</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
@@ -481,7 +480,7 @@ export function UserForm() {
                   setEmail(emp.email);
                 }
               }}
-              className="flex w-full h-9 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo-500"
+              className="flex w-full h-9 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-blue-500"
             >
               <option value="" disabled>Select Employee...</option>
               {employees
@@ -518,7 +517,7 @@ export function UserForm() {
                   {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
-              <div className="flex items-center gap-2 border border-slate-200 rounded-lg px-3 py-1.5 bg-slate-50 min-w-max">
+              <div className="flex items-center gap-2 border border-slate-200 rounded-sm px-3 py-1.5 bg-slate-50 min-w-max">
                 <Sw on={isActive} set={setIsActive} size="sm" />
                 <span className="text-xs font-semibold text-slate-700">{isActive ? 'Account Active' : 'Account Disabled'}</span>
               </div>
@@ -528,13 +527,13 @@ export function UserForm() {
       </div>
 
       {/* Presets Strip */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 mb-6">
+      <div className="bg-white rounded-md border border-slate-200 p-4 mb-6">
         <div className="flex items-center justify-between mb-3">
           <span className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-            <Shield className="h-3.5 w-3.5 text-indigo-500" /> Quick Presets
+            <Shield className="h-3.5 w-3.5 text-blue-600" /> Quick Presets
           </span>
           <div className="flex items-center gap-3">
-            <button onClick={() => setShowPresetSave(!showPresetSave)} className="text-xs text-indigo-600 hover:underline flex items-center gap-1">
+            <button onClick={() => setShowPresetSave(!showPresetSave)} className="text-xs text-blue-600 hover:underline flex items-center gap-1">
               <BookmarkPlus className="h-3.5 w-3.5" /> Save Current
             </button>
             <span className="text-slate-200">|</span>
@@ -550,13 +549,13 @@ export function UserForm() {
           {presets.map((p) => (
             <div key={p.id} className="group relative flex items-center">
               <button onClick={() => setPrivileges(JSON.parse(JSON.stringify(p.privileges)))}
-                className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 bg-slate-50 text-slate-600 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-300 transition-all shadow-sm">
+                className="px-3 py-1.5 text-xs font-semibold rounded-sm border border-slate-200 bg-slate-50 text-slate-600 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 transition-all rounded-sm">
                 {p.name}
               </button>
               {!p.id.startsWith('preset-') && (
                 <button 
                   onClick={(e) => { e.stopPropagation(); deletePreset(p.id); toast.success('Preset deleted'); }}
-                  className="absolute -top-1.5 -right-1.5 h-4 w-4 bg-red-100 text-red-600 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500 hover:text-white shadow-sm"
+                  className="absolute -top-1.5 -right-1.5 h-4 w-4 bg-red-100 text-red-600 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500 hover:text-white"
                 >
                   <X className="h-2.5 w-2.5" />
                 </button>
@@ -567,7 +566,7 @@ export function UserForm() {
         {showPresetSave && (
           <div className="flex gap-2 mt-3 max-w-sm">
             <Input value={presetName} onChange={(e) => setPresetName(e.target.value)} placeholder="Preset name..." className="h-8 text-xs flex-1" />
-            <Button onClick={handleSavePreset} className="h-8 text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-3 gap-1">
+            <Button onClick={handleSavePreset} className="h-8 text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 gap-1 rounded-sm">
               <Save className="h-3 w-3" /> Save
             </Button>
           </div>
@@ -595,7 +594,7 @@ export function UserForm() {
           });
 
           return (
-            <div key={group.name} className={`rounded-xl border ${isOn ? C.border : 'border-slate-200'} bg-white shadow-sm overflow-hidden transition-colors`}>
+            <div key={group.name} className={`rounded-md border ${isOn ? C.border : 'border-slate-200'} bg-white  overflow-hidden transition-colors`}>
               {/* Group header */}
               <div className={`flex items-center gap-3 px-4 py-3 ${isOn ? C.bg : 'bg-slate-50/80'} transition-colors`}>
                 <Sw on={isOn} set={(v) => toggleGroupAccess(group, v)} />
@@ -651,7 +650,7 @@ export function UserForm() {
                           <button onClick={() => togglePage(page.key)} className="flex-1 text-left">
                             <span className={`text-sm font-medium ${master ? 'text-slate-800' : 'text-slate-400'}`}>{page.label}</span>
                           </button>
-                          <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${pChecked === pTotal && pTotal > 0 ? 'bg-emerald-100 text-emerald-700' : pChecked > 0 ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-400'}`}>
+                          <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${pChecked === pTotal && pTotal > 0 ? 'bg-emerald-100 text-emerald-700' : pChecked > 0 ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'bg-slate-100 text-slate-400'}`}>
                             {pChecked}/{pTotal}
                           </span>
                         </div>
@@ -666,7 +665,7 @@ export function UserForm() {
                                 <label key={f.key} className={`flex items-center gap-2 text-xs cursor-pointer select-none ${dis ? 'opacity-40 cursor-not-allowed' : ''}`}>
                                   <input type="checkbox" checked={checked} disabled={dis}
                                     onChange={(e) => setField(page.parentKey, f.key, e.target.checked)}
-                                    className={`h-3.5 w-3.5 rounded border-slate-300 focus:ring-indigo-500 ${f.danger ? 'accent-amber-600' : f.special ? 'accent-emerald-600' : 'accent-indigo-600'}`} />
+                                    className={`h-3.5 w-3.5 rounded border-slate-300 focus:ring-blue-500 ${f.danger ? 'accent-amber-600' : f.special ? 'accent-emerald-600' : 'accent-blue-600'}`} />
                                   <span className={`font-medium ${f.danger ? 'text-amber-700' : f.special ? 'text-emerald-700' : 'text-slate-700'}`}>{f.label}</span>
                                 </label>
                               );
@@ -684,13 +683,13 @@ export function UserForm() {
       </div>
 
       {/* Sticky bottom bar */}
-      <div className="sticky bottom-0 mt-6 -mx-2 px-2 py-4 bg-gradient-to-t from-slate-100 via-slate-100/95 to-transparent flex items-center justify-between rounded-b-xl">
+      <div className="sticky bottom-0 mt-6 -mx-2 px-2 py-4 bg-slate-100/95 backdrop-blur-sm border-t border-slate-200 flex items-center justify-between rounded-b-md">
         <span className="text-xs text-slate-500">
           <strong className="text-slate-700">{totalG}/{totalT}</strong> permissions
         </span>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => navigate('/users')} className="h-9 text-sm">Cancel</Button>
-          <Button disabled={isSaving} onClick={handleSave} className="h-9 text-sm bg-indigo-600 hover:bg-indigo-700 text-white gap-1.5">
+          <Button disabled={isSaving} onClick={handleSave} className="h-9 text-sm bg-blue-600 hover:bg-blue-700 text-white gap-1.5 rounded-sm">
             <Save className="h-3.5 w-3.5" /> {isEdit ? 'Save Changes' : (isSaving ? 'Creating...' : 'Create User')}
           </Button>
         </div>

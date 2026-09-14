@@ -113,8 +113,8 @@ export function Layout() {
         <div className="flex-1 relative overflow-hidden">
           <main 
             ref={mainRef}
-            className={`h-full overflow-y-auto w-full ${
-              isHomePage ? '' : 'pt-4 px-2 pb-4 md:pt-4 md:px-6 md:pb-6'
+            className={`h-full w-full ${
+              isHomePage ? 'overflow-hidden' : 'overflow-y-auto pt-4 px-2 pb-4 md:pt-4 md:px-6 md:pb-6'
             } ${isDark ? 'bg-slate-950' : 'bg-slate-50'}`}
           >
             <Outlet />

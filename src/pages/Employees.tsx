@@ -824,7 +824,7 @@ export function Employees() {
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start">
         {/* --- LEFT COLUMN: Primary Details --- */}
         <div className="xl:col-span-2 flex flex-col gap-6">
-          <Card className="shadow-sm border-slate-200">
+          <Card className=" border-slate-200">
             <CardHeader className="bg-slate-50/50 rounded-t-xl border-b border-slate-100">
               <CardTitle className="text-slate-800">Personal & Job Parameters</CardTitle>
             </CardHeader>
@@ -844,7 +844,7 @@ export function Employees() {
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Position</label>
-                  <select className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-indigo-500/20 outline-none" 
+                  <select className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-blue-500/20 outline-none" 
                     value={formData.position || ''} 
                     onChange={e => {
                       const newPos = e.target.value;
@@ -879,7 +879,7 @@ export function Employees() {
                     {departments
                       .filter(d => d.name !== formData.department && d.staffType !== 'NON-EMPLOYEE')
                       .map(dept => (
-                      <label key={dept.id} className="flex items-center gap-2 bg-white dark:bg-slate-800 dark:text-slate-200 px-2 py-1 rounded border border-slate-200 dark:border-slate-700 text-xs font-semibold cursor-pointer hover:bg-indigo-50 transition-colors">
+                      <label key={dept.id} className="flex items-center gap-2 bg-white dark:bg-slate-800 dark:text-slate-200 px-2 py-1 rounded border border-slate-200 dark:border-slate-700 text-xs font-semibold cursor-pointer hover:bg-blue-50 transition-colors">
                         <input 
                           type="checkbox" 
                           checked={formData.secondaryDepartments?.includes(dept.name) || false} 
@@ -888,7 +888,7 @@ export function Employees() {
                             const next = e.target.checked ? [...current, dept.name] : current.filter(n => n !== dept.name);
                             setFormData({ ...formData, secondaryDepartments: next });
                           }}
-                          className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-600 h-3.5 w-3.5"
+                          className="rounded border-slate-300 text-blue-600 focus:ring-blue-600 h-3.5 w-3.5"
                         />
                         {dept.name}
                       </label>
@@ -901,7 +901,7 @@ export function Employees() {
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Staff Type</label>
                   <select 
-                    className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-indigo-500/20 outline-none" 
+                    className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-blue-500/20 outline-none" 
                     value={formData.staffType || 'OFFICE'} 
                     onChange={e => setFormData({ ...formData, staffType: e.target.value as any })}
                   >
@@ -913,7 +913,7 @@ export function Employees() {
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Employee Level</label>
                   <select 
-                    className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-indigo-500/20 outline-none" 
+                    className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-blue-500/20 outline-none" 
                     value={formData.level || 10} 
                     onChange={e => setFormData({ ...formData, level: parseInt(e.target.value) })}
                   >
@@ -926,7 +926,7 @@ export function Employees() {
                   <div className="space-y-2">
                     <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Line Manager</label>
                     <select 
-                      className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-indigo-500/20 outline-none" 
+                      className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-blue-500/20 outline-none" 
                       value={formData.lineManager || ''} 
                       onChange={e => setFormData({ ...formData, lineManager: e.target.value || undefined })}
                     >
@@ -950,7 +950,7 @@ export function Employees() {
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Status</label>
                   <select 
-                    className={`flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-indigo-500/20 outline-none ${normalizeDate(formData.endDate) ? 'opacity-70 cursor-not-allowed' : ''}`} 
+                    className={`flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-blue-500/20 outline-none ${normalizeDate(formData.endDate) ? 'opacity-70 cursor-not-allowed' : ''}`} 
                     value={formData.status} 
                     onChange={e => {
                       const newStatus = e.target.value;
@@ -984,13 +984,13 @@ export function Employees() {
           </Card>
 
           {canSeeSalary && (
-            <Card className="shadow-sm border-slate-200">
+            <Card className=" border-slate-200">
               <CardHeader className="bg-slate-50/50 rounded-t-xl border-b border-slate-100 flex flex-row items-center justify-between">
                 <div>
                   <CardTitle className="text-slate-800">Monthly Salary Matrix (₦)</CardTitle>
                   <CardDescription className="mt-1">Define gross monthly salary dynamically. Subject to revision.</CardDescription>
                 </div>
-                <Button variant="outline" size="sm" className="bg-white dark:bg-slate-800 dark:text-slate-200 shadow-sm" onClick={() => {
+                <Button variant="outline" size="sm" className="bg-white dark:bg-slate-800 dark:text-slate-200 " onClick={() => {
                   const janVal = formData.monthlySalaries?.jan || 0;
                   setFormData({
                     ...formData,
@@ -1023,20 +1023,20 @@ export function Employees() {
 
         {/* --- RIGHT COLUMN: Secondary Details --- */}
         <div className="xl:col-span-1 flex flex-col gap-6">
-          <Card className="shadow-sm border-slate-200">
+          <Card className=" border-slate-200">
             <CardHeader className="bg-slate-50/50 rounded-t-xl border-b border-slate-100">
               <CardTitle className="text-slate-800 text-center">Profile Image</CardTitle>
             </CardHeader>
             <CardContent className="pt-6 flex flex-col items-center">
-              <Avatar className="h-32 w-32 border-4 border-white shadow-md mb-4 bg-slate-100">
-                <AvatarFallback className="bg-indigo-50 text-indigo-700 font-bold text-4xl">
+              <Avatar className="h-32 w-32 border-4 border-white  mb-4 bg-slate-100">
+                <AvatarFallback className="bg-slate-100 text-slate-800 border border-slate-200 font-bold text-4xl">
                   {formData.firstname?.charAt(0) || ''}{formData.surname?.charAt(0) || ''}
                 </AvatarFallback>
                 {formData.avatar && <AvatarImage src={formData.avatar} alt="Avatar" className="object-cover" />}
               </Avatar>
               <div className="flex gap-2 w-full justify-center">
                 <label className="cursor-pointer">
-                  <span className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 shadow-sm h-9 px-4 py-2">
+                  <span className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200  h-9 px-4 py-2">
                     <Upload className="h-4 w-4 mr-2 text-slate-500" /> Upload Image
                   </span>
                   <input type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
@@ -1050,7 +1050,7 @@ export function Employees() {
             </CardContent>
           </Card>
 
-          <Card className="shadow-sm border-slate-200">
+          <Card className=" border-slate-200">
             <CardHeader className="bg-slate-50/50 rounded-t-xl border-b border-slate-100 flex flex-row items-center justify-between">
               <CardTitle className="text-slate-800">Guarantors</CardTitle>
               <Button 
@@ -1074,7 +1074,7 @@ export function Employees() {
               ) : (
                 <div className="space-y-4">
                   {(formData.onboardingChecklist?.guarantors || []).map((g, idx) => (
-                    <div key={idx} className="p-3 bg-slate-50 rounded-xl border border-slate-100 relative group/g">
+                    <div key={idx} className="p-3 bg-slate-50 rounded-md border border-slate-100 relative group/g">
                       <button 
                         className="absolute top-2 right-2 text-slate-300 hover:text-rose-500 transition-colors"
                         onClick={() => {
@@ -1124,7 +1124,7 @@ export function Employees() {
                                next[idx] = { ...next[idx], verified: e.target.checked };
                                setFormData({ ...formData, onboardingChecklist: { ...cl, guarantors: next } as any });
                              }}
-                             className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-600 h-3.5 w-3.5"
+                             className="rounded border-slate-300 text-blue-600 focus:ring-blue-600 h-3.5 w-3.5"
                            />
                            <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wide">Identity Verified</span>
                         </label>
@@ -1136,7 +1136,7 @@ export function Employees() {
             </CardContent>
           </Card>
 
-          <Card className="shadow-sm border-slate-200">
+          <Card className=" border-slate-200">
             <CardHeader className="bg-slate-50/50 rounded-t-xl border-b border-slate-100">
               <CardTitle className="text-slate-800">Financial Setup</CardTitle>
             </CardHeader>
@@ -1185,28 +1185,28 @@ export function Employees() {
 
               <div className="pt-4 border-t border-slate-100 space-y-3">
                 <label className="flex items-center gap-3 text-sm font-medium cursor-pointer p-2 rounded-lg hover:bg-slate-50 transition-colors">
-                  <input type="checkbox" checked={formData.payeTax} onChange={e => setFormData({ ...formData, payeTax: e.target.checked })} className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-600 h-4 w-4" />
+                  <input type="checkbox" checked={formData.payeTax} onChange={e => setFormData({ ...formData, payeTax: e.target.checked })} className="rounded border-slate-300 text-blue-600 focus:ring-blue-600 h-4 w-4" />
                   Subject to PAYE Tax
                 </label>
                 <label className="flex items-center gap-3 text-sm font-medium cursor-pointer p-2 rounded-lg hover:bg-slate-50 transition-colors">
-                  <input type="checkbox" checked={formData.subjectToPension !== undefined ? formData.subjectToPension : formData.payeTax} onChange={e => setFormData({ ...formData, subjectToPension: e.target.checked })} className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-600 h-4 w-4" />
+                  <input type="checkbox" checked={formData.subjectToPension !== undefined ? formData.subjectToPension : formData.payeTax} onChange={e => setFormData({ ...formData, subjectToPension: e.target.checked })} className="rounded border-slate-300 text-blue-600 focus:ring-blue-600 h-4 w-4" />
                   Subject to Pension
                 </label>
                 <label className="flex items-center gap-3 text-sm font-medium cursor-pointer p-2 rounded-lg hover:bg-slate-50 transition-colors">
-                  <input type="checkbox" checked={formData.withholdingTax} onChange={e => setFormData({ ...formData, withholdingTax: e.target.checked })} className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-600 h-4 w-4" />
+                  <input type="checkbox" checked={formData.withholdingTax} onChange={e => setFormData({ ...formData, withholdingTax: e.target.checked })} className="rounded border-slate-300 text-blue-600 focus:ring-blue-600 h-4 w-4" />
                   Subject to Withholding Tax
                 </label>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="shadow-sm border-slate-200 border-t-4 border-t-indigo-500">
+          <Card className=" border-slate-200 border-t-4 border-t-blue-600">
             <CardHeader className="bg-slate-50/50 rounded-t-xl border-b border-slate-100">
               <CardTitle className="text-slate-800">System Preferences</CardTitle>
             </CardHeader>
             <CardContent className="pt-6">
               <label className="flex items-start gap-3 text-sm font-medium cursor-pointer p-3 rounded-lg border border-slate-100 bg-slate-50 hover:bg-slate-100 transition-colors">
-                <input type="checkbox" id="excludeFromOnboarding" checked={formData.excludeFromOnboarding || false} onChange={e => setFormData({ ...formData, excludeFromOnboarding: e.target.checked })} className="mt-1 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600 h-4 w-4 shrink-0" />
+                <input type="checkbox" id="excludeFromOnboarding" checked={formData.excludeFromOnboarding || false} onChange={e => setFormData({ ...formData, excludeFromOnboarding: e.target.checked })} className="mt-1 rounded border-slate-300 text-blue-600 focus:ring-blue-600 h-4 w-4 shrink-0" />
                 <span className="text-slate-700 leading-snug">
                   Exclude from Onboarding & Offboarding workflows
                   <span className="block text-xs text-slate-500 font-normal mt-0.5">Useful for Management, Directors, or Owners.</span>
@@ -1228,9 +1228,9 @@ export function Employees() {
     return (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
         <div className="bg-white dark:bg-slate-900 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-          <div className="sticky top-0 z-20 bg-indigo-600 p-4 flex justify-between items-center rounded-t-lg">
+          <div className="sticky top-0 z-20 bg-slate-900 p-4 flex justify-between items-center rounded-t-md">
             <h3 className="text-white font-bold text-lg">Employee Details</h3>
-            <Button variant="ghost" size="sm" className="text-white hover:bg-indigo-700" onClick={closeViewModal}>
+            <Button variant="ghost" size="sm" className="text-white hover:bg-blue-700" onClick={closeViewModal}>
               <X className="h-5 w-5" />
             </Button>
           </div>
@@ -1238,7 +1238,7 @@ export function Employees() {
           <div className="p-6">
             <div className="flex items-center gap-4 mb-6">
               <Avatar className="h-16 w-16">
-                <AvatarFallback className="bg-indigo-100 text-indigo-700 font-bold text-xl">
+                <AvatarFallback className="bg-slate-100 text-slate-800 border border-slate-200 font-bold text-xl">
                   {emp.firstname.charAt(0)}{emp.surname.charAt(0)}
                 </AvatarFallback>
                 {emp.avatar && <AvatarImage src={emp.avatar} alt="Avatar" className="object-cover" />}
@@ -1248,7 +1248,7 @@ export function Employees() {
                 <p className="text-slate-500">
                   {emp.position} - {emp.department}
                   {emp.secondaryDepartments && emp.secondaryDepartments.length > 0 && (
-                    <span className="text-indigo-500 font-medium ml-1">
+                    <span className="text-blue-600 font-medium ml-1">
                       (Dual: {emp.secondaryDepartments.join(', ')})
                     </span>
                   )}
@@ -1264,7 +1264,7 @@ export function Employees() {
                 {['Overview', 'Attendance', 'Leaves', 'Conduct', 'Evaluations', 'Reminders'].map(tab => (
                   <button
                     key={tab}
-                    className={`flex-1 py-1.5 px-3 text-xs font-semibold rounded-md transition-all ${detailTab === tab ? 'bg-white dark:bg-slate-900 dark:bg-slate-900 dark:bg-slate-700 text-indigo-700 dark:text-indigo-300 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                    className={`flex-1 py-1.5 px-3 text-xs font-semibold rounded-md transition-all ${detailTab === tab ? 'bg-white dark:bg-slate-900 dark:bg-slate-900 dark:bg-slate-700 text-blue-700 dark:text-blue-300 font-bold ' : 'text-slate-500 hover:text-slate-700'}`}
                     onClick={() => setDetailTab(tab as any)}
                   >
                     {tab === 'Conduct' ? 'Merits & Incidents' : tab}
@@ -1277,7 +1277,7 @@ export function Employees() {
                   <select
                     value={activeTabMonth}
                     onChange={(e) => setActiveTabMonth(e.target.value)}
-                    className="h-8 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 dark:text-slate-100 px-3 text-xs font-semibold focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                    className="h-8 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 dark:text-slate-100 px-3 text-xs font-semibold focus:ring-2 focus:ring-blue-500/20 outline-none"
                   >
                     <option value="All">All Months</option>
                     {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(m => (
@@ -1287,7 +1287,7 @@ export function Employees() {
                   <select
                     value={activeTabYear}
                     onChange={(e) => setActiveTabYear(e.target.value)}
-                    className="h-8 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 dark:text-slate-100 px-3 text-xs font-semibold focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                    className="h-8 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 dark:text-slate-100 px-3 text-xs font-semibold focus:ring-2 focus:ring-blue-500/20 outline-none"
                   >
                     <option value="All">All Years</option>
                     {Array.from({ length: 5 }, (_, i) => {
@@ -1311,7 +1311,7 @@ export function Employees() {
                       <div className="flex justify-between"><span className="text-slate-500">End Date:</span><span>{formatDisplayDate(emp.endDate) || 'N/A'}</span></div>
                       <div className="flex justify-between"><span className="text-slate-500">Yearly Leave:</span><span>{emp.yearlyLeave} days</span></div>
                       {emp.phone && <div className="flex justify-between"><span className="text-slate-500">Phone:</span><span className="font-mono">{emp.phone}</span></div>}
-                      {emp.email && <div className="flex justify-between"><span className="text-slate-500">Email:</span><span className="text-indigo-600">{emp.email}</span></div>}
+                      {emp.email && <div className="flex justify-between"><span className="text-slate-500">Email:</span><span className="text-blue-600">{emp.email}</span></div>}
                     </div>
                   </div>
 
@@ -1351,7 +1351,7 @@ export function Employees() {
                       </div>
                       <div className="border-t border-slate-200 dark:border-slate-700 pt-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                         <span className="font-bold text-slate-600 dark:text-slate-400 uppercase text-xs tracking-widest">Annual Total</span>
-                        <span className="text-2xl font-black text-indigo-600 dark:text-indigo-400">
+                        <span className="text-2xl font-black text-blue-600 dark:text-blue-400">
                           ₦{totalSalary.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </span>
                       </div>
@@ -1370,7 +1370,7 @@ export function Employees() {
                         <p className="text-slate-500 font-medium">No system reminders tied to this employee.</p>
                      </div>
                    ) : (
-                     <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-sm overflow-hidden">
+                     <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900  overflow-hidden">
                        <Table>
                          <TableHeader>
                            <TableRow className="bg-slate-50/50">
@@ -1387,7 +1387,7 @@ export function Employees() {
                                  <TableCell className="font-semibold text-slate-800 text-xs">{r.title}</TableCell>
                                  <TableCell className="font-mono text-[11px] text-slate-500">{formatDisplayDate(r.remindAt)}</TableCell>
                                  <TableCell>
-                                   <Badge variant="outline" className={`text-[10px] ${r.isActive ? (isPast ? 'bg-rose-50 text-rose-600 border-rose-200' : 'bg-indigo-50 text-indigo-600 border-indigo-200') : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
+                                   <Badge variant="outline" className={`text-[10px] ${r.isActive ? (isPast ? 'bg-rose-50 text-rose-600 border-rose-200' : 'bg-blue-50 text-blue-700 border-blue-200') : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
                                      {!r.isActive ? 'Dismissed' : (isPast ? 'Overdue' : 'Pending')}
                                    </Badge>
                                  </TableCell>
@@ -1512,17 +1512,17 @@ export function Employees() {
                     const isPresent = r.isPresent === 'Yes';
 
                     if (isSickLeave) {
-                      bgColor = 'bg-purple-500 dark:bg-purple-600 shadow-sm'; textColor = 'text-white font-bold'; borderStyle = 'border-transparent'; hoverTitle = 'Sick Leave';
+                      bgColor = 'bg-rose-500 dark:bg-rose-600'; textColor = 'text-white font-bold'; borderStyle = 'border-transparent'; hoverTitle = 'Sick Leave';
                     } else if (isLeave) {
-                      bgColor = 'bg-amber-500 dark:bg-amber-600 shadow-sm'; textColor = 'text-white font-bold'; borderStyle = 'border-transparent'; hoverTitle = 'On Leave';
+                      bgColor = 'bg-amber-500 dark:bg-amber-600 '; textColor = 'text-white font-bold'; borderStyle = 'border-transparent'; hoverTitle = 'On Leave';
                     } else if (isPermit) {
-                      bgColor = 'bg-orange-500 dark:bg-orange-600 shadow-sm'; textColor = 'text-white font-bold'; borderStyle = 'border-transparent'; hoverTitle = 'Absent with Permit';
+                      bgColor = 'bg-orange-500 dark:bg-orange-600 '; textColor = 'text-white font-bold'; borderStyle = 'border-transparent'; hoverTitle = 'Absent with Permit';
                     } else if (isAbsent) {
-                      bgColor = 'bg-rose-500 dark:bg-rose-600 shadow-sm'; textColor = 'text-white font-bold'; borderStyle = 'border-transparent'; hoverTitle = 'Absent';
+                      bgColor = 'bg-rose-500 dark:bg-rose-600 '; textColor = 'text-white font-bold'; borderStyle = 'border-transparent'; hoverTitle = 'Absent';
                     } else if (isOvertime) {
-                      bgColor = 'bg-blue-500 dark:bg-blue-600 shadow-sm'; textColor = 'text-white font-bold'; borderStyle = 'border-transparent'; hoverTitle = 'Overtime';
+                      bgColor = 'bg-blue-500 dark:bg-blue-600 '; textColor = 'text-white font-bold'; borderStyle = 'border-transparent'; hoverTitle = 'Overtime';
                     } else if (isPresent) {
-                      bgColor = 'bg-emerald-500 dark:bg-emerald-600 shadow-sm'; textColor = 'text-white font-bold'; borderStyle = 'border-transparent'; hoverTitle = 'Present';
+                      bgColor = 'bg-emerald-500 dark:bg-emerald-600 '; textColor = 'text-white font-bold'; borderStyle = 'border-transparent'; hoverTitle = 'Present';
                     }
 
                     if (isPresent || isOvertime) {
@@ -1553,7 +1553,7 @@ export function Employees() {
                 const monthName = new Date(currentYear, monthNum - 1, 1).toLocaleString('default', { month: 'long' });
 
                 return (
-                  <div key={`month-${monthNum}`} className={`bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm ${isMini ? '' : 'mt-4'}`}>
+                  <div key={`month-${monthNum}`} className={`bg-white dark:bg-slate-900 rounded-md border border-slate-200 dark:border-slate-800 overflow-hidden  ${isMini ? '' : 'mt-4'}`}>
                     <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-900/50">
                       <h4 className={`font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2 ${isMini ? 'text-sm' : ''}`}>
                         {!isMini && <CalendarIcon className="w-4 h-4 text-slate-500" />}
@@ -1564,7 +1564,7 @@ export function Employees() {
                           <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-emerald-500"></div> Present</div>
                           <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-blue-500"></div> Overtime</div>
                           <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-amber-500"></div> Leave</div>
-                          <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-purple-500"></div> Sick Leave</div>
+                          <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-rose-500"></div> Sick Leave</div>
                           <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-orange-500"></div> Permit</div>
                           <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-rose-500"></div> Absent</div>
                         </div>
@@ -1608,9 +1608,9 @@ export function Employees() {
                       <span className="text-xs text-amber-600 font-medium uppercase tracking-wider mb-1">Leave</span>
                       <span className="text-2xl font-bold text-amber-700 dark:text-amber-400">{totalLeave}</span>
                     </div>
-                    <div className="bg-purple-50 dark:bg-purple-900/10 rounded-lg p-3 border border-purple-100 dark:border-purple-900/50 flex flex-col">
-                      <span className="text-xs text-purple-600 font-medium uppercase tracking-wider mb-1">Sick Leave</span>
-                      <span className="text-2xl font-bold text-purple-700 dark:text-purple-400">{totalSickLeave}</span>
+                    <div className="bg-rose-50 dark:bg-rose-900/10 rounded-lg p-3 border border-rose-100 dark:border-rose-900/50 flex flex-col">
+                      <span className="text-xs text-rose-600 font-medium uppercase tracking-wider mb-1">Sick Leave</span>
+                      <span className="text-2xl font-bold text-rose-700 dark:text-rose-400">{totalSickLeave}</span>
                     </div>
                     <div className="bg-blue-50 dark:bg-blue-900/10 rounded-lg p-3 border border-blue-100 dark:border-blue-900/50 flex flex-col">
                       <span className="text-xs text-blue-600 font-medium uppercase tracking-wider mb-1">Overtime</span>
@@ -1619,12 +1619,12 @@ export function Employees() {
                   </div>
 
                   {isAllMonths && (
-                    <div className="flex flex-wrap items-center gap-4 text-xs font-medium bg-white dark:bg-slate-900 p-3 rounded-lg border border-slate-200 dark:border-slate-800 shadow-sm">
+                    <div className="flex flex-wrap items-center gap-4 text-xs font-medium bg-white dark:bg-slate-900 p-3 rounded-lg border border-slate-200 dark:border-slate-800 ">
                       <span className="text-slate-500 font-bold mr-2"><CalendarIcon className="inline-block w-4 h-4 mr-1 -mt-0.5" /> YEARLY OVERVIEW</span>
                       <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-emerald-500"></div> Present</div>
                       <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-blue-500"></div> Overtime</div>
                       <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-amber-500"></div> Leave</div>
-                      <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-purple-500"></div> Sick Leave</div>
+                      <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-rose-500"></div> Sick Leave</div>
                       <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-orange-500"></div> Permit</div>
                       <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-rose-500"></div> Absent</div>
                     </div>
@@ -1662,7 +1662,7 @@ export function Employees() {
                       <p className="text-slate-500 font-medium">No leave records found for selected period.</p>
                     </div>
                   ) : (
-                    <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-sm overflow-hidden">
+                    <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900  overflow-hidden">
                       <Table>
                         <TableHeader>
                           <TableRow className="bg-slate-50/50">
@@ -1727,7 +1727,7 @@ export function Employees() {
                         <p className="text-xs text-slate-400 mt-1">Clean record and good standing.</p>
                      </div>
                    ) : (
-                     <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-sm overflow-hidden">
+                     <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900  overflow-hidden">
                        <Table>
                          <TableHeader>
                            <TableRow className="bg-slate-50/50">
@@ -1752,7 +1752,7 @@ export function Employees() {
                                </TableCell>
                                <TableCell className="text-right">
                                  <div className="flex justify-end gap-1">
-                                   <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50" onClick={() => setViewingNarrative({ type: 'Disciplinary', data: d })}>
+                                   <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-blue-600 hover:bg-blue-50" onClick={() => setViewingNarrative({ type: 'Disciplinary', data: d })}>
                                      <Eye className="h-4 w-4" />
                                    </Button>
                                    <Button variant="ghost" size="icon" className="h-7 w-7 text-rose-400 hover:text-rose-600 hover:bg-rose-50" onClick={async () => {
@@ -1790,7 +1790,7 @@ export function Employees() {
                         <p className="text-xs text-slate-400 mt-1">Schedule a review to get started.</p>
                      </div>
                    ) : (
-                     <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-sm overflow-hidden">
+                     <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900  overflow-hidden">
                        <Table>
                          <TableHeader>
                            <TableRow className="bg-slate-50/50">
@@ -1811,7 +1811,7 @@ export function Employees() {
                                  </span>
                                </TableCell>
                                <TableCell className="text-right">
-                                 <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50" onClick={() => setViewingNarrative({ type: 'Evaluation', data: e })}>
+                                 <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-blue-600 hover:bg-blue-50" onClick={() => setViewingNarrative({ type: 'Evaluation', data: e })}>
                                    <Eye className="h-4 w-4" />
                                  </Button>
                                </TableCell>
@@ -1923,9 +1923,9 @@ export function Employees() {
     return (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
         <div className="bg-white dark:bg-slate-900 rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
-          <div className="sticky top-0 bg-indigo-600 p-4 flex justify-between items-center rounded-t-lg">
+          <div className="sticky top-0 bg-slate-900 p-4 flex justify-between items-center rounded-t-md">
             <h3 className="text-white font-bold text-lg">Bulk Edit Employees ({selectedIds.length})</h3>
-            <Button variant="ghost" size="sm" className="text-white hover:bg-indigo-700" onClick={() => setIsBulkEditing(false)}>
+            <Button variant="ghost" size="sm" className="text-white hover:bg-blue-700" onClick={() => setIsBulkEditing(false)}>
               <X className="h-5 w-5" />
             </Button>
           </div>
@@ -1937,7 +1937,7 @@ export function Employees() {
               <div className="space-y-2">
                 <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Status</label>
                 <select
-                  className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                  className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-blue-500/20 outline-none"
                   value={bulkFormData.status || ''}
                   onChange={e => setBulkFormData({ ...bulkFormData, status: e.target.value as any })}
                 >
@@ -1951,7 +1951,7 @@ export function Employees() {
               <div className="space-y-2">
                 <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Staff Type</label>
                 <select
-                  className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                  className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-blue-500/20 outline-none"
                   value={bulkFormData.staffType || ''}
                   onChange={e => setBulkFormData({ ...bulkFormData, staffType: e.target.value as any })}
                 >
@@ -1967,7 +1967,7 @@ export function Employees() {
                   <div className="space-y-2">
                     <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Position</label>
                     <select
-                      className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                      className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-blue-500/20 outline-none"
                       value={bulkFormData.position || ''}
                       onChange={e => {
                         const newPos = e.target.value;
@@ -1991,7 +1991,7 @@ export function Employees() {
                   <div className="space-y-2">
                     <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Department</label>
                     <select
-                      className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                      className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-blue-500/20 outline-none"
                       value={bulkFormData.department || ''}
                       onChange={e => setBulkFormData({ ...bulkFormData, department: e.target.value })}
                     >
@@ -2003,7 +2003,7 @@ export function Employees() {
                   <div className="space-y-2">
                     <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Employee Level</label>
                     <select
-                      className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                      className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-blue-500/20 outline-none"
                       value={bulkFormData.level || ''}
                       onChange={e => setBulkFormData({ ...bulkFormData, level: parseInt(e.target.value) || undefined })}
                     >
@@ -2017,7 +2017,7 @@ export function Employees() {
                   <div className="space-y-2">
                     <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Line Manager</label>
                     <select
-                      className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                      className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-blue-500/20 outline-none"
                       value={bulkFormData.lineManager || ''}
                       onChange={e => setBulkFormData({ ...bulkFormData, lineManager: e.target.value || undefined })}
                     >
@@ -2038,7 +2038,7 @@ export function Employees() {
                   <Checkbox
                     checked={bulkFormData.payeTax}
                     onCheckedChange={(checked) => setBulkFormData({ ...bulkFormData, payeTax: checked as boolean })}
-                    className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-600 h-4 w-4"
+                    className="rounded border-slate-300 text-blue-600 focus:ring-blue-600 h-4 w-4"
                   />
                   Subject to PAYE Tax
                 </label>
@@ -2046,7 +2046,7 @@ export function Employees() {
                   <Checkbox
                     checked={bulkFormData.subjectToPension}
                     onCheckedChange={(checked) => setBulkFormData({ ...bulkFormData, subjectToPension: checked as boolean })}
-                    className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-600 h-4 w-4"
+                    className="rounded border-slate-300 text-blue-600 focus:ring-blue-600 h-4 w-4"
                   />
                   Subject to Pension
                 </label>
@@ -2054,7 +2054,7 @@ export function Employees() {
                   <Checkbox
                     checked={bulkFormData.withholdingTax}
                     onCheckedChange={(checked) => setBulkFormData({ ...bulkFormData, withholdingTax: checked as boolean })}
-                    className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-600 h-4 w-4"
+                    className="rounded border-slate-300 text-blue-600 focus:ring-blue-600 h-4 w-4"
                   />
                   Subject to Withholding Tax
                 </label>
@@ -2063,7 +2063,7 @@ export function Employees() {
 
             <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
               <Button variant="outline" onClick={() => setIsBulkEditing(false)}>Cancel</Button>
-              <Button onClick={handleBulkUpdate} className="bg-indigo-600 hover:bg-indigo-700 text-white">Apply Changes</Button>
+              <Button onClick={handleBulkUpdate} className="bg-blue-600 hover:bg-blue-700 text-white">Apply Changes</Button>
             </div>
           </div>
         </div>
@@ -2080,29 +2080,29 @@ export function Employees() {
     return (
       <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
         <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsLoggingPerformance(false)} />
-        <div className="relative bg-white dark:bg-slate-900 rounded-[2rem] shadow-2xl w-full max-w-lg border border-slate-200 overflow-hidden font-sans">
-          <div className={`p-6 bg-gradient-to-r ${(performanceRecord.points || 0) > 0 ? 'from-emerald-600 to-teal-600' : (performanceRecord.points || 0) < 0 ? 'from-rose-600 to-pink-600' : 'from-indigo-600 to-blue-600'}`}>
-             <div className="flex items-center justify-between mb-2">
-                <h3 className="text-xl font-black text-white uppercase tracking-tighter">Log Professional Event</h3>
-                <button onClick={() => setIsLoggingPerformance(false)} className="text-white/70 hover:text-white transition-colors duration-200"><X className="h-6 w-6" /></button>
+        <div className="relative bg-white dark:bg-slate-900 rounded-md shadow-2xl w-full max-w-lg border border-slate-200 dark:border-slate-800 overflow-hidden font-sans">
+          <div className={`p-5 ${(performanceRecord.points || 0) > 0 ? 'bg-emerald-600' : (performanceRecord.points || 0) < 0 ? 'bg-rose-600' : 'bg-blue-600'}`}>
+             <div className="flex items-center justify-between mb-1">
+                <h3 className="text-lg font-bold text-white uppercase tracking-tight">Log Professional Event</h3>
+                <button onClick={() => setIsLoggingPerformance(false)} className="text-white/70 hover:text-white transition-colors duration-200"><X className="h-5 w-5" /></button>
              </div>
-             <p className="text-white/80 text-sm font-medium">Internal Ledger for {emp.firstname} {emp.surname}</p>
+             <p className="text-white/80 text-xs font-medium">Internal Ledger for {emp.firstname} {emp.surname}</p>
           </div>
 
           <div className="p-8 space-y-6 max-h-[70vh] overflow-y-auto custom-scrollbar">
             <div className="grid grid-cols-2 gap-4">
                <div className="space-y-2">
                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Date of Event</label>
-                 <Input type="date" value={performanceRecord.date} onChange={e => setPerformanceRecord({...performanceRecord, date: e.target.value})} className="rounded-xl border-slate-100 bg-slate-50/50" />
+                 <Input type="date" value={performanceRecord.date} onChange={e => setPerformanceRecord({...performanceRecord, date: e.target.value})} className="rounded-md border-slate-100 bg-slate-50/50" />
                </div>
                <div className="space-y-2">
                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Point Weight</label>
                  <div className="flex items-center gap-3">
-                    <Button variant="outline" size="icon" className="h-10 w-10 rounded-xl hover:bg-rose-50 hover:text-rose-600 border-slate-100" onClick={() => setPerformanceRecord({...performanceRecord, points: (performanceRecord.points || 0) - 1})}>
+                    <Button variant="outline" size="icon" className="h-10 w-10 rounded-md hover:bg-rose-50 hover:text-rose-600 border-slate-100" onClick={() => setPerformanceRecord({...performanceRecord, points: (performanceRecord.points || 0) - 1})}>
                       <span className="font-bold">-</span>
                     </Button>
-                    <Input type="number" value={performanceRecord.points} onChange={e => setPerformanceRecord({...performanceRecord, points: parseInt(e.target.value) || 0})} className="h-10 text-center font-black rounded-xl border-slate-100 bg-slate-50/50" />
-                    <Button variant="outline" size="icon" className="h-10 w-10 rounded-xl hover:bg-emerald-50 hover:text-emerald-600 border-slate-100" onClick={() => setPerformanceRecord({...performanceRecord, points: (performanceRecord.points || 0) + 1})}>
+                    <Input type="number" value={performanceRecord.points} onChange={e => setPerformanceRecord({...performanceRecord, points: parseInt(e.target.value) || 0})} className="h-10 text-center font-black rounded-md border-slate-100 bg-slate-50/50" />
+                    <Button variant="outline" size="icon" className="h-10 w-10 rounded-md hover:bg-emerald-50 hover:text-emerald-600 border-slate-100" onClick={() => setPerformanceRecord({...performanceRecord, points: (performanceRecord.points || 0) + 1})}>
                       <span className="font-bold">+</span>
                     </Button>
                  </div>
@@ -2119,7 +2119,7 @@ export function Employees() {
                   if (val === 'Accolade' && pts <= 0) pts = meritDefault;
                   if (['Attendance', 'Behavioral', 'Performance', 'Safety/PPE'].includes(val) && pts >= 0) pts = demeritDefault;
                   setPerformanceRecord({...performanceRecord, type: val as any, points: pts});
-               }} className="w-full h-11 px-4 rounded-xl border border-slate-100 bg-slate-50/50 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20">
+               }} className="w-full h-11 px-4 rounded-md border border-slate-100 bg-slate-50/50 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20">
                   {hrVariables?.performanceCategories?.length ? (
                     hrVariables.performanceCategories.map(c => <option key={c} value={c}>{c}</option>)
                   ) : (
@@ -2137,7 +2137,7 @@ export function Employees() {
 
             <div className="space-y-2">
                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Official Severity / Action</label>
-               <select value={performanceRecord.severity} onChange={e => setPerformanceRecord({...performanceRecord, severity: e.target.value as any})} className="w-full h-11 px-4 rounded-xl border border-slate-100 bg-slate-50/50 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20">
+               <select value={performanceRecord.severity} onChange={e => setPerformanceRecord({...performanceRecord, severity: e.target.value as any})} className="w-full h-11 px-4 rounded-md border border-slate-100 bg-slate-50/50 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20">
                   <option value="Neutral/Info">Neutral / Informational Only</option>
                   {hrVariables?.actionLevels?.map(level => (
                     <option key={level} value={level}>{level}</option>
@@ -2149,7 +2149,7 @@ export function Employees() {
 
             <div className="space-y-2">
                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Event Description & Narrative</label>
-               <textarea value={performanceRecord.description} onChange={e => setPerformanceRecord({...performanceRecord, description: e.target.value})} placeholder="Describe exactly what happened..." className="w-full h-24 px-4 py-3 rounded-2xl border border-slate-100 bg-slate-50/50 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 resize-none shadow-inner" />
+               <textarea value={performanceRecord.description} onChange={e => setPerformanceRecord({...performanceRecord, description: e.target.value})} placeholder="Describe exactly what happened..." className="w-full h-24 px-3 py-2 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50/50 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 resize-none" />
             </div>
 
             <Button onClick={() => {
@@ -2172,7 +2172,7 @@ export function Employees() {
               addDisciplinaryRecord(rec);
               toast.success('Performance record updated');
               setIsLoggingPerformance(false);
-            }} className="w-full rounded-2xl h-14 font-black uppercase tracking-widest bg-slate-900 hover:bg-black text-white shadow-lg transition-all active:scale-95 duration-300">
+            }} className="w-full rounded-md h-11 font-bold uppercase tracking-wider bg-slate-900 hover:bg-black text-white transition-colors">
               Post to Ledger
             </Button>
           </div>
@@ -2204,7 +2204,7 @@ export function Employees() {
         }} className="gap-2 text-slate-600 font-bold h-9">
           <ArrowLeft className="h-4 w-4" /> Back
         </Button>
-        <Button onClick={isAdding ? handleSave : handleUpdate} className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white shadow-md font-semibold h-9">
+        <Button onClick={isAdding ? handleSave : handleUpdate} className="gap-2 bg-blue-600 hover:bg-blue-700 text-white  font-semibold h-9">
           <Save className="h-4 w-4" /> {isAdding ? 'Create Employee' : 'Save Changes'}
         </Button>
       </div>
@@ -2226,7 +2226,7 @@ export function Employees() {
         {priv.canExport && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="w-full md:w-auto gap-2 h-9 px-3 border-slate-200 bg-white text-slate-600 hover:bg-slate-50 font-bold text-[11px] uppercase tracking-tight shadow-sm">
+              <Button variant="outline" size="sm" className="w-full md:w-auto gap-2 h-9 px-3 border-slate-200 bg-white text-slate-600 hover:bg-slate-50 font-bold text-[11px] uppercase tracking-tight ">
                 <Upload className="h-3.5 w-3.5 text-emerald-500" /> Export <ChevronDown className="h-3 w-3 text-slate-400" />
               </Button>
             </DropdownMenuTrigger>
@@ -2249,8 +2249,8 @@ export function Employees() {
           </DropdownMenu>
         )}
         {priv.canImport && (
-          <label className="flex w-full md:w-auto items-center justify-center md:justify-start gap-2 px-3 h-9 bg-white rounded-md border border-slate-200 text-slate-600 text-[11px] font-bold uppercase tracking-tight cursor-pointer hover:bg-slate-50 transition-all shadow-sm">
-            <Download className="h-3.5 w-3.5 text-indigo-500" /> Import
+          <label className="flex w-full md:w-auto items-center justify-center md:justify-start gap-2 px-3 h-9 bg-white rounded-md border border-slate-200 text-slate-600 text-[11px] font-bold uppercase tracking-tight cursor-pointer hover:bg-slate-50 transition-all ">
+            <Download className="h-3.5 w-3.5 text-blue-600" /> Import
             <input type="file" accept=".csv" className="hidden" onChange={handleImportCSV} />
           </label>
         )}
@@ -2260,7 +2260,7 @@ export function Employees() {
           </Button>
         )}
         {priv.canAdd && (
-          <Button size="sm" className="w-full md:w-auto gap-2 bg-indigo-600 hover:bg-indigo-700 text-white h-9" onClick={() => { setIsAdding(true); setOpenMenuId(null); setFormData({ staffType: 'OFFICE', level: 10, status: 'Active', payeTax: false, subjectToPension: false, withholdingTax: false, monthlySalaries: { jan: 0, feb: 0, mar: 0, apr: 0, may: 0, jun: 0, jul: 0, aug: 0, sep: 0, oct: 0, nov: 0, dec: 0 } }); }}>
+          <Button size="sm" className="w-full md:w-auto gap-2 bg-blue-600 hover:bg-blue-700 text-white h-9" onClick={() => { setIsAdding(true); setOpenMenuId(null); setFormData({ staffType: 'OFFICE', level: 10, status: 'Active', payeTax: false, subjectToPension: false, withholdingTax: false, monthlySalaries: { jan: 0, feb: 0, mar: 0, apr: 0, may: 0, jun: 0, jul: 0, aug: 0, sep: 0, oct: 0, nov: 0, dec: 0 } }); }}>
             <Plus className="h-4 w-4" /> Add Employee
           </Button>
         )}
@@ -2283,17 +2283,17 @@ export function Employees() {
   return (
     <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
 
-      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 overflow-hidden flex-1 flex flex-col min-h-[500px]">
-        <div className="border-b border-slate-100 p-4 sm:p-5 flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center bg-slate-50/50">
-          <div className="flex bg-slate-200/50 p-1 rounded-lg">
+      <div className="bg-white dark:bg-slate-900 rounded-md border border-slate-200 dark:border-slate-800 overflow-hidden flex-1 flex flex-col min-h-[500px]">
+        <div className="border-b border-slate-200 dark:border-slate-800 p-4 sm:p-5 flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center bg-slate-50/50 dark:bg-slate-900/50">
+          <div className="flex bg-slate-200/50 dark:bg-slate-800 p-1 rounded-md">
             <button
-              className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${activeTab === 'Active' ? 'bg-white dark:bg-slate-900 dark:bg-slate-900 dark:bg-slate-700 text-indigo-700 dark:text-indigo-300 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${activeTab === 'Active' ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-xs' : 'text-slate-500 hover:text-slate-700'}`}
               onClick={() => setActiveTab('Active')}
             >
               Active Personnel
             </button>
             <button
-              className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${activeTab === 'Delisted' ? 'bg-white dark:bg-slate-900 dark:bg-slate-900 text-slate-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${activeTab === 'Delisted' ? 'bg-white dark:bg-slate-900 dark:bg-slate-900 text-slate-700 ' : 'text-slate-500 hover:text-slate-700'}`}
               onClick={() => setActiveTab('Delisted')}
             >
               Delisted
@@ -2305,12 +2305,12 @@ export function Employees() {
               <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
               <Input
                 placeholder="Search Name or Code..."
-                className="pl-9 bg-white border-slate-200 h-9 text-sm focus-visible:ring-indigo-500/50 rounded-lg shadow-sm"
+                className="pl-9 bg-white border-slate-200 h-9 text-sm focus-visible:ring-blue-500/50 rounded-lg "
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            <select className="h-9 px-3 rounded-md border border-slate-200 bg-white text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/20" value={sortBy} onChange={(e) => setSortBy(e.target.value as any)}>
+            <select className="h-9 px-3 rounded-md border border-slate-200 bg-white text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20" value={sortBy} onChange={(e) => setSortBy(e.target.value as any)}>
               <option value="dateAdded">Sort By: Default</option>
               <option value="name">Sort By: Name</option>
               <option value="position">Sort By: Position</option>
@@ -2342,7 +2342,7 @@ export function Employees() {
           </TableHeader>
           <TableBody>
             {paginatedEmployees.map((employee) => (
-              <TableRow key={employee.id} className={`${selectedIds.includes(employee.id) ? 'bg-indigo-50/50' : ''} hover:bg-slate-50/50 transition-colors`}>
+              <TableRow key={employee.id} className={`${selectedIds.includes(employee.id) ? 'bg-blue-50/50' : ''} hover:bg-slate-50/50 transition-colors`}>
                 <TableCell>
                   <Checkbox 
                     checked={selectedIds.includes(employee.id)}
@@ -2355,13 +2355,13 @@ export function Employees() {
                 <TableCell>
                   <div className="flex items-center gap-3">
                     <Avatar className="h-10 w-10 border border-slate-200">
-                      <AvatarFallback className="bg-indigo-50 text-indigo-700 font-bold text-xs">
+                      <AvatarFallback className="bg-slate-100 text-slate-800 border border-slate-200 font-bold text-xs">
                         {employee.firstname.charAt(0)}{employee.surname.charAt(0)}
                       </AvatarFallback>
                       {employee.avatar && <AvatarImage src={employee.avatar} alt="Avatar" className="object-cover" />}
                     </Avatar>
                     <div className="flex flex-col">
-                      <span className="font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">{employee.surname} {employee.firstname}</span>
+                      <span className="font-bold text-slate-900 group-hover:text-blue-600 transition-colors">{employee.surname} {employee.firstname}</span>
                       <span className="text-xs text-slate-500 font-mono tracking-tight">{employee.employeeCode || `EMP-${employee.id.substring(0, 4).toUpperCase()}`}</span>
                     </div>
                   </div>
@@ -2389,7 +2389,7 @@ export function Employees() {
                 <TableCell className="text-right">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-indigo-600 hover:bg-slate-50 data-[state=open]:bg-slate-100 data-[state=open]:text-indigo-600">
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-blue-600 hover:bg-slate-50 data-[state=open]:bg-slate-100 data-[state=open]:text-blue-600">
                         <MoreHorizontal className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
@@ -2440,7 +2440,7 @@ export function Employees() {
         {/* Mobile View: Cards */}
         <div className="md:hidden flex flex-col divide-y divide-slate-100 dark:divide-slate-800">
           {paginatedEmployees.map((employee) => (
-            <div key={`mobile-${employee.id}`} className={`p-4 flex flex-col gap-3 ${selectedIds.includes(employee.id) ? 'bg-indigo-50/50 dark:bg-indigo-900/20' : ''}`}>
+            <div key={`mobile-${employee.id}`} className={`p-4 flex flex-col gap-3 ${selectedIds.includes(employee.id) ? 'bg-blue-50/50 dark:bg-blue-900/20' : ''}`}>
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-3">
                   <Checkbox 
@@ -2451,7 +2451,7 @@ export function Employees() {
                     }}
                   />
                   <Avatar className="h-10 w-10 border border-slate-200">
-                    <AvatarFallback className="bg-indigo-50 text-indigo-700 font-bold text-xs">
+                    <AvatarFallback className="bg-slate-100 text-slate-800 border border-slate-200 font-bold text-xs">
                       {employee.firstname.charAt(0)}{employee.surname.charAt(0)}
                     </AvatarFallback>
                     {employee.avatar && <AvatarImage src={employee.avatar} alt="Avatar" className="object-cover" />}
@@ -2464,7 +2464,7 @@ export function Employees() {
                 
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-indigo-600 hover:bg-slate-50 data-[state=open]:bg-slate-100 data-[state=open]:text-indigo-600">
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-blue-600 hover:bg-slate-50 data-[state=open]:bg-slate-100 data-[state=open]:text-blue-600">
                       <MoreHorizontal className="h-4 w-4" />
                     </Button>
                   </DropdownMenuTrigger>
@@ -2536,13 +2536,13 @@ export function Employees() {
       {importFile && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setImportFile(null)} />
-          <div className="relative bg-white rounded-xl shadow-2xl p-6 w-full max-w-md mx-4 border border-slate-200">
+          <div className="relative bg-white rounded-md shadow-2xl p-6 w-full max-w-md mx-4 border border-slate-200">
             <h3 className="text-xl font-bold text-slate-900 mb-2">Import Policy</h3>
             <p className="text-sm text-slate-500 leading-relaxed mb-6">
               How would you like to process the employee records from this CSV file?
             </p>
             <div className="flex flex-col gap-3">
-              <Button onClick={() => processImport(importFile, 'update')} className="bg-indigo-600 hover:bg-indigo-700 text-white h-auto py-3 flex-col items-center justify-center">
+              <Button onClick={() => processImport(importFile, 'update')} className="bg-blue-600 hover:bg-blue-700 text-white h-auto py-3 flex-col items-center justify-center">
                 <span className="font-semibold block text-base">Update & Add (Recommended)</span>
                 <span className="block text-xs opacity-80 mt-1 font-normal text-center">Modifies matching IDs. Adds missing ones. Leaves others alone.</span>
               </Button>

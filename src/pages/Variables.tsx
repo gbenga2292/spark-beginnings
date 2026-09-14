@@ -1033,8 +1033,8 @@ export function Variables() {
   const headerButtons = (
     <div className="flex flex-col md:flex-row md:items-center gap-2">
       {priv.canImport && (
-        <label className="flex items-center gap-2 px-3 h-9 bg-white rounded-md border border-slate-200 text-slate-600 text-[11px] font-bold uppercase tracking-tight cursor-pointer hover:bg-slate-50 transition-all shadow-sm">
-          <Download className="h-3.5 w-3.5 text-indigo-500" />
+        <label className="flex items-center gap-2 px-3 h-9 bg-white rounded-md border border-slate-200 text-slate-600 text-[11px] font-bold uppercase tracking-tight cursor-pointer hover:bg-slate-50 transition-all">
+          <Download className="h-3.5 w-3.5 text-blue-600" />
           Import
           <input
             type="file"
@@ -1048,14 +1048,14 @@ export function Variables() {
         <Button 
           variant="outline" 
           onClick={handleExportVariables} 
-          className="gap-2 h-9 px-3 border-slate-200 bg-white text-slate-600 hover:bg-slate-50 font-bold text-[11px] uppercase tracking-tight shadow-sm"
+          className="gap-2 h-9 px-3 border-slate-200 bg-white text-slate-600 hover:bg-slate-50 font-bold text-[11px] uppercase tracking-tight"
         >
           <Upload className="h-3.5 w-3.5 text-emerald-500" />
           Export
         </Button>
       )}
       {priv.canEdit && (
-        <Button onClick={handleSave} className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-md font-semibold gap-2 transition-all">
+        <Button onClick={handleSave} className="bg-blue-600 hover:bg-blue-700 text-white font-semibold gap-2 transition-all rounded-sm">
           <Save className="h-4 w-4" /> Save Changes
         </Button>
       )}
@@ -1068,12 +1068,12 @@ export function Variables() {
     <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
 
       {/* Section selector */}
-      <div className="flex gap-1 bg-slate-100 rounded-xl p-1 self-start">
+      <div className="flex gap-1 bg-slate-100 rounded-md p-1 self-start">
         <button
           onClick={() => setVarSection('system')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+          className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold transition-all ${
             varSection === 'system'
-              ? 'bg-white text-slate-900 shadow-sm'
+              ? 'bg-white text-slate-900 '
               : 'text-slate-500 hover:text-slate-700'
           }`}
         >
@@ -1082,9 +1082,9 @@ export function Variables() {
         </button>
         <button
           onClick={() => setVarSection('ledger')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+          className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold transition-all ${
             varSection === 'ledger'
-              ? 'bg-white text-slate-900 shadow-sm'
+              ? 'bg-white text-slate-900 '
               : 'text-slate-500 hover:text-slate-700'
           }`}
         >
@@ -1093,9 +1093,9 @@ export function Variables() {
         </button>
         <button
           onClick={() => setVarSection('services')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+          className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold transition-all ${
             varSection === 'services'
-              ? 'bg-white text-slate-900 shadow-sm'
+              ? 'bg-white text-slate-900 '
               : 'text-slate-500 hover:text-slate-700'
           }`}
         >
@@ -1104,9 +1104,9 @@ export function Variables() {
         </button>
         <button
           onClick={() => setVarSection('operations')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+          className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold transition-all ${
             varSection === 'operations'
-              ? 'bg-white text-slate-900 shadow-sm'
+              ? 'bg-white text-slate-900 '
               : 'text-slate-500 hover:text-slate-700'
           }`}
         >
@@ -1117,7 +1117,7 @@ export function Variables() {
 
       {varSection === 'operations' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <Card className="shadow-sm border-slate-200">
+          <Card className="border-slate-200">
             <CardHeader className="bg-slate-50/50 rounded-t-xl border-b border-slate-100">
               <CardTitle className="text-slate-800">Vehicle Document Types</CardTitle>
               <CardDescription>Manage types of documents tracked for the fleet (e.g. Insurance, Permits).</CardDescription>
@@ -1176,7 +1176,7 @@ export function Variables() {
         </div>
       ) : varSection === 'services' ? (
         <div className="flex flex-col gap-6">
-          <Card className="shadow-sm border-slate-200 border-t-4 border-t-cyan-500">
+          <Card className="border-slate-200 border-t-4 border-t-cyan-500">
             <CardHeader className="bg-cyan-50/30 rounded-t-lg border-b border-cyan-100">
               <CardTitle className="text-cyan-900">Configure Project Services</CardTitle>
               <CardDescription>
@@ -1229,7 +1229,7 @@ export function Variables() {
                     onClick={() => setSelectedService(s.serviceName === selectedService ? '' : s.serviceName)}
                     className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium border transition-colors
                       ${selectedService === s.serviceName 
-                        ? 'bg-cyan-600 text-white border-cyan-700 shadow-sm' 
+                        ? 'bg-cyan-600 text-white border-cyan-700 ' 
                         : 'bg-white text-slate-700 hover:bg-slate-50'}`}
                   >
                     {s.serviceName}
@@ -1269,7 +1269,7 @@ export function Variables() {
 
               {/* Service Subtasks */}
               {selectedService && (
-                <div className="rounded-xl border border-cyan-200 bg-cyan-50/20 overflow-hidden mt-6">
+                <div className="rounded-md border border-cyan-200 bg-cyan-50/20 overflow-hidden mt-6">
                   <div className="flex items-center justify-between px-4 py-2.5 bg-cyan-100/60 border-b border-cyan-200">
                     <span className="text-xs font-bold uppercase tracking-wider text-cyan-800">
                       Preset Tasks for {selectedService}
@@ -1280,7 +1280,7 @@ export function Variables() {
                   </div>
                   <div className="p-4 space-y-4">
                     {priv.canEdit && (
-                      <div className="grid grid-cols-1 md:grid-cols-12 gap-2 p-3 bg-white rounded-lg border border-cyan-100 shadow-sm">
+                      <div className="grid grid-cols-1 md:grid-cols-12 gap-2 p-3 bg-white rounded-md border border-cyan-100">
                         <Input 
                           placeholder="Task Title (e.g. Site Visitation)" 
                           value={newServiceTaskTitle} 
@@ -1319,7 +1319,7 @@ export function Variables() {
 
                     <div className="space-y-2 max-h-[400px] overflow-y-auto">
                       {(serviceTemplates.find(s => s.serviceName === selectedService)?.subtasks || []).map((t, idx) => (
-                        <div key={idx} className="flex items-center gap-3 p-3 bg-white rounded-lg border border-slate-200 shadow-sm group hover:border-cyan-300 transition-colors">
+                        <div key={idx} className="flex items-center gap-3 p-3 bg-white rounded-md border border-slate-200 group hover:border-cyan-300 transition-colors">
                           <span className="h-6 w-6 rounded-full bg-cyan-100/50 text-cyan-700 text-[11px] font-bold flex items-center justify-center shrink-0 border border-cyan-200">
                             {idx + 1}
                           </span>
@@ -1343,7 +1343,7 @@ export function Variables() {
                         </div>
                       ))}
                       {(serviceTemplates.find(s => s.serviceName === selectedService)?.subtasks || []).length === 0 && (
-                        <p className="text-sm text-slate-400 text-center py-6 italic border-2 border-dashed border-slate-200 rounded-lg">
+                        <p className="text-sm text-slate-400 text-center py-6 italic border-2 border-dashed border-slate-200 rounded-md">
                           No tasks defined for this service yet. Add one above.
                         </p>
                       )}
@@ -1354,9 +1354,9 @@ export function Variables() {
 
               {/* Onboarding Form Builder */}
               {selectedService && (
-                <div className="rounded-xl border border-indigo-200 bg-indigo-50/20 overflow-hidden mt-6">
-                  <div className="flex items-center justify-between px-4 py-2.5 bg-indigo-100/60 border-b border-indigo-200">
-                    <span className="text-xs font-bold uppercase tracking-wider text-indigo-800">
+                <div className="rounded-md border border-slate-200 bg-slate-50/40 overflow-hidden mt-6">
+                  <div className="flex items-center justify-between px-4 py-2.5 bg-slate-100 border-b border-slate-200">
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-800">
                       Onboarding Form Builder for {selectedService}
                     </span>
                   </div>
@@ -1369,7 +1369,7 @@ export function Variables() {
                           onClick={() => setActiveBuilderPhase(phase as any)}
                           className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
                             activeBuilderPhase === phase 
-                              ? 'bg-indigo-600 text-white border-indigo-700' 
+                              ? 'bg-blue-600 text-white border-blue-700' 
                               : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
                           }`}
                         >
@@ -1380,7 +1380,7 @@ export function Variables() {
 
                     {/* New Field Form */}
                     {priv.canEdit && (
-                      <div className="grid grid-cols-1 md:grid-cols-12 gap-2 p-3 bg-white rounded-lg border border-indigo-100 shadow-sm items-center">
+                      <div className="grid grid-cols-1 md:grid-cols-12 gap-2 p-3 bg-white rounded-md border border-slate-200 items-center">
                         <Input 
                           placeholder="Field Label (e.g. Dimensions)" 
                           value={newFieldLabel} 
@@ -1411,7 +1411,7 @@ export function Variables() {
                             type="checkbox" 
                             checked={newFieldRequired} 
                             onChange={e => setNewFieldRequired(e.target.checked)} 
-                            className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                            className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                           /> Required
                         </label>
                         <Button 
@@ -1461,7 +1461,7 @@ export function Variables() {
                             setNewFieldType('text');
                             setEditingFieldId(null);
                           }} 
-                          className={`gap-1 border-indigo-300 text-indigo-700 hover:bg-indigo-50 h-9 ${newFieldType === 'select' ? 'md:col-span-2' : 'md:col-span-4'}`}
+                          className={`gap-1 border-blue-300 text-blue-700 hover:bg-blue-50 rounded-sm h-9 ${newFieldType === 'select' ? 'md:col-span-2' : 'md:col-span-4'}`}
                           disabled={!newFieldLabel || (newFieldType === 'select' && !newFieldOptions)}
                         >
                           {editingFieldId ? <Save className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
@@ -1496,7 +1496,7 @@ export function Variables() {
                         const phaseFields = (template?.phases?.[phaseKey]?.fields || []);
                         if (phaseFields.length === 0) {
                           return (
-                            <p className="text-sm text-slate-400 text-center py-6 italic border-2 border-dashed border-slate-200 rounded-lg">
+                            <p className="text-sm text-slate-400 text-center py-6 italic border-2 border-dashed border-slate-200 rounded-md">
                               No custom fields defined for Phase {activeBuilderPhase} yet. Add one above.
                             </p>
                           );
@@ -1505,7 +1505,7 @@ export function Variables() {
                           const isEditing = editingFieldId === f.id;
                           if (isEditing) {
                             return (
-                              <div key={f.id} className="grid grid-cols-1 md:grid-cols-12 gap-2 p-3 bg-indigo-50/50 rounded-lg border border-indigo-300 shadow-md items-center">
+                              <div key={f.id} className="grid grid-cols-1 md:grid-cols-12 gap-2 p-3 bg-blue-50/40 rounded-sm border border-blue-300 items-center">
                                 <Input 
                                   placeholder="Label" 
                                   value={newFieldLabel} 
@@ -1536,7 +1536,7 @@ export function Variables() {
                                     type="checkbox" 
                                     checked={newFieldRequired} 
                                     onChange={e => setNewFieldRequired(e.target.checked)} 
-                                    className="h-3 w-3 rounded border-slate-300 text-indigo-600"
+                                    className="h-3 w-3 rounded border-slate-300 text-blue-600"
                                   /> Req
                                 </label>
                                 <div className="md:col-span-3 flex items-center gap-1 justify-end">
@@ -1600,24 +1600,24 @@ export function Variables() {
                           }
 
                           return (
-                            <div key={f.id} className="flex items-center gap-3 p-3 bg-white border border-slate-200 rounded-lg group hover:border-indigo-200 hover:shadow-sm transition-all">
+                            <div key={f.id} className="flex items-center gap-3 p-3 bg-white border border-slate-200 rounded-md group hover:border-blue-300 transition-all">
                               <div className="flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                                 <button 
-                                  className="h-5 w-5 rounded text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 flex items-center justify-center disabled:opacity-30 text-[10px]" 
+                                  className="h-5 w-5 rounded text-slate-400 hover:text-blue-600 hover:bg-blue-50 flex items-center justify-center disabled:opacity-30 text-[10px]" 
                                   onClick={() => handleMoveOnboardingField(f.id, 'up')} 
                                   disabled={idx === 0}
                                 >
                                   &#9650;
                                 </button>
                                 <button 
-                                  className="h-5 w-5 rounded text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 flex items-center justify-center disabled:opacity-30 text-[10px]" 
+                                  className="h-5 w-5 rounded text-slate-400 hover:text-blue-600 hover:bg-blue-50 flex items-center justify-center disabled:opacity-30 text-[10px]" 
                                   onClick={() => handleMoveOnboardingField(f.id, 'down')} 
                                   disabled={idx === phaseFields.length - 1}
                                 >
                                   &#9660;
                                 </button>
                               </div>
-                              <span className="h-6 w-6 rounded-full bg-indigo-100/50 text-indigo-700 text-[11px] font-bold flex items-center justify-center shrink-0 border border-indigo-200">
+                              <span className="h-6 w-6 rounded-full bg-blue-50 text-blue-700 text-[11px] font-bold flex items-center justify-center shrink-0 border border-blue-200 rounded-sm">
                                 {idx + 1}
                               </span>
                               <div className="flex-1 min-w-0">
@@ -1632,7 +1632,7 @@ export function Variables() {
                                   <Button 
                                     variant="ghost" 
                                     size="icon" 
-                                    className="h-8 w-8 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50" 
+                                    className="h-8 w-8 text-slate-400 hover:text-blue-600 hover:bg-blue-50" 
                                     onClick={() => {
                                       setNewFieldLabel(f.label);
                                       setNewFieldType(f.type as any);
@@ -1680,7 +1680,7 @@ export function Variables() {
       ) : varSection === 'ledger' ? (
         /* ── LEDGER VARIABLES SECTION ─────────────────────────── */
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <Card className="shadow-sm border-slate-200">
+          <Card className="border-slate-200">
             <CardHeader className="bg-slate-50/50 rounded-t-xl border-b border-slate-100">
               <CardTitle className="text-slate-800">Categories</CardTitle>
               <CardDescription>Expense categories used for ledger entries.</CardDescription>
@@ -1716,7 +1716,7 @@ export function Variables() {
             </CardContent>
           </Card>
 
-          <Card className="shadow-sm border-slate-200">
+          <Card className="border-slate-200">
             <CardHeader className="bg-slate-50/50 rounded-t-xl border-b border-slate-100">
               <CardTitle className="text-slate-800">Banks / Accounts</CardTitle>
               <CardDescription>Pay-from accounts and bank names.</CardDescription>
@@ -1752,7 +1752,7 @@ export function Variables() {
             </CardContent>
           </Card>
 
-          <Card className="shadow-sm border-slate-200 md:col-span-2 lg:col-span-1">
+          <Card className="border-slate-200 md:col-span-2 lg:col-span-1">
             <CardHeader className="bg-slate-50/50 rounded-t-xl border-b border-slate-100">
               <CardTitle className="text-slate-800">Vendors</CardTitle>
               <CardDescription>Store vendors with optional TIN numbers.</CardDescription>
@@ -1775,7 +1775,7 @@ export function Variables() {
                         <TableCell className="w-[80px]">
                           <div className="flex items-center gap-1">
                             {priv.canEdit && (
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-indigo-600" onClick={() => handleOpenRename('ledgerVendor', v.name, v.id)}>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-blue-600" onClick={() => handleOpenRename('ledgerVendor', v.name, v.id)}>
                                 <Edit2 className="h-3.5 w-3.5" />
                               </Button>
                             )}
@@ -1798,7 +1798,7 @@ export function Variables() {
             </CardContent>
           </Card>
 
-          <Card className="shadow-sm border-slate-200">
+          <Card className="border-slate-200">
             <CardHeader className="bg-slate-50/50 rounded-t-xl border-b border-slate-100">
               <CardTitle className="text-slate-800">Beneficiary Banks (Paid To)</CardTitle>
               <CardDescription>Target banks and accounts for company expenses.</CardDescription>
@@ -1819,7 +1819,7 @@ export function Variables() {
                         <TableCell className="w-[80px]">
                           <div className="flex items-center gap-1">
                             {priv.canEdit && (
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-indigo-600" onClick={() => handleOpenRename('ledgerBenBank', b.name, b.id)}>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-blue-600" onClick={() => handleOpenRename('ledgerBenBank', b.name, b.id)}>
                                 <Edit2 className="h-3.5 w-3.5" />
                               </Button>
                             )}
@@ -1846,7 +1846,7 @@ export function Variables() {
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 items-start">
         {/* --- LEFT COLUMN --- */}
         <div className="flex flex-col gap-6">
-          <Card className="shadow-sm border-slate-200">
+          <Card className="border-slate-200">
             <CardHeader className="bg-slate-50/50 rounded-t-xl border-b border-slate-100">
               <CardTitle className="text-slate-800">Public Holidays</CardTitle>
               <CardDescription>Dates defined here are used to calculate OT in the Daily Register.</CardDescription>
@@ -1899,7 +1899,7 @@ export function Variables() {
                                   variant="ghost"
                                   size="icon"
                                   onClick={() => handleOpenRename('holiday', holiday.name, holiday.id, holiday.date)}
-                                  className="h-8 w-8 text-slate-400 hover:text-indigo-600 hover:bg-slate-50"
+                                  className="h-8 w-8 text-slate-400 hover:text-blue-600 hover:bg-slate-50"
                                 >
                                   <Edit2 className="h-3.5 w-3.5" />
                                 </Button>
@@ -1927,7 +1927,7 @@ export function Variables() {
           </Card>
 
           {/* --- MOVED POSITIONS --- */}
-          <Card className="shadow-sm border-slate-200">
+          <Card className="border-slate-200">
             <CardHeader>
               <CardTitle>Positions</CardTitle>
               <CardDescription>Manage available job positions for employees.</CardDescription>
@@ -2001,7 +2001,7 @@ export function Variables() {
                                 if (dept.staffType === 'NON-EMPLOYEE') 
                                   return <span className="text-[10px] font-bold px-2 py-0.5 bg-rose-100 text-rose-700 rounded-full uppercase">Non-Employee</span>;
                                 return (
-                                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${dept.staffType === 'FIELD' ? 'bg-amber-100 text-amber-700' : 'bg-indigo-100 text-indigo-700'}`}>
+                                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${dept.staffType === 'FIELD' ? 'bg-amber-100 text-amber-700' : 'bg-blue-50 text-blue-700 border border-blue-200 rounded-sm'}`}>
                                     {dept.staffType} Staff
                                   </span>
                                 );
@@ -2014,7 +2014,7 @@ export function Variables() {
                                     variant="ghost"
                                     size="icon"
                                     onClick={() => handleOpenRename('position', pos.title, pos.id)}
-                                    className="h-8 w-8 text-slate-400 hover:text-indigo-600 hover:bg-slate-50"
+                                    className="h-8 w-8 text-slate-400 hover:text-blue-600 hover:bg-slate-50"
                                   >
                                     <Edit2 className="h-3.5 w-3.5" />
                                   </Button>
@@ -2043,7 +2043,7 @@ export function Variables() {
           </Card>
 
           {/* --- MOVED DEPARTMENTS --- */}
-          <Card className="shadow-sm border-slate-200">
+          <Card className="border-slate-200">
             <CardHeader>
               <CardTitle>Departments</CardTitle>
               <CardDescription>Manage available departments and their hierarchy.</CardDescription>
@@ -2055,7 +2055,7 @@ export function Variables() {
                   <div className="flex flex-col gap-1.5 w-40">
                     <label className="text-[10px] font-bold text-slate-400 uppercase px-1">Dept Category</label>
                     <select 
-                       className="h-9 rounded-md border border-slate-200 bg-white px-3 text-sm cursor-pointer focus:ring-2 focus:ring-indigo-400 outline-none"
+                       className="h-9 rounded-md border border-slate-200 bg-white px-3 text-sm cursor-pointer focus:ring-2 focus:ring-blue-400 outline-none"
                        value={newDeptStaffType}
                        onChange={(e) => setNewDeptStaffType(e.target.value as any)}
                     >
@@ -2108,7 +2108,7 @@ export function Variables() {
                           <TableCell>
                             {priv.canEdit ? (
                               <select 
-                                 className="h-8 rounded border border-slate-200 px-2 text-sm bg-white min-w-[140px] focus:ring-2 focus:ring-indigo-400 outline-none"
+                                 className="h-8 rounded border border-slate-200 px-2 text-sm bg-white min-w-[140px] focus:ring-2 focus:ring-blue-400 outline-none"
                                  value={dep.staffType}
                                  onChange={(e) => updateDepartment(dep.id, { staffType: e.target.value as any })}
                               >
@@ -2121,7 +2121,7 @@ export function Variables() {
                                  {dep.staffType === 'NON-EMPLOYEE' ? (
                                    <span className="text-[10px] font-bold px-2 py-0.5 bg-rose-100 text-rose-700 rounded-full uppercase">Non-Employee</span>
                                  ) : (
-                                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${dep.staffType === 'FIELD' ? 'bg-amber-100 text-amber-700' : 'bg-indigo-100 text-indigo-700'}`}>
+                                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${dep.staffType === 'FIELD' ? 'bg-amber-100 text-amber-700' : 'bg-blue-50 text-blue-700 border border-blue-200 rounded-sm'}`}>
                                      {dep.staffType} Staff
                                    </span>
                                  )}
@@ -2148,7 +2148,7 @@ export function Variables() {
                                   variant="ghost"
                                   size="icon"
                                   onClick={() => handleOpenRename('department', dep.name, dep.id)}
-                                  className="h-8 w-8 text-slate-400 hover:text-indigo-600 hover:bg-slate-50"
+                                  className="h-8 w-8 text-slate-400 hover:text-blue-600 hover:bg-slate-50"
                                 >
                                   <Edit2 className="h-3.5 w-3.5" />
                                 </Button>
@@ -2177,7 +2177,7 @@ export function Variables() {
 
 
           {/* ——— LEAVE TYPES ——— */}
-          <Card className="shadow-sm border-slate-200">
+          <Card className="border-slate-200">
             <CardHeader>
               <CardTitle>Leave Types</CardTitle>
               <CardDescription>Manage the types of leave available on employee leave forms.</CardDescription>
@@ -2226,7 +2226,7 @@ export function Variables() {
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1">
                             {priv.canEdit && (
-                              <Button variant="ghost" size="icon" onClick={() => handleOpenRename('leaveType', lt.name)} className="h-8 w-8 text-slate-400 hover:text-indigo-600">
+                              <Button variant="ghost" size="icon" onClick={() => handleOpenRename('leaveType', lt.name)} className="h-8 w-8 text-slate-400 hover:text-blue-600">
                                 <Edit2 className="h-3.5 w-3.5" />
                               </Button>
                             )}
@@ -2249,7 +2249,7 @@ export function Variables() {
           </Card>
 
           {/* ——— PAYEE TYPES ——— */}
-          <Card className="shadow-sm border-slate-200">
+          <Card className="border-slate-200">
             <CardHeader>
               <CardTitle>Payee Types</CardTitle>
               <CardDescription>Define categories for non-employees (e.g. Director, Contractor).</CardDescription>
@@ -2281,7 +2281,7 @@ export function Variables() {
               )}
               <div className="flex flex-wrap gap-2">
                 {(localHrVars.payeeTypes || []).map(pt => (
-                  <div key={pt} className="bg-indigo-50 border border-indigo-200 rounded-full px-3 py-1 text-sm flex items-center gap-2 text-indigo-800">
+                  <div key={pt} className="bg-blue-50 border border-slate-200 rounded-full px-3 py-1 text-sm flex items-center gap-2 text-slate-800">
                     {pt}
                     {priv.canEdit && (
                       <button 
@@ -2290,7 +2290,7 @@ export function Variables() {
                           updateHrVariables({ payeeTypes: newTypes });
                           updateLocalHrVariables({ payeeTypes: newTypes });
                         }} 
-                        className="text-indigo-400 hover:text-rose-500"
+                        className="text-blue-400 hover:text-rose-500"
                       >
                         <Trash2 className="h-3 w-3" />
                       </button>
@@ -2302,10 +2302,10 @@ export function Variables() {
           </Card>
 
           {/* Task Templates */}
-          <Card className="shadow-sm border-slate-200 border-t-4 border-t-indigo-500">
-            <CardHeader className="bg-indigo-50/30 rounded-t-lg border-b border-indigo-100 flex-row items-center justify-between">
+          <Card className="border-slate-200 border-t-4 border-t-blue-600">
+            <CardHeader className="bg-slate-50 rounded-t-md border-b border-slate-200 flex-row items-center justify-between">
               <div className="flex-1">
-                <CardTitle className="text-indigo-900">Onboarding Task Templates</CardTitle>
+                <CardTitle className="text-slate-900">Onboarding Task Templates</CardTitle>
                 <CardDescription>
                   <strong>System Default Tasks</strong> (Steps 1–8) are built-in for all departments and cannot be removed.
                   Add <strong>custom extra tasks</strong> below and choose where they slot in.
@@ -2315,7 +2315,7 @@ export function Variables() {
                 <Button 
                   variant="outline" 
                   size="sm" 
-                  className="bg-indigo-600 text-white hover:bg-indigo-700 border-none h-8 gap-2 ml-4 px-4"
+                  className="bg-blue-600 text-white hover:bg-blue-700 border-none h-8 gap-2 ml-4 px-4 rounded-sm"
                   onClick={handleDeduplicateAllTasks}
                 >
                   <Trash2 className="h-3.5 w-3.5" /> Clean Duplicate Tasks
@@ -2332,10 +2332,10 @@ export function Variables() {
               </div>
 
               {/* Unified Onboarding Tasks */}
-              <div className="rounded-xl border border-indigo-200 bg-indigo-50/20 overflow-hidden">
-                <div className="flex items-center justify-between px-4 py-2.5 bg-indigo-100/60 border-b border-indigo-200">
-                  <span className="text-xs font-bold uppercase tracking-wider text-indigo-800">Onboarding Tasks{taskDeptFilter !== 'ALL' ? ` — ${taskDeptFilter}` : ' (All Departments)'}</span>
-                  <span className="text-[10px] text-indigo-600 bg-indigo-100 rounded px-2 py-0.5 font-semibold">{taskDeptFilter === 'ALL' ? 7 + currentTaskView.onboardingTasks.length : currentTaskView.onboardingTasks.length} tasks</span>
+              <div className="rounded-md border border-slate-200 bg-slate-50/40 overflow-hidden">
+                <div className="flex items-center justify-between px-4 py-2.5 bg-slate-100 border-b border-slate-200">
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-800">Onboarding Tasks{taskDeptFilter !== 'ALL' ? ` — ${taskDeptFilter}` : ' (All Departments)'}</span>
+                  <span className="text-[10px] text-blue-600 bg-blue-50 border border-blue-200 rounded px-2 py-0.5 font-semibold">{taskDeptFilter === 'ALL' ? 7 + currentTaskView.onboardingTasks.length : currentTaskView.onboardingTasks.length} tasks</span>
                 </div>
                 <div className="p-3 space-y-3">
                   
@@ -2352,12 +2352,12 @@ export function Variables() {
                         { step: '6', key: '6', defaultLabel: 'Orientation (HR, Department, Site, HSE)' },
                         { step: '7', key: '7', defaultLabel: 'Provision of PPE, Handbook & Requirements' },
                       ].map(item => (
-                        <div key={item.step} className="flex gap-2 p-2 rounded-lg bg-white border border-indigo-100 items-center">
-                          <span className="h-6 w-6 rounded-full bg-indigo-500 text-white text-[11px] font-bold flex items-center justify-center shrink-0">{item.step}</span>
+                        <div key={item.step} className="flex gap-2 p-2 rounded-md bg-white border border-slate-200 items-center">
+                          <span className="h-6 w-6 rounded-full bg-blue-600 text-white text-[11px] font-bold flex items-center justify-center shrink-0">{item.step}</span>
                           <div className="flex-1">
                             {priv.canEdit ? (
                                <input 
-                                 className="text-sm font-semibold text-slate-800 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-indigo-500 outline-none w-full transition-colors"
+                                 className="text-sm font-semibold text-slate-800 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 outline-none w-full transition-colors"
                                  value={localHrVars.onboardingStageLabels?.[item.key] ?? item.defaultLabel}
                                  onChange={(e) => updateLocalHrVariables({ onboardingStageLabels: { ...(localHrVars.onboardingStageLabels || {}), [item.key]: e.target.value } })}
                                />
@@ -2372,8 +2372,8 @@ export function Variables() {
                   )}
 
                   {priv.canEdit && (
-                    <div className="space-y-2 p-3 bg-white rounded-lg border border-indigo-100">
-                      <p className="text-xs font-bold text-indigo-700 uppercase tracking-wider">Add Custom Onboarding Task</p>
+                    <div className="space-y-2 p-3 bg-white rounded-md border border-slate-200">
+                      <p className="text-xs font-bold text-blue-700 uppercase tracking-wider">Add Custom Onboarding Task</p>
                       <Input placeholder="Task title (e.g. Provide Laptop)" value={newTaskTitle} onChange={(e) => setNewTaskTitle(e.target.value)} className="text-sm h-9" />
                       <div className="grid grid-cols-2 gap-2">
                         <select className="h-9 rounded-md border border-slate-200 bg-slate-50 px-3 text-sm" value={newTaskAssignee} onChange={(e) => setNewTaskAssignee(e.target.value)}>
@@ -2398,7 +2398,7 @@ export function Variables() {
                           ))}
                         </select>
                       </div>
-                      <Button variant="outline" onClick={handleAddTask} className="gap-2 border-indigo-300 text-indigo-700 hover:bg-indigo-50 w-full h-9" disabled={!newTaskTitle || !newTaskAssignee}>
+                      <Button variant="outline" onClick={handleAddTask} className="gap-2 border-blue-300 text-blue-700 hover:bg-blue-50 rounded-sm w-full h-9" disabled={!newTaskTitle || !newTaskAssignee}>
                         <Plus className="h-4 w-4" /> Add Task
                       </Button>
                     </div>
@@ -2406,10 +2406,10 @@ export function Variables() {
                   {currentTaskView.onboardingTasks.length === 0
                     ? <p className="text-xs text-slate-400 text-center py-4 italic">No custom tasks added for this department context.</p>
                     : <div className="space-y-1.5">{currentTaskView.onboardingTasks.map((t, idx) => (
-                        <div key={idx} className="flex items-center gap-2 p-2 bg-white rounded-lg border border-slate-200 group hover:border-indigo-300 transition-colors">
+                        <div key={idx} className="flex items-center gap-2 p-2 bg-white rounded-md border border-slate-200 group hover:border-blue-300 transition-colors">
                           <div className="flex flex-col gap-0.5">
-                            <button className="h-5 w-5 rounded text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 flex items-center justify-center disabled:opacity-30 text-[10px]" onClick={() => handleMoveTask(idx, 'up')} disabled={idx === 0}>&#9650;</button>
-                            <button className="h-5 w-5 rounded text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 flex items-center justify-center disabled:opacity-30 text-[10px]" onClick={() => handleMoveTask(idx, 'down')} disabled={idx === currentTaskView.onboardingTasks.length - 1}>&#9660;</button>
+                            <button className="h-5 w-5 rounded text-slate-400 hover:text-blue-600 hover:bg-blue-50 flex items-center justify-center disabled:opacity-30 text-[10px]" onClick={() => handleMoveTask(idx, 'up')} disabled={idx === 0}>&#9650;</button>
+                            <button className="h-5 w-5 rounded text-slate-400 hover:text-blue-600 hover:bg-blue-50 flex items-center justify-center disabled:opacity-30 text-[10px]" onClick={() => handleMoveTask(idx, 'down')} disabled={idx === currentTaskView.onboardingTasks.length - 1}>&#9660;</button>
                           </div>
                           <span className="h-6 w-6 rounded-full bg-slate-100 text-slate-500 text-[11px] font-bold flex items-center justify-center shrink-0">+</span>
                           <div className="flex-1 min-w-0">
@@ -2428,14 +2428,14 @@ export function Variables() {
               </div>
 
               {/* Offboarding tasks */}
-              <div className="rounded-xl border border-rose-200 bg-rose-50/20 overflow-hidden">
+              <div className="rounded-md border border-rose-200 bg-rose-50/20 overflow-hidden">
                 <div className="flex items-center justify-between px-4 py-2.5 bg-rose-100/60 border-b border-rose-200">
                   <span className="text-xs font-bold uppercase tracking-wider text-rose-700">Offboarding Tasks{taskDeptFilter !== 'ALL' ? ` — ${taskDeptFilter}` : ''}</span>
                   <span className="text-[10px] text-rose-600 bg-rose-100 rounded px-2 py-0.5 font-semibold">{currentTaskView.offboardingTasks.length} task{currentTaskView.offboardingTasks.length !== 1 ? 's' : ''}</span>
                 </div>
                 <div className="p-3 space-y-2">
                   {priv.canEdit && (
-                    <div className="flex gap-2 p-2 bg-white rounded-lg border border-rose-100">
+                    <div className="flex gap-2 p-2 bg-white rounded-md border border-rose-100">
                       <Input placeholder="Task title" value={newOffTaskTitle} onChange={e => setNewOffTaskTitle(e.target.value)} className="flex-1 text-sm h-9" />
                       <select className="h-9 rounded-md border border-slate-200 bg-slate-50 px-3 text-sm w-44 shrink-0" value={newOffTaskAssignee} onChange={e => setNewOffTaskAssignee(e.target.value)}>
                         <option value="">-- Assignee Dept --</option>
@@ -2453,7 +2453,7 @@ export function Variables() {
                   {currentTaskView.offboardingTasks.length === 0
                     ? <p className="text-xs text-slate-400 text-center py-4 italic">No offboarding tasks configured.</p>
                     : currentTaskView.offboardingTasks.map((t, idx) => (
-                        <div key={idx} className="flex items-center gap-2 p-2 bg-white rounded-lg border border-rose-100 group hover:border-rose-300 transition-colors">
+                        <div key={idx} className="flex items-center gap-2 p-2 bg-white rounded-md border border-rose-100 group hover:border-rose-300 transition-colors">
                           <div className="flex flex-col gap-0.5">
                             <button className="h-5 w-5 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center disabled:opacity-30 text-[10px]" onClick={() => handleMoveOffTask(idx, 'up')} disabled={idx === 0}>&#9650;</button>
                             <button className="h-5 w-5 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center disabled:opacity-30 text-[10px]" onClick={() => handleMoveOffTask(idx, 'down')} disabled={idx === currentTaskView.offboardingTasks.length - 1}>&#9660;</button>
@@ -2475,7 +2475,7 @@ export function Variables() {
             </CardContent>
           </Card>
           {/* Performance & Conduct Variables */}
-          <Card className="shadow-sm border-slate-200 border-t-4 border-t-rose-500">
+          <Card className="border-slate-200 border-t-4 border-t-rose-500">
             <CardHeader className="bg-rose-50/30 rounded-t-lg border-b border-rose-100">
               <CardTitle className="text-rose-900">Performance & Conduct Configuration</CardTitle>
               <CardDescription>
@@ -2510,7 +2510,7 @@ export function Variables() {
                 <label className="text-xs font-bold text-slate-500 uppercase">Performance Categories</label>
                 <div className="flex flex-wrap gap-2 mb-2">
                   {(localHrVars.performanceCategories || ['Attendance', 'Behavioral', 'Performance', 'Safety/PPE', 'Accolade', 'Clarity']).map((cat, i) => (
-                    <div key={i} className="flex items-center gap-2 bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-lg text-sm font-medium text-slate-600">
+                    <div key={i} className="flex items-center gap-2 bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-md text-sm font-medium text-slate-600">
                       {cat}
                       {priv.canEdit && (
                         <button onClick={() => {
@@ -2564,7 +2564,7 @@ export function Variables() {
 
                 <div className="pt-4 border-t border-rose-100 flex flex-col gap-4">
                   <label className="text-xs font-bold text-slate-500 uppercase">Sanction Thresholds (Points based)</label>
-                  <div className="border border-slate-200 rounded-lg overflow-hidden bg-white shadow-sm">
+                  <div className="border border-slate-200 rounded-md overflow-hidden bg-white">
                     <div className="overflow-x-auto">
                     <Table>
                       <TableHeader className="bg-slate-50/80">
@@ -2613,13 +2613,13 @@ export function Variables() {
 
         {/* --- RIGHT COLUMN --- */}
         <div className="flex flex-col gap-6">
-          <Card className="shadow-sm border-slate-200">
+          <Card className="border-slate-200">
             <CardHeader className="bg-slate-50/50 rounded-t-xl border-b border-slate-100">
               <CardTitle className="text-slate-800 flex items-center gap-2">Payroll Breakdown Variables (<NairaSign className="h-4 w-4" />)</CardTitle>
               <CardDescription>Adjust the percentage breakdown for components of basic salary and automated deductions.</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="mb-8 p-5 bg-slate-50 border border-slate-200 rounded-xl space-y-6">
+              <div className="mb-8 p-5 bg-slate-50 border border-slate-200 rounded-md space-y-6">
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="text-sm font-bold text-slate-800 uppercase tracking-tight">Salary Components Breakdown</h3>
@@ -2630,7 +2630,7 @@ export function Variables() {
                     const isPerfect = total === 100;
                     const isOver = total > 100;
                     return (
-                      <div className={`px-4 py-2 rounded-lg border flex flex-col items-end justify-center transition-colors shadow-sm ${
+                      <div className={`px-4 py-2 rounded-md border flex flex-col items-end justify-center transition-colors  ${
                         isPerfect ? 'bg-emerald-50 border-emerald-200' : isOver ? 'bg-rose-50 border-rose-200' : 'bg-amber-50 border-amber-200'
                       }`}>
                         <span className={`text-xl font-black leading-none ${isPerfect ? 'text-emerald-600' : isOver ? 'text-rose-600' : 'text-amber-600'}`}>
@@ -2654,7 +2654,7 @@ export function Variables() {
 
                   return (
                     <div className="h-3.5 w-full bg-slate-200 rounded-full overflow-hidden flex border border-slate-300/50 shadow-inner">
-                      {b > 0 && <div className="bg-indigo-500 h-full transition-all duration-300" style={{ width: `${b}%` }} title={`Basic: ${localPayrollVars.basic}%`} />}
+                      {b > 0 && <div className="bg-blue-600 h-full transition-all duration-300" style={{ width: `${b}%` }} title={`Basic: ${localPayrollVars.basic}%`} />}
                       {h > 0 && <div className="bg-emerald-500 h-full transition-all duration-300" style={{ width: `${h}%` }} title={`Housing: ${localPayrollVars.housing}%`} />}
                       {t > 0 && <div className="bg-amber-500 h-full transition-all duration-300" style={{ width: `${t}%` }} title={`Transport: ${localPayrollVars.transport}%`} />}
                       {o > 0 && <div className="bg-rose-500 h-full transition-all duration-300" style={{ width: `${o}%` }} title={`Other: ${localPayrollVars.otherAllowances}%`} />}
@@ -2665,12 +2665,12 @@ export function Variables() {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 items-end">
                   <div className="space-y-1.5">
                     <label className="text-xs font-bold text-slate-600 uppercase flex items-start gap-1.5">
-                      <span className="w-2.5 h-2.5 mt-0.5 rounded-sm bg-indigo-500 block shrink-0"></span>
+                      <span className="w-2.5 h-2.5 mt-0.5 rounded-sm bg-blue-600 block shrink-0"></span>
                       Basic Salary
                     </label>
                     <Input
                       type="number"
-                      className="font-mono text-sm shadow-sm h-9"
+                      className="font-mono text-sm h-9"
                       value={localPayrollVars.basic}
                       onChange={e => updateLocalPayrollVariables({ basic: Number(e.target.value) })}
                     />
@@ -2682,7 +2682,7 @@ export function Variables() {
                     </label>
                     <Input
                       type="number"
-                      className="font-mono text-sm shadow-sm h-9"
+                      className="font-mono text-sm h-9"
                       value={localPayrollVars.housing}
                       onChange={e => updateLocalPayrollVariables({ housing: Number(e.target.value) })}
                     />
@@ -2694,7 +2694,7 @@ export function Variables() {
                     </label>
                     <Input
                       type="number"
-                      className="font-mono text-sm shadow-sm h-9"
+                      className="font-mono text-sm h-9"
                       value={localPayrollVars.transport}
                       onChange={e => updateLocalPayrollVariables({ transport: Number(e.target.value) })}
                     />
@@ -2706,7 +2706,7 @@ export function Variables() {
                     </label>
                     <Input
                       type="number"
-                      className="font-mono text-sm shadow-sm h-9"
+                      className="font-mono text-sm h-9"
                       value={localPayrollVars.otherAllowances}
                       onChange={e => updateLocalPayrollVariables({ otherAllowances: Number(e.target.value) })}
                     />
@@ -2805,9 +2805,9 @@ export function Variables() {
                     return (
                       <label
                         key={sec.key}
-                        className={`flex items-start gap-3 p-3 rounded-xl border transition-all cursor-pointer select-none ${
+                        className={`flex items-start gap-3 p-3 rounded-md border transition-all cursor-pointer select-none ${
                           isChecked
-                            ? 'bg-indigo-50/60 border-indigo-200 text-indigo-900 shadow-xs'
+                            ? 'bg-blue-50/60 border-slate-200 text-slate-900 '
                             : 'bg-slate-50/70 border-slate-200/80 text-slate-600 hover:bg-slate-100/60'
                         }`}
                       >
@@ -2821,7 +2821,7 @@ export function Variables() {
                             };
                             updateLocalPayrollVariables({ defaultVatableSections: updated });
                           }}
-                          className="mt-0.5 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 accent-indigo-600"
+                          className="mt-0.5 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 accent-blue-600"
                         />
                         <div className="flex-1 min-w-0">
                           <span className="text-xs font-bold block leading-tight">{sec.label}</span>
@@ -2849,7 +2849,7 @@ export function Variables() {
                 <select
                   value={monthConfigDept}
                   onChange={e => setMonthConfigDept(e.target.value)}
-                  className="h-8 rounded-md border border-slate-200 bg-white px-3 text-sm cursor-pointer focus:ring-2 focus:ring-indigo-400 outline-none"
+                  className="h-8 rounded-md border border-slate-200 bg-white px-3 text-sm cursor-pointer focus:ring-2 focus:ring-blue-400 outline-none"
                 >
                   <option value="">— All (6 days/wk default) —</option>
                   {departments.map(d => (
@@ -2859,7 +2859,7 @@ export function Variables() {
                 {monthConfigDept && (() => {
                   const deptObj = departments.find(d => d.name === monthConfigDept);
                   const effective = deptObj?.workDaysPerWeek ?? (deptObj?.staffType === 'FIELD' ? 6 : 5);
-                  return <span className="text-xs text-indigo-600 font-medium bg-indigo-50 rounded-full px-2 py-0.5">{effective} days/week</span>;
+                  return <span className="text-xs text-blue-600 font-medium bg-blue-50 rounded-full px-2 py-0.5">{effective} days/week</span>;
                 })()}
               </div>
               <div className="border rounded-md overflow-hidden">
@@ -2897,7 +2897,7 @@ export function Variables() {
                           <TableCell className="text-slate-500 text-xs font-mono">{formatDisplayDate(startDate)}</TableCell>
                           <TableCell className="text-slate-500 text-xs font-mono">{formatDisplayDate(endDate)}</TableCell>
                           <TableCell className="text-center">
-                            <span className="inline-flex items-center justify-center h-8 w-16 rounded bg-indigo-50 text-indigo-700 font-bold text-sm">
+                            <span className="inline-flex items-center justify-center h-8 w-16 rounded bg-blue-50 text-blue-700 border border-blue-200 font-bold rounded-sm text-sm">
                               {computedWorkDays}
                             </span>
                           </TableCell>
@@ -2930,7 +2930,7 @@ export function Variables() {
             </CardHeader>
             <CardContent className="pt-4 space-y-6">
               
-              <div className="bg-amber-50/50 border border-amber-100 rounded-xl p-4 flex flex-col gap-3">
+              <div className="bg-amber-50/50 border border-amber-100 rounded-md p-4 flex flex-col gap-3">
                 <h4 className="text-xs font-bold text-amber-800 uppercase tracking-tighter">Calculation Logic Reference</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
                   <div className="space-y-1">
@@ -3095,7 +3095,7 @@ export function Variables() {
                             <TableCell className="text-center">
                               <input type="checkbox" checked={cond.enabled}
                                 onChange={e => updateLocalExtraCond(cond.id, { enabled: e.target.checked })}
-                                className="h-4 w-4 accent-indigo-600" />
+                                className="h-4 w-4 accent-blue-600" />
                             </TableCell>
                             <TableCell>
                               {priv.canEdit && (
@@ -3118,9 +3118,9 @@ export function Variables() {
           </Card>
           
           {/* --- HR Module & Disciplinary Settings --- */}
-          <Card className="border-indigo-200">
-            <CardHeader className="bg-indigo-50/50 rounded-t-lg border-b border-indigo-100">
-              <CardTitle className="text-indigo-900">HR, Disciplinary &amp; Lifecycle Settings (Due Process)</CardTitle>
+          <Card className="border-slate-200">
+            <CardHeader className="bg-slate-50 rounded-t-md border-b border-slate-200">
+              <CardTitle className="text-slate-900">HR, Disciplinary &amp; Lifecycle Settings (Due Process)</CardTitle>
               <CardDescription>
                 Configure thresholds, time-frames, and policies applied automatically by the system. Includes specific "Due Process" variables such as the investigation timeframe and appeal allowance periods.
               </CardDescription>
@@ -3183,7 +3183,7 @@ export function Variables() {
               </div>
               
               <div className="space-y-4 border-t pt-4 border-slate-100">
-                <p className="text-xs font-bold text-indigo-500 uppercase">Due Process Settings</p>
+                <p className="text-xs font-bold text-blue-600 uppercase">Due Process Settings</p>
                 <p className="text-xs text-slate-500 leading-relaxed max-w-lg mb-2">
                   Legally compliant HR actions require allowing the employee time to investigate notes or make appeals before termination or suspension takes final effect.
                 </p>
@@ -3273,7 +3273,7 @@ function RenameVariableDialog({ isOpen, onClose, editingVar, renameInput, setRen
       <DialogContent className="sm:max-w-[450px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Edit2 className="h-5 w-5 text-indigo-600" />
+            <Edit2 className="h-5 w-5 text-blue-600" />
             {getTitle()}
           </DialogTitle>
         </DialogHeader>
@@ -3304,13 +3304,13 @@ function RenameVariableDialog({ isOpen, onClose, editingVar, renameInput, setRen
               value={renameInput}
               onChange={e => setRenameInput(e.target.value)}
               placeholder="Enter new name..."
-              className="h-10 focus:ring-indigo-500"
+              className="h-10 focus:ring-blue-500"
               autoFocus
             />
           </div>
 
           {totalRefs > 0 && (
-            <div className="p-4 bg-amber-50 border border-amber-100 rounded-lg space-y-3">
+            <div className="p-4 bg-amber-50 border border-amber-100 rounded-md space-y-3">
               <div className="flex items-start gap-2">
                 <Settings2 className="h-4 w-4 text-amber-600 mt-0.5" />
                 <div>
@@ -3348,7 +3348,7 @@ function RenameVariableDialog({ isOpen, onClose, editingVar, renameInput, setRen
         <DialogFooter className="gap-2 sm:gap-0">
           <Button variant="ghost" onClick={onClose} disabled={isPropagating}>Cancel</Button>
           <Button 
-            className="bg-indigo-600 hover:bg-indigo-700 text-white" 
+            className="bg-blue-600 hover:bg-blue-700 text-white rounded-sm" 
             onClick={() => onConfirm(shouldPropagate)}
             disabled={isPropagating || !renameInput.trim()}
           >

@@ -57,9 +57,9 @@ const FREQ_LABELS: Record<ReminderFrequency, string> = {
 const FREQ_COLORS: Record<ReminderFrequency, string> = {
   once:         'bg-slate-100 text-slate-600 border-slate-200',
   hourly:       'bg-blue-50 text-blue-600 border-blue-200',
-  every_6_hours:'bg-indigo-50 text-indigo-600 border-indigo-200',
-  daily:        'bg-indigo-50 text-indigo-600 border-indigo-200',
-  weekly:       'bg-purple-50 text-purple-600 border-purple-200',
+  every_6_hours:'bg-blue-50 text-blue-700 border-blue-200',
+  daily:        'bg-blue-50 text-blue-700 border-blue-200',
+  weekly:       'bg-sky-50 text-sky-700 border-sky-200',
   monthly:      'bg-pink-50 text-pink-600 border-pink-200',
 };
 
@@ -92,13 +92,13 @@ const toneStyles = {
   ok:      'text-muted-foreground',
   soon:    'text-amber-600 dark:text-amber-400 font-semibold',
   overdue: 'text-red-600 dark:text-red-400 font-bold',
-  today:   'text-indigo-600 dark:text-indigo-400 font-semibold',
+  today:   'text-blue-600 dark:text-blue-400 font-semibold',
 };
 const toneIconStyles = {
   ok:      'text-muted-foreground',
   soon:    'text-amber-500',
   overdue: 'text-red-500',
-  today:   'text-indigo-500',
+  today:   'text-blue-600',
 };
 
 /* ─── Main Component ────────────────────────────────────────────────────────── */
@@ -302,7 +302,7 @@ export function TaskReminders() {
             variant={viewMode === 'calendar' ? 'secondary' : 'ghost'}
             size="sm"
             onClick={() => setViewMode('calendar')}
-            className={`h-8 px-2 sm:px-3 gap-2 font-bold text-[10px] uppercase tracking-tight ${viewMode === 'calendar' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500'}`}
+            className={`h-8 px-2 sm:px-3 gap-2 font-bold text-[10px] uppercase tracking-tight ${viewMode === 'calendar' ? 'bg-white  text-blue-600' : 'text-slate-500'}`}
           >
             <Calendar className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Calendar</span>
           </Button>
@@ -310,7 +310,7 @@ export function TaskReminders() {
             variant={viewMode === 'list' ? 'secondary' : 'ghost'}
             size="sm"
             onClick={() => setViewMode('list')}
-            className={`h-8 px-2 sm:px-3 gap-2 font-bold text-[10px] uppercase tracking-tight ${viewMode === 'list' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500'}`}
+            className={`h-8 px-2 sm:px-3 gap-2 font-bold text-[10px] uppercase tracking-tight ${viewMode === 'list' ? 'bg-white  text-blue-600' : 'text-slate-500'}`}
           >
             <LayoutList className="w-3.5 h-3.5" /> <span className="hidden sm:inline">List</span>
           </Button>
@@ -330,7 +330,7 @@ export function TaskReminders() {
         <Button
           size="sm"
           onClick={openCreate}
-          className="h-8 sm:h-9 px-2 sm:px-4 gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] uppercase tracking-tight shadow-md transition-all active:scale-95"
+          className="h-8 sm:h-9 px-2 sm:px-4 gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-[11px] uppercase tracking-tight transition-all active:scale-95 rounded-sm"
         >
           <Plus className="w-4 h-4" /> <span className="hidden sm:inline">New Reminder</span>
         </Button>
@@ -373,10 +373,10 @@ export function TaskReminders() {
             const isOwnerCal = rem.createdBy === currentUser?.id;
             const canEditCal = isOwnerCal || isAdminCal;
             return (
-              <div key={rem.id} className={`p-2.5 rounded-xl border transition-all group ${rem.isActive ? 'bg-card border-border hover:border-indigo-200 hover:shadow-sm' : 'bg-muted/30 border-border/50 opacity-70'}`}>
+              <div key={rem.id} className={`p-2.5 rounded-md border transition-all group ${rem.isActive ? 'bg-card border-border hover:border-blue-300' : 'bg-muted/30 border-border/50 opacity-70'}`}>
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-1.5 min-w-0">
-                    <div className={`w-1.5 h-1.5 rounded-full ${rem.isActive ? 'bg-indigo-500' : 'bg-muted-foreground'}`} />
+                    <div className={`w-1.5 h-1.5 rounded-full ${rem.isActive ? 'bg-blue-600' : 'bg-muted-foreground'}`} />
                     <span className="text-xs font-semibold text-foreground truncate">{format(parseISO(rem.remindAt), 'h:mm a')}</span>
                   </div>
                   {canEditCal && (
@@ -394,7 +394,7 @@ export function TaskReminders() {
                 <p className="text-xs font-medium text-foreground mt-1.5 line-clamp-2 leading-tight">{rem.title}</p>
                 {rem.body && <p className="text-[10px] text-muted-foreground mt-1 line-clamp-1">{rem.body}</p>}
                 {isOwnerCal ? (
-                  <span className="mt-1.5 inline-flex items-center gap-1 text-[9px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded-full">✦ You</span>
+                  <span className="mt-1.5 inline-flex items-center gap-1 text-[9px] font-bold text-blue-600 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded-sm">✦ You</span>
                 ) : (
                   <span className="mt-1.5 inline-flex items-center gap-1 text-[9px] font-medium text-slate-400 bg-slate-50 border border-slate-100 px-1.5 py-0.5 rounded-full">
                     {users.find(u => u.id === rem.createdBy)?.name?.split(' ')[0] ?? 'System'}
@@ -432,11 +432,11 @@ export function TaskReminders() {
     return (
       <div className="flex flex-col lg:flex-row h-full min-h-0 gap-4 overflow-y-auto lg:overflow-hidden pb-20 lg:pb-0">
         {/* Calendar Grid */}
-        <div className="flex-1 flex flex-col bg-card border border-border rounded-xl overflow-hidden shadow-sm min-h-[500px] lg:min-h-0">
+        <div className="flex-1 flex flex-col bg-card border border-border rounded-md overflow-hidden min-h-[500px] lg:min-h-0">
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b border-border bg-muted/10">
             <h2 className="text-lg font-bold text-foreground">{format(currentDate, 'MMMM yyyy')}</h2>
-            <div className="flex items-center gap-1.5 bg-background border border-border rounded-lg p-0.5 shadow-sm">
+            <div className="flex items-center gap-1.5 bg-background border border-border rounded-lg p-0.5">
               <button onClick={prevMonth} className="px-2 py-1.5 rounded-md hover:bg-muted text-muted-foreground transition-colors"><ChevronLeft className="w-4 h-4" /></button>
               <button onClick={() => setCurrentDate(new Date())} className="px-3 py-1 text-xs font-bold rounded-md hover:bg-muted text-foreground transition-colors">Today</button>
               <button onClick={nextMonth} className="px-2 py-1.5 rounded-md hover:bg-muted text-muted-foreground transition-colors"><ChevronRight className="w-4 h-4" /></button>
@@ -460,16 +460,16 @@ export function TaskReminders() {
                 const isCurrentMonth = isSameMonth(day, monthStart);
                 return (
                   <div key={day.toString()} onClick={() => setSelectedDate(day)}
-                    className={`p-2 border-b border-border/60 cursor-pointer transition-all hover:bg-muted/40 flex flex-col gap-1.5 ${!isCurrentMonth ? 'opacity-40 bg-muted/5' : ''} ${isSelected ? 'bg-indigo-50/50 dark:bg-indigo-900/10 shadow-[inset_0_0_0_1px_rgba(139,92,246,0.5)] z-10' : ''} ${idx % 7 !== 6 ? 'border-r' : ''}`}>
+                    className={`p-2 border-b border-border/60 cursor-pointer transition-all hover:bg-muted/40 flex flex-col gap-1.5 ${!isCurrentMonth ? 'opacity-40 bg-muted/5' : ''} ${isSelected ? 'bg-blue-50/50 dark:bg-blue-900/10 border border-blue-500 z-10' : ''} ${idx % 7 !== 6 ? 'border-r' : ''}`}>
                     <div className="flex items-center justify-between">
-                      <span className={`text-xs font-semibold w-6 h-6 flex items-center justify-center rounded-full ${isToday(day) ? 'bg-indigo-600 text-white shadow-sm' : isSelected ? 'bg-indigo-200 text-indigo-900 dark:bg-indigo-800 dark:text-indigo-100' : 'text-foreground'}`}>
+                      <span className={`text-xs font-semibold w-6 h-6 flex items-center justify-center rounded-full ${isToday(day) ? 'bg-blue-600 text-white' : isSelected ? 'bg-blue-100 text-blue-900 dark:bg-blue-900 dark:text-blue-100' : 'text-foreground'}`}>
                         {format(day, 'd')}
                       </span>
                     </div>
                     <div className="flex-1 overflow-y-auto space-y-1 mt-0.5 pr-1 no-scrollbar">
                       {dayReminders.slice(0, 3).map(r => (
-                        <div key={r.id} className={`text-[10px] font-medium px-1.5 py-1 rounded truncate flex items-center gap-1 border border-transparent ${r.isActive ? 'bg-indigo-100/60 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300 hover:border-indigo-200' : 'bg-muted/50 text-muted-foreground'}`}>
-                          <div className={`w-1 h-1 rounded-full flex-shrink-0 ${r.isActive ? 'bg-indigo-500' : 'bg-muted-foreground'}`} />
+                        <div key={r.id} className={`text-[10px] font-medium px-1.5 py-1 rounded truncate flex items-center gap-1 border border-transparent ${r.isActive ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 hover:border-blue-300' : 'bg-muted/50 text-muted-foreground'}`}>
+                          <div className={`w-1 h-1 rounded-full flex-shrink-0 ${r.isActive ? 'bg-blue-600' : 'bg-muted-foreground'}`} />
                           <span className="truncate">{format(parseISO(r.remindAt), 'h:mma')} - {r.title}</span>
                         </div>
                       ))}
@@ -487,7 +487,7 @@ export function TaskReminders() {
         </div>
 
         {/* Sidebar */}
-        <div className="w-full lg:w-[300px] flex flex-col bg-card border border-border rounded-xl overflow-hidden shadow-sm flex-shrink-0">
+        <div className="w-full lg:w-[300px] flex flex-col bg-card border border-border rounded-md overflow-hidden flex-shrink-0">
           <div className="p-4 border-b border-border flex flex-col gap-1 bg-muted/10">
             <h3 className="font-bold text-base text-foreground">{format(selectedDate, 'EEEE, MMMM d')}</h3>
             <div className="text-xs font-medium text-muted-foreground flex items-center justify-between">
@@ -529,7 +529,7 @@ export function TaskReminders() {
                 variant={filterStatus === f ? 'secondary' : 'outline'} 
                 size="sm"
                 onClick={() => setFilterStatus(f)}
-                className={`h-8 px-4 rounded-full font-bold text-[10px] uppercase tracking-tight transition-all active:scale-95 ${filterStatus === f ? 'bg-indigo-50 border-indigo-200 text-indigo-700 shadow-sm' : 'text-slate-500 border-slate-200 hover:bg-slate-50'}`}
+                className={`h-8 px-4 rounded-full font-bold text-[10px] uppercase tracking-tight transition-all active:scale-95 ${filterStatus === f ? 'bg-blue-50 border-blue-200 text-blue-700 rounded-sm' : 'text-slate-500 border-slate-200 hover:bg-slate-50'}`}
               >
                 {f}
               </Button>
@@ -541,7 +541,7 @@ export function TaskReminders() {
               <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
               <Input 
                 placeholder="Search reminders..." 
-                className="pl-10 h-9 text-xs border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-white dark:hover:bg-slate-700 focus:bg-white dark:focus:bg-slate-700 text-slate-900 dark:text-slate-100 transition-all shadow-sm rounded-lg w-full" 
+                className="pl-10 h-9 text-xs border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-white dark:hover:bg-slate-700 focus:bg-white dark:focus:bg-slate-700 text-slate-900 dark:text-slate-100 transition-all rounded-lg w-full" 
                 value={search} 
                 onChange={e => setSearch(e.target.value)} 
               />
@@ -575,15 +575,15 @@ export function TaskReminders() {
         <div className="flex-1 min-h-0 overflow-y-auto px-6 pb-6">
         {filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 text-center">
-            <div className="w-16 h-16 rounded-2xl bg-indigo-50 dark:bg-indigo-900/20 flex items-center justify-center mb-4">
-              <BellOff className="w-7 h-7 text-indigo-400" />
+            <div className="w-12 h-12 rounded-md bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-4">
+              <BellOff className="w-6 h-6 text-slate-400" />
             </div>
             <p className="text-sm font-semibold text-foreground">No reminders found</p>
             <p className="text-xs text-muted-foreground mt-1">
               {search ? 'Try a different search term.' : 'Hit "New Reminder" to create your first one.'}
             </p>
             {!search && (
-              <button onClick={openCreate} className="mt-4 flex items-center gap-2 px-4 py-2 rounded-full bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 transition-colors">
+              <button onClick={openCreate} className="mt-4 flex items-center gap-2 px-4 py-2 rounded-md bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-colors">
                 <Plus className="w-4 h-4" /> Create Reminder
               </button>
             )}
@@ -602,28 +602,28 @@ export function TaskReminders() {
               return (
                 <motion.div key={rem.id} id={`reminder-${rem.id}`}
                   initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}
-                  className={`rounded-2xl border transition-all ${
+                  className={`rounded-md border transition-all ${
                     !rem.isActive
                       ? 'bg-muted/20 border-border/40 opacity-60'
                       : rel.tone === 'overdue'
                         ? 'bg-red-50/50 dark:bg-red-950/20 border-red-200/60 dark:border-red-900/40'
                         : rel.tone === 'today'
-                          ? 'bg-indigo-50/40 dark:bg-indigo-950/20 border-indigo-200/60 dark:border-indigo-900/30'
-                          : 'bg-card border-border hover:border-indigo-200/60 hover:shadow-sm'
+                          ? 'bg-blue-50/40 dark:bg-blue-950/20 border-blue-200/60 dark:border-blue-900/30'
+                          : 'bg-card border-border hover:border-slate-300 dark:hover:border-slate-700'
                   }`}>
 
                   {/* Card header row */}
                   <div className="flex items-start gap-3 p-4">
 
                     {/* Status dot */}
-                    <div className={`mt-0.5 w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                    <div className={`mt-0.5 w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0 ${
                       rel.tone === 'overdue' ? 'bg-red-100 dark:bg-red-900/30' :
-                      rem.isActive ? 'bg-indigo-100 dark:bg-indigo-900/20' : 'bg-muted'
+                      rem.isActive ? 'bg-blue-50 dark:bg-blue-900/20' : 'bg-muted'
                     }`}>
                       {rel.tone === 'overdue'
                         ? <AlertCircle className="w-4.5 h-4.5 text-red-500" />
                         : rem.isActive
-                          ? <Bell className="w-4.5 h-4.5 text-indigo-500" />
+                          ? <Bell className="w-4.5 h-4.5 text-blue-600" />
                           : <BellOff className="w-4.5 h-4.5 text-muted-foreground" />
                       }
                     </div>
@@ -642,14 +642,14 @@ export function TaskReminders() {
                         <div className="flex items-center gap-0.5 flex-shrink-0 self-start sm:self-auto -ml-1 sm:ml-0">
                           <button onClick={() => setSelected(isSelected ? null : rem)}
                             title="View details"
-                            className={`p-1.5 rounded-lg transition-colors ${isSelected ? 'bg-indigo-100 text-indigo-600' : 'text-muted-foreground hover:bg-muted'}`}>
+                            className={`p-1.5 rounded-sm transition-colors ${isSelected ? 'bg-blue-50 text-blue-600 border border-blue-200' : 'text-muted-foreground hover:bg-muted'}`}>
                             <Eye className="w-3.5 h-3.5" />
                           </button>
                           {canEdit && (
                             <>
                               <button onClick={() => toggleReminderActive(rem.id)}
                                 title={rem.isActive ? 'Pause' : 'Resume'}
-                                className={`p-1.5 rounded-lg transition-colors ${rem.isActive ? 'text-indigo-500 hover:bg-indigo-50' : 'text-muted-foreground hover:bg-muted'}`}>
+                                className={`p-1.5 rounded-lg transition-colors ${rem.isActive ? 'text-blue-600 hover:bg-blue-50' : 'text-muted-foreground hover:bg-muted'}`}>
                                 {rem.isActive ? <ToggleRight className="w-3.5 h-3.5" /> : <ToggleLeft className="w-3.5 h-3.5" />}
                               </button>
                               {rem.isActive && (
@@ -722,7 +722,7 @@ export function TaskReminders() {
 
                         {/* Creator badge */}
                         {isOwner ? (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 border border-indigo-200 ml-auto">
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 rounded-sm ml-auto">
                             ✦ Created by You
                           </span>
                         ) : (
@@ -766,7 +766,7 @@ export function TaskReminders() {
                           {canEdit && (
                             <div className="col-span-2 sm:col-span-4 flex gap-2 pt-1 border-t border-border/40">
                               <button onClick={() => openEdit(rem)}
-                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white transition-colors">
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-sm transition-colors">
                                 <Edit3 className="w-3 h-3" /> Edit Reminder
                               </button>
                             </div>
@@ -795,12 +795,12 @@ export function TaskReminders() {
             onClick={e => { if (e.target === e.currentTarget) setShowForm(false); }}>
             <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }} transition={{ duration: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}
-              className="w-full max-w-lg bg-card border border-border rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+              className="w-full max-w-lg bg-card border border-border rounded-md shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
 
               {/* Modal header */}
               <div className="flex items-center gap-3 px-6 py-4 border-b border-border flex-shrink-0">
-                <div className="w-9 h-9 rounded-xl bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center">
-                  <Bell className="w-4 h-4 text-indigo-600" />
+                <div className="w-8 h-8 rounded-md bg-blue-50 dark:bg-blue-950/40 flex items-center justify-center">
+                  <Bell className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                 </div>
                 <div className="flex-1">
                   <h3 className="text-base font-semibold text-foreground">{editingId ? 'Edit Reminder' : 'New Reminder'}</h3>
@@ -818,7 +818,7 @@ export function TaskReminders() {
                   <label className="block text-xs font-semibold text-foreground mb-1.5">Title *</label>
                   <input value={form.title} onChange={e => setForm(p => ({ ...p, title: e.target.value }))}
                     placeholder="e.g. Submit weekly report"
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition" />
+                    className="w-full px-3.5 py-2.5 rounded-md border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition" />
                 </div>
 
                 {/* Message */}
@@ -826,7 +826,7 @@ export function TaskReminders() {
                   <label className="block text-xs font-semibold text-foreground mb-1.5">Message (optional)</label>
                   <textarea value={form.body} onChange={e => setForm(p => ({ ...p, body: e.target.value }))}
                     placeholder="Add any details or notes…" rows={2}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition resize-none" />
+                    className="w-full px-3.5 py-2.5 rounded-md border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition resize-none" />
                 </div>
 
                 {/* Dates */}
@@ -834,13 +834,13 @@ export function TaskReminders() {
                   <div>
                     <label className="block text-xs font-semibold text-foreground mb-1.5 flex items-center gap-1"><Calendar className="w-3 h-3" /> Start *</label>
                     <input type="datetime-local" value={form.remindAt} onChange={e => setForm(p => ({ ...p, remindAt: e.target.value }))}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition" />
+                      className="w-full px-3.5 py-2.5 rounded-md border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition" />
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-foreground mb-1.5">End (optional)</label>
                     <input type="datetime-local" value={form.endAt} min={form.remindAt}
                       onChange={e => setForm(p => ({ ...p, endAt: e.target.value }))}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition" />
+                      className="w-full px-3.5 py-2.5 rounded-md border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition" />
                   </div>
                 </div>
 
@@ -850,7 +850,7 @@ export function TaskReminders() {
                   <div className="grid grid-cols-3 gap-2">
                     {(['once','hourly','every_6_hours','daily','weekly','monthly'] as ReminderFrequency[]).map(f => (
                       <button key={f} type="button" onClick={() => setForm(p => ({ ...p, frequency: f }))}
-                        className={`py-2 rounded-xl text-xs font-semibold border-2 transition-all ${form.frequency === f ? 'border-indigo-500 bg-indigo-50 text-indigo-700 dark:bg-indigo-900/20' : 'border-border text-muted-foreground hover:border-indigo-300 hover:text-foreground'}`}>
+                        className={`py-2 rounded-md text-xs font-semibold border-2 transition-all ${form.frequency === f ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-900/20' : 'border-border text-muted-foreground hover:border-blue-300 hover:text-foreground'}`}>
                         {FREQ_LABELS[f]}
                       </button>
                     ))}
@@ -861,7 +861,7 @@ export function TaskReminders() {
                 <div>
                   <label className="block text-xs font-semibold text-foreground mb-1.5 flex items-center gap-1"><Users className="w-3 h-3" /> Recipients *</label>
                   <button type="button" onClick={() => setRecipientOpen(p => !p)}
-                    className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl border border-border bg-background text-sm hover:bg-muted/40 transition">
+                    className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-md border border-border bg-background text-sm hover:bg-muted/40 transition">
                     <span className="text-muted-foreground text-xs">
                       {form.recipientIds.length === 0 ? 'Select recipients…' : `${form.recipientIds.length} selected`}
                     </span>
@@ -871,17 +871,17 @@ export function TaskReminders() {
                     {recipientOpen && (
                       <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }}
                         exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
-                        <div className="mt-1 rounded-xl border border-border bg-card overflow-y-auto max-h-36">
+                        <div className="mt-1 rounded-md border border-border bg-card overflow-y-auto max-h-36">
                           {activeUsers.map(u => {
                             const sel = form.recipientIds.includes(u.id);
                             return (
                               <button key={u.id} type="button" onClick={() => toggleRecipient(u.id)}
-                                className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-muted transition-colors ${sel ? 'bg-indigo-50/50 dark:bg-indigo-900/10' : ''}`}>
+                                className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-muted transition-colors ${sel ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''}`}>
                                 <div className={`w-6 h-6 rounded-full ${u.avatarColor} flex items-center justify-center text-white text-[9px] font-bold flex-shrink-0`}>
                                   {u.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2)}
                                 </div>
                                 <span className="flex-1 text-left font-medium text-foreground text-xs">{u.name}</span>
-                                {sel && <Check className="w-3.5 h-3.5 text-indigo-600 flex-shrink-0" />}
+                                {sel && <Check className="w-3.5 h-3.5 text-blue-600 flex-shrink-0" />}
                               </button>
                             );
                           })}
@@ -895,9 +895,9 @@ export function TaskReminders() {
                         const u = activeUsers.find(u => u.id === id);
                         if (!u) return null;
                         return (
-                          <span key={id} className="flex items-center gap-1 px-2 py-0.5 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 rounded-full text-[11px] font-medium border border-indigo-200 dark:border-indigo-800">
+                          <span key={id} className="flex items-center gap-1 px-2 py-0.5 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 rounded-sm text-[11px] font-medium border border-blue-200 dark:border-blue-800">
                             {u.name.split(' ')[0]}
-                            <button type="button" onClick={() => toggleRecipient(id)} className="hover:text-indigo-500"><X className="w-3 h-3" /></button>
+                            <button type="button" onClick={() => toggleRecipient(id)} className="hover:text-blue-600"><X className="w-3 h-3" /></button>
                           </span>
                         );
                       })}
@@ -909,26 +909,26 @@ export function TaskReminders() {
                 <div>
                   <label className="block text-xs font-semibold text-foreground mb-1.5 flex items-center gap-1"><Link2 className="w-3 h-3" /> Link to Task (optional)</label>
                   <select value={form.mainTaskId} onChange={e => setForm(p => ({ ...p, mainTaskId: e.target.value }))}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring cursor-pointer">
+                    className="w-full px-3.5 py-2.5 rounded-md border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring cursor-pointer">
                     <option value="">— None —</option>
                     {mainTasks.map(t => <option key={t.id} value={t.id}>{t.title}</option>)}
                   </select>
                 </div>
 
                 {/* Email toggle */}
-                <div className="flex items-center justify-between px-4 py-3 rounded-xl bg-muted/40 border border-border">
+                <div className="flex items-center justify-between px-4 py-3 rounded-md bg-muted/40 border border-border">
                   <div>
                     <p className="text-sm font-semibold text-foreground">Email Notification</p>
                     <p className="text-[11px] text-muted-foreground">Also send email when this fires</p>
                   </div>
                   <button type="button" onClick={() => setForm(p => ({ ...p, sendEmail: !p.sendEmail }))} className="flex-shrink-0">
-                    {form.sendEmail ? <ToggleRight className="w-7 h-7 text-indigo-600" /> : <ToggleLeft className="w-7 h-7 text-muted-foreground" />}
+                    {form.sendEmail ? <ToggleRight className="w-7 h-7 text-blue-600" /> : <ToggleLeft className="w-7 h-7 text-muted-foreground" />}
                   </button>
                 </div>
 
                 {/* Error */}
                 {formError && (
-                  <div className="flex items-center gap-2 px-4 py-3 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-xl text-sm text-red-600 dark:text-red-400">
+                  <div className="flex items-center gap-2 px-4 py-3 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-md text-sm text-red-600 dark:text-red-400">
                     <AlertCircle className="w-4 h-4 flex-shrink-0" />{formError}
                   </div>
                 )}
@@ -936,11 +936,11 @@ export function TaskReminders() {
                 {/* Footer */}
                 <div className="flex items-center justify-end gap-2 pt-1 pb-1">
                   <Button type="button" onClick={() => setShowForm(false)}
-                    className="px-4 h-auto py-2.5 rounded-xl border border-border text-sm font-semibold text-foreground bg-transparent hover:bg-muted transition-colors">
+                    className="px-4 h-auto py-2.5 rounded-md border border-border text-sm font-semibold text-foreground bg-transparent hover:bg-muted transition-colors">
                     Cancel
                   </Button>
                   <Button type="submit"
-                    className="px-5 h-auto py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold transition-colors shadow-sm flex items-center gap-2">
+                    className="px-5 h-auto py-2.5 rounded-md bg-blue-600 hover:bg-blue-700 text-white rounded-sm text-sm font-semibold transition-colors flex items-center gap-2">
                     {editingId ? <><CheckCircle2 className="w-4 h-4" /> Save Changes</> : <><Plus className="w-4 h-4" /> Create</>}
                   </Button>
                 </div>

@@ -254,11 +254,17 @@ export function useDataLoader(isAuthenticated: boolean) {
         const currentSupabaseId = authUser?.id ?? useUserStore.getState().currentUserId;
 
         let finalUsers = [...mergedUsers];
-        if (currentUserProfile && !finalUsers.some((u) => u.id === currentUserProfile.id)) {
-          finalUsers.push({
+        if (currentUserProfile) {
+          const freshPrivs = backfillPrivileges(NO_ACCESS, currentUserProfile.privileges ?? {});
+          const currentAppUser = {
             ...currentUserProfile,
-            privileges: backfillPrivileges(NO_ACCESS, currentUserProfile.privileges ?? {})
-          });
+            privileges: freshPrivs,
+          };
+          if (finalUsers.some((u) => u.id === currentUserProfile.id)) {
+            finalUsers = finalUsers.map((u) => u.id === currentUserProfile.id ? currentAppUser : u);
+          } else {
+            finalUsers.push(currentAppUser);
+          }
         }
 
         const userStatePayload = {
@@ -515,7 +521,10 @@ export function useRealtimeData(isAuthenticated: boolean) {
                   useUserStore.setState({ users: [...currentUsers, dbToProfile(newRow)] });
                 }
               } else if (eventType === 'UPDATE') {
-                const updated = dbToProfile(newRow);
+                const updated = {
+                  ...dbToProfile(newRow),
+                  privileges: backfillPrivileges(NO_ACCESS, newRow.privileges ?? {}),
+                };
                 useUserStore.setState({ users: currentUsers.map(u => u.id === updated.id ? updated : u) });
 
                 // ── Real-time revocation: affects the currently logged-in user ──

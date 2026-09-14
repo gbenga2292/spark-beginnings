@@ -260,14 +260,14 @@ export function WaybillDetailView({ waybill: propWaybill, onClose, onEdit }: Way
         <Button
           variant="outline"
           size="sm"
-          className="h-9 px-3 gap-2 text-slate-600 border-slate-200 bg-white hover:bg-slate-50 font-semibold text-[11px] uppercase tracking-tight shadow-sm transition-all"
+          className="h-9 px-3 gap-2 text-foreground border-slate-200 dark:border-slate-800 bg-background hover:bg-muted/50 font-semibold text-xs rounded-md shadow-none"
           onClick={handlePrint}
         >
           <Printer className="h-4 w-4" /> <span className="hidden sm:inline">Print PDF</span>
         </Button>
         <Button
           size="sm"
-          className="h-9 px-3 gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-[11px] uppercase tracking-tight shadow-sm transition-all"
+          className="h-9 px-3 gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-md shadow-none"
           onClick={handleDownload}
         >
           <Download className="h-4 w-4" /> <span className="hidden sm:inline">Download PDF</span>
@@ -278,7 +278,7 @@ export function WaybillDetailView({ waybill: propWaybill, onClose, onEdit }: Way
         <Button
           variant="outline"
           size="sm"
-          className="h-9 px-2 sm:px-3 gap-2 text-slate-600 border-slate-200 bg-white hover:bg-slate-50 font-semibold text-[11px] uppercase tracking-tight shadow-sm transition-all"
+          className="h-9 px-2 sm:px-3 gap-2 text-foreground border-slate-200 dark:border-slate-800 bg-background hover:bg-muted/50 font-semibold text-xs rounded-md shadow-none"
           onClick={handlePreview}
         >
           <Eye className="h-4 w-4" /> <span className="hidden sm:inline">Preview</span>
@@ -286,14 +286,14 @@ export function WaybillDetailView({ waybill: propWaybill, onClose, onEdit }: Way
         <Button
           variant="outline"
           size="sm"
-          className="h-9 px-2 sm:px-3 gap-2 text-slate-600 border-slate-200 bg-white hover:bg-slate-50 font-semibold text-[11px] uppercase tracking-tight shadow-sm transition-all"
+          className="h-9 px-2 sm:px-3 gap-2 text-foreground border-slate-200 dark:border-slate-800 bg-background hover:bg-muted/50 font-semibold text-xs rounded-md shadow-none"
           onClick={handlePrint}
         >
           <Printer className="h-4 w-4" /> <span className="hidden sm:inline">Print</span>
         </Button>
         <Button
           size="sm"
-          className="h-9 px-2 sm:px-3 gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-[11px] uppercase tracking-tight shadow-sm transition-all"
+          className="h-9 px-2 sm:px-3 gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-md shadow-none"
           onClick={handleDownload}
         >
           <Download className="h-4 w-4" /> <span className="hidden sm:inline">Download</span>
@@ -301,7 +301,7 @@ export function WaybillDetailView({ waybill: propWaybill, onClose, onEdit }: Way
         {waybill.type === 'waybill' && waybill.status === 'outstanding' && (
           <Button
             size="sm"
-            className="h-9 px-2 sm:px-3 gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-[11px] uppercase tracking-tight shadow-sm transition-all"
+            className="h-9 px-2 sm:px-3 gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-md shadow-none"
             onClick={() => {
               const d = waybill.sentToSiteDate || waybill.issueDate;
               setSentDate(d ? d.split('T')[0] : new Date().toISOString().split('T')[0]);
@@ -314,7 +314,7 @@ export function WaybillDetailView({ waybill: propWaybill, onClose, onEdit }: Way
         {waybill.type === 'return' && waybill.status === 'outstanding' && (
           <Button
             size="sm"
-            className="h-9 px-2 sm:px-3 gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-[11px] uppercase tracking-tight shadow-sm transition-all"
+            className="h-9 px-2 sm:px-3 gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-md shadow-none"
             onClick={handleOpenReturnDialog}
           >
             <CheckCircle2 className="h-4 w-4" /> <span className="hidden sm:inline">Process Return</span>
@@ -331,7 +331,7 @@ export function WaybillDetailView({ waybill: propWaybill, onClose, onEdit }: Way
         <Button
           variant="ghost"
           size="sm"
-          className="gap-2 text-slate-500 hover:text-slate-800 -ml-2 font-medium"
+          className="gap-2 text-muted-foreground hover:text-foreground -ml-2 font-medium rounded-md"
           onClick={showPdfPreview ? () => setShowPdfPreview(false) : onClose}
         >
           <ArrowLeft className="h-4 w-4" /> {showPdfPreview ? 'Back to Waybill Info' : 'Back to Waybills'}
@@ -340,7 +340,7 @@ export function WaybillDetailView({ waybill: propWaybill, onClose, onEdit }: Way
 
       {showPdfPreview ? (
         <div className="flex flex-col gap-6 max-w-5xl mx-auto pb-10 h-[80vh] min-h-[600px] animate-in fade-in slide-in-from-bottom-2 duration-300">
-          <div className="flex-1 w-full bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col">
+          <div className="flex-1 w-full bg-card rounded-md border border-slate-200 dark:border-slate-800 shadow-none overflow-hidden flex flex-col">
             {/* PDF Viewer – works on desktop and Android */}
             <div className="flex-1 overflow-hidden min-h-[500px] flex flex-col">
               <PdfViewer src={pdfDataUri} className="flex-1" />
@@ -350,14 +350,14 @@ export function WaybillDetailView({ waybill: propWaybill, onClose, onEdit }: Way
       ) : (
         <div className="flex flex-col gap-6 max-w-5xl mx-auto pb-10">
         {/* ── Waybill info card ─────────────────────────────────────────────── */}
-        <div className="border-none shadow-sm overflow-hidden bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800">
+        <div className="border border-slate-200 dark:border-slate-800 shadow-none overflow-hidden bg-card rounded-md">
           {/* Card header */}
-          <div className="border-b border-slate-100 dark:border-slate-800 p-4 sm:p-5 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/30">
+          <div className="border-b border-slate-200 dark:border-slate-800 p-4 sm:p-5 flex items-center justify-between bg-muted/30">
             <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600">
+              <div className="h-8 w-8 rounded-md bg-blue-50 dark:bg-blue-900/30 border border-slate-200 dark:border-slate-800 flex items-center justify-center text-blue-600">
                 <MapPin className="h-4 w-4" />
               </div>
-              <p className="font-semibold text-slate-700 dark:text-slate-200 text-sm">
+              <p className="font-semibold text-foreground text-sm">
                 {waybill.type === 'return' ? 'Return' : 'Waybill'} Information
               </p>
             </div>
@@ -365,7 +365,7 @@ export function WaybillDetailView({ waybill: propWaybill, onClose, onEdit }: Way
               <Button
                 variant="outline"
                 size="sm"
-                className="h-8 px-3 gap-1.5 text-xs font-bold text-indigo-600 border-indigo-200 bg-white hover:bg-indigo-50 shadow-sm transition-all"
+                className="h-8 px-3 gap-1.5 text-xs font-semibold text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800 bg-background hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-md shadow-none transition-all"
                 onClick={() => onEdit(waybill)}
               >
                 <Edit2 className="h-3.5 w-3.5" /> Edit
@@ -374,19 +374,19 @@ export function WaybillDetailView({ waybill: propWaybill, onClose, onEdit }: Way
           </div>
 
           {/* Info cells */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-slate-100 dark:divide-slate-800">
+          <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-slate-200 dark:divide-slate-800">
             {[
               { icon: Calendar, label: 'Date', value: formatDisplayDate(waybill.sentToSiteDate || waybill.issueDate) },
               { icon: User,     label: 'Driver',     value: waybill.driverName },
               { icon: Car,      label: 'Vehicle',    value: formatVehicle(waybill.vehicle) },
             ].map((cell, i) => (
               <div key={i} className="flex items-center gap-4 px-5 py-4">
-                <div className="h-9 w-9 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 shrink-0">
+                <div className="h-9 w-9 rounded-md bg-muted/30 border border-slate-200 dark:border-slate-800 flex items-center justify-center text-muted-foreground shrink-0">
                   <cell.icon className="h-4 w-4" />
                 </div>
                 <div>
-                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{cell.label}</p>
-                  <p className="text-sm font-bold text-slate-800 dark:text-white mt-0.5">{cell.value}</p>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{cell.label}</p>
+                  <p className="text-sm font-semibold text-foreground mt-0.5">{cell.value}</p>
                 </div>
               </div>
             ))}
@@ -413,18 +413,18 @@ export function WaybillDetailView({ waybill: propWaybill, onClose, onEdit }: Way
               to   = waybill.type === 'waybill' ? `${waybill.siteName || 'Site'}${clientSuffix}` : 'Office / Warehouse';
             }
             return (
-              <div className="col-span-full border-t border-slate-100 dark:border-slate-800 px-5 py-4 flex items-center gap-3 flex-wrap">
+              <div className="col-span-full border-t border-slate-200 dark:border-slate-800 px-5 py-4 flex items-center gap-3 flex-wrap">
                 <div className="flex items-center gap-2 min-w-0">
-                  <MapPin className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 shrink-0">From</span>
-                  <span className="text-sm font-bold text-slate-800 dark:text-white truncate">{from}</span>
+                  <MapPin className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground shrink-0">From</span>
+                  <span className="text-sm font-semibold text-foreground truncate">{from}</span>
                 </div>
-                <ArrowLeft className="h-4 w-4 text-slate-300 rotate-180 shrink-0" />
+                <ArrowLeft className="h-4 w-4 text-muted-foreground rotate-180 shrink-0" />
                 <div className="flex items-center gap-2 min-w-0">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 shrink-0">To</span>
-                  <span className="text-sm font-bold text-slate-800 dark:text-white truncate">{to}</span>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground shrink-0">To</span>
+                  <span className="text-sm font-semibold text-foreground truncate">{to}</span>
                   {waybill.transferSiteName && (
-                    <span className="ml-1 px-1.5 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 text-[10px] font-bold uppercase tracking-wide shrink-0">Site Transfer</span>
+                    <span className="ml-1 px-1.5 py-0.5 rounded-sm bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-800 text-[10px] font-bold uppercase tracking-wider shrink-0">Site Transfer</span>
                   )}
                 </div>
               </div>
@@ -433,42 +433,42 @@ export function WaybillDetailView({ waybill: propWaybill, onClose, onEdit }: Way
         </div>
 
         {/* ── Items table ───────────────────────────────────────────────────── */}
-        <div className="border-none shadow-sm overflow-hidden bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800">
+        <div className="border border-slate-200 dark:border-slate-800 shadow-none overflow-hidden bg-card rounded-md">
           {/* Card header */}
-          <div className="border-b border-slate-100 dark:border-slate-800 p-4 sm:p-5 flex items-center gap-2 bg-slate-50/50 dark:bg-slate-800/30">
-            <div className="h-8 w-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600">
+          <div className="border-b border-slate-200 dark:border-slate-800 p-4 sm:p-5 flex items-center gap-2 bg-muted/30">
+            <div className="h-8 w-8 rounded-md bg-blue-50 dark:bg-blue-900/30 border border-slate-200 dark:border-slate-800 flex items-center justify-center text-blue-600">
               <Package className="h-4 w-4" />
             </div>
-            <p className="font-semibold text-slate-700 dark:text-slate-200 text-sm">
+            <p className="font-semibold text-foreground text-sm">
               Items {waybill.type === 'return' ? 'Returned' : 'Listed'}{' '}
-              <span className="text-slate-400 font-normal">({waybill.items.length})</span>
+              <span className="text-muted-foreground font-normal font-mono tabular-nums">({waybill.items.length})</span>
             </p>
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-blue-700 border-b border-blue-800 text-blue-50 uppercase text-[11px] tracking-wider font-bold">
-                  <th className="px-5 py-4 whitespace-nowrap">#</th>
-                  <th className="px-5 py-4 whitespace-nowrap">Asset Name</th>
-                  <th className="px-5 py-4 whitespace-nowrap">Qty Expected</th>
-                  <th className="px-5 py-4 whitespace-nowrap">
+                <tr className="bg-blue-600 border-b border-blue-700 text-white uppercase text-[11px] tracking-wider font-semibold">
+                  <th className="px-5 py-3.5 whitespace-nowrap">#</th>
+                  <th className="px-5 py-3.5 whitespace-nowrap">Asset Name</th>
+                  <th className="px-5 py-3.5 whitespace-nowrap">Qty Expected</th>
+                  <th className="px-5 py-3.5 whitespace-nowrap">
                     Qty {waybill.type === 'return' ? 'Returned' : 'Delivered'}
                   </th>
-                  <th className="px-5 py-4 whitespace-nowrap">Status</th>
+                  <th className="px-5 py-3.5 whitespace-nowrap">Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-sm">
+              <tbody className="divide-y divide-slate-200 dark:divide-slate-800 text-sm">
                 {waybill.items.map((item, i) => (
-                  <tr key={i} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors group">
-                    <td className="px-5 py-4 text-slate-400 font-medium">{i + 1}</td>
-                    <td className="px-5 py-4 font-semibold text-slate-800 dark:text-slate-200">{item.assetName}</td>
-                    <td className="px-5 py-4 font-medium text-slate-600 dark:text-slate-300">{item.quantity}</td>
-                    <td className="px-5 py-4 font-medium text-slate-600 dark:text-slate-300">{item.quantity}</td>
+                  <tr key={i} className="hover:bg-muted/30 transition-colors group">
+                    <td className="px-5 py-4 text-muted-foreground font-mono tabular-nums font-medium">{i + 1}</td>
+                    <td className="px-5 py-4 font-semibold text-foreground">{item.assetName}</td>
+                    <td className="px-5 py-4 font-mono tabular-nums font-semibold text-muted-foreground">{item.quantity}</td>
+                    <td className="px-5 py-4 font-mono tabular-nums font-semibold text-foreground">{item.quantity}</td>
                     <td className="px-5 py-4">
                       <Badge
                         variant="outline"
-                        className="bg-emerald-100 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border-emerald-200 font-semibold px-2 py-0.5 rounded-full text-[11px]"
+                        className="bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800 font-semibold px-2 py-0.5 rounded-sm text-[10px]"
                       >
                         Completed
                       </Badge>
@@ -480,15 +480,15 @@ export function WaybillDetailView({ waybill: propWaybill, onClose, onEdit }: Way
           </div>
 
           {/* Footer totals */}
-          <div className="px-5 py-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 flex flex-wrap items-center gap-4 text-sm">
+          <div className="px-5 py-4 border-t border-slate-200 dark:border-slate-800 bg-muted/30 flex flex-wrap items-center gap-4 text-sm font-mono tabular-nums">
             <div className="flex items-center gap-2">
-              <span className="text-slate-400 font-medium">Total Items:</span>
-              <span className="font-bold text-slate-800 dark:text-white">{waybill.items.length}</span>
+              <span className="text-muted-foreground font-medium">Total Items:</span>
+              <span className="font-bold text-foreground">{waybill.items.length}</span>
             </div>
-            <div className="h-4 w-px bg-slate-200 dark:bg-slate-700 hidden sm:block" />
+            <div className="h-4 w-px bg-slate-200 dark:border-slate-800 hidden sm:block" />
             <div className="flex items-center gap-2">
-              <span className="text-slate-400 font-medium">Total Quantity:</span>
-              <span className="font-bold text-slate-800 dark:text-white">
+              <span className="text-muted-foreground font-medium">Total Quantity:</span>
+              <span className="font-bold text-foreground">
                 {waybill.items.reduce((acc, item) => acc + item.quantity, 0)}
               </span>
             </div>
@@ -500,13 +500,13 @@ export function WaybillDetailView({ waybill: propWaybill, onClose, onEdit }: Way
       {/* ── Date Picker Dialog ─────────────────────────────────────────────────── */}
       {showDateDialog && (
         <Dialog open onOpenChange={setShowDateDialog}>
-          <DialogContent className="sm:max-w-[425px] p-6 rounded-2xl">
+          <DialogContent className="sm:max-w-[425px] p-6 rounded-md border border-slate-200 dark:border-slate-800 shadow-lg bg-card">
             <div className="space-y-6">
               <div>
-                <h2 className="text-xl font-bold text-slate-800 dark:text-white">
+                <h2 className="text-base font-semibold text-foreground">
                   {waybill.type === 'waybill' ? 'Mark as Sent to Site' : 'Complete Return'}
                 </h2>
-                <p className="text-sm text-slate-500 mt-1">
+                <p className="text-xs text-muted-foreground mt-1">
                   {waybill.type === 'waybill'
                     ? 'Select the date the assets were delivered to the site. This will transfer the inventory stock.'
                     : waybill.transferSiteName
@@ -516,29 +516,29 @@ export function WaybillDetailView({ waybill: propWaybill, onClose, onEdit }: Way
               </div>
 
               <div className="space-y-2">
-                <Label className="text-xs font-bold text-slate-700">
+                <Label className="text-xs font-bold text-foreground">
                   {waybill.type === 'waybill' ? 'Delivery Date' : 'Return Date'}
                 </Label>
                 <Input 
                   type="date"
                   value={sentDate}
                   onChange={(e) => setSentDate(e.target.value)}
-                  className="h-11 rounded-xl"
+                  className="h-10 rounded-md border-slate-200 dark:border-slate-800 bg-background text-sm"
                 />
               </div>
 
               {waybill.type === 'return' && (
                 <div className="space-y-3 max-h-60 overflow-y-auto no-scrollbar">
-                  <Label className="text-xs font-bold text-slate-700 border-b pb-2 block">Item Conditions</Label>
+                  <Label className="text-xs font-bold text-foreground border-b border-slate-200 dark:border-slate-800 pb-2 block">Item Conditions</Label>
                   {waybill.items.map(item => (
-                    <div key={item.assetId} className="p-3 bg-slate-50 dark:bg-slate-800 rounded-lg space-y-3">
+                    <div key={item.assetId} className="p-3 bg-muted/20 border border-slate-200 dark:border-slate-800 rounded-md space-y-3">
                       <div className="flex justify-between items-center">
-                        <span className="text-sm font-semibold text-slate-800 dark:text-slate-200 truncate">{item.assetName}</span>
-                        <span className="text-xs font-bold text-blue-600 dark:text-blue-400">Total: {item.quantity}</span>
+                        <span className="text-sm font-semibold text-foreground truncate">{item.assetName}</span>
+                        <span className="text-xs font-bold font-mono tabular-nums text-blue-600 dark:text-blue-400">Total: {item.quantity}</span>
                       </div>
                       <div className="grid grid-cols-3 gap-2">
                         <div className="space-y-1">
-                          <Label className="text-[10px] uppercase text-emerald-600">Good</Label>
+                          <Label className="text-[10px] uppercase font-bold text-emerald-600">Good</Label>
                           <Input 
                             type="number" 
                             min={0}
@@ -548,11 +548,11 @@ export function WaybillDetailView({ waybill: propWaybill, onClose, onEdit }: Way
                               ...prev,
                               [item.assetId]: { ...prev[item.assetId], good: parseInt(e.target.value) || 0 }
                             }))}
-                            className="h-8 text-xs border-emerald-200 focus-visible:ring-emerald-500"
+                            className="h-8 text-xs font-mono tabular-nums border-slate-200 dark:border-slate-800 focus-visible:ring-1 focus-visible:ring-emerald-500 rounded-md"
                           />
                         </div>
                         <div className="space-y-1">
-                          <Label className="text-[10px] uppercase text-amber-600">Damaged</Label>
+                          <Label className="text-[10px] uppercase font-bold text-amber-600">Damaged</Label>
                           <Input 
                             type="number" 
                             min={0}
@@ -561,11 +561,11 @@ export function WaybillDetailView({ waybill: propWaybill, onClose, onEdit }: Way
                               ...prev,
                               [item.assetId]: { ...prev[item.assetId], damaged: parseInt(e.target.value) || 0 }
                             }))}
-                            className="h-8 text-xs border-amber-200 focus-visible:ring-amber-500"
+                            className="h-8 text-xs font-mono tabular-nums border-slate-200 dark:border-slate-800 focus-visible:ring-1 focus-visible:ring-amber-500 rounded-md"
                           />
                         </div>
                         <div className="space-y-1">
-                          <Label className="text-[10px] uppercase text-rose-600">Missing</Label>
+                          <Label className="text-[10px] uppercase font-bold text-rose-600">Missing</Label>
                           <Input 
                             type="number" 
                             min={0}
@@ -574,7 +574,7 @@ export function WaybillDetailView({ waybill: propWaybill, onClose, onEdit }: Way
                               ...prev,
                               [item.assetId]: { ...prev[item.assetId], missing: parseInt(e.target.value) || 0 }
                             }))}
-                            className="h-8 text-xs border-rose-200 focus-visible:ring-rose-500"
+                            className="h-8 text-xs font-mono tabular-nums border-slate-200 dark:border-slate-800 focus-visible:ring-1 focus-visible:ring-rose-500 rounded-md"
                           />
                         </div>
                       </div>
@@ -584,12 +584,12 @@ export function WaybillDetailView({ waybill: propWaybill, onClose, onEdit }: Way
               )}
 
               <div className="flex gap-3 justify-end pt-4">
-                <Button variant="ghost" onClick={() => setShowDateDialog(false)} className="rounded-xl">
+                <Button variant="ghost" onClick={() => setShowDateDialog(false)} className="rounded-md font-medium">
                   Cancel
                 </Button>
                 <Button 
                   onClick={waybill.type === 'waybill' ? handleMarkAsSent : handleMarkReturnCompleted} 
-                  className={waybill.type === 'waybill' ? "bg-blue-600 hover:bg-blue-700 text-white rounded-xl" : "bg-blue-600 hover:bg-blue-700 text-white rounded-xl"}
+                  className="bg-blue-600 hover:bg-blue-700 text-white rounded-md shadow-none font-semibold"
                 >
                   {waybill.type === 'waybill' ? 'Confirm Delivery' : 'Confirm Return'}
                 </Button>

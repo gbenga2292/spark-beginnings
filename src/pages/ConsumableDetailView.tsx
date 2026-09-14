@@ -349,7 +349,7 @@ export function ConsumableDetailView({ item, site, logs, onBack }: ConsumableDet
                   </div>
                   
                   <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-6 flex flex-col items-center justify-center text-center shadow-sm">
-                    <div className="h-12 w-12 rounded-full bg-purple-50 dark:bg-purple-900/20 text-purple-600 flex items-center justify-center mb-3">
+                    <div className="h-12 w-12 rounded-full bg-sky-50 dark:bg-sky-900/20 text-sky-600 flex items-center justify-center mb-3">
                       <Clock className="h-6 w-6" />
                     </div>
                     <p className="text-xs text-slate-500 font-medium uppercase tracking-wider mb-1">Usage Logs</p>

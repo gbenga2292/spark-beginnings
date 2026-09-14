@@ -569,19 +569,19 @@ export function Beneficiaries() {
   // Render Employee Form (Add or Edit)
   const renderEmployeeForm = (isEdit: boolean) => (
     <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 gap-4">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between bg-white dark:bg-slate-900 p-6 rounded-md border border-slate-200 dark:border-slate-800 gap-4">
         <div className="flex items-center gap-4 w-full sm:w-auto">
-          <Button variant="ghost" size="icon" onClick={() => { setIsAdding(false); setIsEditing(false); }} className="hover:bg-slate-100 rounded-full h-10 w-10 shrink-0">
-            <ArrowLeft className="h-5 w-5 text-slate-600" />
+          <Button variant="ghost" size="icon" onClick={() => { setIsAdding(false); setIsEditing(false); }} className="hover:bg-slate-100 dark:hover:bg-slate-800 rounded-sm h-9 w-9 shrink-0">
+            <ArrowLeft className="h-4 w-4 text-slate-600 dark:text-slate-400" />
           </Button>
           <div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 bg-clip-text text-transparent bg-gradient-to-r from-indigo-700 to-indigo-400">
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
               {isEdit ? 'Edit Non-Employee Record' : 'Add New Non-Employee (Contractor / Welfare)'}
             </h1>
-            <p className="text-sm font-medium text-slate-500 mt-1">Configure profile details, compensation, and payment terms.</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Configure profile details, compensation, and payment terms.</p>
           </div>
         </div>
-        <Button onClick={isEdit ? handleUpdate : handleSave} className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white shadow-md transition-all font-semibold w-full sm:w-auto">
+        <Button onClick={isEdit ? handleUpdate : handleSave} className="gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium w-full sm:w-auto">
           <Save className="h-4 w-4" /> {isEdit ? 'Save Changes' : 'Create Record'}
         </Button>
       </div>
@@ -589,8 +589,8 @@ export function Beneficiaries() {
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start">
         {/* --- LEFT COLUMN: Primary Details --- */}
         <div className="xl:col-span-2 flex flex-col gap-6">
-          <Card className="shadow-sm border-slate-200">
-            <CardHeader className="bg-slate-50/50 rounded-t-xl border-b border-slate-100">
+          <Card className="border border-slate-200 dark:border-slate-800 rounded-md">
+            <CardHeader className="bg-slate-50/50 rounded-t-md border-b border-slate-200 dark:border-slate-800">
               <CardTitle className="text-slate-800">Personal & Job Parameters</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4 pt-6">
@@ -606,7 +606,7 @@ export function Beneficiaries() {
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Payee Type</label>
                   <select
-                    className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                    className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-blue-500/20 outline-none"
                     value={formData.payeeType || ''}
                     onChange={e => setFormData({ ...formData, payeeType: e.target.value })}
                   >
@@ -623,7 +623,7 @@ export function Beneficiaries() {
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Status</label>
                   <select
-                    className={`flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-indigo-500/20 outline-none ${normalizeDate(formData.endDate) ? 'opacity-70 cursor-not-allowed' : ''}`}
+                    className={`flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-blue-500/20 outline-none ${normalizeDate(formData.endDate) ? 'opacity-70 cursor-not-allowed' : ''}`}
                     value={formData.status}
                     onChange={e => {
                       const newStatus = e.target.value;
@@ -643,7 +643,7 @@ export function Beneficiaries() {
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Type of Pay</label>
                   <select
-                    className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                    className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-blue-500/20 outline-none"
                     value={formData.typeOfPay || ''}
                     onChange={e => setFormData({ ...formData, typeOfPay: e.target.value })}
                   >
@@ -657,7 +657,7 @@ export function Beneficiaries() {
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Start Month of Payment</label>
                   <select
-                    className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                    className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-blue-500/20 outline-none"
                     value={formData.startMonthOfPay || ''}
                     onChange={e => setFormData({ ...formData, startMonthOfPay: e.target.value })}
                   >
@@ -670,7 +670,7 @@ export function Beneficiaries() {
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Department</label>
                   <select 
-                    className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-indigo-500/20 outline-none" 
+                    className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-blue-500/20 outline-none" 
                     value={formData.department || ''} 
                     onChange={e => setFormData({ ...formData, department: e.target.value })}
                   >
@@ -695,13 +695,13 @@ export function Beneficiaries() {
           </Card>
 
           {canSeeSalary && (
-            <Card className="shadow-sm border-slate-200">
-              <CardHeader className="bg-slate-50/50 rounded-t-xl border-b border-slate-100 flex flex-row items-center justify-between">
+            <Card className="border border-slate-200 dark:border-slate-800 rounded-md">
+              <CardHeader className="bg-slate-50/50 rounded-t-md border-b border-slate-200 dark:border-slate-800 flex flex-row items-center justify-between">
                 <div>
                   <CardTitle className="text-slate-800">Stipend Matrix (₦)</CardTitle>
                   <CardDescription className="mt-1">Define gross monthly stipend dynamically. Subject to revision.</CardDescription>
                 </div>
-                <Button variant="outline" size="sm" className="bg-white dark:bg-slate-800 dark:text-slate-200 shadow-sm" onClick={() => {
+                <Button variant="outline" size="sm" className="bg-white dark:bg-slate-800 dark:text-slate-200 rounded-sm" onClick={() => {
                   const janVal = formData.monthlySalaries?.jan || 0;
                   setFormData({
                     ...formData,
@@ -754,7 +754,7 @@ export function Beneficiaries() {
                     <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Total Annual Payout</span>
                     <span className="text-sm text-slate-500 italic">Based on {formData.typeOfPay || 'Monthly'} cycle starting {formData.startMonthOfPay || 'January'}</span>
                   </div>
-                  <div className="text-2xl font-black text-indigo-600 font-mono">
+                  <div className="text-2xl font-black text-blue-600 font-mono tabular-nums">
                     ₦{(() => {
                       const startIdx = MONTHS_LIST.indexOf(formData.startMonthOfPay || 'January');
                       const cycle = formData.typeOfPay || 'Monthly';
@@ -781,20 +781,20 @@ export function Beneficiaries() {
 
         {/* --- RIGHT COLUMN: Secondary Details --- */}
         <div className="xl:col-span-1 flex flex-col gap-6">
-          <Card className="shadow-sm border-slate-200">
-            <CardHeader className="bg-slate-50/50 rounded-t-xl border-b border-slate-100">
+          <Card className="border border-slate-200 dark:border-slate-800 rounded-md">
+            <CardHeader className="bg-slate-50/50 rounded-t-md border-b border-slate-200 dark:border-slate-800">
               <CardTitle className="text-slate-800 text-center">Profile Image</CardTitle>
             </CardHeader>
             <CardContent className="pt-6 flex flex-col items-center">
-              <Avatar className="h-32 w-32 border-4 border-white shadow-md mb-4 bg-slate-100">
-                <AvatarFallback className="bg-indigo-50 text-indigo-700 font-bold text-4xl">
+              <Avatar className="h-32 w-32 border-2 border-slate-200 dark:border-slate-700 mb-4 bg-slate-100">
+                <AvatarFallback className="bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300 font-bold text-4xl">
                   {formData.firstname?.charAt(0) || ''}{formData.surname?.charAt(0) || ''}
                 </AvatarFallback>
                 {formData.avatar && <AvatarImage src={formData.avatar} alt="Avatar" className="object-cover" />}
               </Avatar>
               <div className="flex gap-2 w-full justify-center">
                 <label className="cursor-pointer">
-                  <span className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 shadow-sm h-9 px-4 py-2">
+                  <span className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 h-9 px-4 py-2 rounded-sm">
                     <Upload className="h-4 w-4 mr-2 text-slate-500" /> Upload Image
                   </span>
                   <input type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
@@ -808,8 +808,8 @@ export function Beneficiaries() {
             </CardContent>
           </Card>
 
-          <Card className="shadow-sm border-slate-200">
-            <CardHeader className="bg-slate-50/50 rounded-t-xl border-b border-slate-100">
+          <Card className="border border-slate-200 dark:border-slate-800 rounded-md">
+            <CardHeader className="bg-slate-50/50 rounded-t-md border-b border-slate-200 dark:border-slate-800">
               <CardTitle className="text-slate-800">Financial Setup</CardTitle>
             </CardHeader>
             <CardContent className="pt-6 space-y-4">
@@ -820,13 +820,13 @@ export function Beneficiaries() {
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Account No.</label>
-                  <Input value={formData.accountNo || ''} onChange={e => setFormData({ ...formData, accountNo: e.target.value })} className="font-mono bg-slate-50 dark:bg-slate-800 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700" />
+                  <Input value={formData.accountNo || ''} onChange={e => setFormData({ ...formData, accountNo: e.target.value })} className="font-mono tabular-nums bg-slate-50 dark:bg-slate-800 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700" />
                 </div>
                   <div className="grid grid-cols-2 gap-3 pt-2">
                     <div className="space-y-2">
                       <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Withholding Tax</label>
                       <select
-                        className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                        className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-blue-500/20 outline-none"
                         value={formData.withholdingTax ? 'Yes' : 'No'}
                         onChange={e => {
                           const isWht = e.target.value === 'Yes';
@@ -892,10 +892,10 @@ export function Beneficiaries() {
 
     return (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-        <div className="bg-white dark:bg-slate-900 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-          <div className="sticky top-0 bg-indigo-600 p-4 flex justify-between items-center rounded-t-lg">
+        <div className="bg-white dark:bg-slate-900 rounded-md shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="sticky top-0 bg-blue-600 p-4 flex justify-between items-center rounded-t-md">
             <h3 className="text-white font-bold text-lg">Non-Employee Details</h3>
-            <Button variant="ghost" size="sm" className="text-white hover:bg-indigo-700" onClick={closeViewModal}>
+            <Button variant="ghost" size="sm" className="text-white hover:bg-blue-700" onClick={closeViewModal}>
               <X className="h-5 w-5" />
             </Button>
           </div>
@@ -903,7 +903,7 @@ export function Beneficiaries() {
           <div className="p-6">
             <div className="flex items-center gap-4 mb-6">
               <Avatar className="h-16 w-16">
-                <AvatarFallback className="bg-indigo-100 text-indigo-700 font-bold text-xl">
+                <AvatarFallback className="bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300 font-bold text-xl">
                   {emp.firstname.charAt(0)}{emp.surname.charAt(0)}
                 </AvatarFallback>
                 {emp.avatar && <AvatarImage src={emp.avatar} alt="Avatar" className="object-cover" />}
@@ -922,7 +922,7 @@ export function Beneficiaries() {
                 {['Overview', 'Reminders'].map(tab => (
                   <button
                     key={tab}
-                    className={`flex-1 py-1.5 px-3 text-xs font-semibold rounded-md transition-all ${detailTab === tab ? 'bg-white dark:bg-slate-900 dark:bg-slate-900 dark:bg-slate-700 text-indigo-700 dark:text-indigo-300 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                    className={`flex-1 py-1.5 px-3 text-xs font-semibold rounded-md transition-all ${detailTab === tab ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 font-semibold' : 'text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'}`}
                     onClick={() => setDetailTab(tab as any)}
                   >
                     {tab}
@@ -935,7 +935,7 @@ export function Beneficiaries() {
                   <select
                     value={activeTabMonth}
                     onChange={(e) => setActiveTabMonth(e.target.value)}
-                    className="h-8 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 dark:text-slate-100 px-3 text-xs font-semibold focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                    className="h-8 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 dark:text-slate-100 px-3 text-xs font-semibold focus:ring-2 focus:ring-blue-500/20 outline-none"
                   >
                     <option value="All">All Months</option>
                     {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(m => (
@@ -945,7 +945,7 @@ export function Beneficiaries() {
                   <select
                     value={activeTabYear}
                     onChange={(e) => setActiveTabYear(e.target.value)}
-                    className="h-8 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 dark:text-slate-100 px-3 text-xs font-semibold focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                    className="h-8 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 dark:text-slate-100 px-3 text-xs font-semibold focus:ring-2 focus:ring-blue-500/20 outline-none"
                   >
                     <option value="All">All Years</option>
                     {Array.from({ length: 5 }, (_, i) => {
@@ -963,13 +963,13 @@ export function Beneficiaries() {
                   <div>
                     <h4 className="text-sm font-semibold text-slate-500 uppercase mb-3">Non-Employee Info</h4>
                     <div className="space-y-2 text-sm">
-                      <div className="flex justify-between"><span className="text-slate-500">ID Code:</span><span className="font-mono text-xs">{emp.employeeCode || emp.id.substring(0, 8)}</span></div>
-                      <div className="flex justify-between"><span className="text-slate-500">Payee Type:</span><span className="font-semibold text-indigo-600">{emp.payeeType || 'N/A'}</span></div>
+                      <div className="flex justify-between"><span className="text-slate-500">ID Code:</span><span className="font-mono tabular-nums text-xs">{emp.employeeCode || emp.id.substring(0, 8)}</span></div>
+                      <div className="flex justify-between"><span className="text-slate-500">Payee Type:</span><span className="font-semibold text-blue-600">{emp.payeeType || 'N/A'}</span></div>
                       <div className="flex justify-between"><span className="text-slate-500">Payment Cycle:</span><span>{emp.typeOfPay || 'Monthly'}</span></div>
                       <div className="flex justify-between"><span className="text-slate-500">Start Month:</span><span>{emp.startMonthOfPay || 'N/A'}</span></div>
-                      <div className="flex justify-between"><span className="text-slate-500">Department:</span><span className="font-semibold text-indigo-600">{emp.department || 'N/A'}</span></div>
+                      <div className="flex justify-between"><span className="text-slate-500">Department:</span><span className="font-semibold text-blue-600">{emp.department || 'N/A'}</span></div>
                       {emp.withholdingTax && (
-                        <div className="flex justify-between"><span className="text-slate-500">TIN:</span><span className="font-mono text-xs">{emp.taxId || 'N/A'}</span></div>
+                        <div className="flex justify-between"><span className="text-slate-500">TIN:</span><span className="font-mono tabular-nums text-xs">{emp.taxId || 'N/A'}</span></div>
                       )}
                     </div>
                   </div>
@@ -978,7 +978,7 @@ export function Beneficiaries() {
                     <h4 className="text-sm font-semibold text-slate-500 uppercase mb-3">Bank & Timeline</h4>
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between"><span className="text-slate-500">Bank:</span><span>{emp.bankName || 'N/A'}</span></div>
-                      <div className="flex justify-between"><span className="text-slate-500">Account:</span><span className="font-mono">{emp.accountNo || 'N/A'}</span></div>
+                      <div className="flex justify-between"><span className="text-slate-500">Account:</span><span className="font-mono tabular-nums">{emp.accountNo || 'N/A'}</span></div>
                       <div className="flex justify-between pt-2 border-t border-slate-100"><span className="text-slate-500">Start Date:</span><span>{emp.startDate || 'N/A'}</span></div>
                       <div className="flex justify-between"><span className="text-slate-500">End Date:</span><span>{emp.endDate || 'N/A'}</span></div>
                     </div>
@@ -1018,7 +1018,7 @@ export function Beneficiaries() {
                       </div>
                       <div className="border-t border-slate-200 dark:border-slate-700 pt-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                         <span className="font-bold text-slate-600 dark:text-slate-400 uppercase text-xs tracking-widest">Annual Total</span>
-                        <span className="text-2xl font-black text-indigo-600 dark:text-indigo-400">
+                        <span className="text-2xl font-bold text-blue-600 dark:text-blue-400 font-mono tabular-nums">
                           ₦{totalSalary.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </span>
                       </div>
@@ -1037,7 +1037,7 @@ export function Beneficiaries() {
                       <p className="text-slate-500 font-medium">No system reminders tied to this employee.</p>
                     </div>
                   ) : (
-                    <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-sm overflow-hidden">
+                    <div className="rounded-md border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden">
                       <div className="overflow-x-auto">
                       <Table>
                         <TableHeader>
@@ -1053,9 +1053,9 @@ export function Beneficiaries() {
                             return (
                               <TableRow key={r.id} className="hover:bg-slate-50/80">
                                 <TableCell className="font-semibold text-slate-800 text-xs">{r.title}</TableCell>
-                                <TableCell className="font-mono text-[11px] text-slate-500">{new Date(r.remindAt).toLocaleString()}</TableCell>
+                                <TableCell className="font-mono tabular-nums text-[11px] text-slate-500">{new Date(r.remindAt).toLocaleString()}</TableCell>
                                 <TableCell>
-                                  <Badge variant="outline" className={`text-[10px] ${r.isActive ? (isPast ? 'bg-rose-50 text-rose-600 border-rose-200' : 'bg-indigo-50 text-indigo-600 border-indigo-200') : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
+                                  <Badge variant="outline" className={`text-[10px] ${r.isActive ? (isPast ? 'bg-rose-50 text-rose-600 border-rose-200' : 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800') : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
                                     {!r.isActive ? 'Dismissed' : (isPast ? 'Overdue' : 'Pending')}
                                   </Badge>
                                 </TableCell>
@@ -1096,7 +1096,7 @@ export function Beneficiaries() {
                       <p className="text-slate-500 font-medium">No attendance records found for selected period.</p>
                     </div>
                   ) : (
-                    <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-sm overflow-hidden">
+                    <div className="rounded-md border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden">
                       <div className="overflow-x-auto">
                       <Table>
                         <TableHeader>
@@ -1109,7 +1109,7 @@ export function Beneficiaries() {
                         <TableBody>
                           {empAtt.map(r => (
                             <TableRow key={r.id}>
-                              <TableCell className="font-mono text-[11px] text-slate-500">{r.date}</TableCell>
+                              <TableCell className="font-mono tabular-nums text-[11px] text-slate-500">{r.date}</TableCell>
                               <TableCell className="text-xs text-slate-600">
                                 {r.dayClient && r.dayClient !== 'N/A' ? `${r.dayClient} - ${r.daySite}` : 'N/A'}
                               </TableCell>
@@ -1154,7 +1154,7 @@ export function Beneficiaries() {
                       <p className="text-slate-500 font-medium">No leave records found for selected period.</p>
                     </div>
                   ) : (
-                    <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-sm overflow-hidden">
+                    <div className="rounded-md border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden">
                       <div className="overflow-x-auto">
                       <Table>
                         <TableHeader>
@@ -1169,7 +1169,7 @@ export function Beneficiaries() {
                           {empLeaves.map(l => (
                             <TableRow key={l.id}>
                               <TableCell className="font-semibold text-xs">{l.leaveType}</TableCell>
-                              <TableCell className="font-mono text-[11px] text-slate-500">{l.startDate} to {l.expectedEndDate}</TableCell>
+                              <TableCell className="font-mono tabular-nums text-[11px] text-slate-500">{l.startDate} to {l.expectedEndDate}</TableCell>
                               <TableCell className="text-[11px]">{l.duration} Days</TableCell>
                               <TableCell>
                                 <Badge variant="outline" className={l.status === 'Active' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-slate-50 text-slate-600 border-slate-200'}>
@@ -1201,7 +1201,7 @@ export function Beneficiaries() {
                       <p className="text-xs text-slate-400 mt-1">Good standing.</p>
                     </div>
                   ) : (
-                    <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-sm overflow-hidden">
+                    <div className="rounded-md border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden">
                       <div className="overflow-x-auto">
                       <Table>
                         <TableHeader>
@@ -1215,13 +1215,13 @@ export function Beneficiaries() {
                         <TableBody>
                           {empDiscip.map(d => (
                             <TableRow key={d.id} className="hover:bg-slate-50/80">
-                              <TableCell className="font-mono text-[11px] text-slate-500">{d.date}</TableCell>
+                              <TableCell className="font-mono tabular-nums text-[11px] text-slate-500">{d.date}</TableCell>
                               <TableCell className="font-semibold text-slate-800 text-xs">{d.type}</TableCell>
                               <TableCell>
                                 <Badge variant={d.severity.includes('Warning') ? 'warning' : 'destructive'} className="text-[10px]">{d.severity}</Badge>
                               </TableCell>
                               <TableCell className="text-right">
-                                <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50" onClick={() => setViewingNarrative({ type: 'Disciplinary', data: d })}>
+                                <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30" onClick={() => setViewingNarrative({ type: 'Disciplinary', data: d })}>
                                   <Eye className="h-4 w-4" />
                                 </Button>
                               </TableCell>
@@ -1250,7 +1250,7 @@ export function Beneficiaries() {
                       <p className="text-xs text-slate-400 mt-1">Schedule a review to get started.</p>
                     </div>
                   ) : (
-                    <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-sm overflow-hidden">
+                    <div className="rounded-md border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden">
                       <div className="overflow-x-auto">
                       <Table>
                         <TableHeader>
@@ -1264,7 +1264,7 @@ export function Beneficiaries() {
                         <TableBody>
                           {empEvals.map(e => (
                             <TableRow key={e.id} className="hover:bg-slate-50/80">
-                              <TableCell className="font-mono text-[11px] text-slate-500">{e.date}</TableCell>
+                              <TableCell className="font-mono tabular-nums text-[11px] text-slate-500">{e.date}</TableCell>
                               <TableCell className="font-semibold text-slate-800 text-xs">{e.type}</TableCell>
                               <TableCell>
                                 <span className={`text-xs font-bold ${e.overallScore >= 70 ? 'text-emerald-600' : e.overallScore >= 40 ? 'text-amber-600' : 'text-rose-600'}`}>
@@ -1272,7 +1272,7 @@ export function Beneficiaries() {
                                 </span>
                               </TableCell>
                               <TableCell className="text-right">
-                                <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50" onClick={() => setViewingNarrative({ type: 'Evaluation', data: e })}>
+                                <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30" onClick={() => setViewingNarrative({ type: 'Evaluation', data: e })}>
                                   <Eye className="h-4 w-4" />
                                 </Button>
                               </TableCell>
@@ -1364,10 +1364,10 @@ export function Beneficiaries() {
 
     return (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-        <div className="bg-white dark:bg-slate-900 rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
-          <div className="sticky top-0 bg-indigo-600 p-4 flex justify-between items-center rounded-t-lg">
+        <div className="bg-white dark:bg-slate-900 rounded-md shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+          <div className="sticky top-0 bg-blue-600 p-4 flex justify-between items-center rounded-t-md">
             <h3 className="text-white font-bold text-lg">Bulk Edit Non-Employees ({selectedIds.length})</h3>
-            <Button variant="ghost" size="sm" className="text-white hover:bg-indigo-700" onClick={() => setIsBulkEditing(false)}>
+            <Button variant="ghost" size="sm" className="text-white hover:bg-blue-700" onClick={() => setIsBulkEditing(false)}>
               <X className="h-5 w-5" />
             </Button>
           </div>
@@ -1379,7 +1379,7 @@ export function Beneficiaries() {
               <div className="space-y-2">
                 <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Status</label>
                 <select
-                  className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                  className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-blue-500/20 outline-none"
                   value={bulkFormData.status || ''}
                   onChange={e => setBulkFormData({ ...bulkFormData, status: e.target.value as any })}
                 >
@@ -1392,7 +1392,7 @@ export function Beneficiaries() {
               <div className="space-y-2">
                 <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Payee Type</label>
                 <select
-                  className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                  className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-blue-500/20 outline-none"
                   value={bulkFormData.payeeType || ''}
                   onChange={e => setBulkFormData({ ...bulkFormData, payeeType: e.target.value })}
                 >
@@ -1407,7 +1407,7 @@ export function Beneficiaries() {
               <div className="space-y-2">
                 <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Department</label>
                 <select 
-                  className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-indigo-500/20 outline-none" 
+                  className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-blue-500/20 outline-none" 
                   value={bulkFormData.department || ''} 
                   onChange={e => setBulkFormData({ ...bulkFormData, department: e.target.value })}
                 >
@@ -1421,7 +1421,7 @@ export function Beneficiaries() {
               <div className="space-y-2">
                 <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Payment Cycle</label>
                 <select
-                  className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                  className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-blue-500/20 outline-none"
                   value={bulkFormData.typeOfPay || ''}
                   onChange={e => setBulkFormData({ ...bulkFormData, typeOfPay: e.target.value as any })}
                 >
@@ -1438,7 +1438,7 @@ export function Beneficiaries() {
                   <Checkbox
                     checked={bulkFormData.withholdingTax}
                     onCheckedChange={(checked) => setBulkFormData({ ...bulkFormData, withholdingTax: checked as boolean })}
-                    className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-600 h-4 w-4"
+                    className="rounded-sm border-slate-300 text-blue-600 focus:ring-blue-600 accent-blue-600 h-4 w-4"
                   />
                   Subject to Withholding Tax (5%)
                 </label>
@@ -1447,7 +1447,7 @@ export function Beneficiaries() {
 
             <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
               <Button variant="outline" onClick={() => setIsBulkEditing(false)}>Cancel</Button>
-              <Button onClick={handleBulkUpdate} className="bg-indigo-600 hover:bg-indigo-700 text-white">Apply Changes</Button>
+              <Button onClick={handleBulkUpdate} className="bg-blue-600 hover:bg-blue-700 text-white">Apply Changes</Button>
             </div>
           </div>
         </div>
@@ -1487,7 +1487,7 @@ export function Beneficiaries() {
             </Button>
           )}
           {priv.canImport && (
-            <label className="flex items-center gap-2 bg-white text-slate-700 hover:bg-slate-50 shadow-sm border border-slate-200 rounded-md h-9 px-3 sm:px-4 text-sm font-medium cursor-pointer transition-colors whitespace-nowrap">
+            <label className="flex items-center gap-2 bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 dark:border-slate-700 rounded-sm h-9 px-3 sm:px-4 text-sm font-medium cursor-pointer transition-colors whitespace-nowrap">
               <Upload className="h-4 w-4 text-slate-500" /> <span className="hidden sm:inline">Import</span>
               <input type="file" accept=".csv" className="hidden" onChange={handleImportCSVSelected} />
             </label>
@@ -1495,7 +1495,7 @@ export function Beneficiaries() {
           {priv.canAdd && (
             <Button
               size="sm"
-              className="gap-2 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-700 hover:to-indigo-600 text-white shadow-md h-9 px-3 sm:px-4"
+              className="gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium h-9 px-3 sm:px-4 rounded-sm"
               onClick={() => { setIsAdding(true); setOpenMenuId(null); setFormData({ staffType: 'NON-EMPLOYEE', status: 'Active', payeTax: false, withholdingTax: false, payeeType: '', typeOfPay: 'Monthly', monthlySalaries: { jan: 0, feb: 0, mar: 0, apr: 0, may: 0, jun: 0, jul: 0, aug: 0, sep: 0, oct: 0, nov: 0, dec: 0 } }); }}
             >
               <Plus className="h-4 w-4" /> <span className="hidden sm:inline">Add Record</span>
@@ -1518,17 +1518,17 @@ export function Beneficiaries() {
   // Main list view
   return (
     <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
-      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 overflow-hidden flex-1 flex flex-col min-h-[500px]">
+      <div className="bg-white dark:bg-slate-900 rounded-md border border-slate-200 dark:border-slate-800 overflow-hidden flex-1 flex flex-col min-h-[500px]">
         <div className="border-b border-slate-100 p-4 sm:p-5 flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center bg-slate-50/50">
           <div className="flex bg-slate-200/50 p-1 rounded-lg">
             <button
-              className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${activeTab === 'Active' ? 'bg-white dark:bg-slate-900 dark:bg-slate-900 dark:bg-slate-700 text-indigo-700 dark:text-indigo-300 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${activeTab === 'Active' ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 font-semibold' : 'text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'}`}
               onClick={() => setActiveTab('Active')}
             >
               Active Personnel
             </button>
             <button
-              className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${activeTab === 'Delisted' ? 'bg-white dark:bg-slate-900 dark:bg-slate-900 text-slate-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${activeTab === 'Delisted' ? 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-semibold' : 'text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'}`}
               onClick={() => setActiveTab('Delisted')}
             >
               Delisted
@@ -1540,12 +1540,12 @@ export function Beneficiaries() {
               <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
               <Input
                 placeholder="Search Name or Code..."
-                className="pl-9 bg-white border-slate-200 h-9 text-sm focus-visible:ring-indigo-500/50 rounded-lg shadow-sm"
+                className="pl-9 bg-white border-slate-200 h-9 text-sm focus-visible:ring-blue-500/20 rounded-sm"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            <select className="h-9 px-3 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/20" value={sortBy} onChange={(e) => setSortBy(e.target.value as any)}>
+            <select className="h-9 px-3 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20" value={sortBy} onChange={(e) => setSortBy(e.target.value as any)}>
               <option value="dateAdded">Sort By: Default</option>
               <option value="name">Sort By: Name</option>
               <option value="department">Sort By: Department</option>
@@ -1568,7 +1568,7 @@ export function Beneficiaries() {
             filteredBeneficiaries.map((employee) => (
               <div key={employee.id} className="flex items-center gap-3 px-4 py-3.5 hover:bg-slate-50 active:bg-slate-100 transition-colors">
                 <Avatar className="h-10 w-10 border border-slate-200 shrink-0">
-                  <AvatarFallback className="bg-indigo-50 text-indigo-700 font-bold text-xs">
+                  <AvatarFallback className="bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300 font-bold text-xs">
                     {employee.firstname.charAt(0)}{employee.surname.charAt(0)}
                   </AvatarFallback>
                   {employee.avatar && <AvatarImage src={employee.avatar} alt="Avatar" className="object-cover" />}
@@ -1583,7 +1583,7 @@ export function Beneficiaries() {
                   <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                     <span className="text-[11px] text-slate-500 font-mono">{employee.employeeCode || `NE-${employee.id.substring(0, 4).toUpperCase()}`}</span>
                     {employee.payeeType && (
-                      <span className="text-[11px] bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded font-medium">{employee.payeeType}</span>
+                      <span className="text-[11px] bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 px-1.5 py-0.5 rounded-sm font-medium">{employee.payeeType}</span>
                     )}
                     {employee.department && (
                       <span className="text-[11px] text-slate-400">{employee.department}</span>
@@ -1595,7 +1595,7 @@ export function Beneficiaries() {
                 </div>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-indigo-600 shrink-0">
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-blue-600 shrink-0">
                       <MoreHorizontal className="h-4 w-4" />
                     </Button>
                   </DropdownMenuTrigger>
@@ -1653,7 +1653,7 @@ export function Beneficiaries() {
           </TableHeader>
           <TableBody>
             {filteredBeneficiaries.map((employee) => (
-              <TableRow key={employee.id} className={`${selectedIds.includes(employee.id) ? 'bg-indigo-50/50' : ''} hover:bg-slate-50/50 transition-colors`}>
+              <TableRow key={employee.id} className={`${selectedIds.includes(employee.id) ? 'bg-blue-50/40 dark:bg-blue-950/20' : ''} hover:bg-slate-50/50 transition-colors`}>
                 <TableCell>
                   <Checkbox 
                     checked={selectedIds.includes(employee.id)}
@@ -1666,20 +1666,20 @@ export function Beneficiaries() {
                 <TableCell>
                   <div className="flex items-center gap-3">
                     <Avatar className="h-10 w-10 border border-slate-200">
-                      <AvatarFallback className="bg-indigo-50 text-indigo-700 font-bold text-xs">
+                      <AvatarFallback className="bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300 font-bold text-xs">
                         {employee.firstname.charAt(0)}{employee.surname.charAt(0)}
                       </AvatarFallback>
                       {employee.avatar && <AvatarImage src={employee.avatar} alt="Avatar" className="object-cover" />}
                     </Avatar>
                     <div className="flex flex-col">
-                      <span className="font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">{employee.surname} {employee.firstname}</span>
+                      <span className="font-bold text-slate-900 group-hover:text-blue-600 transition-colors">{employee.surname} {employee.firstname}</span>
                       <span className="text-xs text-slate-500 font-mono tracking-tight">{employee.employeeCode || `EMP-${employee.id.substring(0, 4).toUpperCase()}`}</span>
                     </div>
                   </div>
                 </TableCell>
                 <TableCell>{employee.department || 'N/A'}</TableCell>
                 <TableCell>
-                  <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-100">
+                  <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800 rounded-sm">
                     {employee.payeeType || employee.staffType}
                   </Badge>
                 </TableCell>
@@ -1697,7 +1697,7 @@ export function Beneficiaries() {
                 <TableCell className="text-right">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-indigo-600 hover:bg-slate-50 data-[state=open]:bg-slate-100 data-[state=open]:text-indigo-600">
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-blue-600 hover:bg-slate-50 data-[state=open]:bg-slate-100 data-[state=open]:text-blue-600">
                         <MoreHorizontal className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
@@ -1740,13 +1740,13 @@ export function Beneficiaries() {
       {importFile && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setImportFile(null)} />
-          <div className="relative bg-white rounded-xl shadow-2xl p-6 w-full max-w-md mx-4 border border-slate-200">
+          <div className="relative bg-white dark:bg-slate-900 rounded-md shadow-2xl p-6 w-full max-w-md mx-4 border border-slate-200 dark:border-slate-800-200">
             <h3 className="text-xl font-bold text-slate-900 mb-2">Import Policy</h3>
             <p className="text-sm text-slate-500 leading-relaxed mb-6">
               How would you like to process the employee records from this CSV file?
             </p>
             <div className="flex flex-col gap-3">
-              <Button onClick={() => processImport(importFile, 'update')} className="bg-indigo-600 hover:bg-indigo-700 text-white h-auto py-3 flex-col items-center justify-center">
+              <Button onClick={() => processImport(importFile, 'update')} className="bg-blue-600 hover:bg-blue-700 text-white h-auto py-3 flex-col items-center justify-center">
                 <span className="font-semibold block text-base">Update & Add (Recommended)</span>
                 <span className="block text-xs opacity-80 mt-1 font-normal text-center">Modifies matching IDs. Adds missing ones. Leaves others alone.</span>
               </Button>

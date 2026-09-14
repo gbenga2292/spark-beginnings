@@ -38,7 +38,7 @@ export function SuperAdminSetup() {
   if (checking) {
     return (
       <div className="flex min-h-full items-center justify-center bg-slate-50 px-4">
-        <div className="w-5 h-5 border-2 border-indigo-300 border-t-indigo-600 rounded-full animate-spin"></div>
+        <div className="w-5 h-5 border-2 border-blue-300 border-t-blue-600 rounded-full animate-spin"></div>
       </div>
     );
   }
@@ -125,7 +125,7 @@ export function SuperAdminSetup() {
     <div className="flex min-h-full items-center justify-center bg-slate-50 px-4">
       <div className="w-full max-w-md space-y-6">
         <div className="flex flex-col items-center space-y-3 text-center">
-          <div className="h-14 w-14 rounded-xl bg-indigo-600 flex items-center justify-center">
+          <div className="h-14 w-14 rounded-xl bg-blue-600 flex items-center justify-center">
             <Shield className="h-7 w-7 text-white" />
           </div>
           <h1 className="text-2xl font-bold text-slate-900">First-Time Setup</h1>
@@ -170,7 +170,7 @@ export function SuperAdminSetup() {
               </div>
             </CardContent>
             <CardFooter>
-              <Button type="submit" disabled={isLoading} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white">
+              <Button type="submit" disabled={isLoading} className="w-full bg-blue-600 hover:bg-blue-700 text-white">
                 {isLoading ? (
                   <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
                 ) : (

@@ -15,6 +15,7 @@ import { useTheme } from '@/src/hooks/useTheme';
 import { useAppStore, Site } from '@/src/store/appStore';
 import { useOperations } from '@/src/contexts/OperationsContext';
 import { useAppData, deriveMainTaskStatus } from '@/src/contexts/AppDataContext';
+import { getInvoiceSettlement } from '@/src/lib/settlementUtils';
 
 type SiteTab = 'financials' | 'operations' | 'maintenance' | 'comms' | 'attachments';
 
@@ -160,8 +161,8 @@ export function SiteDetailDialog({ site, filterMonth, filterYear, onClose, onEdi
         {/* Header */}
         <div className={cn('p-5 border-b shrink-0 flex items-start justify-between gap-4', isDark ? 'border-slate-800' : 'border-slate-200')}>
           <div className="flex items-start gap-3 min-w-0">
-            <div className={cn('p-2.5 rounded-xl shrink-0', isDark ? 'bg-indigo-900/50' : 'bg-indigo-50')}>
-              <MapPin className="w-5 h-5 text-indigo-600" />
+            <div className={cn('p-2.5 rounded-xl shrink-0', isDark ? 'bg-blue-950/40' : 'bg-blue-50')}>
+              <MapPin className="w-5 h-5 text-blue-600" />
             </div>
             <div className="min-w-0">
               <h2 className="text-xl font-black text-slate-900 dark:text-white truncate">{site.name}</h2>
@@ -196,14 +197,14 @@ export function SiteDetailDialog({ site, filterMonth, filterYear, onClose, onEdi
               className={cn(
                 'flex items-center gap-2 px-4 py-3 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap',
                 activeTab === tab.id
-                  ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400'
+                  ? 'border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400'
                   : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
               )}>
               <tab.icon className="w-4 h-4" />
               {tab.label}
               {tab.count !== undefined && tab.count > 0 && (
                 <span className={cn('text-xs rounded-full px-1.5 py-0.5 font-bold',
-                  activeTab === tab.id ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
+                  activeTab === tab.id ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
                 )}>{tab.count}</span>
               )}
             </button>
@@ -233,12 +234,12 @@ export function SiteDetailDialog({ site, filterMonth, filterYear, onClose, onEdi
 
               {/* Invoice List */}
               <div className={card}>
-                <h3 className="font-bold mb-4 flex items-center gap-2"><FileText className="w-4 h-4 text-indigo-500" /> Invoices ({data.siteInvoices.length})</h3>
+                <h3 className="font-bold mb-4 flex items-center gap-2"><FileText className="w-4 h-4 text-blue-600" /> Invoices ({data.siteInvoices.length})</h3>
                 {data.siteInvoices.length > 0 ? (
                   <div className="space-y-0 divide-y divide-slate-100 dark:divide-slate-800">
                     {data.siteInvoices.map(inv => {
-                      const paidForThis = payments.filter(p => p.site?.trim() === site.name.trim() && p.date >= inv.date).reduce((a, p) => a + p.amount, 0);
-                      const isPaid = paidForThis >= (inv.totalCharge || inv.amount || 0) * 0.99;
+                      const settlement = getInvoiceSettlement(inv, invoices, payments);
+                      const status = settlement.status;
                       return (
                         <div key={inv.id} className="py-3 flex items-center justify-between gap-3">
                           <div>
@@ -246,9 +247,20 @@ export function SiteDetailDialog({ site, filterMonth, filterYear, onClose, onEdi
                             <p className="text-xs text-slate-500">{inv.date ? new Date(inv.date).toLocaleDateString('en-GB') : '—'} · {inv.billingCycle || 'Custom'}</p>
                           </div>
                           <div className="text-right flex items-center gap-3">
-                            <p className="font-bold text-sm">₦{(inv.totalCharge || inv.amount || 0).toLocaleString()}</p>
-                            <Badge className={cn('text-xs', isPaid ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700')}>
-                              {isPaid ? 'Paid' : 'Unpaid'}
+                            <div>
+                              <p className="font-bold text-sm">₦{(inv.totalCharge || inv.amount || 0).toLocaleString()}</p>
+                              {settlement.balanceRemaining > 0 && settlement.totalSettled > 0 && (
+                                <p className="text-[11px] text-amber-600 font-mono">Bal: ₦{settlement.balanceRemaining.toLocaleString()}</p>
+                              )}
+                            </div>
+                            <Badge className={cn(
+                              'text-xs font-semibold',
+                              status === 'Paid' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300' :
+                              status === 'Partially Paid' ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300' :
+                              status === 'Overdue' ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300' :
+                              'bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300'
+                            )}>
+                              {status}
                             </Badge>
                           </div>
                         </div>
@@ -272,7 +284,7 @@ export function SiteDetailDialog({ site, filterMonth, filterYear, onClose, onEdi
               {/* Summary */}
               <div className="grid grid-cols-3 gap-3">
                 {[
-                  { label: 'Machine Days', value: data.machineLogs.length, color: 'text-indigo-600' },
+                  { label: 'Machine Days', value: data.machineLogs.length, color: 'text-blue-600' },
                   { label: 'Active Days', value: data.activeDays, color: 'text-emerald-600' },
                   { label: 'Total Diesel (L)', value: data.totalDiesel.toLocaleString(), color: 'text-amber-600' },
                 ].map(k => (
@@ -285,7 +297,7 @@ export function SiteDetailDialog({ site, filterMonth, filterYear, onClose, onEdi
 
               {/* Machine Log List */}
               <div className={card}>
-                <h3 className="font-bold mb-4 flex items-center gap-2"><Activity className="w-4 h-4 text-indigo-500" /> Machine Logs ({data.machineLogs.length})</h3>
+                <h3 className="font-bold mb-4 flex items-center gap-2"><Activity className="w-4 h-4 text-blue-600" /> Machine Logs ({data.machineLogs.length})</h3>
                 {data.machineLogs.length > 0 ? (
                   <div className="divide-y divide-slate-100 dark:divide-slate-800">
                     {data.machineLogs.slice().sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(log => (
@@ -394,12 +406,12 @@ export function SiteDetailDialog({ site, filterMonth, filterYear, onClose, onEdi
               {/* Contacts */}
               {data.siteContacts.length > 0 && (
                 <div className={card}>
-                  <h3 className="font-bold mb-4 flex items-center gap-2"><Users className="w-4 h-4 text-indigo-500" /> Site Contacts</h3>
+                  <h3 className="font-bold mb-4 flex items-center gap-2"><Users className="w-4 h-4 text-blue-600" /> Site Contacts</h3>
                   <div className="divide-y divide-slate-100 dark:divide-slate-800">
                     {data.siteContacts.map(c => (
                       <div key={c.id} className="py-3">
                         <p className="font-semibold text-sm">{c.name}</p>
-                        <p className="text-xs text-indigo-600 dark:text-indigo-400">{c.position}</p>
+                        <p className="text-xs text-blue-600 dark:text-blue-400">{c.position}</p>
                         <div className="flex gap-3 mt-1 text-xs text-slate-500">
                           {c.phone && <span>{c.phone}</span>}
                           {c.email && <span>{c.email}</span>}
@@ -440,7 +452,7 @@ export function SiteDetailDialog({ site, filterMonth, filterYear, onClose, onEdi
             <div className="space-y-4">
               <div className={card}>
                 <h3 className="font-bold mb-4 flex items-center gap-2">
-                  <Paperclip className="w-4 h-4 text-indigo-500" />
+                  <Paperclip className="w-4 h-4 text-blue-600" />
                   Site Documents ({siteAttachments.length})
                 </h3>
 
@@ -465,18 +477,18 @@ export function SiteDetailDialog({ site, filterMonth, filterYear, onClose, onEdi
                           className={cn(
                             'flex items-center gap-3 p-3 rounded-xl border transition-all group',
                             att.url
-                              ? 'border-slate-100 hover:border-indigo-200 hover:bg-indigo-50/40 cursor-pointer'
+                              ? 'border-slate-100 hover:border-blue-200 hover:bg-blue-50/40 cursor-pointer'
                               : 'border-slate-100 bg-slate-50 cursor-default opacity-60'
                           )}
                         >
                           <div className={cn(
                             'h-9 w-9 rounded-lg flex items-center justify-center shrink-0',
-                            isImage ? 'bg-sky-100 text-sky-600' : 'bg-indigo-100 text-indigo-600'
+                            isImage ? 'bg-sky-100 text-sky-600' : 'bg-blue-50 text-blue-600'
                           )}>
                             <FileText className="h-4 w-4" />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold text-slate-800 truncate group-hover:text-indigo-700 transition-colors">
+                            <p className="text-sm font-semibold text-slate-800 truncate group-hover:text-blue-700 transition-colors">
                               {att.caption || att.name}
                             </p>
                             {att.caption && (
@@ -493,12 +505,12 @@ export function SiteDetailDialog({ site, filterMonth, filterYear, onClose, onEdi
                             <div className="flex items-center gap-1 shrink-0">
                               <button
                                 onClick={e => { e.preventDefault(); e.stopPropagation(); setPreviewDoc(att); }}
-                                className="h-7 w-7 rounded-lg flex items-center justify-center text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                                className="h-7 w-7 rounded-lg flex items-center justify-center text-slate-300 hover:text-blue-600 hover:bg-blue-50 transition-colors"
                                 title="Preview"
                               >
                                 <Eye className="h-3.5 w-3.5" />
                               </button>
-                              <ExternalLink className="h-4 w-4 text-slate-300 group-hover:text-indigo-500 transition-colors" />
+                              <ExternalLink className="h-4 w-4 text-slate-300 group-hover:text-blue-600 transition-colors" />
                             </div>
                           )}
                         </a>

@@ -1164,14 +1164,14 @@ export function Ledger() {
       : 'Monthly accumulated VAT on ledger expenses for tax remittance planning',
     <div className="relative flex items-center gap-2">
       <div className="flex items-center gap-2 md:gap-3">
-        <div className="flex bg-slate-100/80 p-0.5 rounded-lg border border-slate-200/60 shadow-sm backdrop-blur-sm">
-          <button onClick={() => setTab('entry')} className={`px-2 sm:px-3 py-1.5 rounded-md text-[10px] uppercase tracking-wider font-extrabold transition-all duration-200 flex items-center gap-1.5 ${tab === 'entry' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-indigo-600'}`}>
+        <div className="flex bg-slate-100 dark:bg-slate-900 p-0.5 rounded-md border border-slate-200 dark:border-slate-800">
+          <button onClick={() => setTab('entry')} className={`px-2 sm:px-3 py-1.5 rounded-md text-[10px] uppercase tracking-wider font-extrabold transition-all duration-200 flex items-center gap-1.5 ${tab === 'entry' ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 font-semibold' : 'text-slate-600 dark:text-slate-400 hover:text-blue-600'}`}>
             <FileText className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Entry</span>
           </button>
-          <button onClick={() => setTab('records')} className={`px-2 sm:px-3 py-1.5 rounded-md text-[10px] uppercase tracking-wider font-extrabold transition-all duration-200 flex items-center gap-1.5 ${tab === 'records' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-indigo-600'}`}>
+          <button onClick={() => setTab('records')} className={`px-2 sm:px-3 py-1.5 rounded-md text-[10px] uppercase tracking-wider font-extrabold transition-all duration-200 flex items-center gap-1.5 ${tab === 'records' ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 font-semibold' : 'text-slate-600 dark:text-slate-400 hover:text-blue-600'}`}>
             <History className="h-3.5 w-3.5" /> <span className="hidden sm:inline">History</span>
           </button>
-          <button onClick={() => setTab('vat')} className={`px-2 sm:px-3 py-1.5 rounded-md text-[10px] uppercase tracking-wider font-extrabold transition-all duration-200 flex items-center gap-1.5 ${tab === 'vat' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500 hover:text-emerald-600'}`}>
+          <button onClick={() => setTab('vat')} className={`px-2 sm:px-3 py-1.5 rounded-md text-[10px] uppercase tracking-wider font-extrabold transition-all duration-200 flex items-center gap-1.5 ${tab === 'vat' ? 'bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 font-semibold' : 'text-slate-600 dark:text-slate-400 hover:text-emerald-600'}`}>
             <Receipt className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Expenses VAT</span>
           </button>
         </div>
@@ -1179,21 +1179,21 @@ export function Ledger() {
         {tab === 'records' && (
           <>
             <button
-              className={`sm:hidden h-9 w-9 flex items-center justify-center rounded-xl border ${showMobileFilters ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-slate-200 bg-white text-slate-600'} shadow-sm transition-all`}
+              className={`sm:hidden h-9 w-9 flex items-center justify-center rounded-sm border ${showMobileFilters ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300'} rounded-sm transition-all`}
               onClick={() => setShowMobileFilters(o => !o)}
               title="Toggle filters"
             >
               <Filter className="h-4 w-4" />
             </button>
             {priv.canAdd && (
-              <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} className="h-9 px-2 sm:px-3 gap-2 border-slate-200 bg-white text-slate-600 font-bold text-[11px] uppercase tracking-tight hover:bg-slate-50 shadow-sm transition-all">
-                <Download className="h-4 w-4 text-indigo-500" /> <span className="hidden sm:inline">Import</span>
+              <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} className="h-9 px-2 sm:px-3 gap-2 border-slate-200 bg-white text-slate-600 font-bold text-[11px] uppercase tracking-tight hover:bg-slate-50  transition-all">
+                <Download className="h-4 w-4 text-blue-600" /> <span className="hidden sm:inline">Import</span>
               </Button>
             )}
             {priv.canExport && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="h-9 px-2 sm:px-3 gap-2 border-slate-200 bg-white text-slate-600 font-bold text-[11px] uppercase tracking-tight hover:bg-slate-50 shadow-sm transition-all">
+                  <Button variant="outline" size="sm" className="h-9 px-2 sm:px-3 gap-2 border-slate-200 bg-white text-slate-600 font-bold text-[11px] uppercase tracking-tight hover:bg-slate-50  transition-all">
                     <Upload className="h-4 w-4 text-emerald-500" /> <span className="hidden sm:inline">Export</span> <ChevronDown className="h-3 w-3 text-slate-400" />
                   </Button>
                 </DropdownMenuTrigger>
@@ -1225,7 +1225,7 @@ export function Ledger() {
   if (!priv?.canView) {
     return (
       <div className="flex items-center justify-center h-full">
-        <div className="text-center rounded-lg border bg-card p-8">
+        <div className="text-center rounded-sm border bg-card p-8">
           <FileText className="mx-auto h-12 w-12 text-slate-400 mb-4" />
           <h2 className="text-xl font-semibold mb-2">Access Denied</h2>
         </div>
@@ -1233,18 +1233,18 @@ export function Ledger() {
     );
   }
 
-  const tdClass = "p-0 text-xs border border-slate-200 focus-within:ring-1 focus-within:ring-indigo-500 focus-within:border-indigo-500 focus-within:bg-indigo-50/10 transition-all relative";
+  const tdClass = "p-0 text-xs border border-slate-200 dark:border-slate-800 focus-within:ring-1 focus-within:ring-blue-500 focus-within:border-blue-500 focus-within:bg-blue-50/10 dark:focus-within:bg-blue-950/20 transition-all relative";
   const inputClass = "w-full h-9 px-3 text-xs bg-transparent outline-none disabled:opacity-50 disabled:cursor-not-allowed font-medium text-slate-700";
   
   return (
     <div className="flex flex-col gap-6">
       <TabsContent active={tab === 'entry'} className="m-0 focus-visible:outline-none">
-        <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-sm bg-white">
+        <div className="border border-slate-200 dark:border-slate-800 rounded-md overflow-hidden bg-white dark:bg-slate-900">
           {/* Form Header */}
           <div className="bg-slate-50/80 p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 border-b border-slate-200/60 backdrop-blur-sm">
             <div className="flex flex-col gap-1.5">
               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Voucher No.</label>
-              <div className="flex rounded-md shadow-sm">
+              <div className="flex rounded-sm">
                 <select
                   value={activeVoucherNo || generatedVoucherNo}
                   onChange={async e => {
@@ -1262,7 +1262,7 @@ export function Ledger() {
                       loadVoucher(vno);
                     }
                   }}
-                  className="bg-white flex-1 min-w-0 h-9 text-xs font-mono text-indigo-700 font-bold border border-r-0 rounded-l-md border-slate-300 outline-none px-2 cursor-pointer truncate"
+                  className="bg-white dark:bg-slate-900 flex-1 min-w-0 h-9 text-xs font-mono tabular-nums text-blue-600 dark:text-blue-400 font-bold border border-r-0 rounded-l-sm border-slate-300 dark:border-slate-700 outline-none px-2 cursor-pointer truncate"
                 >
                   <option value={generatedVoucherNo} className="font-sans italic text-slate-500">
                     New: {generatedVoucherNo}
@@ -1270,7 +1270,7 @@ export function Ledger() {
                   {voucherSummaries.length > 0 && (
                     <optgroup label="Saved Vouchers">
                       {voucherSummaries.map(v => (
-                        <option key={v.voucherNo} value={v.voucherNo} className="font-mono text-slate-700">
+                        <option key={v.voucherNo} value={v.voucherNo} className="font-mono tabular-nums text-slate-700">
                           {v.voucherNo}
                         </option>
                       ))}
@@ -1280,7 +1280,7 @@ export function Ledger() {
                 <button onClick={handlePrevVoucher} className="h-9 w-8 shrink-0 bg-slate-50 border border-slate-300 border-l-0 text-slate-600 hover:bg-slate-100 flex items-center justify-center transition-colors">
                   <ChevronLeft className="h-3.5 w-3.5" />
                 </button>
-                <button onClick={handleNextVoucher} className="h-9 w-8 shrink-0 bg-slate-50 border border-slate-300 border-l-0 rounded-r-md text-slate-600 hover:bg-slate-100 flex items-center justify-center transition-colors">
+                <button onClick={handleNextVoucher} className="h-9 w-8 shrink-0 bg-slate-50 border border-slate-300 border-l-0 rounded-r-sm text-slate-600 hover:bg-slate-100 flex items-center justify-center transition-colors">
                   <ChevronRight className="h-3.5 w-3.5" />
                 </button>
               </div>
@@ -1288,12 +1288,12 @@ export function Ledger() {
 
             <div className="flex flex-col gap-1.5">
               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Voucher Date</label>
-              <Input type="date" value={voucherDate} onChange={e => handleDateChange(e.target.value)} className="bg-white h-9 shadow-sm border-slate-300 font-bold text-slate-700 text-xs" />
+              <Input type="date" value={voucherDate} onChange={e => handleDateChange(e.target.value)} className="bg-white dark:bg-slate-800 h-9 border-slate-200 dark:border-slate-700 font-medium text-slate-700 dark:text-slate-200 text-xs rounded-sm" />
             </div>
 
             <div className="flex flex-col gap-1.5">
               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Paid From</label>
-              <select className="bg-white h-9 px-3 rounded-md border border-slate-300 text-xs font-bold text-slate-700 shadow-sm outline-none" value={paidFrom} onChange={e => setPaidFrom(e.target.value)}>
+              <select className="bg-white dark:bg-slate-800 h-9 px-3 rounded-sm border border-slate-200 dark:border-slate-700 text-xs font-medium text-slate-700 dark:text-slate-200 outline-none" value={paidFrom} onChange={e => setPaidFrom(e.target.value)}>
                 <option value="" disabled>Select Bank...</option>
                 {sortedBanks.map(b => (
                   <option key={b.id} value={b.name}>{b.name}</option>
@@ -1303,7 +1303,7 @@ export function Ledger() {
 
             <div className="flex flex-col gap-1.5">
               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Entered By</label>
-              <Input readOnly value={currentUser?.name || ''} className="bg-slate-100/50 h-9 text-xs font-bold text-slate-400 border-slate-200 pointer-events-none shadow-sm" />
+              <Input readOnly value={currentUser?.name || ''} className="bg-slate-100/50 dark:bg-slate-800/50 h-9 text-xs font-medium text-slate-400 border-slate-200 dark:border-slate-700 pointer-events-none rounded-sm" />
             </div>
 
             <div className="flex flex-col gap-1.5">
@@ -1311,14 +1311,14 @@ export function Ledger() {
               <div className="flex gap-2">
                 <Button 
                   variant="outline" 
-                  className="h-9 flex-1 sm:w-auto px-3 border-slate-300 text-slate-700 hover:bg-slate-100 hover:text-indigo-600 font-bold text-[11px] uppercase tracking-wider gap-2 shadow-sm transition-all active:scale-95 bg-white justify-start" 
+                  className="h-9 flex-1 sm:w-auto px-3 border-slate-300 text-slate-700 hover:bg-slate-100 hover:text-blue-600 font-medium text-[11px] uppercase tracking-wider gap-2 rounded-sm border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 justify-start" 
                   onClick={() => setShowVendorDialog(true)}
                 >
                   <Users className="h-3.5 w-3.5" /> Manage Vendors
                 </Button>
                 <Button 
                   variant="outline" 
-                  className="h-9 flex-1 sm:w-auto px-3 border-slate-300 text-slate-700 hover:bg-slate-100 hover:text-indigo-600 font-bold text-[11px] uppercase tracking-wider gap-2 shadow-sm transition-all active:scale-95 bg-white justify-start" 
+                  className="h-9 flex-1 sm:w-auto px-3 border-slate-300 text-slate-700 hover:bg-slate-100 hover:text-blue-600 font-medium text-[11px] uppercase tracking-wider gap-2 rounded-sm border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 justify-start" 
                   onClick={() => setShowCategoryDialog(true)}
                 >
                   <LayoutGrid className="h-3.5 w-3.5" /> Manage Categories
@@ -1355,7 +1355,7 @@ export function Ledger() {
                   <X className="h-3.5 w-3.5" /> Clear
                 </Button>
                 <Button 
-                  className="h-9 px-6 gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] uppercase tracking-tight shadow-md transition-all active:scale-95" 
+                  className="h-9 px-6 gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-[11px] uppercase tracking-tight rounded-sm transition-all active:scale-95" 
                   onClick={handleSubmit} 
                   disabled={!priv.canAdd}
                 >
@@ -1366,7 +1366,7 @@ export function Ledger() {
           </div>
 
           {/* Mobile Actions (Only visible on small screens) */}
-          <div className="sm:hidden p-3 bg-white border-b border-slate-200/60 flex items-center justify-between gap-2 shadow-sm">
+          <div className="sm:hidden p-3 bg-white border-b border-slate-200/60 flex items-center justify-between gap-2 ">
             <div className="flex gap-2">
               {activeVoucherNo && priv.canDelete && (
                 <Button size="sm" variant="outline" className="h-9 px-3 text-rose-500 hover:bg-rose-50 border-rose-100 font-bold gap-1.5" onClick={handleDeleteVoucher}>
@@ -1377,7 +1377,7 @@ export function Ledger() {
                 <RotateCcw className="h-3.5 w-3.5" /> <span className="text-[10px] uppercase tracking-wider">Reload</span>
               </Button>
             </div>
-            <Button size="sm" className="h-9 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold gap-1.5 shadow-md active:scale-95 transition-all" onClick={handleSubmit} disabled={!priv.canAdd}>
+            <Button size="sm" className="h-9 px-4 bg-blue-600 hover:bg-blue-700 text-white font-bold gap-1.5  active:scale-95 transition-all" onClick={handleSubmit} disabled={!priv.canAdd}>
               <CheckCircle2 className="h-3.5 w-3.5" /> <span className="text-[10px] uppercase tracking-wider">Submit</span>
             </Button>
           </div>
@@ -1465,7 +1465,7 @@ export function Ledger() {
                       <div className="flex items-center gap-2">
                         <label className="text-[10px] font-bold text-slate-500 uppercase">VAT Policy</label>
                         <select
-                          className="h-8 px-2 rounded border border-slate-200 text-xs bg-white font-bold text-indigo-700 outline-none cursor-pointer"
+                          className="h-8 px-2 rounded border border-slate-200 text-xs bg-white font-bold text-blue-600 dark:text-blue-400 outline-none cursor-pointer"
                           value={item.vatMode || (item.isVatable ? 'Yes' : 'No')}
                           onChange={e => {
                             const mode = e.target.value as VatMode;
@@ -1498,12 +1498,12 @@ export function Ledger() {
                   </div>
                 </div>
               ))}
-              <div className="p-4 bg-indigo-50 flex flex-col gap-1">
+              <div className="p-4 bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex flex-col gap-1">
                 <div className="flex justify-between items-center text-xs">
                   <span className="font-bold text-slate-700 uppercase tracking-wider">Subtotal (Line Items)</span>
                   <span className="font-bold text-slate-800 text-sm tabular-nums">₦{formTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                 </div>
-                <div className="flex justify-between items-center text-xs text-indigo-700 font-semibold">
+                <div className="flex justify-between items-center text-xs text-slate-700 dark:text-slate-300 font-semibold">
                   <span>Base Vatable Amount</span>
                   <span className="tabular-nums">₦{formNetTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                 </div>
@@ -1513,7 +1513,7 @@ export function Ledger() {
                     <span className="tabular-nums">₦{formVatTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                   </div>
                 )}
-                <div className="flex justify-between items-center pt-1 border-t border-indigo-200/60 font-extrabold text-indigo-900 text-sm">
+                <div className="flex justify-between items-center pt-1 border-t border-slate-200 dark:border-slate-700 font-bold text-slate-900 dark:text-slate-100 text-sm">
                   <span>Gross Total</span>
                   <span className="tabular-nums">₦{formGrossTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                 </div>
@@ -1556,7 +1556,7 @@ export function Ledger() {
                         <button
                           type="button"
                           onClick={() => setDescDialog({ idx, value: item.description })}
-                          className="shrink-0 px-2 text-slate-300 hover:text-indigo-500 transition-colors bg-transparent border-none outline-none"
+                          className="shrink-0 px-2 text-slate-300 hover:text-blue-600 transition-colors bg-transparent border-none outline-none"
                           title="View full description"
                         >
                           <BookOpen className="h-3.5 w-3.5" />
@@ -1570,7 +1570,7 @@ export function Ledger() {
                       </select>
                     </td>
                     <td className={tdClass}>
-                      <div className="flex items-center relative h-9 group-focus-within:text-indigo-600">
+                      <div className="flex items-center relative h-9 group-focus-within:text-blue-600">
                         <span className="text-slate-400 absolute left-3 text-xs pointer-events-none">₦</span>
                         <input 
                           type="text" 
@@ -1593,7 +1593,7 @@ export function Ledger() {
                     </td>
                     <td className={tdClass + " text-center"}>
                       <select 
-                        className="w-full h-8 px-1.5 rounded border border-slate-200 text-xs bg-white font-extrabold text-indigo-700 outline-none cursor-pointer text-center" 
+                        className="w-full h-8 px-1.5 rounded border border-slate-200 text-xs bg-white font-extrabold text-blue-600 dark:text-blue-400 outline-none cursor-pointer text-center" 
                         value={item.vatMode || (item.isVatable ? 'Yes' : 'No')} 
                         onChange={e => {
                           const mode = e.target.value as VatMode;
@@ -1668,7 +1668,7 @@ export function Ledger() {
                   <td colSpan={4} className="text-right py-3 px-4 font-bold text-slate-700 bg-white border border-slate-200">
                     Totals
                   </td>
-                  <td className="py-3 px-3 font-bold text-indigo-700 border border-slate-200 bg-indigo-50/50">
+                  <td className="py-3 px-3 font-bold font-mono tabular-nums text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50">
                     ₦{formTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </td>
                   <td className="border border-slate-200 bg-slate-50 text-center text-xs font-bold text-slate-400">
@@ -1694,13 +1694,13 @@ export function Ledger() {
           onClick={() => setDescDialog(null)}
         >
           <div
-            className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden"
+            className="bg-white dark:bg-slate-900 rounded-md shadow-2xl w-full max-w-lg overflow-hidden border border-slate-200 dark:border-slate-800"
             onClick={e => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="flex items-center justify-between bg-indigo-700 px-5 py-3.5">
+            <div className="flex items-center justify-between bg-blue-600 px-5 py-3.5">
               <div className="flex items-center gap-2">
-                <BookOpen className="h-4 w-4 text-indigo-200" />
+                <BookOpen className="h-4 w-4 text-blue-200" />
                 <span className="text-white font-semibold text-sm uppercase tracking-wider">
                   Row {descDialog.idx + 1} — Description
                 </span>
@@ -1728,7 +1728,7 @@ export function Ledger() {
             <div className="border-t border-slate-100 px-6 py-4 bg-slate-50">
               <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">Edit Description</label>
               <textarea
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 resize-none"
+                className="w-full border border-slate-200 rounded-sm px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 resize-none"
                 rows={3}
                 value={items[descDialog.idx]?.description || ''}
                 onChange={e => {
@@ -1741,7 +1741,7 @@ export function Ledger() {
               <div className="flex justify-end mt-3">
                 <button
                   onClick={() => setDescDialog(null)}
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors"
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-sm transition-colors"
                 >
                   Done
                 </button>
@@ -1752,22 +1752,22 @@ export function Ledger() {
       )}
 
       <TabsContent active={tab === 'records'} className="mt-6 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-        <Card className="border-none shadow-xl shadow-slate-200/50 overflow-hidden bg-white/80 backdrop-blur-sm">
+        <Card className="border border-slate-200 dark:border-slate-800 rounded-md overflow-hidden bg-white dark:bg-slate-900">
           <CardHeader className="border-b border-slate-100 p-6 space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="flex items-center gap-2.5">
-                <div className="p-2 bg-indigo-50 rounded-lg">
-                  <History className="h-4 w-4 text-indigo-600" />
+                <div className="p-2 bg-blue-50 dark:bg-blue-950/40 rounded-sm">
+                  <History className="h-4 w-4 text-blue-600" />
                 </div>
                 <h3 className="font-bold text-slate-800 tracking-tight">Records</h3>
               </div>
               
-              <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 self-start sm:self-center">
+              <div className="flex items-center bg-slate-100 p-1 rounded-sm border border-slate-200 dark:border-slate-700 self-start sm:self-center">
                 <Button 
                   variant="ghost" 
                   size="sm" 
                   onClick={() => setHistoryViewMode('detailed')}
-                  className={`h-8 px-3 rounded-lg text-xs font-bold transition-all ${historyViewMode === 'detailed' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}
+                  className={`h-8 px-3 rounded-sm text-xs font-bold transition-all ${historyViewMode === 'detailed' ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 font-semibold' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'}`}
                 >
                   <LayoutGrid className="h-3.5 w-3.5 mr-1.5" /> Detailed View
                 </Button>
@@ -1775,7 +1775,7 @@ export function Ledger() {
                   variant="ghost" 
                   size="sm" 
                   onClick={() => setHistoryViewMode('grouped')}
-                  className={`h-8 px-3 rounded-lg text-xs font-bold transition-all ${historyViewMode === 'grouped' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}
+                  className={`h-8 px-3 rounded-sm text-xs font-bold transition-all ${historyViewMode === 'grouped' ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 font-semibold' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'}`}
                 >
                   <FileText className="h-3.5 w-3.5 mr-1.5" /> Voucher View
                 </Button>
@@ -1785,7 +1785,7 @@ export function Ledger() {
             {/* Filters Row */}
             <div className="flex flex-wrap items-center justify-between gap-4 pt-2">
               <div className="flex flex-wrap items-center gap-3">
-                <div className="flex items-center gap-2 bg-slate-50 p-1 rounded-lg border border-slate-100">
+                <div className="flex items-center gap-2 bg-slate-50 p-1 rounded-sm border border-slate-100">
                   <select 
                     className="h-8 px-2 rounded-md border-none bg-transparent text-xs text-slate-600 font-bold focus:ring-0" 
                     value={dateFilterType} 
@@ -1802,7 +1802,7 @@ export function Ledger() {
               </div>
 
               <div className="flex items-center gap-3">
-                <div className="flex items-center bg-slate-50 p-1 rounded-lg border border-slate-100">
+                <div className="flex items-center bg-slate-50 p-1 rounded-sm border border-slate-100">
                   <select 
                     className="h-8 px-2 rounded-md border-none bg-transparent text-xs text-slate-600 font-bold focus:ring-0 max-w-[110px]" 
                     value={searchKey} 
@@ -1834,23 +1834,23 @@ export function Ledger() {
             <div className="flex flex-wrap items-center justify-between gap-4 mt-2">
               <div>
                 {search.trim() && (
-                  <div className="flex items-center gap-2 py-1.5 px-3 bg-indigo-50/50 rounded-lg border border-indigo-100 w-fit">
-                    <Search className="h-3 w-3 text-indigo-500" />
-                    <span className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider">
+                  <div className="flex items-center gap-2 py-1.5 px-3 bg-blue-50/50 dark:bg-blue-950/40 rounded-sm border border-blue-200 dark:border-blue-800 w-fit">
+                    <Search className="h-3 w-3 text-blue-600" />
+                    <span className="text-[10px] font-bold text-blue-700 uppercase tracking-wider">
                       Results for: <span className="text-slate-900">{search}</span>
                     </span>
-                    <button onClick={() => setSearch('')} className="ml-1 text-indigo-400 hover:text-indigo-600 flex items-center justify-center p-0.5 rounded hover:bg-indigo-100/50 transition-colors">
+                    <button onClick={() => setSearch('')} className="ml-1 text-blue-400 hover:text-blue-600 flex items-center justify-center p-0.5 rounded hover:bg-blue-100/50 transition-colors">
                       <X className="h-3 w-3" />
                     </button>
                   </div>
                 )}
               </div>
               
-              <div className="flex items-center gap-2 py-1.5 px-3 bg-indigo-50/80 rounded-lg border border-indigo-100 shadow-sm backdrop-blur-sm ml-auto">
-                <span className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider">
+              <div className="flex items-center gap-2 py-1.5 px-3 bg-blue-50/80 dark:bg-blue-950/40 rounded-sm border border-blue-200 dark:border-blue-800 ml-auto">
+                <span className="text-[10px] font-bold text-blue-700 uppercase tracking-wider">
                   Filtered Total:
                 </span>
-                <span className="text-xs font-extrabold text-indigo-900 tabular-nums">
+                <span className="text-xs font-extrabold text-slate-900 dark:text-slate-100 font-mono tabular-nums tabular-nums">
                   ₦{filteredTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               </div>
@@ -1865,48 +1865,48 @@ export function Ledger() {
                     <tr>
                       <th className="py-2.5 px-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-44 cursor-pointer hover:bg-slate-100 transition-colors group" onClick={() => toggleSort('voucherNo')}>
                         <div className="flex items-center gap-1.5">
-                          Voucher No. {sortField === 'voucherNo' ? (sortOrder === 'asc' ? <ArrowUp className="h-3 w-3 text-indigo-600" /> : <ArrowDown className="h-3 w-3 text-indigo-600" />) : <ArrowUpDown className="h-3 w-3 text-slate-300 group-hover:text-slate-400" />}
+                          Voucher No. {sortField === 'voucherNo' ? (sortOrder === 'asc' ? <ArrowUp className="h-3 w-3 text-blue-600" /> : <ArrowDown className="h-3 w-3 text-blue-600" />) : <ArrowUpDown className="h-3 w-3 text-slate-300 group-hover:text-slate-400" />}
                         </div>
                       </th>
                       <th className="py-2.5 px-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-28 cursor-pointer hover:bg-slate-100 transition-colors group" onClick={() => toggleSort('date')}>
                         <div className="flex items-center gap-1.5">
-                          Date {sortField === 'date' ? (sortOrder === 'asc' ? <ArrowUp className="h-3 w-3 text-indigo-600" /> : <ArrowDown className="h-3 w-3 text-indigo-600" />) : <ArrowUpDown className="h-3 w-3 text-slate-300 group-hover:text-slate-400" />}
+                          Date {sortField === 'date' ? (sortOrder === 'asc' ? <ArrowUp className="h-3 w-3 text-blue-600" /> : <ArrowDown className="h-3 w-3 text-blue-600" />) : <ArrowUpDown className="h-3 w-3 text-slate-300 group-hover:text-slate-400" />}
                         </div>
                       </th>
                       <th className="py-2.5 px-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 transition-colors group" onClick={() => toggleSort('description')}>
                         <div className="flex items-center gap-1.5">
-                          Description {sortField === 'description' ? (sortOrder === 'asc' ? <ArrowUp className="h-3 w-3 text-indigo-600" /> : <ArrowDown className="h-3 w-3 text-indigo-600" />) : <ArrowUpDown className="h-3 w-3 text-slate-300 group-hover:text-slate-400" />}
+                          Description {sortField === 'description' ? (sortOrder === 'asc' ? <ArrowUp className="h-3 w-3 text-blue-600" /> : <ArrowDown className="h-3 w-3 text-blue-600" />) : <ArrowUpDown className="h-3 w-3 text-slate-300 group-hover:text-slate-400" />}
                         </div>
                       </th>
                       <th className="py-2.5 px-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-32 cursor-pointer hover:bg-slate-100 transition-colors group" onClick={() => toggleSort('category')}>
                         <div className="flex items-center gap-1.5">
-                          Category {sortField === 'category' ? (sortOrder === 'asc' ? <ArrowUp className="h-3 w-3 text-indigo-600" /> : <ArrowDown className="h-3 w-3 text-indigo-600" />) : <ArrowUpDown className="h-3 w-3 text-slate-300 group-hover:text-slate-400" />}
+                          Category {sortField === 'category' ? (sortOrder === 'asc' ? <ArrowUp className="h-3 w-3 text-blue-600" /> : <ArrowDown className="h-3 w-3 text-blue-600" />) : <ArrowUpDown className="h-3 w-3 text-slate-300 group-hover:text-slate-400" />}
                         </div>
                       </th>
                       <th className="py-2.5 px-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-28 cursor-pointer hover:bg-slate-100 transition-colors group" onClick={() => toggleSort('client')}>
                         <div className="flex items-center gap-1.5">
-                          Client {sortField === 'client' ? (sortOrder === 'asc' ? <ArrowUp className="h-3 w-3 text-indigo-600" /> : <ArrowDown className="h-3 w-3 text-indigo-600" />) : <ArrowUpDown className="h-3 w-3 text-slate-300 group-hover:text-slate-400" />}
+                          Client {sortField === 'client' ? (sortOrder === 'asc' ? <ArrowUp className="h-3 w-3 text-blue-600" /> : <ArrowDown className="h-3 w-3 text-blue-600" />) : <ArrowUpDown className="h-3 w-3 text-slate-300 group-hover:text-slate-400" />}
                         </div>
                       </th>
                       <th className="py-2.5 px-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-28 cursor-pointer hover:bg-slate-100 transition-colors group" onClick={() => toggleSort('site')}>
                         <div className="flex items-center gap-1.5">
-                          Site {sortField === 'site' ? (sortOrder === 'asc' ? <ArrowUp className="h-3 w-3 text-indigo-600" /> : <ArrowDown className="h-3 w-3 text-indigo-600" />) : <ArrowUpDown className="h-3 w-3 text-slate-300 group-hover:text-slate-400" />}
+                          Site {sortField === 'site' ? (sortOrder === 'asc' ? <ArrowUp className="h-3 w-3 text-blue-600" /> : <ArrowDown className="h-3 w-3 text-blue-600" />) : <ArrowUpDown className="h-3 w-3 text-slate-300 group-hover:text-slate-400" />}
                         </div>
                       </th>
                       <th className="py-2.5 px-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-24 cursor-pointer hover:bg-slate-100 transition-colors group" onClick={() => toggleSort('bank')}>
                         <div className="flex items-center gap-1.5">
-                          Bank {sortField === 'bank' ? (sortOrder === 'asc' ? <ArrowUp className="h-3 w-3 text-indigo-600" /> : <ArrowDown className="h-3 w-3 text-indigo-600" />) : <ArrowUpDown className="h-3 w-3 text-slate-300 group-hover:text-slate-400" />}
+                          Bank {sortField === 'bank' ? (sortOrder === 'asc' ? <ArrowUp className="h-3 w-3 text-blue-600" /> : <ArrowDown className="h-3 w-3 text-blue-600" />) : <ArrowUpDown className="h-3 w-3 text-slate-300 group-hover:text-slate-400" />}
                         </div>
                       </th>
                       <th className="py-2.5 px-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider w-32 cursor-pointer hover:bg-slate-100 transition-colors group" onClick={() => toggleSort('amount')}>
                         <div className="flex items-center justify-end gap-1.5">
-                          Amount {sortField === 'amount' ? (sortOrder === 'asc' ? <ArrowUp className="h-3 w-3 text-indigo-600" /> : <ArrowDown className="h-3 w-3 text-indigo-600" />) : <ArrowUpDown className="h-3 w-3 text-slate-300 group-hover:text-slate-400" />}
+                          Amount {sortField === 'amount' ? (sortOrder === 'asc' ? <ArrowUp className="h-3 w-3 text-blue-600" /> : <ArrowDown className="h-3 w-3 text-blue-600" />) : <ArrowUpDown className="h-3 w-3 text-slate-300 group-hover:text-slate-400" />}
                         </div>
                       </th>
                       <th className="py-2.5 px-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider w-28">VAT ({vatRate}%)</th>
                       <th className="py-2.5 px-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-28 cursor-pointer hover:bg-slate-100 transition-colors group" onClick={() => toggleSort('vendor')}>
                         <div className="flex items-center gap-1.5">
-                          Vendor {sortField === 'vendor' ? (sortOrder === 'asc' ? <ArrowUp className="h-3 w-3 text-indigo-600" /> : <ArrowDown className="h-3 w-3 text-indigo-600" />) : <ArrowUpDown className="h-3 w-3 text-slate-300 group-hover:text-slate-400" />}
+                          Vendor {sortField === 'vendor' ? (sortOrder === 'asc' ? <ArrowUp className="h-3 w-3 text-blue-600" /> : <ArrowDown className="h-3 w-3 text-blue-600" />) : <ArrowUpDown className="h-3 w-3 text-slate-300 group-hover:text-slate-400" />}
                         </div>
                       </th>
                       <th className="py-2.5 px-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider w-20">Actions</th>
@@ -1923,11 +1923,11 @@ export function Ledger() {
                       paginatedEntries.map((entry, idx) => (
                         <tr
                           key={entry.id || `flat-${idx}`}
-                          className={`border-b border-slate-100 hover:bg-indigo-50/30 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'}`}
+                          className={`border-b border-slate-100 hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'}`}
                         >
                           <td className="py-2.5 px-4">
                             <button
-                              className="font-mono font-bold text-indigo-600 hover:text-indigo-800 hover:underline text-xs transition-colors text-left"
+                              className="font-mono tabular-nums font-bold text-blue-600 hover:text-blue-800 hover:underline text-xs transition-colors text-left"
                               onClick={() => setDialogVoucher(entry.voucherNo)}
                               title="View full voucher"
                             >
@@ -1941,7 +1941,7 @@ export function Ledger() {
                             {entry.description || <span className="text-slate-300 italic">—</span>}
                           </td>
                           <td className="py-2.5 px-3">
-                            <span className="inline-flex items-center rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-700 whitespace-nowrap">
+                            <span className="inline-flex items-center rounded-full bg-blue-50 dark:bg-blue-950/40 px-2 py-0.5 text-xs font-semibold text-blue-700 whitespace-nowrap">
                               {entry.category}
                             </span>
                           </td>
@@ -1966,7 +1966,7 @@ export function Ledger() {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                className="h-7 w-7 p-0 text-indigo-500 hover:bg-indigo-50 hover:text-indigo-700"
+                                className="h-7 w-7 p-0 text-blue-600 hover:bg-blue-50 dark:bg-blue-950/40 hover:text-blue-700"
                                 title="View voucher"
                                 onClick={() => setDialogVoucher(entry.voucherNo)}
                               >
@@ -2030,13 +2030,13 @@ export function Ledger() {
                           role="button"
                           tabIndex={0}
                           key={v.voucherNo || `v-${i}`}
-                          className="flex items-center gap-3 px-4 py-3.5 hover:bg-indigo-50/30 active:bg-indigo-100/40 cursor-pointer transition-colors"
+                          className="flex items-center gap-3 px-4 py-3.5 hover:bg-slate-50/50 dark:hover:bg-slate-800/50 active:bg-slate-100 cursor-pointer transition-colors"
                           onClick={() => setDialogVoucher(v.voucherNo)}
                         >
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-0.5">
-                              <span className="font-mono font-bold text-indigo-600 text-sm">{v.voucherNo || '—'}</span>
-                              <span className="inline-flex items-center justify-center h-4 w-4 rounded-full bg-indigo-100 text-indigo-700 text-[9px] font-bold">{v.count}</span>
+                              <span className="font-mono tabular-nums font-bold text-blue-600 text-sm">{v.voucherNo || '—'}</span>
+                              <span className="inline-flex items-center justify-center h-4 w-4 rounded-full bg-blue-100 dark:bg-blue-950/60 text-blue-700 text-[9px] font-bold">{v.count}</span>
                             </div>
                             <div className="flex items-center gap-2 text-[11px] text-slate-400">
                               {v.date && <span>{formatDisplayDate(v.date)}</span>}
@@ -2047,7 +2047,7 @@ export function Ledger() {
                             <p className="font-bold text-slate-900 text-sm tabular-nums">
                               ₦{(isNaN(v.total) ? 0 : v.total).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                             </p>
-                            <p className="text-[10px] text-indigo-500 font-medium">Tap to view</p>
+                            <p className="text-[10px] text-blue-600 font-medium">Tap to view</p>
                           </div>
                         </div>
                       ))
@@ -2060,27 +2060,27 @@ export function Ledger() {
                       <tr>
                         <th className="py-2.5 px-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-44 cursor-pointer hover:bg-slate-100 transition-colors group" onClick={() => toggleVoucherSort('voucherNo')}>
                           <div className="flex items-center gap-1.5">
-                            Voucher No. {voucherSortField === 'voucherNo' ? (voucherSortOrder === 'asc' ? <ArrowUp className="h-3 w-3 text-indigo-600" /> : <ArrowDown className="h-3 w-3 text-indigo-600" />) : <ArrowUpDown className="h-3 w-3 text-slate-300 group-hover:text-slate-400" />}
+                            Voucher No. {voucherSortField === 'voucherNo' ? (voucherSortOrder === 'asc' ? <ArrowUp className="h-3 w-3 text-blue-600" /> : <ArrowDown className="h-3 w-3 text-blue-600" />) : <ArrowUpDown className="h-3 w-3 text-slate-300 group-hover:text-slate-400" />}
                           </div>
                         </th>
                         <th className="py-2.5 px-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-32 cursor-pointer hover:bg-slate-100 transition-colors group" onClick={() => toggleVoucherSort('date')}>
                           <div className="flex items-center gap-1.5">
-                            Date {voucherSortField === 'date' ? (voucherSortOrder === 'asc' ? <ArrowUp className="h-3 w-3 text-indigo-600" /> : <ArrowDown className="h-3 w-3 text-indigo-600" />) : <ArrowUpDown className="h-3 w-3 text-slate-300 group-hover:text-slate-400" />}
+                            Date {voucherSortField === 'date' ? (voucherSortOrder === 'asc' ? <ArrowUp className="h-3 w-3 text-blue-600" /> : <ArrowDown className="h-3 w-3 text-blue-600" />) : <ArrowUpDown className="h-3 w-3 text-slate-300 group-hover:text-slate-400" />}
                           </div>
                         </th>
                         <th className="py-2.5 px-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 transition-colors group" onClick={() => toggleVoucherSort('bank')}>
                           <div className="flex items-center gap-1.5">
-                            Bank {voucherSortField === 'bank' ? (voucherSortOrder === 'asc' ? <ArrowUp className="h-3 w-3 text-indigo-600" /> : <ArrowDown className="h-3 w-3 text-indigo-600" />) : <ArrowUpDown className="h-3 w-3 text-slate-300 group-hover:text-slate-400" />}
+                            Bank {voucherSortField === 'bank' ? (voucherSortOrder === 'asc' ? <ArrowUp className="h-3 w-3 text-blue-600" /> : <ArrowDown className="h-3 w-3 text-blue-600" />) : <ArrowUpDown className="h-3 w-3 text-slate-300 group-hover:text-slate-400" />}
                           </div>
                         </th>
                         <th className="py-2.5 px-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider w-40 cursor-pointer hover:bg-slate-100 transition-colors group" onClick={() => toggleVoucherSort('total')}>
                           <div className="flex items-center justify-end gap-1.5">
-                            Total Amount {voucherSortField === 'total' ? (voucherSortOrder === 'asc' ? <ArrowUp className="h-3 w-3 text-indigo-600" /> : <ArrowDown className="h-3 w-3 text-indigo-600" />) : <ArrowUpDown className="h-3 w-3 text-slate-300 group-hover:text-slate-400" />}
+                            Total Amount {voucherSortField === 'total' ? (voucherSortOrder === 'asc' ? <ArrowUp className="h-3 w-3 text-blue-600" /> : <ArrowDown className="h-3 w-3 text-blue-600" />) : <ArrowUpDown className="h-3 w-3 text-slate-300 group-hover:text-slate-400" />}
                           </div>
                         </th>
                         <th className="py-2.5 px-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider w-20 cursor-pointer hover:bg-slate-100 transition-colors group" onClick={() => toggleVoucherSort('count')}>
                           <div className="flex items-center justify-center gap-1.5">
-                            Lines {voucherSortField === 'count' ? (voucherSortOrder === 'asc' ? <ArrowUp className="h-3 w-3 text-indigo-600" /> : <ArrowDown className="h-3 w-3 text-indigo-600" />) : <ArrowUpDown className="h-3 w-3 text-slate-300 group-hover:text-slate-400" />}
+                            Lines {voucherSortField === 'count' ? (voucherSortOrder === 'asc' ? <ArrowUp className="h-3 w-3 text-blue-600" /> : <ArrowDown className="h-3 w-3 text-blue-600" />) : <ArrowUpDown className="h-3 w-3 text-slate-300 group-hover:text-slate-400" />}
                           </div>
                         </th>
                         <th className="py-2.5 px-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider w-36">Actions</th>
@@ -2093,15 +2093,15 @@ export function Ledger() {
                         </tr>
                       ) : (
                         voucherSummaries.map((v, i) => (
-                          <tr key={v.voucherNo || `v-${i}`} className="border-b border-slate-100 hover:bg-indigo-50/30 cursor-pointer transition-colors" onClick={() => setDialogVoucher(v.voucherNo)}>
-                            <td className="py-2.5 px-4 font-mono font-bold text-indigo-600">{v.voucherNo || '—'}</td>
+                          <tr key={v.voucherNo || `v-${i}`} className="border-b border-slate-100 hover:bg-slate-50/50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors" onClick={() => setDialogVoucher(v.voucherNo)}>
+                            <td className="py-2.5 px-4 font-mono font-bold text-blue-600">{v.voucherNo || '—'}</td>
                             <td className="py-2.5 px-3 text-slate-600 text-xs whitespace-nowrap">{v.date ? formatDisplayDate(v.date) : '—'}</td>
                             <td className="py-2.5 px-3 text-slate-600 text-xs">{v.bank || '—'}</td>
                             <td className="py-2.5 px-3 font-bold text-slate-900 text-right tabular-nums text-xs">₦{(isNaN(v.total) ? 0 : v.total).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                            <td className="py-2.5 px-3 text-center"><span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-indigo-50 text-indigo-700 text-[10px] font-bold border border-indigo-100">{v.count}</span></td>
+                            <td className="py-2.5 px-3 text-center"><span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-700 text-[10px] font-bold border border-blue-200 dark:border-blue-800">{v.count}</span></td>
                             <td className="py-2.5 px-3 text-center" onClick={e => e.stopPropagation()}>
                               <div className="flex items-center justify-center gap-1">
-                                <Button variant="ghost" size="sm" className="text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 gap-1 h-8 px-2 text-xs font-bold" onClick={() => setDialogVoucher(v.voucherNo)}>
+                                <Button variant="ghost" size="sm" className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 dark:bg-blue-950/40 gap-1 h-8 px-2 text-xs font-bold" onClick={() => setDialogVoucher(v.voucherNo)}>
                                   <Eye className="h-3.5 w-3.5" /> View
                                 </Button>
                                 {priv?.canDelete && (
@@ -2134,7 +2134,7 @@ export function Ledger() {
         <div className="space-y-4">
           {/* Top KPI Stat Strip */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-            <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-sm transition-all hover:border-slate-300">
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md p-3.5">
               <span className="text-[11px] font-medium text-slate-500 block">Total Records</span>
               <div className="text-lg font-bold text-slate-900 mt-0.5 tabular-nums tracking-tight">
                 {vatTableTotals.count.toLocaleString()}
@@ -2143,7 +2143,7 @@ export function Ledger() {
               <span className="text-[10px] text-slate-400 font-medium">Filtered transactions</span>
             </div>
 
-            <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-sm transition-all hover:border-slate-300">
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md p-3.5">
               <span className="text-[11px] font-medium text-slate-500 block">Base Vatable Amount</span>
               <div className="text-lg font-bold text-slate-900 mt-0.5 tabular-nums tracking-tight">
                 ₦{vatTableTotals.totalBase.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -2151,7 +2151,7 @@ export function Ledger() {
               <span className="text-[10px] text-slate-400 font-medium">Net base subject to VAT</span>
             </div>
 
-            <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-sm transition-all hover:border-slate-300">
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md p-3.5">
               <span className="text-[11px] font-medium text-slate-500 block">Total VAT Amount</span>
               <div className="text-lg font-bold text-emerald-600 mt-0.5 tabular-nums tracking-tight">
                 ₦{vatTableTotals.totalVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -2159,7 +2159,7 @@ export function Ledger() {
               <span className="text-[10px] text-slate-400 font-medium">Accumulated VAT</span>
             </div>
 
-            <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-sm transition-all hover:border-slate-300">
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md p-3.5">
               <span className="text-[11px] font-medium text-slate-500 block">Total Gross Amount</span>
               <div className="text-lg font-bold text-slate-900 mt-0.5 tabular-nums tracking-tight">
                 ₦{vatTableTotals.totalGross.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -2167,7 +2167,7 @@ export function Ledger() {
               <span className="text-[10px] text-slate-400 font-medium">Base + VAT total</span>
             </div>
 
-            <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-sm transition-all hover:border-slate-300 col-span-2 sm:col-span-1">
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md p-3.5 col-span-2 sm:col-span-1">
               <span className="text-[11px] font-medium text-slate-500 block">Standard VAT Rate</span>
               <div className="text-lg font-bold text-slate-900 mt-0.5 tabular-nums tracking-tight">
                 {vatRate}%
@@ -2177,7 +2177,7 @@ export function Ledger() {
           </div>
 
           {/* Straight Table Container */}
-          <div className="bg-white border border-slate-200/80 rounded-xl shadow-sm overflow-hidden">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md overflow-hidden">
             {/* Filter Bar */}
             <div className="p-3 border-b border-slate-100 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2.5 bg-slate-50/50">
               {/* Left search */}
@@ -2199,7 +2199,7 @@ export function Ledger() {
                   <select
                     value={vatFilterPolicy}
                     onChange={e => { setVatFilterPolicy(e.target.value as any); setVatPage(1); }}
-                    className="h-8 rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold text-indigo-700 shadow-none focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer"
+                    className="h-8 rounded-sm border border-slate-200 bg-white px-2 text-xs font-semibold text-blue-700 shadow-none focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
                   >
                     <option value="vatable">Vatable Only (Yes & Add)</option>
                     <option value="all">All VAT Types</option>
@@ -2213,7 +2213,7 @@ export function Ledger() {
                 <select
                   value={selectedVatMonth}
                   onChange={e => { setSelectedVatMonth(e.target.value); setVatPage(1); }}
-                  className="h-8 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 shadow-none focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer"
+                  className="h-8 rounded-sm border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 shadow-none focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
                 >
                   <option value="all">All Months</option>
                   {availableVatMonths.map(m => (
@@ -2225,7 +2225,7 @@ export function Ledger() {
                 <select
                   value={selectedVatCategory}
                   onChange={e => { setSelectedVatCategory(e.target.value); setVatPage(1); }}
-                  className="h-8 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 shadow-none focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer"
+                  className="h-8 rounded-sm border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 shadow-none focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
                 >
                   <option value="all">All Categories</option>
                   {sortedCategories.map(c => (
@@ -2272,37 +2272,37 @@ export function Ledger() {
                   <tr>
                     <th className="py-2.5 px-3.5 whitespace-nowrap cursor-pointer hover:bg-slate-100 transition-colors group" onClick={() => toggleVatSort('voucherNo')}>
                       <div className="flex items-center gap-1.5">
-                        Voucher No. {vatSortField === 'voucherNo' ? (vatSortOrder === 'asc' ? <ArrowUp className="h-3 w-3 text-indigo-600" /> : <ArrowDown className="h-3 w-3 text-indigo-600" />) : <ArrowUpDown className="h-3 w-3 text-slate-300 group-hover:text-slate-400" />}
+                        Voucher No. {vatSortField === 'voucherNo' ? (vatSortOrder === 'asc' ? <ArrowUp className="h-3 w-3 text-blue-600" /> : <ArrowDown className="h-3 w-3 text-blue-600" />) : <ArrowUpDown className="h-3 w-3 text-slate-300 group-hover:text-slate-400" />}
                       </div>
                     </th>
                     <th className="py-2.5 px-3 whitespace-nowrap cursor-pointer hover:bg-slate-100 transition-colors group" onClick={() => toggleVatSort('date')}>
                       <div className="flex items-center gap-1.5">
-                        Date {vatSortField === 'date' ? (vatSortOrder === 'asc' ? <ArrowUp className="h-3 w-3 text-indigo-600" /> : <ArrowDown className="h-3 w-3 text-indigo-600" />) : <ArrowUpDown className="h-3 w-3 text-slate-300 group-hover:text-slate-400" />}
+                        Date {vatSortField === 'date' ? (vatSortOrder === 'asc' ? <ArrowUp className="h-3 w-3 text-blue-600" /> : <ArrowDown className="h-3 w-3 text-blue-600" />) : <ArrowUpDown className="h-3 w-3 text-slate-300 group-hover:text-slate-400" />}
                       </div>
                     </th>
                     <th className="py-2.5 px-3 cursor-pointer hover:bg-slate-100 transition-colors group" onClick={() => toggleVatSort('description')}>
                       <div className="flex items-center gap-1.5">
-                        Description {vatSortField === 'description' ? (vatSortOrder === 'asc' ? <ArrowUp className="h-3 w-3 text-indigo-600" /> : <ArrowDown className="h-3 w-3 text-indigo-600" />) : <ArrowUpDown className="h-3 w-3 text-slate-300 group-hover:text-slate-400" />}
+                        Description {vatSortField === 'description' ? (vatSortOrder === 'asc' ? <ArrowUp className="h-3 w-3 text-blue-600" /> : <ArrowDown className="h-3 w-3 text-blue-600" />) : <ArrowUpDown className="h-3 w-3 text-slate-300 group-hover:text-slate-400" />}
                       </div>
                     </th>
                     <th className="py-2.5 px-3 whitespace-nowrap cursor-pointer hover:bg-slate-100 transition-colors group" onClick={() => toggleVatSort('category')}>
                       <div className="flex items-center gap-1.5">
-                        Category {vatSortField === 'category' ? (vatSortOrder === 'asc' ? <ArrowUp className="h-3 w-3 text-indigo-600" /> : <ArrowDown className="h-3 w-3 text-indigo-600" />) : <ArrowUpDown className="h-3 w-3 text-slate-300 group-hover:text-slate-400" />}
+                        Category {vatSortField === 'category' ? (vatSortOrder === 'asc' ? <ArrowUp className="h-3 w-3 text-blue-600" /> : <ArrowDown className="h-3 w-3 text-blue-600" />) : <ArrowUpDown className="h-3 w-3 text-slate-300 group-hover:text-slate-400" />}
                       </div>
                     </th>
                     <th className="py-2.5 px-3 whitespace-nowrap cursor-pointer hover:bg-slate-100 transition-colors group" onClick={() => toggleVatSort('client')}>
                       <div className="flex items-center gap-1.5">
-                        Client / Site {vatSortField === 'client' ? (vatSortOrder === 'asc' ? <ArrowUp className="h-3 w-3 text-indigo-600" /> : <ArrowDown className="h-3 w-3 text-indigo-600" />) : <ArrowUpDown className="h-3 w-3 text-slate-300 group-hover:text-slate-400" />}
+                        Client / Site {vatSortField === 'client' ? (vatSortOrder === 'asc' ? <ArrowUp className="h-3 w-3 text-blue-600" /> : <ArrowDown className="h-3 w-3 text-blue-600" />) : <ArrowUpDown className="h-3 w-3 text-slate-300 group-hover:text-slate-400" />}
                       </div>
                     </th>
                     <th className="py-2.5 px-3 text-center whitespace-nowrap cursor-pointer hover:bg-slate-100 transition-colors group" onClick={() => toggleVatSort('vatMode')}>
                       <div className="flex items-center justify-center gap-1.5">
-                        VAT Policy {vatSortField === 'vatMode' ? (vatSortOrder === 'asc' ? <ArrowUp className="h-3 w-3 text-indigo-600" /> : <ArrowDown className="h-3 w-3 text-indigo-600" />) : <ArrowUpDown className="h-3 w-3 text-slate-300 group-hover:text-slate-400" />}
+                        VAT Policy {vatSortField === 'vatMode' ? (vatSortOrder === 'asc' ? <ArrowUp className="h-3 w-3 text-blue-600" /> : <ArrowDown className="h-3 w-3 text-blue-600" />) : <ArrowUpDown className="h-3 w-3 text-slate-300 group-hover:text-slate-400" />}
                       </div>
                     </th>
                     <th className="py-2.5 px-3.5 text-right whitespace-nowrap cursor-pointer hover:bg-slate-100 transition-colors group min-w-[150px]" onClick={() => toggleVatSort('grossAmount')}>
                       <div className="flex items-center justify-end gap-1.5">
-                        Amount & VAT (₦) {vatSortField === 'grossAmount' ? (vatSortOrder === 'asc' ? <ArrowUp className="h-3 w-3 text-indigo-600" /> : <ArrowDown className="h-3 w-3 text-indigo-600" />) : <ArrowUpDown className="h-3 w-3 text-slate-300 group-hover:text-slate-400" />}
+                        Amount & VAT (₦) {vatSortField === 'grossAmount' ? (vatSortOrder === 'asc' ? <ArrowUp className="h-3 w-3 text-blue-600" /> : <ArrowDown className="h-3 w-3 text-blue-600" />) : <ArrowUpDown className="h-3 w-3 text-slate-300 group-hover:text-slate-400" />}
                       </div>
                     </th>
                     <th className="py-2.5 px-3 text-center w-12 whitespace-nowrap">View</th>
@@ -2326,7 +2326,7 @@ export function Ledger() {
                             idx % 2 === 0 ? "bg-white" : "bg-slate-50/30"
                           )}
                         >
-                          <td className="py-2.5 px-3.5 font-mono font-bold text-indigo-600 whitespace-nowrap">
+                          <td className="py-2.5 px-3.5 font-mono font-bold text-blue-600 whitespace-nowrap">
                             <button
                               className="hover:underline text-left"
                               onClick={() => setDialogVoucher(entry.voucherNo)}
@@ -2352,7 +2352,7 @@ export function Ledger() {
                           <td className="py-2.5 px-3 text-center whitespace-nowrap">
                             <span className={cn(
                               "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold border",
-                              entry.vatMode === 'Yes' ? "bg-indigo-50 text-indigo-700 border-indigo-200" :
+                              entry.vatMode === 'Yes' ? "bg-blue-50 dark:bg-blue-950/40 text-blue-700 border-blue-200 dark:border-blue-800" :
                               entry.vatMode === 'Add' ? "bg-amber-50 text-amber-700 border-amber-200" :
                               "bg-slate-100 text-slate-500 border-slate-200"
                             )}>
@@ -2375,7 +2375,7 @@ export function Ledger() {
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="h-7 w-7 p-0 text-indigo-600 hover:bg-indigo-50"
+                              className="h-7 w-7 p-0 text-blue-600 hover:bg-blue-50 dark:bg-blue-950/40"
                               onClick={() => setDialogVoucher(entry.voucherNo)}
                               title="View voucher details"
                             >
@@ -2470,21 +2470,21 @@ export function Ledger() {
       {/* Expenses VAT Reconciliation Modal Dialog */}
       {reconcileMonthKey && (
         <Dialog open={reconcileMonthKey !== null} onOpenChange={() => setReconcileMonthKey(null)}>
-          <DialogContent className="max-w-5xl w-[95vw] overflow-hidden p-0 rounded-2xl">
-            <DialogHeader className="bg-indigo-700 px-6 py-4 text-white">
+          <DialogContent className="max-w-5xl w-[95vw] overflow-hidden p-0 rounded-md">
+            <DialogHeader className="bg-blue-600 px-6 py-4 text-white">
               <div className="flex justify-between items-center">
                 <div>
                   <DialogTitle className="text-white text-lg font-bold flex items-center gap-2">
-                    <Link className="h-5 w-5 text-indigo-200" /> Reconcile Expenses VAT — {availableVatMonths.find(g => g.key === reconcileMonthKey)?.label || reconcileMonthKey}
+                    <Link className="h-5 w-5 text-blue-200" /> Reconcile Expenses VAT — {availableVatMonths.find(g => g.key === reconcileMonthKey)?.label || reconcileMonthKey}
                   </DialogTitle>
-                  <p className="text-indigo-200 text-xs mt-1">
+                  <p className="text-blue-200 text-xs mt-1">
                     Link existing ledger payment vouchers or record direct VAT remittance payments
                   </p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setReconcileMonthKey(null)}
-                  className="h-8 w-8 rounded-full bg-indigo-800/60 hover:bg-indigo-900 text-white flex items-center justify-center transition-colors shrink-0 cursor-pointer"
+                  className="h-8 w-8 rounded-full bg-blue-700 hover:bg-blue-800 rounded-sm text-white flex items-center justify-center transition-colors shrink-0 cursor-pointer"
                   title="Close modal"
                 >
                   <X className="h-4 w-4" />
@@ -2498,7 +2498,7 @@ export function Ledger() {
                 onClick={() => setReconcileTab('link')}
                 className={cn(
                   "px-3 py-1.5 rounded-md transition-colors flex items-center gap-1.5",
-                  reconcileTab === 'link' ? "bg-white text-indigo-700 shadow-sm" : "text-slate-600 hover:text-slate-900"
+                  reconcileTab === 'link' ? "bg-white text-blue-700 " : "text-slate-600 hover:text-slate-900"
                 )}
               >
                 <Search className="h-3.5 w-3.5" /> Link Ledger Payment
@@ -2507,7 +2507,7 @@ export function Ledger() {
                 onClick={() => setReconcileTab('direct')}
                 className={cn(
                   "px-3 py-1.5 rounded-md transition-colors flex items-center gap-1.5",
-                  reconcileTab === 'direct' ? "bg-white text-indigo-700 shadow-sm" : "text-slate-600 hover:text-slate-900"
+                  reconcileTab === 'direct' ? "bg-white text-blue-700 " : "text-slate-600 hover:text-slate-900"
                 )}
               >
                 <Plus className="h-3.5 w-3.5" /> Record Direct VAT Payment
@@ -2527,7 +2527,7 @@ export function Ledger() {
                     />
                   </div>
 
-                  <div className="border border-slate-200 rounded-lg overflow-x-auto overflow-y-auto max-h-[50vh] max-w-full">
+                  <div className="border border-slate-200 rounded-sm overflow-x-auto overflow-y-auto max-h-[50vh] max-w-full">
                     <table className="w-full min-w-[700px] text-left text-xs whitespace-nowrap">
                       <thead className="bg-slate-900 text-white font-semibold sticky top-0 z-10">
                         <tr>
@@ -2559,8 +2559,8 @@ export function Ledger() {
                               r => r.ledgerEntryId === entry.id && r.monthKey === reconcileMonthKey
                             );
                             return (
-                              <tr key={entry.id} className="hover:bg-indigo-50/20 transition-colors">
-                                <td className="py-2.5 px-3 font-mono font-bold text-indigo-600">{entry.voucherNo}</td>
+                              <tr key={entry.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors">
+                                <td className="py-2.5 px-3 font-mono font-bold text-blue-600">{entry.voucherNo}</td>
                                 <td className="py-2.5 px-3 font-mono text-slate-600">{formatDisplayDate(entry.date)}</td>
                                 <td className="py-2.5 px-3"><span className="bg-slate-100 px-2 py-0.5 rounded font-semibold text-slate-700">{entry.category}</span></td>
                                 <td className="py-2.5 px-3 text-slate-600">{entry.bank || '—'}</td>
@@ -2574,7 +2574,7 @@ export function Ledger() {
                                   ) : (
                                     <Button
                                       size="sm"
-                                      className="h-7 px-2.5 text-[11px] font-bold bg-indigo-600 hover:bg-indigo-700 text-white"
+                                      className="h-7 px-2.5 text-[11px] font-bold bg-blue-600 hover:bg-blue-700 text-white"
                                       onClick={() => {
                                         addExpenseVatRemittance({
                                           id: generateId(),
@@ -2713,7 +2713,7 @@ export function Ledger() {
                     <Button type="button" variant="outline" size="sm" onClick={() => setReconcileMonthKey(null)}>
                       Cancel
                     </Button>
-                    <Button type="submit" size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold">
+                    <Button type="submit" size="sm" className="bg-blue-600 hover:bg-blue-700 text-white font-bold">
                       Save VAT Remittance
                     </Button>
                   </DialogFooter>
@@ -2731,19 +2731,19 @@ export function Ledger() {
           onClick={() => setDialogVoucher(null)}
         >
           <div
-            className="bg-white sm:rounded-2xl shadow-2xl w-full h-full sm:h-auto sm:max-h-[85vh] max-w-4xl flex flex-col overflow-hidden"
+            className="bg-white sm:rounded-md shadow-2xl w-full h-full sm:h-auto sm:max-h-[85vh] max-w-4xl flex flex-col overflow-hidden"
             onClick={e => e.stopPropagation()}
           >
             {/* Dialog Header */}
-            <div className="bg-indigo-700 px-6 py-4 flex items-center justify-between shrink-0">
+            <div className="bg-blue-600 px-6 py-4 flex items-center justify-between shrink-0">
               <div>
-                <p className="text-indigo-200 text-xs font-semibold uppercase tracking-wider">Voucher Transactions</p>
+                <p className="text-blue-200 text-xs font-semibold uppercase tracking-wider">Voucher Transactions</p>
                 <h2 className="text-white font-bold text-xl tracking-wide font-mono">{dialogVoucher}</h2>
               </div>
               <div className="flex items-center gap-5">
                 <div className="text-right flex items-center gap-4">
                   <div>
-                    <p className="text-indigo-200 text-[10px] uppercase font-bold tracking-wider">Subtotal</p>
+                    <p className="text-blue-200 text-[10px] uppercase font-bold tracking-wider">Subtotal</p>
                     <p className="text-white font-bold text-sm tabular-nums">
                       ₦{dialogNetTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </p>
@@ -2757,7 +2757,7 @@ export function Ledger() {
                     </div>
                   )}
                   <div>
-                    <p className="text-indigo-200 text-[10px] uppercase font-bold tracking-wider">Total Amount</p>
+                    <p className="text-blue-200 text-[10px] uppercase font-bold tracking-wider">Total Amount</p>
                     <p className="text-white font-extrabold text-lg tabular-nums">
                       ₦{dialogGrossTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </p>
@@ -2807,7 +2807,7 @@ export function Ledger() {
                       <div className="mb-3">
                         <p className="text-sm font-medium text-slate-800 break-words">{t.description || <span className="text-slate-300 italic">No description</span>}</p>
                         <div className="flex flex-wrap gap-2 mt-2">
-                          <span className="inline-flex items-center rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-700">{t.category}</span>
+                          <span className="inline-flex items-center rounded-full bg-blue-50 dark:bg-blue-950/40 px-2 py-0.5 text-[10px] font-semibold text-blue-700">{t.category}</span>
                           {t.client && <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-600">{t.client}</span>}
                           {t.site && <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-600">{t.site}</span>}
                           {t.isVatable && (
@@ -2873,14 +2873,14 @@ export function Ledger() {
                   {dialogTransactions.map((t, idx) => {
                     const lineVat = t.vatAmount ?? ((t.amount * (t.vatRate ?? vatRate)) / 100);
                     return (
-                      <tr key={t.id || `t-${idx}`} className={`border-b border-slate-100 hover:bg-indigo-50/30 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'}`}>
+                      <tr key={t.id || `t-${idx}`} className={`border-b border-slate-100 hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'}`}>
                         <td className="py-2.5 px-4 text-slate-400 text-xs font-semibold">{idx + 1}</td>
                         <td className="py-2.5 px-3 text-slate-600 text-xs font-mono whitespace-nowrap">
                           {t.date ? formatDisplayDate(t.date) : '—'}
                         </td>
                         <td className="py-2.5 px-3 text-slate-700 font-medium">{t.description || <span className="text-slate-300 italic">—</span>}</td>
                         <td className="py-2.5 px-3">
-                          <span className="inline-flex items-center rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-semibold text-indigo-700">{t.category}</span>
+                          <span className="inline-flex items-center rounded-full bg-blue-50 dark:bg-blue-950/40 px-2.5 py-0.5 text-xs font-semibold text-blue-700">{t.category}</span>
                         </td>
                         <td className="py-2.5 px-3 text-slate-500 text-xs">{t.client || '—'}</td>
                         <td className="py-2.5 px-3 text-slate-500 text-xs">{t.site || '—'}</td>
@@ -2934,7 +2934,7 @@ export function Ledger() {
                     );
                   })}
                   {/* Grand total row */}
-                  <tr key="voucher-total-row" className="bg-indigo-50/70 border-t-2 border-indigo-200">
+                  <tr key="voucher-total-row" className="bg-blue-50 dark:bg-blue-950/40/70 border-t-2 border-blue-200 dark:border-blue-800">
                     <td colSpan={6} className="py-3 px-4 text-right font-bold text-slate-700">Totals</td>
                     <td className="py-3 px-3 text-right font-bold text-slate-900 tabular-nums">
                       ₦{dialogNetTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -2943,7 +2943,7 @@ export function Ledger() {
                     <td className="py-3 px-3 text-right font-extrabold text-emerald-700 tabular-nums bg-emerald-50">
                       ₦{dialogVatTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </td>
-                    <td colSpan={priv?.canDelete ? 2 : 1} className="py-3 px-3 text-right font-extrabold text-indigo-900 tabular-nums bg-indigo-100/50">
+                    <td colSpan={priv?.canDelete ? 2 : 1} className="py-3 px-3 text-right font-extrabold text-slate-900 dark:text-slate-100 font-mono tabular-nums tabular-nums bg-blue-100 dark:bg-blue-950/60/50">
                       Gross: ₦{dialogGrossTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </td>
                   </tr>
@@ -2961,11 +2961,11 @@ export function Ledger() {
       {importFile && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setImportFile(null)} />
-          <div className="relative bg-white rounded-2xl shadow-2xl p-7 w-full max-w-md mx-4 border border-slate-200">
+          <div className="relative bg-white dark:bg-slate-900 rounded-md shadow-2xl p-6 w-full max-w-md mx-4 border border-slate-200 dark:border-slate-800">
             {/* Header */}
             <div className="flex items-center gap-3 mb-4">
-              <div className="h-10 w-10 rounded-xl bg-indigo-100 flex items-center justify-center shrink-0">
-                <Download className="h-5 w-5 text-indigo-600" />
+              <div className="h-10 w-10 rounded-md bg-blue-100 dark:bg-blue-950/60 flex items-center justify-center shrink-0">
+                <Download className="h-5 w-5 text-blue-600" />
               </div>
               <div>
                 <h3 className="text-lg font-bold text-slate-900">Import Policy</h3>
@@ -2978,9 +2978,9 @@ export function Ledger() {
             <div className="flex flex-col gap-3">
               <button
                 onClick={() => processImport(importFile, 'append')}
-                className="w-full text-left px-4 py-3.5 rounded-xl border-2 border-slate-200 hover:border-indigo-400 hover:bg-indigo-50/40 transition-all group"
+                className="w-full text-left px-4 py-3.5 rounded-md border-2 border-slate-200 hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-all group"
               >
-                <span className="font-semibold text-slate-800 block text-sm group-hover:text-indigo-700">
+                <span className="font-semibold text-slate-800 block text-sm group-hover:text-blue-700">
                   Append Only
                 </span>
                 <span className="text-xs text-slate-500 mt-0.5 block">
@@ -2989,7 +2989,7 @@ export function Ledger() {
               </button>
               <button
                 onClick={() => processImport(importFile, 'overwrite')}
-                className="w-full text-left px-4 py-3.5 rounded-xl border-2 border-amber-200 hover:border-amber-400 hover:bg-amber-50/40 transition-all group"
+                className="w-full text-left px-4 py-3.5 rounded-md border-2 border-amber-200 hover:border-amber-400 hover:bg-amber-50/40 transition-all group"
               >
                 <span className="font-semibold text-amber-700 block text-sm">
                   Overwrite Duplicates
@@ -3012,7 +3012,7 @@ export function Ledger() {
       <TabsContent active={tab === 'records'} className="m-0 space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-12">
           {voucherSummaries.length === 0 ? (
-            <div className="col-span-full py-24 text-center bg-white rounded-2xl border border-dashed border-slate-200 shadow-sm">
+            <div className="col-span-full py-24 text-center bg-white dark:bg-slate-900 rounded-md border border-dashed border-slate-200 dark:border-slate-800">
               <div className="h-16 w-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
                 <History className="h-8 w-8 text-slate-300" />
               </div>
@@ -3023,17 +3023,17 @@ export function Ledger() {
             voucherSummaries.map((v) => (
               <Card 
                 key={v.voucherNo} 
-                className="group hover:border-indigo-400 transition-all cursor-pointer hover:shadow-lg overflow-hidden border-slate-200 relative bg-white"
+                className="group hover:border-blue-400 transition-all cursor-pointer overflow-hidden border border-slate-200 dark:border-slate-800 rounded-md relative bg-white"
                 onClick={() => setDialogVoucher(v.voucherNo)}
               >
-                <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                <div className="absolute top-0 left-0 w-1 h-full bg-blue-50 dark:bg-blue-950/400 opacity-0 group-hover:opacity-100 transition-opacity" />
                 <div className="p-5 space-y-4">
                   <div className="flex justify-between items-start">
                     <div className="space-y-0.5">
                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Voucher No</p>
-                      <h4 className="text-lg font-black text-slate-900 font-mono tracking-tight group-hover:text-indigo-600 transition-colors">{v.voucherNo}</h4>
+                      <h4 className="text-lg font-black text-slate-900 font-mono tracking-tight group-hover:text-blue-600 transition-colors">{v.voucherNo}</h4>
                     </div>
-                    <div className="bg-slate-100 px-2.5 py-1 rounded-lg text-slate-600 font-bold text-[10px] uppercase group-hover:bg-indigo-600 group-hover:text-white transition-all shadow-sm">
+                    <div className="bg-slate-100 px-2.5 py-1 rounded-sm text-slate-600 font-bold text-[10px] uppercase group-hover:bg-blue-600 group-hover:text-white transition-all ">
                       {v.count} Line{v.count !== 1 ? 's' : ''}
                     </div>
                   </div>
@@ -3052,9 +3052,9 @@ export function Ledger() {
                   <div className="pt-4 border-t border-slate-100 flex justify-between items-end">
                     <div>
                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Total Amount</p>
-                      <p className="text-xl font-black text-indigo-700 font-mono">₦{v.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                      <p className="text-xl font-black text-blue-700 font-mono">₦{v.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                     </div>
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-slate-300 group-hover:text-indigo-500 group-hover:bg-indigo-50 transition-all">
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-slate-300 group-hover:text-blue-600 group-hover:bg-blue-50 dark:bg-blue-950/40 transition-all">
                       <ChevronRight className="h-5 w-5" />
                     </Button>
                   </div>
@@ -3071,8 +3071,8 @@ export function Ledger() {
           <DialogHeader className="p-6 pb-5 border-b border-slate-100 bg-white shrink-0">
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-indigo-50 border border-indigo-100/50 rounded-xl">
-                  <Users className="h-5 w-5 text-indigo-600" />
+                <div className="p-2.5 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/50 rounded-md">
+                  <Users className="h-5 w-5 text-blue-600" />
                 </div>
                 <div>
                   <DialogTitle className="text-xl font-black tracking-tight text-slate-800">Vendor Directory</DialogTitle>
@@ -3083,7 +3083,7 @@ export function Ledger() {
                 variant="outline" 
                 size="sm" 
                 onClick={() => setShowAddVendorForm(!showAddVendorForm)}
-                className={`hidden sm:flex gap-2 h-9 border-slate-200 font-bold text-[10px] uppercase tracking-wider transition-all ${showAddVendorForm ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'text-slate-500 hover:bg-slate-50'}`}
+                className={`hidden sm:flex gap-2 h-9 border-slate-200 font-bold text-[10px] uppercase tracking-wider transition-all ${showAddVendorForm ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 border-blue-200 dark:border-blue-800' : 'text-slate-500 hover:bg-slate-50'}`}
               >
                 <Plus className={`h-3.5 w-3.5 transition-transform duration-300 ${showAddVendorForm ? 'rotate-45' : ''}`} />
                 {showAddVendorForm ? 'Close Form' : 'Add New Vendor'}
@@ -3093,7 +3093,7 @@ export function Ledger() {
                 variant="outline" 
                 size="icon" 
                 onClick={() => setShowAddVendorForm(!showAddVendorForm)}
-                className={`sm:hidden h-9 w-9 border-slate-200 transition-all ${showAddVendorForm ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'text-slate-500'}`}
+                className={`sm:hidden h-9 w-9 border-slate-200 transition-all ${showAddVendorForm ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 border-blue-200 dark:border-blue-800' : 'text-slate-500'}`}
               >
                 <Plus className={`h-4 w-4 transition-transform duration-300 ${showAddVendorForm ? 'rotate-45' : ''}`} />
               </Button>
@@ -3103,9 +3103,9 @@ export function Ledger() {
           <div className="flex-1 overflow-y-auto p-6 space-y-8 bg-slate-50/30">
             {/* Add New Vendor Form (integrated with header toggle) */}
             {showAddVendorForm && (
-              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+              <div className="bg-white dark:bg-slate-900 p-5 rounded-md border border-slate-200 dark:border-slate-800 space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
                 <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
-                  <Plus className="h-3 w-3 text-indigo-500" /> Add New Vendor
+                  <Plus className="h-3 w-3 text-blue-600" /> Add New Vendor
                 </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-[1.5fr_1.5fr_auto] gap-3 items-end">
                   <div className="space-y-1.5">
@@ -3115,7 +3115,7 @@ export function Ledger() {
                       value={quickVendor}
                       onChange={e => setQuickVendor(e.target.value)}
                       onKeyDown={e => e.key === 'Enter' && handleAddVendor()}
-                      className="h-9 text-xs shadow-sm border-slate-200 focus:border-indigo-500 transition-colors"
+                      className="h-9 text-xs  border-slate-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
                     />
                   </div>
                   <div className="space-y-1.5">
@@ -3125,10 +3125,10 @@ export function Ledger() {
                       value={quickTin}
                       onChange={e => setQuickTin(e.target.value)}
                       onKeyDown={e => e.key === 'Enter' && handleAddVendor()}
-                      className="h-9 text-xs shadow-sm border-slate-200 focus:border-indigo-500 font-mono transition-colors"
+                      className="h-9 text-xs  border-slate-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 font-mono transition-colors"
                     />
                   </div>
-                  <Button onClick={handleAddVendor} className="h-9 bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm gap-2 px-6 w-full sm:w-auto">
+                  <Button onClick={handleAddVendor} className="h-9 bg-blue-600 hover:bg-blue-700 text-white  gap-2 px-6 w-full sm:w-auto">
                     Add Vendor
                   </Button>
                 </div>
@@ -3140,7 +3140,7 @@ export function Ledger() {
               <div className="flex items-center justify-between">
                 <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Registered Vendors ({ledgerVendors.length})</h4>
               </div>
-              <div className="border border-slate-100 rounded-xl overflow-hidden shadow-sm">
+              <div className="border border-slate-200 dark:border-slate-800 rounded-md overflow-hidden">
                 <Table>
                   <TableHeader className="bg-slate-50">
                     <TableRow>
@@ -3162,7 +3162,7 @@ export function Ledger() {
                               <Input 
                                 value={vendorRenameValue} 
                                 onChange={e => setVendorRenameValue(e.target.value)}
-                                className="h-8 text-xs font-semibold focus:ring-indigo-500/20"
+                                className="h-8 text-xs font-semibold focus:ring-blue-500/20"
                                 autoFocus
                                 onKeyDown={e => {
                                   if (e.key === 'Enter') handleRenameVendor(v.id);
@@ -3178,7 +3178,7 @@ export function Ledger() {
                               <Input 
                                 value={tinRenameValue} 
                                 onChange={e => setTinRenameValue(e.target.value)}
-                                className="h-8 text-xs font-mono focus:ring-indigo-500/20"
+                                className="h-8 text-xs font-mono focus:ring-blue-500/20"
                                 placeholder="TIN..."
                                 onKeyDown={e => {
                                   if (e.key === 'Enter') handleRenameVendor(v.id);
@@ -3200,7 +3200,7 @@ export function Ledger() {
                                 <Button 
                                   variant="ghost" 
                                   size="sm" 
-                                  className="h-8 w-8 p-0 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50"
+                                  className="h-8 w-8 p-0 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:bg-blue-950/40"
                                   onClick={() => {
                                     setEditingVendorId(v.id);
                                     setVendorRenameValue(v.name);
@@ -3230,7 +3230,7 @@ export function Ledger() {
           </div>
 
           <DialogFooter className="p-4 bg-slate-50 border-t border-slate-100 shrink-0 flex justify-end">
-            <DialogClose className="w-auto h-10 px-6 bg-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-200 font-semibold border-none rounded-lg transition-colors">
+            <DialogClose className="w-auto h-10 px-6 bg-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-200 font-semibold border-none rounded-sm transition-colors">
               Close Directory
             </DialogClose>
           </DialogFooter>
@@ -3243,8 +3243,8 @@ export function Ledger() {
           <DialogHeader className="p-6 pb-5 border-b border-slate-100 bg-white shrink-0">
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-indigo-50 border border-indigo-100/50 rounded-xl">
-                  <LayoutGrid className="h-5 w-5 text-indigo-600" />
+                <div className="p-2.5 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/50 rounded-md">
+                  <LayoutGrid className="h-5 w-5 text-blue-600" />
                 </div>
                 <div>
                   <DialogTitle className="text-xl font-black tracking-tight text-slate-800">Category Directory</DialogTitle>
@@ -3255,7 +3255,7 @@ export function Ledger() {
                 variant="outline" 
                 size="sm" 
                 onClick={() => setShowAddCategoryForm(!showAddCategoryForm)}
-                className={`hidden sm:flex gap-2 h-9 border-slate-200 font-bold text-[10px] uppercase tracking-wider transition-all ${showAddCategoryForm ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'text-slate-500 hover:bg-slate-50'}`}
+                className={`hidden sm:flex gap-2 h-9 border-slate-200 font-bold text-[10px] uppercase tracking-wider transition-all ${showAddCategoryForm ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 border-blue-200 dark:border-blue-800' : 'text-slate-500 hover:bg-slate-50'}`}
               >
                 <Plus className={`h-3.5 w-3.5 transition-transform duration-300 ${showAddCategoryForm ? 'rotate-45' : ''}`} />
                 {showAddCategoryForm ? 'Close Form' : 'Add New Category'}
@@ -3265,7 +3265,7 @@ export function Ledger() {
                 variant="outline" 
                 size="icon" 
                 onClick={() => setShowAddCategoryForm(!showAddCategoryForm)}
-                className={`sm:hidden h-9 w-9 border-slate-200 transition-all ${showAddCategoryForm ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'text-slate-500'}`}
+                className={`sm:hidden h-9 w-9 border-slate-200 transition-all ${showAddCategoryForm ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 border-blue-200 dark:border-blue-800' : 'text-slate-500'}`}
               >
                 <Plus className={`h-4 w-4 transition-transform duration-300 ${showAddCategoryForm ? 'rotate-45' : ''}`} />
               </Button>
@@ -3275,9 +3275,9 @@ export function Ledger() {
           <div className="flex-1 overflow-y-auto p-6 space-y-8 bg-slate-50/30">
             {/* Add New Category Form (integrated with header toggle) */}
             {showAddCategoryForm && (
-              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+              <div className="bg-white dark:bg-slate-900 p-5 rounded-md border border-slate-200 dark:border-slate-800 space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
                 <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
-                  <Plus className="h-3 w-3 text-indigo-500" /> Add New Category
+                  <Plus className="h-3 w-3 text-blue-600" /> Add New Category
                 </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3 items-end">
                   <div className="space-y-1.5">
@@ -3287,10 +3287,10 @@ export function Ledger() {
                       value={quickCategory}
                       onChange={e => setQuickCategory(e.target.value)}
                       onKeyDown={e => e.key === 'Enter' && handleAddCategory()}
-                      className="h-9 text-xs shadow-sm border-slate-200 focus:border-indigo-500 transition-colors"
+                      className="h-9 text-xs  border-slate-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
                     />
                   </div>
-                  <Button onClick={handleAddCategory} className="h-9 bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm gap-2 px-6 w-full sm:w-auto">
+                  <Button onClick={handleAddCategory} className="h-9 bg-blue-600 hover:bg-blue-700 text-white  gap-2 px-6 w-full sm:w-auto">
                     Add Category
                   </Button>
                 </div>
@@ -3302,7 +3302,7 @@ export function Ledger() {
               <div className="flex items-center justify-between">
                 <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Registered Categories ({ledgerCategories.length})</h4>
               </div>
-              <div className="border border-slate-100 rounded-xl overflow-hidden shadow-sm">
+              <div className="border border-slate-200 dark:border-slate-800 rounded-md overflow-hidden">
                 <Table>
                   <TableHeader className="bg-slate-50">
                     <TableRow>
@@ -3323,7 +3323,7 @@ export function Ledger() {
                               <Input 
                                 value={categoryRenameValue} 
                                 onChange={e => setCategoryRenameValue(e.target.value)}
-                                className="h-8 text-xs font-semibold focus:ring-indigo-500/20"
+                                className="h-8 text-xs font-semibold focus:ring-blue-500/20"
                                 autoFocus
                                 onKeyDown={e => {
                                   if (e.key === 'Enter') handleRenameCategory(c.id);
@@ -3345,7 +3345,7 @@ export function Ledger() {
                                 <Button 
                                   variant="ghost" 
                                   size="sm" 
-                                  className="h-8 w-8 p-0 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50"
+                                  className="h-8 w-8 p-0 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:bg-blue-950/40"
                                   onClick={() => {
                                     setEditingCategoryId(c.id);
                                     setCategoryRenameValue(c.name);
@@ -3374,7 +3374,7 @@ export function Ledger() {
           </div>
 
           <DialogFooter className="p-4 bg-slate-50 border-t border-slate-100 shrink-0 flex justify-end">
-            <DialogClose className="w-auto h-10 px-6 bg-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-200 font-semibold border-none rounded-lg transition-colors">
+            <DialogClose className="w-auto h-10 px-6 bg-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-200 font-semibold border-none rounded-sm transition-colors">
               Close Directory
             </DialogClose>
           </DialogFooter>
