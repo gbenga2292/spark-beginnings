@@ -1,13 +1,15 @@
 {
-  "deno.enablePaths": ["supabase/functions"],
+  "deno.enablePaths": [
+    "supabase/functions"
+  ],
   "deno.importMap": "./supabase/functions/deno.json",
   "[typescript]": {
     "editor.defaultFormatter": "denoland.vscode-deno"
   },
-  "css.lint.unknownAtRules": "ignore"
-  ,
+  "css.lint.unknownAtRules": "ignore",
   "files.associations": {
     "supabase/migrations/*.sql": "pgsql",
     "supabase/**/*.sql": "pgsql"
-  }
+  },
+  "java.jdt.ls.vmargs": "-XX:+UseParallelGC -XX:GCTimeRatio=4 -XX:AdaptiveSizePolicyWeight=90 -Dsun.zip.disableMemoryMapping=true -Xmx4G -Xms100m -Xlog:disable"
 }

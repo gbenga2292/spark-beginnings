@@ -633,6 +633,7 @@ export type Database = {
       dewatering_layouts: {
         Row: {
           areas: Json
+          arrows: Json
           background_image_url: string | null
           components: Json
           created_at: string
@@ -642,11 +643,13 @@ export type Database = {
           levels: Json
           lines: Json
           name: string
+          texts: Json
           updated_at: string
           user_id: string
         }
         Insert: {
           areas?: Json
+          arrows?: Json
           background_image_url?: string | null
           components?: Json
           created_at?: string
@@ -656,11 +659,13 @@ export type Database = {
           levels?: Json
           lines?: Json
           name: string
+          texts?: Json
           updated_at?: string
           user_id: string
         }
         Update: {
           areas?: Json
+          arrows?: Json
           background_image_url?: string | null
           components?: Json
           created_at?: string
@@ -670,6 +675,7 @@ export type Database = {
           levels?: Json
           lines?: Json
           name?: string
+          texts?: Json
           updated_at?: string
           user_id?: string
         }

@@ -56,6 +56,8 @@ const routeImportMap: Record<string, () => Promise<any>> = {
   '/site-analytics': () => import('@/src/pages/ActiveSiteAnalytics'),
   '/operations/simulator': () => import('@/src/pages/Simulator'),
   '/operations/estimator': () => import('@/src/pages/Estimator'),
+  '/operations/dewatering-calculator': () => import('@/src/pages/DewateringCalculator'),
+  '/operations/vat-calculator': () => import('@/src/pages/VatCalculator'),
   '/operations/machine-reconciliation': () => import('@/src/pages/MachineReconciliation'),
   '/activity-log': () => import('@/src/pages/ActivityLog'),
   '/profile': () => import('@/src/pages/Profile'),

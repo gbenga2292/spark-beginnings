@@ -45,7 +45,7 @@ function fmt(n: number): string {
 }
 
 export function InvoiceDetailDialog({ invoice, invoiceList, open, onClose, onNavigate, onEdit, onPrint }: InvoiceDetailDialogProps) {
-  const { maintenanceAssets, dailyMachineLogs, waybills, assets } = useOperations();
+  const { maintenanceAssets, dailyMachineLogs, waybills, assets, sitePumpDates } = useOperations();
   const payments = useAppStore(state => state.payments);
   const invoices = useAppStore(state => state.invoices);
   const sites = useAppStore(state => state.sites);
@@ -215,28 +215,62 @@ export function InvoiceDetailDialog({ invoice, invoiceList, open, onClose, onNav
       }
     });
     
-    return Array.from(seen.values());
-  }, [maintenanceAssets, waybills, assets, invoiceSiteName, invoiceSiteId, relevantLogs]);
+    const list = Array.from(seen.values()).map(m => {
+      const pumpDateRec = (sitePumpDates || []).find(pd => 
+        (pd.siteId === invoiceSiteId || (invoiceSiteName && pd.siteId === invoice?.siteId)) && pd.assetId === m.id
+      );
+      const isStopped = Boolean(pumpDateRec?.pumpStopDate);
+      const stopDate = pumpDateRec?.pumpStopDate || undefined;
+      return { ...m, isStopped, stopDate };
+    });
+
+    list.sort((a, b) => {
+      if (a.isStopped && !b.isStopped) return 1;
+      if (!a.isStopped && b.isStopped) return -1;
+      return a.name.localeCompare(b.name);
+    });
+
+    return list;
+  }, [maintenanceAssets, waybills, assets, invoiceSiteName, invoiceSiteId, relevantLogs, sitePumpDates, invoice?.siteId]);
+
+  const machineConfigs: any[] = invoice?.machineConfigs ?? [];
+  const totalContractedDays = useMemo(() => {
+    if (machineConfigs.length > 0) {
+      const firstDur = parseFloat(String(machineConfigs[0]?.duration ?? 0)) || invoiceDuration;
+      let total = machineConfigs.reduce((sum, c) => {
+        const d = c.sameDurationAsFirst ? firstDur : (parseFloat(String(c.duration ?? 0)) || firstDur || invoiceDuration);
+        return sum + d;
+      }, 0);
+      if (invoice?.noOfMachine && invoice.noOfMachine > machineConfigs.length) {
+        total += (invoice.noOfMachine - machineConfigs.length) * (firstDur || invoiceDuration);
+      }
+      return total;
+    }
+    const count = invoice?.noOfMachine || 1;
+    return count * invoiceDuration;
+  }, [machineConfigs, invoice?.noOfMachine, invoiceDuration]);
 
   const consumedDays = useMemo(() =>
     relevantLogs.reduce((acc, l) => acc + dayValue(l), 0)
   , [relevantLogs]);
 
-  const remainingDays = Math.max(0, invoiceDuration - consumedDays);
-  const progressPct = invoiceDuration > 0 ? Math.min(100, (consumedDays / invoiceDuration) * 100) : 0;
+  const remainingDays = Math.max(0, totalContractedDays - consumedDays);
+  const progressPct = totalContractedDays > 0 ? Math.min(100, (consumedDays / totalContractedDays) * 100) : 0;
   const todayStr = new Date().toISOString().split('T')[0];
-  const projectedEndDate = remainingDays > 0 ? addDays(todayStr, remainingDays) : todayStr;
+  const invoicedCount = invoice?.noOfMachine || machineConfigs.length || 1;
+  const activeMachines = siteMachines.filter(m => !m.isStopped);
+  const activeMachineCount = Math.max(1, activeMachines.length || invoicedCount);
+  const projectedEndDate = remainingDays > 0 ? addDays(todayStr, Math.ceil(remainingDays / activeMachineCount)) : todayStr;
 
   const totalCharge = invoice?.totalCharge ?? invoice?.amount ?? 0;
-  const machineConfigs: any[] = invoice?.machineConfigs ?? [];
 
   if (!open || !invoice) return null;
 
   return (
     <>
-      <div className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="fixed inset-0 z-[130] bg-black/40 backdrop-blur-sm" onClick={onClose} />
 
-      <div className="fixed inset-y-0 right-0 z-[110] w-full md:w-[600px] lg:w-[700px] flex flex-col bg-white shadow-2xl overflow-hidden animate-in slide-in-from-right duration-300">
+      <div className="fixed inset-y-0 right-0 z-[140] w-full md:w-[600px] lg:w-[700px] flex flex-col bg-white shadow-2xl overflow-hidden animate-in slide-in-from-right duration-300">
 
         {/* Header */}
         <div className="bg-blue-600 dark:bg-slate-900 px-6 py-5 text-white flex-shrink-0 border-b border-blue-700 dark:border-slate-800">
@@ -260,19 +294,31 @@ export function InvoiceDetailDialog({ invoice, invoiceList, open, onClose, onNav
           {/* Action strip + navigation */}
           <div className="flex items-center justify-between mt-4 pt-4 border-t border-blue-500/40 dark:border-slate-800">
             <div className="flex items-center gap-2">
-              <Button size="sm" variant="ghost" className="gap-1.5 text-white/90 hover:text-white hover:bg-white/15 h-8 text-xs bg-white/10" onClick={() => {
-                if (invoice) {
-                  openPaymentModalForInvoice({
-                    client: invoice.client,
-                    site: invoice.siteName || inv.site || '',
-                    invoiceId: invoice.id,
-                    invoiceNumber: invoice.invoiceNumber || (invoice as any).invoiceNo || invoice.id,
-                    amount: settlement ? settlement.remainingBalance : Number(invoice.totalCharge || (invoice as any).amount || 0),
-                  });
-                  onClose();
-                }
-              }}>
-                <CreditCard className="h-3.5 w-3.5" /> Record Payment
+              <Button 
+                size="sm" 
+                variant="ghost" 
+                disabled={Boolean(settlement && settlement.isPaid)}
+                className={cn(
+                  "gap-1.5 h-8 text-xs",
+                  settlement?.isPaid 
+                    ? "opacity-50 cursor-not-allowed text-white/50 bg-white/5" 
+                    : "text-white/90 hover:text-white hover:bg-white/15 bg-white/10"
+                )}
+                title={settlement?.isPaid ? "This invoice is already fully paid" : "Record Payment"}
+                onClick={() => {
+                  if (invoice && (!settlement || !settlement.isPaid)) {
+                    openPaymentModalForInvoice({
+                      client: invoice.client,
+                      site: invoice.siteName || inv.site || '',
+                      invoiceId: invoice.id,
+                      invoiceNumber: invoice.invoiceNumber || (invoice as any).invoiceNo || invoice.id,
+                      amount: settlement ? settlement.remainingBalance : Number(invoice.totalCharge || (invoice as any).amount || 0),
+                    });
+                    onClose();
+                  }
+                }}
+              >
+                <CreditCard className="h-3.5 w-3.5" /> {settlement?.isPaid ? 'Fully Paid' : 'Record Payment'}
               </Button>
               <Button size="sm" variant="ghost" className="gap-1.5 text-white/90 hover:text-white hover:bg-white/15 h-8 text-xs" onClick={() => onEdit(invoice)}>
                 <Edit className="h-3.5 w-3.5" /> Edit
@@ -524,7 +570,7 @@ export function InvoiceDetailDialog({ invoice, invoiceList, open, onClose, onNav
                 <div>
                   <div className="flex justify-between items-center text-xs mb-1.5">
                     <span className="font-semibold text-slate-500">Days Consumed</span>
-                    <span className="font-bold text-slate-700 tabular-nums">{consumedDays.toFixed(1)} / {invoiceDuration} days ({progressPct.toFixed(0)}%)</span>
+                    <span className="font-bold text-slate-700 tabular-nums">{consumedDays.toFixed(1)} / {totalContractedDays} days ({progressPct.toFixed(0)}%)</span>
                   </div>
                   <div className="h-3 w-full bg-slate-100 rounded-full overflow-hidden">
                     <div
@@ -547,7 +593,7 @@ export function InvoiceDetailDialog({ invoice, invoiceList, open, onClose, onNav
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">Remaining</p>
                   </div>
                   <div className="bg-slate-50 border border-slate-200 dark:border-slate-800 rounded-sm p-3 text-center">
-                    <p className="text-xl font-black text-slate-700">{invoiceDuration}</p>
+                    <p className="text-xl font-black text-slate-700">{totalContractedDays}</p>
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">Contracted</p>
                   </div>
                 </div>
@@ -575,16 +621,45 @@ export function InvoiceDetailDialog({ invoice, invoiceList, open, onClose, onNav
                 <div>
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Site Machines ({siteMachines.length})</p>
                   <div className="space-y-1">
-                    {siteMachines.map(a => {
+                    {siteMachines.map((a, idx) => {
                       const machineLogs = relevantLogs.filter(l => l.assetId === a.id);
                       const machineConsumed = machineLogs.reduce((s, l) => s + dayValue(l), 0);
+                      const invoicedCount = invoice?.noOfMachine || machineConfigs.length || 1;
+                      const hasSwaps = siteMachines.length > invoicedCount || siteMachines.some(m => (m as any).isStopped);
+                      const firstDur = parseFloat(String(machineConfigs[0]?.duration ?? 0)) || invoiceDuration;
+                      const cfg = !hasSwaps ? machineConfigs[idx] : undefined;
+                      const machineDuration = cfg
+                        ? (cfg.sameDurationAsFirst ? firstDur : (parseFloat(String(cfg.duration ?? 0)) || firstDur || invoiceDuration))
+                        : invoiceDuration;
+                      const isOver = machineDuration > 0 && machineConsumed > machineDuration;
+                      const overDays = isOver ? machineConsumed - machineDuration : 0;
+                      const isStopped = (a as any).isStopped;
+
                       return (
                         <div key={a.id} className="flex items-center justify-between bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-sm px-3 py-2">
-                          <div>
-                            <span className="text-sm font-medium text-slate-700">{a.name}</span>
-                            {a.serialNumber && <span className="text-xs text-slate-400 ml-2">S/N: {a.serialNumber}</span>}
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <span className={cn("text-sm font-medium truncate", isStopped ? "text-slate-500 dark:text-slate-400" : "text-slate-700 dark:text-slate-200")}>
+                              {a.name}
+                            </span>
+                            {a.serialNumber && <span className="text-xs text-slate-400 ml-1">S/N: {a.serialNumber}</span>}
+                            {isStopped && (
+                              <span className="text-[9px] font-semibold px-1.5 py-0.2 rounded bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 shrink-0">
+                                Swapped Out
+                              </span>
+                            )}
                           </div>
-                          <span className="text-xs font-bold text-blue-600 dark:text-blue-400 font-mono tabular-nums">{machineConsumed.toFixed(1)} days logged</span>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className="text-xs font-bold text-blue-600 dark:text-blue-400 font-mono tabular-nums">
+                              {hasSwaps 
+                                ? `${machineConsumed.toFixed(1)}d logged` 
+                                : `${machineConsumed.toFixed(1)} / ${machineDuration} days logged`}
+                            </span>
+                            {isOver && !hasSwaps && (
+                              <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-200 dark:border-rose-800">
+                                +{overDays.toFixed(1)}d
+                              </span>
+                            )}
+                          </div>
                         </div>
                       );
                     })}

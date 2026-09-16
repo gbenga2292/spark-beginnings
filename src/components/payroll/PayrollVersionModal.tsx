@@ -4,10 +4,10 @@ import { Button } from '@/src/components/ui/button';
 import { Badge } from '@/src/components/ui/badge';
 import { Card, CardContent } from '@/src/components/ui/card';
 import { Textarea } from '@/src/components/ui/textarea';
-import { History, GitCommit, CheckCircle, AlertTriangle, ArrowRight, Clock, User, ShieldCheck } from 'lucide-react';
+import { History, GitCommit, CheckCircle, AlertTriangle, ArrowRight, Clock, User, ShieldCheck, Trash2 } from 'lucide-react';
 import { PayrollSnapshot, useAppStore } from '@/src/store/appStore';
 import { formatDisplayDate } from '@/src/lib/dateUtils';
-import { toast } from '@/src/components/ui/toast';
+import { toast, showConfirm } from '@/src/components/ui/toast';
 
 interface PayrollVersionModalProps {
   isOpen: boolean;
@@ -46,9 +46,11 @@ export function PayrollVersionModal({
 }: PayrollVersionModalProps) {
   const savePayrollSnapshot = useAppStore((state) => state.savePayrollSnapshot);
   const setActivePayrollSnapshot = useAppStore((state) => state.setActivePayrollSnapshot);
+  const deletePayrollSnapshot = useAppStore((state) => state.deletePayrollSnapshot);
 
   const [changeReason, setChangeReason] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [isDeletingId, setIsDeletingId] = useState<string | null>(null);
   const [selectedVersionToView, setSelectedVersionToView] = useState<number | null>(null);
 
   const nextVersionNumber = useMemo(() => {
@@ -198,6 +200,48 @@ export function PayrollVersionModal({
     } catch (e: any) {
       console.error('Switch version error:', e);
       toast.error('Failed to switch version: ' + (e?.message || 'Unknown error'));
+    }
+  };
+
+  const handleDeleteSnapshot = async (snap: PayrollSnapshot) => {
+    if (!isAdmin) {
+      toast.error('Only administrators can delete a payroll version.');
+      return;
+    }
+
+    const isOnlyVersion = allVersions.length <= 1;
+    const confirmed = await showConfirm(
+      isOnlyVersion
+        ? `Are you sure you want to delete Version ${snap.version} for ${monthLabel} ${year}?\n\nThis is the only recorded version. Deleting it will unlock the payroll and revert to live calculation mode.`
+        : `Are you sure you want to delete Version ${snap.version} for ${monthLabel} ${year}?${
+            snap.isActive ? ' Since this is the active version, the previous version will be restored as active.' : ''
+          }`,
+      {
+        title: `Delete Version ${snap.version}`,
+        variant: 'danger',
+        confirmLabel: isOnlyVersion ? 'Delete & Unlock Payroll' : 'Delete Version',
+      }
+    );
+
+    if (!confirmed) return;
+
+    setIsDeletingId(snap.id);
+    try {
+      await deletePayrollSnapshot(snap.id);
+      toast.success(
+        isOnlyVersion
+          ? `Version ${snap.version} deleted. Payroll for ${monthLabel} ${year} is now unlocked.`
+          : `Version ${snap.version} deleted successfully.`
+      );
+      onSaveRevisionSuccess?.();
+      if (isOnlyVersion) {
+        onClose();
+      }
+    } catch (e: any) {
+      console.error('Delete snapshot error:', e);
+      toast.error('Failed to delete payroll version: ' + (e?.message || 'Unknown error'));
+    } finally {
+      setIsDeletingId(null);
     }
   };
 
@@ -376,8 +420,8 @@ export function PayrollVersionModal({
                                 )}
                               </div>
 
-                              {/* Snapshot Metric Chips */}
-                              <div className="flex flex-wrap gap-2 pt-1 border-t border-slate-100 dark:border-slate-800 text-[11px]">
+                              {/* Snapshot Metric Chips & Actions */}
+                              <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100 dark:border-slate-800 text-[11px]">
                                 <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-700 font-mono tabular-nums">
                                   Staff: {snap.totals?.employeeCount ?? snap.records?.length ?? 0}
                                 </span>
@@ -388,18 +432,33 @@ export function PayrollVersionModal({
                                   Net: ₦{fm(snap.totals?.totalNet || 0)}
                                 </span>
 
-                                {!isCurrentActive && isAdmin && (
-                                  <div className="ml-auto">
+                                <div className="ml-auto flex items-center gap-2">
+                                  {!isCurrentActive && isAdmin && (
                                     <Button
                                       size="sm"
                                       variant="outline"
                                       onClick={() => handleSwitchActiveVersion(snap.version)}
+                                      disabled={isDeletingId === snap.id}
                                       className="h-7 text-xs border-blue-200 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-950/40 rounded-sm"
                                     >
                                       Set as Active Version
                                     </Button>
-                                  </div>
-                                )}
+                                  )}
+
+                                  {isAdmin && (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => handleDeleteSnapshot(snap)}
+                                      disabled={isDeletingId === snap.id}
+                                      className="h-7 text-xs border-rose-200 text-rose-600 hover:bg-rose-50 hover:border-rose-300 dark:border-rose-900/50 dark:text-rose-400 dark:hover:bg-rose-950/40 rounded-sm gap-1 transition-colors"
+                                      title="Delete this version snapshot (Admin only)"
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5 text-rose-500" />
+                                      <span>{isDeletingId === snap.id ? 'Deleting...' : 'Delete Version'}</span>
+                                    </Button>
+                                  )}
+                                </div>
                               </div>
                             </CardContent>
                           </Card>

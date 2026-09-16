@@ -495,29 +495,35 @@ export function Site360View({ site, clientSites, onSiteChange, onBack, onEditSit
 
     const vatGenerated = 0; // VAT is only on payments, not invoices
 
-    const periodVatCollected = sitePayments.reduce((sum, p) => {
-      if (p.vat !== undefined && p.vat > 0) return sum + p.vat;
+    const getPaymentVatAmount = (p: any) => {
+      if (p.vat !== undefined && p.vat !== null) return p.vat;
+      // Proportional fallback if linked to an invoice with itemized VAT
+      if (p.invoiceId) {
+        const inv = invoices.find(i => i.id === p.invoiceId);
+        if (inv) {
+          const invTotal = Number((inv as any).totalCharge || (inv as any).amount || 0);
+          const invVat = Number((inv as any).vat || 0);
+          if (invTotal > 0 && invVat > 0) {
+            return Math.round(((p.amount || 0) * (invVat / invTotal)) * 100) / 100;
+          }
+          if ((inv as any).vatInc === 'No') return 0;
+        }
+      }
       const baseAmount = (p.amount || 0) - (p.damages || 0);
       const payVat = p.payVat || 'No';
       let vatVal = 0;
       if (payVat === 'Add') vatVal = ((baseAmount * vatRate) / (100 + vatRate));
       else if (payVat === 'Yes') vatVal = ((baseAmount / (100 + vatRate)) * vatRate);
-      return sum + Math.round(vatVal * 100) / 100;
-    }, 0);
+      return Math.round(vatVal * 100) / 100;
+    };
+
+    const periodVatCollected = sitePayments.reduce((sum, p) => sum + getPaymentVatAmount(p), 0);
 
     const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
     const clientVatPayments = vatPayments.filter(vp => vp.client?.trim() === site.client?.trim());
 
     const prevPayments = payments.filter(p => (p.site?.trim() === site.name.trim() || p.client?.trim() === site.name.trim()) && isBeforeFilter(p.date));
-    const prevVatCollected = prevPayments.reduce((sum, p) => {
-      if (p.vat !== undefined && p.vat > 0) return sum + p.vat;
-      const baseAmount = (p.amount || 0) - (p.damages || 0);
-      const payVat = p.payVat || 'No';
-      let vatVal = 0;
-      if (payVat === 'Add') vatVal = ((baseAmount * vatRate) / (100 + vatRate));
-      else if (payVat === 'Yes') vatVal = ((baseAmount / (100 + vatRate)) * vatRate);
-      return sum + Math.round(vatVal * 100) / 100;
-    }, 0);
+    const prevVatCollected = prevPayments.reduce((sum, p) => sum + getPaymentVatAmount(p), 0);
 
     const prevVatRemitted = clientVatPayments.filter(vp => {
       if (filterMonth === 'all' || filterYear === 'all') return false;

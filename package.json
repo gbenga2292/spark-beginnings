@@ -1,7 +1,7 @@
 {
   "name": "dcel-office-app",
   "private": true,
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "DCEL Office Suite - Comprehensive HR and Operations Management for Construction",
   "author": "Alconsult",
   "type": "module",
@@ -136,24 +136,17 @@
       "dist/**/*",
       "electron/**/*",
       "logo/**/*",
-      "!**/node_modules/*/{android,ios}/**"
+      "!**/node_modules/**/{android,ios}/**",
+      "!**/node_modules/**/android/**",
+      "!**/node_modules/**/ios/**",
+      "!**/node_modules/**/build/**",
+      "!**/node_modules/**/.transforms/**",
+      "!**/node_modules/**/intermediates/**"
     ],
     "win": {
       "target": [
         {
           "target": "nsis",
-          "arch": [
-            "x64"
-          ]
-        },
-        {
-          "target": "portable",
-          "arch": [
-            "x64"
-          ]
-        },
-        {
-          "target": "dir",
           "arch": [
             "x64"
           ]
@@ -165,7 +158,14 @@
       "oneClick": false,
       "perMachine": true,
       "allowToChangeInstallationDirectory": true,
-      "include": "build/installer.nsh"
+      "include": "build/installer.nsh",
+      "createDesktopShortcut": "always",
+      "createStartMenuShortcut": true,
+      "shortcutName": "DCEL Office Suite",
+      "runAfterFinish": true,
+      "differentialPackage": false,
+      "installerIcon": "logo/icon.ico",
+      "uninstallerIcon": "logo/icon.ico"
     },
     "publish": [
       {

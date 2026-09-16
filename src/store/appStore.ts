@@ -1490,14 +1490,14 @@ export const useAppStore = create<AppState>()(
       removeDepartment: (id) => { set((s) => ({ departments: s.departments.filter(d => d.id !== id) })); db.deleteDepartment(id); },
 
       // Invoices
-      addInvoice: (invoice) => { set((s) => ({ invoices: [...s.invoices, invoice] })); db.insertInvoice(invoice); },
-      updateInvoice: (id, updatedInvoice) => { set((s) => ({ invoices: s.invoices.map(inv => inv.id === id ? { ...inv, ...updatedInvoice } : inv) })); db.updateInvoice(id, updatedInvoice); },
-      deleteInvoice: (id) => { set((s) => ({ invoices: s.invoices.filter(inv => inv.id !== id) })); db.deleteInvoice(id); },
+      addInvoice: (invoice) => { set((s) => ({ invoices: [...s.invoices, invoice] })); db.insertInvoice(invoice).catch(err => console.error('insertInvoice error:', err)); },
+      updateInvoice: (id, updatedInvoice) => { set((s) => ({ invoices: s.invoices.map(inv => inv.id === id ? { ...inv, ...updatedInvoice } : inv) })); db.updateInvoice(id, updatedInvoice).catch(err => console.error('updateInvoice error:', err)); },
+      deleteInvoice: (id) => { set((s) => ({ invoices: s.invoices.filter(inv => inv.id !== id) })); db.deleteInvoice(id).catch(err => console.error('deleteInvoice error:', err)); },
 
       // Pending Invoices
-      addPendingInvoice: (inv) => { set((s) => ({ pendingInvoices: [...s.pendingInvoices, inv] })); db.insertPendingInvoice(inv); },
-      updatePendingInvoice: (id, updated) => { set((s) => ({ pendingInvoices: s.pendingInvoices.map(inv => inv.id === id ? { ...inv, ...updated } : inv) })); db.updatePendingInvoice(id, updated); },
-      deletePendingInvoice: (id) => { set((s) => ({ pendingInvoices: s.pendingInvoices.filter(inv => inv.id !== id) })); db.deletePendingInvoice(id); },
+      addPendingInvoice: (inv) => { set((s) => ({ pendingInvoices: [...s.pendingInvoices, inv] })); db.insertPendingInvoice(inv).catch(err => console.error('insertPendingInvoice error:', err)); },
+      updatePendingInvoice: (id, updated) => { set((s) => ({ pendingInvoices: s.pendingInvoices.map(inv => inv.id === id ? { ...inv, ...updated } : inv) })); db.updatePendingInvoice(id, updated).catch(err => console.error('updatePendingInvoice error:', err)); },
+      deletePendingInvoice: (id) => { set((s) => ({ pendingInvoices: s.pendingInvoices.filter(inv => inv.id !== id) })); db.deletePendingInvoice(id).catch(err => console.error('deletePendingInvoice error:', err)); },
 
       // Salary Advances
       addSalaryAdvance: (advance) => { set((s) => ({ salaryAdvances: [...s.salaryAdvances, advance] })); db.insertSalaryAdvance(advance); },
@@ -2012,7 +2012,28 @@ export const useAppStore = create<AppState>()(
       },
       deletePayrollSnapshot: async (id) => {
         try {
+          const currentSnapshots = get().payrollSnapshots;
+          const target = currentSnapshots.find(s => s.id === id);
           await db.deletePayrollSnapshot(id);
+
+          if (target && target.isActive) {
+            const remaining = currentSnapshots.filter(s => s.id !== id && s.month === target.month && s.year === target.year);
+            if (remaining.length > 0) {
+              const highest = [...remaining].sort((a, b) => b.version - a.version)[0];
+              try {
+                await db.setActivePayrollSnapshot(target.month, target.year, highest.version);
+              } catch (err) {
+                console.error('Failed to set fallback active snapshot:', err);
+              }
+              set(s => ({
+                payrollSnapshots: s.payrollSnapshots
+                  .filter(snap => snap.id !== id)
+                  .map(snap => (snap.id === highest.id ? { ...snap, isActive: true } : snap))
+              }));
+              return;
+            }
+          }
+
           set(s => ({
             payrollSnapshots: s.payrollSnapshots.filter(snap => snap.id !== id)
           }));

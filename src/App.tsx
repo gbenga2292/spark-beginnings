@@ -78,6 +78,8 @@ const InterviewManager = lazy(() => import('./pages/InterviewManager').then(m =>
 const Simulator = lazy(() => import('./pages/Simulator').then(m => ({ default: m.default })));
 const MachineReconciliation = lazy(() => import('./pages/MachineReconciliation').then(m => ({ default: m.MachineReconciliation })));
 const Estimator = lazy(() => import('./pages/Estimator').then(m => ({ default: m.default })));
+const DewateringCalculator = lazy(() => import('./pages/DewateringCalculator').then(m => ({ default: m.default })));
+const VatCalculator = lazy(() => import('./pages/VatCalculator').then(m => ({ default: m.default })));
 const Budget = lazy(() => import('./pages/Budget').then(m => ({ default: m.Budget })));
 const ActiveSiteAnalytics = lazy(() => import('./pages/ActiveSiteAnalytics').then(m => ({ default: m.ActiveSiteAnalytics })));
 import { OperationsProvider } from './contexts/OperationsContext';
@@ -151,7 +153,14 @@ function RootRedirect() {
   }
 
   if (currentUser) {
-    // Always land on the home launchpad first — user picks their module from there
+    // Default to Task Dashboard after login; fallback to /home if user lacks task permissions
+    const canAccessTaskDashboard =
+      currentUser.privileges?.tasks?.canView !== false &&
+      currentUser.privileges?.tasks?.canViewDashboard !== false;
+
+    if (canAccessTaskDashboard) {
+      return <Navigate to="/tasks/dashboard" replace />;
+    }
     return <Navigate to="/home" replace />;
   }
 
@@ -279,6 +288,8 @@ function AppContent() {
                       <Route path="analytics" element={<ProtectedRoute requiredModule="opsCheckout"><EmployeeAnalytics /></ProtectedRoute>} />
                       <Route path="simulator" element={<ProtectedRoute requiredModule="simulator"><Simulator /></ProtectedRoute>} />
                       <Route path="estimator" element={<ProtectedRoute requiredModule="simulator"><Estimator /></ProtectedRoute>} />
+                      <Route path="dewatering-calculator" element={<ProtectedRoute requiredModule="simulator"><DewateringCalculator /></ProtectedRoute>} />
+                      <Route path="vat-calculator" element={<ProtectedRoute requiredModule="simulator"><VatCalculator /></ProtectedRoute>} />
                       <Route path="machine-reconciliation" element={<ProtectedRoute requiredModule={['opsMachineRecon']}><MachineReconciliation /></ProtectedRoute>} />
                       <Route path="site-analytics" element={<ProtectedRoute requiredModule={['operations', 'opsSites', 'sites']}><ActiveSiteAnalytics /></ProtectedRoute>} />
                       <Route path="*" element={<Navigate to="/operations" replace />} />

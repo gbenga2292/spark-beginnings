@@ -508,11 +508,11 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
                       'bg-white/10 hover:bg-white/20 text-white border border-white/15 shadow-xs',
                       effectiveCollapsed ? 'px-0 justify-center' : 'px-3'
                     )}
-                    title={effectiveCollapsed ? 'Back to All Categories' : undefined}
+                    title={effectiveCollapsed ? 'Home' : undefined}
                   >
                     <div className={cn('flex items-center', effectiveCollapsed && 'justify-center w-full')}>
                       <ArrowLeft className={cn('h-4 w-4 shrink-0 text-white transition-transform duration-200 group-hover:-translate-x-0.5', !effectiveCollapsed && 'mr-2')} />
-                      {!effectiveCollapsed && <span>Back</span>}
+                      {!effectiveCollapsed && <span>Home</span>}
                     </div>
                   </button>
                 </div>
@@ -670,15 +670,10 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
                     <div key={cat.name} className="mb-1">
                       <button
                         type="button"
-                        onClick={(e) => {
+                        onClick={() => {
                           setDrilledCategory(cat);
                           setIsRootView(false);
                           if (effectiveCollapsed) setIsCollapsed(false);
-
-                          const firstHref = getFirstAccessibleHref(cat, currentUser);
-                          if (firstHref) {
-                            handleLinkClick(e, firstHref);
-                          }
                         }}
                         onMouseEnter={() => {
                           const firstHref = getFirstAccessibleHref(cat, currentUser);

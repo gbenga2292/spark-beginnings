@@ -22,7 +22,6 @@ const YEARS = Array.from({ length: 11 }, (_, i) => (new Date().getFullYear() - 5
 
 export function VatPayments({ setPreviewModal, searchTerm = '' }: { setPreviewModal?: (val: any) => void; searchTerm?: string }) {
     const sites = useAppStore((state) => state.sites);
-    const payments = useAppStore((state) => state.payments);
     const vatPayments = useAppStore((state) => state.vatPayments);
     const addVatPayment = useAppStore((state) => state.addVatPayment);
     const updateVatPayment = useAppStore((state) => state.updateVatPayment);
@@ -40,9 +39,6 @@ export function VatPayments({ setPreviewModal, searchTerm = '' }: { setPreviewMo
     // Sorting state for Entries table
     const [entriesSortField, setEntriesSortField] = useState<string>('date');
     const [entriesSortOrder, setEntriesSortOrder] = useState<'asc' | 'desc'>('desc');
-    // Sorting state for Totals table
-    const [totalsSortField, setTotalsSortField] = useState<string>('client');
-    const [totalsSortOrder, setTotalsSortOrder] = useState<'asc' | 'desc'>('asc');
     const [filterFromMonth, setFilterFromMonth] = useState<string>('');
     const [filterToMonth, setFilterToMonth] = useState<string>('');
     const [showFilters, setShowFilters] = useState(false);
@@ -295,100 +291,6 @@ export function VatPayments({ setPreviewModal, searchTerm = '' }: { setPreviewMo
         return Array.from(new Set(sites.map(s => s.client))).sort();
     }, [sites]);
 
-    const totalsData = useMemo(() => {
-        let data = uniqueClients.map(client => {
-            const allClientPayments = payments.filter(p => p.client === client && p.payVat && p.payVat !== 'No');
-            const allClientVatPayments = vatPayments.filter(vp => vp.client === client);
-
-            let periodClientPayments = [...allClientPayments];
-            let periodClientVatPayments = [...allClientVatPayments];
-
-            if (filterFromMonth || filterToMonth) {
-                const checkPayDate = (d: string) => {
-                    if (!d) return false;
-                    let dateYM = '';
-                    if (d.includes('-')) {
-                        dateYM = d.substring(0, 7);
-                    } else {
-                        const parts = d.split('/');
-                        if (parts.length === 3) {
-                            dateYM = `${parts[2]}-${parts[1]}`;
-                        }
-                    }
-                    if (!dateYM) return false;
-                    if (filterFromMonth && dateYM < filterFromMonth) return false;
-                    if (filterToMonth && dateYM > filterToMonth) return false;
-                    return true;
-                };
-
-                const checkVatPeriod = (vp: VatPayment) => {
-                    const monthIndex = MONTHS.findIndex(m => m === vp.month);
-                    const mKey = monthIndex !== -1 ? (monthIndex + 1).toString().padStart(2, '0') : '';
-                    if (!mKey || !vp.year) return false;
-                    const dateYM = `${vp.year}-${mKey}`;
-                    if (filterFromMonth && dateYM < filterFromMonth) return false;
-                    if (filterToMonth && dateYM > filterToMonth) return false;
-                    return true;
-                };
-
-                periodClientPayments = allClientPayments.filter(p => checkPayDate(p.date));
-                periodClientVatPayments = allClientVatPayments.filter(checkVatPeriod);
-            }
-
-            const totalPaid = periodClientPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
-            const totalVat = periodClientPayments.reduce((sum, p) => {
-                const vatValue = p.payVat === 'Add' ? Math.round(((p.amount * 7.5) / 107.5) * 100) / 100 
-                               : p.payVat === 'Yes' ? Math.round(((p.amount / (100 + vatRate)) * vatRate) * 100) / 100 
-                               : 0;
-                return sum + vatValue;
-            }, 0);
-            const vatPaid = periodClientVatPayments.reduce((sum, vp) => sum + vp.amount, 0);
-
-            // All-time balance calculations
-            const allTimeTotalVat = allClientPayments.reduce((sum, p) => {
-                const vatValue = p.payVat === 'Add' ? Math.round(((p.amount * 7.5) / 107.5) * 100) / 100 
-                               : p.payVat === 'Yes' ? Math.round(((p.amount / (100 + vatRate)) * vatRate) * 100) / 100 
-                               : 0;
-                return sum + vatValue;
-            }, 0);
-            const allTimeVatPaid = allClientVatPayments.reduce((sum, vp) => sum + vp.amount, 0);
-            
-            const vatBalanceToPay = allTimeTotalVat - allTimeVatPaid;
-            
-            const allTimeTotalPaid = allClientPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
-            const principleOnVatDue = allTimeTotalVat > 0 ? (vatBalanceToPay / allTimeTotalVat) * allTimeTotalPaid : 0;
-
-            return {
-                client,
-                totalPaid,
-                vat: totalVat,
-                vatPaid,
-                vatBalanceToPay,
-                principleOnVatDue: Math.max(0, principleOnVatDue)
-            };
-        });
-
-        // Hide rows that have absolutely no activity AND no all-time outstanding balance
-        data = data.filter(d => !(d.totalPaid === 0 && d.vat === 0 && d.vatPaid === 0 && d.vatBalanceToPay === 0));
-
-        if (searchTerm) {
-            const lowerSearch = searchTerm.toLowerCase();
-            data = data.filter(d => d.client.toLowerCase().includes(lowerSearch));
-        }
-
-        return data.sort((a, b) => {
-            let valA: any = (a as any)[totalsSortField];
-            let valB: any = (b as any)[totalsSortField];
-            if (typeof valA === 'string') {
-                valA = valA.toLowerCase();
-                valB = valB.toLowerCase();
-            }
-            if (valA < valB) return totalsSortOrder === 'asc' ? -1 : 1;
-            if (valA > valB) return totalsSortOrder === 'asc' ? 1 : -1;
-            return 0;
-        });
-    }, [uniqueClients, payments, vatPayments, totalsSortField, totalsSortOrder, filterFromMonth, filterToMonth]);
-
     const sortedVatPayments = useMemo(() => {
         let filtered = vatPayments;
         if (filterFromMonth || filterToMonth) {
@@ -436,29 +338,10 @@ export function VatPayments({ setPreviewModal, searchTerm = '' }: { setPreviewMo
         }
     };
 
-    const handleTotalsSort = (field: string) => {
-        if (totalsSortField === field) {
-            setTotalsSortOrder(totalsSortOrder === 'asc' ? 'desc' : 'asc');
-        } else {
-            setTotalsSortField(field);
-            setTotalsSortOrder('asc');
-        }
-    };
-
     const SortIcon = ({ field, currentField, currentOrder }: { field: string, currentField: string, currentOrder: 'asc' | 'desc' }) => {
         if (currentField !== field) return <ChevronUp className="w-3 h-3 opacity-20" />;
         return currentOrder === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />;
     };
-
-    const overallTotals = useMemo(() => {
-        return totalsData.reduce((acc, curr) => ({
-            totalPaid: acc.totalPaid + curr.totalPaid,
-            vat: acc.vat + curr.vat,
-            vatPaid: acc.vatPaid + curr.vatPaid,
-            vatBalanceToPay: acc.vatBalanceToPay + curr.vatBalanceToPay,
-            principleOnVatDue: acc.principleOnVatDue + curr.principleOnVatDue,
-        }), { totalPaid: 0, vat: 0, vatPaid: 0, vatBalanceToPay: 0, principleOnVatDue: 0 });
-    }, [totalsData]);
 
     const vatPaymentsSum = useMemo(() => {
         return sortedVatPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
@@ -580,7 +463,7 @@ export function VatPayments({ setPreviewModal, searchTerm = '' }: { setPreviewMo
                                 </div>
                             </div>
 
-                            <div className="flex-1 overflow-x-auto [scrollbar-gutter:stable] min-h-[250px] max-h-[350px] relative">
+                            <div className="flex-1 overflow-x-auto [scrollbar-gutter:stable] min-h-[400px] relative">
                                 <style>{`
                                     .overflow-x-auto {
                                         scrollbar-width: thin;
@@ -722,179 +605,6 @@ export function VatPayments({ setPreviewModal, searchTerm = '' }: { setPreviewMo
                                             <TableRow>
                                                 <TableCell colSpan={showActions ? 7 : 6} className="px-4 py-8 text-center text-slate-500 font-medium tracking-wide">
                                                     No VAT payment records.
-                                                </TableCell>
-                                            </TableRow>
-                                        )}
-                                    </TableBody>
-                                </Table>
-                            </div>
-                        </div>
-
-                        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md overflow-hidden flex flex-col flex-1">
-                            <div className="border-b border-slate-100 dark:border-slate-800 p-4 bg-slate-50/50 dark:bg-slate-800/30 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                                <div className="flex items-center gap-2">
-                                    <span className="w-1.5 h-4 rounded-sm bg-rose-500"></span>
-                                    <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wide">
-                                        Client & Total Balances
-                                    </h3>
-                                </div>
-                                <div className="flex gap-4 font-mono text-sm">
-                                    <div className="flex flex-col items-end">
-                                        <span className="text-slate-400 text-xs font-sans tracking-tight">Total VAT</span>
-                                        <span className="text-slate-800 dark:text-slate-200 font-bold tabular-nums">₦{priv?.canViewAmounts === false ? '***' : overallTotals.vat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                    </div>
-                                    <div className="h-8 w-px bg-slate-300 dark:bg-slate-700 mx-2 hidden sm:block"></div>
-                                    <div className="flex flex-col items-end">
-                                        <span className="text-slate-400 text-xs font-sans tracking-tight">Total Balance</span>
-                                        <span className="text-rose-600 font-bold tabular-nums">₦{priv?.canViewAmounts === false ? '***' : overallTotals.vatBalanceToPay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="flex-1 overflow-x-auto [scrollbar-gutter:stable] min-h-[250px] max-h-[350px]">
-                                {/* MOBILE CARDS */}
-                                <div className="md:hidden flex flex-col p-4 bg-slate-50 dark:bg-slate-800/30 border-b border-slate-100 dark:border-slate-800">
-                                    <h4 className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-3">Aggregate Balances</h4>
-                                    <div className="grid grid-cols-2 gap-2">
-                                        <div className="bg-white dark:bg-slate-800 p-2 rounded-sm border border-slate-200 dark:border-slate-700 min-w-0">
-                                            <p className="text-[10px] text-slate-400 font-bold uppercase truncate">Total Paid</p>
-                                            <p className="text-[11px] sm:text-xs font-mono font-bold text-slate-600 dark:text-slate-300 break-all" title={'₦' + formatSum(overallTotals.totalPaid)}>₦{formatSum(overallTotals.totalPaid)}</p>
-                                        </div>
-                                        <div className="bg-white dark:bg-slate-800 p-2 rounded-sm border border-slate-200 dark:border-slate-700 min-w-0">
-                                            <p className="text-[10px] text-slate-400 font-bold uppercase truncate">VAT Value</p>
-                                            <p className="text-[11px] sm:text-xs font-mono font-bold text-slate-600 dark:text-slate-300 break-all" title={'₦' + formatSum(overallTotals.vat)}>₦{formatSum(overallTotals.vat)}</p>
-                                        </div>
-                                        <div className="bg-white dark:bg-slate-800 p-2 rounded-sm border border-emerald-100 dark:border-emerald-900/40 min-w-0">
-                                            <p className="text-[10px] text-slate-400 font-bold uppercase truncate">VAT Remitted</p>
-                                            <p className="text-[11px] sm:text-xs font-mono font-bold text-emerald-600 break-all" title={'₦' + formatSum(overallTotals.vatPaid)}>₦{formatSum(overallTotals.vatPaid)}</p>
-                                        </div>
-                                        <div className="bg-white dark:bg-slate-800 p-2 rounded-sm border border-rose-100 dark:border-rose-900/40 min-w-0">
-                                            <p className="text-[10px] text-slate-400 font-bold uppercase truncate">Balance to Pay</p>
-                                            <p className="text-[11px] sm:text-xs font-mono font-bold text-rose-600 break-all" title={'₦' + formatSum(overallTotals.vatBalanceToPay)}>₦{formatSum(overallTotals.vatBalanceToPay)}</p>
-                                        </div>
-                                        <div className="bg-white dark:bg-slate-800 p-2 rounded-sm border border-slate-200 dark:border-slate-700 col-span-2 min-w-0">
-                                            <p className="text-[10px] text-slate-400 font-bold uppercase truncate">Amount for VAT</p>
-                                            <p className="text-[11px] sm:text-xs font-mono font-bold text-blue-600 break-all" title={'₦' + formatSum(overallTotals.principleOnVatDue)}>₦{formatSum(overallTotals.principleOnVatDue)}</p>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800 px-4">
-                                    {totalsData.map((t, i) => (
-                                        <div key={i} className="py-4 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
-                                            <h3 className="font-bold text-slate-900 dark:text-slate-100 mb-2">{t.client}</h3>
-                                            <div className="grid grid-cols-2 gap-y-2 gap-x-4">
-                                                <div className="flex justify-between">
-                                                    <span className="text-[10px] text-slate-500 uppercase">Paid</span>
-                                                    <span className="text-xs font-mono text-slate-600 dark:text-slate-400">{t.totalPaid ? t.totalPaid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</span>
-                                                </div>
-                                                <div className="flex justify-between">
-                                                    <span className="text-[10px] text-slate-500 uppercase">VAT</span>
-                                                    <span className="text-xs font-mono text-slate-600 dark:text-slate-400">{t.vat ? t.vat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</span>
-                                                </div>
-                                                <div className="flex justify-between">
-                                                    <span className="text-[10px] text-slate-500 uppercase">VAT Paid</span>
-                                                    <span className="text-xs font-mono text-emerald-600">{t.vatPaid ? t.vatPaid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</span>
-                                                </div>
-                                                <div className="flex justify-between">
-                                                    <span className="text-[10px] text-slate-500 uppercase">Balance</span>
-                                                    <span className="text-xs font-mono font-bold text-rose-600">{t.vatBalanceToPay ? t.vatBalanceToPay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</span>
-                                                </div>
-                                                <div className="flex justify-between col-span-2 border-t border-slate-50 dark:border-slate-800 pt-1 mt-1">
-                                                    <span className="text-[10px] text-slate-500 uppercase">Amount for VAT</span>
-                                                    <span className="text-xs font-mono font-medium text-blue-600">{t.principleOnVatDue ? t.principleOnVatDue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ))}
-                                    {totalsData.length === 0 && (
-                                        <div className="py-8 text-center text-slate-500 text-sm">
-                                            No summarized data.
-                                        </div>
-                                    )}
-                                </div>
-                                <Table className="hidden md:table whitespace-nowrap min-w-full text-sm">
-                                    <TableHeader className="bg-slate-50 dark:bg-slate-800/60 sticky top-0 z-20">
-                                        <TableRow className="bg-slate-100/80 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700">
-                                            <TableHead className="px-6 py-2.5">
-                                                <div className="flex items-center gap-2">
-                                                    <div className="w-1.5 h-4 bg-rose-500 rounded-sm"></div>
-                                                    <span className="text-[10px] font-bold uppercase tracking-widest text-slate-900 dark:text-slate-100">Aggregate Balances</span>
-                                                </div>
-                                            </TableHead>
-                                            <TableHead className="px-4 py-2.5 text-right">
-                                                <div className="text-[11px] font-mono font-bold text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800 px-2 py-1 rounded-sm border border-slate-200 dark:border-slate-700 inline-block">
-                                                    ₦{formatSum(overallTotals.totalPaid)}
-                                                </div>
-                                            </TableHead>
-                                            <TableHead className="px-4 py-2.5 text-right">
-                                                <div className="text-[11px] font-mono font-bold text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800 px-2 py-1 rounded-sm border border-slate-200 dark:border-slate-700 inline-block">
-                                                    ₦{formatSum(overallTotals.vat)}
-                                                </div>
-                                            </TableHead>
-                                            <TableHead className="px-4 py-2.5 text-right">
-                                                <div className="text-[11px] font-mono font-bold text-emerald-600 bg-white dark:bg-slate-800 px-2 py-1 rounded-sm border border-emerald-200 dark:border-emerald-800 inline-block">
-                                                    ₦{formatSum(overallTotals.vatPaid)}
-                                                </div>
-                                            </TableHead>
-                                            <TableHead className="px-4 py-2.5 text-right">
-                                                <div className="text-[11px] font-mono font-bold text-rose-600 bg-white dark:bg-slate-800 px-2 py-1 rounded-sm border border-rose-200 dark:border-rose-800 inline-block">
-                                                    ₦{formatSum(overallTotals.vatBalanceToPay)}
-                                                </div>
-                                            </TableHead>
-                                            <TableHead className="px-4 py-2.5 text-right">
-                                                <div className="text-[11px] font-mono font-bold text-blue-600 bg-white dark:bg-slate-800 px-2 py-1 rounded-sm border border-blue-200 dark:border-blue-800 inline-block">
-                                                    ₦{formatSum(overallTotals.principleOnVatDue)}
-                                                </div>
-                                            </TableHead>
-                                        </TableRow>
-                                        <TableRow className="border-b-0">
-                                            {[
-                                                { field: 'client',            label: 'Client', align: 'left' },
-                                                { field: 'totalPaid',         label: 'Total Paid', align: 'right' },
-                                                { field: 'vat',               label: 'VAT Value', align: 'right' },
-                                                { field: 'vatPaid',           label: 'VAT Remitted', align: 'right' },
-                                                { field: 'vatBalanceToPay',   label: 'Balance to Pay', align: 'right', className: 'text-rose-600' },
-                                                { field: 'principleOnVatDue', label: 'Amount for VAT', align: 'right', className: 'text-blue-600' },
-                                            ].map((col) => (
-                                                <TableHead
-                                                    key={col.field}
-                                                    className={`font-semibold px-4 py-3 uppercase text-[10px] tracking-wider select-none ${col.className || 'text-slate-500'} ${col.align === 'right' ? 'text-right' : ''} cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-blue-600 transition-colors`}
-                                                    onClick={() => handleTotalsSort(col.field)}
-                                                    onMouseDown={(e) => e.stopPropagation()}
-                                                >
-                                                    <div className={`flex items-center gap-1 ${col.align === 'right' ? 'justify-end' : ''}`}>
-                                                        {col.label}
-                                                        <SortIcon field={col.field} currentField={totalsSortField} currentOrder={totalsSortOrder} />
-                                                    </div>
-                                                </TableHead>
-                                            ))}
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {totalsData.map((t, i) => (
-                                            <TableRow key={i} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors">
-                                                <TableCell className="px-4 py-3 font-semibold text-slate-800 dark:text-slate-200">{t.client}</TableCell>
-                                                <TableCell className="px-4 py-3 text-right text-slate-600 dark:text-slate-400 font-mono">
-                                                    {t.totalPaid ? t.totalPaid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}
-                                                </TableCell>
-                                                <TableCell className="px-4 py-3 text-right text-slate-600 dark:text-slate-400 font-mono">
-                                                    {t.vat ? t.vat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}
-                                                </TableCell>
-                                                <TableCell className="px-4 py-3 text-right text-emerald-600 font-mono">
-                                                    {t.vatPaid ? t.vatPaid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}
-                                                </TableCell>
-                                                <TableCell className="px-4 py-3 text-right text-rose-600 font-mono font-bold">
-                                                    {t.vatBalanceToPay ? t.vatBalanceToPay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}
-                                                </TableCell>
-                                                <TableCell className="px-4 py-3 text-right text-blue-600 font-mono font-medium">
-                                                    {t.principleOnVatDue ? t.principleOnVatDue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}
-                                                </TableCell>
-                                            </TableRow>
-                                        ))}
-                                        {totalsData.length === 0 && (
-                                            <TableRow>
-                                                <TableCell colSpan={6} className="px-4 py-8 text-center text-slate-500 font-medium tracking-wide">
-                                                    No summarized data.
                                                 </TableCell>
                                             </TableRow>
                                         )}

@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/src/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
 import { Input } from '@/src/components/ui/input';
-import { Download, Upload, CreditCard, ChevronDown, X, Printer, Lock, Unlock, History, GitCommit, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Download, Upload, CreditCard, ChevronDown, X, Printer, Lock, Unlock, History, GitCommit, AlertTriangle, CheckCircle2, Trash2 } from 'lucide-react';
 import { useAppStore, Employee, PayrollSnapshot } from '@/src/store/appStore';
 import { useUserStore } from '@/src/store/userStore';
 import { toast, showConfirm } from '@/src/components/ui/toast';
@@ -134,6 +134,7 @@ export function Payroll() {
   const payrollSnapshots = useAppStore((state) => state.payrollSnapshots);
   const fetchPayrollSnapshots = useAppStore((state) => state.fetchPayrollSnapshots);
   const savePayrollSnapshot = useAppStore((state) => state.savePayrollSnapshot);
+  const deletePayrollSnapshot = useAppStore((state) => state.deletePayrollSnapshot);
 
   const currentUser = useUserStore((state) => state.users.find((u) => u.id === state.currentUserId) ?? null);
   const isAdmin = currentUser?.role === 'Admin' || currentUser?.role === 'SuperAdmin' || currentUser?.role === 'admin' || currentUser?.role === 'co-admin' || !!currentUser?.privileges?.users?.canManage;
@@ -1137,6 +1138,41 @@ export function Payroll() {
                   >
                     <GitCommit className="h-4 w-4 text-blue-600" /> Create Revision (v{nextVersionNumber})
                   </DropdownMenuItem>
+                )}
+                {isAdmin && activeSnapshot && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={async () => {
+                        const isOnlyVersion = monthSnapshots.length <= 1;
+                        const ok = await showConfirm(
+                          isOnlyVersion
+                            ? `Are you sure you want to delete Version ${activeSnapshot.version} for ${selectedMonthLabel} ${selectedYear}?\n\nThis will completely unlock the payroll and return it to live calculations.`
+                            : `Are you sure you want to delete active Version ${activeSnapshot.version} for ${selectedMonthLabel} ${selectedYear}? The previous version will be restored as active.`,
+                          {
+                            title: `Delete Version ${activeSnapshot.version}`,
+                            variant: 'danger',
+                            confirmLabel: isOnlyVersion ? 'Delete & Unlock Payroll' : 'Delete Version',
+                          }
+                        );
+                        if (!ok) return;
+                        try {
+                          await deletePayrollSnapshot(activeSnapshot.id);
+                          toast.success(
+                            isOnlyVersion
+                              ? `Version ${activeSnapshot.version} deleted. Payroll unlocked.`
+                              : `Version ${activeSnapshot.version} deleted successfully.`
+                          );
+                          fetchPayrollSnapshots(selectedYear);
+                        } catch (e: any) {
+                          toast.error('Failed to delete version: ' + (e?.message || 'Unknown error'));
+                        }
+                      }}
+                      className="gap-2 text-xs cursor-pointer text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 font-medium"
+                    >
+                      <Trash2 className="h-4 w-4 text-rose-600" /> Delete Version (v{activeSnapshot.version})
+                    </DropdownMenuItem>
+                  </>
                 )}
               </DropdownMenuContent>
             </DropdownMenu>

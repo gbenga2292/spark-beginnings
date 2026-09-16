@@ -5,7 +5,7 @@ import { Input } from '@/src/components/ui/input';
 import {
   ArrowLeft, Save, Eye, EyeOff, Shield, ChevronDown, ChevronRight,
   CheckCircle2, X, BookmarkPlus, Trash2,
-  LayoutDashboard, Users as UsersIcon, Building2, Landmark, Settings, Package, Library, History, ListTodo, FileText, MessageSquare, FolderOpen, Sparkles, Bot
+  LayoutDashboard, Users as UsersIcon, Building2, Landmark, Settings, Package, Library, History, ListTodo, FileText, MessageSquare, FolderOpen, Sparkles, Bot, Calculator
 } from 'lucide-react';
 import { useUserStore, AppUser, UserPrivileges, FULL_ACCESS, NO_ACCESS, PrivilegePreset } from '@/src/store/userStore';
 import { useAppStore } from '@/src/store/appStore';
@@ -252,6 +252,25 @@ const PRIV_GROUPS: PG[] = [
         ] },
       { key: 'activityLog', label: 'Activity Log', parentKey: 'activityLog', masterField: 'canView',
         fields: [{ key: 'canView', label: 'View Logs' }, { key: 'canExport', label: 'Export' }] },
+    ],
+  },
+  {
+    name: 'Tools', icon: Calculator, color: 'emerald',
+    pages: [
+      { key: 'dewateringCalculator', label: 'Dewatering Calculator', parentKey: 'dewateringCalculator', masterField: 'canView',
+        fields: [
+          { key: 'canView', label: 'View' },
+          { key: 'canExport', label: 'Export' },
+        ] },
+      { key: 'vatCalculator', label: 'VAT Calculator', parentKey: 'vatCalculator', masterField: 'canView',
+        fields: [
+          { key: 'canView', label: 'View' },
+          { key: 'canExport', label: 'Export' },
+        ] },
+      { key: 'estimator', label: 'Estimator', parentKey: 'estimator', masterField: 'canView',
+        fields: [
+          { key: 'canView', label: 'View' },
+        ] },
     ],
   },
   {

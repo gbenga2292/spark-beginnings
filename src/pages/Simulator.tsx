@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import logoSrc from '../../logo/logo-2.png';
 import { Upload, Save, FolderOpen, Loader2, X, Trash2, Clock, ChevronRight, ChevronLeft, Ruler } from 'lucide-react';
 import { DewateringCanvas } from '../components/canvas/DewateringCanvas';
@@ -171,6 +172,37 @@ export default function Simulator() {
   const [selected3DId, setSelected3DId] = useState<string | null>(null);
   const [showResults, setShowResults] = useState(window.innerWidth >= 640);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Auto-import layout from Dewatering Calculator
+  const location = useLocation();
+  useEffect(() => {
+    try {
+      const stateData = (location.state as any)?.layoutData;
+      const sessionStr = sessionStorage.getItem('dewatering_calculator_import');
+      const importPayload = stateData || (sessionStr ? JSON.parse(sessionStr) : null);
+
+      if (importPayload) {
+        sessionStorage.removeItem('dewatering_calculator_import');
+        if (importPayload.lines) setLines(importPayload.lines);
+        if (importPayload.components) setPlacedComponents(importPayload.components);
+        if (importPayload.areas) setAreas(importPayload.areas);
+        if (importPayload.hoses) setHoses(importPayload.hoses);
+        if (importPayload.arrows) setArrows(importPayload.arrows);
+        if (importPayload.dimensions) setDimensions(importPayload.dimensions);
+        if (importPayload.texts) setTexts(importPayload.texts);
+        if (importPayload.targetDepth) setTargetDepth(importPayload.targetDepth);
+        if (importPayload.levels && importPayload.levels.length > 0) {
+          setLevels(importPayload.levels);
+          setActiveLevelId(importPayload.activeLevelId || importPayload.levels[0].id);
+        }
+        setShowWellpoints(true);
+        setSimulatorDirty(true);
+        toast.success(`Imported ${importPayload.name || 'Dewatering Layout'} from Calculator`);
+      }
+    } catch {
+      // ignore
+    }
+  }, [location.state]);
 
   // Save dialog state
   const [showSaveDialog, setShowSaveDialog] = useState(false);

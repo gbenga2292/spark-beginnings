@@ -768,7 +768,7 @@ function invoiceToDb(i: Invoice) {
     vatable_amount: i.vatableAmount != null ? i.vatableAmount : null,
     non_vatable_amount: i.nonVatableAmount != null ? i.nonVatableAmount : null,
     discount: i.discount != null ? i.discount : null,
-    noOfMachine: i.noOfMachine,
+    no_of_machine: i.noOfMachine,
     daily_rental_cost: i.dailyRentalCost, diesel_cost_per_ltr: i.dieselCostPerLtr,
     daily_usage: i.dailyUsage, no_of_technician: i.noOfTechnician,
     technicians_daily_rate: i.techniciansDailyRate, mob_demob: i.mobDemob,
@@ -804,7 +804,7 @@ function pendingInvoiceToDb(p: PendingInvoice) {
     vatable_amount: p.vatableAmount != null ? p.vatableAmount : null,
     non_vatable_amount: p.nonVatableAmount != null ? p.nonVatableAmount : null,
     discount: p.discount != null ? p.discount : null,
-    noOfMachine: p.noOfMachine,
+    no_of_machine: p.noOfMachine,
     daily_rental_cost: p.dailyRentalCost, diesel_cost_per_ltr: p.dieselCostPerLtr,
     daily_usage: p.dailyUsage, no_of_technician: p.noOfTechnician,
     technicians_daily_rate: p.techniciansDailyRate, mob_demob: p.mobDemob,
@@ -2048,11 +2048,11 @@ export const db = {
     if (p.payVat !== undefined) update.pay_vat = p.payVat;
     if (p.vat !== undefined) update.vat = p.vat;
     if (p.amountForVat !== undefined) update.amount_for_vat = p.amountForVat;
-    if (p.paidTo !== undefined) update.paid_to = p.paidTo;
-    if (p.invoiceId !== undefined) update.invoice_id = p.invoiceId;
-    if (p.invoiceNumber !== undefined) update.invoice_number = p.invoiceNumber;
-    if (p.allocations !== undefined) update.allocations = p.allocations;
-    if (p.unappliedAmount !== undefined) update.unapplied_amount = p.unappliedAmount;
+    if ('paidTo' in p) update.paid_to = p.paidTo || null;
+    if ('invoiceId' in p) update.invoice_id = p.invoiceId || null;
+    if ('invoiceNumber' in p) update.invoice_number = p.invoiceNumber || null;
+    if ('allocations' in p) update.allocations = p.allocations || [];
+    if ('unappliedAmount' in p) update.unapplied_amount = p.unappliedAmount ?? 0;
     const { error } = await supabase.from('payments').update(update).eq('id', id);
     if (error) { console.error('Database error:', error); throw error; }
   },
@@ -2739,7 +2739,11 @@ export const db = {
 
   // Dewatering Layouts
   async saveDewateringLayout(layout: any) {
-    const { error } = await supabase.from('dewatering_layouts').upsert(layout, { onConflict: 'id' });
+    const payload = {
+      ...layout,
+      updated_at: new Date().toISOString()
+    };
+    const { error } = await supabase.from('dewatering_layouts').upsert(payload, { onConflict: 'id' });
     if (error) { console.error('saveDewateringLayout:', error); throw error; }
   },
   async getDewateringLayouts(userId: string) {

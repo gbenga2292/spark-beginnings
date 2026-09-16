@@ -61,25 +61,54 @@ export function InvoiceRuntimeTracker({ invoice, onSyncDates }: InvoiceRuntimeTr
     return Array.from(ids);
   }, [linkedIds, sitePumpDates, invoice.siteId]);
 
-  /** Logs for linked machines, on or after invoice start date */
+  const invoiceSiteName = (invoice.siteName || (invoice as any).site || '').trim().toLowerCase();
+  const invoiceSiteId = (invoice.siteId || '').trim().toLowerCase();
+
+  /** Logs for linked machines, on or after invoice start date, for this site */
   const relevantLogs = useMemo(() => {
     if (!effectiveLinkedIds.length || !invoiceStartDate) return [];
-    return allMachineLogs.filter(
-      l => effectiveLinkedIds.includes(l.assetId) && l.date >= invoiceStartDate
-    ).sort((a, b) => a.date.localeCompare(b.date));
-  }, [allMachineLogs, effectiveLinkedIds, invoiceStartDate]);
+    return allMachineLogs.filter(l => {
+      const lSiteId = (l.siteId || '').trim().toLowerCase();
+      const lSiteName = (l.siteName || (l as any).site_name || '').trim().toLowerCase();
+      const matchSite = (lSiteId && (lSiteId === invoiceSiteId)) ||
+        (invoiceSiteName && lSiteName === invoiceSiteName) ||
+        (invoiceSiteName && invoiceSiteName.length > 3 && lSiteName.includes(invoiceSiteName)) ||
+        (invoiceSiteName && lSiteName.length > 3 && invoiceSiteName.includes(lSiteName));
+      if (!matchSite) return false;
+
+      return effectiveLinkedIds.includes(l.assetId) && l.date >= invoiceStartDate;
+    }).sort((a, b) => a.date.localeCompare(b.date));
+  }, [allMachineLogs, effectiveLinkedIds, invoiceStartDate, invoiceSiteName, invoiceSiteId]);
+
+  const machineConfigs: any[] = invoice.machineConfigs ?? [];
+  const totalContractedDays = useMemo(() => {
+    if (machineConfigs.length > 0) {
+      const firstDur = parseFloat(String(machineConfigs[0]?.duration ?? 0)) || invoiceDuration;
+      let total = machineConfigs.reduce((sum, c) => {
+        const d = c.sameDurationAsFirst ? firstDur : (parseFloat(String(c.duration ?? 0)) || firstDur || invoiceDuration);
+        return sum + d;
+      }, 0);
+      if (invoice.noOfMachine && invoice.noOfMachine > machineConfigs.length) {
+        total += (invoice.noOfMachine - machineConfigs.length) * (firstDur || invoiceDuration);
+      }
+      return total;
+    }
+    const count = invoice.noOfMachine || 1;
+    return count * invoiceDuration;
+  }, [machineConfigs, invoice.noOfMachine, invoiceDuration]);
 
   /** Consumed days = sum of day fractions per log */
   const consumedDays = useMemo(() => {
     return relevantLogs.reduce((acc, l) => acc + dayValue(l), 0);
   }, [relevantLogs]);
 
-  const remainingDays = Math.max(0, invoiceDuration - consumedDays);
-  const progressPct = invoiceDuration > 0 ? Math.min(100, (consumedDays / invoiceDuration) * 100) : 0;
+  const remainingDays = Math.max(0, totalContractedDays - consumedDays);
+  const progressPct = totalContractedDays > 0 ? Math.min(100, (consumedDays / totalContractedDays) * 100) : 0;
 
-  /** Projected end = today + remaining days */
+  /** Projected end = today + remaining days divided by active machine count */
+  const activeMachineCount = Math.max(1, effectiveLinkedIds.length || (invoice.noOfMachine || 1));
   const todayStr = new Date().toISOString().split('T')[0];
-  const projectedEndDate = remainingDays > 0 ? addDays(todayStr, Math.ceil(remainingDays)) : todayStr;
+  const projectedEndDate = remainingDays > 0 ? addDays(todayStr, Math.ceil(remainingDays / activeMachineCount)) : todayStr;
   const newReminderDate = addDays(projectedEndDate, -3);
 
   const reminderChanged = newReminderDate !== invoice.reminderDate;
@@ -136,16 +165,16 @@ export function InvoiceRuntimeTracker({ invoice, onSyncDates }: InvoiceRuntimeTr
               {linkedIds.length} machine{linkedIds.length > 1 ? 's' : ''} linked
             </Badge>
           )}
-          {remainingDays === 0 && invoiceDuration > 0 && (
+          {remainingDays === 0 && totalContractedDays > 0 && (
             <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 text-[10px] font-bold px-2 py-0">
               COMPLETED
             </Badge>
           )}
         </div>
         <div className="flex items-center gap-3">
-          {linkedIds.length > 0 && invoiceDuration > 0 && (
+          {linkedIds.length > 0 && totalContractedDays > 0 && (
             <span className="text-xs font-bold text-blue-500 tabular-nums">
-              {consumedDays.toFixed(1)} / {invoiceDuration} days
+              {consumedDays.toFixed(1)} / {totalContractedDays} days
             </span>
           )}
           {expanded ? <ChevronUp className="h-4 w-4 text-blue-400" /> : <ChevronDown className="h-4 w-4 text-blue-400" />}
@@ -196,14 +225,14 @@ export function InvoiceRuntimeTracker({ invoice, onSyncDates }: InvoiceRuntimeTr
           )}
 
           {/* Progress section */}
-          {linkedIds.length > 0 && invoiceDuration > 0 && (
+          {linkedIds.length > 0 && totalContractedDays > 0 && (
             <div className="space-y-3">
               {/* Progress bar */}
               <div className="space-y-1.5">
                 <div className="flex justify-between items-center text-xs">
                   <span className="font-semibold text-slate-600 dark:text-slate-400">Days Consumed</span>
                   <span className="font-bold tabular-nums text-slate-700 dark:text-slate-200">
-                    {consumedDays.toFixed(1)} / {invoiceDuration} days ({progressPct.toFixed(0)}%)
+                    {consumedDays.toFixed(1)} / {totalContractedDays} days ({progressPct.toFixed(0)}%)
                   </span>
                 </div>
                 <div className="h-2.5 w-full bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
@@ -229,10 +258,64 @@ export function InvoiceRuntimeTracker({ invoice, onSyncDates }: InvoiceRuntimeTr
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">Remaining</p>
                 </div>
                 <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-3 text-center">
-                  <p className="text-lg font-black text-slate-700 dark:text-slate-200">{invoiceDuration}</p>
+                  <p className="text-lg font-black text-slate-700 dark:text-slate-200">{totalContractedDays}</p>
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">Contracted</p>
                 </div>
               </div>
+
+              {/* Site machines list */}
+              {siteMachines.length > 0 && (
+                <div className="space-y-1.5">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Site Machines ({siteMachines.length})</p>
+                  <div className="space-y-1">
+                    {siteMachines.map((a, idx) => {
+                      const machineLogs = relevantLogs.filter(l => l.assetId === a.id);
+                      const machineConsumed = machineLogs.reduce((s, l) => s + dayValue(l), 0);
+                      const pumpDateRec = (sitePumpDates || []).find(pd => 
+                        (!invoice.siteId || pd.siteId === invoice.siteId) && pd.assetId === a.id
+                      );
+                      const isStopped = Boolean(pumpDateRec?.pumpStopDate);
+                      const invoicedCount = invoice.noOfMachine || machineConfigs.length || 1;
+                      const hasSwaps = siteMachines.length > invoicedCount || isStopped;
+                      const firstDur = parseFloat(String(machineConfigs[0]?.duration ?? 0)) || invoiceDuration;
+                      const cfg = !hasSwaps ? machineConfigs[idx] : undefined;
+                      const machineDuration = cfg
+                        ? (cfg.sameDurationAsFirst ? firstDur : (parseFloat(String(cfg.duration ?? 0)) || firstDur || invoiceDuration))
+                        : invoiceDuration;
+                      const isOver = machineDuration > 0 && machineConsumed > machineDuration;
+                      const overDays = isOver ? machineConsumed - machineDuration : 0;
+
+                      return (
+                        <div key={a.id} className="flex items-center justify-between bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-xs">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <span className={cn("font-medium truncate", isStopped ? "text-slate-500 dark:text-slate-400" : "text-slate-700 dark:text-slate-200")}>
+                              {a.name}
+                            </span>
+                            {a.serialNumber && <span className="text-[10px] text-slate-400 ml-1">S/N: {a.serialNumber}</span>}
+                            {isStopped && (
+                              <span className="text-[9px] font-semibold px-1.5 py-0.2 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 shrink-0">
+                                Swapped Out
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className="font-bold text-blue-600 dark:text-blue-400 font-mono tabular-nums">
+                              {hasSwaps 
+                                ? `${machineConsumed.toFixed(1)}d logged`
+                                : `${machineConsumed.toFixed(1)} / ${machineDuration} days logged`}
+                            </span>
+                            {isOver && !hasSwaps && (
+                              <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-200 dark:border-rose-800">
+                                +{overDays.toFixed(1)}d
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               {/* Dates */}
               <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-3 space-y-2">

@@ -429,13 +429,57 @@ export function AccountsReportBuilder({
   }, [clientProfiles, pendingSites]);
 
   const getVatDetails = useCallback((amount: number, payVat: string, rate: number, damages: number = 0) => {
-    const baseAmount = amount - damages;
+    const baseAmount = Math.max(0, amount - damages);
     const vat =
-      payVat === 'Add' ? Math.round(((baseAmount * 7.5) / 107.5) * 100) / 100
+      payVat === 'Add' ? Math.round(((baseAmount * rate) / (100 + rate)) * 100) / 100
       : payVat === 'Yes' ? Math.round(((baseAmount / (100 + rate)) * rate) * 100) / 100
       : 0;
-    return { vat, amountForVat: payVat !== 'No' ? baseAmount - vat : baseAmount };
+    const amountForVat = payVat !== 'No' && vat > 0 ? baseAmount - vat : 0;
+    return { vat, amountForVat };
   }, []);
+
+  // Build a stable invoice index (id → invoice) for VAT ratio lookups
+  const invIndex = useMemo(() => {
+    const m = new Map<string, any>();
+    rawInvoices.forEach(inv => m.set(inv.id, inv));
+    return m;
+  }, [rawInvoices]);
+
+  // Invoice-aware VAT resolver: when stored vat is 0 but payVat is active,
+  // use the linked invoice's VAT ratio (mirrors computePaymentVatDetails).
+  const resolvePaymentVat = useCallback((
+    pay: { amount?: number; damages?: number; payVat?: string; vat?: number | null; amountForVat?: number | null; invoiceId?: string },
+    payVatSetting: string
+  ): { vat: number; amountForVat: number } => {
+    const storedVat = pay.vat !== undefined && pay.vat !== null ? Number(pay.vat) : null;
+    const storedAmtForVat = pay.amountForVat !== undefined && pay.amountForVat !== null ? Number(pay.amountForVat) : null;
+
+    // Trust stored value when it is explicitly non-zero
+    if (storedVat !== null && storedVat > 0) {
+      return {
+        vat: storedVat,
+        amountForVat: storedAmtForVat !== null && storedAmtForVat >= 0 ? storedAmtForVat
+          : Math.max(0, (pay.amount || 0) - (pay.damages || 0) - storedVat),
+      };
+    }
+    if (payVatSetting === 'No') return { vat: 0, amountForVat: 0 };
+
+    // Try invoice-based ratio
+    const baseAmount = Math.max(0, (pay.amount || 0) - (pay.damages || 0));
+    if (pay.invoiceId && invIndex.has(pay.invoiceId)) {
+      const inv = invIndex.get(pay.invoiceId);
+      const invTotal = Number(inv.totalCharge || inv.amount || 0);
+      const invVat   = Number(inv.vat || 0);
+      if (invVat > 0 && invTotal > 0) {
+        const ratio = invVat / invTotal;
+        const vat = Math.round(baseAmount * ratio * 100) / 100;
+        return { vat, amountForVat: Math.max(0, baseAmount - vat) };
+      }
+    }
+
+    // Fallback: rate-based
+    return getVatDetails(pay.amount || 0, payVatSetting, vatRate, pay.damages || 0);
+  }, [invIndex, getVatDetails, vatRate]);
 
   // ── Available clients ────────────────────────────────────────────────────────
   const availableClients = useMemo(() => {
@@ -596,7 +640,9 @@ export function AccountsReportBuilder({
             if (!keepByDate(r.date, (r as any).client || '', (r as any).site)) return false;
             const pvVal = (r as any).payVat ||
               (sites.find(s => s.name === (r as any).site && s.client === (r as any).client)?.vat as any) || 'No';
-            const { vat } = getVatDetails((r as any).amount || 0, pvVal, vatRate, (r as any).damages || 0);
+            const vat = (r as any).vat !== undefined && (r as any).vat !== null
+              ? Number((r as any).vat)
+              : getVatDetails((r as any).amount || 0, pvVal, vatRate, (r as any).damages || 0).vat;
             return vat > 0; // only payments that carry VAT
           })
           .forEach(r => rows.push({ _source: 'VAT', _raw: { ...r, _isVatLiability: true } }));
@@ -696,7 +742,7 @@ export function AccountsReportBuilder({
           const g = groupedMap.get(client)!;
           if (rec._raw._isVatLiability) {
             const pvVal = rec._raw.payVat || (sites.find(s => s.name === rec._raw.site && s.client === rec._raw.client)?.vat as any) || 'No';
-            const { vat, amountForVat } = getVatDetails(rec._raw.amount || 0, pvVal, vatRate, rec._raw.damages || 0);
+            const { vat, amountForVat } = resolvePaymentVat(rec._raw, pvVal);
             g._raw.vatAmtPaid += rec._raw.amount || 0;
             g._raw.vatableAmt += amountForVat;
             g._raw.vatOwed    += vat;
@@ -809,7 +855,7 @@ export function AccountsReportBuilder({
         row.periodCleared += (r.amount || 0) + (r.withholdingTax || 0) + (r.discount || 0);
         
         const pvVal = r.payVat || (sites.find(s => s.name === r.site && s.client === r.client)?.vat as any) || 'No';
-        const { vat } = getVatDetails(r.amount || 0, pvVal, vatRate, r.damages || 0);
+        const { vat } = resolvePaymentVat(r, pvVal);
         row.vatOwedFromPayments += vat;
       } else if (rec._source === 'VAT') {
         // Only count actual remittances towards the 'remitted' total.
@@ -819,7 +865,7 @@ export function AccountsReportBuilder({
           row.vatRemitted += r.amount || 0;
         } else if (r._isVatLiability) {
           const pvVal = r.payVat || (sites.find(s => s.name === r.site && s.client === r.client)?.vat as any) || 'No';
-          const { vat } = getVatDetails(r.amount || 0, pvVal, vatRate, r.damages || 0);
+          const { vat } = resolvePaymentVat(r, pvVal);
           row.vatOwedFromPayments += vat;
         }
       } else if (rec._source === 'LEDGER') {
@@ -875,7 +921,7 @@ export function AccountsReportBuilder({
     });
 
     return Array.from(map.values()).sort((a, b) => a.client.localeCompare(b.client));
-  }, [recordsToPrint, isMultiSource, selectedClients, selectedSites, selectedYears, rawInvoices, rawPayments, sites, getVatDetails, vatRate]); // eslint-disable-line
+  }, [recordsToPrint, isMultiSource, selectedClients, selectedSites, selectedYears, rawInvoices, rawPayments, sites, resolvePaymentVat, vatRate]); // eslint-disable-line
 
   // ── Column sets ──────────────────────────────────────────────────────────────
   const relevantCols = useMemo(() => {
@@ -984,7 +1030,7 @@ export function AccountsReportBuilder({
     if (payOnly.includes(colId)) {
       if (src !== 'PAYMENT') return '—';
       const pvVal = r.payVat || (sites.find(s => s.name === r.site && s.client === r.client)?.vat as any) || 'No';
-      const { vat, amountForVat } = getVatDetails(r.amount || 0, pvVal, vatRate, r.damages || 0);
+      const { vat, amountForVat } = resolvePaymentVat(r, pvVal);
       switch (colId) {
         case 'payAmount':    return r.amount || 0;
         case 'amountForVAT':return amountForVat;
@@ -1009,7 +1055,7 @@ export function AccountsReportBuilder({
       // Detailed view: Return values based on record type to ensure total sum is correct
       if (r._isVatLiability) {
         const pvVal = r.payVat || (sites.find(s => s.name === r.site && s.client === r.client)?.vat as any) || 'No';
-        const { vat, amountForVat } = getVatDetails(r.amount || 0, pvVal, vatRate, r.damages || 0);
+        const { vat, amountForVat } = resolvePaymentVat(r, pvVal);
         const norm = normalizeDate(r.date);
         const payMoIdx = norm ? parseInt(norm.substring(5, 7), 10) - 1 : -1;
         const payYr    = norm ? norm.substring(0, 4) : '';
@@ -1115,7 +1161,7 @@ export function AccountsReportBuilder({
 
     return '—';
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [getTin, getVatDetails, sites, vatRate, vatRemittanceMap]);
+  }, [getTin, resolvePaymentVat, sites, vatRemittanceMap]);
 
   const getAggValue = useCallback((colId: string, row: AggRow, idx: number): string | number => {
     switch (colId) {
@@ -1313,102 +1359,77 @@ export function AccountsReportBuilder({
     
     const pageW = doc.internal.pageSize.getWidth();
 
-    // Helper to draw the professional header on any page
+    // Helper to draw a succinct, minimalist, ink-friendly header on any page
     const drawHeader = (reportLabel: string, period?: string) => {
-      const HEADER_H = 56;
+      const marginX = 12;
 
-      // ── Banner background ──────────────────────────────────────────────────
-      doc.setFillColor(15, 23, 42); // slate-900
-      doc.rect(0, 0, pageW, HEADER_H, 'F');
+      // ── Logo (natural aspect ratio: ~2.73:1, scaled tastefully) ─────────────
+      const logoW = 34;
+      const logoH = 12.45; // 34 / 2.73
+      const logoX = marginX;
+      const logoY = 8;
+      try {
+        doc.addImage(logoSrc, 'PNG', logoX, logoY, logoW, logoH);
+      } catch (_) {}
 
-      // Bottom accent stripe
-      doc.setFillColor(79, 70, 229); // indigo-600
-      doc.rect(0, HEADER_H - 3, pageW, 3, 'F');
+      // Vertical hairline divider after logo
+      const dividerX = logoX + logoW + 5;
+      doc.setDrawColor(226, 232, 240); // slate-200
+      doc.setLineWidth(0.3);
+      doc.line(dividerX, 8, dividerX, 22.5);
 
-      // ── Logo (natural aspect ratio: ~2.73:1 to prevent squeezing) ────────
-      const logoW = 70;
-      const logoH = 25.6; // 70 / 2.73
-      const logoX = 10;
-      const logoY = Math.round((HEADER_H - 3 - logoH) / 2);
-      try { doc.addImage(logoSrc, 'PNG', logoX, logoY, logoW, logoH); } catch (_) {}
-
-      // Vertical divider line after logo
-      const dividerX = logoX + logoW + 6; // 86mm
-      doc.setDrawColor(79, 70, 229);
-      doc.setLineWidth(0.5);
-      doc.line(dividerX, 10, dividerX, HEADER_H - 12);
-
-      // ── Left column: company name + report label ───────────────────────────
-      const leftX = dividerX + 7; // 93mm
+      // ── Left column: company text + report label ─────────────────────────────
+      const leftX = dividerX + 5;
 
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(16);
-      doc.setTextColor(255, 255, 255);
-      doc.text('DCEL Office Suite', leftX, 21);
+      doc.setFontSize(7.5);
+      doc.setTextColor(100, 116, 139); // slate-500
+      doc.text('DCEL OFFICE SUITE', leftX, 11.5);
 
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(9.5);
-      doc.setTextColor(165, 180, 252); // indigo-300
-      doc.text(reportLabel, leftX, 31);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(13);
+      doc.setTextColor(15, 23, 42); // slate-900
+      doc.text(reportLabel, leftX, 17);
 
       // Dept tag (only when PAYROLL with departments selected)
       if (selectedSources.includes('PAYROLL') && selectedDepts.length > 0) {
-        doc.setFont('helvetica', 'italic');
-        doc.setFontSize(7.5);
-        doc.setTextColor(196, 181, 253); // purple-300
-        doc.text(`Dept: ${selectedDepts.join(' · ')}`, leftX, 40);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(7);
+        doc.setTextColor(100, 116, 139); // slate-500
+        doc.text(`Dept: ${selectedDepts.join(' · ')}`, leftX, 21.5);
       }
 
-      // ── Right column: meta box ─────────────────────────────────────────────
-      const metaBoxW = 88;
-      const metaBoxX = pageW - metaBoxW - 8;
-      const metaBoxY = 7;
-      const metaBoxH = HEADER_H - 16;
-
-      // Subtle dark background for meta box
-      doc.setFillColor(5, 10, 25);
-      doc.roundedRect(metaBoxX, metaBoxY, metaBoxW, metaBoxH, 2, 2, 'F');
-
-      // Left accent strip on meta box
-      doc.setFillColor(79, 70, 229);
-      doc.rect(metaBoxX, metaBoxY, 2.5, metaBoxH, 'F');
-
-      // Column X positions — labelX and valueX are fixed so rows align neatly
-      const labelX = metaBoxX + 7;
-      const valueX = metaBoxX + 35;
-
+      // ── Right column: clean metadata grid ──────────────────────────────────
       const periodStr = period ??
         (selectedMonths.map(m => MONTHS.find(mo => mo.key === m)?.label ?? '').filter(Boolean).join(', ') || '—');
       const yearStr   = selectedYears.join(', ') || '—';
       const genStr    = new Date().toLocaleDateString();
-      const sourceStr = selectedSources.map(s => SOURCE_LABELS[s]).join(' + ');
+      const sourceStr = selectedSources.map(s => SOURCE_LABELS[s]).join(', ');
 
-      // Row 1 — Period
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(7.5);
-      doc.setTextColor(148, 163, 184); // slate-400
-      doc.text('Period:', labelX, metaBoxY + 12);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(255, 255, 255);
-      doc.text(`${periodStr} ${yearStr}`.trim(), valueX, metaBoxY + 12);
+      const rightX = pageW - marginX;
+      const metaLabelX = rightX - 58;
+      const metaValX   = rightX;
 
-      // Row 2 — Generated
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(7.5);
-      doc.setTextColor(148, 163, 184);
-      doc.text('Generated:', labelX, metaBoxY + 23);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(255, 255, 255);
-      doc.text(genStr, valueX, metaBoxY + 23);
+      const drawMetaRow = (label: string, val: string, yPos: number) => {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(6.5);
+        doc.setTextColor(148, 163, 184); // slate-400
+        doc.text(label, metaLabelX, yPos);
 
-      // Row 3 — Source
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(7.5);
-      doc.setTextColor(148, 163, 184);
-      doc.text('Source:', labelX, metaBoxY + 34);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(165, 180, 252); // indigo-300
-      doc.text(sourceStr, valueX, metaBoxY + 34);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(7.5);
+        doc.setTextColor(51, 65, 85); // slate-700
+        doc.text(val, metaValX, yPos, { align: 'right' });
+      };
+
+      drawMetaRow('PERIOD', `${periodStr} ${yearStr}`.trim(), 11.5);
+      drawMetaRow('GENERATED', genStr, 16);
+      drawMetaRow('SOURCE', sourceStr, 20.5);
+
+      // ── Clean hairline separator rule beneath header ───────────────────────
+      doc.setDrawColor(226, 232, 240); // slate-200
+      doc.setLineWidth(0.35);
+      doc.line(marginX, 25, pageW - marginX, 25);
     };
 
     const reportTitleText = selectedSources.length === 1
@@ -1481,13 +1502,31 @@ export function AccountsReportBuilder({
         const currentTitle = `${reportTitleText} — ${m}`;
 
         autoTable(doc, {
-          startY: 64,
-          margin: { top: 64, bottom: 15 },
+          startY: 28,
+          margin: { top: 28, bottom: 13, left: 12, right: 12 },
           head: [headers],
           body: rowsByMonth[m],
-          theme: 'grid',
-          headStyles: { fillColor: [79, 70, 229] },
-          styles: { fontSize: 7 },
+          theme: 'plain',
+          headStyles: {
+            fillColor: [248, 250, 252],
+            textColor: [15, 23, 42],
+            fontStyle: 'bold',
+            fontSize: 7.5,
+            cellPadding: { top: 2.5, bottom: 2.5, left: 2.5, right: 2.5 },
+            lineColor: [203, 213, 225],
+            lineWidth: { bottom: 0.5, top: 0.25, left: 0, right: 0 } as any,
+          },
+          styles: {
+            font: 'helvetica',
+            fontSize: 7,
+            textColor: [51, 65, 85],
+            cellPadding: { top: 2, bottom: 2, left: 2.5, right: 2.5 },
+            lineColor: [241, 245, 249],
+            lineWidth: { bottom: 0.15, top: 0, left: 0, right: 0 } as any,
+          },
+          alternateRowStyles: {
+            fillColor: [252, 253, 254],
+          },
           columnStyles: columnStyles,
           didDrawPage: () => {
             drawHeader(currentTitle, m);
@@ -1500,13 +1539,28 @@ export function AccountsReportBuilder({
       doc.addPage();
       const grandTitle = `${reportTitleText} — Grand Totals`;
       autoTable(doc, {
-        startY: 64,
-        margin: { top: 64, bottom: 15 },
+        startY: 28,
+        margin: { top: 28, bottom: 13, left: 12, right: 12 },
         head: [headers],
         body: [totalsRow],
-        theme: 'grid',
-        headStyles: { fillColor: [79, 70, 229] },
-        styles: { fontSize: 7 },
+        theme: 'plain',
+        headStyles: {
+          fillColor: [248, 250, 252],
+          textColor: [15, 23, 42],
+          fontStyle: 'bold',
+          fontSize: 7.5,
+          cellPadding: { top: 2.5, bottom: 2.5, left: 2.5, right: 2.5 },
+          lineColor: [203, 213, 225],
+          lineWidth: { bottom: 0.5, top: 0.25, left: 0, right: 0 } as any,
+        },
+        styles: {
+          font: 'helvetica',
+          fontSize: 7,
+          textColor: [51, 65, 85],
+          cellPadding: { top: 2, bottom: 2, left: 2.5, right: 2.5 },
+          lineColor: [241, 245, 249],
+          lineWidth: { bottom: 0.15, top: 0, left: 0, right: 0 } as any,
+        },
         columnStyles: columnStyles,
         didDrawPage: () => {
           drawHeader(grandTitle);
@@ -1514,25 +1568,49 @@ export function AccountsReportBuilder({
         didParseCell: function(cellData) {
           cellData.cell.styles.fontStyle = 'bold';
           cellData.cell.styles.fillColor = [241, 245, 249];
+          cellData.cell.styles.textColor = [15, 23, 42];
+          cellData.cell.styles.lineColor = [148, 163, 184];
+          cellData.cell.styles.lineWidth = { top: 0.5, bottom: 0.5, left: 0, right: 0 } as any;
         }
       });
     } else {
       autoTable(doc, {
-        startY: 64,
-        margin: { top: 64, bottom: 15 },
+        startY: 28,
+        margin: { top: 28, bottom: 13, left: 12, right: 12 },
         head: [headers],
         body: dataRows,
-        theme: 'grid',
-        headStyles: { fillColor: [79, 70, 229] },
-        styles: { fontSize: 7 },
+        theme: 'plain',
+        headStyles: {
+          fillColor: [248, 250, 252],
+          textColor: [15, 23, 42],
+          fontStyle: 'bold',
+          fontSize: 7.5,
+          cellPadding: { top: 2.5, bottom: 2.5, left: 2.5, right: 2.5 },
+          lineColor: [203, 213, 225],
+          lineWidth: { bottom: 0.5, top: 0.25, left: 0, right: 0 } as any,
+        },
+        styles: {
+          font: 'helvetica',
+          fontSize: 7,
+          textColor: [51, 65, 85],
+          cellPadding: { top: 2, bottom: 2, left: 2.5, right: 2.5 },
+          lineColor: [241, 245, 249],
+          lineWidth: { bottom: 0.15, top: 0, left: 0, right: 0 } as any,
+        },
+        alternateRowStyles: {
+          fillColor: [252, 253, 254],
+        },
         columnStyles: columnStyles,
         didDrawPage: () => {
           drawHeader(reportTitleText);
         },
         didParseCell: function(cellData) {
-          if (cellData.row.index === dataRows.length - 1) {
+          if (cellData.section === 'body' && cellData.row.index === dataRows.length - 1) {
             cellData.cell.styles.fontStyle = 'bold';
             cellData.cell.styles.fillColor = [241, 245, 249];
+            cellData.cell.styles.textColor = [15, 23, 42];
+            cellData.cell.styles.lineColor = [148, 163, 184];
+            cellData.cell.styles.lineWidth = { top: 0.5, bottom: 0.5, left: 0, right: 0 } as any;
           }
         }
       });
@@ -1542,10 +1620,17 @@ export function AccountsReportBuilder({
     const totalPageCount = (doc.internal as any).getNumberOfPages();
     for (let p = 1; p <= totalPageCount; p++) {
       doc.setPage(p);
+
+      // Subtle hairline divider above footer
+      doc.setDrawColor(226, 232, 240); // slate-200
+      doc.setLineWidth(0.25);
+      doc.line(12, pageH - 9, pageW - 12, pageH - 9);
+
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(7.5);
+      doc.setFontSize(6.5);
       doc.setTextColor(148, 163, 184); // slate-400
-      doc.text(`Page ${p} of ${totalPageCount}`, pageW / 2, pageH - 5, { align: 'center' });
+      doc.text('DCEL Office Suite  ·  Confidential Financial Report', 12, pageH - 5);
+      doc.text(`Page ${p} of ${totalPageCount}`, pageW - 12, pageH - 5, { align: 'right' });
     }
 
     const monthsPart = selectedMonths.length > 0 ? `_${selectedMonths.join('-')}` : '';

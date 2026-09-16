@@ -4,6 +4,40 @@ All notable changes to this project will be documented in this file.
 
 ---
 
+## [2.1.0] - 2026-09-15
+
+### Added / Improved
+
+- **Wellpoint Dewatering Sizing Calculator (`/operations/dewatering-calculator`)**:
+  - Engineered an industrial-grade calculation engine (`src/utils/dewateringCalculator.ts`) ported from field Python algorithms for wellpoint perimeter ring-main sizing, header pipe layout, and equipment bill of quantities (BOQ).
+  - Computes exact perimeter dimensions, 6-meter pipe section requirements with safety rounding, excavation volume ($m^3$), wellpoint density based on soil-condition spacing (1.0m to 1.5m), riser pipes (with spare), swing bows, sealing rubber rings, and plug caps.
+  - Implemented automated pump recommendation algorithm sizing 6-inch / 8-inch diesel and electric dewatering units according to overall wellpoint count and depth thresholds.
+  - Added jetting hose sizing ($2 \times \text{depth} + 5\text{m}$) and optional site ingress opening calculations.
+  - **Interactive Live Site Schematic (SVG)**:
+    - Real-time segmented vector schematic visualizing plot boundaries, excavation envelope, segmented ring-main pipe run, wellpoint distribution nodes, pump placement, and site ingress clearance.
+    - True physical gap rendering for vehicle ingress access with custom gap width markers, dimension lines, and ingress flow directional indicator.
+  - **Minimalist Industrial Interface & Direct Header Controls**:
+    - Embedded action buttons (Reset Defaults, Copy Bill of Quantities, Print / Export PDF, Open Dewatering Simulator) directly into the global application header via `useSetPageTitle`.
+    - Pure monochromatic slate styling adhering to strict design standards (zero violet/purple, high contrast, clean typography, absence of AI aesthetic clichés).
+  - **System Navigation & Access Control**:
+    - Protected by `simulator.canView` permission gate via `ProtectedRoute`.
+    - Integrated across `Sidebar.tsx`, `HomePage.tsx` launchpad, `OmniSearch.tsx` command palette, and `routePrefetch.ts` for instant zero-lag route transitions.
+
+- **Invoice, Billing & Operational Enhancements**:
+  - Enhanced `useActiveSiteInvoices.ts` and `ActiveSiteInvoicesModal.tsx` for real-time site financial reconciliation.
+  - Improved payment settlement workflows in `Billing.tsx`, `InvoiceDetailDialog.tsx`, and `InvoiceRuntimeTracker.tsx`.
+  - Refined dashboard navigation and responsiveness across `Site360View.tsx` and `TaskDashboard.tsx`.
+
+### Git Commits Since v2.0.0
+
+- `075ec30`: feat: initialize application scaffold with comprehensive suite of administrative and operational modules
+
+### Database Migrations (Supabase)
+
+- Verified Supabase migrations in sync up to `20260914140000_add_invoice_linkage_to_payments.sql`. No additional database schema migrations required for client-side operational calculator tooling.
+
+---
+
 ## [2.0.0] - 2026-09-14
 
 ### Added / Improved

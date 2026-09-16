@@ -130,6 +130,8 @@ export const navigation: NavCategory[] = [
     items: [
       { name: 'Simulator', href: '/operations/simulator', icon: HardHat, privKey: 'simulator', privField: 'canView' },
       { name: 'Logistics Estimator', href: '/operations/estimator', icon: Calculator, privKey: 'simulator', privField: 'canView' },
+      { name: 'Dewatering Calculator', href: '/operations/dewatering-calculator', icon: Calculator, privKey: 'simulator', privField: 'canView' },
+      { name: 'VAT Calculator', href: '/operations/vat-calculator', icon: Calculator, privKey: 'simulator', privField: 'canView' },
     ],
   },
   {

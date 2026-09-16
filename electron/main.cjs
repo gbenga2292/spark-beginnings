@@ -653,28 +653,31 @@ function initIPC() {
       const exe = downloadedInstallerPath;
       downloadedInstallerPath = null;
       try {
-        const openErr = await shell.openPath(exe);
-        if (openErr) {
-          console.error('shell.openPath failed, attempting spawn fallback:', openErr);
-          const { spawn } = require('child_process');
-          const child = spawn(`"${exe}"`, [], {
-            detached: true,
-            stdio: 'ignore',
-            shell: true
-          });
-          child.on('error', (err) => {
-            console.error('Failed to launch detached installer:', err);
-          });
-          child.unref();
-        }
+        const { spawn } = require('child_process');
+        const child = spawn(`"${exe}"`, ['--updated'], {
+          detached: true,
+          stdio: 'ignore',
+          shell: true,
+          windowsHide: false,
+        });
+        child.on('error', (err) => {
+          console.error('Failed to launch detached installer:', err);
+        });
+        child.unref();
+
+        // Brief delay to allow the child process to detach before forcefully terminating
+        // all Electron runtime helpers (GPU, utility, crashpad) to release file handles immediately
+        setTimeout(() => {
+          app.isQuitting = true;
+          app.exit(0);
+        }, 200);
       } catch (err) {
         console.error('Failed to launch installer:', err);
+        app.isQuitting = true;
+        app.exit(0);
       }
-      setTimeout(() => {
-        app.quit();
-      }, 500);
     } else {
-      autoUpdater.quitAndInstall();
+      autoUpdater.quitAndInstall(false, true);
     }
   });
 

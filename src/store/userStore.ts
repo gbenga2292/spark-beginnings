@@ -131,12 +131,26 @@ export interface InterviewsPriv {
   canForwardToOnboarding: boolean;
 }
 
-// ─── Simulator ───────────────────────────────────────────────
+// ─── Simulator & Tools ───────────────────────────────────────
 export interface SimulatorPriv {
   canView: boolean;
   canSave: boolean;
   canDelete: boolean;
   canExport: boolean;
+}
+
+export interface DewateringCalculatorPriv {
+  canView: boolean;
+  canExport: boolean;
+}
+
+export interface VatCalculatorPriv {
+  canView: boolean;
+  canExport: boolean;
+}
+
+export interface EstimatorPriv {
+  canView: boolean;
 }
 
 // ─── AI Co-Pilot ─────────────────────────────────────────────
@@ -183,6 +197,9 @@ export interface UserPrivileges {
   weeklyReport:      WeeklyReportPriv;
   interviews:        InterviewsPriv;
   simulator:         SimulatorPriv;
+  dewateringCalculator?: DewateringCalculatorPriv;
+  vatCalculator?:        VatCalculatorPriv;
+  estimator?:            EstimatorPriv;
   budget:            BudgetPriv;
   aiCopilot?:        AiCopilotPriv;
 }
@@ -256,6 +273,9 @@ export const FULL_ACCESS: UserPrivileges = {
   weeklyReport:     { canView: true, canViewHr: true, canViewOps: true, canViewComm: true, canViewFinance: true },
   interviews:       { canView: true, canAdd: true, canEdit: true, canDelete: true, canConductInterview: true, canRecordVerdict: true, canForwardToOnboarding: true },
   simulator:        { canView: true, canSave: true, canDelete: true, canExport: true },
+  dewateringCalculator: { canView: true, canExport: true },
+  vatCalculator:    { canView: true, canExport: true },
+  estimator:        { canView: true },
   budget:           { canView: true, canAdd: true, canEdit: true, canDelete: true, canSetBudgeted: true, canLinkLedger: true },
   aiCopilot:        { canAccess: true },
 };
@@ -307,6 +327,9 @@ export const NO_ACCESS: UserPrivileges = {
   weeklyReport:     { canView: false, canViewHr: false, canViewOps: false, canViewComm: false, canViewFinance: false },
   interviews:       { canView: false, canAdd: false, canEdit: false, canDelete: false, canConductInterview: false, canRecordVerdict: false, canForwardToOnboarding: false },
   simulator:        { canView: false, canSave: false, canDelete: false, canExport: false },
+  dewateringCalculator: { canView: false, canExport: false },
+  vatCalculator:    { canView: false, canExport: false },
+  estimator:        { canView: false },
   budget:           { canView: false, canAdd: false, canEdit: false, canDelete: false, canSetBudgeted: false, canLinkLedger: false },
   aiCopilot:        { canAccess: false },
 };

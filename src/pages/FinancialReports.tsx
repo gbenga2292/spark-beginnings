@@ -229,13 +229,51 @@ export function FinancialReports() {
   const sites = useAppStore(state => state.sites);
   const vatRate = useAppStore((state) => state.payrollVariables.vatRate);
 
-  const getVatDetails = (amount: number, payVat: string, vatRate: number, damages: number = 0) => {
-    const baseAmount = amount - damages;
-    const vat = payVat === 'Add' ? Math.round(((baseAmount * 7.5) / 107.5) * 100) / 100 
-              : payVat === 'Yes' ? Math.round(((baseAmount / (100 + vatRate)) * vatRate) * 100) / 100 
+  const getVatDetails = (amount: number, payVat: string, rate: number, damages: number = 0) => {
+    const baseAmount = Math.max(0, amount - damages);
+    const vat = payVat === 'Add' ? Math.round(((baseAmount * rate) / (100 + rate)) * 100) / 100
+              : payVat === 'Yes' ? Math.round(((baseAmount / (100 + rate)) * rate) * 100) / 100
               : 0;
-    const amountForVat = payVat !== 'No' ? baseAmount - vat : baseAmount;
+    const amountForVat = payVat !== 'No' && vat > 0 ? baseAmount - vat : 0;
     return { vat, amountForVat };
+  };
+
+  // Invoice-aware VAT resolver: uses the linked invoice's VAT ratio when stored vat is 0
+  // but the payment has an active VAT policy (matching PaymentFormModal's live calculation).
+  const resolvePaymentVat = (
+    pay: { amount?: number; damages?: number; payVat?: string; vat?: number | null; amountForVat?: number | null; invoiceId?: string },
+    payVatSetting: string,
+    invIndex: Map<string, any>
+  ): { vat: number; amountForVat: number } => {
+    const storedVat = pay.vat !== undefined && pay.vat !== null ? Number(pay.vat) : null;
+    const storedAmtForVat = pay.amountForVat !== undefined && pay.amountForVat !== null ? Number(pay.amountForVat) : null;
+
+    // Trust stored value only when it is explicitly non-zero, or VAT policy is 'No'
+    if (storedVat !== null && storedVat > 0) {
+      return {
+        vat: storedVat,
+        amountForVat: storedAmtForVat !== null && storedAmtForVat >= 0 ? storedAmtForVat
+          : Math.max(0, (pay.amount || 0) - (pay.damages || 0) - storedVat),
+      };
+    }
+    if (payVatSetting === 'No') return { vat: 0, amountForVat: 0 };
+
+    // Try invoice-based ratio (mirrors computePaymentVatDetails single-allocation logic)
+    const baseAmount = Math.max(0, (pay.amount || 0) - (pay.damages || 0));
+    if (pay.invoiceId && invIndex.has(pay.invoiceId)) {
+      const inv = invIndex.get(pay.invoiceId);
+      const invTotal = Number(inv.totalCharge || inv.amount || 0);
+      const invVat = Number(inv.vat || 0);
+      if (invVat > 0 && invTotal > 0) {
+        const ratio = invVat / invTotal;
+        const vat = Math.round(baseAmount * ratio * 100) / 100;
+        const amountForVat = Math.max(0, baseAmount - vat);
+        return { vat, amountForVat };
+      }
+    }
+
+    // Final fallback: rate-based calculation
+    return getVatDetails(pay.amount || 0, payVatSetting, vatRate, pay.damages || 0);
   };
 
   const calculateItemVat = (amount: number, vatMode: 'No' | 'Yes' | 'Add' = 'No', rate: number = 7.5) => {
@@ -1010,7 +1048,7 @@ export function FinancialReports() {
 
       const siteKey = `${clientName}|${siteName}`;
       const payVatSetting = pay.payVat || siteIndex.get(siteKey)?.vat || 'No';
-      const { vat } = getVatDetails(pay.amount || 0, payVatSetting, vatRate, (pay as any).damages || 0);
+      const vat = pay.vat !== undefined && pay.vat !== null ? Number(pay.vat) : getVatDetails(pay.amount || 0, payVatSetting, vatRate, (pay as any).damages || 0).vat;
 
       bfVatPaidMap.set(key, (bfVatPaidMap.get(key) || 0) + (vat || 0));
       bfVatOwedMap.set(key, (bfVatOwedMap.get(key) || 0) + (vat || 0));
@@ -1083,14 +1121,18 @@ export function FinancialReports() {
       }
     });
 
+    // Build O(1) invoice index for VAT ratio lookups
+    const invIndexGlobal = new Map<string, any>();
+    rawInvoices.forEach(inv => invIndexGlobal.set(inv.id, inv));
+
     payments.forEach(p => {
       totalCollectedCash += (p.amount || 0);
       totalWHT += (p.withholdingTax || 0);
       totalDiscount += (p.discount || 0);
       
       const siteKey = `${(p.client || '').trim()}|${(p.site || '').trim()}`;
-      const payVat = p.payVat || siteIndex.get(siteKey)?.vat || 'No';
-      const { vat } = getVatDetails(p.amount || 0, payVat, vatRate, (p as any).damages || 0);
+      const payVatSetting = p.payVat || siteIndex.get(siteKey)?.vat || 'No';
+      const { vat } = resolvePaymentVat(p, payVatSetting, invIndexGlobal);
       
       if (vat > 0) clientVatMap.set(p.client, (clientVatMap.get(p.client) || 0) + vat);
       totalVATCollected += (vat || 0);
@@ -1103,7 +1145,8 @@ export function FinancialReports() {
     }
 
     const totalValueCleared = totalCollectedCash + totalWHT + totalDiscount;
-    const totalOutstanding = Math.max(0, totalBilled - totalValueCleared);
+    const rawOutstanding = totalBilled - totalValueCleared;
+    const totalOutstanding = rawOutstanding <= 0.01 ? 0 : Math.round(rawOutstanding * 100) / 100;
     
     const vatSources = Array.from(clientVatMap.entries())
       .map(([client, amount]) => ({ client, amount }))
@@ -1122,7 +1165,7 @@ export function FinancialReports() {
     const vatDeficit = totalVATCollectedVal - totalVATRemitted;
     
     return { totalBilled, totalVATInvoiced, totalCollectedCash, totalValueCleared, totalOutstanding, totalWHT, totalDiscount, totalVATCollected: totalVATCollectedVal, totalVATRemitted, vatDeficit, vatSources };
-  }, [invoices, payments, vatPayments, sites, pendingSites, vatRate, bfVatData, priorPeriodLimit]);
+  }, [invoices, payments, vatPayments, sites, pendingSites, vatRate, bfVatData, priorPeriodLimit, rawInvoices]);
 
   const collectionRate = globalStats.totalBilled > 0
     ? Math.round((globalStats.totalValueCleared / globalStats.totalBilled) * 100) : 0;
@@ -1167,6 +1210,10 @@ export function FinancialReports() {
       }
     });
 
+    // Build O(1) invoice index for VAT ratio lookups (needed for payments with stale vat=0)
+    const invIndex = new Map<string, any>();
+    rawInvoices.forEach(inv => invIndex.set(inv.id, inv));
+
     payments.forEach(pay => {
       const siteName = (pay.site || 'Unknown Site').trim();
       const clientName = (pay.client || '').trim();
@@ -1192,10 +1239,11 @@ export function FinancialReports() {
       r.discount += (pay.discount || 0);
       r.withholdingTax += (pay.withholdingTax || 0);
       
-      // Calculate VAT Paid dynamically based on payment amount and site VAT settings
+      // Resolve VAT using invoice ratio when stored vat is 0 but policy is active
       const siteKey = `${clientName}|${siteName}`;
       const payVatSetting = pay.payVat || siteIndex.get(siteKey)?.vat || 'No';
-      const { vat, amountForVat } = getVatDetails(pay.amount || 0, payVatSetting, vatRate, (pay as any).damages || 0);
+      const { vat, amountForVat } = resolvePaymentVat(pay, payVatSetting, invIndex);
+
       if (r.vatPolicy === 'No') {
         r.vatPolicy = payVatSetting;
       } else if (r.vatPolicy !== payVatSetting) {
@@ -1246,7 +1294,8 @@ export function FinancialReports() {
     let result = Array.from(rowMap.values()).map(r => {
       const bf = bfData.get(r.key) || 0;
       const bfVatOwed = bfVatData.bfVatOwedMap.get(r.key) || 0;
-      let balance = bf + r.totalInvoices - r.totalPayment - r.discount - r.withholdingTax;
+      const rawBalance = bf + r.totalInvoices - r.totalPayment - r.discount - r.withholdingTax;
+      let balance = Math.abs(rawBalance) < 0.01 ? 0 : Math.round(rawBalance * 100) / 100;
       let status = balance > 0 && r.totalPayment === 0 && r.discount === 0 && r.withholdingTax === 0 && r.totalInvoices === 0 ? 'OWING'
         : balance > 0 && (r.totalPayment > 0 || r.discount > 0 || r.withholdingTax > 0 || bf < 0) ? 'PART PAID'
         : balance > 0 ? 'OWING'
@@ -1257,7 +1306,8 @@ export function FinancialReports() {
         balance = 0;
         status = 'FULLY PAID';
       }
-      const vatOwed = (priorPeriodLimit !== 'none' ? bfVatOwed : 0) + r.vatPaid - r.vatRemitted;
+      const rawVatOwed = (priorPeriodLimit !== 'none' ? bfVatOwed : 0) + r.vatPaid - r.vatRemitted;
+      const vatOwed = Math.abs(rawVatOwed) < 0.01 ? 0 : Math.round(rawVatOwed * 100) / 100;
       return { ...r, bf, balance, status, vatOwed, bfVatOwed };
     });
 
@@ -1286,7 +1336,7 @@ export function FinancialReports() {
     }
 
     return result.sort((a, b) => a.client.localeCompare(b.client));
-  }, [invoices, payments, vatPayments, summaryTab, bfData, bfVatData, filterMonth, priorPeriodLimit]);
+  }, [invoices, payments, vatPayments, summaryTab, bfData, bfVatData, filterMonth, priorPeriodLimit, rawInvoices, sites, pendingSites, vatRate]);
 
   // VAT Pie
   const vatPieData = useMemo(() => [
@@ -1467,7 +1517,9 @@ export function FinancialReports() {
     const extractCSV = (val: any) => typeof val === 'number' ? String(val) : `"${String(val ?? '').replace(/"/g, '""')}"`;
     const data = payments.map(p => {
         const payVat = p.payVat || (sites.find(s => s.name === p.site && s.client === p.client)?.vat as any) || 'No';
-        const { vat, amountForVat } = getVatDetails(p.amount || 0, payVat, vatRate, (p as any).damages || 0);
+        const fallback = getVatDetails(p.amount || 0, payVat, vatRate, (p as any).damages || 0);
+        const vat = p.vat !== undefined && p.vat !== null ? Number(p.vat) : fallback.vat;
+        const amountForVat = p.amountForVat !== undefined && p.amountForVat !== null ? Number(p.amountForVat) : fallback.amountForVat;
         return [ p.client, getTin(p.client), p.site, formatDisplayDate(p.date), p.amount, amountForVat, p.withholdingTax || 0, vat || 0, p.discount || 0];
     });
     const csvData = [headers.join(','), ...data.map(row => row.map(extractCSV).join(','))].join('\n');
@@ -1507,7 +1559,7 @@ export function FinancialReports() {
     const head = [["Client", "Client TIN", "Site", "Date", "Amount (₦)", "WHT (₦)", "VAT (₦)"]];
     const body = payments.map(p => {
         const payVat = p.payVat || (sites.find(s => s.name === p.site && s.client === p.client)?.vat as any) || 'No';
-        const { vat } = getVatDetails(p.amount || 0, payVat, vatRate, (p as any).damages || 0);
+        const vat = p.vat !== undefined && p.vat !== null ? Number(p.vat) : getVatDetails(p.amount || 0, payVat, vatRate, (p as any).damages || 0).vat;
         return [
             p.client,
             getTin(p.client),
@@ -2065,7 +2117,7 @@ export function FinancialReports() {
         </div>
 
         {/* ── Filter bar: flush full-width sticky strip right under header ── */}
-        <div className="bg-white/90 backdrop-blur-sm border-y border-slate-200 px-4 md:px-8 py-4 mb-6 sticky top-0 z-[40] transition-shadow">
+        <div className="bg-white/90 backdrop-blur-sm border-y border-slate-200 px-4 md:px-8 py-4 mb-6 sticky -top-4 z-[40] transition-shadow">
           <div className="max-w-7xl mx-auto flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="flex items-center justify-center w-7 h-7 rounded-md bg-blue-50 text-blue-600 border border-blue-200">
@@ -3003,8 +3055,8 @@ export function FinancialReports() {
                   <TableCell className="px-5 py-3 text-right font-mono font-medium text-emerald-700 text-xs">{row.totalPayment ? row.totalPayment.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
                   {summaryTab !== 'vat' && (
                     <>
-                      <TableCell className={`px-5 py-3 text-right font-mono font-bold ${row.balance > 0 ? 'text-rose-600' : row.balance < 0 ? 'text-slate-500' : 'text-emerald-600'}`}>
-                        {row.balance !== 0 ? (row.balance < 0 ? `(${Math.abs(row.balance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})` : row.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })) : '-'}
+                      <TableCell className={`px-5 py-3 text-right font-mono font-bold ${row.balance >= 0.01 ? 'text-rose-600' : row.balance <= -0.01 ? 'text-slate-500' : 'text-emerald-600'}`}>
+                        {Math.abs(row.balance) >= 0.01 ? (row.balance < 0 ? `(${Math.abs(row.balance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})` : row.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })) : '-'}
                       </TableCell>
                       <TableCell className="px-5 py-3 text-right font-mono text-slate-400 text-xs">{row.discount ? row.discount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
                       <TableCell className="px-5 py-3 text-right font-mono text-blue-600/70 text-xs">{row.withholdingTax ? row.withholdingTax.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
@@ -3018,9 +3070,10 @@ export function FinancialReports() {
                         {row.vatRemitted !== 0 && vatRate > 0 ? ((row.vatRemitted / (vatRate / 100)) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}
                       </TableCell>
                       <TableCell className="px-5 py-3 text-right font-mono text-sky-600/70 text-xs">{row.vatRemitted ? row.vatRemitted.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
-                      <TableCell className="px-5 py-3 text-right font-mono text-rose-600/70 text-xs">{row.vatOwed !== 0 && vatRate > 0 ? ((row.vatOwed / (vatRate / 100)) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
-                      <TableCell className={`px-5 py-3 text-right font-mono font-bold text-xs ${row.vatOwed < 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                        {row.vatOwed !== 0 ? (row.vatOwed < 0 ? `(${Math.abs(row.vatOwed).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})` : row.vatOwed.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })) : '-'}
+                      <TableCell className="px-5 py-3 text-right font-mono text-rose-600/70 text-xs">{row.vatOwed !== 0 && vatRate > 0 ? ((row.vatOwed / (vatRate / 100)) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}
+                      </TableCell>
+                      <TableCell className={`px-5 py-3 text-right font-mono font-bold text-xs ${row.vatOwed <= -0.01 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                        {Math.abs(row.vatOwed) >= 0.01 ? (row.vatOwed < 0 ? `(${Math.abs(row.vatOwed).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})` : row.vatOwed.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })) : '-'}
                       </TableCell>
                     </>
                   )}
@@ -3075,9 +3128,11 @@ export function FinancialReports() {
                     {summaryTab !== 'vat' && (
                       <>
                         <TableCell className="bg-slate-900 px-5 py-4 text-right font-mono font-bold text-rose-400 bg-rose-950/20">
-                          {totalBalance < 0
-                            ? `(${Math.abs(totalBalance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`
-                            : totalBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          {Math.abs(totalBalance) >= 0.01
+                            ? (totalBalance < 0
+                              ? `(${Math.abs(totalBalance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`
+                              : totalBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }))
+                            : '-'}
                         </TableCell>
                         <TableCell className="bg-slate-900 px-5 py-4 text-right font-mono font-medium text-slate-400">{totalDiscount ? totalDiscount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
                         <TableCell className="bg-slate-900 px-5 py-4 text-right font-mono font-medium text-slate-300">{totalWHT ? totalWHT.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>

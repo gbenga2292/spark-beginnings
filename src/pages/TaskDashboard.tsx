@@ -10,7 +10,7 @@ import {
   Circle, Loader2, Calendar, Clock, Users, BarChart2,
   Flame, Zap, Award, Flag, Lock, Target, ListTodo, Activity,
   CheckCheck, Layers, ArrowUpRight, Sparkles, ChevronRight, ChevronDown,
-  Archive, RotateCcw, Trash2, Fuel, Receipt, FileText,
+  Archive, RotateCcw, Trash2, Fuel, Receipt, FileText, Building2,
   Hourglass, ShieldAlert, ShieldCheck, Wrench, AlertCircle, Package
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -24,6 +24,7 @@ import { useSetPageTitle } from "@/src/contexts/PageContext";
 import { MetricHeroCard } from "@/src/components/ui/MetricHeroCard";
 import { useRefillForecast } from "@/src/hooks/useRefillForecast";
 import { RefillForecastModal } from "@/src/components/analytics/RefillForecastModal";
+import { ActiveSiteInvoicesModal } from "@/src/components/analytics/ActiveSiteInvoicesModal";
 import { useActiveSiteInvoices, ActiveSiteInvoiceSummary } from "@/src/hooks/useActiveSiteInvoices";
 import { InvoiceDetailDialog } from "@/src/pages/InvoiceDetailDialog";
 import type { Invoice } from "@/src/store/appStore";
@@ -729,6 +730,7 @@ function UserDashboard() {
   const navigate = useNavigate();
   const [openSubtaskId, setOpenSubtaskId] = useState<string | null>(null);
   const [isRefillModalOpen, setIsRefillModalOpen] = useState(false);
+  const [isActiveInvoicesModalOpen, setIsActiveInvoicesModalOpen] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const { hrVariables } = useStore();
   const { restoreSubtask, deleteSubtaskPermanently } = useAppData();
@@ -1080,7 +1082,10 @@ function UserDashboard() {
               <RefillForecastCard onOpenModal={() => setIsRefillModalOpen(true)} />
             )}
             {canViewInvoices && (
-              <ActiveSiteInvoicesCard onSelectInvoice={(inv) => setSelectedInvoice(inv)} />
+              <ActiveSiteInvoicesCard
+                onSelectInvoice={(inv) => setSelectedInvoice(inv)}
+                onOpenModal={() => setIsActiveInvoicesModalOpen(true)}
+              />
             )}
           </motion.div>
         )}
@@ -1091,6 +1096,14 @@ function UserDashboard() {
         <RefillForecastModal
           isOpen={isRefillModalOpen}
           onClose={() => setIsRefillModalOpen(false)}
+        />
+      )}
+      {canViewInvoices && (
+        <ActiveSiteInvoicesModal
+          isOpen={isActiveInvoicesModalOpen}
+          onClose={() => setIsActiveInvoicesModalOpen(false)}
+          onSelectInvoice={(inv) => setSelectedInvoice(inv)}
+          onSelectSite={(siteId) => navigate(`/site-analytics?siteId=${siteId}`)}
         />
       )}
       {canViewInvoices && selectedInvoice && (
@@ -1200,31 +1213,332 @@ function RefillForecastCard({ onOpenModal }: { onOpenModal: () => void }) {
   );
 }
 
+/* --- Site Pool Card Sub-Component ----------------------------------------- */
+function SitePoolCard({
+  siteItem,
+  onSelectInvoice,
+  showSiteName = false,
+}: {
+  siteItem: ActiveSiteInvoiceSummary;
+  onSelectInvoice: (inv: Invoice) => void;
+  showSiteName?: boolean;
+}) {
+  return (
+    <div className={cn(
+      "rounded-md border space-y-2.5 transition-colors p-3",
+      showSiteName ? "bg-background/90" : "bg-muted/10",
+      siteItem.isOverrun
+        ? "border-rose-200 dark:border-rose-900/50 bg-rose-50/20 dark:bg-rose-950/15"
+        : "border-border/60 hover:border-border"
+    )}>
+      {/* If showSiteName is true (e.g. inside a client group with multiple sites) */}
+      {showSiteName && (
+        <div className="flex items-center justify-between gap-2 border-b border-border/40 pb-2">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className={cn(
+              "w-2 h-2 rounded-full shrink-0",
+              siteItem.isOverrun ? "bg-rose-500" : "bg-blue-500"
+            )} />
+            <span className="font-bold text-xs text-foreground truncate">
+              {siteItem.siteName}
+            </span>
+          </div>
+          <span className={cn(
+            "text-[9px] font-bold px-1.5 py-0.2 rounded border shrink-0",
+            siteItem.urgencyBadgeClass
+          )}>
+            {siteItem.urgencyLabel}
+          </span>
+        </div>
+      )}
+
+      {/* Top Metric Row: Logged / Billed, Active Pumps, Capacity */}
+      <div className="flex items-center justify-between gap-2 text-xs">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className={cn(
+            "font-bold font-mono text-sm tabular-nums",
+            siteItem.isOverrun ? "text-rose-600 dark:text-rose-400" : "text-foreground"
+          )}>
+            {siteItem.totalLoggedDays.toFixed(1)}d logged
+          </span>
+          <span className="text-muted-foreground font-mono tabular-nums">
+            / {siteItem.totalBilledDays}d billed
+          </span>
+          <span className="text-[11px] text-muted-foreground font-normal">
+            ({siteItem.activeMachinesCount} active pump{siteItem.activeMachinesCount === 1 ? '' : 's'})
+          </span>
+        </div>
+
+        <div className="text-right text-[11px] text-muted-foreground shrink-0 font-medium">
+          {siteItem.isOverrun ? (
+            <span className="text-rose-600 dark:text-rose-400 font-semibold">
+              Exceeded by {siteItem.overrunDays.toFixed(1)}d
+            </span>
+          ) : (
+            <span>
+              {siteItem.remainingDays.toFixed(1)}d capacity left
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Progress Bar */}
+      <div className="w-full bg-slate-200/70 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden">
+        <div
+          className={cn(
+            "h-full rounded-full transition-all duration-500",
+            siteItem.isOverrun ? "bg-rose-500" :
+            siteItem.progressPct >= 80 ? "bg-amber-500" : "bg-blue-500"
+          )}
+          style={{ width: `${Math.min(100, siteItem.progressPct)}%` }}
+        />
+      </div>
+
+      {/* Billed Invoices contributing to pool */}
+      <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+        <span className="text-[10px] font-bold text-muted-foreground/80 uppercase tracking-wider">
+          Invoices:
+        </span>
+        {siteItem.invoices.map((invDetail) => (
+          <button
+            key={invDetail.invoice.id}
+            type="button"
+            onClick={() => onSelectInvoice(invDetail.invoice)}
+            className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded border border-border/80 bg-background hover:border-primary/60 hover:text-primary transition-colors cursor-pointer"
+            title="Click to view invoice details"
+          >
+            <FileText className="w-3 h-3 text-blue-500" />
+            <span>#{invDetail.invoiceNumber}</span>
+            <span className="text-muted-foreground/70 font-mono text-[10px]">({invDetail.totalContractedDays}d)</span>
+          </button>
+        ))}
+        {siteItem.hasMultipleConcurrent && (
+          <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30 ml-auto">
+            {siteItem.concurrentCount} Concurrent Invoices
+          </span>
+        )}
+      </div>
+
+      {/* Per-machine breakdown */}
+      {siteItem.siteMachines && siteItem.siteMachines.length > 0 && (
+        <div className="py-1.5 px-2.5 rounded bg-muted/40 dark:bg-slate-900/40 border border-border/40 space-y-1.5">
+          {siteItem.siteMachines.map(m => {
+            const displayConsumed = m.slotConsumedDays !== undefined ? m.slotConsumedDays : m.consumedDays;
+            return (
+              <div key={m.id} className="space-y-0.5">
+                <div className="flex items-center justify-between text-[11px]">
+                  <div className="flex items-center gap-1.5 min-w-0 truncate">
+                    <span className={cn(
+                      "truncate font-medium max-w-[160px] sm:max-w-[250px]",
+                      m.isStopped ? "text-muted-foreground/60" : "text-foreground"
+                    )}>
+                      {m.name}
+                    </span>
+                    {m.isStopped && (
+                      <span className="text-[9px] font-semibold px-1 py-0.2 rounded bg-muted text-muted-foreground/70 shrink-0">
+                        swapped
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1 font-mono tabular-nums text-[11px] shrink-0">
+                    <span className={cn(
+                      "font-semibold",
+                      (m.isOver || (siteItem.isOverrun && !m.isStopped)) ? "text-rose-600 dark:text-rose-400" : "text-blue-600 dark:text-blue-400"
+                    )}>
+                      {displayConsumed.toFixed(1)}
+                    </span>
+                    {m.contractedDays > 0 ? (
+                      <>
+                        <span className="text-muted-foreground/60 text-[10px]">/</span>
+                        <span className="text-muted-foreground text-[11px] font-medium">
+                          {m.contractedDays.toFixed(1)} days
+                        </span>
+                      </>
+                    ) : (
+                      <span className="text-muted-foreground/60 text-[10px]">d logged</span>
+                    )}
+                    {m.isOver && !m.isStopped && (
+                      <span className="text-[9px] font-bold px-1 py-0.2 rounded bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-200 dark:border-rose-800 ml-0.5">
+                        +{m.overDays.toFixed(1)}d
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Sub-line for predecessor swaps (Option 1) */}
+                {m.predecessors && m.predecessors.length > 0 && (
+                  <div className="flex items-center gap-1 text-[10px] text-muted-foreground/75 pl-2 font-mono">
+                    <span className="text-muted-foreground/40">↳</span>
+                    <span>
+                      {m.consumedDays.toFixed(1)}d current (+ {m.predecessors.map(p => `${p.consumedDays.toFixed(1)}d ex-${p.name.replace(/^dewatering\s+/i, '')}`).join(', ')})
+                    </span>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Bottom row: Scheduled vs Live expiry */}
+      <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-0.5">
+        <div className="flex items-center gap-1.5 truncate">
+          <span>Start: {formatDisplayDate(siteItem.earliestStartDate || siteItem.invoices[0]?.startDate)}</span>
+        </div>
+        <div className="text-right shrink-0">
+          <span className={cn(
+            "font-medium",
+            siteItem.isOverrun ? "text-rose-600 dark:text-rose-400 font-semibold" : "text-foreground"
+          )}>
+            {siteItem.isOverrun
+              ? `Overrun since: ${formatDisplayDate(siteItem.latestLiveEndDate || siteItem.latestScheduledEndDate)}`
+              : `Live Target: ${formatDisplayDate(siteItem.latestLiveEndDate || siteItem.latestScheduledEndDate)}`
+            }
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* --- Active Site Invoices Card ------------------------------------------- */
-function ActiveSiteInvoicesCard({ onSelectInvoice }: { onSelectInvoice: (inv: Invoice) => void }) {
+function ActiveSiteInvoicesCard({
+  onSelectInvoice,
+  onOpenModal,
+}: {
+  onSelectInvoice: (inv: Invoice) => void;
+  onOpenModal?: () => void;
+}) {
   const navigate = useNavigate();
-  const { activeSiteInvoices, totalActiveSites, concurrentSitesCount } = useActiveSiteInvoices();
+  const [groupBy, setGroupBy] = useState<'site' | 'client'>('site');
+  const { activeSiteInvoices, totalActiveSites, concurrentSitesCount, lapsedSitesCount } = useActiveSiteInvoices();
+
+  // Group by client
+  const clientGroups = useMemo(() => {
+    const clientMap = new Map<string, { displayName: string; sites: ActiveSiteInvoiceSummary[] }>();
+    activeSiteInvoices.forEach(s => {
+      const raw = (s.clientName || 'Other Clients').trim() || 'Other Clients';
+      const key = raw.toLowerCase();
+      if (!clientMap.has(key)) {
+        clientMap.set(key, { displayName: raw, sites: [] });
+      }
+      clientMap.get(key)!.sites.push(s);
+    });
+
+    const groups = Array.from(clientMap.values()).map(({ displayName, sites }) => {
+      const totalBilledDays = sites.reduce((sum, s) => sum + s.totalBilledDays, 0);
+      const totalLoggedDays = Number(sites.reduce((sum, s) => sum + s.totalLoggedDays, 0).toFixed(1));
+      const activeMachinesCount = sites.reduce((sum, s) => sum + s.activeMachinesCount, 0);
+      const isOverrun = totalBilledDays > 0 && totalLoggedDays > totalBilledDays;
+      const overrunDays = isOverrun ? Number((totalLoggedDays - totalBilledDays).toFixed(1)) : 0;
+      const remainingDays = isOverrun ? 0 : Math.max(0, Number((totalBilledDays - totalLoggedDays).toFixed(1)));
+      const calendarRunwayDays = Math.ceil(remainingDays / Math.max(1, activeMachinesCount));
+      const progressPct = totalBilledDays > 0 ? Math.min(100, (totalLoggedDays / totalBilledDays) * 100) : 0;
+      const hasAnyOverrun = sites.some(s => s.isOverrun);
+      const invoicesCount = sites.reduce((sum, s) => sum + s.invoices.length, 0);
+
+      let urgencyBadgeClass = 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800';
+      let urgencyLabel = `${calendarRunwayDays}d runway`;
+
+      if (hasAnyOverrun || isOverrun) {
+        urgencyBadgeClass = 'bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border-rose-300 dark:border-rose-800';
+        urgencyLabel = isOverrun ? `+${overrunDays.toFixed(1)}d Overrun` : `Site Overrun`;
+      } else if (calendarRunwayDays <= 0) {
+        urgencyBadgeClass = 'bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border-rose-300 dark:border-rose-800';
+        urgencyLabel = 'Due Today';
+      } else if (calendarRunwayDays <= 3) {
+        urgencyBadgeClass = 'bg-amber-50 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border-amber-300 dark:border-amber-800';
+        urgencyLabel = `Due in ${calendarRunwayDays}d`;
+      }
+
+      return {
+        clientName: displayName,
+        sites,
+        totalSites: sites.length,
+        totalBilledDays,
+        totalLoggedDays,
+        remainingDays,
+        overrunDays,
+        isOverrun: hasAnyOverrun || isOverrun,
+        activeMachinesCount,
+        calendarRunwayDays,
+        progressPct,
+        invoicesCount,
+        urgencyBadgeClass,
+        urgencyLabel,
+      };
+    });
+
+    return groups.sort((a, b) => {
+      if (a.isOverrun && !b.isOverrun) return -1;
+      if (!a.isOverrun && b.isOverrun) return 1;
+      if (a.isOverrun && b.isOverrun) return b.overrunDays - a.overrunDays;
+      return a.calendarRunwayDays - b.calendarRunwayDays;
+    });
+  }, [activeSiteInvoices]);
+
+  const totalClientsCount = clientGroups.length;
 
   return (
     <div className="bg-card border border-border rounded-md overflow-hidden flex flex-col">
-      <div className="flex items-center justify-between px-4 sm:px-5 py-3.5 border-b border-border">
+      <div className="flex items-center justify-between px-4 sm:px-5 py-3 border-b border-border gap-2">
         <div className="flex items-center gap-2 min-w-0">
           <Receipt className="w-4 h-4 text-blue-500 shrink-0" />
           <div className="min-w-0">
             <h3 className="text-sm font-semibold text-foreground truncate">Active Site Invoices</h3>
             <p className="text-[11px] text-muted-foreground truncate">
-              {totalActiveSites} Active Dewatering Site{totalActiveSites === 1 ? '' : 's'}
-              {concurrentSitesCount > 0 ? ` · ${concurrentSitesCount} with concurrent invoices` : ''}
+              {groupBy === 'site'
+                ? `${totalActiveSites} Active Dewatering Site${totalActiveSites === 1 ? '' : 's'}`
+                : `${totalClientsCount} Client${totalClientsCount === 1 ? '' : 's'} (${totalActiveSites} Sites)`
+              }
+              {lapsedSitesCount > 0 ? (
+                <span className="text-rose-600 dark:text-rose-400 font-semibold ml-1">
+                  · {lapsedSitesCount} with unbilled overrun
+                </span>
+              ) : concurrentSitesCount > 0 ? (
+                ` · ${concurrentSitesCount} with concurrent invoices`
+              ) : ''}
             </p>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={() => navigate('/client-accounts')}
-          className="flex items-center gap-1 text-xs font-semibold text-primary hover:text-primary/80 transition-colors shrink-0 pl-2 cursor-pointer"
-        >
-          View all <ArrowUpRight className="w-3.5 h-3.5" />
-        </button>
+
+        <div className="flex items-center gap-2 shrink-0">
+          {/* Toggle By Site / By Client */}
+          <div className="flex items-center bg-muted/60 dark:bg-muted/30 p-0.5 rounded-md text-[11px] font-medium border border-border/50">
+            <button
+              type="button"
+              onClick={() => setGroupBy('site')}
+              className={cn(
+                "px-2 py-0.5 rounded transition-all cursor-pointer",
+                groupBy === 'site'
+                  ? "bg-background text-foreground font-semibold shadow-xs"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              By Site
+            </button>
+            <button
+              type="button"
+              onClick={() => setGroupBy('client')}
+              className={cn(
+                "px-2 py-0.5 rounded transition-all cursor-pointer",
+                groupBy === 'client'
+                  ? "bg-background text-foreground font-semibold shadow-xs"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              By Client
+            </button>
+          </div>
+
+          <button
+            type="button"
+            onClick={onOpenModal || (() => navigate('/client-accounts'))}
+            className="flex items-center gap-1 text-xs font-semibold text-primary hover:text-primary/80 transition-colors shrink-0 pl-1 cursor-pointer"
+          >
+            View all <ArrowUpRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
       </div>
 
       {activeSiteInvoices.length === 0 ? (
@@ -1235,101 +1549,124 @@ function ActiveSiteInvoicesCard({ onSelectInvoice }: { onSelectInvoice: (inv: In
           <p className="text-sm font-semibold text-foreground">No active dewatering sites</p>
           <p className="text-xs text-muted-foreground mt-0.5">All active sites are either on hold or closed.</p>
         </div>
-      ) : (
-        <div className="divide-y divide-border/40 max-h-[500px] overflow-y-auto">
+      ) : groupBy === 'site' ? (
+        <div className="divide-y divide-border/40 max-h-[520px] overflow-y-auto">
           {activeSiteInvoices.map(siteItem => (
             <div
               key={siteItem.siteId}
               className="px-4 sm:px-5 py-3.5 space-y-2.5"
             >
-              {/* Site Header: Name, Client, and Concurrent Invoices Badge if multiple */}
+              {/* Site Header */}
               <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                <div className="flex items-center gap-2 min-w-0 flex-1">
                   <span className={cn(
-                    "w-2 h-2 rounded-full shrink-0",
+                    "w-2.5 h-2.5 rounded-full shrink-0",
+                    siteItem.isOverrun ? "bg-rose-500 ring-2 ring-rose-500/20" :
                     siteItem.hasActiveInvoices ? "bg-blue-500" : "bg-muted-foreground/40"
                   )} />
-                  <p className="text-sm font-semibold text-foreground truncate">
+                  <p className="text-sm font-bold text-foreground truncate">
                     {siteItem.siteName}
                   </p>
                   {siteItem.clientName && (
-                    <span className="text-[11px] text-muted-foreground truncate hidden sm:inline">
+                    <span className="text-xs text-muted-foreground truncate hidden sm:inline">
                       ({siteItem.clientName})
                     </span>
                   )}
                 </div>
 
-                {siteItem.hasMultipleConcurrent ? (
-                  <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30 shrink-0">
-                    <Layers className="w-3 h-3" />
-                    {siteItem.concurrentCount} Concurrent Invoices
+                {siteItem.hasActiveInvoices && (
+                  <span className={cn(
+                    "text-[10px] font-bold px-2 py-0.5 rounded-md border shrink-0",
+                    siteItem.urgencyBadgeClass
+                  )}>
+                    {siteItem.urgencyLabel}
                   </span>
-                ) : !siteItem.hasActiveInvoices ? (
-                  <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-muted text-muted-foreground shrink-0">
-                    No Running Invoice
-                  </span>
-                ) : null}
+                )}
               </div>
 
               {/* If no running invoices */}
-              {!siteItem.hasActiveInvoices && (
-                <p className="text-xs text-muted-foreground/80 pl-3.5">
+              {!siteItem.hasActiveInvoices ? (
+                <p className="text-xs text-muted-foreground/80 pl-4.5">
                   All billing cycles settled · No active running invoice for this site.
                 </p>
+              ) : (
+                <SitePoolCard
+                  siteItem={siteItem}
+                  onSelectInvoice={onSelectInvoice}
+                />
               )}
+            </div>
+          ))}
+        </div>
+      ) : (
+        /* --- By Client View --- */
+        <div className="divide-y divide-border/40 max-h-[520px] overflow-y-auto">
+          {clientGroups.map(group => (
+            <div
+              key={group.clientName}
+              className="px-4 sm:px-5 py-3.5 space-y-2.5"
+            >
+              {/* Client Header */}
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <span className={cn(
+                    "w-2.5 h-2.5 rounded-full shrink-0",
+                    group.isOverrun ? "bg-rose-500 ring-2 ring-rose-500/20" : "bg-blue-500"
+                  )} />
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <Building2 className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                    <p className="text-sm font-bold text-foreground truncate">
+                      {group.clientName}
+                    </p>
+                  </div>
+                  <span className="text-xs text-muted-foreground truncate hidden sm:inline">
+                    ({group.totalSites} active site{group.totalSites === 1 ? '' : 's'})
+                  </span>
+                </div>
 
-              {/* Running Invoices list */}
-              {siteItem.invoices.map((invDetail, idx) => (
-                <div
-                  key={invDetail.invoice.id}
-                  onClick={() => onSelectInvoice(invDetail.invoice)}
-                  className="p-2.5 rounded-md border border-border/60 hover:border-primary/50 hover:bg-muted/40 transition-colors cursor-pointer group bg-muted/10 space-y-1.5"
-                >
-                  {/* Top row: Invoice #, Cycle badge, Duration, Off-days, and Due badge */}
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-1.5 min-w-0 truncate">
-                      <span className="text-xs font-bold text-foreground group-hover:text-primary transition-colors">
-                        {invDetail.invoiceNumber}
-                      </span>
-                      {siteItem.hasMultipleConcurrent && (
-                        <span className="text-[9px] font-semibold px-1.5 py-0.2 rounded bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
-                          Cycle {idx + 1}
-                        </span>
-                      )}
-                      <span className="text-muted-foreground/50">·</span>
-                      <span className="text-xs text-muted-foreground font-medium">
-                        {invDetail.duration}d duration
-                      </span>
-                      {invDetail.offDaysCount > 0 && (
-                        <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-sm bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 shrink-0">
-                          +{invDetail.offDaysCount}d off-days
-                        </span>
-                      )}
-                    </div>
+                <span className={cn(
+                  "text-[10px] font-bold px-2 py-0.5 rounded-md border shrink-0",
+                  group.urgencyBadgeClass
+                )}>
+                  {group.urgencyLabel}
+                </span>
+              </div>
 
-                    <span className={cn(
-                      "text-[10px] font-semibold px-2 py-0.5 rounded-md border shrink-0",
-                      invDetail.urgencyBadgeClass
-                    )}>
-                      {invDetail.urgencyLabel}
+              {/* Combined Progress Banner if client has multiple sites */}
+              {group.totalSites > 1 && (
+                <div className="px-3 py-2 rounded-md bg-muted/40 dark:bg-muted/20 border border-border/50 space-y-1.5">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-semibold text-muted-foreground">
+                      Client Total ({group.totalSites} Sites):
+                    </span>
+                    <span className="font-mono font-bold text-foreground">
+                      {group.totalLoggedDays.toFixed(1)}d logged / {group.totalBilledDays}d billed
                     </span>
                   </div>
-
-                  {/* Bottom row: Scheduled vs Live expiry */}
-                  <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-                    <div className="flex items-center gap-2 truncate">
-                      <span>Start: {formatDisplayDate(invDetail.startDate)}</span>
-                      <span className="text-muted-foreground/40">·</span>
-                      <span>Scheduled: {formatDisplayDate(invDetail.scheduledEndDate)}</span>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <span className="font-bold text-foreground">
-                        Live: {formatDisplayDate(invDetail.liveEndDate)}
-                      </span>
-                    </div>
+                  <div className="w-full bg-slate-200/70 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                    <div
+                      className={cn(
+                        "h-full rounded-full transition-all duration-500",
+                        group.isOverrun ? "bg-rose-500" :
+                        group.progressPct >= 80 ? "bg-amber-500" : "bg-blue-500"
+                      )}
+                      style={{ width: `${Math.min(100, group.progressPct)}%` }}
+                    />
                   </div>
                 </div>
-              ))}
+              )}
+
+              {/* Sites list under this client */}
+              <div className="space-y-2">
+                {group.sites.map(siteItem => (
+                  <SitePoolCard
+                    key={siteItem.siteId}
+                    siteItem={siteItem}
+                    onSelectInvoice={onSelectInvoice}
+                    showSiteName={group.totalSites > 1}
+                  />
+                ))}
+              </div>
             </div>
           ))}
         </div>
