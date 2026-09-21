@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { MousePointer2, Pencil, Droplet, GitMerge, CornerDownRight, Square, Undo2, Redo2, Eraser, Eye, EyeOff, Crosshair, Maximize, Minimize, Grid, Ruler, Spline, Frame, ChevronUp, ChevronDown, Printer, Move, Copy, RotateCw, Type, Pin, PinOff, Scissors, AlignLeft, SlidersHorizontal, FlipHorizontal, Image, ArrowRight } from 'lucide-react';
+import { MousePointer2, Pencil, Droplet, GitMerge, CornerDownRight, Square, Undo2, Redo2, Eraser, Eye, EyeOff, Crosshair, Maximize, Minimize, Grid, Ruler, Spline, Frame, ChevronUp, ChevronDown, Printer, Move, Copy, RotateCw, Type, Pin, PinOff, Scissors, AlignLeft, SlidersHorizontal, FlipHorizontal, Image, ArrowRight, ZoomIn, ZoomOut, Maximize2, Scan, Target, RotateCcw } from 'lucide-react';
 import { ComponentType } from '../../utils/simulationLogic';
 
-export type ActiveTool = 'select' | 'line' | 'dimension' | 'arrow' | 'delete' | 'area' | 'hose' | 'discharge' | 'discharge-area' | 'site-area' | 'move' | 'copy' | 'rotate' | 'align' | 'offset' | 'mirror-pick' | 'mirror-draw' | 'split' | 'trim' | 'pin' | 'unpin' | 'text' | 'modify-blueprint' | 'export-window' | ComponentType;
+export type ActiveTool = 'select' | 'pan' | 'line' | 'dimension' | 'arrow' | 'delete' | 'area' | 'hose' | 'discharge' | 'discharge-area' | 'site-area' | 'move' | 'copy' | 'rotate' | 'align' | 'offset' | 'mirror-pick' | 'mirror-draw' | 'split' | 'trim' | 'pin' | 'unpin' | 'text' | 'modify-blueprint' | 'export-window' | 'zoom-window' | ComponentType;
 
 interface ToolbarProps {
   activeTool: ActiveTool;
@@ -24,6 +24,15 @@ interface ToolbarProps {
   show3D?: boolean;
   onToggle3D?: () => void;
   onExportDrawing?: () => void;
+
+  // Zoom tool variations
+  onZoomIn?: () => void;
+  onZoomOut?: () => void;
+  onZoomAll?: () => void;
+  onZoomWindow?: () => void;
+  onZoomSelection?: () => void;
+  onZoom100?: () => void;
+  onZoomPrevious?: () => void;
   
   // Options bar state
   offsetDistance: number;
@@ -55,6 +64,13 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   isFullscreen, onToggleFullscreen,
   show3D, onToggle3D,
   onExportDrawing,
+  onZoomIn,
+  onZoomOut,
+  onZoomAll,
+  onZoomWindow,
+  onZoomSelection,
+  onZoom100,
+  onZoomPrevious,
   offsetDistance, onOffsetDistanceChange,
   mirrorCopy, onMirrorCopyChange,
   drawShapeMode, onDrawShapeModeChange,
@@ -64,6 +80,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   hasBlueprint, onUploadBlueprintClick,
   isSettingScale, onStartReferenceScale
 }) => {
+  const [showZoomDropdown, setShowZoomDropdown] = useState(false);
   const [isMobileCollapsed, setIsMobileCollapsed] = useState(window.innerWidth < 640);
   const [isCompactIcons, setIsCompactIcons] = useState<boolean>(() => {
     try {
@@ -221,6 +238,168 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                     {!isCompactIcons && <span className="text-[10px] font-semibold">Redo</span>}
                   </button>
                 )}
+              </div>
+            </div>
+
+            {/* Navigate / Zoom Section (Autodesk Revit & AutoCAD standard) */}
+            <div className="flex flex-col space-y-1 pr-6 border-r border-gray-200">
+              <span className="text-[9px] font-bold text-gray-400 tracking-wider uppercase mb-0.5 select-none">Zoom</span>
+              <div className="flex items-center space-x-1">
+                {/* 1. Zoom Dropdown Menu with all variations */}
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setShowZoomDropdown(!showZoomDropdown)}
+                    className={`flex flex-col items-center justify-center rounded transition-colors ${
+                      isCompactIcons ? 'p-1.5 min-w-[34px] h-[34px]' : 'p-2'
+                    } ${
+                      activeTool === 'zoom-window'
+                        ? 'bg-amber-50 text-amber-600 border border-amber-300 font-bold'
+                        : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 border border-transparent'
+                    }`}
+                    title="Zoom Variations (AutoCAD / Revit standard)"
+                  >
+                    <div className="flex items-center gap-0.5">
+                      <ZoomIn size={18} className={isCompactIcons ? 'm-0' : 'mb-1'} />
+                      <ChevronDown size={10} className="text-gray-400" />
+                    </div>
+                    {!isCompactIcons && <span className="text-[10px] font-semibold">Zoom</span>}
+                  </button>
+
+                  {showZoomDropdown && (
+                    <div 
+                      className="absolute top-full left-0 mt-1 w-56 bg-white dark:bg-slate-900 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-800 z-50 py-1.5 text-xs animate-in fade-in zoom-in-95 duration-100"
+                      onClick={() => setShowZoomDropdown(false)}
+                    >
+                      <div className="px-3 py-1 text-[9px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100 dark:border-slate-800 mb-1">
+                        Zoom Variations (Revit / CAD)
+                      </div>
+                      <button
+                        onClick={() => { onZoomWindow?.(); onToolSelect('zoom-window'); }}
+                        className="w-full text-left px-3 py-1.5 hover:bg-amber-50 dark:hover:bg-slate-800 flex items-center justify-between text-slate-700 dark:text-slate-200 cursor-pointer"
+                      >
+                        <div className="flex items-center gap-2">
+                          <Scan size={14} className="text-amber-500" />
+                          <span className="font-medium">Zoom Region / Window</span>
+                        </div>
+                        <span className="text-[10px] font-mono text-slate-400">ZW</span>
+                      </button>
+                      <button
+                        onClick={onZoomAll}
+                        className="w-full text-left px-3 py-1.5 hover:bg-amber-50 dark:hover:bg-slate-800 flex items-center justify-between text-slate-700 dark:text-slate-200 cursor-pointer"
+                      >
+                        <div className="flex items-center gap-2">
+                          <Maximize2 size={14} className="text-sky-500" />
+                          <span className="font-medium">Zoom All / Extents</span>
+                        </div>
+                        <span className="text-[10px] font-mono text-slate-400">ZA</span>
+                      </button>
+                      <button
+                        onClick={onZoomSelection}
+                        className="w-full text-left px-3 py-1.5 hover:bg-amber-50 dark:hover:bg-slate-800 flex items-center justify-between text-slate-700 dark:text-slate-200 cursor-pointer"
+                      >
+                        <div className="flex items-center gap-2">
+                          <Target size={14} className="text-emerald-500" />
+                          <span className="font-medium">Zoom to Selection</span>
+                        </div>
+                        <span className="text-[10px] font-mono text-slate-400">ZS</span>
+                      </button>
+                      <button
+                        onClick={onZoomIn}
+                        className="w-full text-left px-3 py-1.5 hover:bg-amber-50 dark:hover:bg-slate-800 flex items-center justify-between text-slate-700 dark:text-slate-200 cursor-pointer"
+                      >
+                        <div className="flex items-center gap-2">
+                          <ZoomIn size={14} className="text-slate-500" />
+                          <span>Zoom In (+25%)</span>
+                        </div>
+                        <span className="text-[10px] font-mono text-slate-400">ZI</span>
+                      </button>
+                      <button
+                        onClick={onZoomOut}
+                        className="w-full text-left px-3 py-1.5 hover:bg-amber-50 dark:hover:bg-slate-800 flex items-center justify-between text-slate-700 dark:text-slate-200 cursor-pointer"
+                      >
+                        <div className="flex items-center gap-2">
+                          <ZoomOut size={14} className="text-slate-500" />
+                          <span>Zoom Out (-25%)</span>
+                        </div>
+                        <span className="text-[10px] font-mono text-slate-400">ZO</span>
+                      </button>
+                      <div className="my-1 border-t border-slate-100 dark:border-slate-800" />
+                      <button
+                        onClick={onZoom100}
+                        className="w-full text-left px-3 py-1.5 hover:bg-amber-50 dark:hover:bg-slate-800 flex items-center justify-between text-slate-700 dark:text-slate-200 cursor-pointer"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-bold text-slate-500">1:1</span>
+                          <span>Actual Size (100%)</span>
+                        </div>
+                        <span className="text-[10px] font-mono text-slate-400">Z1</span>
+                      </button>
+                      <button
+                        onClick={onZoomPrevious}
+                        className="w-full text-left px-3 py-1.5 hover:bg-amber-50 dark:hover:bg-slate-800 flex items-center justify-between text-slate-700 dark:text-slate-200 cursor-pointer"
+                      >
+                        <div className="flex items-center gap-2">
+                          <RotateCcw size={14} className="text-slate-500" />
+                          <span>Zoom Previous</span>
+                        </div>
+                        <span className="text-[10px] font-mono text-slate-400">ZP</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* 2. Direct Quick Button: Zoom Region / Window */}
+                <button
+                  onClick={() => { onZoomWindow?.(); onToolSelect('zoom-window'); }}
+                  title="Zoom Region (ZW) - Drag a rectangle on canvas to zoom in"
+                  className={`flex flex-col items-center justify-center rounded transition-colors ${
+                    isCompactIcons ? 'p-1.5 min-w-[34px] h-[34px]' : 'p-2'
+                  } ${
+                    activeTool === 'zoom-window'
+                      ? 'bg-amber-50 text-amber-600 border border-amber-300 font-bold'
+                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 border border-transparent'
+                  }`}
+                >
+                  <Scan size={18} className={isCompactIcons ? 'm-0' : 'mb-1'} />
+                  {!isCompactIcons && <span className="text-[10px] font-semibold">Region</span>}
+                </button>
+
+                {/* 3. Direct Quick Button: Zoom All / Extents */}
+                <button
+                  onClick={onZoomAll}
+                  title="Zoom to Fit All / Extents (ZA / ZE)"
+                  className={`flex flex-col items-center justify-center rounded transition-colors text-gray-600 hover:bg-gray-100 hover:text-gray-900 border border-transparent ${
+                    isCompactIcons ? 'p-1.5 min-w-[34px] h-[34px]' : 'p-2'
+                  }`}
+                >
+                  <Maximize2 size={18} className={isCompactIcons ? 'm-0' : 'mb-1'} />
+                  {!isCompactIcons && <span className="text-[10px] font-semibold">Fit All</span>}
+                </button>
+
+                {/* 4. Direct Quick Button: Zoom In */}
+                <button
+                  onClick={onZoomIn}
+                  title="Zoom In (+25%) [Ctrl +]"
+                  className={`flex flex-col items-center justify-center rounded transition-colors text-gray-600 hover:bg-gray-100 hover:text-gray-900 border border-transparent ${
+                    isCompactIcons ? 'p-1.5 min-w-[34px] h-[34px]' : 'p-2'
+                  }`}
+                >
+                  <ZoomIn size={18} className={isCompactIcons ? 'm-0' : 'mb-1'} />
+                  {!isCompactIcons && <span className="text-[10px] font-semibold">In</span>}
+                </button>
+
+                {/* 5. Direct Quick Button: Zoom Out */}
+                <button
+                  onClick={onZoomOut}
+                  title="Zoom Out (-25%) [Ctrl -]"
+                  className={`flex flex-col items-center justify-center rounded transition-colors text-gray-600 hover:bg-gray-100 hover:text-gray-900 border border-transparent ${
+                    isCompactIcons ? 'p-1.5 min-w-[34px] h-[34px]' : 'p-2'
+                  }`}
+                >
+                  <ZoomOut size={18} className={isCompactIcons ? 'm-0' : 'mb-1'} />
+                  {!isCompactIcons && <span className="text-[10px] font-semibold">Out</span>}
+                </button>
               </div>
             </div>
 

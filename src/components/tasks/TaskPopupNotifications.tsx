@@ -28,6 +28,7 @@ import { addHours, addDays, addMonths, isBefore } from 'date-fns';
 import type { Reminder, ReminderFrequency } from '@/src/types/tasks';
 import { Capacitor } from '@capacitor/core';
 import { LocalNotifications } from '@capacitor/local-notifications';
+import { speakAlert, getStoredVoiceSettings } from '@/src/lib/voiceAlertService';
 
 /* ─── Types ──────────────────────────────────────────────────────────────── */
 export interface TaskPopup {
@@ -43,7 +44,7 @@ export interface TaskPopup {
 }
 
 const POPUP_TTL_MS = 15000; // auto-dismiss after 15 s
-const MAX_POPUPS   = 4;    // max stacked popups
+const MAX_POPUPS = 4;    // max stacked popups
 
 /* ─── Persistent Local Storage Dismissal Helpers ─────────────────────────── */
 function getDismissedPopupKeys(userId: string): Set<string> {
@@ -78,28 +79,28 @@ function saveDismissedPopupKey(userId: string, key: string) {
     const data: Record<string, number> = raw ? JSON.parse(raw) : {};
     data[key] = Date.now();
     localStorage.setItem(`dcel_dismissed_popups_${userId}`, JSON.stringify(data));
-  } catch {}
+  } catch { }
 }
 
 /* ─── Icons per type ─────────────────────────────────────────────────────── */
 function TypeIcon({ type }: { type: TaskPopup['type'] }) {
   switch (type) {
-    case 'mention':    return <AtSign    className="w-4 h-4" />;
-    case 'assignment': return <User      className="w-4 h-4" />;
-    case 'update':     return <MessageSquare className="w-4 h-4" />;
-    case 'new_task':   return <Zap       className="w-4 h-4" />;
-    default:           return <Bell      className="w-4 h-4" />;
+    case 'mention': return <AtSign className="w-4 h-4" />;
+    case 'assignment': return <User className="w-4 h-4" />;
+    case 'update': return <MessageSquare className="w-4 h-4" />;
+    case 'new_task': return <Zap className="w-4 h-4" />;
+    default: return <Bell className="w-4 h-4" />;
   }
 }
 
 /* ─── Colour ring per type ───────────────────────────────────────────────── */
 function ringClass(type: TaskPopup['type']) {
   switch (type) {
-    case 'mention':    return 'bg-indigo-600';
+    case 'mention': return 'bg-indigo-600';
     case 'assignment': return 'bg-emerald-600';
-    case 'update':     return 'bg-sky-600';
-    case 'new_task':   return 'bg-amber-500';
-    default:           return 'bg-slate-500';
+    case 'update': return 'bg-sky-600';
+    case 'new_task': return 'bg-amber-500';
+    default: return 'bg-slate-500';
   }
 }
 
@@ -130,14 +131,13 @@ function PopupCard({
     <motion.div
       layout
       initial={{ opacity: 0, x: 80, scale: 0.9 }}
-      animate={{ opacity: 1, x: 0,  scale: 1   }}
-      exit  ={{ opacity: 0, x: 80, scale: 0.88, transition: { duration: 0.18 } }}
+      animate={{ opacity: 1, x: 0, scale: 1 }}
+      exit={{ opacity: 0, x: 80, scale: 0.88, transition: { duration: 0.18 } }}
       transition={{ type: 'spring', stiffness: 360, damping: 28 }}
-      className={`relative w-80 rounded-xl shadow-2xl border overflow-hidden ${
-        isDark
+      className={`relative w-80 rounded-xl shadow-2xl border overflow-hidden ${isDark
           ? 'bg-slate-800 border-slate-700 text-slate-100'
           : 'bg-white border-slate-200 text-slate-800'
-      }`}
+        }`}
       style={{ pointerEvents: 'all' }}
     >
       {/* Top accent colour bar */}
@@ -169,20 +169,18 @@ function PopupCard({
         <div className="flex flex-col gap-1 flex-shrink-0 ml-1">
           <button
             onClick={(e) => { e.stopPropagation(); onDismiss(popup); }}
-            className={`p-1 rounded-lg transition-colors flex items-center justify-center ${
-              isDark ? 'text-slate-500 hover:text-slate-300 hover:bg-slate-700' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'
-            }`}
+            className={`p-1 rounded-lg transition-colors flex items-center justify-center ${isDark ? 'text-slate-500 hover:text-slate-300 hover:bg-slate-700' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'
+              }`}
           >
             <X className="w-4 h-4" />
           </button>
-          
+
           {popup.reminderId && onMarkAsDone && (
             <button
               onClick={(e) => { e.stopPropagation(); onMarkAsDone(popup); }}
               title="Mark as Done"
-              className={`p-1 rounded-lg transition-colors flex items-center justify-center mt-1 ${
-                isDark ? 'text-emerald-500 hover:bg-emerald-900/30' : 'text-emerald-600 hover:bg-emerald-50'
-              }`}
+              className={`p-1 rounded-lg transition-colors flex items-center justify-center mt-1 ${isDark ? 'text-emerald-500 hover:bg-emerald-900/30' : 'text-emerald-600 hover:bg-emerald-50'
+                }`}
             >
               <CheckCircle2 className="w-4 h-4" />
             </button>
@@ -236,7 +234,7 @@ export function TaskPopupNotifications() {
     // Scheduled reminders are handled by the syncLocalNotifications logic in AppDataContext.
     if (Capacitor.isNativePlatform() && !p.skipNative) {
       let notificationId = p.nativeId;
-      
+
       if (!notificationId) {
         const seed = p.reminderId || dedupeKey || p.title;
         notificationId = Math.abs(seed.split('').reduce((a, b) => { a = ((a << 5) - a) + b.charCodeAt(0); return a & a; }, 0)) % 1000000;
@@ -311,14 +309,14 @@ export function TaskPopupNotifications() {
           default: nextDate = addDays(nextDate, 1); break;
         }
       }
-      
+
       if (rem.endAt && isBefore(new Date(rem.endAt), nextDate)) {
         updateReminder(rem.id, { isActive: false });
       } else {
         updateReminder(rem.id, { remindAt: nextDate.toISOString() });
       }
     }
-    
+
     dismiss(popup);
   }, [reminders, updateReminder, dismiss, user?.id]);
 
@@ -348,7 +346,7 @@ export function TaskPopupNotifications() {
         // Skip mention-type reminders (handled by task_updates listener)
         if (rem.title?.startsWith('Mentioned')) return;
 
-        const isGlobal    = !rem.recipientIds || rem.recipientIds.length === 0;
+        const isGlobal = !rem.recipientIds || rem.recipientIds.length === 0;
         const isRecipient = isGlobal || rem.recipientIds?.includes(userId);
         if (!isRecipient) return;
 
@@ -365,7 +363,7 @@ export function TaskPopupNotifications() {
         }
 
         const diff = now - popupStartDate;
-        
+
         // Not due yet
         if (diff < 0) return;
 
@@ -379,7 +377,7 @@ export function TaskPopupNotifications() {
           const todayStr = new Date().toISOString().split('T')[0];
           const lastSentStr = lastSent ? lastSent.toISOString().split('T')[0] : '';
           const invDedupeKey = `inv-rem-${rem.id}-${todayStr}`;
-          
+
           if (lastSentStr === todayStr || dismissedSet.has(invDedupeKey) || shownIds.current.has(invDedupeKey)) {
             return; // Already notified today
           }
@@ -426,16 +424,16 @@ export function TaskPopupNotifications() {
           if (!isCreator && !isAssigned) return;
         }
 
-        const isNewTask  = rem.title === 'New Task Created';
+        const isNewTask = rem.title === 'New Task Created';
         const isAssigned = rem.title?.startsWith('Assigned') || rem.title?.includes('assigned');
 
         let type: TaskPopup['type'] = 'update';
-        if (isNewTask)  type = 'new_task';
+        if (isNewTask) type = 'new_task';
         else if (isAssigned) type = 'assignment';
 
         const dedupeKey = isInvoiceReminder
           ? `inv-rem-${rem.id}-${new Date().toISOString().split('T')[0]}`
-          : (isAssigned && rem.subtaskId) 
+          : (isAssigned && rem.subtaskId)
             ? `assign-sub-${rem.subtaskId}`
             : (isAssigned && rem.mainTaskId)
               ? `assign-main-${rem.mainTaskId}`
@@ -446,8 +444,8 @@ export function TaskPopupNotifications() {
         pushPopup({
           type,
           title: isNewTask ? '🆕 New Task' : isAssigned ? '✅ Task Assigned' : '🔔 Reminder',
-          body:  rem.body || rem.title || 'You have a reminder',
-          taskUrl:   rem.mainTaskId ? `/tasks?openTask=${rem.mainTaskId}` : undefined,
+          body: rem.body || rem.title || 'You have a reminder',
+          taskUrl: rem.mainTaskId ? `/tasks?openTask=${rem.mainTaskId}` : undefined,
           dedupeKey,
           reminderId: rem.id,
           skipNative: true, // Reminders are already handled by native scheduling in AppDataContext
@@ -489,31 +487,31 @@ export function TaskPopupNotifications() {
           // Don't notify on own comments
           if (comment.author_id === userId || comment.authorId === userId) return;
 
-          const subtaskId   = comment.subtask_id || comment.subtaskId;
-          const mainTaskId  = comment.main_task_id || comment.mainTaskId;
+          const subtaskId = comment.subtask_id || comment.subtaskId;
+          const mainTaskId = comment.main_task_id || comment.mainTaskId;
 
           // Is the current user assigned to this subtask or main task?
-          const sub  = subtaskId  ? subtasks.find(s => s.id === subtaskId)  : null;
-          const mt   = mainTaskId ? mainTasks.find(m => m.id === mainTaskId) : null;
+          const sub = subtaskId ? subtasks.find(s => s.id === subtaskId) : null;
+          const mt = mainTaskId ? mainTasks.find(m => m.id === mainTaskId) : null;
 
-          const subAssignees  = (sub?.assignedTo || sub?.assigned_to || '').split(',').map((x: string) => x.trim());
-          const mtAssignees   = (mt?.assignedTo  || mt?.assigned_to  || '').split(',').map((x: string) => x.trim());
-          const isSubCreator  = sub?.createdBy === userId || sub?.created_by === userId;
-          const isMtCreator   = mt?.createdBy  === userId || mt?.created_by  === userId;
+          const subAssignees = (sub?.assignedTo || sub?.assigned_to || '').split(',').map((x: string) => x.trim());
+          const mtAssignees = (mt?.assignedTo || mt?.assigned_to || '').split(',').map((x: string) => x.trim());
+          const isSubCreator = sub?.createdBy === userId || sub?.created_by === userId;
+          const isMtCreator = mt?.createdBy === userId || mt?.created_by === userId;
 
           // Check for @mention in text FIRST so we can include it in the isRelevant check
-          const myName   = (currentUser?.name || '').toLowerCase();
-          const text     = (comment.content || comment.text || '').toLowerCase();
+          const myName = (currentUser?.name || '').toLowerCase();
+          const text = (comment.content || comment.text || '').toLowerCase();
           const isMention = !!myName && text.includes(`@${myName.split(' ')[0].toLowerCase()}`);
 
           let isReplyToMe = false;
           const replyMatch = text.match(/\[reply_to:([\w-]+)\]/);
           if (replyMatch) {
-              const targetCommentId = replyMatch[1];
-              const targetComment = comments.find(c => c.id === targetCommentId);
-              if (targetComment && (targetComment.author_id === userId || targetComment.authorId === userId)) {
-                  isReplyToMe = true;
-              }
+            const targetCommentId = replyMatch[1];
+            const targetComment = comments.find(c => c.id === targetCommentId);
+            if (targetComment && (targetComment.author_id === userId || targetComment.authorId === userId)) {
+              isReplyToMe = true;
+            }
           }
 
           const isRelevant = subAssignees.includes(userId) || mtAssignees.includes(userId) || isSubCreator || isMtCreator || isMention || isReplyToMe;
@@ -526,11 +524,11 @@ export function TaskPopupNotifications() {
           const taskTitle = mt?.title || sub?.title || 'a task';
 
           pushPopup({
-            type:      isMention ? 'mention' : 'update',
-            title:     isMention ? `@ You were mentioned` : isReplyToMe ? `↩️ Someone replied to you` : `💬 New update on task`,
-            body:      `${taskTitle}: ${(comment.content || comment.text || '').replace(/\[reply_to:[\w-]+\]/g, '').trim().slice(0, 80)}`,
-            taskUrl:   mainTaskId ? `/tasks?openTask=${mainTaskId}` : undefined,
-            subtaskUrl: subtaskId ? `/tasks?open=${subtaskId}`     : undefined,
+            type: isMention ? 'mention' : 'update',
+            title: isMention ? `@ You were mentioned` : isReplyToMe ? `↩️ Someone replied to you` : `💬 New update on task`,
+            body: `${taskTitle}: ${(comment.content || comment.text || '').replace(/\[reply_to:[\w-]+\]/g, '').trim().slice(0, 80)}`,
+            taskUrl: mainTaskId ? `/tasks?openTask=${mainTaskId}` : undefined,
+            subtaskUrl: subtaskId ? `/tasks?open=${subtaskId}` : undefined,
             dedupeKey: `comment-popup-${comment.id}`,
           });
         }
@@ -575,7 +573,7 @@ export function TaskPopupNotifications() {
               'completed': 'Completed'
             };
             const newStatusLabel = statusLabels[payload.new.status] || payload.new.status;
-            
+
             if (payload.new.status === 'completed') {
               title = '🎉 Task Completed!';
             } else if (existingSub && existingSub.status === 'completed' && payload.new.status !== 'completed') {
@@ -592,9 +590,9 @@ export function TaskPopupNotifications() {
           pushPopup({
             type,
             title,
-            body:      `${payload.new.title}${mt ? ` (${mt.title})` : ''}`,
+            body: `${payload.new.title}${mt ? ` (${mt.title})` : ''}`,
             subtaskUrl: `/tasks?open=${payload.new.id}`,
-            taskUrl:   mt ? `/tasks?openTask=${mt.id}` : undefined,
+            taskUrl: mt ? `/tasks?openTask=${mt.id}` : undefined,
             dedupeKey: `assign-sub-${payload.new.id}-${payload.new.status}-${newAssigned}`,
           });
         }
@@ -603,7 +601,7 @@ export function TaskPopupNotifications() {
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'subtasks' },
         payload => {
-          const newAssigned = (payload.new?.assignedTo  || payload.new?.assigned_to  || '');
+          const newAssigned = (payload.new?.assignedTo || payload.new?.assigned_to || '');
           const creator = (payload.new?.createdBy || payload.new?.created_by || '');
           // only notify if assigned to us, and we are not the one who created it!
           if (!newAssigned.includes(userId) || creator === userId) return;
@@ -616,11 +614,11 @@ export function TaskPopupNotifications() {
           if (isExternalHr && mt && !mt.is_hr_task && !isCreator && !isAssigned) return;
 
           pushPopup({
-            type:      'assignment',
-            title:     '✅ You were assigned a new task',
-            body:      `${payload.new.title}${mt ? ` (${mt.title})` : ''}`,
+            type: 'assignment',
+            title: '✅ You were assigned a new task',
+            body: `${payload.new.title}${mt ? ` (${mt.title})` : ''}`,
             subtaskUrl: `/tasks?open=${payload.new.id}`,
-            taskUrl:   mt ? `/tasks?openTask=${mt.id}` : undefined,
+            taskUrl: mt ? `/tasks?openTask=${mt.id}` : undefined,
             dedupeKey: `assign-sub-insert-${payload.new.id}`,
           });
         }

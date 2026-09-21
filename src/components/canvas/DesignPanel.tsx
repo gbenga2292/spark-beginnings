@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { Lock, Unlock, ChevronUp, ChevronDown, Layers, ChevronLeft, ChevronRight, Eye, EyeOff, Plus, Trash2, Edit2, Check } from 'lucide-react';
+import { Lock, Unlock, ChevronUp, ChevronDown, Layers, ChevronLeft, ChevronRight, Eye, EyeOff, Plus, Trash2, Edit2, Check, X } from 'lucide-react';
 import { ElevationLevel } from '../../utils/simulationLogic';
 import { CADLayer } from '../../utils/cadDataModels';
 
-interface LayerItem {
+export interface LayerItem {
   id: string;
   type: 'area' | 'line' | 'component';
   label: string;
@@ -13,7 +13,7 @@ interface LayerItem {
   color: string;
 }
 
-interface DesignPanelProps {
+export interface DesignPanelProps {
   layerItems: LayerItem[];
   selectedId: string | null;
   onSelectLayer: (id: string) => void;
@@ -36,6 +36,8 @@ interface DesignPanelProps {
   onUpdateCadLayer?: (id: string, updates: Partial<CADLayer>) => void;
   onAddCadLayer?: (layer: CADLayer) => void;
   onDeleteCadLayer?: (id: string) => void;
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
 export const DesignPanel: React.FC<DesignPanelProps> = ({
@@ -60,9 +62,17 @@ export const DesignPanel: React.FC<DesignPanelProps> = ({
   onUpdateCadLayer,
   onAddCadLayer,
   onDeleteCadLayer,
+  isCollapsed: isCollapsedProp,
+  onToggleCollapse,
 }) => {
   const [activeTab, setActiveTab] = useState<'layers' | 'cadlayers' | 'levels'>('cadlayers');
-  const [isCollapsed, setIsCollapsed] = useState(window.innerWidth < 640);
+  const [internalCollapsed, setInternalCollapsed] = useState(false);
+  const isCollapsed = isCollapsedProp !== undefined ? isCollapsedProp : internalCollapsed;
+
+  const handleToggle = () => {
+    if (onToggleCollapse) onToggleCollapse();
+    else setInternalCollapsed(p => !p);
+  };
   const [editingLevelId, setEditingLevelId] = useState<string | null>(null);
   const [editLevelName, setEditLevelName] = useState('');
   const [editLevelDepth, setEditLevelDepth] = useState(0);
@@ -133,9 +143,18 @@ export const DesignPanel: React.FC<DesignPanelProps> = ({
         style={{ width: PANEL_WIDTH, transform: isCollapsed ? `translateX(-${PANEL_WIDTH}px)` : 'translateX(0)' }}
       >
         {/* Header */}
-        <div className="flex items-center gap-1.5 px-3 py-3 border-b border-slate-200 bg-slate-50 shrink-0">
-          <Layers size={16} className="text-slate-500" />
-          <span className="text-sm font-bold text-slate-700 tracking-wide whitespace-nowrap">Design Tools</span>
+        <div className="flex items-center justify-between px-3 py-3 border-b border-slate-200 bg-slate-50 shrink-0">
+          <div className="flex items-center gap-1.5">
+            <Layers size={16} className="text-blue-600" />
+            <span className="text-sm font-bold text-slate-700 tracking-wide whitespace-nowrap">Layers & Levels</span>
+          </div>
+          <button
+            onClick={handleToggle}
+            className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 rounded transition-colors cursor-pointer"
+            title="Close Panel (F7)"
+          >
+            <X size={14} />
+          </button>
         </div>
 
         {/* Tabs */}
@@ -433,9 +452,9 @@ export const DesignPanel: React.FC<DesignPanelProps> = ({
 
       {/* Collapse / expand toggle */}
       <button
-        onClick={() => setIsCollapsed((prev) => !prev)}
-        className="absolute top-1/2 -translate-y-1/2 right-0 translate-x-full flex items-center justify-center w-5 h-10 bg-white border border-l-0 border-slate-200 rounded-r-md shadow-sm hover:bg-slate-50 text-slate-400 hover:text-slate-600 transition-colors z-20"
-        title={isCollapsed ? 'Expand Design Tools' : 'Collapse Design Tools'}
+        onClick={handleToggle}
+        className="absolute top-1/2 -translate-y-1/2 right-0 translate-x-full flex items-center justify-center w-5 h-10 bg-white border border-l-0 border-slate-200 rounded-r-md shadow-sm hover:bg-slate-50 text-slate-400 hover:text-slate-600 transition-colors z-20 cursor-pointer"
+        title={isCollapsed ? 'Expand Layers & Levels (F7)' : 'Collapse Layers & Levels (F7)'}
       >
         {isCollapsed ? <ChevronRight size={13} /> : <ChevronLeft size={13} />}
       </button>

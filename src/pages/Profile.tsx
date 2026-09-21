@@ -8,13 +8,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/src
 import { Avatar, AvatarFallback, AvatarImage } from '@/src/components/ui/avatar';
 import { supabase } from '@/src/integrations/supabase/client';
 import { useTheme, ALL_COLOR_THEMES, ALL_UI_THEMES, type ColorTheme, type UITheme } from '@/src/hooks/useTheme';
-import { 
-  User, 
-  Mail, 
-  Lock, 
-  Shield, 
-  Camera, 
-  Save, 
+import {
+  User,
+  Mail,
+  Lock,
+  Shield,
+  Camera,
+  Save,
   ArrowLeft,
   AlertCircle,
   CheckCircle2,
@@ -30,25 +30,36 @@ import {
   Upload,
   Trash2,
   Sparkles,
-  RotateCcw
+  RotateCcw,
+  Volume2,
+  VolumeX,
+  Radio
 } from 'lucide-react';
 import { BiometricAuth } from '@aparajita/capacitor-biometric-auth';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { toast, showConfirm } from '@/src/components/ui/toast';
+import { useSystemAlerts } from '@/src/hooks/useSystemAlerts';
+import {
+  getStoredVoiceSettings,
+  saveVoiceSettings,
+  speakAlert,
+  generateBriefingText,
+  type VoiceAlertSettings
+} from '@/src/lib/voiceAlertService';
 
 const COLOR_THEMES: { id: ColorTheme; label: string; swatches: string[] }[] = [
   { id: 'default', label: 'Default (Cobalt)', swatches: ['#1d4ed8', '#2563eb', '#60a5fa'] },
-  { id: 'ocean',   label: 'Ocean Blue',  swatches: ['#2563eb', '#3b82f6', '#60a5fa'] },
-  { id: 'forest',  label: 'Forest Green',swatches: ['#059669', '#10b981', '#34d399'] },
-  { id: 'sunset',  label: 'Sunset Amber',swatches: ['#d97706', '#f59e0b', '#fbbf24'] },
-  { id: 'rose',    label: 'Rose Pink',   swatches: ['#e11d48', '#f43f5e', '#fb7185'] },
-  { id: 'sky',     label: 'Sky Blue',    swatches: ['#0369a1', '#0284c7', '#38bdf8'] },
-  { id: 'slate',   label: 'Slate Gray',  swatches: ['#475569', '#64748b', '#94a3b8'] },
-  { id: 'burgundy',label: 'Burgundy IDE',swatches: ['#380000', '#9f1239', '#fb7185'] },
-  { id: 'midnight',label: 'Midnight IDE',swatches: ['#001428', '#0284c7', '#38bdf8'] },
+  { id: 'ocean', label: 'Ocean Blue', swatches: ['#2563eb', '#3b82f6', '#60a5fa'] },
+  { id: 'forest', label: 'Forest Green', swatches: ['#059669', '#10b981', '#34d399'] },
+  { id: 'sunset', label: 'Sunset Amber', swatches: ['#d97706', '#f59e0b', '#fbbf24'] },
+  { id: 'rose', label: 'Rose Pink', swatches: ['#e11d48', '#f43f5e', '#fb7185'] },
+  { id: 'sky', label: 'Sky Blue', swatches: ['#0369a1', '#0284c7', '#38bdf8'] },
+  { id: 'slate', label: 'Slate Gray', swatches: ['#475569', '#64748b', '#94a3b8'] },
+  { id: 'burgundy', label: 'Burgundy IDE', swatches: ['#380000', '#9f1239', '#fb7185'] },
+  { id: 'midnight', label: 'Midnight IDE', swatches: ['#001428', '#0284c7', '#38bdf8'] },
   { id: 'monokai', label: 'Monokai IDE', swatches: ['#272822', '#88c010', '#a6e22e'] },
-  { id: 'solarized',label: 'Solarized Dark', swatches: ['#002b36', '#218c83', '#2aa198'] },
-  { id: 'tokyo-night',label: 'Tokyo Night', swatches: ['#1a1b26', '#4264b3', '#7aa2f7'] },
+  { id: 'solarized', label: 'Solarized Dark', swatches: ['#002b36', '#218c83', '#2aa198'] },
+  { id: 'tokyo-night', label: 'Tokyo Night', swatches: ['#1a1b26', '#4264b3', '#7aa2f7'] },
 ];
 
 export function Profile() {
@@ -57,24 +68,24 @@ export function Profile() {
   const { updateUser, getCurrentUser } = useUserStore();
   const { isDark, setLight, setDark, colorTheme, setColorTheme, showFloatingCalendar, setShowFloatingCalendar } = useTheme();
   const currentUser = getCurrentUser();
-  
+
   const [isEditing, setIsEditing] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [avatarPreview, setAvatarPreview] = useState<string | undefined>(currentUser?.avatar || user?.avatar);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
+
   const [signaturePreview, setSignaturePreview] = useState<string | undefined>(currentUser?.signature || (user as any)?.signature);
   const [isUploadingSignature, setIsUploadingSignature] = useState(false);
   const signatureInputRef = useRef<HTMLInputElement>(null);
-  
+
   // Form states
   const [name, setName] = useState(currentUser?.name || user?.name || '');
   const [email, setEmail] = useState(currentUser?.email || user?.email || '');
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  
+
   // Messages
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
@@ -88,11 +99,62 @@ export function Profile() {
   const [mfaFactorId, setMfaFactorId] = useState('');
   const [mfaCode, setMfaCode] = useState('');
 
-  // Biometric States
+  // Biometric Auth States
   const [isBiometricAvailable, setIsBiometricAvailable] = useState(false);
   const [isBiometricEnabled, setIsBiometricEnabled] = useState(false);
   const [showBiometricPasswordPrompt, setShowBiometricPasswordPrompt] = useState(false);
   const [biometricSetupPassword, setBiometricSetupPassword] = useState('');
+
+  // Voice Alert Settings
+  const { activeAlerts } = useSystemAlerts();
+  const [voiceSettings, setVoiceSettings] = useState<VoiceAlertSettings>(() => getStoredVoiceSettings());
+  const [isTestingVoice, setIsTestingVoice] = useState(false);
+  const [availableVoices, setAvailableVoices] = useState<Array<{ name: string; lang: string; isNatural: boolean }>>([]);
+
+  useEffect(() => {
+    const loadVoices = () => {
+      if (!('speechSynthesis' in window)) return;
+      const voices = window.speechSynthesis.getVoices();
+      if (voices.length > 0) {
+        const enVoices = voices.filter(v => v.lang.startsWith('en'));
+        const mapped = enVoices.map(v => ({
+          name: v.name,
+          lang: v.lang,
+          isNatural: /natural|neural|online|google|aria|jenny|guy|sonia/i.test(v.name),
+        }));
+        mapped.sort((a, b) => (b.isNatural ? 1 : 0) - (a.isNatural ? 1 : 0));
+        setAvailableVoices(mapped);
+      }
+    };
+    loadVoices();
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.onvoiceschanged = loadVoices;
+    }
+    return () => {
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.onvoiceschanged = null;
+      }
+    };
+  }, []);
+
+  const handleUpdateVoice = (updates: Partial<VoiceAlertSettings>) => {
+    const updated = saveVoiceSettings(updates);
+    setVoiceSettings(updated);
+  };
+
+  const handleTestVoice = async () => {
+    setIsTestingVoice(true);
+    const userName = currentUser?.name ? currentUser.name.split(' ')[0] : 'Director';
+    const briefing = generateBriefingText(activeAlerts, userName);
+    const textToSpeak = briefing.hasContent
+      ? briefing.speechText
+      : `Hello ${userName}. Voice alert announcements are functioning properly for DCEL Office Suite. All active site invoices are up to date and no diesel refills are pending for today or tomorrow.`;
+    await speakAlert(textToSpeak, {
+      force: true,
+      withChime: true,
+    });
+    setIsTestingVoice(false);
+  };
 
   useEffect(() => {
     const checkMfa = async () => {
@@ -101,9 +163,9 @@ export function Profile() {
         const activeFactors = factorsData?.totp ?? [];
         setFactors(activeFactors.filter(f => f.status === 'verified'));
         if (activeFactors.some(f => f.status === 'verified')) {
-           setMfaStatus('verified');
+          setMfaStatus('verified');
         } else {
-           setMfaStatus('unverified');
+          setMfaStatus('unverified');
         }
       } catch (err) {
         console.error('Failed to load MFA:', err);
@@ -144,12 +206,12 @@ export function Profile() {
     try {
       const emailToUse = currentUser?.email || user?.email;
       if (!emailToUse) throw new Error('No email found');
-      
+
       const { error } = await supabase.auth.signInWithPassword({ email: emailToUse, password: biometricSetupPassword });
       if (error) throw error;
-      
+
       await BiometricAuth.authenticate({ reason: 'Authenticate to enable Biometric Sign-In' });
-      
+
       const creds = btoa(JSON.stringify({ email: emailToUse, password: biometricSetupPassword }));
       localStorage.setItem('biometric_credentials', creds);
       setIsBiometricEnabled(true);
@@ -185,7 +247,7 @@ export function Profile() {
     try {
       const { data: challenge, error: challengeErr } = await supabase.auth.mfa.challenge({ factorId: mfaFactorId });
       if (challengeErr) throw challengeErr;
-      
+
       const { error } = await supabase.auth.mfa.verify({
         factorId: mfaFactorId,
         challengeId: challenge.id,
@@ -195,7 +257,7 @@ export function Profile() {
       setSuccessMessage('Two-Factor Authentication successfully enabled!');
       setMfaStatus('verified');
       setIsEnrollingMfa(false);
-      
+
       const { data: factorsData } = await supabase.auth.mfa.listFactors();
       setFactors(factorsData?.totp?.filter(f => f.status === 'verified') ?? []);
     } catch (err: any) {
@@ -556,11 +618,10 @@ export function Profile() {
                   <button
                     type="button"
                     onClick={() => setLight()}
-                    className={`flex items-center justify-center gap-2.5 p-3 rounded-xl border text-sm font-bold transition-all cursor-pointer ${
-                      !isDark
+                    className={`flex items-center justify-center gap-2.5 p-3 rounded-xl border text-sm font-bold transition-all cursor-pointer ${!isDark
                         ? 'bg-white text-slate-900 border-blue-600 dark:border-blue-400 ring-2 ring-blue-500/20 shadow-md'
                         : 'bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'
-                    }`}
+                      }`}
                   >
                     <Sun className={`h-4 w-4 ${!isDark ? 'text-amber-500' : 'text-slate-400'}`} />
                     Light Mode
@@ -569,11 +630,10 @@ export function Profile() {
                   <button
                     type="button"
                     onClick={() => setDark()}
-                    className={`flex items-center justify-center gap-2.5 p-3 rounded-xl border text-sm font-bold transition-all cursor-pointer ${
-                      isDark
+                    className={`flex items-center justify-center gap-2.5 p-3 rounded-xl border text-sm font-bold transition-all cursor-pointer ${isDark
                         ? 'bg-slate-900 text-white border-blue-500 ring-2 ring-blue-500/30 shadow-md'
                         : 'bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'
-                    }`}
+                      }`}
                   >
                     <Moon className={`h-4 w-4 ${isDark ? 'text-blue-400' : 'text-slate-400'}`} />
                     Dark Mode
@@ -617,11 +677,10 @@ export function Profile() {
                         key={theme.id}
                         type="button"
                         onClick={() => setColorTheme(theme.id)}
-                        className={`flex items-center justify-between p-3 rounded-xl border text-left transition-all cursor-pointer ${
-                          isActive
+                        className={`flex items-center justify-between p-3 rounded-xl border text-left transition-all cursor-pointer ${isActive
                             ? 'border-blue-600 dark:border-blue-400 bg-blue-50/70 dark:bg-blue-950/40 ring-2 ring-blue-500/20 shadow-sm font-bold'
                             : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 text-slate-700 dark:text-slate-300'
-                        }`}
+                          }`}
                       >
                         <div className="flex items-center gap-2.5 min-w-0">
                           <div className="flex -space-x-1 shrink-0">
@@ -669,15 +728,198 @@ export function Profile() {
                 <button
                   type="button"
                   onClick={() => setShowFloatingCalendar(!showFloatingCalendar)}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-all duration-300 shadow-inner cursor-pointer ${
-                    showFloatingCalendar ? 'bg-emerald-500' : 'bg-slate-200 dark:bg-slate-700'
-                  }`}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-all duration-300 shadow-inner cursor-pointer ${showFloatingCalendar ? 'bg-emerald-500' : 'bg-slate-200 dark:bg-slate-700'
+                    }`}
                 >
-                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-md transition-transform duration-300 ${
-                    showFloatingCalendar ? 'translate-x-6' : 'translate-x-1'
-                  }`} />
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-md transition-transform duration-300 ${showFloatingCalendar ? 'translate-x-6' : 'translate-x-1'
+                    }`} />
                 </button>
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Voice Alert Settings */}
+          <Card className="border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden rounded-2xl">
+            <CardHeader className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 flex items-center justify-center shadow-sm">
+                    {voiceSettings.enabled ? (
+                      <Volume2 className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                    ) : (
+                      <VolumeX className="h-5 w-5 text-slate-400" />
+                    )}
+                  </div>
+                  <div>
+                    <CardTitle className="text-sm font-semibold text-slate-800 dark:text-slate-200">Voice Alerts & Audio Assistant</CardTitle>
+                    <CardDescription className="text-xs text-slate-500">Spoken audio announcements for overdue invoices and deadlines</CardDescription>
+                  </div>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleTestVoice}
+                  disabled={isTestingVoice}
+                  className="h-8 px-3 rounded-lg text-xs font-semibold gap-1.5 border-slate-200 dark:border-slate-700"
+                >
+                  {isTestingVoice ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Radio className="h-3.5 w-3.5 text-indigo-500" />}
+                  <span>Test Voice</span>
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="p-4 sm:p-6 space-y-4">
+              {/* Master Toggle */}
+              <div className="flex items-center justify-between p-3.5 rounded-xl bg-white dark:bg-slate-800/30 border border-slate-100 dark:border-slate-800/60">
+                <div>
+                  <p className="text-xs font-semibold text-slate-900 dark:text-white">Enable Spoken Voice Alerts</p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">Allow the app to verbally announce high-priority items</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleUpdateVoice({ enabled: !voiceSettings.enabled })}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-all duration-300 shadow-inner cursor-pointer ${voiceSettings.enabled ? 'bg-indigo-600' : 'bg-slate-200 dark:bg-slate-700'
+                    }`}
+                >
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-md transition-transform duration-300 ${voiceSettings.enabled ? 'translate-x-6' : 'translate-x-1'
+                    }`} />
+                </button>
+              </div>
+
+              {voiceSettings.enabled && (
+                <div className="space-y-4 pt-2 animate-in fade-in-50 duration-200">
+                  {/* Voice Persona & Specific Natural Voice Picker */}
+                  <div className="space-y-3">
+                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block">
+                      Voice Persona & Accent
+                    </label>
+
+                    {/* Quick Tone Buttons */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleUpdateVoice({ voiceGender: 'female', voiceName: '' })}
+                        className={`p-2.5 text-xs rounded-xl border text-center transition-all cursor-pointer ${
+                          voiceSettings.voiceGender === 'female' && !voiceSettings.voiceName
+                            ? 'border-indigo-600 bg-indigo-50/70 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 font-bold shadow-xs'
+                            : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50'
+                        }`}
+                      >
+                        Female (Natural Assistant)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleUpdateVoice({ voiceGender: 'male', voiceName: '' })}
+                        className={`p-2.5 text-xs rounded-xl border text-center transition-all cursor-pointer ${
+                          voiceSettings.voiceGender === 'male' && !voiceSettings.voiceName
+                            ? 'border-indigo-600 bg-indigo-50/70 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 font-bold shadow-xs'
+                            : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50'
+                        }`}
+                      >
+                        Male (Deep Assistant)
+                      </button>
+                    </div>
+
+                    {/* Specific Voice Dropdown Selector */}
+                    <div className="space-y-1.5 pt-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-medium text-slate-600 dark:text-slate-400">
+                          Specific Voice Choice
+                        </span>
+                        {voiceSettings.voiceName && (
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateVoice({ voiceName: '' })}
+                            className="text-[10px] text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
+                          >
+                            Reset to Auto-Natural
+                          </button>
+                        )}
+                      </div>
+
+                      <select
+                        value={voiceSettings.voiceName || ''}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          const isMale = /male|david|guy|ryan|mark|andrew|brian|thomas/i.test(val);
+                          handleUpdateVoice({
+                            voiceName: val,
+                            voiceGender: isMale ? 'male' : 'female'
+                          });
+                        }}
+                        className="w-full text-xs font-medium bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer"
+                      >
+                        <option value="">✨ Auto-Select Best Natural Voice ({voiceSettings.voiceGender === 'female' ? 'Female' : 'Male'})</option>
+                        {availableVoices.length > 0 ? (
+                          availableVoices.map((v) => (
+                            <option key={v.name} value={v.name}>
+                              {v.isNatural ? '✨ ' : ''}{v.name} ({v.lang})
+                            </option>
+                          ))
+                        ) : (
+                          <>
+                            <option value="Microsoft Jenny">✨ Microsoft Jenny (Natural Studio)</option>
+                            <option value="Microsoft Aria">✨ Microsoft Aria (Natural Professional)</option>
+                            <option value="Microsoft Guy">✨ Microsoft Guy (Natural Deep)</option>
+                            <option value="Microsoft Sonia">✨ Microsoft Sonia (Natural British)</option>
+                            <option value="Microsoft Zira">Microsoft Zira (Windows OneCore)</option>
+                            <option value="Microsoft David">Microsoft David (Windows OneCore)</option>
+                          </>
+                        )}
+                      </select>
+
+                      <p className="text-[10px] text-slate-400 dark:text-slate-500 leading-relaxed pt-1">
+                        ✨ Voices with a sparkle icon feature neural human intonation. You can also download more free natural voices in Windows Settings → Time & Language → Speech.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Volume Slider */}
+                  <div>
+                    <div className="flex items-center justify-between text-xs mb-1.5 font-semibold text-slate-700 dark:text-slate-300">
+                      <span>Volume</span>
+                      <span className="text-indigo-600 dark:text-indigo-400">{Math.round(voiceSettings.volume * 100)}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0.1"
+                      max="1.0"
+                      step="0.05"
+                      value={voiceSettings.volume}
+                      onChange={(e) => handleUpdateVoice({ volume: parseFloat(e.target.value) })}
+                      className="w-full accent-indigo-600 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg cursor-pointer"
+                    />
+                  </div>
+
+                  {/* Scenarios */}
+                  <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                    <label className="flex items-center justify-between p-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/40 cursor-pointer">
+                      <div>
+                        <p className="text-xs font-medium text-slate-800 dark:text-slate-200">Session Launch Briefing</p>
+                        <p className="text-[11px] text-slate-400">Verbally summarize overdue invoices & today's tasks on first open</p>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={voiceSettings.sessionBriefing}
+                        onChange={(e) => handleUpdateVoice({ sessionBriefing: e.target.checked })}
+                        className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4"
+                      />
+                    </label>
+
+                    <label className="flex items-center justify-between p-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/40 cursor-pointer">
+                      <div>
+                        <p className="text-xs font-medium text-slate-800 dark:text-slate-200">Realtime Due Invoices & Reminders</p>
+                        <p className="text-[11px] text-slate-400">Speak urgent alert immediately when an item crosses the deadline</p>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={voiceSettings.realtimeAlerts}
+                        onChange={(e) => handleUpdateVoice({ realtimeAlerts: e.target.checked })}
+                        className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4"
+                      />
+                    </label>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -695,8 +937,8 @@ export function Profile() {
                   </div>
                 </div>
                 {!isEditing && (
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     size="sm"
                     onClick={() => setIsEditing(true)}
                     className="h-8 px-4 rounded-lg font-bold text-[10px] uppercase tracking-wider border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
@@ -728,14 +970,14 @@ export function Profile() {
                     <p className="text-[10px] text-slate-400 italic px-2 font-medium">Registered email cannot be changed</p>
                   </div>
                   <div className="flex flex-col sm:flex-row gap-3 pt-2">
-                    <Button 
+                    <Button
                       onClick={handleSaveProfile}
                       className="bg-blue-600 hover:bg-blue-700 text-white font-bold h-11 rounded-xl shadow-lg active:scale-95 transition-all"
                     >
                       <Save className="h-4 w-4 mr-2" />
                       Save Changes
                     </Button>
-                    <Button 
+                    <Button
                       variant="ghost"
                       onClick={() => {
                         setIsEditing(false);
@@ -839,18 +1081,18 @@ export function Profile() {
                   </Button>
                 </div>
               )}
-              
+
               {/* MFA / Two-Factor Authentication Divider */}
               <div className="h-px bg-slate-100 dark:bg-slate-800 my-6" />
-              
+
               {isEnrollingMfa ? (
                 <div className="space-y-5 bg-slate-50 dark:bg-slate-800/50 border border-blue-100 dark:border-blue-900/30 p-5 rounded-xl animate-in zoom-in-95 duration-300">
                   <div className="flex items-center gap-2">
-                      <div className="h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
-                      <p className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider">MFA Setup Wizard</p>
+                    <div className="h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
+                    <p className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider">MFA Setup Wizard</p>
                   </div>
                   <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">Scan this code with an Authenticator app (Authy, Google Authenticator, etc).</p>
-                  
+
                   <div className="flex flex-col items-center py-2">
                     <div className="bg-white p-3 rounded-xl shadow-xl inline-block border-4 border-white" dangerouslySetInnerHTML={{ __html: mfaQr }} />
                     <div className="mt-4 p-2 bg-slate-100 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 w-full max-w-[280px]">
@@ -858,19 +1100,19 @@ export function Profile() {
                       <p className="text-[10px] text-slate-600 dark:text-slate-300 tracking-widest font-mono text-center break-all select-all">{mfaSecret}</p>
                     </div>
                   </div>
-                  
+
                   <div className="space-y-2 pt-2">
-                     <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1 text-center block">6-Digit Verification Code</label>
-                     <Input 
-                       type="text" 
-                       value={mfaCode} 
-                       onChange={(e) => setMfaCode(e.target.value)}
-                       placeholder="000 000"
-                       className="font-mono text-center tracking-[0.5em] text-2xl h-14 rounded-xl border-blue-200 dark:border-blue-900 bg-white dark:bg-slate-900 shadow-inner"
-                       maxLength={6}
-                     />
+                    <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1 text-center block">6-Digit Verification Code</label>
+                    <Input
+                      type="text"
+                      value={mfaCode}
+                      onChange={(e) => setMfaCode(e.target.value)}
+                      placeholder="000 000"
+                      className="font-mono text-center tracking-[0.5em] text-2xl h-14 rounded-xl border-blue-200 dark:border-blue-900 bg-white dark:bg-slate-900 shadow-inner"
+                      maxLength={6}
+                    />
                   </div>
-                  
+
                   <div className="flex flex-col sm:flex-row gap-3 pt-2">
                     <Button onClick={handleVerifyMfa} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-12 rounded-xl shadow-lg active:scale-95 transition-all">
                       Verify & Enable
@@ -883,29 +1125,29 @@ export function Profile() {
               ) : (
                 <div className="flex items-center gap-4 py-2">
                   <div className="h-10 w-10 shrink-0 rounded-xl bg-emerald-50 dark:bg-emerald-950/20 flex items-center justify-center border border-emerald-100 dark:border-emerald-900/30">
-                     <Shield className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                    <Shield className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
                   </div>
                   <div className="flex-1 min-w-0">
-                     <p className="text-sm font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-                        Two-Factor Auth
-                        {mfaStatus === 'verified' && <span className="bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300 text-[10px] px-2 py-0.5 rounded-full font-bold border border-emerald-200 dark:border-emerald-800 shadow-sm animate-pulse">ACTIVE</span>}
-                     </p>
-                     <p className="text-xs text-slate-500 dark:text-slate-400 truncate">Login verification via 6-digit codes</p>
+                    <p className="text-sm font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                      Two-Factor Auth
+                      {mfaStatus === 'verified' && <span className="bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300 text-[10px] px-2 py-0.5 rounded-full font-bold border border-emerald-200 dark:border-emerald-800 shadow-sm animate-pulse">ACTIVE</span>}
+                    </p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 truncate">Login verification via 6-digit codes</p>
                   </div>
                   {mfaStatus === 'loading' ? (
-                     <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
+                    <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
                   ) : mfaStatus === 'verified' ? (
-                     <Button variant="outline" size="sm" onClick={handleUnenrollMfa} className="rounded-lg h-8 text-xs font-medium border-red-200 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 shadow-sm">
-                       Disable
-                     </Button>
+                    <Button variant="outline" size="sm" onClick={handleUnenrollMfa} className="rounded-lg h-8 text-xs font-medium border-red-200 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 shadow-sm">
+                      Disable
+                    </Button>
                   ) : (
-                     <Button variant="outline" size="sm" onClick={handleEnrollMfa} className="rounded-lg h-8 text-xs font-medium border-slate-200 dark:border-slate-700 shadow-sm">
-                       Enable
-                     </Button>
+                    <Button variant="outline" size="sm" onClick={handleEnrollMfa} className="rounded-lg h-8 text-xs font-medium border-slate-200 dark:border-slate-700 shadow-sm">
+                      Enable
+                    </Button>
                   )}
                 </div>
               )}
-              
+
               {/* Biometric Authentication */}
               <div className="h-px bg-slate-100 dark:bg-slate-800 my-4" />
               {showBiometricPasswordPrompt ? (
@@ -950,13 +1192,11 @@ export function Profile() {
                     type="button"
                     onClick={handleToggleBiometric}
                     disabled={!isBiometricAvailable && !isBiometricEnabled}
-                    className={`relative inline-flex h-7 w-12 items-center rounded-full transition-all duration-300 shadow-inner ${
-                      isBiometricEnabled ? 'bg-emerald-500' : 'bg-slate-200 dark:bg-slate-700'
-                    } ${!isBiometricAvailable && !isBiometricEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    className={`relative inline-flex h-7 w-12 items-center rounded-full transition-all duration-300 shadow-inner ${isBiometricEnabled ? 'bg-emerald-500' : 'bg-slate-200 dark:bg-slate-700'
+                      } ${!isBiometricAvailable && !isBiometricEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                   >
-                    <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-xl transition-transform duration-300 ${
-                      isBiometricEnabled ? 'translate-x-6' : 'translate-x-1'
-                    }`} />
+                    <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-xl transition-transform duration-300 ${isBiometricEnabled ? 'translate-x-6' : 'translate-x-1'
+                      }`} />
                   </button>
                 </div>
               )}

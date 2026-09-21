@@ -25,7 +25,7 @@ const isNodeEmpty = (node: any): boolean => {
 };
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { Capacitor, CapacitorHttp } from '@capacitor/core';
-import { Bell, Search, LogOut, Menu, X, User, Settings, ChevronRight, CalendarClock, Users, MapPin, Wallet, FileText, Landmark, Library, UserPlus, ShieldCheck, LayoutDashboard, Clock, AlertCircle, AtSign, ArrowLeft, ArrowUpCircle, RefreshCw, MoreVertical, Sparkles, Home, CheckCheck, Check } from 'lucide-react';
+import { Bell, Search, LogOut, Menu, X, User, Settings, ChevronRight, CalendarClock, Users, MapPin, Wallet, FileText, Landmark, Library, UserPlus, ShieldCheck, LayoutDashboard, Clock, AlertCircle, AtSign, ArrowLeft, ArrowUpCircle, RefreshCw, MoreVertical, Sparkles, Blocks, CheckCheck, Check, Volume2, VolumeX } from 'lucide-react';
 import { toast, showConfirm } from '@/src/components/ui/toast';
 import { StatusIndicator } from '@/src/components/offline/StatusIndicator';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -43,6 +43,8 @@ import { HEADER_PORTAL_ID } from '@/src/hooks/useHeaderPortal';
 import { APP_VERSION } from '@/src/constants/version';
 import { cn } from '@/src/lib/utils';
 import { OmniSearch } from '@/src/components/common/OmniSearch';
+import { useSystemAlerts } from '@/src/hooks/useSystemAlerts';
+import { getStoredVoiceSettings, saveVoiceSettings, speakAlert, generateBriefingText, stopSpeech } from '@/src/lib/voiceAlertService';
 
 function getGreeting(): string {
   const h = new Date().getHours();
@@ -80,172 +82,6 @@ const ALL_SEARCH_ITEMS: SearchItem[] = [
   { label: 'Settings', description: 'App preferences', href: '/settings', icon: Settings, privKey: null, privField: 'canView', keywords: ['settings', 'preference', 'company', 'notification', 'integration', 'security'] },
   { label: 'User Management', description: 'Users & privileges', href: '/users', icon: ShieldCheck, privKey: 'users', privField: 'canView', keywords: ['user', 'privilege', 'permission', 'role', 'access', 'admin'] },
 ];
-
-// Generate notifications from app data
-// Generate notifications from app data
-function useNotifications() {
-  const { 
-    employees, attendanceRecords, leaves, pendingInvoices, invoices, 
-    salaryAdvances, loans, sites, disciplinaryRecords, evaluations, commLogs,
-    dismissedNotifications
-  } = useAppStore(useShallow((s) => ({
-    employees: s.employees,
-    attendanceRecords: s.attendanceRecords,
-    leaves: s.leaves,
-    pendingInvoices: s.pendingInvoices,
-    invoices: s.invoices,
-    salaryAdvances: s.salaryAdvances,
-    loans: s.loans,
-    sites: s.sites,
-    disciplinaryRecords: s.disciplinaryRecords,
-    evaluations: s.evaluations,
-    commLogs: s.commLogs,
-    dismissedNotifications: s.dismissedNotifications,
-  })));
-  const { reminders } = useAppData();
-
-  return useMemo(() => {
-    const notifs: { 
-      id: string; 
-      icon: any; 
-      text: string; 
-      time: string; 
-      color: string; 
-      bg: string; 
-      url?: string; 
-      priority: number;
-      category?: string;
-    }[] = [];
-    const now = new Date();
-    const todayStr = now.toISOString().split('T')[0];
-
-    // Helper: Is date within X days
-    const isWithinDays = (dateStr: string, days: number) => {
-      const d = new Date(dateStr);
-      const diffHrs = (d.getTime() - now.getTime()) / (1000 * 60 * 60);
-      return diffHrs >= 0 && diffHrs <= (days * 24);
-    };
-
-    // Helper: Is date past or today
-    const isPastOrToday = (dateStr: string) => {
-      return dateStr <= todayStr;
-    };
-
-    // 1. Reminders
-    const currentUser = useUserStore.getState().getCurrentUser();
-    reminders.filter(r => {
-      if (!r.isActive) return false;
-      if (currentUser && r.recipientIds && r.recipientIds.length > 0 && !r.recipientIds.includes(currentUser.id)) return false;
-      return true;
-    }).forEach((r) => {
-      const isMention = r.title && r.title.startsWith('Mentioned');
-      const remDate = new Date(r.remindAt);
-      const isPast = remDate < now;
-      const isNewTask = r.title === 'New Task Created';
-      
-      if (isMention) {
-          notifs.push({
-            id: `rem-${r.id}`, icon: AtSign, text: r.body || r.title,
-            time: r.createdAt ? format(new Date(r.createdAt), 'MMM d, h:mm a') : 'New',
-            color: 'text-blue-600', bg: 'bg-blue-50 dark:bg-blue-500/10',
-            url: r.subtaskId ? `/tasks?open=${r.subtaskId}` : r.mainTaskId ? `/tasks?openTask=${r.mainTaskId}` : undefined,
-            priority: 1,
-            category: 'Mention'
-          });
-      } else if (isNewTask) {
-          notifs.push({
-            id: `rem-${r.id}`, icon: FileText, text: `New Task: ${r.body || 'Task'}`,
-            time: r.createdAt ? format(new Date(r.createdAt), 'MMM d, h:mm a') : 'New',
-            color: 'text-emerald-600', bg: 'bg-emerald-50 dark:bg-emerald-500/10',
-            url: r.mainTaskId ? `/tasks?openTask=${r.mainTaskId}` : undefined,
-            priority: 2,
-            category: 'Task'
-          });
-      } else {
-          notifs.push({ 
-            id: `rem-${r.id}`, icon: isPast ? AlertCircle : Bell, 
-            text: `Reminder: ${r.title}`, 
-            time: isPast ? 'Overdue' : format(remDate, 'MMM d, h:mm a'), 
-            color: isPast ? 'text-rose-600' : 'text-blue-600', bg: isPast ? 'bg-rose-50 dark:bg-rose-500/10' : 'bg-blue-50 dark:bg-blue-500/10',
-            url: r.subtaskId ? `/tasks?open=${r.subtaskId}` : r.mainTaskId ? `/tasks?openTask=${r.mainTaskId}` : undefined,
-            priority: isPast ? 0 : 1,
-            category: isPast ? 'Overdue' : 'Reminder'
-          });
-      }
-    });
-
-    // 2. Pending Approvals
-    const currentUserId = currentUser?.id || useAuthStore.getState().user?.id;
-    leaves.filter(l => l.approvalStatus === 'Pending' && l.status !== 'Cancelled' && l.approvedById === currentUserId).forEach(l => {
-      notifs.push({ id: `leave-${l.id}`, icon: CalendarClock, text: `Leave Request: ${l.employeeName}`, time: l.startDate, color: 'text-amber-600', bg: 'bg-amber-50 dark:bg-amber-500/10', url: '/leaves', priority: 2, category: 'Leave Request' });
-    });
-    salaryAdvances.filter(s => s.status === 'Pending' && s.approvedById === currentUserId).forEach(s => {
-      notifs.push({ id: `adv-${s.id}`, icon: Wallet, text: `Salary Advance: ${s.employeeName}`, time: s.requestDate, color: 'text-amber-600', bg: 'bg-amber-50 dark:bg-amber-500/10', url: '/salary-loans', priority: 2, category: 'Advance Request' });
-    });
-    loans.filter(l => l.status === 'Pending' && l.approvedById === currentUserId).forEach(l => {
-      notifs.push({ id: `loan-${l.id}`, icon: Landmark, text: `Loan Request: ${l.employeeName}`, time: l.startDate, color: 'text-amber-600', bg: 'bg-amber-50 dark:bg-amber-500/10', url: '/salary-loans', priority: 2, category: 'Loan Request' });
-    });
-
-    // 3. Finance
-    invoices.filter(i => i.status === 'Overdue').forEach(i => {
-      notifs.push({ id: `inv-ov-${i.id}`, icon: FileText, text: `Overdue Invoice: ${i.invoiceNumber}`, time: i.dueDate, color: 'text-rose-600', bg: 'bg-rose-50 dark:bg-rose-500/10', url: '/client-accounts', priority: 1, category: 'Overdue Invoice' });
-    });
-    if (pendingInvoices.length > 0) {
-      notifs.push({ id: 'pending-inv', icon: FileText, text: `${pendingInvoices.length} Quotations to draft`, time: 'Now', color: 'text-blue-600', bg: 'bg-blue-50 dark:bg-blue-500/10', url: '/client-accounts', priority: 3, category: 'Quotation' });
-    }
-
-    // 4. HR Alerts
-    employees.filter(e => e.status === 'Active' && e.lashmaExpiryDate && isWithinDays(e.lashmaExpiryDate, 7)).forEach(e => {
-        notifs.push({ id: `lashma-${e.id}`, icon: ShieldCheck, text: `LASHMA Expiring: ${e.firstname} ${e.surname}`, time: e.lashmaExpiryDate!, color: 'text-amber-600', bg: 'bg-amber-50 dark:bg-amber-500/10', url: '/employees', priority: 2, category: 'Insurance' });
-    });
-    commLogs.filter(c => c.followUpDate && !c.followUpDone && isPastOrToday(c.followUpDate)).forEach(c => {
-        notifs.push({ id: `comm-${c.id}`, icon: Clock, text: `Follow-up: ${c.subject || 'Communication'}`, time: c.followUpDate!, color: 'text-blue-600', bg: 'bg-blue-50 dark:bg-blue-500/10', url: '/sites', priority: 2, category: 'Follow-up' });
-    });
-    sites.filter(s => s.status === 'Active' && s.endDate && isWithinDays(s.endDate, 7)).forEach(s => {
-        notifs.push({ id: `site-end-${s.id}`, icon: MapPin, text: `Site Ending Soon: ${s.name}`, time: s.endDate!, color: 'text-rose-500', bg: 'bg-rose-50 dark:bg-rose-500/10', url: '/sites', priority: 2, category: 'Site Notice' });
-    });
-    evaluations.filter(e => e.status === 'Review').forEach(e => {
-        const emp = employees.find(emp => emp.id === e.employeeId);
-        notifs.push({ id: `eval-${e.id}`, icon: Users, text: `Eval Review: ${emp ? emp.surname : 'Employee'}`, time: e.date, color: 'text-emerald-600', bg: 'bg-emerald-50 dark:bg-emerald-500/10', url: '/evaluations', priority: 3, category: 'Evaluation' });
-    });
-    disciplinaryRecords.filter(d => d.workflowState === 'Reported' || d.workflowState === 'Query Issued').forEach(d => {
-        const emp = employees.find(emp => emp.id === d.employeeId);
-        notifs.push({ id: `disc-${d.id}`, icon: ShieldCheck, text: `Disciplinary Action: ${emp ? emp.surname : 'Employee'}`, time: d.date, color: 'text-rose-500', bg: 'bg-rose-50 dark:bg-rose-500/10', url: '/performance-conduct', priority: 1, category: 'Conduct' });
-    });
-    employees.filter(e => e.status === 'Active' && e.startDate && e.probationPeriod).forEach(e => {
-        const start = new Date(e.startDate);
-        const end = new Date(start.getTime() + (e.probationPeriod! * 24 * 60 * 60 * 1000));
-        const endStr = end.toISOString().split('T')[0];
-        if (isWithinDays(endStr, 14)) { // Show 14 days before
-            notifs.push({ id: `prob-${e.id}`, icon: Users, text: `Probation Ending: ${e.firstname} ${e.surname}`, time: endStr, color: 'text-blue-600', bg: 'bg-blue-50 dark:bg-blue-500/10', url: '/employees', priority: 3, category: 'Probation' });
-        }
-    });
-
-    // 5. System
-    const onboardingEmps = employees.filter(e => e.status === 'Onboarding');
-    if (onboardingEmps.length > 0) {
-        notifs.push({ id: 'onboarding-counts', icon: UserPlus, text: `${onboardingEmps.length} staff currently onboarding`, time: 'Ongoing', color: 'text-emerald-600', bg: 'bg-emerald-50 dark:bg-emerald-500/10', url: '/onboarding', priority: 4, category: 'Onboarding' });
-    }
-    const dates = [...new Set(attendanceRecords.map((r) => r.date))].sort().reverse();
-    if (dates.length > 0) {
-      const latestDate = dates[0];
-      const count = attendanceRecords.filter((r) => r.date === latestDate).length;
-      const isLatestToday = latestDate === todayStr;
-      notifs.push({ 
-        id: `att-${latestDate}`, 
-        icon: CalendarClock, 
-        text: isLatestToday ? `${count} attendance records logged today` : `${count} attendance records logged for ${format(new Date(latestDate), 'MMM d, yyyy')}`, 
-        time: latestDate, 
-        color: 'text-slate-500', 
-        bg: 'bg-slate-100 dark:bg-slate-800', 
-        priority: 5,
-        category: 'Activity'
-      });
-    }
-
-    return notifs.sort((a, b) => a.priority - b.priority).filter(n => !dismissedNotifications.includes(n.id)).slice(0, 15);
-  }, [employees, attendanceRecords, leaves, pendingInvoices, invoices, salaryAdvances, loans, sites, disciplinaryRecords, evaluations, commLogs, reminders, dismissedNotifications]);
-}
 
 function formatNotificationDate(timeStr: string): string {
   if (!timeStr) return '';
@@ -302,33 +138,90 @@ export function Header({ onMenuClick }: HeaderProps) {
 
   const { setCurrentUser } = useUserStore();
   const currentUser = useUserStore((s) => s.getCurrentUser());
-  const notifications = useNotifications();
+  const {
+    activeAlerts,
+    handleDismiss,
+    handleDismissAll
+  } = useSystemAlerts();
+  const notifications = useMemo(() => activeAlerts.slice(0, 15), [activeAlerts]);
   const { isDark } = useTheme();
-  const { 
-    updateCommLog, 
-    dismissedNotifications, 
-    dismissNotification,
-    dismissNotifications
-  } = useAppStore();
+  const { updateCommLog } = useAppStore();
 
   const handleMarkAllAsRead = () => {
-    if (notifications.length === 0) return;
-    notifications.forEach(n => {
-      if (n.id.startsWith('rem-')) {
-        updateReminder(n.id.replace('rem-', ''), { isActive: false });
-      }
-    });
-    const allIds = notifications.map(n => n.id);
-    dismissNotifications(allIds);
+    handleDismissAll();
     toast.success('All notifications marked as read');
   };
 
   const handleDismissNotification = (e: React.MouseEvent, n: any) => {
     e.stopPropagation();
-    if (n.id.startsWith('rem-')) {
-      updateReminder(n.id.replace('rem-', ''), { isActive: false });
+    handleDismiss(n.id);
+  };
+
+  const [voiceEnabled, setVoiceEnabled] = useState(() => getStoredVoiceSettings().enabled);
+
+  // Sync voice settings changes from other components (like Profile page)
+  useEffect(() => {
+    const handleVoiceChange = (e: any) => {
+      setVoiceEnabled(e.detail?.enabled ?? false);
+    };
+    window.addEventListener('voice-settings-changed', handleVoiceChange);
+    return () => window.removeEventListener('voice-settings-changed', handleVoiceChange);
+  }, []);
+
+  // Executive session briefing: announce overdue active site invoices, 2-day heads up, & diesel refills on startup
+  const briefingSpokenRef = useRef(false);
+  useEffect(() => {
+    if (briefingSpokenRef.current) return;
+    const settings = getStoredVoiceSettings();
+    if (!settings.enabled || !voiceEnabled || !settings.sessionBriefing) return;
+
+    // Delay 1.2s to allow stores (sites, daily logs, invoices) to fully hydrate
+    const timer = setTimeout(() => {
+      if (briefingSpokenRef.current) return;
+      if (!voiceEnabled || !getStoredVoiceSettings().enabled) return;
+
+      const userName = currentUser?.name ? currentUser.name.split(' ')[0] : 'Director';
+      const briefing = generateBriefingText(activeAlerts, userName);
+
+      if (briefing.hasContent && briefing.speechText) {
+        briefingSpokenRef.current = true;
+        speakAlert(briefing.speechText, {
+          dedupeKey: `session-brief-${new Date().toISOString().split('T')[0]}-${briefing.key}`,
+          cooldownMs: 4 * 60 * 60 * 1000, // max once every 4 hours for the same state
+        });
+      }
+    }, 1200);
+
+    return () => clearTimeout(timer);
+  }, [activeAlerts, currentUser, voiceEnabled]);
+
+  const playExecutiveBriefing = (force = false) => {
+    const settings = getStoredVoiceSettings();
+    // Strictly respect mute setting unless explicitly forced (e.g. Test Voice in settings)
+    if (!force && (!settings.enabled || !voiceEnabled)) {
+      return;
     }
-    dismissNotification(n.id);
+
+    const userName = currentUser?.name ? currentUser.name.split(' ')[0] : 'Director';
+    const briefing = generateBriefingText(activeAlerts, userName);
+    if (briefing.hasContent && briefing.speechText) {
+      speakAlert(briefing.speechText, { force, withChime: true });
+    } else {
+      speakAlert(`Good day ${userName}. All active site invoices are up to date and no diesel refills are pending for today or tomorrow.`, { force, withChime: true });
+    }
+  };
+
+  const toggleVoiceMute = () => {
+    const next = !voiceEnabled;
+    saveVoiceSettings({ enabled: next });
+    setVoiceEnabled(next);
+    if (next) {
+      toast.success('Voice announcements enabled');
+      speakAlert('Voice alerts enabled.', { force: true });
+    } else {
+      toast.info('Voice announcements muted');
+      stopSpeech();
+    }
   };
 
   const { title, subtitle, headerButtons, showBackButton } = usePage();
@@ -352,6 +245,23 @@ export function Header({ onMenuClick }: HeaderProps) {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [mobileOverflowOpen, setMobileOverflowOpen] = useState(false);
   const [checkingUpdate, setCheckingUpdate] = useState(false);
+
+  const handleBellToggle = () => {
+    const nextState = !notifOpen;
+    setNotifOpen(nextState);
+    setIsProfileOpen(false);
+
+    if (nextState) {
+      // ONLY announce if voice is NOT muted!
+      const settings = getStoredVoiceSettings();
+      if (voiceEnabled && settings.enabled) {
+        stopSpeech();
+        playExecutiveBriefing(false);
+      }
+    } else {
+      stopSpeech();
+    }
+  };
 
   const CURRENT_VERSION = APP_VERSION;
   const UPDATE_SERVER_URL = import.meta.env.VITE_UPDATE_SERVER_URL || 'https://dewaterconstruct.com/app-updates';
@@ -642,7 +552,7 @@ export function Header({ onMenuClick }: HeaderProps) {
         <StatusIndicator />
         <div className={`h-6 w-px hidden sm:block ${isDark ? 'bg-slate-700' : 'bg-slate-200'} mx-1`} />
 
-        {/* Home Button */}
+        {/* Module Button */}
         <button
           onClick={async () => {
             const { isDailyLogFormDirty, setDailyLogFormDirty } = useAppStore.getState();
@@ -661,15 +571,29 @@ export function Header({ onMenuClick }: HeaderProps) {
           className={`h-8 w-8 rounded-lg flex items-center justify-center transition-colors ${
             isDark ? 'text-slate-400 hover:bg-slate-800' : 'text-slate-500 hover:bg-slate-100'
           }`}
-          title="Home"
+          title="Module"
         >
-          <Home className="h-4 w-4" />
+          <Blocks className="h-4 w-4" />
+        </button>
+
+        {/* Quick Voice Mute / Unmute Toggle */}
+        <button
+          onClick={toggleVoiceMute}
+          className={`h-8 w-8 rounded-lg flex items-center justify-center transition-colors ${
+            voiceEnabled
+              ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/50'
+              : (isDark ? 'text-slate-500 hover:bg-slate-800' : 'text-slate-400 hover:bg-slate-100')
+          }`}
+          title={voiceEnabled ? 'Voice Alerts: Active (Click to mute)' : 'Voice Alerts: Muted (Click to enable)'}
+          aria-label={voiceEnabled ? 'Mute voice alerts' : 'Enable voice alerts'}
+        >
+          {voiceEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
         </button>
 
         {/* Notification Bell */}
         <div ref={notifRef} className="relative">
           <button
-            onClick={() => { setNotifOpen(!notifOpen); setIsProfileOpen(false); }}
+            onClick={handleBellToggle}
             className={`relative h-8 w-8 rounded-lg flex items-center justify-center transition-all ${
               notifOpen
                 ? (isDark ? 'bg-slate-800 text-slate-100' : 'bg-slate-100 text-slate-900')
@@ -681,9 +605,15 @@ export function Header({ onMenuClick }: HeaderProps) {
           >
             <Bell className="h-4 w-4" />
             {notifications.length > 0 && (
-              <span className={`absolute top-1.5 right-1.5 h-2 w-2 rounded-full ring-2 ${isDark ? 'ring-slate-900' : 'ring-white'} ${
-                notifications.some(n => n.priority <= 1) ? 'bg-rose-500 animate-pulse' : 'bg-sky-500'
-              }`} />
+              <span 
+                className={`absolute top-0.5 right-0.5 min-w-[15px] h-[15px] px-1 rounded-full text-[9px] font-bold leading-none flex items-center justify-center text-white ring-[1.5px] shadow-xs pointer-events-none transition-all ${
+                  isDark ? 'ring-slate-900' : 'ring-white'
+                } ${
+                  notifications.some(n => n.priority <= 1) ? 'bg-rose-500' : 'bg-blue-600'
+                }`}
+              >
+                {notifications.length > 99 ? '99+' : notifications.length}
+              </span>
             )}
           </button>
 
@@ -733,7 +663,7 @@ export function Header({ onMenuClick }: HeaderProps) {
                   </div>
                 ) : (
                   notifications.map((n) => {
-                    const isActivity = n.category === 'Activity' || n.priority === 5;
+                    const isActivity = n.category === 'system' || n.priority === 5;
                     const isUrgent = n.priority === 0;
                     const isHigh = n.priority === 1;
 
@@ -771,7 +701,7 @@ export function Header({ onMenuClick }: HeaderProps) {
                                     ? 'text-slate-400 dark:text-slate-500' 
                                     : 'text-sky-600 dark:text-sky-400'
                             }`}>
-                              {n.category || (isUrgent ? 'Urgent' : isHigh ? 'High Priority' : 'Notice')}
+                              {n.categoryLabel || n.category || (isUrgent ? 'Urgent' : isHigh ? 'High Priority' : 'Notice')}
                             </span>
                             <span className="text-[10px] text-slate-400 font-normal whitespace-nowrap tabular-nums">
                               {formatNotificationDate(n.time)}

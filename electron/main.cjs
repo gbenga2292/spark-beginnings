@@ -345,11 +345,11 @@ function buildMenus() {
 
   // HR section
   const hrItems = [
-    can('employees',  'canView') && { label: 'Employees',           click: () => mainWindow?.webContents.send('navigate', '/employees') },
-    can('attendance', 'canView') && { label: 'Daily Register',       click: () => mainWindow?.webContents.send('navigate', '/attendance') },
-    can('leaves',     'canView') && { label: 'Leaves',               click: () => mainWindow?.webContents.send('navigate', '/leaves') },
-    can('salaryLoans','canView') && { label: 'Salary & Loan Advance', click: () => mainWindow?.webContents.send('navigate', '/salary-loans') },
-    can('reports',    'canView') && { label: 'Employee Reports',      click: () => mainWindow?.webContents.send('navigate', '/reports') },
+    can('employees', 'canView') && { label: 'Employees', click: () => mainWindow?.webContents.send('navigate', '/employees') },
+    can('attendance', 'canView') && { label: 'Daily Register', click: () => mainWindow?.webContents.send('navigate', '/attendance') },
+    can('leaves', 'canView') && { label: 'Leaves', click: () => mainWindow?.webContents.send('navigate', '/leaves') },
+    can('salaryLoans', 'canView') && { label: 'Salary & Loan Advance', click: () => mainWindow?.webContents.send('navigate', '/salary-loans') },
+    can('reports', 'canView') && { label: 'Employee Reports', click: () => mainWindow?.webContents.send('navigate', '/reports') },
   ].filter(Boolean);
 
   if (hrItems.length > 0) {
@@ -367,11 +367,11 @@ function buildMenus() {
 
   // Account section
   const accountItems = [
-    can('billing',         'canView') && { label: 'Invoices',        click: () => mainWindow?.webContents.send('navigate', '/invoices') },
-    can('payments',        'canView') && { label: 'Payments',        click: () => mainWindow?.webContents.send('navigate', '/payments') },
-    can('payments',        'canViewVat') && { label: 'VAT',          click: () => mainWindow?.webContents.send('navigate', '/vat') },
-    can('payroll',         'canView') && { label: 'Payroll',         click: () => mainWindow?.webContents.send('navigate', '/payroll') },
-    can('financialReports','canView') && { label: 'Account Reports', click: () => mainWindow?.webContents.send('navigate', '/financial-reports') },
+    can('billing', 'canView') && { label: 'Invoices', click: () => mainWindow?.webContents.send('navigate', '/invoices') },
+    can('payments', 'canView') && { label: 'Payments', click: () => mainWindow?.webContents.send('navigate', '/payments') },
+    can('payments', 'canViewVat') && { label: 'VAT', click: () => mainWindow?.webContents.send('navigate', '/vat') },
+    can('payroll', 'canView') && { label: 'Payroll', click: () => mainWindow?.webContents.send('navigate', '/payroll') },
+    can('financialReports', 'canView') && { label: 'Account Reports', click: () => mainWindow?.webContents.send('navigate', '/financial-reports') },
   ].filter(Boolean);
 
   if (accountItems.length > 0) {
@@ -380,9 +380,9 @@ function buildMenus() {
 
   // System section (admin only)
   const sysItems = [
-    !currentPrivileges                   && { label: 'Settings',        click: () => mainWindow?.webContents.send('navigate', '/settings') },
-    can('users', 'canView')              && { label: 'User Management', click: () => mainWindow?.webContents.send('navigate', '/users') },
-    can('variables', 'canView')          && { label: 'Variables',       click: () => mainWindow?.webContents.send('navigate', '/variables') },
+    !currentPrivileges && { label: 'Settings', click: () => mainWindow?.webContents.send('navigate', '/settings') },
+    can('users', 'canView') && { label: 'User Management', click: () => mainWindow?.webContents.send('navigate', '/users') },
+    can('variables', 'canView') && { label: 'Variables', click: () => mainWindow?.webContents.send('navigate', '/variables') },
   ].filter(Boolean);
 
   if (sysItems.length > 0) {
@@ -393,12 +393,12 @@ function buildMenus() {
 
   /* ── VIEW ───────────────────────────────────────────────────── */
   const viewMenu = Menu.buildFromTemplate([
-    { role: 'reload',       label: 'Reload Page' },
-    { role: 'forceReload',  label: 'Force Reload' },
+    { role: 'reload', label: 'Reload Page' },
+    { role: 'forceReload', label: 'Force Reload' },
     { type: 'separator' },
-    { role: 'zoomIn',       label: 'Zoom In',    accelerator: 'CmdOrCtrl+=' },
-    { role: 'zoomOut',      label: 'Zoom Out' },
-    { role: 'resetZoom',    label: 'Reset Zoom' },
+    { role: 'zoomIn', label: 'Zoom In', accelerator: 'CmdOrCtrl+=' },
+    { role: 'zoomOut', label: 'Zoom Out' },
+    { role: 'resetZoom', label: 'Reset Zoom' },
     { type: 'separator' },
     { role: 'togglefullscreen', label: 'Toggle Full Screen' },
     ...(isDev ? [{ type: 'separator' }, { role: 'toggleDevTools', label: 'Developer Tools' }] : []),
@@ -492,13 +492,13 @@ function initIPC() {
       const parts = cleanPath.split('\\').filter(Boolean);
       if (parts.length > 0) {
         const host = parts[0];
-        
+
         const result = await new Promise((resolve) => {
           const { exec } = require('child_process');
           exec(`net view \\\\${host}`, (error, stdout, stderr) => {
             const output = (stdout + stderr).toLowerCase();
             const rawError = (stdout + stderr).trim();
-            
+
             if (!error) {
               // Server is online and we are authenticated, but the specific folder may be missing
               resolve({ status: 'online' });
@@ -521,7 +521,7 @@ function initIPC() {
 
         return result;
       }
-      
+
       return { status: 'offline', error: 'Invalid path format' };
     } catch (err) {
       console.error('check-nas-status error:', err);
@@ -809,6 +809,77 @@ function initIPC() {
     n.show();
   });
 
+  // ── Native Text-to-Speech via Windows SAPI / PowerShell (100% reliable fallback)
+  let activeSpeechProcess = null;
+
+  try { ipcMain.removeHandler('app:stop-speech'); } catch {}
+  ipcMain.handle('app:stop-speech', async () => {
+    if (activeSpeechProcess) {
+      try { activeSpeechProcess.kill(); } catch {}
+      activeSpeechProcess = null;
+    }
+    return { success: true };
+  });
+
+  try { ipcMain.removeHandler('app:speak'); } catch {}
+  ipcMain.handle('app:speak', async (_event, { text, voiceGender = 'female', voiceName = '', rate = 1.0, volume = 100, withChime = true }) => {
+    if (!text || typeof text !== 'string') return { success: false };
+    if (process.platform !== 'win32') return { success: false, error: 'Non-windows platform' };
+
+    // Stop any existing speech process so audio never overlaps
+    if (activeSpeechProcess) {
+      try { activeSpeechProcess.kill(); } catch {}
+      activeSpeechProcess = null;
+    }
+
+    return new Promise((resolve) => {
+      const { spawn } = require('child_process');
+      const sanitized = text.replace(/["'`$\\]/g, ' ').slice(0, 400);
+      const genderSelect = voiceGender === 'male' ? 'Male' : 'Female';
+
+      // Normalize rate (WinRT expects 0.5 to 1.5, default 1.0; natural conversational is ~0.96)
+      let numRate = typeof rate === 'number' ? rate : parseFloat(rate) || 1.0;
+      if (numRate === 0) numRate = 0.98;
+      else if (numRate === 2) numRate = 1.15;
+      else if (numRate === -2) numRate = 0.88;
+      const winRtRate = Math.min(Math.max(numRate, 0.6), 1.4).toFixed(2);
+
+      // Normalize volume (0.0 to 1.0 for WinRT, 0 to 100 for SAPI)
+      let numVol = typeof volume === 'number' ? volume : parseFloat(volume) || 100;
+      if (numVol > 1) numVol = numVol / 100;
+      const winRtVol = Math.min(Math.max(numVol, 0.0), 1.0).toFixed(2);
+
+      const scriptPath = path.join(__dirname, 'speak.ps1');
+      const psArgs = [
+        '-NoProfile',
+        '-NonInteractive',
+        '-ExecutionPolicy', 'Bypass',
+        '-File', scriptPath,
+        '-Text', sanitized,
+        '-Gender', genderSelect,
+        '-Rate', winRtRate,
+        '-Volume', winRtVol,
+        '-WithChime', withChime !== false ? '1' : '0'
+      ];
+      if (voiceName) {
+        psArgs.push('-VoiceName', String(voiceName).replace(/["'`$\\]/g, ' '));
+      }
+
+      const ps = spawn('powershell.exe', psArgs);
+      activeSpeechProcess = ps;
+
+      ps.on('close', (code) => {
+        if (activeSpeechProcess === ps) activeSpeechProcess = null;
+        resolve({ success: code === 0 });
+      });
+      ps.on('error', (err) => {
+        if (activeSpeechProcess === ps) activeSpeechProcess = null;
+        console.error('TTS execution error:', err);
+        resolve({ success: false, error: err.message });
+      });
+    });
+  });
+
   // ── Supabase Native Database Backup via CLI ──
   ipcMain.handle('db:backup-supabase', async (_event, opts = {}) => {
     const fs = require('fs');
@@ -817,7 +888,7 @@ function initIPC() {
     const { execSync } = require('child_process');
 
     const now = new Date();
-    const dateStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`;
+    const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
     const defaultFileName = `Supabase_DB_Backup_${dateStr}.zip`;
 
     const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
@@ -853,8 +924,8 @@ function initIPC() {
         if (filePath.endsWith('.sql')) {
           // If saving directly as a single .sql file, combine them
           const combined = `-- Supabase Roles DDL\n` + fs.readFileSync(rolesFile, 'utf8') +
-                           `\n\n-- Supabase Schema DDL\n` + fs.readFileSync(schemaFile, 'utf8') +
-                           `\n\n-- Supabase Data\n` + fs.readFileSync(dataFile, 'utf8');
+            `\n\n-- Supabase Schema DDL\n` + fs.readFileSync(schemaFile, 'utf8') +
+            `\n\n-- Supabase Data\n` + fs.readFileSync(dataFile, 'utf8');
           fs.writeFileSync(filePath, combined, 'utf8');
         } else {
           // Zip using PowerShell Compress-Archive
@@ -872,7 +943,7 @@ function initIPC() {
       }
     } catch (err) {
       console.error('Supabase CLI backup error:', err);
-      try { fs.rmSync(tempDir, { recursive: true, force: true }); } catch (e) {}
+      try { fs.rmSync(tempDir, { recursive: true, force: true }); } catch (e) { }
       return { success: false, fallbackToClient: true, filePath, message: err.message || 'CLI dump error' };
     }
   });
@@ -892,17 +963,21 @@ function initTray() {
 
   tray = new Tray(trayIcon);
   const contextMenu = Menu.buildFromTemplate([
-    { label: 'Open DCEL Office Suite', click: () => {
-      if (mainWindow) {
-        mainWindow.show();
-        mainWindow.focus();
+    {
+      label: 'Open DCEL Office Suite', click: () => {
+        if (mainWindow) {
+          mainWindow.show();
+          mainWindow.focus();
+        }
       }
-    } },
+    },
     { type: 'separator' },
-    { label: 'Quit', click: () => {
-      app.isQuitting = true;
-      app.quit();
-    } }
+    {
+      label: 'Quit', click: () => {
+        app.isQuitting = true;
+        app.quit();
+      }
+    }
   ]);
   tray.setToolTip('DCEL Office Suite');
   tray.setContextMenu(contextMenu);

@@ -178,6 +178,28 @@ function AppContent() {
   useRealtimeData(!!user);
 
 
+  // Prevent default browser Ctrl+A / Cmd+A from highlighting everything across the application,
+  // while allowing it to select all text within input fields, textareas, and contenteditable elements.
+  useEffect(() => {
+    const handleSelectAll = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'a' || e.key === 'A')) {
+        const target = e.target as HTMLElement | null;
+        if (!target) return;
+
+        const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA';
+        const isContentEditable = target.isContentEditable || Boolean(target.closest('[contenteditable="true"]'));
+        const isSelectableContainer = Boolean(target.closest('.selectable-text'));
+
+        if (!isInput && !isContentEditable && !isSelectableContainer) {
+          e.preventDefault();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleSelectAll);
+    return () => window.removeEventListener('keydown', handleSelectAll);
+  }, []);
+
   // Handle navigation triggered by Electron main-process menu items
   useEffect(() => {
     const handler = (e: Event) => {

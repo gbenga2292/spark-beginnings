@@ -1,25 +1,15 @@
-import { useMemo, useState, useContext } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Bell, AlertCircle, CalendarClock, Users, MapPin, Wallet, FileText, Landmark,
-  UserPlus, ShieldCheck, Clock, AtSign, CheckCircle, ChevronRight, Trash2, Filter,
-  BellOff, BellRing
+  Bell, ChevronRight, Trash2, Filter, BellOff, CheckCircle
 } from 'lucide-react';
-import { useAppStore } from '@/src/store/appStore';
-import { useShallow } from 'zustand/react/shallow';
-import { useAppData, TaskContext } from '@/src/contexts/AppDataContext';
-import { useUserStore } from '@/src/store/userStore';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { formatDisplayDate } from '@/src/lib/dateUtils';
-import { format } from 'date-fns';
-
-type Notif = {
-  id: string; icon: any; text: string; time: string; color: string;
-  bg: string; url?: string; priority: number; category: string; isRead?: boolean;
-};
+import { useSystemAlerts, SystemAlert } from '@/src/hooks/useSystemAlerts';
 
 const CATEGORY_LABELS: Record<string, string> = {
   all: 'All',
+  operations: 'Diesel & Ops',
   mention: 'Mentions',
   reminder: 'Reminders',
   approval: 'Approvals',
@@ -30,194 +20,52 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 export function NotificationsPage() {
   useSetPageTitle('Notifications', 'All notifications and alerts');
-  const { 
-    employees, attendanceRecords, leaves, pendingInvoices, invoices, 
-    salaryAdvances, loans, sites, disciplinaryRecords, evaluations, commLogs,
-    dismissedNotifications, dismissNotification
-  } = useAppStore(useShallow((s) => ({
-    employees: s.employees,
-    attendanceRecords: s.attendanceRecords,
-    leaves: s.leaves,
-    pendingInvoices: s.pendingInvoices,
-    invoices: s.invoices,
-    salaryAdvances: s.salaryAdvances,
-    loans: s.loans,
-    sites: s.sites,
-    disciplinaryRecords: s.disciplinaryRecords,
-    evaluations: s.evaluations,
-    commLogs: s.commLogs,
-    dismissedNotifications: s.dismissedNotifications,
-    dismissNotification: s.dismissNotification,
-  })));
-  const { updateReminder, reminders, subtasks } = useAppData();
   const navigate = useNavigate();
-
-  const currentUser = useUserStore(s => s.getCurrentUser());
   const [activeCategory, setActiveCategory] = useState<string>('all');
 
-  const notifications = useMemo<Notif[]>(() => {
-    const notifs: Notif[] = [];
-    const now = new Date();
-    const todayStr = now.toISOString().split('T')[0];
+  const {
+    alerts,
+    activeAlerts,
+    dismissedNotifications,
+    handleDismiss,
+    handleDismissAll
+  } = useSystemAlerts();
 
-    const isWithinDays = (dateStr: string, days: number) => {
-      const d = new Date(dateStr);
-      const diffHrs = (d.getTime() - now.getTime()) / (1000 * 60 * 60);
-      return diffHrs >= 0 && diffHrs <= days * 24;
-    };
-    const isPastOrToday = (dateStr: string) => dateStr <= todayStr;
-
-    reminders.filter(r => {
-      if (!r.isActive) return false;
-      if (currentUser && r.recipientIds && r.recipientIds.length > 0 && !r.recipientIds.includes(currentUser.id)) return false;
-      return true;
-    }).forEach(r => {
-      const isMention = r.title?.startsWith('Mentioned');
-      const isNewTask = r.title === 'New Task Created';
-      const remDate = new Date(r.remindAt);
-      const isPast = remDate < now;
-      
-      if (isMention) {
-        notifs.push({
-          id: `rem-${r.id}`, icon: AtSign, text: r.body || r.title,
-          time: r.createdAt ? format(new Date(r.createdAt), 'MMM d, h:mm a') : 'New',
-          color: 'text-blue-600', bg: 'bg-blue-50',
-          url: r.subtaskId ? `/tasks?open=${r.subtaskId}` : r.mainTaskId ? `/tasks?openTask=${r.mainTaskId}` : undefined,
-          priority: 1, category: 'mention',
-        });
-      } else if (isNewTask) {
-        notifs.push({
-          id: `rem-${r.id}`, icon: FileText, text: `New Task: ${r.body || 'Task'}`,
-          time: r.createdAt ? format(new Date(r.createdAt), 'MMM d, h:mm a') : 'New',
-          color: 'text-emerald-500', bg: 'bg-emerald-50',
-          url: r.mainTaskId ? `/tasks?openTask=${r.mainTaskId}` : undefined,
-          priority: 2, category: 'system',
-        });
-      } else {
-        notifs.push({
-          id: `rem-${r.id}`, icon: isPast ? AlertCircle : BellRing,
-          text: `Reminder: ${r.title}`,
-          time: isPast ? 'Overdue' : format(remDate, 'MMM d, h:mm a'),
-          color: isPast ? 'text-rose-500' : 'text-blue-600',
-          bg: isPast ? 'bg-rose-50' : 'bg-blue-50',
-          url: r.subtaskId ? `/tasks?open=${r.subtaskId}` : r.mainTaskId ? `/tasks?openTask=${r.mainTaskId}` : '/tasks/reminders',
-          priority: isPast ? 0 : 2, category: 'reminder',
-        });
-      }
-    });
-
-    leaves.filter(l => l.approvalStatus === 'Pending' && l.status !== 'Cancelled').forEach(l => {
-      notifs.push({ id: `leave-${l.id}`, icon: CalendarClock, text: `Leave Request pending: ${l.employeeName}`, time: l.startDate, color: 'text-amber-600', bg: 'bg-amber-50', url: '/leaves', priority: 2, category: 'approval' });
-    });
-    salaryAdvances.filter(s => s.status === 'Pending').forEach(s => {
-      notifs.push({ id: `adv-${s.id}`, icon: Wallet, text: `Salary Advance pending: ${s.employeeName}`, time: s.requestDate, color: 'text-amber-600', bg: 'bg-amber-50', url: '/salary-loans', priority: 2, category: 'approval' });
-    });
-    loans.filter(l => l.status === 'Pending').forEach(l => {
-      notifs.push({ id: `loan-${l.id}`, icon: Landmark, text: `Loan Request pending: ${l.employeeName}`, time: l.startDate, color: 'text-amber-600', bg: 'bg-amber-50', url: '/salary-loans', priority: 2, category: 'approval' });
-    });
-
-    invoices.filter(i => i.status === 'Overdue').forEach(i => {
-      notifs.push({ id: `inv-ov-${i.id}`, icon: FileText, text: `Overdue Invoice: ${i.invoiceNumber}`, time: i.dueDate, color: 'text-rose-600', bg: 'bg-rose-50', url: '/client-accounts', priority: 0, category: 'finance' });
-    });
-    if (pendingInvoices.length > 0) {
-      notifs.push({ id: 'pending-inv', icon: FileText, text: `${pendingInvoices.length} pending invoices to draft`, time: 'Now', color: 'text-blue-500', bg: 'bg-blue-50', url: '/client-accounts', priority: 3, category: 'finance' });
-    }
-
-    employees.filter(e => e.status === 'Active' && e.lashmaExpiryDate && isWithinDays(e.lashmaExpiryDate, 7)).forEach(e => {
-      notifs.push({ id: `lashma-${e.id}`, icon: ShieldCheck, text: `LASHMA Expiring Soon: ${e.firstname} ${e.surname}`, time: e.lashmaExpiryDate!, color: 'text-amber-600', bg: 'bg-amber-50', url: '/tasks/reminders', priority: 1, category: 'hr' });
-    });
-    employees.filter(e => e.status === 'Active' && e.lashmaExpiryDate && isPastOrToday(e.lashmaExpiryDate)).forEach(e => {
-      notifs.push({ id: `lashma-overdue-${e.id}`, icon: ShieldCheck, text: `LASHMA Expired: ${e.firstname} ${e.surname} — renew immediately`, time: e.lashmaExpiryDate!, color: 'text-rose-600', bg: 'bg-rose-50', url: '/tasks/reminders', priority: 0, category: 'hr' });
-    });
-    commLogs.filter(c => c.followUpDate && !c.followUpDone && isPastOrToday(c.followUpDate)).forEach(c => {
-      notifs.push({ id: `comm-${c.id}`, icon: Clock, text: `Follow-up due: ${c.subject || 'Communication'}`, time: c.followUpDate!, color: 'text-blue-600', bg: 'bg-blue-50', url: '/sites', priority: 2, category: 'hr' });
-    });
-    sites.filter(s => s.status === 'Active' && s.endDate && isWithinDays(s.endDate, 7)).forEach(s => {
-      notifs.push({ id: `site-end-${s.id}`, icon: MapPin, text: `Site ending soon: ${s.name}`, time: s.endDate!, color: 'text-rose-400', bg: 'bg-rose-50', url: '/sites', priority: 1, category: 'hr' });
-    });
-    evaluations.filter(e => e.status === 'Review').forEach(e => {
-      const emp = employees.find(em => em.id === e.employeeId);
-      notifs.push({ id: `eval-${e.id}`, icon: Users, text: `Eval review: ${emp ? emp.surname : 'Employee'}`, time: e.date, color: 'text-emerald-500', bg: 'bg-emerald-50', url: '/evaluations', priority: 3, category: 'hr' });
-    });
-    disciplinaryRecords.filter(d => d.workflowState === 'Reported' || d.workflowState === 'Query Issued').forEach(d => {
-      const emp = employees.find(em => em.id === d.employeeId);
-      notifs.push({ id: `disc-${d.id}`, icon: ShieldCheck, text: `Disciplinary action: ${emp ? emp.surname : 'Employee'}`, time: d.date, color: 'text-rose-500', bg: 'bg-rose-50', url: '/performance-conduct', priority: 0, category: 'hr' });
-    });
-    employees.filter(e => e.status === 'Active' && e.startDate && e.probationPeriod).forEach(e => {
-      const start = new Date(e.startDate);
-      const end = new Date(start.getTime() + e.probationPeriod! * 86400000);
-      const endStr = end.toISOString().split('T')[0];
-      if (isWithinDays(endStr, 14)) {
-        notifs.push({ id: `prob-${e.id}`, icon: Users, text: `Probation ending: ${e.firstname} ${e.surname}`, time: endStr, color: 'text-blue-600', bg: 'bg-blue-50', url: '/employees', priority: 3, category: 'hr' });
-      }
-    });
-
-    const mySubtasks = subtasks.filter(s =>
-      s.status !== 'completed' && s.deadline &&
-      (currentUser && (
-        (s.assignedTo?.split(',').includes(currentUser.id)) ||
-        ((s as any).assigned_to?.split(',').includes(currentUser.id))
-      ))
+  const filtered = useMemo(() => {
+    return activeAlerts.filter(
+      (n) => activeCategory === 'all' || n.category === activeCategory
     );
-    mySubtasks.forEach(s => {
-      if (isPastOrToday(s.deadline.split('T')[0])) {
-        notifs.push({ id: `sub-overdue-${s.id}`, icon: AlertCircle, text: `Overdue subtask: ${s.title}`, time: s.deadline, color: 'text-rose-600', bg: 'bg-rose-50', url: `/tasks?open=${s.id}`, priority: 0, category: 'reminder' });
-      } else if (isWithinDays(s.deadline.split('T')[0], 1)) {
-        notifs.push({ id: `sub-due-${s.id}`, icon: Clock, text: `Due tomorrow: ${s.title}`, time: s.deadline, color: 'text-amber-600', bg: 'bg-amber-50', url: `/tasks?open=${s.id}`, priority: 1, category: 'reminder' });
-      }
-    });
+  }, [activeAlerts, activeCategory]);
 
-    const onboardingEmps = employees.filter(e => e.status === 'Onboarding');
-    if (onboardingEmps.length > 0) {
-      notifs.push({ id: 'onboarding-counts', icon: UserPlus, text: `${onboardingEmps.length} staff currently onboarding`, time: 'Ongoing', color: 'text-emerald-500', bg: 'bg-emerald-50', url: '/onboarding', priority: 4, category: 'system' });
-    }
-    const dates = [...new Set(attendanceRecords.map(r => r.date))].sort().reverse();
-    if (dates.length > 0) {
-      const latestDate = dates[0];
-      const count = attendanceRecords.filter(r => r.date === latestDate).length;
-      notifs.push({ id: `att-${latestDate}`, icon: CalendarClock, text: `${count} attendance records for ${latestDate}`, time: latestDate, color: 'text-slate-500', bg: 'bg-slate-50', priority: 5, category: 'system' });
-    }
-
-    return notifs.sort((a, b) => a.priority - b.priority);
-  }, [employees, attendanceRecords, leaves, pendingInvoices, invoices, salaryAdvances, loans, sites, disciplinaryRecords, evaluations, commLogs, reminders, currentUser, subtasks]);
-
-  const filtered = notifications.filter(n =>
-    !dismissedNotifications.includes(n.id) && (activeCategory === 'all' || n.category === activeCategory)
-  );
-
-  const handleDismiss = (id: string, e?: React.MouseEvent) => {
+  const onDismissClick = (id: string, e?: React.MouseEvent) => {
     if (e) {
       e.stopPropagation();
       e.preventDefault();
     }
-    if (id.startsWith('rem-')) {
-      updateReminder(id.replace('rem-', ''), { isActive: false });
-    }
-    dismissNotification(id);
+    handleDismiss(id);
   };
 
-  const handleAction = (n: Notif) => {
+  const handleAction = (n: SystemAlert) => {
     if (n.id.startsWith('rem-')) {
-      updateReminder(n.id.replace('rem-', ''), { isActive: false });
+      handleDismiss(n.id);
     }
     if (n.url) navigate(n.url);
   };
 
   const priorityLabel = (p: number) => {
-    if (p === 0) return { label: 'Urgent', cls: 'bg-rose-100 text-rose-700 border-rose-200' };
-    if (p === 1) return { label: 'High', cls: 'bg-amber-100 text-amber-700 border-amber-200' };
-    if (p === 2) return { label: 'Medium', cls: 'bg-blue-100 text-blue-700 border-blue-200' };
-    return { label: 'Info', cls: 'bg-slate-100 text-slate-600 border-slate-200' };
+    if (p === 0) return { label: 'Urgent', cls: 'bg-rose-100 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-900/40' };
+    if (p === 1) return { label: 'High', cls: 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-900/40' };
+    if (p === 2) return { label: 'Medium', cls: 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-900/40' };
+    return { label: 'Info', cls: 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700' };
   };
 
   const categoryCounts = useMemo(() => {
-    const counts: Record<string, number> = { all: 0 };
-    notifications.filter(n => !dismissedNotifications.includes(n.id)).forEach(n => {
-      counts['all'] = (counts['all'] || 0) + 1;
+    const counts: Record<string, number> = { all: activeAlerts.length };
+    activeAlerts.forEach((n) => {
       counts[n.category] = (counts[n.category] || 0) + 1;
     });
     return counts;
-  }, [notifications, dismissedNotifications]);
+  }, [activeAlerts]);
 
   return (
     <div className="flex flex-col gap-6 w-full pb-12 animate-in fade-in duration-300">
@@ -233,17 +81,9 @@ export function NotificationsPage() {
               <p className="text-xs text-slate-500">{filtered.length} active notification{filtered.length !== 1 ? 's' : ''}</p>
             </div>
           </div>
-          {dismissedNotifications.length < notifications.length && (
+          {activeAlerts.length > 0 && (
             <button
-              onClick={() => {
-                const active = notifications.filter(n => !dismissedNotifications.includes(n.id));
-                active.forEach(n => {
-                  if (n.id.startsWith('rem-')) {
-                    updateReminder(n.id.replace('rem-', ''), { isActive: false });
-                  }
-                  dismissNotification(n.id);
-                });
-              }}
+              onClick={handleDismissAll}
               className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-rose-600 transition-colors px-3 py-1.5 rounded-lg hover:bg-rose-50"
             >
               <BellOff className="w-3.5 h-3.5" /> Dismiss All
@@ -322,7 +162,7 @@ export function NotificationsPage() {
                           {n.time.includes('-') ? formatDisplayDate(n.time) : n.time}
                         </span>
                         <button
-                          onClick={e => handleDismiss(n.id, e)}
+                          onClick={e => onDismissClick(n.id, e)}
                           className="opacity-0 group-hover:opacity-100 p-1 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all"
                           title="Dismiss"
                         >

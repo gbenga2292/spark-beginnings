@@ -61,6 +61,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   // Supabase Database Backup CLI/Native trigger
   backupSupabaseDatabase: (opts) => ipcRenderer.invoke('db:backup-supabase', opts),
+
+  // Native Speech Synthesis
+  speakNative: (opts) => ipcRenderer.invoke('app:speak', opts),
+  stopSpeechNative: () => ipcRenderer.invoke('app:stop-speech'),
 });
 
 

@@ -19,6 +19,7 @@ import {
   RefreshCw,
   DownloadCloud,
   ArrowLeft,
+  Home,
   ChevronRight,
 } from 'lucide-react';
 import { APP_VERSION } from '@/src/constants/version';
@@ -511,7 +512,7 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
                     title={effectiveCollapsed ? 'Home' : undefined}
                   >
                     <div className={cn('flex items-center', effectiveCollapsed && 'justify-center w-full')}>
-                      <ArrowLeft className={cn('h-4 w-4 shrink-0 text-white transition-transform duration-200 group-hover:-translate-x-0.5', !effectiveCollapsed && 'mr-2')} />
+                      <Home className={cn('h-4 w-4 shrink-0 text-white transition-transform duration-200', !effectiveCollapsed && 'mr-2')} />
                       {!effectiveCollapsed && <span>Home</span>}
                     </div>
                   </button>

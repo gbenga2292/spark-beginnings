@@ -14,7 +14,7 @@ import {
   Hourglass, ShieldAlert, ShieldCheck, Wrench, AlertCircle, Package
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { format, isToday, isTomorrow, isPast, differenceInHours } from "date-fns";
+import { format, parseISO, isToday, isTomorrow, isPast, differenceInHours } from "date-fns";
 import { TaskDetailSheet } from "@/src/components/tasks/TaskDetailSheet";
 import { Button } from "@/src/components/ui/button";
 import { toast, showConfirm } from "@/src/components/ui/toast";
@@ -23,6 +23,7 @@ import type { TaskPriority } from "@/src/types/tasks";
 import { useSetPageTitle } from "@/src/contexts/PageContext";
 import { MetricHeroCard } from "@/src/components/ui/MetricHeroCard";
 import { useRefillForecast } from "@/src/hooks/useRefillForecast";
+import { useOperations } from "@/src/contexts/OperationsContext";
 import { RefillForecastModal } from "@/src/components/analytics/RefillForecastModal";
 import { ActiveSiteInvoicesModal } from "@/src/components/analytics/ActiveSiteInvoicesModal";
 import { useActiveSiteInvoices, ActiveSiteInvoiceSummary } from "@/src/hooks/useActiveSiteInvoices";
@@ -1218,10 +1219,14 @@ function SitePoolCard({
   siteItem,
   onSelectInvoice,
   showSiteName = false,
+  onQuickFillMissingLogs,
+  isLogging = false,
 }: {
   siteItem: ActiveSiteInvoiceSummary;
   onSelectInvoice: (inv: Invoice) => void;
   showSiteName?: boolean;
+  onQuickFillMissingLogs?: (siteItem: ActiveSiteInvoiceSummary) => void;
+  isLogging?: boolean;
 }) {
   return (
     <div className={cn(
@@ -1261,6 +1266,14 @@ function SitePoolCard({
           )}>
             {siteItem.totalLoggedDays.toFixed(1)}d logged
           </span>
+          {siteItem.totalUnloggedDays > 0 && (
+            <span 
+              className="text-[10px] font-mono font-semibold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/50 px-1.5 py-0.2 rounded border border-amber-300 dark:border-amber-700/60"
+              title="Assumed active operational days"
+            >
+              +{siteItem.totalUnloggedDays.toFixed(1)}d unlogged
+            </span>
+          )}
           <span className="text-muted-foreground font-mono tabular-nums">
             / {siteItem.totalBilledDays}d billed
           </span>
@@ -1271,8 +1284,14 @@ function SitePoolCard({
 
         <div className="text-right text-[11px] text-muted-foreground shrink-0 font-medium">
           {siteItem.isOverrun ? (
+            <span className="text-rose-600 dark:text-rose-400 font-semibold font-mono">
+              {siteItem.activeMachinesCount > 1
+                ? `+${siteItem.overrunDays.toFixed(1)}d over (${Math.max(1, Math.abs(siteItem.calendarRunwayDays))}d × ${siteItem.activeMachinesCount} pumps)`
+                : `+${siteItem.overrunDays.toFixed(1)}d over (${Math.max(1, Math.abs(siteItem.calendarRunwayDays))}d overdue)`}
+            </span>
+          ) : siteItem.remainingDays === 0 ? (
             <span className="text-rose-600 dark:text-rose-400 font-semibold">
-              Exceeded by {siteItem.overrunDays.toFixed(1)}d
+              0.0d capacity left
             </span>
           ) : (
             <span>
@@ -1293,6 +1312,40 @@ function SitePoolCard({
           style={{ width: `${Math.min(100, siteItem.progressPct)}%` }}
         />
       </div>
+
+      {/* Missing Logs Banner & 1-Click Action */}
+      {siteItem.hasUnloggedDays && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-2.5 py-1.5 rounded-md bg-amber-50/80 dark:bg-amber-950/40 border border-amber-300/80 dark:border-amber-800/80 text-amber-950 dark:text-amber-200">
+          <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+            <AlertTriangle className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+            <span className="font-semibold text-xs text-amber-900 dark:text-amber-100 shrink-0">
+              {siteItem.unloggedDaysCount} unlogged day{siteItem.unloggedDaysCount === 1 ? '' : 's'}
+            </span>
+            <span className="text-amber-800 dark:text-amber-300 font-mono text-[10px] shrink-0">
+              ({siteItem.missingLogDates.map(d => format(parseISO(d), 'MMM d')).join(', ')})
+            </span>
+            <span className="text-[10px] text-amber-700/90 dark:text-amber-400/90 font-medium shrink-0">
+              · assumed active
+            </span>
+          </div>
+          {onQuickFillMissingLogs && (
+            <button
+              type="button"
+              onClick={() => onQuickFillMissingLogs(siteItem)}
+              disabled={isLogging}
+              className="inline-flex items-center justify-center gap-1 px-2.5 py-1 rounded bg-amber-600 hover:bg-amber-700 active:scale-95 text-white font-semibold text-[10px] shrink-0 transition-all shadow-xs cursor-pointer disabled:opacity-50 self-start sm:self-center whitespace-nowrap"
+              title="Record full active operational logs for missing dates"
+            >
+              {isLogging ? (
+                <Loader2 className="w-3 h-3 animate-spin" />
+              ) : (
+                <CheckCircle2 className="w-3 h-3" />
+              )}
+              <span>{isLogging ? 'Logging...' : 'Log Missing Days'}</span>
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Billed Invoices contributing to pool */}
       <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
@@ -1347,6 +1400,11 @@ function SitePoolCard({
                     )}>
                       {displayConsumed.toFixed(1)}
                     </span>
+                    {(m.unloggedDays || 0) > 0 && (
+                      <span className="text-[10px] text-amber-600 dark:text-amber-400 font-medium" title={`${m.unloggedDays}d unlogged assumed active`}>
+                        (+{m.unloggedDays}d)
+                      </span>
+                    )}
                     {m.contractedDays > 0 ? (
                       <>
                         <span className="text-muted-foreground/60 text-[10px]">/</span>
@@ -1412,6 +1470,44 @@ function ActiveSiteInvoicesCard({
   const navigate = useNavigate();
   const [groupBy, setGroupBy] = useState<'site' | 'client'>('site');
   const { activeSiteInvoices, totalActiveSites, concurrentSitesCount, lapsedSitesCount } = useActiveSiteInvoices();
+  const { logDailyActivitiesBulk } = useOperations();
+  const currentUser = useUserStore((s) => s.getCurrentUser());
+  const [loggingSiteId, setLoggingSiteId] = useState<string | null>(null);
+
+  const handleAutoFillMissingLogs = async (siteItem: ActiveSiteInvoiceSummary) => {
+    if (!siteItem.missingLogDates || siteItem.missingLogDates.length === 0) return;
+    const activePumps = (siteItem.siteMachines || []).filter(m => !m.isStopped);
+    if (activePumps.length === 0) return;
+
+    setLoggingSiteId(siteItem.siteId);
+    try {
+      const logsToSave: Parameters<typeof logDailyActivitiesBulk>[0] = [];
+      for (const date of siteItem.missingLogDates) {
+        for (const pump of activePumps) {
+          logsToSave.push({
+            assetId: pump.id,
+            assetName: pump.name,
+            siteId: siteItem.siteId,
+            siteName: siteItem.siteName,
+            date,
+            isActive: true,
+            operationalDay: 'full',
+            downtimeEntries: [],
+            dieselUsage: 0,
+            loggedBy: currentUser?.name || 'Operator',
+          });
+        }
+      }
+      if (logsToSave.length > 0) {
+        await logDailyActivitiesBulk(logsToSave);
+      }
+      toast.success(`Logged ${logsToSave.length} operational entries for ${siteItem.siteName} (${siteItem.missingLogDates.length} days recorded as active).`);
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to log missing days');
+    } finally {
+      setLoggingSiteId(null);
+    }
+  };
 
   // Group by client
   const clientGroups = useMemo(() => {
@@ -1428,24 +1524,31 @@ function ActiveSiteInvoicesCard({
     const groups = Array.from(clientMap.values()).map(({ displayName, sites }) => {
       const totalBilledDays = sites.reduce((sum, s) => sum + s.totalBilledDays, 0);
       const totalLoggedDays = Number(sites.reduce((sum, s) => sum + s.totalLoggedDays, 0).toFixed(1));
+      const totalUnloggedDays = Number(sites.reduce((sum, s) => sum + (s.totalUnloggedDays || 0), 0).toFixed(1));
+      const totalProjectedDays = Number(sites.reduce((sum, s) => sum + (s.totalProjectedDays || s.totalLoggedDays), 0).toFixed(1));
       const activeMachinesCount = sites.reduce((sum, s) => sum + s.activeMachinesCount, 0);
-      const isOverrun = totalBilledDays > 0 && totalLoggedDays > totalBilledDays;
-      const overrunDays = isOverrun ? Number((totalLoggedDays - totalBilledDays).toFixed(1)) : 0;
-      const remainingDays = isOverrun ? 0 : Math.max(0, Number((totalBilledDays - totalLoggedDays).toFixed(1)));
-      const calendarRunwayDays = Math.ceil(remainingDays / Math.max(1, activeMachinesCount));
-      const progressPct = totalBilledDays > 0 ? Math.min(100, (totalLoggedDays / totalBilledDays) * 100) : 0;
-      const hasAnyOverrun = sites.some(s => s.isOverrun);
+      const isOverrun = totalBilledDays > 0 && totalProjectedDays > totalBilledDays;
+      const overrunDays = isOverrun ? Number((totalProjectedDays - totalBilledDays).toFixed(1)) : 0;
+      const remainingDays = isOverrun ? 0 : Math.max(0, Number((totalBilledDays - totalProjectedDays).toFixed(1)));
+      const minRunway = Math.min(...sites.map(s => s.calendarRunwayDays));
+      const calendarRunwayDays = isFinite(minRunway) ? minRunway : Math.ceil(remainingDays / Math.max(1, activeMachinesCount));
+      const progressPct = totalBilledDays > 0 ? Math.min(100, (totalProjectedDays / totalBilledDays) * 100) : 0;
+      const hasAnyOverrun = sites.some(s => s.isOverrun || s.calendarRunwayDays < 0);
       const invoicesCount = sites.reduce((sum, s) => sum + s.invoices.length, 0);
 
       let urgencyBadgeClass = 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800';
       let urgencyLabel = `${calendarRunwayDays}d runway`;
 
-      if (hasAnyOverrun || isOverrun) {
+      if (hasAnyOverrun || isOverrun || calendarRunwayDays < 0) {
         urgencyBadgeClass = 'bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border-rose-300 dark:border-rose-800';
-        urgencyLabel = isOverrun ? `+${overrunDays.toFixed(1)}d Overrun` : `Site Overrun`;
-      } else if (calendarRunwayDays <= 0) {
+        const calDays = Math.max(1, Math.abs(calendarRunwayDays));
+        urgencyLabel = `+${calDays}d Overdue`;
+      } else if (calendarRunwayDays <= 0 || remainingDays === 0) {
         urgencyBadgeClass = 'bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border-rose-300 dark:border-rose-800';
         urgencyLabel = 'Due Today';
+      } else if (calendarRunwayDays === 1) {
+        urgencyBadgeClass = 'bg-amber-50 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border-amber-300 dark:border-amber-800';
+        urgencyLabel = 'Due Tomorrow';
       } else if (calendarRunwayDays <= 3) {
         urgencyBadgeClass = 'bg-amber-50 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border-amber-300 dark:border-amber-800';
         urgencyLabel = `Due in ${calendarRunwayDays}d`;
@@ -1457,6 +1560,8 @@ function ActiveSiteInvoicesCard({
         totalSites: sites.length,
         totalBilledDays,
         totalLoggedDays,
+        totalUnloggedDays,
+        totalProjectedDays,
         remainingDays,
         overrunDays,
         isOverrun: hasAnyOverrun || isOverrun,
@@ -1593,6 +1698,8 @@ function ActiveSiteInvoicesCard({
                 <SitePoolCard
                   siteItem={siteItem}
                   onSelectInvoice={onSelectInvoice}
+                  onQuickFillMissingLogs={handleAutoFillMissingLogs}
+                  isLogging={loggingSiteId === siteItem.siteId}
                 />
               )}
             </div>
@@ -1664,6 +1771,8 @@ function ActiveSiteInvoicesCard({
                     siteItem={siteItem}
                     onSelectInvoice={onSelectInvoice}
                     showSiteName={group.totalSites > 1}
+                    onQuickFillMissingLogs={handleAutoFillMissingLogs}
+                    isLogging={loggingSiteId === siteItem.siteId}
                   />
                 ))}
               </div>

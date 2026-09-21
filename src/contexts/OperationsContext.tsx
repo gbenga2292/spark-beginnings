@@ -124,6 +124,7 @@ interface OperationsContextType {
   
   // Daily Machine Logs
   logDailyActivity: (log: Omit<DailyMachineLog, 'id' | 'created_at'>) => Promise<void>;
+  logDailyActivitiesBulk: (logs: Omit<DailyMachineLog, 'id' | 'created_at'>[]) => Promise<void>;
   deleteDailyLog: (logId: string) => Promise<void>;
   sitePumpDates: AssetPumpDate[];
   persistSitePumpDates: (assetId: string, siteId: string, pumpStartDate: string, pumpStopDate: string | null, replacedAssetId?: string | null, swapReason?: string | null) => Promise<void>;
@@ -168,6 +169,28 @@ interface OperationsContextType {
 
   isLoaded: boolean;
 }
+
+export const mapDbRowToDailyMachineLog = (log: any): DailyMachineLog => ({
+  id: log.id,
+  assetId: log.asset_id,
+  assetName: log.asset_name,
+  siteId: log.site_id,
+  siteName: log.site_name,
+  date: log.date,
+  isActive: log.is_active,
+  operationalDay: log.operational_day,
+  downtimeEntries: log.downtime_entries || [],
+  maintenanceDetails: log.maintenance_details,
+  clientFeedback: log.client_feedback,
+  issuesOnSite: log.issues_on_site,
+  dieselUsage: Number(log.diesel_usage || 0),
+  dipstickLevelLitres: log.dipstick_level_litres != null ? Number(log.dipstick_level_litres) : undefined,
+  isTankFilledToFull: !!log.is_tank_filled_to_full,
+  supervisorOnSite: log.supervisor_on_site,
+  loggedBy: log.logged_by,
+  siteProgressPercentage: log.site_progress_percentage ?? undefined,
+  created_at: log.created_at
+});
 
 const OperationsContext = createContext<OperationsContextType | undefined>(undefined);
 
@@ -384,12 +407,36 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const fetchData = async () => {
       try {
+        // Helper to fetch all rows from operations_daily_logs (bypassing Supabase's default 1,000 row PostgREST limit)
+        const fetchAllDailyLogs = async () => {
+          const PAGE_SIZE = 1000;
+          let allRows: any[] = [];
+          let from = 0;
+          while (true) {
+            const { data, error } = await supabase
+              .from('operations_daily_logs')
+              .select('*')
+              .order('date', { ascending: false })
+              .range(from, from + PAGE_SIZE - 1);
+
+            if (error) {
+              console.error('Error fetching operations_daily_logs in OperationsContext:', error);
+              break;
+            }
+            if (!data || data.length === 0) break;
+            allRows.push(...data);
+            if (data.length < PAGE_SIZE) break;
+            from += PAGE_SIZE;
+          }
+          return allRows;
+        };
+
         const [
           { data: dbAssets }, 
           { data: dbWaybills }, 
           { data: dbCheckouts }, 
           { data: dbMaintenance },
-          { data: dbDailyLogs },
+          dbDailyLogs,
           { data: dbPumpDates },
           { data: dbFuelLogs },
           { data: dbDieselRefills },
@@ -400,7 +447,7 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
           supabase.from('operations_waybills').select('*'),
           supabase.from('operations_checkouts').select('*'),
           supabase.from('operations_maintenance').select('*'),
-          supabase.from('operations_daily_logs').select('*'),
+          fetchAllDailyLogs(),
           supabase.from('operations_site_pump_dates').select('*'),
           supabase.from('vehicle_fuel_logs').select('*').order('date', { ascending: false }),
           supabase.from('diesel_refills').select('*').order('date', { ascending: false }),
@@ -556,27 +603,7 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
         }
 
         if (dbDailyLogs) {
-          setDailyMachineLogs(dbDailyLogs.map((log: any) => ({
-            id: log.id,
-            assetId: log.asset_id,
-            assetName: log.asset_name,
-            siteId: log.site_id,
-            siteName: log.site_name,
-            date: log.date,
-            isActive: log.is_active,
-            operationalDay: log.operational_day,
-            downtimeEntries: log.downtime_entries || [],
-            maintenanceDetails: log.maintenance_details,
-            clientFeedback: log.client_feedback,
-            issuesOnSite: log.issues_on_site,
-            dieselUsage: Number(log.diesel_usage || 0),
-            dipstickLevelLitres: log.dipstick_level_litres != null ? Number(log.dipstick_level_litres) : undefined,
-            isTankFilledToFull: !!log.is_tank_filled_to_full,
-            supervisorOnSite: log.supervisor_on_site,
-            loggedBy: log.logged_by,
-            siteProgressPercentage: log.site_progress_percentage ?? undefined,
-            created_at: log.created_at
-          })));
+          setDailyMachineLogs(dbDailyLogs.map(mapDbRowToDailyMachineLog));
         }
 
         if (dbMaintenance) {
@@ -2794,27 +2821,7 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
 
           if (error) throw error;
 
-          const newLog: DailyMachineLog = {
-            id: data.id,
-            assetId: data.asset_id,
-            assetName: data.asset_name,
-            siteId: data.site_id,
-            siteName: data.site_name,
-            date: data.date,
-            isActive: data.is_active,
-            operationalDay: data.operational_day,
-            downtimeEntries: data.downtime_entries || [],
-            maintenanceDetails: data.maintenance_details,
-            clientFeedback: data.client_feedback,
-            issuesOnSite: data.issues_on_site,
-            dieselUsage: Number(data.diesel_usage || 0),
-            dipstickLevelLitres: data.dipstick_level_litres != null ? Number(data.dipstick_level_litres) : undefined,
-            isTankFilledToFull: !!data.is_tank_filled_to_full,
-            supervisorOnSite: data.supervisor_on_site,
-            loggedBy: data.logged_by,
-            siteProgressPercentage: data.site_progress_percentage ?? undefined,
-            created_at: data.created_at
-          };
+          const newLog = mapDbRowToDailyMachineLog(data);
 
           setDailyMachineLogs(prev => {
             const index = prev.findIndex(l => l.assetId === newLog.assetId && l.date === newLog.date);
@@ -2828,6 +2835,70 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
 
         } catch (error) {
           console.error('Error logging daily activity:', error);
+          throw error;
+        }
+      },
+      logDailyActivitiesBulk: async (logsData: Omit<DailyMachineLog, 'id' | 'created_at'>[]) => {
+        if (!logsData || logsData.length === 0) return;
+        try {
+          const existingMap = new Map<string, DailyMachineLog>();
+          dailyMachineLogs.forEach(l => existingMap.set(`${l.assetId}_${l.date}`, l));
+
+          const payloads = logsData.map(logData => {
+            const existingLog = existingMap.get(`${logData.assetId}_${logData.date}`);
+            const resolvedDipstick = logData.dipstickLevelLitres !== undefined
+              ? (logData.dipstickLevelLitres != null ? Number(logData.dipstickLevelLitres) : null)
+              : (existingLog?.dipstickLevelLitres != null ? Number(existingLog.dipstickLevelLitres) : null);
+            const resolvedIsFull = logData.isTankFilledToFull !== undefined
+              ? !!logData.isTankFilledToFull
+              : (existingLog?.isTankFilledToFull ?? false);
+
+            return {
+              asset_id: logData.assetId,
+              asset_name: logData.assetName,
+              site_id: logData.siteId,
+              site_name: logData.siteName,
+              date: logData.date,
+              is_active: logData.isActive,
+              operational_day: logData.operationalDay,
+              downtime_entries: logData.downtimeEntries || [],
+              maintenance_details: logData.maintenanceDetails || '',
+              client_feedback: logData.clientFeedback || '',
+              issues_on_site: logData.issuesOnSite || '',
+              diesel_usage: logData.dieselUsage ?? 0,
+              dipstick_level_litres: resolvedDipstick,
+              is_tank_filled_to_full: resolvedIsFull,
+              supervisor_on_site: logData.supervisorOnSite || '',
+              logged_by: logData.loggedBy || '',
+              site_progress_percentage: logData.siteProgressPercentage ?? null,
+            };
+          });
+
+          const BATCH_SIZE = 200;
+          const insertedLogs: DailyMachineLog[] = [];
+
+          for (let i = 0; i < payloads.length; i += BATCH_SIZE) {
+            const chunk = payloads.slice(i, i + BATCH_SIZE);
+            const { data, error } = await supabase
+              .from('operations_daily_logs')
+              .upsert(chunk, { onConflict: 'asset_id,date' })
+              .select();
+
+            if (error) throw error;
+            if (data) {
+              insertedLogs.push(...data.map(mapDbRowToDailyMachineLog));
+            }
+          }
+
+          setDailyMachineLogs(prev => {
+            const map = new Map(prev.map(l => [`${l.assetId}_${l.date}`, l]));
+            insertedLogs.forEach(nl => {
+              map.set(`${nl.assetId}_${nl.date}`, nl);
+            });
+            return Array.from(map.values());
+          });
+        } catch (error) {
+          console.error('Error in bulk daily machine activity logging:', error);
           throw error;
         }
       },
@@ -3050,6 +3121,7 @@ export const useOperations = () => {
       updateDailyMachineLog: () => {},
       deleteDailyMachineLog: () => {},
       bulkAddDailyMachineLogs: () => {},
+      logDailyActivitiesBulk: async () => {},
       addDieselRefill: () => {},
       updateDieselRefill: () => {},
       deleteDieselRefill: () => {},

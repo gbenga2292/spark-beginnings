@@ -1,13 +1,16 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import logoSrc from '../../logo/logo-2.png';
-import { Upload, Save, FolderOpen, Loader2, X, Trash2, Clock, ChevronRight, ChevronLeft, Ruler } from 'lucide-react';
+import { Save, FolderOpen, Loader2, X, Trash2, Clock, Ruler, ZoomIn, ZoomOut, Maximize2, RotateCcw } from 'lucide-react';
 import { DewateringCanvas } from '../components/canvas/DewateringCanvas';
 import { Dewatering3DView } from '../components/canvas/Dewatering3DView';
 import { ResultsPanel } from '../components/canvas/ResultsPanel';
-import { Toolbar, ActiveTool } from '../components/canvas/Toolbar';
+import { ActiveTool } from '../components/canvas/Toolbar';
 import { StatusBar } from '../components/canvas/StatusBar';
 import { DrawingSheetPreview, ExportOptions } from '../components/canvas/DrawingSheetPreview';
+import { DewaterCadHeader, ViewMode } from '../components/canvas/DewaterCadHeader';
+import { CadToolDock } from '../components/canvas/CadToolDock';
+import { DesignPanel, LayerItem } from '../components/canvas/DesignPanel';
 import { calculateBOM, LineData, PlacedComponent, DimensionData, AreaData, HoseData, ArrowData, TextData, ElevationLevel, PIXELS_PER_METER } from '../utils/simulationLogic';
 import { captureKonvaStage, captureThreeCanvas } from '../utils/drawingExportUtils';
 import { useSetPageTitle } from '../contexts/PageContext';
@@ -18,6 +21,7 @@ import { supabase } from '../integrations/supabase/client';
 import { toast } from 'sonner';
 import { CADLayer, DEFAULT_LAYERS } from '../utils/cadDataModels';
 import { usePriv } from '../hooks/usePriv';
+import { DewateringInput, DewateringLayoutType, DEFAULT_DEWATERING_INPUT } from '../utils/dewateringCalculator';
 
 interface SavedLayout {
   id: string;
@@ -94,6 +98,117 @@ function serializeBlueprintUrl(url: string | null | undefined, settings: Bluepri
   return `${url}#${params.toString()}`;
 }
 
+interface CanvasHudOverlayProps {
+  isLoopClosed: boolean;
+  is3D: boolean;
+  activeLayerName: string;
+  gridSnap: boolean;
+  orthoLocked: boolean;
+  scale?: string;
+  onZoomIn: () => void;
+  onZoomOut: () => void;
+  onZoomAll: () => void;
+  onResetView?: () => void;
+  onToggleLayers?: () => void;
+  showLayers?: boolean;
+}
+
+function CanvasHudOverlay({
+  isLoopClosed, is3D, activeLayerName,
+  gridSnap, orthoLocked, scale = '1:100',
+  onZoomIn, onZoomOut, onZoomAll, onResetView,
+  onToggleLayers, showLayers,
+}: CanvasHudOverlayProps) {
+  return (
+    <div className="absolute inset-0 pointer-events-none z-10">
+      {/* ── Top-Left Status Badge ── */}
+      <div className="absolute top-3 left-3 pointer-events-auto">
+        <div className="flex items-center gap-2 bg-white/90 backdrop-blur-sm border border-slate-200 shadow-sm rounded-lg px-3 py-1.5 text-[10px] font-mono text-slate-600">
+          <span>Scale: <span className="font-semibold text-slate-900">{scale}</span></span>
+          <span className="text-slate-300">•</span>
+          <span>Grid: <span className="font-semibold text-slate-900">1.0 m</span></span>
+          <span className="text-slate-300">•</span>
+          <button
+            type="button"
+            onClick={onToggleLayers}
+            title={`Toggle Layers & Levels (F7) ${showLayers ? '(Active)' : ''}`}
+            className={`flex items-center gap-1 px-1.5 py-0.5 -my-0.5 rounded transition-colors cursor-pointer ${
+              showLayers
+                ? 'bg-blue-100 text-blue-800 font-semibold'
+                : 'hover:bg-slate-100 text-slate-700'
+            }`}
+          >
+            <span className="text-slate-500">Layer:</span>
+            <span className="font-semibold text-blue-600">{activeLayerName}</span>
+          </button>
+          <span className="text-slate-300">•</span>
+          <span className="flex items-center gap-1 font-sans">
+            <span className={`w-1.5 h-1.5 rounded-full ${isLoopClosed ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+            <span className={`font-semibold ${isLoopClosed ? 'text-emerald-700' : 'text-amber-700'}`}>
+              {isLoopClosed ? 'Closed Loop' : 'Open Header'}
+            </span>
+          </span>
+        </div>
+      </div>
+
+      {/* ── Top-Right ViewCube / Compass ── */}
+      <div className="absolute top-3 right-3 pointer-events-auto">
+        <div className="flex flex-col items-center gap-1.5">
+          {/* 2D Compass / View label (only shown in 2D mode; 3D uses interactive ViewCube3D) */}
+          {!is3D && (
+            <div className="relative w-11 h-11 rounded-xl bg-white/90 backdrop-blur-sm border border-slate-200 shadow-sm flex flex-col items-center justify-center cursor-default">
+              <span className="text-[9px] font-bold text-slate-700 tracking-widest">
+                TOP
+              </span>
+              <span className="text-[8px] font-medium text-slate-400">
+                2D
+              </span>
+              {/* N arrow */}
+              <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 flex flex-col items-center">
+                <span className="text-[7.5px] font-bold text-rose-500">N</span>
+              </div>
+            </div>
+          )}
+
+          {/* Zoom controls (offset below ViewCube3D in 3D mode) */}
+          <div className={`flex flex-col gap-0.5 bg-white/90 backdrop-blur-sm border border-slate-200 shadow-sm rounded-lg p-0.5 ${is3D ? 'mt-[138px]' : ''}`}>
+            <button
+              onClick={onZoomIn}
+              title="Zoom In (+)"
+              className="w-8 h-8 flex items-center justify-center rounded-md text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors"
+            >
+              <ZoomIn size={14} />
+            </button>
+            <button
+              onClick={onZoomAll}
+              title="Zoom All / Fit (A)"
+              className="w-8 h-8 flex items-center justify-center rounded-md text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors"
+            >
+              <Maximize2 size={13} />
+            </button>
+            <button
+              onClick={onZoomOut}
+              title="Zoom Out (-)"
+              className="w-8 h-8 flex items-center justify-center rounded-md text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors"
+            >
+              <ZoomOut size={14} />
+            </button>
+            {onResetView && (
+              <button
+                onClick={onResetView}
+                title="Reset View"
+                className="w-8 h-8 flex items-center justify-center rounded-md text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors"
+              >
+                <RotateCcw size={13} />
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Simulator() {
   const priv = usePriv('simulator');
   const { isSimulatorDirty, setSimulatorDirty } = useAppStore();
@@ -123,6 +238,14 @@ export default function Simulator() {
       setSimulatorDirty(false);
     };
   }, [isSimulatorDirty, setSimulatorDirty]);
+
+  // Auto-collapse navigation sidebar when in DewaterCAD Simulator to maximize canvas workspace
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent('sidebar:collapse'));
+    return () => {
+      window.dispatchEvent(new CustomEvent('sidebar:restore'));
+    };
+  }, []);
   
   const [backgroundImage, setBackgroundImage] = useState<string | undefined>();
   const [blueprintSettings, setBlueprintSettings] = useState<BlueprintSettings>({
@@ -170,11 +293,89 @@ export default function Simulator() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [show3D, setShow3D] = useState(false);
   const [selected3DId, setSelected3DId] = useState<string | null>(null);
-  const [showResults, setShowResults] = useState(window.innerWidth >= 640);
+  const [showResults, setShowResults] = useState(true);
+  const [showLayersPanel, setShowLayersPanel] = useState(false);
+  const [showNavWheel, setShowNavWheel] = useState(false);
+  const [hiddenCanvasIds, setHiddenCanvasIds] = useState<Set<string>>(new Set());
+  const [lockedCanvasIds, setLockedCanvasIds] = useState<Set<string>>(new Set());
+  const [viewMode, setViewMode] = useState<ViewMode>('2d');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const navigate = useNavigate();
+
+  // F7 Global shortcut to toggle Layers & Levels panel
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'F7') {
+        e.preventDefault();
+        setShowLayersPanel(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, []);
+
+  const layerItems = useMemo<LayerItem[]>(() => {
+    const items: LayerItem[] = [];
+    lines.forEach((l, i) => items.push({
+      id: l.id,
+      label: `Header Pipe ${i + 1}`,
+      type: 'line',
+      visible: !hiddenCanvasIds.has(l.id),
+      locked: lockedCanvasIds.has(l.id),
+      zIndex: 10 + i,
+      color: '#0284c7'
+    }));
+    hoses.forEach((h, i) => items.push({
+      id: h.id,
+      label: `${h.kind === 'discharge' ? 'Discharge' : 'Suction'} Hose ${i + 1}`,
+      type: 'line',
+      visible: !hiddenCanvasIds.has(h.id),
+      locked: lockedCanvasIds.has(h.id),
+      zIndex: 20 + i,
+      color: h.kind === 'discharge' ? '#f97316' : '#eab308'
+    }));
+    placedComponents.forEach((c, i) => items.push({
+      id: c.id,
+      label: `${c.type.toUpperCase()} ${i + 1}`,
+      type: 'component',
+      visible: !hiddenCanvasIds.has(c.id),
+      locked: lockedCanvasIds.has(c.id),
+      zIndex: 30 + i,
+      color: c.type === 'pump' ? '#16a34a' : '#f59e0b'
+    }));
+    areas.forEach((a, i) => items.push({
+      id: a.id,
+      label: `${a.kind === 'site' ? 'Site' : a.kind === 'discharge' ? 'Discharge' : 'Pit'} ${i + 1}`,
+      type: 'area',
+      visible: !hiddenCanvasIds.has(a.id),
+      locked: lockedCanvasIds.has(a.id),
+      zIndex: 1 + i,
+      color: a.kind === 'site' ? '#22c55e' : a.kind === 'discharge' ? '#f97316' : '#ef4444'
+    }));
+    return items;
+  }, [lines, hoses, placedComponents, areas, hiddenCanvasIds, lockedCanvasIds]);
+
+  const handleToggleCanvasItemVisibility = useCallback((id: string) => {
+    setHiddenCanvasIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const handleToggleCanvasItemLock = useCallback((id: string) => {
+    setLockedCanvasIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
 
   // Auto-import layout from Dewatering Calculator
   const location = useLocation();
+  const [calculatorInputs, setCalculatorInputs] = useState<DewateringInput | null>(null);
   useEffect(() => {
     try {
       const stateData = (location.state as any)?.layoutData;
@@ -183,14 +384,40 @@ export default function Simulator() {
 
       if (importPayload) {
         sessionStorage.removeItem('dewatering_calculator_import');
-        if (importPayload.lines) setLines(importPayload.lines);
-        if (importPayload.components) setPlacedComponents(importPayload.components);
-        if (importPayload.areas) setAreas(importPayload.areas);
-        if (importPayload.hoses) setHoses(importPayload.hoses);
+        if (importPayload.lines) {
+          setLines(importPayload.lines.map((l: any) => ({
+            ...l,
+            layerId: (l.layerId && l.layerId !== 'layer-0') ? l.layerId : 'layer-headers',
+          })));
+        }
+        if (importPayload.components) {
+          setPlacedComponents(importPayload.components.map((c: any) => ({
+            ...c,
+            layerId: (c.layerId && c.layerId !== 'layer-0') ? c.layerId : 'layer-components',
+          })));
+        }
+        if (importPayload.areas) {
+          setAreas(importPayload.areas.map((a: any) => ({
+            ...a,
+            layerId: (a.layerId && a.layerId !== 'layer-0') ? a.layerId : 'layer-areas',
+          })));
+        }
+        if (importPayload.hoses) {
+          setHoses(importPayload.hoses.map((h: any) => ({
+            ...h,
+            layerId: (h.layerId && h.layerId !== 'layer-0') ? h.layerId : (h.kind === 'discharge' ? 'layer-discharge' : 'layer-suction'),
+          })));
+        }
         if (importPayload.arrows) setArrows(importPayload.arrows);
-        if (importPayload.dimensions) setDimensions(importPayload.dimensions);
+        if (importPayload.dimensions) {
+          setDimensions(importPayload.dimensions.map((d: any) => ({
+            ...d,
+            layerId: (d.layerId && d.layerId !== 'layer-0') ? d.layerId : 'layer-dimensions',
+          })));
+        }
         if (importPayload.texts) setTexts(importPayload.texts);
         if (importPayload.targetDepth) setTargetDepth(importPayload.targetDepth);
+        if (importPayload.calculatorInputs) setCalculatorInputs(importPayload.calculatorInputs);
         if (importPayload.levels && importPayload.levels.length > 0) {
           setLevels(importPayload.levels);
           setActiveLevelId(importPayload.activeLevelId || importPayload.levels[0].id);
@@ -198,6 +425,10 @@ export default function Simulator() {
         setShowWellpoints(true);
         setSimulatorDirty(true);
         toast.success(`Imported ${importPayload.name || 'Dewatering Layout'} from Calculator`);
+        setTimeout(() => {
+          canvasApiRef.current?.zoomAll();
+          view3DApiRef.current?.zoomAll();
+        }, 120);
       }
     } catch {
       // ignore
@@ -212,6 +443,8 @@ export default function Simulator() {
 
   // Drawing Export State
   const stageRef = useRef<any>(null);
+  const canvasApiRef = useRef<any>(null);
+  const view3DApiRef = useRef<any>(null);
   const [showDrawingPreview, setShowDrawingPreview] = useState(false);
   const [showExportOptions, setShowExportOptions] = useState(false);
   const [exportOptions, setExportOptions] = useState<ExportOptions>({
@@ -249,7 +482,7 @@ export default function Simulator() {
   const [showScaleModal, setShowScaleModal] = useState(false);
   const [scaleInputStr, setScaleInputStr] = useState('');
 
-  const results = useMemo(() => calculateBOM(lines, placedComponents), [lines, placedComponents]);
+  const results = useMemo(() => calculateBOM(lines, placedComponents, PIXELS_PER_METER, hoses), [lines, placedComponents, hoses]);
 
   useEffect(() => {
     return () => {
@@ -601,72 +834,83 @@ export default function Simulator() {
     handleClear();
   };
 
-  useSetPageTitle(
-    'Dewatering Layout Simulator',
-    '',
-    <div className="flex items-center gap-3">
+  useSetPageTitle('Dewatering Layout Simulator', '', null);
 
-      <label className="flex items-center justify-center px-4 py-2 bg-blue-600 text-white border border-transparent rounded-md shadow-sm text-sm font-medium hover:bg-blue-700 cursor-pointer">
-        <Upload className="w-4 h-4 mr-2" />
-        <span>Upload Blueprint</span>
-        <input
-          ref={fileInputRef}
-          type="file"
-          className="sr-only"
-          accept="image/*"
-          onChange={handleImageUpload}
-        />
-      </label>
+  // Handle view mode changes
+  const handleViewModeChange = useCallback((mode: ViewMode) => {
+    setViewMode(mode);
+    if (mode === '3d') {
+      setShow3D(true);
+    } else if (mode === '2d') {
+      setShow3D(false);
+    } else if (mode === 'calc') {
+      // Extract latest layout dimensions and geometry from canvas elements
+      const pit = areas.find(a => a.kind === 'excavation') || areas[0];
+      const site = areas.find(a => a.kind === 'site');
 
-      <button 
-        onClick={handleNewLayout} 
-        className="flex items-center justify-center px-4 py-2 bg-gray-600 text-white border border-transparent rounded-md shadow-sm text-sm font-medium hover:bg-gray-700"
-      >
-        <span>New</span>
-      </button>
+      let calcL = calculatorInputs?.excavationLength || 6;
+      let calcW = calculatorInputs?.excavationWidth || 6;
 
-      {currentLayoutId ? (
-        <>
-          <button 
-            onClick={handleUpdateLayout} 
-            disabled={isSaving || !priv.canSave}
-            className="flex items-center justify-center px-4 py-2 bg-green-600 text-white border border-transparent rounded-md shadow-sm text-sm font-medium hover:bg-green-700 disabled:opacity-50"
-            title={!priv.canSave ? "You don't have permission to save layouts" : ""}
-          >
-            <Save className="w-4 h-4 mr-2" />
-            <span>Update</span>
-          </button>
-          <button 
-            onClick={() => { setSaveName(currentLayoutName); setShowSaveDialog(true); }} 
-            disabled={isSaving || !priv.canSave}
-            className="flex items-center justify-center px-4 py-2 bg-teal-600 text-white border border-transparent rounded-md shadow-sm text-sm font-medium hover:bg-teal-700 disabled:opacity-50"
-            title={!priv.canSave ? "You don't have permission to save layouts" : ""}
-          >
-            <Save className="w-4 h-4 mr-2" />
-            <span>Save As</span>
-          </button>
-        </>
-      ) : (
-        <button 
-          onClick={() => { setSaveName(''); setShowSaveDialog(true); }} 
-          disabled={isSaving || !priv.canSave}
-          className="flex items-center justify-center px-4 py-2 bg-green-600 text-white border border-transparent rounded-md shadow-sm text-sm font-medium hover:bg-green-700 disabled:opacity-50"
-          title={!priv.canSave ? "You don't have permission to save layouts" : ""}
-        >
-          <Save className="w-4 h-4 mr-2" />
-          <span>Save</span>
-        </button>
-      )}
+      if (pit && pit.width && pit.height) {
+        calcL = Math.max(1, Math.round((pit.width / PIXELS_PER_METER) * 10) / 10);
+        calcW = Math.max(1, Math.round((pit.height / PIXELS_PER_METER) * 10) / 10);
+      } else if (lines.length > 0) {
+        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+        lines.forEach(l => l.points.forEach(p => {
+          if (p.x < minX) minX = p.x;
+          if (p.x > maxX) maxX = p.x;
+          if (p.y < minY) minY = p.y;
+          if (p.y > maxY) maxY = p.y;
+        }));
+        if (minX !== Infinity && maxX > minX && maxY > minY) {
+          calcL = Math.max(1, Math.round(((maxX - minX) / PIXELS_PER_METER) * 10) / 10);
+          calcW = Math.max(1, Math.round(((maxY - minY) / PIXELS_PER_METER) * 10) / 10);
+        }
+      }
 
-      <button 
-        onClick={handleOpenLoadPanel}
-        className="flex items-center justify-center px-4 py-2 bg-blue-600 text-white border border-transparent rounded-md shadow-sm text-sm font-medium hover:bg-blue-700"
-      >
-        <FolderOpen className="w-4 h-4 mr-2" />
-        <span>Load</span>
-      </button>
-    </div>
-  );
+      let landL = calculatorInputs?.landLength || Math.max(30, calcL + 12);
+      let landW = calculatorInputs?.landWidth || Math.max(24, calcW + 12);
+      if (site && site.width && site.height) {
+        landL = Math.max(calcL + 4, Math.round((site.width / PIXELS_PER_METER) * 10) / 10);
+        landW = Math.max(calcW + 4, Math.round((site.height / PIXELS_PER_METER) * 10) / 10);
+      }
+
+      const calcDepth = targetDepth || calculatorInputs?.excavationDepth || 5;
+
+      let detectedLayout: DewateringLayoutType = calculatorInputs?.layoutType || 'ring';
+      if (lines.length === 1 && lines[0].points.length === 2) {
+        detectedLayout = 'single_line';
+      } else if (lines.length === 1 && lines[0].points.length === 3) {
+        detectedLayout = 'l_shape';
+      } else if (lines.length === 1 && lines[0].points.length === 4) {
+        detectedLayout = 'u_shape';
+      } else if (lines.length > 0) {
+        detectedLayout = 'ring';
+      }
+
+      const exportInputs: DewateringInput = {
+        ...(calculatorInputs || DEFAULT_DEWATERING_INPUT),
+        excavationLength: calcL,
+        excavationWidth: calcW,
+        excavationDepth: calcDepth,
+        landLength: Math.max(landL, calcL + 4),
+        landWidth: Math.max(landW, calcW + 4),
+        layoutType: detectedLayout,
+        waterTableDepth: calculatorInputs?.waterTableDepth ?? 1.5,
+        requiredDrawdown: calculatorInputs?.requiredDrawdown ?? (calcDepth + 0.5),
+      };
+
+      sessionStorage.setItem('dewatering_simulator_export', JSON.stringify(exportInputs));
+      navigate('/operations/dewatering-calculator', {
+        state: { fromSimulator: true, calculatorInputs: exportInputs }
+      });
+    }
+  }, [navigate, areas, lines, targetDepth, calculatorInputs]);
+
+  // Keep viewMode in sync with show3D
+  useEffect(() => {
+    setViewMode(show3D ? '3d' : '2d');
+  }, [show3D]);
 
   const handleUndo = () => {
     if (history.length === 0) return;
@@ -822,66 +1066,182 @@ export default function Simulator() {
     }
   };
 
-  return (
-    <div className={isFullscreen ? "fixed inset-0 z-50 bg-gray-100 flex flex-col overflow-hidden print:overflow-visible print:static print:h-auto" : "absolute inset-0 flex flex-col bg-gray-100 overflow-hidden print:overflow-visible print:static print:h-auto"}>
-      {/* Top Toolbar Ribbon */}
-      <div className="flex-shrink-0 z-10 w-full">
-        <Toolbar 
-          activeTool={activeTool} 
-          onToolSelect={handleToolSelect} 
-          onUndo={handleUndo} 
-          onRedo={handleRedo}
-          canUndo={history.length > 0}
-          canRedo={redoStack.length > 0} 
-          showWellpoints={showWellpoints}
-          onToggleWellpoints={() => setShowWellpoints(!showWellpoints)}
-          wellpointSide={
-            (selectedCanvasId && lines.find(l => l.id === selectedCanvasId)?.wellpointSide) || wellpointSide
-          }
-          onToggleWellpointSide={() => {
-            if (selectedCanvasId) {
-              const line = lines.find(l => l.id === selectedCanvasId);
-              if (line) {
-                const currentSide = line.wellpointSide || wellpointSide;
-                const nextSide = currentSide === 'left' ? 'right' : currentSide === 'right' ? 'both' : 'left';
-                handleLinesChange(lines.map(l => l.id === selectedCanvasId ? { ...l, wellpointSide: nextSide } : l));
-                return;
-              }
-            }
-            setWellpointSide(prev => prev === 'left' ? 'right' : prev === 'right' ? 'both' : 'left');
-          }}
-          orthoLocked={orthoLocked}
-          onToggleOrtho={() => setOrthoLocked(!orthoLocked)}
-          gridSnap={gridSnap}
-          onToggleGridSnap={() => setGridSnap(!gridSnap)}
-          isFullscreen={isFullscreen}
-          onToggleFullscreen={() => setIsFullscreen(!isFullscreen)}
-          show3D={show3D}
-          onToggle3D={() => { setShow3D(!show3D); setSelected3DId(null); }}
-          onExportDrawing={handleExportDrawing}
-          offsetDistance={offsetDistance}
-          onOffsetDistanceChange={setOffsetDistance}
-          mirrorCopy={mirrorCopy}
-          onMirrorCopyChange={setMirrorCopy}
-          drawShapeMode={drawShapeMode}
-          onDrawShapeModeChange={setDrawShapeMode}
-          textColor={textColor}
-          onTextColorChange={setTextColor}
-          textSize={textSize}
-          onTextSizeChange={setTextSize}
-          blueprintSettings={blueprintSettings}
-          onUpdateBlueprintSettings={(updates) => setBlueprintSettings(prev => ({ ...prev, ...updates }))}
-          hasBlueprint={!!backgroundImage}
-          isSettingScale={scaleRefMode !== 'idle'}
-          onStartReferenceScale={() => { setScaleRefMode('selecting-start'); setScaleRefPt1(null); setScaleRefPt2(null); setShowScaleModal(false); }}
-        />
-      </div>
+  // Zoom Variation Handlers (Revit / AutoCAD Suite)
+  const handleZoomIn = useCallback(() => {
+    if (show3D) {
+      view3DApiRef.current?.zoomIn?.();
+    } else {
+      canvasApiRef.current?.zoomIn?.();
+    }
+  }, [show3D]);
 
-      <div className="flex flex-1 relative overflow-hidden flex-col">
+  const handleZoomOut = useCallback(() => {
+    if (show3D) {
+      view3DApiRef.current?.zoomOut?.();
+    } else {
+      canvasApiRef.current?.zoomOut?.();
+    }
+  }, [show3D]);
+
+  const handleZoomAll = useCallback(() => {
+    if (show3D) {
+      view3DApiRef.current?.zoomAll?.();
+    } else {
+      canvasApiRef.current?.zoomAll?.();
+    }
+  }, [show3D]);
+
+  const handleZoomWindow = useCallback(() => {
+    if (show3D) {
+      view3DApiRef.current?.zoomWindow?.();
+    } else {
+      setActiveTool('zoom-window');
+    }
+  }, [show3D]);
+
+  const handleZoomSelection = useCallback(() => {
+    if (show3D) {
+      view3DApiRef.current?.zoomAll?.();
+    } else {
+      canvasApiRef.current?.zoomSelection?.();
+    }
+  }, [show3D]);
+
+  const handleZoom100 = useCallback(() => {
+    if (show3D) {
+      view3DApiRef.current?.resetView?.();
+    } else {
+      canvasApiRef.current?.zoom100?.();
+    }
+  }, [show3D]);
+
+  const handleZoomPrevious = useCallback(() => {
+    if (show3D) {
+      view3DApiRef.current?.resetView?.();
+    } else {
+      canvasApiRef.current?.zoomPrevious?.();
+    }
+  }, [show3D]);
+
+  return (
+    <div className={isFullscreen ? "fixed inset-0 z-50 flex flex-col overflow-hidden bg-slate-50 select-none" : "absolute inset-0 flex flex-col overflow-hidden bg-slate-50 select-none"}>
+
+      {/* Hidden blueprint file input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        className="sr-only"
+        accept="image/*"
+        onChange={handleImageUpload}
+      />
+
+      {/* ── Top Navigation Bar ── */}
+      <DewaterCadHeader
+        currentLayoutName={currentLayoutName}
+        onLayoutNameChange={(name) => {
+          setCurrentLayoutName(name);
+          setSaveName(name);
+        }}
+        viewMode={viewMode}
+        onViewModeChange={handleViewModeChange}
+        onNew={handleNewLayout}
+        onSave={() => { setSaveName(''); setShowSaveDialog(true); }}
+        onUpdate={handleUpdateLayout}
+        onOpenLoad={handleOpenLoadPanel}
+        onExport={handleExportDrawing}
+        onUploadBlueprint={() => fileInputRef.current?.click()}
+        onUndo={handleUndo}
+        onRedo={handleRedo}
+        canUndo={history.length > 0}
+        canRedo={redoStack.length > 0}
+        onZoomIn={handleZoomIn}
+        onZoomOut={handleZoomOut}
+        onZoomAll={handleZoomAll}
+        orthoLocked={orthoLocked}
+        onToggleOrtho={() => setOrthoLocked(!orthoLocked)}
+        gridSnap={gridSnap}
+        onToggleGridSnap={() => setGridSnap(!gridSnap)}
+        isFullscreen={isFullscreen}
+        onToggleFullscreen={() => setIsFullscreen(!isFullscreen)}
+        boqResults={results}
+        onClearBOQ={handleClear}
+        isSaving={isSaving}
+        isDirty={isSimulatorDirty}
+        hasLayout={!!currentLayoutId}
+      />
+
+      {/* ── Body: Left Dock + Layers Panel + Canvas ── */}
+      <div className="flex flex-1 overflow-hidden">
+
+        {/* ── Left Vertical Tool Dock ── */}
+        <div className="relative z-50 flex-shrink-0">
+          <CadToolDock
+            activeTool={activeTool}
+            onToolSelect={handleToolSelect}
+            orthoLocked={orthoLocked}
+            onToggleOrtho={() => setOrthoLocked(!orthoLocked)}
+            gridSnap={gridSnap}
+            onToggleGridSnap={() => setGridSnap(!gridSnap)}
+            onToggleLayers={() => setShowLayersPanel(p => !p)}
+            showWellpoints={showWellpoints}
+            onToggleWellpoints={() => setShowWellpoints(!showWellpoints)}
+            showLayers={showLayersPanel}
+            showNavWheel={showNavWheel}
+            onToggleNavWheel={() => setShowNavWheel(p => !p)}
+          />
+        </div>
+
+        {/* ── Slide-out Design / Layers & Levels Panel ── */}
+        {showLayersPanel && (
+          <div className="relative z-40 flex-shrink-0 animate-in slide-in-from-left duration-200">
+            <DesignPanel
+              layerItems={layerItems}
+              selectedId={selectedCanvasId}
+              onSelectLayer={(id) => setSelectedCanvasId(id)}
+              onToggleLock={handleToggleCanvasItemLock}
+              onToggleVisibility={handleToggleCanvasItemVisibility}
+              onMoveUp={() => {}}
+              onMoveDown={() => {}}
+              onSendToBack={() => {}}
+              onBringToFront={() => {}}
+              levels={levels}
+              activeLevelId={activeLevelId}
+              onSelectLevel={setActiveLevelId}
+              onAddLevel={(lvl) => setLevels(prev => [...prev, lvl])}
+              onUpdateLevel={(id, updates) => setLevels(prev => prev.map(l => l.id === id ? { ...l, ...updates } : l))}
+              onDeleteLevel={(id) => setLevels(prev => prev.filter(l => l.id !== id))}
+              cadLayers={layers}
+              activeCadLayerId={activeLayerId}
+              onSelectCadLayer={setActiveLayerId}
+              onUpdateCadLayer={(id, updates) => setLayers(prev => prev.map(l => l.id === id ? { ...l, ...updates } : l))}
+              onAddCadLayer={(layer) => setLayers(prev => [...prev, layer])}
+              onDeleteCadLayer={(id) => setLayers(prev => prev.filter(l => l.id !== id))}
+              onToggleCollapse={() => setShowLayersPanel(false)}
+            />
+          </div>
+        )}
+
+      <div className="flex flex-1 relative overflow-hidden flex-col z-0">
         {/* Main Canvas Area */}
         <div className="flex-1 bg-[#e5e7eb] overflow-hidden relative">
+
+          {/* Canvas HUD Overlays */}
+          <CanvasHudOverlay
+            isLoopClosed={lines.length > 0}
+            is3D={show3D}
+            activeLayerName={layers.find(l => l.id === activeLayerId)?.name || 'Layer 0'}
+            gridSnap={gridSnap}
+            orthoLocked={orthoLocked}
+            onZoomIn={handleZoomIn}
+            onZoomOut={handleZoomOut}
+            onZoomAll={handleZoomAll}
+            onResetView={show3D ? () => view3DApiRef.current?.resetView?.() : undefined}
+            onToggleLayers={() => setShowLayersPanel(p => !p)}
+            showLayers={showLayersPanel}
+          />
+
           {activeTool === 'export-window' && (
-            <div className="absolute top-0 inset-x-0 z-50 bg-blue-600 text-white text-center py-1.5 text-sm font-medium shadow-md flex items-center justify-center gap-4">
+            <div className="absolute top-0 inset-x-0 z-50 bg-blue-700/90 backdrop-blur-sm text-white text-center py-1.5 text-xs font-medium shadow-md flex items-center justify-center gap-4">
               <span>Click and drag on the canvas to select the export window area.</span>
               <button 
                 onClick={() => setActiveTool('select')} 
@@ -891,6 +1251,7 @@ export default function Simulator() {
               </button>
             </div>
           )}
+
           {show3D ? (
             <Dewatering3DView 
               lines={lines}
@@ -908,11 +1269,18 @@ export default function Simulator() {
               onAreasChange={handleAreasChange}
               onLinesChange={handleLinesChange}
               onPlacedComponentsChange={handleComponentsChange}
+              onHosesChange={handleHosesChange}
+              resultsOpen={showResults}
+              showNavWheel={showNavWheel}
+              onToggleNavWheel={() => setShowNavWheel(p => !p)}
+              view3DApiRef={view3DApiRef}
             />
           ) : (
-            <>
-              <DewateringCanvas
+            <DewateringCanvas
               stageRef={stageRef}
+              canvasApiRef={canvasApiRef}
+              showLayersPanel={showLayersPanel}
+              onToggleLayersPanel={() => setShowLayersPanel(p => !p)}
               onSelectionChange={setSelectedCanvasId}
               lines={lines}
               onLinesChange={handleLinesChange}
@@ -955,35 +1323,20 @@ export default function Simulator() {
               onSelectLayer={setActiveLayerId}
               onUpdateLayer={(id, updates) => setLayers(prev => prev.map(l => l.id === id ? { ...l, ...updates } : l))}
               onAddLayer={(layer) => setLayers(prev => [...prev, layer])}
-              onDeleteLayer={(id) => setLayers(prev => prev.filter(l => l.id !== id))}
               onCursorPosChange={setCursorPos}
+              lockedCanvasIds={lockedCanvasIds}
+              hiddenCanvasIds={hiddenCanvasIds}
               scaleRefMode={scaleRefMode}
               scaleRefPt1={scaleRefPt1}
               scaleRefPt2={scaleRefPt2}
               onSetScaleRefPt1={(pt) => { setScaleRefPt1(pt); setScaleRefMode('selecting-end'); }}
               onSetScaleRefPt2={(pt) => { setScaleRefPt2(pt); setScaleRefMode('idle'); setShowScaleModal(true); setScaleInputStr(''); }}
             />
-            </>
           )}
+
         </div>
 
-        {/* Floating/Collapsible Results Sidebar */}
-        <div className={`absolute top-4 right-4 z-20 flex transition-transform duration-300 ${showResults ? 'translate-x-0' : 'translate-x-[calc(100%+16px)]'}`}>
-          <button 
-            onClick={() => setShowResults(!showResults)}
-            className="absolute -left-8 top-2 bg-white border border-gray-200 shadow-md p-1.5 rounded-l-md hover:bg-gray-50"
-            title={showResults ? "Hide BOM" : "Show BOM"}
-          >
-            {showResults ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
-          </button>
-          <div className="shadow-2xl rounded-lg">
-            <ResultsPanel
-              results={results}
-              onClear={handleClear}
-            />
-          </div>
-        </div>
-
+        {/* Status Bar */}
         <StatusBar
           cursorPos={cursorPos}
           activeTool={activeTool}
@@ -992,8 +1345,14 @@ export default function Simulator() {
           osnapEnabled={true}
           activeLayerName={layers.find(l => l.id === activeLayerId)?.name || 'Layer 0'}
           isDirty={isSimulatorDirty}
+          onToggleOrtho={() => setOrthoLocked(!orthoLocked)}
+          onToggleGridSnap={() => setGridSnap(!gridSnap)}
+          onToggleLayers={() => setShowLayersPanel(p => !p)}
+          showLayers={showLayersPanel}
         />
       </div>
+
+      </div> {/* end body */}
 
       {/* ── Save Dialog ── */}
       {showSaveDialog && (
@@ -1350,7 +1709,7 @@ export default function Simulator() {
         if (results.wellpoints > 0) activeLegendItems.push('WELL POINTS');
         if (results.pumps > 0) activeLegendItems.push('DEWATERING PUMPS');
         if (results.elbows > 0) activeLegendItems.push('ELBOW CONNECTORS');
-        if (results.tees > 0) activeLegendItems.push('FLUSH CONNECTIONS');
+        if (results.tees > 0) activeLegendItems.push('TEE CONNECTORS');
         if (hoses.some(h => h.kind === 'suction' || h.kind === 'hose')) activeLegendItems.push('SUCTION HOSES');
         if (hoses.some(h => h.kind === 'discharge')) activeLegendItems.push('DISCHARGE HOSES');
         if (areas.some(a => a.kind === 'excavation')) activeLegendItems.push('EXCAVATION AREA');

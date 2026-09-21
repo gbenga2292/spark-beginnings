@@ -51,6 +51,41 @@ body, button, input, select, textarea {
   font-family: inherit;
 }
 
+/* ── Native Desktop App Feel: Prevent accidental browser text highlighting ── */
+*, *::before, *::after {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+/* Re-enable selection for inputs, textareas, and print/export preview documents */
+input,
+textarea,
+[contenteditable="true"],
+[contenteditable="true"] *,
+.selectable-text,
+.selectable-text *,
+.printable-area,
+.printable-area *,
+.print-preview,
+.print-preview *,
+pre,
+pre *,
+code,
+code * {
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+  user-select: text;
+}
+
+/* Prevent native browser ghost drag of images and links */
+img, a {
+  -webkit-user-drag: none;
+  user-drag: none;
+}
+
 /* ── Tabular figures for numerical precision and alignment ─────────── */
 .tabular-nums, table, [data-metric], .font-mono {
   font-feature-settings: "tnum" 1;

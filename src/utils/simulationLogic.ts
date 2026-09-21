@@ -86,13 +86,14 @@ export interface HoseData {
   id: string;
   points: Point[];
   kind?: string;
+  levelId?: string;
   layerId?: string;
   locked?: boolean;
   zIndex?: number;
   hideLength?: boolean;
 }
 
-export type ComponentType = 'pump' | 'tee' | 'elbow';
+export type ComponentType = 'pump' | 'tee' | 'elbow' | 'ingress';
 
 export interface PlacedComponent {
   id: string;
@@ -105,13 +106,20 @@ export interface PlacedComponent {
 }
 
 export interface DewateringSimulationResult {
-  headers: number;
+  headers: number; // total count of headers (headers6m + headers3m)
+  headers6m: number;
+  headers3m: number;
   pumps: number;
-  wellpoints: number;
-  connectors: number;
-  clips: number;
+  wellpoints: number; // filters (1.0m c/c along active headers)
+  connectors: number; // swing joints (for backwards compatibility)
+  clips: number; // couplings / clamps (for backwards compatibility)
   elbows: number;
   tees: number;
+  endCaps: number;
+  swingJoints: number;
+  couplings: number; // quick-release Bauer clamp couplings
+  suctionHoses: number;
+  dischargeHoseMeters: number;
   totalLengthMeters: number;
 }
 
@@ -126,18 +134,30 @@ export function calculateDistance(p1: Point, p2: Point): number {
 export function calculateBOM(
   lines: LineData[], 
   placedComponents: PlacedComponent[] = [],
-  scalePxPerMeter: number = PIXELS_PER_METER
+  scalePxPerMeter: number = PIXELS_PER_METER,
+  hoses: HoseData[] = []
 ): DewateringSimulationResult {
   let totalLengthPx = 0;
-  let elbows = 0;
+  let detectedElbows = 0;
+  let isClosedLoop = false;
   
   const allPoints: Point[] = [];
   
   lines.forEach(line => {
     if (line.points.length < 2) return;
     
-    // Add internal elbows for this line
-    elbows += Math.max(0, line.points.length - 2);
+    // Check if line is a closed ring (first point touches last point)
+    const pFirst = line.points[0];
+    const pLast = line.points[line.points.length - 1];
+    const isRing = line.points.length >= 4 && calculateDistance(pFirst, pLast) < 15;
+    if (isRing) isClosedLoop = true;
+
+    // Detect 90° corners / elbows in polylines
+    if (isRing) {
+      detectedElbows += line.points.length - 1; // e.g. 4-sided ring has 4 corners
+    } else {
+      detectedElbows += Math.max(0, line.points.length - 2);
+    }
     
     for (let i = 0; i < line.points.length - 1; i++) {
       totalLengthPx += calculateDistance(line.points[i], line.points[i + 1]);
@@ -146,51 +166,101 @@ export function calculateBOM(
     allPoints.push(...line.points);
   });
 
-  const totalLengthMeters = totalLengthPx / scalePxPerMeter;
+  const totalLengthMeters = Math.round((totalLengthPx / scalePxPerMeter) * 100) / 100;
   
-  // Calculate headers
-  let headers = Math.ceil(totalLengthMeters / DEFAULT_HEADER_LENGTH_METERS);
-  
-  // 1 pump for every 10 headers
-  let pumps = Math.ceil(headers / 10);
-  
-  // 6 wellpoints and 6 connectors per header
-  const wellpoints = headers * 6;
-  const connectors = headers * 6;
-  
-  // 2 clips per wellpoint
-  const clips = wellpoints * 2;
-  
-  // Basic Tee calculation: find points that are shared across different lines (or close to each other)
-  // To keep it performant for a rough sketch, we just count how many points overlap
-  let tees = 0;
-  for (let i = 0; i < allPoints.length; i++) {
-    let overlapCount = 0;
-    for (let j = i + 1; j < allPoints.length; j++) {
-      if (Math.abs(allPoints[i].x - allPoints[j].x) < 5 && Math.abs(allPoints[i].y - allPoints[j].y) < 5) {
-        overlapCount++;
+  // Modular 6m & 3m header breakdown (matches Dewatering Calculator breakdownRunLength)
+  let headers6m = 0;
+  let headers3m = 0;
+  if (totalLengthMeters > 0) {
+    lines.forEach(line => {
+      for (let i = 0; i < line.points.length - 1; i++) {
+        const segDistPx = calculateDistance(line.points[i], line.points[i + 1]);
+        const segLenM = segDistPx / scalePxPerMeter;
+        if (segLenM > 0.5) {
+          const needed = Math.ceil(segLenM / 3) * 3;
+          const h6 = Math.floor(needed / 6);
+          const h3 = (needed % 6 === 3) ? 1 : 0;
+          headers6m += h6;
+          headers3m += h3;
+        }
       }
-    }
-    if (overlapCount >= 1) { // 3-way connection means at least 2 lines meet at a point (1 overlap)
-      tees++;
+    });
+
+    if (headers6m === 0 && headers3m === 0 && totalLengthMeters > 0) {
+      const needed = Math.ceil(totalLengthMeters / 3) * 3;
+      headers6m = Math.floor(needed / 6);
+      headers3m = (needed % 6 === 3) ? 1 : 0;
     }
   }
 
-  // Add manual components
-  placedComponents.forEach(comp => {
-    if (comp.type === 'pump') pumps++;
-    if (comp.type === 'tee') tees++;
-    if (comp.type === 'elbow') elbows++;
+  const totalHeaders = headers6m + headers3m;
+  
+  // Pumps: 100 m³/hr vacuum pump, max 60m header coverage per pump, min 1 if lines exist
+  let calculatedPumps = totalLengthMeters > 0 ? Math.max(1, Math.ceil(totalLengthMeters / 60)) : 0;
+  
+  // Manual pumps added on canvas
+  const manualPumps = placedComponents.filter(c => c.type === 'pump').length;
+  const pumps = Math.max(calculatedPumps, manualPumps || (totalLengthMeters > 0 ? 1 : 0));
+  
+  // Wellpoints / Filters: 1.0m c/c along active line (minimum 4 if system active)
+  const wellpoints = totalLengthMeters > 0 ? Math.max(4, Math.ceil(totalLengthMeters / 1.0)) : 0;
+  
+  // Swing joints: 1 flexible swing arm per wellpoint filter
+  const swingJoints = wellpoints;
+  const connectors = swingJoints; // alias for backwards compatibility
+  
+  // Fittings: Elbows & Tees
+  const manualElbows = placedComponents.filter(c => c.type === 'elbow').length;
+  const elbows = detectedElbows + manualElbows;
+
+  const manualTees = placedComponents.filter(c => c.type === 'tee').length;
+  // 1 suction tie-in tee per vacuum pump to tie into line + manual tees
+  const tees = (pumps > 0 ? pumps : 0) + manualTees;
+
+  // End Caps: 0 for closed ring, 2 for open linear / U-shape / ingress break
+  let endCaps = 0;
+  if (totalLengthMeters > 0) {
+    endCaps = isClosedLoop ? 0 : 2 * Math.max(1, lines.length);
+  }
+
+  // Couplings / Bauer clamps:
+  // Pipe-to-pipe joints within runs + (elbows * 2) + (tees * 2) + endCaps + pumps tie-ins
+  const pipeToPipeJoints = Math.max(0, totalHeaders - Math.max(1, lines.length));
+  const couplings = totalLengthMeters > 0 
+    ? pipeToPipeJoints + (elbows * 2) + (tees * 2) + endCaps + pumps
+    : 0;
+  const clips = couplings; // alias for backwards compatibility
+
+  // Suction Hoses: 1 heavy-duty armored suction hose per pump + drawn suction hoses
+  const drawnSuctionHoses = hoses.filter(h => h.kind === 'suction' || h.kind === 'hose').length;
+  const suctionHoses = Math.max(pumps, drawnSuctionHoses);
+
+  // Discharge Lines (meters): default ~30m per active pump + length of drawn discharge hoses
+  let drawnDischargeLengthMeters = 0;
+  hoses.filter(h => h.kind === 'discharge').forEach(h => {
+    for (let i = 0; i < h.points.length - 1; i++) {
+      drawnDischargeLengthMeters += calculateDistance(h.points[i], h.points[i + 1]) / scalePxPerMeter;
+    }
   });
+  const dischargeHoseMeters = drawnDischargeLengthMeters > 0 
+    ? Math.round(drawnDischargeLengthMeters * 10) / 10 
+    : (pumps * 30);
 
   return {
-    headers,
+    headers: totalHeaders,
+    headers6m,
+    headers3m,
     pumps,
     wellpoints,
     connectors,
     clips,
     elbows,
     tees,
-    totalLengthMeters: Math.round(totalLengthMeters * 100) / 100
+    endCaps,
+    swingJoints,
+    couplings,
+    suctionHoses,
+    dischargeHoseMeters,
+    totalLengthMeters
   };
 }

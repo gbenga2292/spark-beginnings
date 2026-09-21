@@ -71,34 +71,46 @@ export function ActiveSiteInvoicesModal({
       const totalLoggedDays = Number(
         sites.reduce((sum, s) => sum + s.totalLoggedDays, 0).toFixed(1)
       );
+      const totalUnloggedDays = Number(
+        sites.reduce((sum, s) => sum + (s.totalUnloggedDays || 0), 0).toFixed(1)
+      );
+      const totalProjectedDays = Number(
+        sites.reduce((sum, s) => sum + (s.totalProjectedDays || s.totalLoggedDays), 0).toFixed(1)
+      );
       const activeMachinesCount = sites.reduce((sum, s) => sum + s.activeMachinesCount, 0);
-      const isOverrun = totalBilledDays > 0 && totalLoggedDays > totalBilledDays;
-      const overrunDays = isOverrun ? Number((totalLoggedDays - totalBilledDays).toFixed(1)) : 0;
+      const isOverrun = totalBilledDays > 0 && totalProjectedDays > totalBilledDays;
+      const overrunDays = isOverrun ? Number((totalProjectedDays - totalBilledDays).toFixed(1)) : 0;
       const remainingDays = isOverrun
         ? 0
-        : Math.max(0, Number((totalBilledDays - totalLoggedDays).toFixed(1)));
-      const calendarRunwayDays = Math.ceil(
-        remainingDays / Math.max(1, activeMachinesCount)
-      );
+        : Math.max(0, Number((totalBilledDays - totalProjectedDays).toFixed(1)));
+      const minRunway = Math.min(...sites.map((s) => s.calendarRunwayDays));
+      const calendarRunwayDays = isFinite(minRunway)
+        ? minRunway
+        : Math.ceil(remainingDays / Math.max(1, activeMachinesCount));
       const progressPct =
         totalBilledDays > 0
-          ? Math.min(100, (totalLoggedDays / totalBilledDays) * 100)
+          ? Math.min(100, (totalProjectedDays / totalBilledDays) * 100)
           : 0;
-      const hasAnyOverrun = sites.some((s) => s.isOverrun);
+      const hasAnyOverrun = sites.some((s) => s.isOverrun || s.calendarRunwayDays < 0);
       const invoicesCount = sites.reduce((sum, s) => sum + s.invoices.length, 0);
 
       let urgencyBadgeClass =
         'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800';
       let urgencyLabel = `${calendarRunwayDays}d runway`;
 
-      if (hasAnyOverrun || isOverrun) {
+      if (hasAnyOverrun || isOverrun || calendarRunwayDays < 0) {
         urgencyBadgeClass =
           'bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border-rose-300 dark:border-rose-800';
-        urgencyLabel = isOverrun ? `+${overrunDays.toFixed(1)}d Overrun` : `Site Overrun`;
-      } else if (calendarRunwayDays <= 0) {
+        const calDays = Math.max(1, Math.abs(calendarRunwayDays));
+        urgencyLabel = `+${calDays}d Overdue`;
+      } else if (calendarRunwayDays <= 0 || remainingDays === 0) {
         urgencyBadgeClass =
           'bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border-rose-300 dark:border-rose-800';
         urgencyLabel = 'Due Today';
+      } else if (calendarRunwayDays === 1) {
+        urgencyBadgeClass =
+          'bg-amber-50 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border-amber-300 dark:border-amber-800';
+        urgencyLabel = 'Due Tomorrow';
       } else if (calendarRunwayDays <= 3) {
         urgencyBadgeClass =
           'bg-amber-50 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border-amber-300 dark:border-amber-800';
@@ -111,6 +123,8 @@ export function ActiveSiteInvoicesModal({
         totalSites: sites.length,
         totalBilledDays,
         totalLoggedDays,
+        totalUnloggedDays,
+        totalProjectedDays,
         remainingDays,
         overrunDays,
         isOverrun: hasAnyOverrun || isOverrun,

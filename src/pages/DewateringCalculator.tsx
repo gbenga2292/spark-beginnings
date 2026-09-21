@@ -1,15 +1,20 @@
-import React, { useState, useMemo, useCallback, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
-  AlertTriangle, CheckCircle2, XCircle, ChevronRight,
+  CheckCircle2, XCircle, ChevronRight,
   Copy, Printer, RotateCcw, ArrowRight, FileText, X,
+  Map, Eye, EyeOff, Sparkles, SlidersHorizontal, PanelLeftClose, PanelLeftOpen,
+  Columns, ArrowLeft, RotateCw, Info,
 } from 'lucide-react';
 import { Button } from '@/src/components/ui/button';
 import { cn } from '@/src/lib/utils';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
+import logoSrc from '../../logo/logo-2.png';
 import {
   DewateringInput,
   DewateringCalculationResult,
+  DewateringLayoutType,
+  PipeStockOption,
   calculateDewatering,
   DEFAULT_DEWATERING_INPUT,
   EMPTY_DEWATERING_INPUT,
@@ -23,207 +28,185 @@ import {
   PlacedComponent,
 } from '@/src/utils/simulationLogic';
 import { toast } from 'sonner';
+import { useTheme } from '@/src/hooks/useTheme';
 
-interface FieldProps {
-  id: string;
+/* -------------------------------------------------------------------------
+   Minimalist Form Controls
+------------------------------------------------------------------------- */
+
+function CompactNumber({
+  label,
+  value,
+  unit,
+  min = 0,
+  step = 0.1,
+  onChange,
+}: {
   label: string;
-  unit: string;
-  tooltip?: string;
   value: number;
+  unit: string;
   min?: number;
   step?: number;
   onChange: (v: number) => void;
-  disabled?: boolean;
-  warning?: boolean;
-}
-
-function NumericField({ id, label, unit, tooltip, value, min, step = 0.1, onChange, disabled, warning }: FieldProps) {
-  const [focused, setFocused] = useState(false);
-
+}) {
   return (
-    <div className={cn('flex flex-col gap-1', disabled && 'opacity-40 pointer-events-none')}>
-      <label htmlFor={id} className="flex items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400">
-        {label}
-        {tooltip && (
-          <span
-            className="w-3.5 h-3.5 rounded-full border border-slate-300 dark:border-slate-600 text-slate-400 flex items-center justify-center cursor-help text-[9px] font-bold leading-none"
-            title={tooltip}
-          >i</span>
-        )}
-      </label>
-      <div className={cn(
-        'flex items-center rounded-md border overflow-hidden transition-colors',
-        focused ? 'border-slate-400 dark:border-slate-500' :
-        warning ? 'border-orange-400 dark:border-orange-600' :
-        'border-slate-200 dark:border-slate-700',
-        'bg-white dark:bg-slate-900',
-      )}>
+    <div className="flex items-center justify-between py-1.5 border-b border-slate-100 dark:border-slate-800/60 last:border-0 text-xs">
+      <span className="text-slate-700 dark:text-slate-300 font-medium whitespace-nowrap mr-3">{label}</span>
+      <div className="flex items-center gap-1.5 shrink-0">
         <input
-          id={id}
           type="number"
-          min={min ?? 0}
+          min={min}
           step={step}
           value={value === 0 ? '' : value}
-          placeholder="0.0"
-          onChange={(e) => {
-            const raw = e.target.value;
-            if (raw === '') {
-              onChange(0);
-            } else {
-              const v = parseFloat(raw);
-              if (!isNaN(v)) onChange(v);
-            }
-          }}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
-          className="flex-1 px-3 py-1.5 text-sm bg-transparent outline-none text-slate-900 dark:text-slate-100 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+          onChange={e => onChange(parseFloat(e.target.value) || 0)}
+          className="w-20 text-right px-2 py-0.5 text-xs font-mono font-semibold bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded focus:border-amber-500 focus:outline-none text-slate-900 dark:text-white"
         />
-        <span className="px-2.5 py-1.5 text-xs text-slate-400 bg-slate-50 dark:bg-slate-800 border-l border-slate-200 dark:border-slate-700 select-none whitespace-nowrap">
-          {unit}
-        </span>
+        <span className="text-[11px] text-slate-400 text-left font-mono whitespace-nowrap min-w-[20px]">{unit}</span>
       </div>
     </div>
   );
 }
 
-function ToggleField({ id, label, value, onChange }: { id: string; label: string; value: boolean; onChange: (v: boolean) => void }) {
-  return (
-    <div className="flex items-center justify-between gap-3">
-      <label htmlFor={id} className="text-xs font-medium text-slate-500 dark:text-slate-400 cursor-pointer">
-        {label}
-      </label>
-      <button
-        id={id}
-        type="button"
-        role="switch"
-        aria-checked={value}
-        onClick={() => onChange(!value)}
-        className={cn(
-          'relative w-9 h-5 rounded-full transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-1',
-          value ? 'bg-slate-700 dark:bg-slate-300' : 'bg-slate-200 dark:bg-slate-700',
-        )}
-      >
-        <span className={cn(
-          'absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-150',
-          value ? 'translate-x-4' : 'translate-x-0',
-        )} />
-      </button>
-    </div>
-  );
-}
+/* -------------------------------------------------------------------------
+   Schematic Visualizer (2D Site Plan with Auto-Fit Framing)
+------------------------------------------------------------------------- */
 
-function StatusBar({ result }: { result: DewateringCalculationResult | null }) {
-  if (!result) {
+function SiteSchematic({
+  inputs,
+  result,
+}: {
+  inputs: DewateringInput;
+  result: DewateringCalculationResult | null;
+}) {
+  const { isDark } = useTheme();
+  const W = 660;
+  const H = 400;
+  const PAD = 36;
+
+  const ll = inputs.landLength || 30;
+  const lw = inputs.landWidth || 24;
+  const pitL = inputs.excavationLength || 6;
+  const pitW = inputs.excavationWidth || 6;
+  const offset = result?.designOffset ?? 1.0;
+
+  if (ll <= 0 || lw <= 0 || pitL <= 0 || pitW <= 0) {
     return (
-      <div className="flex items-center gap-2.5 px-3 py-2 rounded-md bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-xs text-slate-400">
-        Enter dimensions above to calculate wellpoint sizing and bill of quantities.
+      <div className="w-full h-full flex items-center justify-center text-xs text-slate-400">
+        Enter valid dimensions to view plan
       </div>
     );
   }
-
-  if (result.status === 'ERROR') {
-    return (
-      <div className="flex items-start gap-2.5 px-3 py-2.5 rounded-md bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800/60">
-        <XCircle className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
-        <div>
-          <p className="text-xs font-semibold text-red-700 dark:text-red-400">Input Error</p>
-          <p className="text-xs text-red-600/80 dark:text-red-400/80 mt-0.5">{result.errorMessage}</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (result.status === 'NOT_REQUIRED') {
-    return (
-      <div className="flex items-start gap-2.5 px-3 py-2.5 rounded-md bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/60">
-        <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" />
-        <div>
-          <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">Dewatering not required</p>
-          <p className="text-xs text-emerald-600/80 dark:text-emerald-400/80 mt-0.5">
-            Water level at {result.effectiveWaterLevel.toFixed(2)}m — below the {result.targetDepth.toFixed(2)}m target.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex flex-col gap-1.5">
-      <div className="flex items-center gap-2.5 px-3 py-2 rounded-md bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
-        <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
-        <p className="text-xs text-slate-600 dark:text-slate-400">
-          Dewatering required — offset <strong className="text-slate-800 dark:text-slate-200">{result.designOffset.toFixed(2)}m</strong>, perimeter <strong className="text-slate-800 dark:text-slate-200">{result.loopPerimeter.toFixed(1)}m</strong>
-        </p>
-      </div>
-      {result.warningMessage && (
-        <div className="flex items-start gap-2.5 px-3 py-2 rounded-md bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800/60">
-          <AlertTriangle className="h-4 w-4 text-orange-400 shrink-0 mt-0.5" />
-          <p className="text-xs text-orange-600/90 dark:text-orange-400/90">{result.warningMessage}</p>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function SiteSchematic({ inputs, result }: { inputs: DewateringInput; result: DewateringCalculationResult | null }) {
-  const W = 320;
-  const H = 220;
-  const PAD = 20;
-
-  const ll = inputs.landLength;
-  const lw = inputs.landWidth;
-
-  if (!ll || !lw) {
-    return (
-      <div className="w-full h-full flex flex-col items-center justify-center text-center p-4 border border-dashed border-slate-200 dark:border-slate-800 rounded-md">
-        <p className="text-xs text-slate-400">Enter site & excavation dimensions to view schematic</p>
-      </div>
-    );
-  }
-
-  const scale = Math.min((W - PAD * 2) / ll, (H - PAD * 2) / lw);
-
-  const landW = ll * scale;
-  const landH = lw * scale;
-  const landX = (W - landW) / 2;
-  const landY = (H - landH) / 2;
 
   const show = result && result.status === 'REQUIRED';
+  const layout = result?.layoutType || inputs.layoutType || 'ring';
 
-  const exW = show ? inputs.excavationLength * scale : 0;
-  const exH = show ? inputs.excavationWidth * scale : 0;
-  const exX = show ? landX + (landW - exW) / 2 : 0;
-  const exY = show ? landY + (landH - exH) / 2 : 0;
+  // Ring bounding box in meters
+  const ringL = pitL + 2 * offset;
+  const ringW = pitW + 2 * offset;
 
-  const offset = show ? result!.designOffset * scale : 0;
-  const ringX = exX - offset;
-  const ringY = exY - offset;
-  const ringW = exW + offset * 2;
-  const ringH = exH + offset * 2;
+  // Auto-fit frame — extra padding for run labels on all sides
+  const frameL = Math.max(ringL + 8, 12);
+  const frameW = Math.max(ringW + 8, 10);
 
-  // Ingress gap on bottom edge, centered
-  const ingressPx = show && inputs.ingressRequired
-    ? Math.min(inputs.ingressWidth * scale, ringW * 0.7)
-    : 0;
-  const ingressL = ringX + ringW / 2 - ingressPx / 2;
-  const ingressR = ringX + ringW / 2 + ingressPx / 2;
-  const ingressY = ringY + ringH;
+  const scale = Math.min((W - PAD * 2) / frameL, (H - PAD * 2 - 36) / frameW);
+  const cx = W / 2;
+  const cy = (H - 36) / 2 + PAD / 2; // shift slightly up to leave legend space at bottom
 
-  // Build ring-main as 4 separate segments (bottom edge split when ingress is on)
-  const ringSegments: { x1: number; y1: number; x2: number; y2: number }[] = show ? [
-    // top
-    { x1: ringX, y1: ringY, x2: ringX + ringW, y2: ringY },
-    // right
-    { x1: ringX + ringW, y1: ringY, x2: ringX + ringW, y2: ingressY },
-    // left
-    { x1: ringX, y1: ringY, x2: ringX, y2: ingressY },
-    // bottom-left (up to ingress gap)
-    ...(ingressPx > 0 ? [{ x1: ringX, y1: ingressY, x2: ingressL, y2: ingressY }] : [{ x1: ringX, y1: ingressY, x2: ringX + ringW, y2: ingressY }]),
-    // bottom-right (after ingress gap)
-    ...(ingressPx > 0 ? [{ x1: ingressR, y1: ingressY, x2: ringX + ringW, y2: ingressY }] : []),
-  ] : [];
+  // Pit dimensions in px
+  const exW = pitL * scale;
+  const exH = pitW * scale;
+  const exX = cx - exW / 2;
+  const exY = cy - exH / 2;
 
-  // Filter points follow the segmented ring (skip the ingress gap area)
+  // Ring dimensions in px
+  const offsetPx = offset * scale;
+  const ringX = exX - offsetPx;
+  const ringY = exY - offsetPx;
+  const ringWidth = exW + offsetPx * 2;
+  const ringHeight = exH + offsetPx * 2;
+  const botY = ringY + ringHeight;
+
+  // Boundary dimensions in px
+  const landW = ll * scale;
+  const landH = lw * scale;
+  const landX = cx - landW / 2;
+  const landY = cy - landH / 2;
+
+  // Ingress break calculations
+  const ingressSide = inputs.ingressSide || 'south';
+  const ingressMeters = show && layout === 'ring' && inputs.ingressRequired ? inputs.ingressWidth : 0;
+  const isHorizSide = ingressSide === 'north' || ingressSide === 'south';
+  const ingressPx = ingressMeters > 0 ? Math.min(ingressMeters * scale, (isHorizSide ? ringWidth : ringHeight) * 0.75) : 0;
+  const ingressL = ringX + ringWidth / 2 - ingressPx / 2;
+  const ingressR = ringX + ringWidth / 2 + ingressPx / 2;
+  const ingressT = ringY + ringHeight / 2 - ingressPx / 2;
+  const ingressB = ringY + ringHeight / 2 + ingressPx / 2;
+
+  // Segments for drawing header lines
+  const ringSegments: { x1: number; y1: number; x2: number; y2: number; name: string; lengthM: number }[] = [];
+  const endCaps: { x: number; y: number; isHoriz: boolean }[] = [];
+
+  if (show) {
+    if (layout === 'ring') {
+      // North
+      if (ingressPx > 0 && ingressSide === 'north') {
+        ringSegments.push({ x1: ringX, y1: ringY, x2: ingressL, y2: ringY, name: 'North', lengthM: Math.max(0, (ringL - ingressMeters) / 2) });
+        ringSegments.push({ x1: ingressR, y1: ringY, x2: ringX + ringWidth, y2: ringY, name: 'North', lengthM: Math.max(0, (ringL - ingressMeters) / 2) });
+        endCaps.push({ x: ingressL, y: ringY, isHoriz: false });
+        endCaps.push({ x: ingressR, y: ringY, isHoriz: false });
+      } else {
+        ringSegments.push({ x1: ringX, y1: ringY, x2: ringX + ringWidth, y2: ringY, name: 'North', lengthM: ringL });
+      }
+
+      // East
+      if (ingressPx > 0 && ingressSide === 'east') {
+        ringSegments.push({ x1: ringX + ringWidth, y1: ringY, x2: ringX + ringWidth, y2: ingressT, name: 'East', lengthM: Math.max(0, (ringW - ingressMeters) / 2) });
+        ringSegments.push({ x1: ringX + ringWidth, y1: ingressB, x2: ringX + ringWidth, y2: botY, name: 'East', lengthM: Math.max(0, (ringW - ingressMeters) / 2) });
+        endCaps.push({ x: ringX + ringWidth, y: ingressT, isHoriz: true });
+        endCaps.push({ x: ringX + ringWidth, y: ingressB, isHoriz: true });
+      } else {
+        ringSegments.push({ x1: ringX + ringWidth, y1: ringY, x2: ringX + ringWidth, y2: botY, name: 'East', lengthM: ringW });
+      }
+
+      // South
+      if (ingressPx > 0 && ingressSide === 'south') {
+        ringSegments.push({ x1: ringX, y1: botY, x2: ingressL, y2: botY, name: 'South', lengthM: Math.max(0, (ringL - ingressMeters) / 2) });
+        ringSegments.push({ x1: ingressR, y1: botY, x2: ringX + ringWidth, y2: botY, name: 'South', lengthM: Math.max(0, (ringL - ingressMeters) / 2) });
+        endCaps.push({ x: ingressL, y: botY, isHoriz: false });
+        endCaps.push({ x: ingressR, y: botY, isHoriz: false });
+      } else {
+        ringSegments.push({ x1: ringX, y1: botY, x2: ringX + ringWidth, y2: botY, name: 'South', lengthM: ringL });
+      }
+
+      // West
+      if (ingressPx > 0 && ingressSide === 'west') {
+        ringSegments.push({ x1: ringX, y1: ringY, x2: ringX, y2: ingressT, name: 'West', lengthM: Math.max(0, (ringW - ingressMeters) / 2) });
+        ringSegments.push({ x1: ringX, y1: ingressB, x2: ringX, y2: botY, name: 'West', lengthM: Math.max(0, (ringW - ingressMeters) / 2) });
+        endCaps.push({ x: ringX, y: ingressT, isHoriz: true });
+        endCaps.push({ x: ringX, y: ingressB, isHoriz: true });
+      } else {
+        ringSegments.push({ x1: ringX, y1: ringY, x2: ringX, y2: botY, name: 'West', lengthM: ringW });
+      }
+    } else if (layout === 'u_shape') {
+      ringSegments.push({ x1: ringX, y1: ringY, x2: ringX + ringWidth, y2: ringY, name: 'North', lengthM: ringL });
+      ringSegments.push({ x1: ringX + ringWidth, y1: ringY, x2: ringX + ringWidth, y2: botY, name: 'East', lengthM: ringW });
+      ringSegments.push({ x1: ringX, y1: ringY, x2: ringX, y2: botY, name: 'West', lengthM: ringW });
+      endCaps.push({ x: ringX, y: botY, isHoriz: true });
+      endCaps.push({ x: ringX + ringWidth, y: botY, isHoriz: true });
+    } else if (layout === 'l_shape') {
+      ringSegments.push({ x1: ringX, y1: ringY, x2: ringX + ringWidth, y2: ringY, name: 'North', lengthM: ringL });
+      ringSegments.push({ x1: ringX, y1: ringY, x2: ringX, y2: botY, name: 'West', lengthM: ringW });
+      endCaps.push({ x: ringX + ringWidth, y: ringY, isHoriz: false });
+      endCaps.push({ x: ringX, y: botY, isHoriz: true });
+    } else {
+      // Single line
+      ringSegments.push({ x1: ringX, y1: ringY, x2: ringX + ringWidth, y2: ringY, name: 'North', lengthM: ringL });
+      endCaps.push({ x: ringX, y: ringY, isHoriz: false });
+      endCaps.push({ x: ringX + ringWidth, y: ringY, isHoriz: false });
+    }
+  }
+
+  // Wellpoint dots
   const filterPoints: { x: number; y: number }[] = [];
   if (show && result!.loopPerimeter > 0 && ringSegments.length > 0) {
     const lengths = ringSegments.map(s => Math.sqrt((s.x2 - s.x1) ** 2 + (s.y2 - s.y1) ** 2));
@@ -231,143 +214,487 @@ function SiteSchematic({ inputs, result }: { inputs: DewateringInput; result: De
     const spacingPx = totalPx / result!.filters;
     let segIdx = 0, segTraveled = 0;
     for (let i = 0; i < result!.filters; i++) {
-      const target = i * spacingPx;
+      const target = i * spacingPx + spacingPx / 2;
       while (segIdx < ringSegments.length - 1 && segTraveled + lengths[segIdx] < target) {
-        segTraveled += lengths[segIdx]; segIdx++;
+        segTraveled += lengths[segIdx];
+        segIdx++;
       }
-      const t = Math.min(1, (target - segTraveled) / (lengths[segIdx] || 1));
+      const t = Math.min(1, Math.max(0, (target - segTraveled) / (lengths[segIdx] || 1)));
       const seg = ringSegments[Math.min(segIdx, ringSegments.length - 1)];
       filterPoints.push({ x: seg.x1 + (seg.x2 - seg.x1) * t, y: seg.y1 + (seg.y2 - seg.y1) * t });
     }
   }
 
-  // Pump points distributed across ring segments
-  const pumpPoints: { x: number; y: number }[] = [];
-  if (show && result!.pumps > 0 && ringSegments.length > 0) {
-    const lengths = ringSegments.map(s => Math.sqrt((s.x2 - s.x1) ** 2 + (s.y2 - s.y1) ** 2));
-    const totalPx = lengths.reduce((a, b) => a + b, 0);
-    const spacingPx = totalPx / result!.pumps;
-    for (let i = 0; i < result!.pumps; i++) {
-      const target = i * spacingPx + spacingPx / 2;
-      let segIdx = 0, segTraveled = 0;
-      while (segIdx < ringSegments.length - 1 && segTraveled + lengths[segIdx] < target) {
-        segTraveled += lengths[segIdx]; segIdx++;
-      }
-      const t = Math.min(1, (target - segTraveled) / (lengths[segIdx] || 1));
-      const seg = ringSegments[Math.min(segIdx, ringSegments.length - 1)];
-      pumpPoints.push({ x: seg.x1 + (seg.x2 - seg.x1) * t, y: seg.y1 + (seg.y2 - seg.y1) * t });
-    }
+  // Optimal pump position — avoid ingress gap
+  let pumpX = ringX + ringWidth / 2;
+  let pumpY = ringY;
+  if (layout === 'l_shape') {
+    pumpX = ringX;
+    pumpY = ringY;
+  } else if (layout === 'ring' && ingressPx > 0 && ingressSide === 'north') {
+    pumpX = ringX + ringWidth * 0.2;
   }
 
+  // Get run summary info from result — only show if there are actual pipes
+  const northRun = result?.runs.find(r => r.id === 'north');
+  const eastRun = result?.runs.find(r => r.id === 'east');
+  const southRun = result?.runs.find(r => r.id === 'south');
+  const westRun = result?.runs.find(r => r.id === 'west');
+
+  const formatRunLabel = (run?: typeof northRun) => {
+    if (!run || run.length <= 0) return null;
+    const parts = [];
+    if (run.headers6m > 0) parts.push(`${run.headers6m}×6m`);
+    if (run.headers3m > 0) parts.push(`${run.headers3m}×3m`);
+    if (parts.length === 0) return null;
+    return `${run.length.toFixed(1)}m  (${parts.join(' + ')})`;
+  };
+
+  const pitFloorFill = isDark ? '#1e293b' : '#f8fafc';
+  const pitFloorStroke = isDark ? '#475569' : '#94a3b8';
+  const pitTitleFill = isDark ? '#f8fafc' : '#0f172a';
+  const pitSubtitleFill = isDark ? '#94a3b8' : '#475569';
+  const boundaryTextColor = isDark ? '#94a3b8' : '#64748b';
+  const boundaryStroke = isDark ? '#475569' : '#cbd5e1';
+  const runTextColor = isDark ? '#f59e0b' : '#b45309';
+  const compassBg = isDark ? '#1e293b' : '#ffffff';
+  const compassBorder = isDark ? '#475569' : '#cbd5e1';
+  const legendBg = isDark ? '#0f172a' : '#ffffff';
+  const legendBorder = isDark ? '#334155' : '#e2e8f0';
+  const legendText = isDark ? '#94a3b8' : '#64748b';
+
+  // Label clearances (keep labels outside the ring bounds)
+  const runLabelGap = 18;
+  const northLabelY = Math.max(PAD - 2, ringY - runLabelGap);
+  const southLabelY = Math.min(H - 50, botY + runLabelGap + 4);
+  const eastLabelX = Math.min(W - 8, ringX + ringWidth + runLabelGap);
+  const westLabelX = Math.max(8, ringX - runLabelGap);
+
+  const nLabel = formatRunLabel(northRun);
+  const eLabel = formatRunLabel(eastRun);
+  const sLabel = formatRunLabel(southRun);
+  const wLabel = formatRunLabel(westRun);
+
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} width="100%" height="100%" style={{ fontFamily: 'inherit' }} aria-label="Site plan schematic">
+    <svg viewBox={`0 0 ${W} ${H}`} width="100%" height="100%" className="select-none font-mono">
       <rect x="0" y="0" width={W} height={H} fill="transparent" />
 
-      {/* Land boundary */}
-      <rect x={landX} y={landY} width={landW} height={landH}
-        fill="none" stroke="#cbd5e1" strokeWidth="1" strokeDasharray="5 3" />
-      <text x={landX + 3} y={landY - 4} fontSize="7" fill="#94a3b8" letterSpacing="0.5">SITE BOUNDARY</text>
+      {/* Grid Pattern / Site Boundary */}
+      <rect
+        x={landX}
+        y={landY}
+        width={landW}
+        height={landH}
+        fill="none"
+        stroke={boundaryStroke}
+        strokeWidth="1"
+        strokeDasharray="5 4"
+        opacity={isDark ? 0.4 : 0.7}
+      />
+      <text x={Math.max(12, landX + 6)} y={Math.max(16, landY + 11)} fontSize="8.5" fill={boundaryTextColor} fontWeight="600">
+        SITE BOUNDARY: {ll}m × {lw}m
+      </text>
+
+      {/* Compass Rose */}
+      <g transform={`translate(${W - 32}, 26)`}>
+        <circle cx="0" cy="0" r="13" fill={compassBg} stroke={compassBorder} strokeWidth="1" />
+        <path d="M 0 -9 L 3.5 0 L -3.5 0 Z" fill="#ef4444" />
+        <path d="M 0 9 L 3.5 0 L -3.5 0 Z" fill={isDark ? '#64748b' : '#94a3b8'} />
+        <text x="0" y="-11" textAnchor="middle" fontSize="7.5" fontWeight="bold" fill="#ef4444">N</text>
+      </g>
 
       {show && (
         <>
-          {/* Ring-main fill */}
-          <rect x={ringX} y={ringY} width={ringW} height={ringH} fill="rgba(217,119,6,0.04)" stroke="none" />
+          {/* Excavation Pit Floor */}
+          <rect
+            x={exX}
+            y={exY}
+            width={exW}
+            height={exH}
+            fill={pitFloorFill}
+            stroke={pitFloorStroke}
+            strokeWidth="1.8"
+            rx="1"
+          />
 
-          {/* Ring-main segments (with gap if ingress) */}
+          {/* Pit Labels */}
+          <text x={cx} y={cy - 7} textAnchor="middle" fontSize="10" fill={pitTitleFill} fontWeight="700">
+            EXCAVATION PIT
+          </text>
+          <text x={cx} y={cy + 7} textAnchor="middle" fontSize="9" fill={pitSubtitleFill} fontWeight="600">
+            {pitL}m × {pitW}m  ·  Depth: {inputs.excavationDepth}m
+          </text>
+
+          {/* Setback callout line */}
+          {result!.designOffset > 0 && (
+            <g>
+              <line x1={exX} y1={exY + exH / 2} x2={ringX} y2={exY + exH / 2} stroke="#d97706" strokeWidth="1" strokeDasharray="2 1" />
+              <text x={(exX + ringX) / 2} y={exY + exH / 2 - 4} textAnchor="middle" fontSize="8" fill="#d97706" fontWeight="bold">
+                {result!.designOffset.toFixed(2)}m
+              </text>
+            </g>
+          )}
+
+          {/* Header Lines */}
           {ringSegments.map((seg, i) => (
-            <line key={i}
-              x1={seg.x1} y1={seg.y1} x2={seg.x2} y2={seg.y2}
-              stroke="#d97706" strokeWidth="1.5" strokeLinecap="square"
+            <line
+              key={i}
+              x1={seg.x1}
+              y1={seg.y1}
+              x2={seg.x2}
+              y2={seg.y2}
+              stroke="#f59e0b"
+              strokeWidth="3.2"
+              strokeLinecap="round"
             />
           ))}
 
-          {/* Ingress gap — hatch fill + width label */}
+          {/* End Caps */}
+          {endCaps.map((c, i) => (
+            <line
+              key={`cap-${i}`}
+              x1={c.isHoriz ? c.x - 5 : c.x}
+              y1={c.isHoriz ? c.y : c.y - 5}
+              x2={c.isHoriz ? c.x + 5 : c.x}
+              y2={c.isHoriz ? c.y : c.y + 5}
+              stroke="#ef4444"
+              strokeWidth="4"
+              strokeLinecap="square"
+            />
+          ))}
+
+          {/* Filter (Wellpoint) Dots */}
+          {filterPoints.map((pt, i) => (
+            <circle
+              key={`f${i}`}
+              cx={pt.x}
+              cy={pt.y}
+              r="2.2"
+              fill="#10b981"
+              stroke="#065f46"
+              strokeWidth="0.6"
+            />
+          ))}
+
+          {/* ── Run Dimension Labels ── kept outside ring box, skipped if no pipes ── */}
+          {nLabel && (
+            <text x={cx} y={northLabelY} textAnchor="middle" fontSize="8.5" fill={runTextColor} fontWeight="700">
+              N: {nLabel}
+            </text>
+          )}
+          {sLabel && (
+            <text x={cx} y={southLabelY} textAnchor="middle" fontSize="8.5" fill={runTextColor} fontWeight="700">
+              S: {sLabel}
+            </text>
+          )}
+          {eLabel && (
+            <text
+              x={eastLabelX}
+              y={cy}
+              textAnchor="start"
+              dominantBaseline="middle"
+              fontSize="8.5"
+              fill={runTextColor}
+              fontWeight="700"
+            >
+              E: {eLabel}
+            </text>
+          )}
+          {wLabel && (
+            <text
+              x={westLabelX}
+              y={cy}
+              textAnchor="end"
+              dominantBaseline="middle"
+              fontSize="8.5"
+              fill={runTextColor}
+              fontWeight="700"
+            >
+              W: {wLabel}
+            </text>
+          )}
+
+          {/* ── Ingress Opening ── simple callout placed beside the gap ── */}
           {ingressPx > 0 && (
-            <>
-              {/* Arrow spanning the gap */}
-              <line x1={ingressL} y1={ingressY} x2={ingressR} y2={ingressY}
-                stroke="#64748b" strokeWidth="1" strokeDasharray="2 1.5" />
-              {/* Vertical tick marks at gap edges */}
-              <line x1={ingressL} y1={ingressY - 5} x2={ingressL} y2={ingressY + 5} stroke="#64748b" strokeWidth="1" />
-              <line x1={ingressR} y1={ingressY - 5} x2={ingressR} y2={ingressY + 5} stroke="#64748b" strokeWidth="1" />
-              {/* Width label */}
-              <text
-                x={(ingressL + ingressR) / 2} y={ingressY + 12}
-                textAnchor="middle" fontSize="6.5" fill="#64748b" fontWeight="600"
-              >
-                {inputs.ingressWidth.toFixed(1)}m ingress
-              </text>
-              {/* Access arrow pointing inward */}
-              <line
-                x1={(ingressL + ingressR) / 2} y1={ingressY + 20}
-                x2={(ingressL + ingressR) / 2} y2={ingressY + 6}
-                stroke="#475569" strokeWidth="1"
-                markerEnd="url(#arrowIn)"
-              />
-            </>
-          )}
-
-          {/* Pit */}
-          <rect x={exX} y={exY} width={exW} height={exH}
-            fill="rgba(51,65,85,0.08)" stroke="#475569" strokeWidth="1.5" />
-          <text x={exX + exW / 2} y={exY + exH / 2 + 3} textAnchor="middle" fontSize="7.5" fill="#64748b" fontWeight="600" letterSpacing="0.5">PIT</text>
-
-          {/* Offset annotation */}
-          {result!.designOffset > 0 && (
-            <>
-              <line x1={exX} y1={exY - 7} x2={ringX} y2={exY - 7} stroke="#d97706" strokeWidth="0.8" />
-              <text x={(exX + ringX) / 2} y={exY - 10} textAnchor="middle" fontSize="6" fill="#b45309">{result!.designOffset.toFixed(2)}m</text>
-            </>
-          )}
-
-          {/* Filter dots */}
-          {filterPoints.slice(0, 120).map((pt, i) => (
-            <circle key={`f${i}`} cx={pt.x} cy={pt.y} r="2" fill="#10b981" />
-          ))}
-
-          {/* Pump markers */}
-          {pumpPoints.map((pt, i) => (
-            <g key={`p${i}`}>
-              <rect x={pt.x - 4.5} y={pt.y - 4.5} width="9" height="9" fill="#1e40af" rx="1.5" />
-              <text x={pt.x} y={pt.y + 3} textAnchor="middle" fontSize="5.5" fill="white" fontWeight="700">P</text>
+            <g>
+              {(ingressSide === 'south' || ingressSide === 'north') && (
+                <>
+                  <rect
+                    x={ingressL}
+                    y={ingressSide === 'south' ? botY - 5 : ringY - 5}
+                    width={ingressPx}
+                    height="10"
+                    fill="#fef3c7"
+                    stroke="#d97706"
+                    strokeWidth="0.8"
+                    strokeDasharray="3 2"
+                    rx="1"
+                  />
+                  <text
+                    x={ingressR + 6}
+                    y={ingressSide === 'south' ? botY + 3 : ringY + 3}
+                    textAnchor="start"
+                    dominantBaseline="middle"
+                    fontSize="8"
+                    fill="#92400e"
+                    fontWeight="700"
+                  >
+                    {`<< INGRESS ${ingressMeters}m`}
+                  </text>
+                </>
+              )}
+              {(ingressSide === 'east' || ingressSide === 'west') && (
+                <>
+                  <rect
+                    x={ingressSide === 'east' ? ringX + ringWidth - 5 : ringX - 5}
+                    y={ingressT}
+                    width="10"
+                    height={ingressPx}
+                    fill="#fef3c7"
+                    stroke="#d97706"
+                    strokeWidth="0.8"
+                    strokeDasharray="3 2"
+                    rx="1"
+                  />
+                  <text
+                    x={ingressSide === 'east' ? ringX + ringWidth + 10 : ringX - 10}
+                    y={ingressT - 5}
+                    textAnchor={ingressSide === 'east' ? 'start' : 'end'}
+                    fontSize="8"
+                    fill="#92400e"
+                    fontWeight="700"
+                  >
+                    {`INGRESS ${ingressMeters}m >>`}
+                  </text>
+                </>
+              )}
             </g>
-          ))}
+          )}
+
+          {/* ── Pump Unit ── wider box, legible label ── */}
+          <g>
+            <circle cx={pumpX} cy={pumpY} r="4" fill="#f59e0b" stroke="#78350f" strokeWidth="1.2" />
+            <line x1={pumpX} y1={pumpY} x2={pumpX} y2={pumpY - 20} stroke="#ca8a04" strokeWidth="1.6" strokeDasharray="2 1" />
+            <rect x={pumpX - 26} y={pumpY - 36} width="52" height="15" fill="#1d4ed8" rx="2.5" />
+            <text x={pumpX} y={pumpY - 26} textAnchor="middle" fontSize="7" fill="white" fontWeight="bold">
+              PUMP · 100 m³/h
+            </text>
+            <line x1={pumpX} y1={pumpY - 36} x2={pumpX} y2={Math.max(14, landY + 3)} stroke="#ea580c" strokeWidth="1.5" strokeDasharray="3 2" />
+            <text x={pumpX + 4} y={Math.max(20, landY + 13)} fontSize="6.5" fill="#c2410c" fontWeight="600">
+              DISCHARGE
+            </text>
+          </g>
         </>
       )}
 
-      <defs>
-        <marker id="arrowIn" markerWidth="5" markerHeight="5" refX="4" refY="2.5" orient="auto">
-          <path d="M 0 0 L 5 2.5 L 0 5 z" fill="#475569" />
-        </marker>
-      </defs>
+      {/* ── Legend Box — embedded inside SVG so it prints ── */}
+      <g transform={`translate(10, ${H - 30})`}>
+        <rect x="0" y="0" width="252" height="22" rx="3" fill={legendBg} stroke={legendBorder} strokeWidth="1" />
+        <circle cx="12" cy="11" r="3.5" fill="#10b981" stroke="#065f46" strokeWidth="0.7" />
+        <text x="20" y="11" dominantBaseline="middle" fontSize="8" fill={legendText} fontWeight="600">Wellpoint</text>
+        <line x1="72" y1="11" x2="88" y2="11" stroke="#f59e0b" strokeWidth="3" strokeLinecap="round" />
+        <text x="92" y="11" dominantBaseline="middle" fontSize="8" fill={legendText} fontWeight="600">Header Pipe</text>
+        <line x1="152" y1="7" x2="152" y2="15" stroke="#ef4444" strokeWidth="3.5" strokeLinecap="square" />
+        <text x="158" y="11" dominantBaseline="middle" fontSize="8" fill={legendText} fontWeight="600">End Cap</text>
+        <rect x="198" y="6" width="12" height="10" fill="#1d4ed8" rx="1.5" />
+        <text x="214" y="11" dominantBaseline="middle" fontSize="8" fill={legendText} fontWeight="600">Pump</text>
+      </g>
     </svg>
   );
 }
 
-function Row({ label, value, unit, subtle }: { label: string; value: number | string; unit?: string; subtle?: boolean }) {
+function SiteCrossSection({
+  inputs,
+  result,
+}: {
+  inputs: DewateringInput;
+  result: DewateringCalculationResult | null;
+}) {
+  const { isDark } = useTheme();
+  const W = 620;
+  const H = 330;
+
+  const depth = inputs.excavationDepth || 4.0;
+  const wt = inputs.waterTableDepth || 1.0;
+  const target = result?.targetDepth || (depth + 0.5);
+  const offset = result?.designOffset || 1.0;
+
+  const tipDepth = Math.max(depth + 2.0, 6.0);
+  const maxScaleDepth = Math.max(tipDepth + 1.2, 7.5);
+
+  const yGL = 58;
+  const availH = H - yGL - 35;
+  const scaleY = availH / maxScaleDepth;
+
+  const getY = (d: number) => yGL + d * scaleY;
+
+  const yPit = getY(depth);
+  const yWT = getY(wt);
+  const yTarget = getY(target);
+  const yTip = getY(tipDepth);
+
+  const cx = W / 2;
+  const pitHalfW = 110;
+  const pitLeft = cx - pitHalfW;
+  const pitRight = cx + pitHalfW;
+
+  const batter = 24;
+  const crestLeft = pitLeft - batter;
+  const crestRight = pitRight + batter;
+
+  const offsetPx = Math.max(24, Math.min(50, offset * 26));
+  const wpLeft = crestLeft - offsetPx;
+  const wpRight = crestRight + offsetPx;
+
+  const layout = result?.layoutType || inputs.layoutType || 'ring';
+  const showRightWp = layout !== 'single_line';
+
+  const drawdownPath = showRightWp
+    ? `M 15 ${yWT} 
+       C ${wpLeft - 25} ${yWT}, ${wpLeft - 12} ${yTarget + 5}, ${wpLeft} ${yTarget + 2}
+       C ${(wpLeft + cx) / 2} ${yTarget}, ${cx - 20} ${yTarget}, ${cx} ${yTarget}
+       C ${cx + 20} ${yTarget}, ${(wpRight + cx) / 2} ${yTarget}, ${wpRight} ${yTarget + 2}
+       C ${wpRight + 12} ${yTarget + 5}, ${wpRight + 25} ${yWT}, ${W - 15} ${yWT}
+       L ${W - 15} ${H - 10} L 15 ${H - 10} Z`
+    : `M 15 ${yWT} 
+       C ${wpLeft - 25} ${yWT}, ${wpLeft - 12} ${yTarget + 5}, ${wpLeft} ${yTarget + 2}
+       C ${cx} ${yTarget}, ${crestRight + 15} ${yTarget + 16}, ${W - 15} ${yWT}
+       L ${W - 15} ${H - 10} L 15 ${H - 10} Z`;
+
+  const groundStroke = isDark ? '#64748b' : '#475569';
+  const groundText = isDark ? '#94a3b8' : '#64748b';
+  const pitFloorStroke = isDark ? '#cbd5e1' : '#0f172a';
+  const pitFloorText = isDark ? '#f8fafc' : '#0f172a';
+  const staticWtStroke = isDark ? '#38bdf8' : '#0284c7';
+  const targetText = isDark ? '#34d399' : '#059669';
+  const drawdownFill = isDark ? 'rgba(56, 189, 248, 0.12)' : 'rgba(2, 132, 199, 0.08)';
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} width="100%" height="100%" className="select-none font-mono">
+      {/* Ground & Excavation Cut */}
+      <line x1="15" y1={yGL} x2={crestLeft} y2={yGL} stroke={groundStroke} strokeWidth="2" />
+      <line x1={crestLeft} y1={yGL} x2={pitLeft} y2={yPit} stroke={groundStroke} strokeWidth="2" />
+      <line x1={pitLeft} y1={yPit} x2={pitRight} y2={yPit} stroke={pitFloorStroke} strokeWidth="2.8" />
+      <line x1={pitRight} y1={yPit} x2={crestRight} y2={yGL} stroke={groundStroke} strokeWidth="2" />
+      <line x1={crestRight} y1={yGL} x2={W - 15} y2={yGL} stroke={groundStroke} strokeWidth="2" />
+
+      {/* Static Water Table */}
+      <line x1="15" y1={yWT} x2={W - 15} y2={yWT} stroke={staticWtStroke} strokeWidth="1.2" strokeDasharray="5 3" />
+      <text x="20" y={yWT - 6} fontSize="8.5" fill={staticWtStroke} fontWeight="700">
+        STATIC WATER TABLE (-{wt.toFixed(1)}m b.g.l.)
+      </text>
+
+      {/* Depressed Drawdown Surface */}
+      <path d={drawdownPath} fill={drawdownFill} stroke={staticWtStroke} strokeWidth="1.6" />
+
+      {/* Target Water Level */}
+      <line x1={pitLeft - 15} y1={yTarget} x2={pitRight + 15} y2={yTarget} stroke="#10b981" strokeWidth="1.2" strokeDasharray="3 2" />
+      <text x={cx} y={yTarget + 11} textAnchor="middle" fontSize="8.5" fill={targetText} fontWeight="700">
+        TARGET WATER LEVEL (-{target.toFixed(2)}m) • DRAWDOWN {result?.drawdownAmount.toFixed(1)}m
+      </text>
+
+      {/* Pit Floor */}
+      <text x={cx} y={yPit - 6} textAnchor="middle" fontSize="9" fill={pitFloorText} fontWeight="700">
+        EXCAVATION FORMATION LEVEL (-{depth.toFixed(2)}m)
+      </text>
+
+      {/* Left Wellpoint & Pump */}
+      <g>
+        <circle cx={wpLeft} cy={yGL} r="3.5" fill="#f59e0b" stroke="#92400e" strokeWidth="1" />
+        <line x1={wpLeft} y1={yGL} x2={wpLeft} y2={yTip} stroke="#64748b" strokeWidth="2" />
+        <line x1={wpLeft} y1={yTip - 24} x2={wpLeft} y2={yTip} stroke="#10b981" strokeWidth="3.6" strokeLinecap="round" />
+
+        {/* Pump on surface */}
+        <rect x={wpLeft - 22} y={yGL - 16} width="16" height="13" fill="#1d4ed8" rx="2" />
+        <text x={wpLeft - 14} y={yGL - 7} textAnchor="middle" fontSize="7" fill="white" fontWeight="bold">P</text>
+        <line x1={wpLeft - 6} y1={yGL - 6} x2={wpLeft - 3.5} y2={yGL} stroke="#ca8a04" strokeWidth="1.4" />
+        <line x1={wpLeft - 22} y1={yGL - 8} x2={15} y2={yGL - 8} stroke="#ea580c" strokeWidth="1.4" />
+
+        <text x={wpLeft - 5} y={yTip - 6} textAnchor="end" fontSize="7.5" fill={targetText} fontWeight="700">
+          FILTER TIP -{tipDepth.toFixed(1)}m
+        </text>
+      </g>
+
+      {/* Right Wellpoint */}
+      {showRightWp && (
+        <g>
+          <circle cx={wpRight} cy={yGL} r="3.5" fill="#f59e0b" stroke="#92400e" strokeWidth="1" />
+          <line x1={wpRight} y1={yGL} x2={wpRight} y2={yTip} stroke="#64748b" strokeWidth="2" />
+          <line x1={wpRight} y1={yTip - 24} x2={wpRight} y2={yTip} stroke="#10b981" strokeWidth="3.6" strokeLinecap="round" />
+          <text x={wpRight + 5} y={yTip - 6} textAnchor="start" fontSize="7.5" fill={targetText} fontWeight="700">
+            FILTER TIP -{tipDepth.toFixed(1)}m
+          </text>
+        </g>
+      )}
+
+      <text x="20" y={yGL - 6} fontSize="8.5" fill={groundText} fontWeight="700">
+        GROUND LEVEL ±0.00m
+      </text>
+    </svg>
+  );
+}
+
+/* -------------------------------------------------------------------------
+   Minimalist Bill of Quantities Row
+------------------------------------------------------------------------- */
+
+function BoqRow({
+  label,
+  value,
+  unit,
+  subtle,
+}: {
+  label: string;
+  value: number | string;
+  unit?: string;
+  subtle?: boolean;
+}) {
   return (
     <div className={cn(
-      'flex items-center justify-between py-2 border-b border-slate-100 dark:border-slate-800 last:border-0',
-      subtle && 'opacity-60',
+      'flex items-center justify-between py-1.5 text-xs border-b border-slate-100 dark:border-slate-800/60 last:border-0',
+      subtle && 'text-slate-400 dark:text-slate-500',
     )}>
-      <span className="text-sm text-slate-600 dark:text-slate-400">{label}</span>
-      <span className="text-sm font-semibold tabular-nums text-slate-900 dark:text-slate-100">
-        {typeof value === 'number' ? value.toLocaleString() : value}
-        {unit && <span className="ml-1 text-xs font-normal text-slate-400">{unit}</span>}
+      <span className="text-slate-600 dark:text-slate-400">{label}</span>
+      <span className="font-mono font-semibold text-slate-900 dark:text-slate-100">
+        {value}
+        {unit && <span className="ml-1 text-[11px] font-normal text-slate-400">{unit}</span>}
       </span>
     </div>
   );
 }
 
-function SectionLabel({ children }: { children: React.ReactNode }) {
-  return <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 mb-3">{children}</p>;
-}
+/* -------------------------------------------------------------------------
+   Main Component
+------------------------------------------------------------------------- */
 
 export default function DewateringCalculator() {
   const navigate = useNavigate();
-  const summaryRef = useRef<HTMLDivElement>(null);
+  const location = useLocation();
   const [inputs, setInputs] = useState<DewateringInput>(DEFAULT_DEWATERING_INPUT);
-  const [showPrintPreview, setShowPrintPreview] = useState(false);
+  const [activeTab, setActiveTab] = useState<'calculator' | 'print'>('calculator');
+  const [printOrientation, setPrintOrientation] = useState<'portrait' | 'landscape'>('portrait');
+  const [showInputs, setShowInputs] = useState(true);
+  const [showDrawings, setShowDrawings] = useState(true);
+  const [viewMode, setViewMode] = useState<'both' | 'plan' | 'section'>('both');
+
+  // Auto-import layout data sent back from DewaterCAD Simulator
+  useEffect(() => {
+    try {
+      const stateInputs = (location.state as any)?.calculatorInputs;
+      const sessionStr = sessionStorage.getItem('dewatering_simulator_export');
+      const payloadInputs = stateInputs || (sessionStr ? JSON.parse(sessionStr) : null);
+      if (payloadInputs) {
+        sessionStorage.removeItem('dewatering_simulator_export');
+        setInputs(prev => ({
+          ...prev,
+          ...payloadInputs,
+        }));
+        toast.success(`Loaded calculator with ${payloadInputs.excavationLength}×${payloadInputs.excavationWidth}m (${payloadInputs.excavationDepth}m depth) layout data from Simulator`);
+      }
+    } catch {
+      // ignore
+    }
+  }, [location.state]);
 
   const result = useMemo(() => calculateDewatering(inputs), [inputs]);
 
@@ -377,38 +704,55 @@ export default function DewateringCalculator() {
 
   const handleReset = useCallback(() => {
     setInputs(EMPTY_DEWATERING_INPUT);
-    toast.info('All inputs cleared');
+    toast.info('All inputs reset');
   }, []);
 
   const handleCopySummary = useCallback(() => {
-    if (!result) return;
-    const lines = ['WELLPOINT DEWATERING SIZING', ''];
-    lines.push(`Status: ${result.status === 'REQUIRED' ? 'Required' : result.status === 'NOT_REQUIRED' ? 'Not required' : 'Error'}`);
-    if (result.status === 'REQUIRED') {
-      lines.push(
-        `Design offset: ${result.designOffset.toFixed(2)} m`,
-        `Loop perimeter: ${result.loopPerimeter.toFixed(2)} m`,
-        '',
-        'Bill of Quantities',
-        `Wellpoint filters (1.0m c/c): ${result.filters}`,
-        `Vacuum pumps (100 m3/hr): ${result.pumps}`,
-        `Header pipes 6m: ${result.headers6m} pcs`,
-        `Header pipes 3m: ${result.headers3m} pcs`,
-        `90 deg elbows: ${result.elbows90} pcs`,
-        `Tee connectors (pump tie-ins): ${result.tees} pcs`,
-        ...(result.endCaps > 0 ? [`End blanking caps: ${result.endCaps} pcs`] : []),
-        '',
-        result.autoSummary,
-      );
-    } else {
-      lines.push('', result.autoSummary);
-    }
-    navigator.clipboard.writeText(lines.join('\n')).then(() => toast.success('Copied to clipboard'));
-  }, [result]);
+    if (!result || result.status !== 'REQUIRED') return;
+    const lines = [
+      `WELLPOINT DEWATERING BOQ: ${result.layoutType.toUpperCase()}`,
+      `Perimeter / Line: ${result.loopPerimeter.toFixed(2)} m | Offset: ${result.designOffset.toFixed(2)} m`,
+      `Drawdown: ${result.drawdownAmount.toFixed(1)}m (Target: ${result.targetDepth.toFixed(2)}m b.g.l.)`,
+      '',
+      `Header pipes, 6m: ${result.headers6m} pcs`,
+      ...(result.headers3m > 0 ? [`Header pipes, 3m: ${result.headers3m} pcs`] : []),
+      `Wellpoint filters (1.0m c/c): ${result.filters}`,
+      `Vacuum pumps (100 m3/hr, max 60m): ${result.pumps}`,
+      `Elbows: ${result.elbows90} pcs`,
+      `Tee connectors: ${result.tees} pcs`,
+      ...(result.endCaps > 0 ? [`End blanking caps: ${result.endCaps} pcs`] : []),
+      '',
+      ...result.runs.map(r => `* ${r.name} (${r.length.toFixed(1)}m): ${r.headers6m}x6m + ${r.headers3m}x3m`),
+    ];
+    const text = lines.join('\n');
+    const copyFallback = () => {
+      try {
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-999999px';
+        textArea.style.top = '-999999px';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        document.execCommand('copy');
+        textArea.remove();
+        toast.success('BOQ copied to clipboard');
+        return true;
+      } catch (err) {
+        console.error('Fallback copy failed', err);
+        return false;
+      }
+    };
 
-  const handlePrint = useCallback(() => {
-    setShowPrintPreview(true);
-  }, []);
+    if (navigator?.clipboard?.writeText) {
+      navigator.clipboard.writeText(text)
+        .then(() => toast.success('BOQ copied to clipboard'))
+        .catch(() => copyFallback());
+    } else {
+      copyFallback();
+    }
+  }, [result]);
 
   const handleSendToSimulator = useCallback(() => {
     if (!result || result.status !== 'REQUIRED') {
@@ -416,22 +760,19 @@ export default function DewateringCalculator() {
       return;
     }
 
-    const SCALE = 10; // 10 px per meter, matching Simulator PIXELS_PER_METER
+    const SCALE = 10;
     const centerX = 550;
     const centerY = 380;
-
     const L = inputs.excavationLength;
     const W = inputs.excavationWidth;
     const depth = inputs.excavationDepth;
     const offset = result.designOffset;
 
-    // Excavation Pit Box
     const pitW = L * SCALE;
     const pitH = W * SCALE;
     const pitX = Math.round(centerX - pitW / 2);
     const pitY = Math.round(centerY - pitH / 2);
 
-    // 1. Elevation Levels
     const glLevel: ElevationLevel = {
       id: 'level-gl',
       name: 'Ground Level (GL 0.0m)',
@@ -453,660 +794,1156 @@ export default function DewateringCalculator() {
       height: pitH,
       kind: 'excavation',
       levelId: pitLevel.id,
-      layerId: 'layer-0',
+      layerId: 'layer-areas',
     };
 
-    // 2. Perimeter Header Ring-main
+    // Site boundary rectangle — land perimeter from landLength × landWidth inputs
+    const landL = inputs.landLength || Math.max(30, L + 12);
+    const landW = inputs.landWidth || Math.max(24, W + 12);
+    const siteW = landL * SCALE;
+    const siteH = landW * SCALE;
+    const siteArea: AreaData = {
+      id: `site-${Date.now()}`,
+      x: Math.round(centerX - siteW / 2),
+      y: Math.round(centerY - siteH / 2),
+      width: siteW,
+      height: siteH,
+      kind: 'site',
+      levelId: glLevel.id,
+      layerId: 'layer-areas',
+    };
+
     const ringX = Math.round(pitX - offset * SCALE);
     const ringY = Math.round(pitY - offset * SCALE);
     const ringW = Math.round(pitW + offset * 2 * SCALE);
     const ringH = Math.round(pitH + offset * 2 * SCALE);
     const botY = ringY + ringH;
 
+    // Layout & Ingress break handling
+    const layout = result.layoutType;
+    const ingressRequired = inputs.ingressRequired;
+    const ingressSide = inputs.ingressSide || 'south';
+    const ingressMeters = inputs.ingressWidth || 6.0;
+    const isHorizSide = ingressSide === 'north' || ingressSide === 'south';
+    const ingressPx = Math.min(ingressMeters * SCALE, (isHorizSide ? ringW : ringH) * 0.75);
+    const ingressL = Math.round(ringX + ringW / 2 - ingressPx / 2);
+    const ingressR = Math.round(ringX + ringW / 2 + ingressPx / 2);
+    const ingressT = Math.round(ringY + ringH / 2 - ingressPx / 2);
+    const ingressB = Math.round(ringY + ringH / 2 + ingressPx / 2);
+
     let ringPoints: { x: number; y: number }[] = [];
-    const arrows: ArrowData[] = [];
-    const texts: any[] = [];
-    const placedComponents: PlacedComponent[] = [];
-    const hoses: HoseData[] = [];
-    const areas: AreaData[] = [pitArea];
 
-    if (inputs.ingressRequired) {
-      const ingressPx = Math.min(inputs.ingressWidth * SCALE, ringW * 0.7);
-      const gapL = Math.round(ringX + ringW / 2 - ingressPx / 2);
-      const gapR = Math.round(ringX + ringW / 2 + ingressPx / 2);
-
+    if (layout === 'ring') {
+      if (ingressRequired && ingressMeters > 0) {
+        if (ingressSide === 'south') {
+          ringPoints = [
+            { x: ingressR, y: botY },
+            { x: ringX + ringW, y: botY },
+            { x: ringX + ringW, y: ringY },
+            { x: ringX, y: ringY },
+            { x: ringX, y: botY },
+            { x: ingressL, y: botY },
+          ];
+        } else if (ingressSide === 'north') {
+          ringPoints = [
+            { x: ingressR, y: ringY },
+            { x: ringX + ringW, y: ringY },
+            { x: ringX + ringW, y: botY },
+            { x: ringX, y: botY },
+            { x: ringX, y: ringY },
+            { x: ingressL, y: ringY },
+          ];
+        } else if (ingressSide === 'east') {
+          ringPoints = [
+            { x: ringX + ringW, y: ingressT },
+            { x: ringX + ringW, y: ringY },
+            { x: ringX, y: ringY },
+            { x: ringX, y: botY },
+            { x: ringX + ringW, y: botY },
+            { x: ringX + ringW, y: ingressB },
+          ];
+        } else {
+          // west
+          ringPoints = [
+            { x: ringX, y: ingressB },
+            { x: ringX, y: botY },
+            { x: ringX + ringW, y: botY },
+            { x: ringX + ringW, y: ringY },
+            { x: ringX, y: ringY },
+            { x: ringX, y: ingressT },
+          ];
+        }
+      } else {
+        ringPoints = [
+          { x: ringX, y: ringY },
+          { x: ringX + ringW, y: ringY },
+          { x: ringX + ringW, y: botY },
+          { x: ringX, y: botY },
+          { x: ringX, y: ringY },
+        ];
+      }
+    } else if (layout === 'u_shape') {
       ringPoints = [
-        { x: gapR, y: botY },
+        { x: ringX, y: botY },
+        { x: ringX, y: ringY },
+        { x: ringX + ringW, y: ringY },
         { x: ringX + ringW, y: botY },
+      ];
+    } else if (layout === 'l_shape') {
+      ringPoints = [
         { x: ringX + ringW, y: ringY },
         { x: ringX, y: ringY },
         { x: ringX, y: botY },
-        { x: gapL, y: botY },
       ];
-
-      // Visual Ingress Direction Arrow
-      arrows.push({
-        id: `arrow-ingress-${Date.now()}`,
-        start: { x: Math.round(ringX + ringW / 2), y: botY + 60 },
-        end: { x: Math.round(ringX + ringW / 2), y: botY - 15 },
-        text: 'VEHICLE INGRESS',
-        layerId: 'layer-0',
-      });
-
-      // Clear Ingress Access Annotation
-      texts.push({
-        id: `txt-ingress-${Date.now()}`,
-        x: Math.round(ringX + ringW / 2) - 60,
-        y: botY + 68,
-        text: `VEHICLE INGRESS (${inputs.ingressWidth.toFixed(1)}m)`,
-        fontSize: 11,
-        color: '#0284c7',
-        layerId: 'layer-0',
-      });
     } else {
       ringPoints = [
         { x: ringX, y: ringY },
         { x: ringX + ringW, y: ringY },
-        { x: ringX + ringW, y: ringY + ringH },
-        { x: ringX, y: ringY + ringH },
-        { x: ringX, y: ringY },
       ];
     }
 
     const headerLine: LineData = {
-      id: `header-ring-${Date.now()}`,
+      id: `header-line-${Date.now()}`,
       points: ringPoints,
-      depthFromGL: 0,
       levelId: glLevel.id,
-      wellpointSide: 'left',
-      layerId: 'layer-0',
+      layerId: 'layer-headers',
     };
 
-    // 3. Vacuum Pumps, Header Tie-In Tees, Suction & Discharge Hoses
-    // Set pumps back ~45px outside the top header ring
+    // 1. Suction Tee on Header line (North run)
+    // If ingress is on North side, place Tee on the left solid run so it doesn't float in the ingress opening
+    const isIngressNorth = layout === 'ring' && ingressRequired && ingressSide === 'north';
+    const teeX = isIngressNorth ? Math.round((ringX + ingressL) / 2) : Math.round(ringX + ringW / 2);
+    const teeY = ringY;
+    const teeComponent: PlacedComponent = {
+      id: `tee-${Date.now()}`,
+      type: 'tee',
+      x: teeX,
+      y: teeY,
+      rotation: 180, // mouth points North towards the pump
+      levelId: glLevel.id,
+      layerId: 'layer-components',
+    };
+
+    // 2. Vacuum Pump Unit placed North of the header line
+    // Offset pumpX by +20px so its suction port (at comp.x - 20) aligns 100% vertically with the Tee at teeX
+    const pumpX = teeX + 20;
     const pumpY = ringY - 45;
-    const numPumps = Math.max(1, result.pumps);
-    const pumpCoords: { x: number; y: number }[] = [];
+    const pumpComponent: PlacedComponent = {
+      id: `pump-${Date.now()}`,
+      type: 'pump',
+      x: pumpX,
+      y: pumpY,
+      rotation: 0,
+      levelId: glLevel.id,
+      layerId: 'layer-components',
+    };
 
-    if (numPumps === 1) {
-      pumpCoords.push({ x: Math.round(ringX + ringW / 2), y: pumpY });
-    } else {
-      for (let i = 0; i < numPumps; i++) {
-        const fraction = (i + 1) / (numPumps + 1);
-        pumpCoords.push({ x: Math.round(ringX + ringW * fraction), y: pumpY });
-      }
-    }
+    // 3. Heavy-Duty Suction Hose connecting Header Tee to Pump Suction port (port at pumpX - 20 === teeX)
+    // Perfectly orthogonal 90-degree tie-in (dx = 0)
+    const suctionHose: HoseData = {
+      id: `suction-hose-${Date.now()}`,
+      points: [
+        { x: teeX, y: teeY },
+        { x: teeX, y: pumpY },
+      ],
+      kind: 'suction',
+      levelId: glLevel.id,
+      layerId: 'layer-suction',
+    };
 
-    // Site Discharge Basin (Settlement Area) placed outside the perimeter
-    const dischargeBasinX = Math.round(ringX + ringW + 25);
-    const dischargeBasinY = ringY - 60;
-    const dischargeBasin: AreaData = {
-      id: `discharge-basin-${Date.now()}`,
-      x: dischargeBasinX,
-      y: dischargeBasinY,
-      width: 70, // 7m
-      height: 50, // 5m
+    // 4. Layflat Discharge Line heading from Pump Discharge port (pumpX + 20) straight East
+    // Perfectly orthogonal 0-degree horizontal line running outward to site perimeter
+    const dischargeHose: HoseData = {
+      id: `discharge-hose-${Date.now()}`,
+      points: [
+        { x: pumpX + 20, y: pumpY },
+        { x: Math.max(pumpX + 200, ringX + ringW + 120), y: pumpY },
+      ],
       kind: 'discharge',
       levelId: glLevel.id,
-      layerId: 'layer-0',
+      layerId: 'layer-discharge',
     };
-    areas.push(dischargeBasin);
-
-    pumpCoords.forEach((pCoord, idx) => {
-      const pId = `pump-${Date.now()}-${idx + 1}`;
-      
-      // Placed Pump
-      placedComponents.push({
-        id: pId,
-        type: 'pump',
-        x: pCoord.x,
-        y: pCoord.y,
-        levelId: glLevel.id,
-        layerId: 'layer-0',
-      });
-
-      // Header Tie-in Tee (rotation 180 points branch upward directly to pump suction port)
-      placedComponents.push({
-        id: `tee-${pId}`,
-        type: 'tee',
-        x: pCoord.x - 20,
-        y: ringY,
-        rotation: 180,
-        levelId: glLevel.id,
-        layerId: 'layer-0',
-      });
-
-      // Flexible Suction Pipe (yellow armored hose from header tee to pump suction inlet)
-      hoses.push({
-        id: `suction-hose-${idx + 1}-${Date.now()}`,
-        kind: 'suction',
-        points: [
-          { x: pCoord.x - 20, y: ringY },
-          { x: pCoord.x - 20, y: pCoord.y },
-        ],
-        layerId: 'layer-0',
-      });
-
-      // Layflat Discharge Pipe (orange hose from pump discharge outlet to discharge basin)
-      hoses.push({
-        id: `discharge-hose-${idx + 1}-${Date.now()}`,
-        kind: 'discharge',
-        points: [
-          { x: pCoord.x + 20, y: pCoord.y },
-          { x: pCoord.x + 60, y: pCoord.y - 25 },
-          { x: dischargeBasinX + 15, y: dischargeBasinY + 25 },
-        ],
-        layerId: 'layer-0',
-      });
-    });
-
-    // 4. De-cluttered annotations (clean pit title only, avoid overlapping boundary badges)
-    texts.push({
-      id: `txt-pit-${Date.now()}`,
-      x: pitX + 15,
-      y: pitY + 22,
-      text: `EXCAVATION PIT (-${depth.toFixed(1)}m)`,
-      fontSize: 12,
-      color: '#475569',
-      layerId: 'layer-0',
-    });
 
     const layoutPayload = {
-      name: `Dewatering - ${L}x${W}m Pit`,
+      name: `Dewatering - ${result.layoutType.toUpperCase()} (${L}x${W}m Pit)`,
       lines: [headerLine],
-      areas,
-      components: placedComponents,
-      hoses,
-      arrows,
-      dimensions: [], // Omit manual dimensions so native Konva area labels don't collide
-      texts,
+      areas: [siteArea, pitArea],
+      components: [pumpComponent, teeComponent],
+      hoses: [suctionHose, dischargeHose],
+      arrows: [],
+      dimensions: [],
+      texts: [],
       levels: [glLevel, pitLevel],
       activeLevelId: pitLevel.id,
       targetDepth: depth,
+      calculatorInputs: inputs,
     };
 
-    try {
-      sessionStorage.setItem('dewatering_calculator_import', JSON.stringify(layoutPayload));
-    } catch {
-      // ignore
-    }
-
+    sessionStorage.setItem('dewatering_calculator_import', JSON.stringify(layoutPayload));
     navigate('/operations/simulator', {
-      state: {
-        fromCalculator: true,
-        layoutData: layoutPayload,
-      },
+      state: { fromCalculator: true, layoutData: layoutPayload },
     });
-    toast.success('Layout sent to Simulator');
   }, [navigate, result, inputs]);
 
   const showResults = result?.status === 'REQUIRED';
 
-  const headerButtons = useMemo(() => (
-    <div className="flex items-center gap-2">
-      <Button variant="outline" size="sm" onClick={handleReset} className="gap-1.5 text-xs h-8 print:hidden">
-        <RotateCcw className="h-3 w-3" />
-        Reset
-      </Button>
-      {showResults && (
-        <>
-          <Button variant="outline" size="sm" onClick={handleCopySummary} className="gap-1.5 text-xs h-8 print:hidden">
-            <Copy className="h-3 w-3" />
-            Copy
-          </Button>
-          <Button variant="outline" size="sm" onClick={handlePrint} className="gap-1.5 text-xs h-8 print:hidden">
-            <Printer className="h-3 w-3" />
-            Print
-          </Button>
-          <Button size="sm" onClick={handleSendToSimulator} className="gap-1.5 text-xs h-8 bg-amber-500 hover:bg-amber-600 text-white border-0 print:hidden">
-            <ArrowRight className="h-3 w-3" />
-            Send to Simulator
-          </Button>
-        </>
-      )}
-    </div>
-  ), [showResults, handleReset, handleCopySummary, handlePrint, handleSendToSimulator]);
+  const headerActions = useMemo(() => {
+    if (activeTab === 'print') {
+      return (
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-0.5 p-0.5 bg-slate-100 dark:bg-slate-800 rounded-md border border-slate-200 dark:border-slate-700">
+            <button
+              type="button"
+              onClick={() => setPrintOrientation('portrait')}
+              className={cn(
+                'p-1 text-xs font-medium rounded transition-all flex items-center justify-center cursor-pointer',
+                printOrientation === 'portrait'
+                  ? 'bg-amber-500 text-white font-semibold shadow-xs'
+                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white',
+              )}
+              title="Portrait Orientation (210 × 297 mm)"
+              aria-label="Portrait"
+            >
+              <FileText className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setPrintOrientation('landscape')}
+              className={cn(
+                'p-1 text-xs font-medium rounded transition-all flex items-center justify-center cursor-pointer',
+                printOrientation === 'landscape'
+                  ? 'bg-amber-500 text-white font-semibold shadow-xs'
+                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white',
+              )}
+              title="Landscape Orientation (297 × 210 mm)"
+              aria-label="Landscape"
+            >
+              <Map className="h-3.5 w-3.5" />
+            </button>
+          </div>
+
+          <div className="flex items-center gap-1.5 text-xs">
+            <span className="px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 font-medium flex items-center gap-1 text-[11px]">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400 inline-block animate-pulse" />
+              1 Page Fit
+            </span>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => window.print()}
+            className="h-7 text-xs px-3 rounded-md bg-amber-500 hover:bg-amber-600 text-white font-semibold transition-colors flex items-center cursor-pointer shadow-xs"
+          >
+            <Printer className="h-3.5 w-3.5 mr-1.5" /> Print Now
+          </button>
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex items-center gap-1.5 flex-wrap">
+        <button
+          type="button"
+          onClick={handleReset}
+          className="h-7 text-xs px-2.5 rounded-md text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors flex items-center cursor-pointer"
+        >
+          <RotateCcw className="h-3 w-3 mr-1" /> Reset
+        </button>
+
+        {showResults && (
+          <>
+            <button
+              type="button"
+              onClick={() => setActiveTab('print')}
+              className="h-7 text-xs px-2.5 rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors flex items-center cursor-pointer shadow-xs"
+            >
+              <Printer className="h-3 w-3 mr-1" /> Print
+            </button>
+            <button
+              type="button"
+              onClick={handleSendToSimulator}
+              className="h-7 text-xs px-2.5 rounded-md bg-amber-500 hover:bg-amber-600 text-white font-medium transition-colors flex items-center cursor-pointer shadow-xs"
+            >
+              Simulator <ArrowRight className="h-3 w-3 ml-1" />
+            </button>
+          </>
+        )}
+      </div>
+    );
+  }, [activeTab, showResults, handleReset, handleCopySummary, handleSendToSimulator]);
 
   useSetPageTitle(
-    'Dewatering Calculator',
-    'Perimeter ring-main sizing & bill of quantities',
-    headerButtons,
-    [showResults],
+    activeTab === 'print' ? 'BOQ Specification Sheet' : 'Dewatering Sizing',
+    activeTab === 'print' ? 'A4 Document Preview & Engineering Sign-Off' : 'Perimeter wellpoint installation & BOQ',
+    headerActions,
+    [headerActions, activeTab],
+    activeTab === 'print' ? () => setActiveTab('calculator') : false
   );
 
+  const activeLayout = inputs.layoutType || 'ring';
+  const activeStock = inputs.pipeStock || 'all';
+
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 print:bg-white">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 grid grid-cols-1 xl:grid-cols-[380px_1fr] gap-6 items-start">
+    <div className="min-h-screen bg-slate-50/60 dark:bg-slate-950 print:bg-white text-slate-900 dark:text-slate-100">
+      <div className={cn(
+        'mx-auto px-4 py-4 transition-all duration-200',
+        activeTab === 'print' ? 'max-w-[1250px]' : showInputs ? 'max-w-7xl' : 'max-w-[1550px]',
+      )}>
+        {activeTab === 'print' ? (
+          <PrintSpecificationView
+            inputs={inputs}
+            result={result}
+            orientation={printOrientation}
+          />
+        ) : (
+          <>
+            {/* Quick Variables Pill Bar when Inputs are Hidden */}
+            {!showInputs && (
+              <div className="mb-4 px-4 py-2 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3 text-xs shadow-xs flex-wrap">
+            <div className="flex items-center gap-4 flex-wrap text-slate-600 dark:text-slate-300">
+              <span className="font-semibold text-slate-900 dark:text-white flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-amber-500 inline-block" />
+                Active Configuration:
+              </span>
+              <span>Layout: <strong className="uppercase text-slate-900 dark:text-white">{result?.layoutType}</strong></span>
+              <span>Pit: <strong>{inputs.excavationLength}×{inputs.excavationWidth}m</strong> (Depth: <strong>{inputs.excavationDepth}m</strong>)</span>
+              <span>Water Table: <strong>{inputs.waterTableDepth}m</strong></span>
+              <span>Header Stock: <strong>{result?.pipeStock === '6m_only' ? '6m Only' : '6m & 3m Mix'}</strong></span>
+              <span>Setback: <strong>{result?.designOffset.toFixed(2)}m</strong></span>
+              <span className="text-amber-600 dark:text-amber-400 font-mono font-bold">Line: {result?.loopPerimeter.toFixed(1)}m</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowInputs(true)}
+              className="px-2.5 py-1 text-xs font-semibold rounded bg-amber-50 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-500/40 hover:bg-amber-100 dark:hover:bg-amber-500/30 transition-all flex items-center gap-1 cursor-pointer shrink-0"
+            >
+              <SlidersHorizontal className="h-3 w-3" /> Edit Variables
+            </button>
+          </div>
+        )}
 
-        {/* Left: Inputs */}
-        <div className="flex flex-col gap-4">
-
-          {/* Dimensions */}
-          <div className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 p-4">
-            <SectionLabel>Site & Excavation</SectionLabel>
-            <div className="grid grid-cols-2 gap-3">
-              <NumericField id="landLength" label="Land Length" unit="m"
-                tooltip="Total land parcel length."
-                value={inputs.landLength} min={0.1}
-                onChange={v => setField('landLength', v)}
-                warning={inputs.landLength <= inputs.excavationLength} />
-              <NumericField id="landWidth" label="Land Width" unit="m"
-                tooltip="Total land parcel width."
-                value={inputs.landWidth} min={0.1}
-                onChange={v => setField('landWidth', v)}
-                warning={inputs.landWidth <= inputs.excavationWidth} />
-              <NumericField id="excavationLength" label="Pit Length" unit="m"
-                tooltip="Excavation length. Must be less than land length."
-                value={inputs.excavationLength} min={0.1}
-                onChange={v => setField('excavationLength', v)} />
-              <NumericField id="excavationWidth" label="Pit Width" unit="m"
-                tooltip="Excavation width. Must be less than land width."
-                value={inputs.excavationWidth} min={0.1}
-                onChange={v => setField('excavationWidth', v)} />
-              <div className="col-span-2">
-                <NumericField id="excavationDepth" label="Depth" unit="m"
-                  tooltip="Formation level depth below existing ground."
-                  value={inputs.excavationDepth} min={0.1}
-                  onChange={v => setField('excavationDepth', v)} />
+        <div className={cn(
+          'grid gap-5 items-start transition-all',
+          showInputs ? 'grid-cols-1 lg:grid-cols-[340px_1fr]' : 'grid-cols-1',
+        )}>
+          {/* =========================================================================
+              LEFT COLUMN: Variable Inputs (Collapsible)
+          ========================================================================== */}
+          {showInputs && (
+            <div className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 p-4 space-y-4 shadow-xs">
+              <div className="flex items-center justify-between pb-1 border-b border-slate-100 dark:border-slate-800">
+                <span className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+                  <SlidersHorizontal className="h-3.5 w-3.5 text-amber-500" /> Input Variables
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowInputs(false)}
+                  className="text-[11px] text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 flex items-center gap-0.5 cursor-pointer"
+                  title="Hide variables to view drawing full width"
+                >
+                  <PanelLeftClose className="h-3.5 w-3.5" /> Hide
+                </button>
               </div>
-            </div>
-          </div>
 
-          {/* Groundwater */}
-          <div className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 p-4">
-            <SectionLabel>Groundwater</SectionLabel>
-            <div className="grid grid-cols-2 gap-3">
-              <NumericField id="waterTableDepth" label="Water Table" unit="m b.g.l."
-                tooltip="Static water table depth below existing ground level."
-                value={inputs.waterTableDepth} min={0}
-                onChange={v => setField('waterTableDepth', v)} />
-              <NumericField id="requiredDrawdown" label="Drawdown" unit="m below pit"
-                tooltip="Required drawdown below the formation level."
-                value={inputs.requiredDrawdown} min={0}
-                onChange={v => setField('requiredDrawdown', v)} />
-            </div>
-          </div>
-
-          {/* Ingress */}
-          <div className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 p-4">
-            <SectionLabel>Ingress</SectionLabel>
-            <div className="flex flex-col gap-3">
-              <ToggleField id="ingressRequired" label="Vehicle ramp / ingress required"
-                value={inputs.ingressRequired} onChange={v => setField('ingressRequired', v)} />
-              <NumericField id="ingressWidth" label="Opening width" unit="m"
-                tooltip="Break in ring-main for vehicle access. Minimum 6.0m."
-                value={inputs.ingressWidth} min={6.0}
-                onChange={v => setField('ingressWidth', Math.max(6.0, v))}
-                disabled={!inputs.ingressRequired} />
-              {inputs.ingressRequired && (
-                <p className="text-xs text-slate-400 dark:text-slate-500">
-                  Ingress creates an open perimeter (3 elbows) and requires 2 end blanking caps to seal the ramp break.
-                </p>
-              )}
-            </div>
-          </div>
-
-          {/* Status */}
-          <StatusBar result={result} />
-        </div>
-
-        {/* Right: Results */}
-        <div className="flex flex-col gap-4">
-
-          {/* Schematic */}
-          <div className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 p-4">
-            <div className="flex items-center justify-between mb-3">
-              <SectionLabel>Site Plan</SectionLabel>
-              <div className="flex items-center gap-3 text-[11px] text-slate-400">
-                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" />Filter</span>
-                <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-blue-700 inline-block" />Pump</span>
-                <span className="flex items-center gap-1"><span className="w-5 h-px bg-amber-400 inline-block" />Ring-main</span>
-              </div>
-            </div>
-            <div className="h-[220px]">
-              <SiteSchematic inputs={inputs} result={result} />
-            </div>
-          </div>
-
-          {/* BOQ */}
-          {showResults && (
-            <div className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 p-4" ref={summaryRef}>
-              <SectionLabel>Bill of Quantities</SectionLabel>
-              <Row label="Loop perimeter" value={result.loopPerimeter.toFixed(2)} unit="m" />
-              <Row label="Wellpoint filters (1.0m c/c)" value={result.filters} />
-              <Row label="Vacuum pumps (100 m3/hr, max 60m)" value={result.pumps} />
-              <Row label="Header pipes, 6m" value={result.headers6m} unit="pcs" />
-              <Row label="Header pipes, 3m" value={result.headers3m} unit="pcs" subtle={result.headers3m === 0} />
-              <Row label="90 deg elbows" value={result.elbows90} unit="pcs" />
-              <Row label="Tee connectors (pump tie-ins)" value={result.tees} unit="pcs" />
-              {result.endCaps > 0 && (
-                <Row label="End blanking caps" value={result.endCaps} unit="pcs" />
-              )}
-              {inputs.ingressRequired && (
-                <Row label="Ingress opening" value={inputs.ingressWidth.toFixed(2)} unit="m" />
-              )}
-
-              <details className="mt-3 group">
-                <summary className="text-[11px] text-slate-400 cursor-pointer select-none flex items-center gap-1 hover:text-slate-600 dark:hover:text-slate-300 transition-colors">
-                  <ChevronRight className="h-3 w-3 transition-transform group-open:rotate-90" />
-                  Calculation steps
-                </summary>
-                <div className="mt-2 px-3 py-2 bg-slate-50 dark:bg-slate-800/50 rounded-md font-mono text-[11px] text-slate-500 dark:text-slate-400 space-y-0.5 leading-relaxed">
-                  <p>Target depth = D + 0.5 = {(inputs.excavationDepth + 0.5).toFixed(2)}m</p>
-                  <p>Effective water level = WT - Rd = {result.effectiveWaterLevel.toFixed(2)}m</p>
-                  <p>Offset L = (LL - L) / 2 = {result.offsetL.toFixed(2)}m</p>
-                  <p>Offset W = (LW - W) / 2 = {result.offsetW.toFixed(2)}m</p>
-                  <p>Design offset = min(1.0, {result.offsetL.toFixed(2)}, {result.offsetW.toFixed(2)}) = {result.designOffset.toFixed(2)}m</p>
-                  <p>Eff. L = L + 2 * offset = {result.effL.toFixed(2)}m</p>
-                  <p>Eff. W = W + 2 * offset = {result.effW.toFixed(2)}m</p>
-                  <p>P = 2 * (effL + effW) = {result.loopPerimeter.toFixed(2)}m</p>
-                  <p>Filters = ceil(P / 1.0) = {result.filters}</p>
-                  <p>Pumps = max(1, ceil(P / 60)) = {result.pumps}</p>
-                  <p>Base header = P + pumps * 2 = {result.baseHeaderLength.toFixed(2)}m</p>
-                  <p>Final header = ceil(base * 1.10) = {result.finalHeaderLength}m</p>
+              {/* 1. System Layout (Minimalist Segmented Control) */}
+              <div>
+                <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider block mb-1.5">
+                  System Layout
+                </span>
+                <div className="grid grid-cols-4 gap-1 p-0.5 bg-slate-100 dark:bg-slate-800/80 rounded">
+                  {[
+                    { id: 'ring', label: 'Ring' },
+                    { id: 'u_shape', label: 'U-Shape' },
+                    { id: 'l_shape', label: 'L-Shape' },
+                    { id: 'single_line', label: 'Line' },
+                  ].map(t => (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => setField('layoutType', t.id as DewateringLayoutType)}
+                      className={cn(
+                        'py-1 text-xs font-medium rounded transition-all text-center cursor-pointer',
+                        activeLayout === t.id
+                          ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs font-semibold'
+                          : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200',
+                      )}
+                    >
+                      {t.label}
+                    </button>
+                  ))}
                 </div>
-              </details>
-            </div>
-          )}
+              </div>
 
-          {/* Summary note */}
-          {result && result.status !== 'ERROR' && (
-            <div className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 p-4">
-              <div className="flex items-start justify-between gap-3">
-                <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">{result.autoSummary}</p>
-                {showResults && (
-                  <button onClick={handleCopySummary} className="shrink-0 text-[11px] text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 flex items-center gap-1 transition-colors">
-                    <Copy className="h-3 w-3" />
-                    Copy
+              {/* 2. Pipe Stock Availability (Minimalist 2-Pill) */}
+              <div>
+                <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider block mb-1.5">
+                  Header Pipe Stock
+                </span>
+                <div className="grid grid-cols-2 gap-1 p-0.5 bg-slate-100 dark:bg-slate-800/80 rounded">
+                  <button
+                    type="button"
+                    onClick={() => setField('pipeStock', 'all')}
+                    className={cn(
+                      'py-1 text-xs font-medium rounded transition-all text-center cursor-pointer',
+                      activeStock === 'all'
+                        ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs font-semibold'
+                        : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200',
+                    )}
+                  >
+                    6m & 3m Mix
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setField('pipeStock', '6m_only')}
+                    className={cn(
+                      'py-1 text-xs font-medium rounded transition-all text-center cursor-pointer',
+                      activeStock === '6m_only'
+                        ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs font-semibold'
+                        : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200',
+                    )}
+                  >
+                    6m Only
+                  </button>
+                </div>
+              </div>
+
+              <div className="border-t border-slate-100 dark:border-slate-800" />
+
+              {/* 3. Site & Excavation Dimensions */}
+              <div>
+                <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider block mb-2">
+                  Geometry & Levels
+                </span>
+                <div className="space-y-1">
+                  <CompactNumber label="Land Length" value={inputs.landLength} unit="m"
+                    onChange={v => setField('landLength', v)} />
+                  <CompactNumber label="Land Width" value={inputs.landWidth} unit="m"
+                    onChange={v => setField('landWidth', v)} />
+                  <CompactNumber label="Pit Length" value={inputs.excavationLength} unit="m"
+                    onChange={v => setField('excavationLength', v)} />
+                  <CompactNumber label="Pit Width" value={inputs.excavationWidth} unit="m"
+                    onChange={v => setField('excavationWidth', v)} />
+                  <CompactNumber label="Pit Depth" value={inputs.excavationDepth} unit="m"
+                    onChange={v => setField('excavationDepth', v)} />
+                  <CompactNumber label="Water Table Depth" value={inputs.waterTableDepth} unit="m"
+                    onChange={v => setField('waterTableDepth', v)} />
+                </div>
+              </div>
+
+              <div className="border-t border-slate-100 dark:border-slate-800" />
+
+              {/* 4. Drawdown & Offset */}
+              <div>
+                <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider block mb-2">
+                  Installation Setback & Drawdown
+                </span>
+                <div className="space-y-1">
+                  <CompactNumber label="Target Drawdown" value={inputs.requiredDrawdown} unit="m below pit"
+                    onChange={v => setField('requiredDrawdown', v)} />
+                  <CompactNumber label="Setback Offset" value={inputs.manualOffset ?? 1.0} unit="m" step={0.05}
+                    onChange={v => {
+                      setField('offsetMode', 'manual');
+                      setField('manualOffset', v);
+                    }} />
+                </div>
+
+                {/* Smart Auto-Fit Quick Button */}
+                {result?.recommendedOffset && result.recommendedOffset !== (inputs.manualOffset ?? 1.0) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setField('offsetMode', 'manual');
+                      setField('manualOffset', result.recommendedOffset);
+                    }}
+                    className="mt-2 text-[11px] text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 hover:bg-amber-100 dark:hover:bg-amber-900/40 w-full py-1 px-2 rounded border border-amber-200 dark:border-amber-800/60 flex items-center justify-between transition-colors cursor-pointer"
+                  >
+                    <span className="flex items-center gap-1 font-medium">
+                      <Sparkles className="h-3 w-3" /> Auto-Fit: {result.recommendedOffset.toFixed(2)}m
+                    </span>
+                    <span className="font-semibold text-[10px] underline">Apply</span>
                   </button>
                 )}
               </div>
+
+              {/* 5. Ingress (Only when Ring is active) */}
+              {activeLayout === 'ring' && (
+                <div className="pt-1">
+                  <div className="flex items-center justify-between py-1 border-b border-slate-100 dark:border-slate-800/60">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs text-slate-700 dark:text-slate-300 font-medium">Ingress</span>
+                      <span
+                        className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 text-[10px] font-serif cursor-help transition-colors border border-slate-200 dark:border-slate-700"
+                        title="Vehicle ramp break: leaves an unpiped access opening along the selected run for excavators and site trucks"
+                      >
+                        i
+                      </span>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={inputs.ingressRequired}
+                      onChange={e => setField('ingressRequired', e.target.checked)}
+                      className="rounded border-slate-300 text-amber-500 focus:ring-0 cursor-pointer h-4 w-4"
+                    />
+                  </div>
+                  {inputs.ingressRequired && (
+                    <div className="mt-1.5 space-y-1">
+                      {/* Side Selection with Cycle Switch Button */}
+                      <div className="flex items-center justify-between py-1.5 border-b border-slate-100 dark:border-slate-800/60 text-xs">
+                        <span className="text-slate-700 dark:text-slate-300 font-medium">Side</span>
+                        <div className="flex items-center gap-1.5">
+                          {/* Segmented [N][E][S][W] for direct select */}
+                          <div className="flex items-center p-0.5 bg-slate-100 dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700">
+                            {(['north', 'east', 'south', 'west'] as const).map(s => {
+                              const active = (inputs.ingressSide || 'south') === s;
+                              return (
+                                <button
+                                  key={s}
+                                  type="button"
+                                  onClick={() => setField('ingressSide', s)}
+                                  className={cn(
+                                    'px-1.5 py-0.5 text-[10px] font-semibold rounded transition-all cursor-pointer uppercase',
+                                    active
+                                      ? 'bg-amber-500 text-white shadow-xs'
+                                      : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                                  )}
+                                  title={`Place ingress opening on ${s.toUpperCase()} side`}
+                                >
+                                  {s[0]}
+                                </button>
+                              );
+                            })}
+                          </div>
+
+                          {/* One-by-one Cycle Switch Button */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const current = inputs.ingressSide || 'south';
+                              const order: ('north' | 'east' | 'south' | 'west')[] = ['north', 'east', 'south', 'west'];
+                              const next = order[(order.indexOf(current) + 1) % order.length];
+                              setField('ingressSide', next);
+                            }}
+                            className="px-2 py-0.5 text-xs font-semibold rounded bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800/60 hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-all flex items-center gap-1 cursor-pointer"
+                            title="Click to cycle side: North → East → South → West"
+                          >
+                            <span className="capitalize">{inputs.ingressSide || 'south'}</span>
+                            <RotateCw className="h-2.5 w-2.5 text-amber-600 dark:text-amber-400" />
+                          </button>
+                        </div>
+                      </div>
+
+                      <CompactNumber
+                        label="Opening Width"
+                        value={inputs.ingressWidth}
+                        unit="m"
+                        min={6}
+                        onChange={v => setField('ingressWidth', Math.max(6, v))}
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Status Badge */}
+              {result && (
+                <div className={cn(
+                  'p-2 rounded text-xs leading-relaxed font-medium',
+                  result.status === 'REQUIRED' ? 'bg-amber-50 dark:bg-amber-950/30 text-amber-900 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60' :
+                  result.status === 'NOT_REQUIRED' ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800' :
+                  'bg-red-50 text-red-700 border border-red-200',
+                )}>
+                  {result.status === 'REQUIRED' && (
+                    <p>
+                      Line: <strong className="font-mono">{result.loopPerimeter.toFixed(1)}m</strong> • Drawdown: <strong className="font-mono">{result.drawdownAmount.toFixed(1)}m</strong>
+                    </p>
+                  )}
+                  {result.status === 'NOT_REQUIRED' && <p>Dewatering not required (water table below pit)</p>}
+                  {result.status === 'ERROR' && <p>{result.errorMessage}</p>}
+                </div>
+              )}
             </div>
           )}
 
-          {/* Not required state */}
-          {result?.status === 'NOT_REQUIRED' && (
-            <div className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 px-5 py-8 flex flex-col items-center gap-3 text-center">
-              <CheckCircle2 className="h-8 w-8 text-emerald-400" />
-              <div>
-                <p className="text-sm font-medium text-slate-700 dark:text-slate-300">No dewatering required</p>
-                <p className="text-xs text-slate-400 mt-1">Water table is naturally below the target level for this configuration.</p>
+          {/* =========================================================================
+              MAIN AREA: Prominent Drawing Visualizer + Bill of Quantities
+          ========================================================================== */}
+          <div className="space-y-4">
+            {/* 1. Visualizer Container with Side-by-Side & Dedicated View Modes (Collapsible with Eye icon) */}
+            {showDrawings ? (
+              <div className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 p-4 shadow-xs">
+                <div className="flex items-center justify-between pb-3 mb-2 border-b border-slate-100 dark:border-slate-800 gap-2 flex-wrap">
+                  {/* View Mode Switcher */}
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1 p-0.5 bg-slate-100 dark:bg-slate-800 rounded">
+                      <button
+                        type="button"
+                        onClick={() => setViewMode('both')}
+                        className={cn(
+                          'px-2.5 py-1 text-xs font-medium rounded transition-all flex items-center gap-1.5 cursor-pointer',
+                          viewMode === 'both'
+                            ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs font-semibold'
+                            : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white',
+                        )}
+                      >
+                        <Columns className="h-3.5 w-3.5 text-amber-500" />
+                        Both Views (Side-by-Side)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setViewMode('plan')}
+                        className={cn(
+                          'px-2.5 py-1 text-xs font-medium rounded transition-all flex items-center gap-1.5 cursor-pointer',
+                          viewMode === 'plan'
+                            ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs font-semibold'
+                            : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white',
+                        )}
+                      >
+                        <Map className="h-3.5 w-3.5" />
+                        Site Plan (2D)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setViewMode('section')}
+                        className={cn(
+                          'px-2.5 py-1 text-xs font-medium rounded transition-all flex items-center gap-1.5 cursor-pointer',
+                          viewMode === 'section'
+                            ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs font-semibold'
+                            : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white',
+                        )}
+                      >
+                        <Eye className="h-3.5 w-3.5" />
+                        Elevation Profile
+                      </button>
+                    </div>
+
+                    {!showInputs && (
+                      <button
+                        type="button"
+                        onClick={() => setShowInputs(true)}
+                        className="px-2 py-1 text-xs text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white border border-slate-200 dark:border-slate-700 rounded flex items-center gap-1 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800"
+                      >
+                        <PanelLeftOpen className="h-3.5 w-3.5" /> Show Inputs
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Minimalist Legend & Hide Control */}
+                  <div className="flex items-center gap-3 text-[11px] text-slate-400 font-medium flex-wrap">
+                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />Wellpoints</span>
+                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-xs bg-blue-700 inline-block" />Pump</span>
+                    <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-amber-500 inline-block" />Header Line</span>
+
+                    <div className="h-3.5 w-px bg-slate-200 dark:bg-slate-700 mx-1 hidden sm:block" />
+
+                    <button
+                      type="button"
+                      onClick={() => setShowDrawings(false)}
+                      className="px-2 py-0.5 text-xs text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white border border-slate-200 dark:border-slate-700 rounded hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors flex items-center gap-1 cursor-pointer"
+                      title="Hide drawings to focus on BOQ"
+                    >
+                      <EyeOff className="h-3.5 w-3.5 text-slate-500" />
+                      <span>Hide</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Drawing Canvases with Generous Dimensions */}
+                {viewMode === 'both' ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+                    <div className="border border-slate-100 dark:border-slate-800 rounded-lg p-2 flex flex-col justify-center items-center bg-slate-50/50 dark:bg-slate-950/40">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase self-start mb-1 px-1">Plan View (2D)</span>
+                      <div className="h-[360px] w-full flex items-center justify-center">
+                        <SiteSchematic inputs={inputs} result={result} />
+                      </div>
+                    </div>
+                    <div className="border border-slate-100 dark:border-slate-800 rounded-lg p-2 flex flex-col justify-center items-center bg-slate-50/50 dark:bg-slate-950/40">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase self-start mb-1 px-1">Elevation Cross Section</span>
+                      <div className="h-[360px] w-full flex items-center justify-center">
+                        <SiteCrossSection inputs={inputs} result={result} />
+                      </div>
+                    </div>
+                  </div>
+                ) : viewMode === 'plan' ? (
+                  <div className="h-[420px] w-full pt-1 flex items-center justify-center">
+                    <SiteSchematic inputs={inputs} result={result} />
+                  </div>
+                ) : (
+                  <div className="h-[420px] w-full pt-1 flex items-center justify-center">
+                    <SiteCrossSection inputs={inputs} result={result} />
+                  </div>
+                )}
               </div>
+            ) : (
+              <div className="p-3 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 flex items-center justify-between shadow-xs">
+                <div className="flex items-center gap-2.5 text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  <EyeOff className="h-4 w-4 text-slate-400" />
+                  <span>Schematic Drawings Hidden</span>
+                  <span className="text-[11px] font-normal text-slate-400 hidden sm:inline">
+                    ({viewMode === 'both' ? 'Both Views' : viewMode === 'plan' ? 'Site Plan' : 'Elevation Profile'})
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowDrawings(true)}
+                  className="px-2.5 py-1 text-xs font-semibold rounded bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800/60 hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+                  title="Unhide drawings"
+                >
+                  <Eye className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                  <span>Unhide Drawings</span>
+                </button>
+              </div>
+            )}
+
+            {/* 2. Succinct Minimalist Bill of Quantities (Visible at the Same Time) */}
+            {showResults && (
+              <div className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 p-4 shadow-xs">
+                <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-100 dark:border-slate-800">
+                  <span className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">
+                    Bill of Quantities
+                  </span>
+                  <span className="text-[11px] font-mono text-slate-500">
+                    {result.loopPerimeter.toFixed(1)}m line @ {result.designOffset.toFixed(2)}m offset
+                  </span>
+                </div>
+
+                {/* Clean Single List with Original Naming */}
+                <div className="space-y-0.5">
+                  <BoqRow label="Loop perimeter" value={result.loopPerimeter.toFixed(2)} unit="m" />
+                  <BoqRow label="Wellpoint filters (1.0m c/c)" value={result.filters} />
+                  <BoqRow label="Vacuum pumps (100 m3/hr, max 60m)" value={result.pumps} />
+                  <BoqRow label="Header pipes, 6m" value={result.headers6m} unit="pcs" />
+                  <BoqRow label="Header pipes, 3m" value={result.headers3m} unit="pcs" subtle={result.headers3m === 0} />
+                  <BoqRow label="Elbows" value={result.elbows90} unit="pcs" />
+                  <BoqRow label="Tee connectors" value={result.tees} unit="pcs" />
+                  {result.endCaps > 0 && (
+                    <BoqRow label="End blanking caps" value={result.endCaps} unit="pcs" />
+                  )}
+                </div>
+
+                {/* Per-Side Stick Breakdown (Collapsible & Compact) */}
+                <details className="mt-3 group pt-2 border-t border-slate-100 dark:border-slate-800/80" open>
+                  <summary className="text-[11px] text-amber-600 dark:text-amber-400 cursor-pointer font-medium hover:underline flex items-center gap-1 select-none">
+                    <ChevronRight className="h-3 w-3 transition-transform group-open:rotate-90" />
+                    Per-side modular stick breakdown ({result.runs.length} runs)
+                  </summary>
+                  <div className="mt-2 space-y-1 pl-1 font-mono text-[11px] text-slate-600 dark:text-slate-400">
+                    {result.runs.map(r => (
+                      <div key={r.id} className="flex items-center justify-between py-0.5">
+                        <span>{r.name} ({r.length.toFixed(1)}m):</span>
+                        <span className="font-semibold text-slate-800 dark:text-slate-200">
+                          {r.headers6m > 0 ? `${r.headers6m}× 6m` : ''}
+                          {r.headers6m > 0 && r.headers3m > 0 ? ' + ' : ''}
+                          {r.headers3m > 0 ? `${r.headers3m}× 3m` : ''}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </details>
+
+                {/* Auto Summary line */}
+                <div className="mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-500 leading-relaxed">
+                  {result.autoSummary}
+                </div>
+              </div>
+            )}
+          </div>
             </div>
-          )}
-        </div>
+          </>
+        )}
       </div>
-
-      <div className="hidden print:block px-8 py-4 border-b">
-        <p className="text-lg font-semibold">Wellpoint Dewatering Sizing</p>
-        <p className="text-xs text-gray-400">{new Date().toLocaleString()}</p>
-      </div>
-
-      {/* Print Preview Modal */}
-      <PrintPreviewModal
-        open={showPrintPreview}
-        onClose={() => setShowPrintPreview(false)}
-        inputs={inputs}
-        result={result}
-      />
     </div>
   );
 }
 
-function PrintPreviewModal({
-  open,
-  onClose,
+/* -------------------------------------------------------------------------
+   In-Page Print Specification View (Theme-Adaptive & Electron Compatible)
+------------------------------------------------------------------------- */
+
+function PrintSpecificationView({
   inputs,
   result,
+  orientation,
 }: {
-  open: boolean;
-  onClose: () => void;
   inputs: DewateringInput;
   result: DewateringCalculationResult | null;
+  orientation: 'portrait' | 'landscape';
 }) {
-  if (!open) return null;
+  if (!result) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex flex-col bg-slate-900/60 backdrop-blur-sm print:bg-white print:static print:z-auto">
+    <div className="space-y-4">
+      {/* High-Fidelity Print CSS: Hides surrounding app chrome and centers exact A4 sheet */}
       <style>{`
         @media print {
           @page {
-            margin: 12mm;
-            size: A4 portrait;
+            size: ${orientation === 'landscape' ? 'A4 landscape' : 'A4 portrait'};
+            margin: 0;
           }
-          body {
-            background: #fff !important;
+          html, body {
+            margin: 0 !important;
+            padding: 0 !important;
+            background: white !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
           }
           body * {
             visibility: hidden;
           }
-          #dewatering-print-preview-sheet, #dewatering-print-preview-sheet * {
+          .print-a4-sheet,
+          .print-a4-sheet * {
             visibility: visible;
           }
-          #dewatering-print-preview-sheet {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100% !important;
+          .print-a4-sheet {
+            position: fixed !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: ${orientation === 'landscape' ? '297mm' : '210mm'} !important;
+            height: ${orientation === 'landscape' ? '210mm' : '297mm'} !important;
             margin: 0 !important;
-            padding: 0 !important;
+            padding: 8mm 10mm !important;
+            background: white !important;
+            z-index: 9999999 !important;
+            overflow: hidden !important;
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: space-between !important;
             border: none !important;
             box-shadow: none !important;
           }
         }
       `}</style>
 
-      {/* Top action bar - hidden when printed */}
-      <div className="flex items-center justify-between px-6 py-3 bg-slate-900 text-white border-b border-slate-800 print:hidden shrink-0">
-        <div className="flex items-center gap-3">
-          <FileText className="h-5 w-5 text-amber-400" />
-          <div>
-            <h2 className="text-sm font-semibold text-white">Print Preview</h2>
-            <p className="text-[11px] text-slate-400">Formal A4 Engineering Bill of Quantities & Site Plan</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onClose}
-            className="h-8 text-xs text-slate-300 border-slate-700 hover:bg-slate-800 hover:text-white"
-          >
-            <X className="h-3.5 w-3.5 mr-1" />
-            Close Preview
-          </Button>
-          <Button
-            size="sm"
-            onClick={() => window.print()}
-            className="h-8 text-xs bg-amber-500 hover:bg-amber-600 text-white border-0 gap-1.5 shadow-sm"
-          >
-            <Printer className="h-3.5 w-3.5" />
-            Print Document
-          </Button>
-        </div>
-      </div>
-
-      {/* Printable Sheet Viewport */}
-      <div className="flex-1 overflow-y-auto p-4 sm:p-8 bg-slate-100 dark:bg-slate-950 flex justify-center print:p-0 print:bg-white print:overflow-visible">
+      {/* Document Sheet Canvas Area (Theme-Adaptive Outer Frame) */}
+      <div className="p-4 md:p-8 bg-slate-200/60 dark:bg-slate-950/60 rounded-xl border border-slate-300/80 dark:border-slate-800 flex justify-center print:p-0 print:m-0 print:border-none print:bg-white print:w-auto">
         <div
-          id="dewatering-print-preview-sheet"
-          className="w-full max-w-[800px] bg-white text-slate-900 p-8 sm:p-10 rounded-lg shadow-xl border border-slate-200 print:shadow-none print:border-none print:p-0 print:max-w-none"
+          className={cn(
+            'print-a4-sheet bg-white text-slate-900 p-8 shadow-md relative border border-slate-300 rounded transition-all duration-200 select-text',
+            'print:shadow-none print:border-none print:p-0 print:m-0 print:max-w-none print:rounded-none',
+            orientation === 'portrait'
+              ? 'w-full max-w-[794px] min-h-[1123px]'
+              : 'w-full max-w-[1123px] min-h-[794px]',
+          )}
         >
-          {/* Document Header */}
-          <div className="border-b-2 border-slate-900 pb-4 mb-6">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-[11px] font-bold tracking-widest text-slate-500 uppercase">DCEL Engineering Operations</p>
-                <h1 className="text-xl sm:text-2xl font-black text-slate-950 tracking-tight mt-0.5">
-                  Wellpoint Dewatering Sizing & BOQ Specification
-                </h1>
-              </div>
-              <div className="text-right">
-                <span className={cn(
-                  "inline-block px-2.5 py-1 rounded text-[11px] font-bold uppercase tracking-wider",
-                  result?.status === 'REQUIRED' ? "bg-amber-100 text-amber-900 border border-amber-300" :
-                  result?.status === 'NOT_REQUIRED' ? "bg-emerald-100 text-emerald-900 border border-emerald-300" :
-                  "bg-slate-100 text-slate-700 border border-slate-300"
-                )}>
-                  {result?.status === 'REQUIRED' ? 'Dewatering Required' : result?.status === 'NOT_REQUIRED' ? 'Dewatering Not Required' : 'Draft Specification'}
-                </span>
-                <p className="text-[11px] text-slate-500 mt-1">
-                  {new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                </p>
-              </div>
-            </div>
+          {/* Centered Watermark Logo */}
+          <div className="absolute inset-0 pointer-events-none flex items-center justify-center overflow-hidden z-0 select-none">
+            <img
+              src={logoSrc}
+              alt="Watermark"
+              className={cn(
+                'object-contain -rotate-12 opacity-[0.045] print:opacity-[0.05] filter grayscale contrast-125',
+                orientation === 'portrait' ? 'w-[440px] max-w-[65%]' : 'w-[500px] max-w-[60%]',
+              )}
+            />
           </div>
 
-          {/* Section 1: Site Geometry & Water Table */}
-          <div className="mb-6">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 mb-2 border-b border-slate-200 pb-1">
-              1. Site & Groundwater Parameters
-            </h3>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
-              <div className="p-2.5 bg-slate-50 rounded border border-slate-200">
-                <span className="text-slate-500 block text-[11px]">Land Boundary</span>
-                <strong className="text-slate-900 font-semibold">{inputs.landLength}m × {inputs.landWidth}m</strong>
-              </div>
-              <div className="p-2.5 bg-slate-50 rounded border border-slate-200">
-                <span className="text-slate-500 block text-[11px]">Excavation Pit</span>
-                <strong className="text-slate-900 font-semibold">{inputs.excavationLength}m × {inputs.excavationWidth}m</strong>
-              </div>
-              <div className="p-2.5 bg-slate-50 rounded border border-slate-200">
-                <span className="text-slate-500 block text-[11px]">Excavation Depth</span>
-                <strong className="text-slate-900 font-semibold">{inputs.excavationDepth} m</strong>
-              </div>
-              <div className="p-2.5 bg-slate-50 rounded border border-slate-200">
-                <span className="text-slate-500 block text-[11px]">Static Water Table</span>
-                <strong className="text-slate-900 font-semibold">{inputs.waterTableDepth} m b.g.l.</strong>
-              </div>
-              <div className="p-2.5 bg-slate-50 rounded border border-slate-200">
-                <span className="text-slate-500 block text-[11px]">Required Drawdown</span>
-                <strong className="text-slate-900 font-semibold">{inputs.requiredDrawdown} m below pit</strong>
-              </div>
-              <div className="p-2.5 bg-slate-50 rounded border border-slate-200">
-                <span className="text-slate-500 block text-[11px]">Site Ingress Ramp</span>
-                <strong className="text-slate-900 font-semibold">
-                  {inputs.ingressRequired ? `Yes (${inputs.ingressWidth}m opening)` : 'No (Closed perimeter)'}
-                </strong>
-              </div>
-            </div>
-          </div>
-
-          {/* Section 2: Schematic Vector Plan */}
-          <div className="mb-6">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 mb-2 border-b border-slate-200 pb-1">
-              2. Schematic Layout Plan
-            </h3>
-            <div className="h-[200px] border border-slate-200 rounded p-2 bg-slate-50/50 flex items-center justify-center">
-              <SiteSchematic inputs={inputs} result={result} />
-            </div>
-          </div>
-
-          {/* Section 3: Bill of Quantities */}
-          {result && result.status === 'REQUIRED' && (
-            <div className="mb-6">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 mb-2 border-b border-slate-200 pb-1">
-                3. Bill of Quantities (BOQ) & Equipment Sizing
-              </h3>
-              <table className="w-full text-left text-xs border-collapse border border-slate-200">
-                <thead>
-                  <tr className="bg-slate-100 text-slate-700 font-semibold">
-                    <th className="p-2 border border-slate-200">Item Description</th>
-                    <th className="p-2 border border-slate-200 text-right">Quantity</th>
-                    <th className="p-2 border border-slate-200">Unit</th>
-                    <th className="p-2 border border-slate-200">Engineering Application</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200">
-                  <tr>
-                    <td className="p-2 border border-slate-200 font-medium">Header Ring Perimeter</td>
-                    <td className="p-2 border border-slate-200 text-right font-mono">{result.loopPerimeter.toFixed(2)}</td>
-                    <td className="p-2 border border-slate-200">m</td>
-                    <td className="p-2 border border-slate-200 text-slate-500">Centerline perimeter at {result.designOffset.toFixed(2)}m setback offset</td>
-                  </tr>
-                  <tr>
-                    <td className="p-2 border border-slate-200 font-medium">Wellpoint Filters</td>
-                    <td className="p-2 border border-slate-200 text-right font-mono font-bold">{result.filters}</td>
-                    <td className="p-2 border border-slate-200">units</td>
-                    <td className="p-2 border border-slate-200 text-slate-500">Self-jetting wellpoints spaced at 1.0m c/c along header</td>
-                  </tr>
-                  <tr>
-                    <td className="p-2 border border-slate-200 font-medium">Vacuum Pumps</td>
-                    <td className="p-2 border border-slate-200 text-right font-mono font-bold">{result.pumps}</td>
-                    <td className="p-2 border border-slate-200">units</td>
-                    <td className="p-2 border border-slate-200 text-slate-500">100 m³/hr capacity vacuum dewatering units (max 60m header each)</td>
-                  </tr>
-                  <tr>
-                    <td className="p-2 border border-slate-200 font-medium">Header Pipes, 6m Standard</td>
-                    <td className="p-2 border border-slate-200 text-right font-mono font-bold">{result.headers6m}</td>
-                    <td className="p-2 border border-slate-200">pcs</td>
-                    <td className="p-2 border border-slate-200 text-slate-500">6" quick-coupling vacuum header pipe sections</td>
-                  </tr>
-                  {result.headers3m > 0 && (
-                    <tr>
-                      <td className="p-2 border border-slate-200 font-medium">Header Pipes, 3m Compensation</td>
-                      <td className="p-2 border border-slate-200 text-right font-mono font-bold">{result.headers3m}</td>
-                      <td className="p-2 border border-slate-200">pcs</td>
-                      <td className="p-2 border border-slate-200 text-slate-500">3" modular compensation piece for exact closure</td>
-                    </tr>
-                  )}
-                  <tr>
-                    <td className="p-2 border border-slate-200 font-medium">90° Corner Elbows</td>
-                    <td className="p-2 border border-slate-200 text-right font-mono">{result.elbows90}</td>
-                    <td className="p-2 border border-slate-200">pcs</td>
-                    <td className="p-2 border border-slate-200 text-slate-500">{inputs.ingressRequired ? '3 corner bends (ingress ramp open edge)' : '4 corner perimeter bends'}</td>
-                  </tr>
-                  <tr>
-                    <td className="p-2 border border-slate-200 font-medium">Tee Connectors</td>
-                    <td className="p-2 border border-slate-200 text-right font-mono font-bold">{result.tees}</td>
-                    <td className="p-2 border border-slate-200">pcs</td>
-                    <td className="p-2 border border-slate-200 text-slate-500">In-line pump suction tie-ins (1 per operating vacuum pump)</td>
-                  </tr>
-                  {result.endCaps > 0 && (
-                    <tr>
-                      <td className="p-2 border border-slate-200 font-medium">End Blanking Caps</td>
-                      <td className="p-2 border border-slate-200 text-right font-mono font-bold">{result.endCaps}</td>
-                      <td className="p-2 border border-slate-200">pcs</td>
-                      <td className="p-2 border border-slate-200 text-slate-500">Vacuum-tight blanking plugs to seal the header break at vehicle ramp</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {/* Section 4: Engineering Calculation Audit */}
-          {result && result.status === 'REQUIRED' && (
-            <div className="mb-6 p-3 bg-slate-50 border border-slate-200 rounded font-mono text-[11px] text-slate-600 space-y-0.5">
-              <p className="font-bold text-slate-800 uppercase text-[10px] mb-1 font-sans">Calculation Audit:</p>
-              <p>Target dry depth = Excavation Depth ({inputs.excavationDepth}m) + 0.5m = {(inputs.excavationDepth + 0.5).toFixed(2)}m b.g.l.</p>
-              <p>Effective water table = WT ({inputs.waterTableDepth}m) - Rd ({inputs.requiredDrawdown}m) = {result.effectiveWaterLevel.toFixed(2)}m b.g.l.</p>
-              <p>Setback offset = min(1.0m, {result.offsetL.toFixed(2)}m, {result.offsetW.toFixed(2)}m) = {result.designOffset.toFixed(2)}m</p>
-              <p>Perimeter = 2 × (Eff. L {result.effL.toFixed(2)}m + Eff. W {result.effW.toFixed(2)}m) = {result.loopPerimeter.toFixed(2)}m</p>
-              <p>Header required = ({result.loopPerimeter.toFixed(2)}m + {result.pumps}×2m) × 1.10 = {result.finalHeaderLength}m</p>
-            </div>
-          )}
-
-          {/* Section 5: Engineering Remarks */}
-          <div className="mb-8 text-xs text-slate-600 leading-relaxed border-l-2 border-amber-400 pl-3">
-            <strong className="text-slate-800 block text-[11px] uppercase tracking-wide">Installation Notes:</strong>
-            {result?.autoSummary}
-          </div>
-
-          {/* Sign-off Footer */}
-          <div className="pt-6 border-t border-slate-200 grid grid-cols-3 gap-6 text-[11px] text-slate-500">
+          <div className="relative z-10 flex flex-col justify-between h-full">
             <div>
-              <p className="font-semibold text-slate-700">Prepared By:</p>
-              <div className="mt-4 border-b border-slate-300 w-32" />
+              {/* Document Header with Logo & Meta */}
+              <div className="flex items-start justify-between pb-3 mb-3 border-b-2 border-slate-800">
+                <div className="flex items-center gap-3.5">
+                  <img src={logoSrc} alt="DCEL Logo" className="h-10 w-auto object-contain" />
+                  <div>
+                    <div className="text-[10px] font-bold tracking-widest text-slate-500 uppercase">DCEL Engineering & Equipment</div>
+                    <h1 className="text-base font-extrabold text-slate-900 tracking-tight leading-tight">Wellpoint Dewatering BOQ Specification</h1>
+                    <div className="text-[11px] text-slate-600 flex items-center gap-2 mt-0.5 font-medium">
+                      <span>Layout: <strong className="uppercase text-slate-900">{result.layoutType}</strong></span>
+                      <span>•</span>
+                      <span>Offset: <strong className="text-slate-900">{result.designOffset.toFixed(2)}m</strong></span>
+                      <span>•</span>
+                      <span>Stock: <strong className="text-slate-900">{result.pipeStock === '6m_only' ? '6m Only' : '6m & 3m Mix'}</strong></span>
+                    </div>
+                  </div>
+                </div>
+                <div className="text-right text-[10.5px] text-slate-600 leading-tight">
+                  <div className="font-bold text-slate-900">BOQ SPECIFICATION SHEET</div>
+                  <div>Date: {new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
+                  <div className="font-mono text-[10px] text-slate-500 mt-0.5">REF: DW-{result.layoutType.slice(0, 3).toUpperCase()}-{Math.round(result.loopPerimeter)}M</div>
+                  <div className="text-[10px] font-semibold text-emerald-700 mt-1">Page 1 of 1</div>
+                </div>
+              </div>
+
+              {/* Parameter Overview Strip */}
+              <div className="grid grid-cols-5 gap-2 p-2 bg-slate-50 border border-slate-200 rounded text-[11px] mb-4">
+                <div>
+                  <span className="text-slate-500 block text-[9.5px] uppercase font-semibold">Excavation Pit</span>
+                  <span className="font-bold text-slate-800 font-mono">{inputs.excavationLength} × {inputs.excavationWidth} m</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block text-[9.5px] uppercase font-semibold">Pit Depth</span>
+                  <span className="font-bold text-slate-800 font-mono">{inputs.excavationDepth} m</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block text-[9.5px] uppercase font-semibold">Water Table</span>
+                  <span className="font-bold text-slate-800 font-mono">{inputs.waterTableDepth} m b.g.l.</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block text-[9.5px] uppercase font-semibold">Target Drawdown</span>
+                  <span className="font-bold text-slate-800 font-mono">{result.drawdownAmount.toFixed(1)} m</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block text-[9.5px] uppercase font-semibold">Header Line</span>
+                  <span className="font-bold text-amber-700 font-mono">{result.loopPerimeter.toFixed(1)} m</span>
+                </div>
+              </div>
+
+              {/* Layout Depending on Orientation */}
+              {orientation === 'portrait' ? (
+                /* PORTRAIT ARRANGEMENT */
+                <div className="space-y-4">
+                  {/* Drawings Side-by-Side */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="border border-slate-200 rounded p-2 bg-white">
+                      <div className="flex items-center justify-between mb-1 pb-1 border-b border-slate-100">
+                        <span className="text-[10px] font-bold text-slate-700 uppercase">Site Plan (2D Overview)</span>
+                        <span className="text-[9.5px] font-mono text-slate-500">{result.runs.length} runs</span>
+                      </div>
+                      <div className="h-[145px] w-full flex items-center justify-center">
+                        <SiteSchematic inputs={inputs} result={result} />
+                      </div>
+                    </div>
+
+                    <div className="border border-slate-200 rounded p-2 bg-white">
+                      <div className="flex items-center justify-between mb-1 pb-1 border-b border-slate-100">
+                        <span className="text-[10px] font-bold text-slate-700 uppercase">Cross Section (Elevation Profile)</span>
+                        <span className="text-[9.5px] font-mono text-slate-500">Drawdown: -{result.targetDepth.toFixed(1)}m</span>
+                      </div>
+                      <div className="h-[145px] w-full flex items-center justify-center">
+                        <SiteCrossSection inputs={inputs} result={result} />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* BOQ Specification Table */}
+                  <div className="border border-slate-200 rounded overflow-hidden">
+                    <div className="bg-slate-100 px-3 py-1.5 border-b border-slate-200 flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-slate-800 uppercase">Itemized Bill of Quantities</span>
+                      <span className="text-[10px] text-slate-500 font-mono">Standard Rig Setup</span>
+                    </div>
+                    <table className="w-full text-xs border-collapse">
+                      <thead>
+                        <tr className="bg-slate-50 text-slate-600 text-left border-b border-slate-200 text-[10.5px]">
+                          <th className="py-1 px-3 font-semibold">Item Description</th>
+                          <th className="py-1 px-3 font-semibold">Specification</th>
+                          <th className="py-1 px-3 text-right font-semibold">Qty</th>
+                          <th className="py-1 px-3 text-center font-semibold">Unit</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200 text-[11px]">
+                        <tr>
+                          <td className="py-1 px-3 font-medium text-slate-900">Loop perimeter</td>
+                          <td className="py-1 px-3 text-slate-500 text-[10px] font-mono">{result.layoutType.toUpperCase()} loop @ {result.designOffset.toFixed(2)}m setback</td>
+                          <td className="py-1 px-3 text-right font-mono font-bold">{result.loopPerimeter.toFixed(2)}</td>
+                          <td className="py-1 px-3 text-center text-slate-500">m</td>
+                        </tr>
+                        <tr>
+                          <td className="py-1 px-3 font-medium text-slate-900">Wellpoint filters (1.0m c/c)</td>
+                          <td className="py-1 px-3 text-slate-500 text-[10px]">Self-jetting 1.0m spaced wellpoints</td>
+                          <td className="py-1 px-3 text-right font-mono font-bold text-amber-600">{result.filters}</td>
+                          <td className="py-1 px-3 text-center text-slate-500">units</td>
+                        </tr>
+                        <tr>
+                          <td className="py-1 px-3 font-medium text-slate-900">Vacuum pumps (100 m3/hr, max 60m)</td>
+                          <td className="py-1 px-3 text-slate-500 text-[10px]">Automatic priming rotary dewatering pump</td>
+                          <td className="py-1 px-3 text-right font-mono font-bold text-amber-600">{result.pumps}</td>
+                          <td className="py-1 px-3 text-center text-slate-500">units</td>
+                        </tr>
+                        <tr>
+                          <td className="py-1 px-3 font-medium text-slate-900">Header pipes, 6m</td>
+                          <td className="py-1 px-3 text-slate-500 text-[10px]">6-inch quick-release suction headers</td>
+                          <td className="py-1 px-3 text-right font-mono font-bold">{result.headers6m}</td>
+                          <td className="py-1 px-3 text-center text-slate-500">pcs</td>
+                        </tr>
+                        {result.headers3m > 0 && (
+                          <tr>
+                            <td className="py-1 px-3 font-medium text-slate-900">Header pipes, 3m</td>
+                            <td className="py-1 px-3 text-slate-500 text-[10px]">Short suction header segments</td>
+                            <td className="py-1 px-3 text-right font-mono font-bold">{result.headers3m}</td>
+                            <td className="py-1 px-3 text-center text-slate-500">pcs</td>
+                          </tr>
+                        )}
+                        <tr>
+                          <td className="py-1 px-3 font-medium text-slate-900">Elbows</td>
+                          <td className="py-1 px-3 text-slate-500 text-[10px]">90-degree quick-release corner bends</td>
+                          <td className="py-1 px-3 text-right font-mono font-bold">{result.elbows90}</td>
+                          <td className="py-1 px-3 text-center text-slate-500">pcs</td>
+                        </tr>
+                        <tr>
+                          <td className="py-1 px-3 font-medium text-slate-900">Tee connectors</td>
+                          <td className="py-1 px-3 text-slate-500 text-[10px]">Suction manifold branch tee connector</td>
+                          <td className="py-1 px-3 text-right font-mono font-bold">{result.tees}</td>
+                          <td className="py-1 px-3 text-center text-slate-500">pcs</td>
+                        </tr>
+                        {result.endCaps > 0 && (
+                          <tr>
+                            <td className="py-1 px-3 font-medium text-slate-900">End blanking caps</td>
+                            <td className="py-1 px-3 text-slate-500 text-[10px]">Header line terminal vacuum seal cap</td>
+                            <td className="py-1 px-3 text-right font-mono font-bold">{result.endCaps}</td>
+                            <td className="py-1 px-3 text-center text-slate-500">pcs</td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Modular Per-Side Run Breakdown Table */}
+                  <div className="border border-slate-200 rounded overflow-hidden">
+                    <div className="bg-slate-100 px-3 py-1 border-b border-slate-200 flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-slate-800 uppercase">Modular Header Run Breakdown</span>
+                      <span className="text-[9.5px] text-slate-500 font-mono">Total {result.runs.length} Runs</span>
+                    </div>
+                    <table className="w-full text-xs border-collapse">
+                      <thead>
+                        <tr className="bg-slate-50 text-slate-600 text-left border-b border-slate-200 text-[10px]">
+                          <th className="py-1 px-3 font-semibold">Side Run</th>
+                          <th className="py-1 px-3 font-semibold">Target Length</th>
+                          <th className="py-1 px-3 font-semibold">Modular Composition</th>
+                          <th className="py-1 px-3 text-right font-semibold">Assembled Length</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 text-[10.5px]">
+                        {result.runs.map(r => (
+                          <tr key={r.id}>
+                            <td className="py-1 px-3 font-medium text-slate-800">{r.name}</td>
+                            <td className="py-1 px-3 font-mono text-slate-600">{r.length.toFixed(1)} m</td>
+                            <td className="py-1 px-3 font-mono font-semibold text-amber-700">
+                              {r.headers6m > 0 ? `${r.headers6m}×6m` : ''}
+                              {r.headers6m > 0 && r.headers3m > 0 ? ' + ' : ''}
+                              {r.headers3m > 0 ? `${r.headers3m}×3m` : ''}
+                            </td>
+                            <td className="py-1 px-3 text-right font-mono font-bold text-slate-800">
+                              {(r.headers6m * 6 + r.headers3m * 3).toFixed(1)} m
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Remarks Box */}
+                  <div className="p-2.5 rounded bg-slate-50 border-l-3 border-amber-500 text-[10.5px] text-slate-600 leading-relaxed">
+                    <strong className="text-slate-800 font-semibold block mb-0.5">Engineering Calculation Summary:</strong>
+                    {result.autoSummary}
+                  </div>
+                </div>
+              ) : (
+                /* LANDSCAPE ARRANGEMENT */
+                <div className="grid grid-cols-2 gap-5">
+                  {/* Left Column: Drawings */}
+                  <div className="space-y-3">
+                    <div className="border border-slate-200 rounded p-2 bg-white">
+                      <div className="flex items-center justify-between mb-1 pb-1 border-b border-slate-100">
+                        <span className="text-[10px] font-bold text-slate-700 uppercase">Site Plan (2D Overview)</span>
+                        <span className="text-[9.5px] font-mono text-slate-500">{result.runs.length} runs</span>
+                      </div>
+                      <div className="h-[190px] w-full flex items-center justify-center">
+                        <SiteSchematic inputs={inputs} result={result} />
+                      </div>
+                    </div>
+
+                    <div className="border border-slate-200 rounded p-2 bg-white">
+                      <div className="flex items-center justify-between mb-1 pb-1 border-b border-slate-100">
+                        <span className="text-[10px] font-bold text-slate-700 uppercase">Cross Section (Elevation Profile)</span>
+                        <span className="text-[9.5px] font-mono text-slate-500">Drawdown: -{result.targetDepth.toFixed(1)}m</span>
+                      </div>
+                      <div className="h-[155px] w-full flex items-center justify-center">
+                        <SiteCrossSection inputs={inputs} result={result} />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right Column: BOQ & Run Details */}
+                  <div className="space-y-3">
+                    {/* BOQ Table */}
+                    <div className="border border-slate-200 rounded overflow-hidden">
+                      <div className="bg-slate-100 px-3 py-1 border-b border-slate-200 flex items-center justify-between">
+                        <span className="text-[10.5px] font-bold text-slate-800 uppercase">Bill of Quantities</span>
+                        <span className="text-[9.5px] text-slate-500 font-mono">Specification</span>
+                      </div>
+                      <table className="w-full text-xs border-collapse">
+                        <thead>
+                          <tr className="bg-slate-50 text-slate-600 text-left border-b border-slate-200 text-[10px]">
+                            <th className="py-1 px-2.5 font-semibold">Item Description</th>
+                            <th className="py-1 px-2.5 text-right font-semibold">Qty</th>
+                            <th className="py-1 px-2 text-center font-semibold">Unit</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 text-[10.5px]">
+                          <tr>
+                            <td className="py-0.5 px-2.5 font-medium text-slate-900">Loop perimeter</td>
+                            <td className="py-0.5 px-2.5 text-right font-mono font-bold">{result.loopPerimeter.toFixed(2)}</td>
+                            <td className="py-0.5 px-2 text-center text-slate-500">m</td>
+                          </tr>
+                          <tr>
+                            <td className="py-0.5 px-2.5 font-medium text-slate-900">Wellpoint filters (1.0m c/c)</td>
+                            <td className="py-0.5 px-2.5 text-right font-mono font-bold text-amber-600">{result.filters}</td>
+                            <td className="py-0.5 px-2 text-center text-slate-500">units</td>
+                          </tr>
+                          <tr>
+                            <td className="py-0.5 px-2.5 font-medium text-slate-900">Vacuum pumps (100 m3/hr, max 60m)</td>
+                            <td className="py-0.5 px-2.5 text-right font-mono font-bold text-amber-600">{result.pumps}</td>
+                            <td className="py-0.5 px-2 text-center text-slate-500">units</td>
+                          </tr>
+                          <tr>
+                            <td className="py-0.5 px-2.5 font-medium text-slate-900">Header pipes, 6m</td>
+                            <td className="py-0.5 px-2.5 text-right font-mono font-bold">{result.headers6m}</td>
+                            <td className="py-0.5 px-2 text-center text-slate-500">pcs</td>
+                          </tr>
+                          {result.headers3m > 0 && (
+                            <tr>
+                              <td className="py-0.5 px-2.5 font-medium text-slate-900">Header pipes, 3m</td>
+                              <td className="py-0.5 px-2.5 text-right font-mono font-bold">{result.headers3m}</td>
+                              <td className="py-0.5 px-2 text-center text-slate-500">pcs</td>
+                            </tr>
+                          )}
+                          <tr>
+                            <td className="py-0.5 px-2.5 font-medium text-slate-900">Elbows</td>
+                            <td className="py-0.5 px-2.5 text-right font-mono font-bold">{result.elbows90}</td>
+                            <td className="py-0.5 px-2 text-center text-slate-500">pcs</td>
+                          </tr>
+                          <tr>
+                            <td className="py-0.5 px-2.5 font-medium text-slate-900">Tee connectors</td>
+                            <td className="py-0.5 px-2.5 text-right font-mono font-bold">{result.tees}</td>
+                            <td className="py-0.5 px-2 text-center text-slate-500">pcs</td>
+                          </tr>
+                          {result.endCaps > 0 && (
+                            <tr>
+                              <td className="py-0.5 px-2.5 font-medium text-slate-900">End blanking caps</td>
+                              <td className="py-0.5 px-2.5 text-right font-mono font-bold">{result.endCaps}</td>
+                              <td className="py-0.5 px-2 text-center text-slate-500">pcs</td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Modular Run Breakdown */}
+                    <div className="border border-slate-200 rounded p-2 bg-slate-50/70 text-[10px]">
+                      <span className="font-bold text-slate-800 uppercase block mb-1">Modular Run Breakdown:</span>
+                      <div className="space-y-0.5 font-mono">
+                        {result.runs.map(r => (
+                          <div key={r.id} className="flex items-center justify-between text-slate-700">
+                            <span>{r.name} ({r.length.toFixed(1)}m):</span>
+                            <span className="font-bold text-amber-700">
+                              {r.headers6m > 0 ? `${r.headers6m}×6m` : ''}
+                              {r.headers6m > 0 && r.headers3m > 0 ? ' + ' : ''}
+                              {r.headers3m > 0 ? `${r.headers3m}×3m` : ''}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Summary Remarks */}
+                    <div className="p-2 rounded bg-slate-50 border-l-2 border-amber-500 text-[10px] text-slate-600 leading-tight">
+                      <strong className="text-slate-800 font-semibold block mb-0.5">Remarks:</strong>
+                      {result.autoSummary}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
-            <div>
-              <p className="font-semibold text-slate-700">Verified & Checked:</p>
-              <div className="mt-4 border-b border-slate-300 w-32" />
-            </div>
-            <div className="text-right">
-              <p className="font-semibold text-slate-700">Site Clearance Stamp</p>
-              <div className="mt-2 text-[10px] text-slate-400">DCEL Operations Suite</div>
-            </div>
+
+
           </div>
         </div>
       </div>

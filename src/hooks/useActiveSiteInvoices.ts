@@ -8,6 +8,9 @@ export interface ActiveSiteInvoiceMachineDetail {
   name: string;
   serialNumber?: string;
   consumedDays: number;
+  unloggedDays?: number;
+  projectedConsumedDays?: number;
+  unloggedDates?: string[];
   contractedDays: number;
   isOver: boolean;
   overDays: number;
@@ -32,6 +35,8 @@ export interface ActiveSiteInvoiceDetail {
   daysRemaining: number;
   billedDaysCounted: number;
   consumedDays: number;
+  unloggedDays?: number;
+  projectedConsumedDays?: number;
   lapsedDays: number;
   isLapsed: boolean;
   hasNextInvoice: boolean;
@@ -56,6 +61,11 @@ export interface ActiveSiteInvoiceSummary {
   // Cumulative Site Pool fields
   totalBilledDays: number;
   totalLoggedDays: number;
+  totalUnloggedDays: number;
+  totalProjectedDays: number;
+  missingLogDates: string[];
+  unloggedDaysCount: number;
+  hasUnloggedDays: boolean;
   remainingDays: number;
   overrunDays: number;
   isOverrun: boolean;
@@ -163,12 +173,27 @@ export function useActiveSiteInvoices() {
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    const todayStr = today.toISOString().split('T')[0];
+
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().split('T')[0];
 
     const summaries: ActiveSiteInvoiceSummary[] = [];
 
     activeDewateringSites.forEach(site => {
       const siteNameLower = site.name?.trim().toLowerCase();
       const siteId = site.id;
+
+      // Helper to check if a specific date was on recorded hold for this site
+      const isDateOnHold = (dateStr: string) => {
+        return (siteHoldPeriods || []).some(h => {
+          if (h.siteId !== siteId && (h.siteName || '').trim().toLowerCase() !== siteNameLower) return false;
+          const startH = h.holdStart ? normalizeDate(h.holdStart) : '';
+          const endH = h.holdEnd ? normalizeDate(h.holdEnd) : todayStr;
+          return Boolean(startH && dateStr >= startH && dateStr <= endH);
+        });
+      };
 
       // Find all invoices for this site (both paid and unpaid, to track cycle continuity)
       const allSiteInvoices = invoices.filter(inv => {
@@ -250,62 +275,84 @@ export function useActiveSiteInvoices() {
           const matchSite = (lSiteId && (lSiteId === siteId.toLowerCase() || (inv.siteId && lSiteId === inv.siteId.toLowerCase()))) ||
             (siteNameLower && lSiteName === siteNameLower) ||
             (siteNameLower && siteNameLower.length > 3 && lSiteName.includes(siteNameLower)) ||
-            (siteNameLower && lSiteName.length > 3 && siteNameLower.includes(lSiteName));
+            (siteNameLower && siteNameLower.length > 3 && siteNameLower.includes(lSiteName));
+
           if (!matchSite) return false;
 
-          if (effectiveLinkedArray.length > 0) {
-            if (!effectiveLinkedArray.includes(l.assetId)) return false;
+          // Date boundary: from invoice startDate onwards
+          if (l.date < startDateStr) return false;
+
+          // Cap at subsequent invoice start date if applicable
+          if (nextStartDateStr && l.date >= nextStartDateStr) return false;
+
+          // If machine is specified, must match effective linked machines
+          if (l.assetId && effectiveLinkedArray.length > 0) {
+            return effectiveLinkedArray.includes(l.assetId);
           }
 
-          const logDate = l.date ? l.date.substring(0, 10) : '';
-          if (!logDate || logDate < startDateStr) return false;
-          if (nextStartDateStr && logDate >= nextStartDateStr) return false;
           return true;
         });
 
-        // 4. Determine contracted days across machines
-        const machineConfigs: any[] = inv.machineConfigs ?? [];
-        const firstDur = parseFloat(String(machineConfigs[0]?.duration ?? 0)) || duration;
-        let totalContractedDays = 0;
-        if (machineConfigs.length > 0) {
-          totalContractedDays = machineConfigs.reduce((sum: number, c: any) => {
-            const d = c.sameDurationAsFirst ? firstDur : (parseFloat(String(c.duration ?? 0)) || firstDur || duration);
-            return sum + d;
-          }, 0);
-          if (inv.noOfMachine && inv.noOfMachine > machineConfigs.length) {
-            totalContractedDays += (inv.noOfMachine - machineConfigs.length) * (firstDur || duration);
-          }
-        } else {
-          const count = Number(inv.noOfMachine) || 1;
-          totalContractedDays = count * duration;
-        }
+        // 5. Machine configurations from invoice
+        const rawConfigs = (inv as any).machineConfigs;
+        const machineConfigs: Array<{
+          assetId?: string;
+          machineName?: string;
+          duration?: number;
+          ratePerDay?: number;
+          sameDurationAsFirst?: boolean;
+          sameRateAsFirst?: boolean;
+        }> = Array.isArray(rawConfigs) ? rawConfigs : [];
 
-        // 5. Collect machine assets for this site (matching maintenanceAssets, sitePumpDates, and logs)
+        const firstDur = machineConfigs[0]?.duration ? parseFloat(String(machineConfigs[0].duration)) : duration;
+
+        let totalContractedDays = machineConfigs.length > 0
+          ? machineConfigs.reduce((sum, cfg, idx) => {
+              const dur = idx === 0 
+                ? firstDur 
+                : (cfg.sameDurationAsFirst ? firstDur : (parseFloat(String(cfg.duration ?? 0)) || firstDur || duration));
+              return sum + dur;
+            }, 0)
+          : duration;
+
+        // Build list of unique machines known to this invoice
         const siteMachinesMap = new Map<string, { id: string; name: string; serialNumber?: string }>();
+
+        effectiveLinkedArray.forEach(id => {
+          if (!siteMachinesMap.has(id)) {
+            const asset = maintenanceAssets.find(a => a.id === id);
+            siteMachinesMap.set(id, { id, name: asset?.name || 'Machine', serialNumber: asset?.serialNumber });
+          }
+        });
+        machineConfigs.forEach(cfg => {
+          if (cfg.assetId && !siteMachinesMap.has(cfg.assetId)) {
+            const asset = maintenanceAssets.find(a => a.id === cfg.assetId);
+            siteMachinesMap.set(cfg.assetId, { 
+              id: cfg.assetId, 
+              name: asset?.name || 'Machine', 
+              serialNumber: asset?.serialNumber 
+            });
+          }
+        });
+
         (maintenanceAssets || []).forEach(a => {
           const aSite = (a.site || '').trim().toLowerCase();
           const match = aSite === siteNameLower || 
                         aSite === siteId.toLowerCase() || 
                         (aSite.length > 3 && siteNameLower && siteNameLower.includes(aSite)) || 
                         (siteNameLower && siteNameLower.length > 3 && aSite.includes(siteNameLower));
-          if (match) {
+          if (match && !siteMachinesMap.has(a.id)) {
             siteMachinesMap.set(a.id, { id: a.id, name: a.name, serialNumber: a.serialNumber });
           }
         });
         (sitePumpDates || []).forEach(pd => {
-          if (pd.siteId === siteId) {
+          if (pd.siteId === siteId && !siteMachinesMap.has(pd.assetId)) {
             const asset = maintenanceAssets.find(a => a.id === pd.assetId);
             siteMachinesMap.set(pd.assetId, { 
               id: pd.assetId, 
               name: asset?.name || 'Machine', 
               serialNumber: asset?.serialNumber 
             });
-          }
-        });
-        (inv.linkedAssetIds || []).forEach(id => {
-          if (!siteMachinesMap.has(id)) {
-            const asset = maintenanceAssets.find(a => a.id === id);
-            siteMachinesMap.set(id, { id, name: asset?.name || 'Machine', serialNumber: asset?.serialNumber });
           }
         });
         relevantMachineLogs.forEach(l => {
@@ -350,7 +397,7 @@ export function useActiveSiteInvoices() {
 
         const hasSwappedMachines = enrichedMachines.length > invoicedMachineCount || enrichedMachines.some(m => m.isStopped);
 
-        // 6. Per-machine breakdown and consumption
+        // 6. Per-machine breakdown and consumption (with assumed active unlogged days)
         const machinesDetail: ActiveSiteInvoiceMachineDetail[] = enrichedMachines.map((m, idx) => {
           const mLogs = relevantMachineLogs.filter(l => l.assetId === m.id);
           const mConsumed = Number((mLogs.reduce((acc, l) => {
@@ -360,19 +407,55 @@ export function useActiveSiteInvoices() {
             return acc;
           }, 0)).toFixed(1));
 
+          // Calculate unlogged past days between machine/invoice start and yesterday.
+          // Unlogged days are assumed active (1.0 day/day) unless explicitly logged otherwise or on hold.
+          const pumpDateRec = (sitePumpDates || []).find(pd => pd.siteId === siteId && pd.assetId === m.id);
+          const mStartStr = pumpDateRec?.pumpStartDate ? normalizeDate(pumpDateRec.pumpStartDate) : startDateStr;
+          const mEffectiveStart = mStartStr > startDateStr ? mStartStr : startDateStr;
+          const mStopStr = m.stopDate ? normalizeDate(m.stopDate) : undefined;
+
+          let mUnloggedDays = 0;
+          const mUnloggedDates: string[] = [];
+
+          if (!m.isStopped && mEffectiveStart <= yesterdayStr) {
+            const iterDate = new Date(mEffectiveStart);
+            let limit = 0;
+            while (limit < 365) {
+              limit++;
+              const curDateStr = iterDate.toISOString().split('T')[0];
+              if (curDateStr > yesterdayStr) break;
+              if (mStopStr && curDateStr > mStopStr) break;
+              if (nextStartDateStr && curDateStr >= nextStartDateStr) break;
+
+              if (!isDateOnHold(curDateStr)) {
+                const logExists = mLogs.some(l => l.date === curDateStr);
+                if (!logExists) {
+                  mUnloggedDays += 1;
+                  mUnloggedDates.push(curDateStr);
+                }
+              }
+              iterDate.setDate(iterDate.getDate() + 1);
+            }
+          }
+
+          const mProjectedConsumed = Number((mConsumed + mUnloggedDays).toFixed(1));
+
           const cfg = !hasSwappedMachines ? machineConfigs[idx] : undefined;
           const mDuration = cfg
             ? (cfg.sameDurationAsFirst ? firstDur : (parseFloat(String(cfg.duration ?? 0)) || firstDur || duration))
             : duration;
 
-          const isOver = mDuration > 0 && mConsumed > mDuration;
-          const overDays = isOver ? Number((mConsumed - mDuration).toFixed(1)) : 0;
+          const isOver = mDuration > 0 && mProjectedConsumed > mDuration;
+          const overDays = isOver ? Number((mProjectedConsumed - mDuration).toFixed(1)) : 0;
 
           return {
             id: m.id,
             name: m.name,
             serialNumber: m.serialNumber,
             consumedDays: mConsumed,
+            unloggedDays: mUnloggedDays,
+            projectedConsumedDays: mProjectedConsumed,
+            unloggedDates: mUnloggedDates,
             contractedDays: mDuration,
             isOver,
             overDays,
@@ -389,8 +472,11 @@ export function useActiveSiteInvoices() {
           return acc;
         }, 0)).toFixed(1));
 
+        const invoiceUnloggedDays = machinesDetail.reduce((sum, m) => sum + (m.unloggedDays || 0), 0);
+        const projectedConsumedDays = Number((consumedDays + invoiceUnloggedDays).toFixed(1));
+
         // Lapsed calculation: compare against total contracted days and per-machine overruns
-        const totalOverrun = Math.max(0, consumedDays - totalContractedDays);
+        const totalOverrun = Math.max(0, projectedConsumedDays - totalContractedDays);
         const machineOverrunSum = machinesDetail.reduce((sum, m) => sum + m.overDays, 0);
         const rawLapse = Math.max(totalOverrun, machineOverrunSum);
         const lapsedDays = (!hasNextInvoice && rawLapse > 0) ? Number(rawLapse.toFixed(1)) : 0;
@@ -452,14 +538,15 @@ export function useActiveSiteInvoices() {
 
         if (isLapsed) {
           urgency = 'overdue';
-          urgencyLabel = `+${lapsedDays % 1 === 0 ? lapsedDays.toFixed(0) : lapsedDays.toFixed(1)}d Overrun`;
+          const calDays = Math.max(1, Math.abs(daysRemaining));
+          urgencyLabel = `+${calDays}d Overdue`;
           urgencyBadgeClass = 'bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border-rose-300 dark:border-rose-800';
-        } else if (!hasNextInvoice && consumedDays >= totalContractedDays) {
+        } else if (!hasNextInvoice && projectedConsumedDays >= totalContractedDays) {
           urgency = 'today';
           urgencyLabel = 'Due Today';
-          urgencyBadgeClass = 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border-amber-300 dark:border-amber-800';
-        } else if (!hasNextInvoice && (totalContractedDays - consumedDays) <= (3 * machineCount) && (totalContractedDays - consumedDays) > 0) {
-          const rem = Math.ceil((totalContractedDays - consumedDays) / machineCount);
+          urgencyBadgeClass = 'bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border-rose-300 dark:border-rose-800';
+        } else if (!hasNextInvoice && (totalContractedDays - projectedConsumedDays) <= (3 * machineCount) && (totalContractedDays - projectedConsumedDays) > 0) {
+          const rem = Math.ceil((totalContractedDays - projectedConsumedDays) / machineCount);
           urgency = 'soon';
           urgencyLabel = `Due in ${rem}d`;
           urgencyBadgeClass = 'bg-amber-50 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border-amber-300 dark:border-amber-800';
@@ -500,6 +587,8 @@ export function useActiveSiteInvoices() {
           daysRemaining,
           billedDaysCounted: Number(daysCounted.toFixed(1)),
           consumedDays,
+          unloggedDays: invoiceUnloggedDays,
+          projectedConsumedDays,
           lapsedDays,
           isLapsed,
           hasNextInvoice,
@@ -554,6 +643,12 @@ export function useActiveSiteInvoices() {
           } else {
             const existing = siteMachinesMap.get(m.id)!;
             existing.consumedDays = Math.max(existing.consumedDays, m.consumedDays);
+            existing.unloggedDays = Math.max(existing.unloggedDays || 0, m.unloggedDays || 0);
+            existing.projectedConsumedDays = Math.max(existing.projectedConsumedDays || 0, m.projectedConsumedDays || 0);
+            if (m.unloggedDates && m.unloggedDates.length > 0) {
+              const combined = new Set([...(existing.unloggedDates || []), ...m.unloggedDates]);
+              existing.unloggedDates = Array.from(combined).sort();
+            }
           }
         });
       });
@@ -571,6 +666,17 @@ export function useActiveSiteInvoices() {
         1,
         activePumps.length || (runningInvoices[0]?.machineCount || 1)
       );
+
+      // Collect missing log dates across active running pumps
+      const siteMissingDatesSet = new Set<string>();
+      activePumps.forEach(m => {
+        (m.unloggedDates || []).forEach(d => siteMissingDatesSet.add(d));
+      });
+      const missingLogDates = Array.from(siteMissingDatesSet).sort();
+      const unloggedDaysCount = missingLogDates.length;
+      const hasUnloggedDays = unloggedDaysCount > 0;
+      const totalUnloggedDays = Number(activePumps.reduce((sum, m) => sum + (m.unloggedDays || 0), 0).toFixed(1));
+      const totalProjectedDays = Number((totalLoggedDays + totalUnloggedDays).toFixed(1));
 
       // In the site pool, total billed days are distributed across active running machines
       const perActiveMachineBilledDays = (activeMachinesCount > 0 && totalBilledDays > 0)
@@ -600,28 +706,38 @@ export function useActiveSiteInvoices() {
                 consumedDays: predMachine.consumedDays,
                 stopDate: predMachine.stopDate,
               });
-              claimedStoppedIds.add(predId);
+              claimedStoppedIds.add(predMachine.id);
+              currId = predId;
+            } else {
+              break;
             }
-            currId = predId;
           } else {
             break;
           }
         }
+
         if (preds.length > 0) {
           activeM.predecessors = preds;
         }
       });
 
-      // 2. Fallback lineage: If stopped machines exist on site that were not explicitly linked via replacedAssetId,
-      // pair them with active pumps that don't have predecessors yet
+      // 2. Timeline pairing for stopped machines not linked via replacedAssetId
       const unclaimedStopped = stoppedPumps.filter(p => !claimedStoppedIds.has(p.id));
-      const activeWithoutPreds = activePumps.filter(p => !p.predecessors || p.predecessors.length === 0);
-      if (unclaimedStopped.length > 0 && activeWithoutPreds.length > 0) {
-        unclaimedStopped.forEach((stoppedM, idx) => {
-          const targetActive = activeWithoutPreds[idx % activeWithoutPreds.length];
-          if (targetActive) {
-            if (!targetActive.predecessors) targetActive.predecessors = [];
-            targetActive.predecessors.push({
+      if (unclaimedStopped.length > 0 && activePumps.length > 0) {
+        unclaimedStopped.forEach(stoppedM => {
+          const stopDate = stoppedM.stopDate;
+          const pairedActive = activePumps.find(activeM => {
+            const pumpDateRec = (sitePumpDates || []).find(p => p.siteId === siteId && p.assetId === activeM.id);
+            const startD = pumpDateRec?.pumpStartDate;
+            if (stopDate && startD) {
+              return startD >= stopDate;
+            }
+            return !activeM.predecessors || activeM.predecessors.length === 0;
+          });
+
+          if (pairedActive) {
+            if (!pairedActive.predecessors) pairedActive.predecessors = [];
+            pairedActive.predecessors.push({
               id: stoppedM.id,
               name: stoppedM.name,
               consumedDays: stoppedM.consumedDays,
@@ -636,9 +752,10 @@ export function useActiveSiteInvoices() {
       activePumps.forEach(m => {
         const predSum = (m.predecessors || []).reduce((sum, p) => sum + p.consumedDays, 0);
         m.slotConsumedDays = Number((m.consumedDays + predSum).toFixed(1));
+        const slotWithUnlogged = Number((m.slotConsumedDays + (m.unloggedDays || 0)).toFixed(1));
         m.contractedDays = perActiveMachineBilledDays;
-        m.isOver = m.contractedDays > 0 && (m.slotConsumedDays || m.consumedDays) > m.contractedDays;
-        m.overDays = m.isOver ? Number(((m.slotConsumedDays || m.consumedDays) - m.contractedDays).toFixed(1)) : 0;
+        m.isOver = m.contractedDays > 0 && slotWithUnlogged > m.contractedDays;
+        m.overDays = m.isOver ? Number((slotWithUnlogged - m.contractedDays).toFixed(1)) : 0;
       });
 
       // Any remaining unclaimed stopped machines do not hold active capacity quota
@@ -655,21 +772,52 @@ export function useActiveSiteInvoices() {
         ...stoppedPumps.filter(p => !claimedStoppedIds.has(p.id))
       ];
 
-      const isOverrun = totalBilledDays > 0 && totalLoggedDays > totalBilledDays;
-      const overrunDays = isOverrun ? Number((totalLoggedDays - totalBilledDays).toFixed(1)) : 0;
-      const remainingDays = isOverrun ? 0 : Math.max(0, Number((totalBilledDays - totalLoggedDays).toFixed(1)));
-      const calendarRunwayDays = Math.ceil(remainingDays / activeMachinesCount);
-      const progressPct = totalBilledDays > 0 ? Math.min(100, (totalLoggedDays / totalBilledDays) * 100) : 0;
+      const isOverrun = totalBilledDays > 0 && totalProjectedDays > totalBilledDays;
+      const overrunDays = isOverrun ? Number((totalProjectedDays - totalBilledDays).toFixed(1)) : 0;
+      const remainingDays = isOverrun ? 0 : Math.max(0, Number((totalBilledDays - totalProjectedDays).toFixed(1)));
+
+      const earliestStartDate = runningInvoices.length > 0
+        ? [...runningInvoices].map(i => i.startDate).filter(Boolean).sort()[0]
+        : undefined;
+      const latestScheduledEndDate = runningInvoices.length > 0
+        ? [...runningInvoices].map(i => i.scheduledEndDate).filter(Boolean).sort().reverse()[0]
+        : undefined;
+      const latestLiveEndDate = runningInvoices.length > 0
+        ? [...runningInvoices].map(i => i.liveEndDate).filter(Boolean).sort().reverse()[0]
+        : undefined;
+
+      // Calculate calendar days remaining to live target
+      let calendarDaysToTarget = 999;
+      if (latestLiveEndDate) {
+        const targetDateObj = new Date(latestLiveEndDate);
+        targetDateObj.setHours(0, 0, 0, 0);
+        calendarDaysToTarget = Math.round((targetDateObj.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      }
+
+      let calendarRunwayDays = 0;
+      if (isOverrun) {
+        calendarRunwayDays = -Math.max(1, Math.ceil(overrunDays / activeMachinesCount));
+      } else if (calendarDaysToTarget < 0) {
+        calendarRunwayDays = calendarDaysToTarget;
+      } else if (remainingDays <= 0) {
+        calendarRunwayDays = 0;
+      } else {
+        const capacityRunway = Math.ceil(remainingDays / activeMachinesCount);
+        calendarRunwayDays = Math.min(capacityRunway, Math.max(0, calendarDaysToTarget));
+      }
+
+      const progressPct = totalBilledDays > 0 ? Math.min(100, (totalProjectedDays / totalBilledDays) * 100) : 0;
 
       let urgency: 'overdue' | 'today' | 'soon' | 'safe' = 'safe';
       let urgencyLabel = '';
       let urgencyBadgeClass = '';
 
-      if (isOverrun) {
+      if (isOverrun || calendarRunwayDays < 0) {
         urgency = 'overdue';
-        urgencyLabel = `+${overrunDays.toFixed(1)}d Overrun`;
+        const calOverdueDays = Math.max(1, Math.abs(calendarRunwayDays));
+        urgencyLabel = `+${calOverdueDays}d Overdue`;
         urgencyBadgeClass = 'bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border-rose-300 dark:border-rose-800';
-      } else if (calendarRunwayDays <= 0) {
+      } else if (calendarRunwayDays === 0 || remainingDays === 0) {
         urgency = 'today';
         urgencyLabel = 'Due Today';
         urgencyBadgeClass = 'bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border-rose-300 dark:border-rose-800';
@@ -687,16 +835,6 @@ export function useActiveSiteInvoices() {
         urgencyBadgeClass = 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800';
       }
 
-      const earliestStartDate = runningInvoices.length > 0
-        ? [...runningInvoices].map(i => i.startDate).filter(Boolean).sort()[0]
-        : undefined;
-      const latestScheduledEndDate = runningInvoices.length > 0
-        ? [...runningInvoices].map(i => i.scheduledEndDate).filter(Boolean).sort().reverse()[0]
-        : undefined;
-      const latestLiveEndDate = runningInvoices.length > 0
-        ? [...runningInvoices].map(i => i.liveEndDate).filter(Boolean).sort().reverse()[0]
-        : undefined;
-
       const hasLapsedInvoice = isOverrun || runningInvoices.some(inv => inv.isLapsed);
       const maxLapsedDays = Math.max(overrunDays, runningInvoices.reduce((max, inv) => Math.max(max, inv.lapsedDays || 0), 0));
 
@@ -713,6 +851,11 @@ export function useActiveSiteInvoices() {
         maxLapsedDays,
         totalBilledDays,
         totalLoggedDays,
+        totalUnloggedDays,
+        totalProjectedDays,
+        missingLogDates,
+        unloggedDaysCount,
+        hasUnloggedDays,
         remainingDays,
         overrunDays,
         isOverrun,

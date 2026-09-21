@@ -4,6 +4,41 @@ All notable changes to this project will be documented in this file.
 
 ---
 
+## [2.1.1] - 2026-09-18
+
+### Added / Improved
+
+- **Simulator & Dewatering Calculator BOQ Synchronization**:
+  - Unified the Bill of Quantities engine between `src/utils/dewateringCalculator.ts` and `src/utils/simulationLogic.ts`.
+  - Upgraded `calculateBOM()` with contractor-grade civil engineering formulas: modular 6m and 3m galvanized steel headers, 1.0m filter spacing along active line runs, 100 m³/hr vacuum pumps (max 60m coverage), 90° pipe elbows, suction tie-in tees, end blanking caps, flexible swing joints, quick-release Bauer clamp couplings, armored suction hoses, and discharge lines.
+  - Overhauled `ResultsPanel.tsx` and `DrawingSheetPreview.tsx` (`BOMTable`) to present complete grouped BOQ data with theme-adaptive styling.
+  - Implemented seamless layout hydration in `Simulator.tsx`: layouts designed in `DewateringCalculator` are automatically loaded into the canvas upon navigation.
+
+- **Theme-Aware 3D Viewport (`Dewatering3DView.tsx`)**:
+  - Integrated `useTheme()` into the 3D canvas viewport, automatically adapting to light and dark themes.
+  - **Light Mode**: Clean architectural drafting canvas (`#f8fafc` / `#f1f5f9` gradient), soft depth fog, natural daylight illumination (high-key ambient and sunlight), and crisp reference grid (`#cbd5e1` / `#94a3b8`).
+  - **Dark Mode**: High-contrast dark studio palette (`#0f172a`), deep studio lighting, and dark metallic grid.
+
+- **Autodesk Revit-Style ViewCube (`ViewCube3D.tsx`)**:
+  - Interactive 3D orientation cube mounted in the 3D viewport with real-time bidirectional orientation sync.
+  - Six standard orthographic faces: `TOP`, `BOTTOM`, `FRONT`, `BACK`, `LEFT`, `RIGHT` with hover highlight states.
+  - Integrated cardinal compass ring (`N`, `S`, `E`, `W`) rotating synchronously with the camera azimuth.
+  - Home button to smoothly return to default 3D isometric perspective.
+  - Smooth animation interpolation when snapping to any view and direct drag-to-orbit support.
+
+- **Autodesk Revit-Style Full Navigation Wheel (`NavWheel3D.tsx`)**:
+  - Multi-modal SteeringWheel HUD overlay modeled after Revit navigation standards.
+  - **Outer Ring**: `ZOOM` (dynamic vertical drag), `REWIND` (camera viewpoint history stack), `PAN` (view-plane translation), and `ORBIT` (target tumble).
+  - **Inner Circle**: `CENTER` (re-center target), `WALK` (first-person walk and turn), `LOOK` (swivel eye direction), and `UP/DOWN` (elevation adjustment).
+  - Pale green hover feedback matching Revit signature interaction aesthetics, dismissible close button, and draggable positioning.
+
+- **Dewatering Calculator Refinements**:
+  - Replaced vehicle ramp selector with segmented N/E/S/W side toggle and step cycler for Ingress.
+  - Embedded dynamic equipment legend directly inside the vector SVG for high-fidelity A4 printing.
+  - Cleaned up A4 sheet layout, removed redundant buttons, and optimized label placement.
+
+---
+
 ## [2.1.0] - 2026-09-15
 
 ### Added / Improved

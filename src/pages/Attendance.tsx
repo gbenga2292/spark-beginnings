@@ -4,7 +4,7 @@ import { Input } from '@/src/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
 import { useAppStore, AttendanceRecord } from '@/src/store/appStore';
 import { supabase } from '@/src/integrations/supabase/client';
-import { Search, Save, Trash2, Calendar as CalendarIcon, Database, Filter, Users, Download, Upload, ArrowUp, ArrowDown, ArrowUpDown, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Wrench, LineChart, Building2, CheckCheck } from 'lucide-react';
+import { Search, Save, Trash2, Calendar as CalendarIcon, Database, Filter, Users, Download, Upload, ArrowUp, ArrowDown, ArrowUpDown, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Wrench, LineChart, Building2, CheckCheck, RotateCcw } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
 import { useOperations } from '@/src/contexts/OperationsContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/src/components/ui/card';
@@ -431,7 +431,7 @@ export function Attendance() {
   const [desktopCalendarOpen, setDesktopCalendarOpen] = useState(false);
 
   // ─── Machine Register State ────────────────────────────────────────────────
-  const { assets, dailyMachineLogs, logDailyActivity, waybills, deleteDailyLog, sitePumpDates } = useOperations();
+  const { assets, dailyMachineLogs, logDailyActivity, logDailyActivitiesBulk, waybills, deleteDailyLog, sitePumpDates } = useOperations();
   const [machineRegDate, setMachineRegDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [machineCalendarOpen, setMachineCalendarOpen] = useState(false);
   const [isSavingMachines, setIsSavingMachines] = useState(false);
@@ -811,6 +811,8 @@ export function Attendance() {
   const handleMachineRegSave = async () => {
     setIsSavingMachines(true);
     try {
+      const logsToSave: Parameters<typeof logDailyActivitiesBulk>[0] = [];
+
       for (const site of sitesWithMachines) {
         const entry = activeMachineBySite[site.id] ?? { activeMachineIds: [], machineTypes: {}, dieselUsage: {}, dipstickLevels: {}, fullTanks: {}, notes: '', progressPercentage: site.currentProgressPercentage ?? 0 };
         const selectedIds = entry.activeMachineIds.filter(id => id && id !== 'none');
@@ -818,7 +820,7 @@ export function Attendance() {
         // Update site progress in DB if changed
         const newProgress = entry.progressPercentage ?? site.currentProgressPercentage ?? 0;
         if (newProgress !== (site.currentProgressPercentage ?? 0)) {
-          await updateSite(site.id, { currentProgressPercentage: newProgress });
+          updateSite(site.id, { currentProgressPercentage: newProgress });
         }
 
         for (const machineId of selectedIds) {
@@ -826,7 +828,7 @@ export function Attendance() {
           if (!machine) continue;
           const dayType = entry.machineTypes[machineId] ?? 'full';
           const isOff = dayType === 'off';
-          await logDailyActivity({
+          logsToSave.push({
             assetId: machine.id,
             assetName: machine.name,
             siteId: site.id,
@@ -835,7 +837,7 @@ export function Attendance() {
             isActive: !isOff,
             operationalDay: isOff ? 'none' : dayType,
             downtimeEntries: [],
-            maintenanceDetails: entry.notes,
+            maintenanceDetails: entry.notes || '',
             dieselUsage: entry.dieselUsage[machineId] || 0,
             dipstickLevelLitres: entry.dipstickLevels?.[machineId] ?? undefined,
             isTankFilledToFull: entry.fullTanks?.[machineId] ?? false,
@@ -846,7 +848,7 @@ export function Attendance() {
         const selectedSet = new Set(selectedIds);
         const siteOnSiteIds = onSiteMachineIds[site.id] ?? new Set();
         for (const machine of allLoggableMachines.filter(m => siteOnSiteIds.has(m.id) && !selectedSet.has(m.id))) {
-          await logDailyActivity({
+          logsToSave.push({
             assetId: machine.id,
             assetName: machine.name,
             siteId: site.id,
@@ -860,6 +862,11 @@ export function Attendance() {
           });
         }
       }
+
+      if (logsToSave.length > 0) {
+        await logDailyActivitiesBulk(logsToSave);
+      }
+
       toast.success(`Machine registers saved for ${formatDisplayDate(machineRegDate)}.`);
     } catch (err: any) {
       toast.error(`Failed to save: ${err?.message ?? 'Unknown error'}`);
@@ -2698,7 +2705,7 @@ export function Attendance() {
           {/* ── Register Sub-panel ── */}
           {machineSubTab === 'register' && priv.canViewMachineRegister && (<>
           {/* Toolbar */}
-          <div className="flex flex-wrap items-end gap-2 py-2 px-1">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-2.5 py-2 px-1">
             {/* Date picker */}
             <div className="flex flex-col gap-1 w-full sm:w-auto shrink-0">
               <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-0.5">Date</span>
@@ -2707,7 +2714,7 @@ export function Attendance() {
                   variant="outline"
                   size="icon"
                   onClick={() => setMachineRegDate(getNextDayStr(machineRegDate, -1))}
-                  className="h-9 w-9 border-slate-200 bg-white flex-shrink-0 shadow-sm hover:bg-slate-50 transition-colors"
+                  className="h-9 w-9 border-slate-200 bg-white shrink-0 shadow-2xs hover:bg-slate-50 transition-colors rounded-lg active:scale-95"
                   title="Previous Day"
                 >
                   <ChevronLeft className="h-4 w-4 text-slate-500" />
@@ -2718,7 +2725,7 @@ export function Attendance() {
                     value={machineRegDate}
                     max={maxSelectableDate}
                     onChange={e => setMachineRegDate(e.target.value)}
-                    className="h-9 pl-9 text-xs bg-white shadow-sm border-slate-200 uppercase font-medium text-slate-700 w-full"
+                    className="h-9 pl-9 text-xs bg-white shadow-2xs border-slate-200 uppercase font-medium text-slate-700 w-full rounded-lg"
                   />
                   <CalendarIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
                 </div>
@@ -2732,7 +2739,7 @@ export function Attendance() {
                     }
                   }}
                   disabled={machineRegDate >= maxSelectableDate}
-                  className="h-9 w-9 border-slate-200 bg-white flex-shrink-0 shadow-sm hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="h-9 w-9 border-slate-200 bg-white shrink-0 shadow-2xs hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed rounded-lg active:scale-95"
                   title="Next Day"
                 >
                   <ChevronRight className="h-4 w-4 text-slate-500" />
@@ -2742,7 +2749,7 @@ export function Attendance() {
                     <Button
                       variant="outline"
                       size="icon"
-                      className="h-9 w-9 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex-shrink-0 shadow-sm hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                      className="h-9 w-9 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shrink-0 shadow-2xs hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors rounded-lg active:scale-95"
                       title="Machine Attendance Calendar Overview"
                     >
                       <CalendarIcon className="h-4 w-4 text-amber-500" />
@@ -2781,31 +2788,126 @@ export function Attendance() {
               </div>
             </div>
 
-            {/* Hide Inactive Toggle & Clear Button */}
-            <div className="flex items-center gap-3 ml-2 self-end mb-1.5 flex-1">
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="hideInactiveSites"
-                  checked={hideInactiveMachineSites}
-                  onChange={e => setHideInactiveMachineSites(e.target.checked)}
-                  className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-4 w-4 cursor-pointer"
-                />
-                <label htmlFor="hideInactiveSites" className="text-xs font-semibold text-slate-600 cursor-pointer select-none">
-                  Hide inactive sites
-                </label>
+            {/* Mobile Control Deck (Designed for touch, hierarchy, and native mobile feel) */}
+            <div className="sm:hidden bg-slate-50/90 border border-slate-200/90 rounded-2xl p-2.5 space-y-2.5 shadow-2xs">
+              {/* Top Row: Sites Active Counter + Filter Toggle Chip */}
+              <div className="flex items-center justify-between gap-2">
+                {sitesWithMachines.length > 0 ? (
+                  <div className="flex items-center gap-1.5 bg-amber-50 border border-amber-200/80 rounded-full px-2.5 py-1">
+                    <Wrench className="h-3 w-3 text-amber-600" />
+                    <span className="text-xs font-bold text-amber-900">
+                      {sitesWithMachines.filter(s => {
+                        const e = activeMachineBySite[s.id];
+                        return e && e.activeMachineIds.some(id => (e.machineTypes[id] ?? 'full') !== 'off');
+                      }).length} / {sitesWithMachines.length}
+                    </span>
+                    <span className="text-[10px] font-semibold text-amber-700">Active</span>
+                  </div>
+                ) : <div />}
+
+                {/* Modern Filter Chip */}
+                <button
+                  type="button"
+                  onClick={() => setHideInactiveMachineSites(prev => !prev)}
+                  className={cn(
+                    "h-7 px-2.5 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-all select-none cursor-pointer active:scale-95",
+                    hideInactiveMachineSites
+                      ? "bg-blue-600 text-white shadow-xs border border-blue-600"
+                      : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-100"
+                  )}
+                >
+                  <Filter className="h-3 w-3" />
+                  <span>{hideInactiveMachineSites ? 'Active Only' : 'All Sites'}</span>
+                </button>
               </div>
-              
+
+              {/* Action Buttons: 3 Comfortable Touch Targets */}
+              {sitesWithMachines.length > 0 && (
+                <div className="grid grid-cols-5 gap-1.5">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleAutoSelectAllWorking}
+                    className="col-span-2 h-9 rounded-xl text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border-emerald-300 shadow-2xs gap-1.5 cursor-pointer active:scale-[0.98] transition-transform justify-center"
+                  >
+                    <CheckCheck className="h-4 w-4 text-emerald-600 shrink-0" />
+                    <span>Auto-Select</span>
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      if (confirm('Are you sure you want to clear all current machine selections for this date?')) {
+                        setActiveMachineBySite({});
+                      }
+                    }}
+                    className="col-span-1 h-9 rounded-xl text-xs font-bold text-slate-600 bg-white hover:text-red-600 hover:bg-red-50 border-slate-200 cursor-pointer active:scale-[0.98] transition-transform justify-center px-1"
+                    title="Clear Selection"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5 text-slate-500 shrink-0" />
+                    <span className="hidden xs:inline">Clear</span>
+                  </Button>
+
+                  <Button
+                    onClick={handleMachineRegSave}
+                    disabled={isSavingMachines}
+                    size="sm"
+                    className="col-span-2 h-9 rounded-xl bg-amber-500 hover:bg-amber-600 text-white shadow-xs font-bold text-xs uppercase tracking-tight gap-1.5 cursor-pointer active:scale-[0.98] transition-transform justify-center"
+                  >
+                    <Save className="h-3.5 w-3.5 shrink-0" />
+                    <span>{isSavingMachines ? 'Saving...' : 'Save'}</span>
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            {/* Desktop Controls (Inline, clean single row on sm and up) */}
+            <div className="hidden sm:flex items-center gap-2.5 sm:self-end sm:mb-0.5 sm:ml-auto">
+              {/* Filter Chip */}
+              <button
+                type="button"
+                onClick={() => setHideInactiveMachineSites(prev => !prev)}
+                className={cn(
+                  "h-8 px-3 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-all select-none cursor-pointer shrink-0",
+                  hideInactiveMachineSites
+                    ? "bg-blue-600 text-white shadow-xs border border-blue-600"
+                    : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
+                )}
+                title="Toggle showing only active sites"
+              >
+                <Filter className="h-3 w-3" />
+                <span>{hideInactiveMachineSites ? 'Active Only' : 'All Sites'}</span>
+              </button>
+
+              {/* Status Badge */}
+              {sitesWithMachines.length > 0 && (
+                <div 
+                  className="flex items-center gap-1.5 bg-amber-50 border border-amber-200/80 rounded-full px-3 py-1 shrink-0"
+                  title="Sites with active machines"
+                >
+                  <Wrench className="h-3 w-3 text-amber-500" />
+                  <span className="text-[11px] font-bold text-amber-800 whitespace-nowrap">
+                    {sitesWithMachines.filter(s => {
+                      const e = activeMachineBySite[s.id];
+                      return e && e.activeMachineIds.some(id => (e.machineTypes[id] ?? 'full') !== 'off');
+                    }).length} / {sitesWithMachines.length} Active
+                  </span>
+                </div>
+              )}
+
+              {/* Auto-Select Button */}
               <Button
                 variant="outline"
                 size="sm"
                 onClick={handleAutoSelectAllWorking}
-                className="h-7 px-2.5 text-[10px] uppercase font-bold tracking-wider text-emerald-700 bg-emerald-50 hover:bg-emerald-100 hover:text-emerald-800 border-emerald-300 shadow-2xs gap-1.5 cursor-pointer"
+                className="h-8 px-3 text-[11px] uppercase font-bold tracking-wider text-emerald-700 bg-emerald-50 hover:bg-emerald-100 hover:text-emerald-800 border-emerald-300 shadow-2xs gap-1.5 cursor-pointer whitespace-nowrap justify-center shrink-0"
               >
-                <CheckCheck className="h-3.5 w-3.5 text-emerald-600" />
-                Auto-Select All Working
+                <CheckCheck className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                <span>Auto-Select</span>
               </Button>
 
+              {/* Clear Button */}
               <Button
                 variant="outline"
                 size="sm"
@@ -2814,37 +2916,25 @@ export function Attendance() {
                     setActiveMachineBySite({});
                   }
                 }}
-                className="h-7 px-2.5 text-[10px] uppercase font-bold tracking-wider text-slate-500 hover:text-red-600 hover:bg-red-50 border-slate-200 cursor-pointer"
+                className="h-8 px-3 text-[11px] uppercase font-bold tracking-wider text-slate-500 hover:text-red-600 hover:bg-red-50 border-slate-200 cursor-pointer whitespace-nowrap justify-center shrink-0"
               >
-                Clear Selection
+                <RotateCcw className="h-3 w-3 text-slate-400 shrink-0" />
+                <span>Clear</span>
               </Button>
+
+              {/* Save Register Button */}
+              {sitesWithMachines.length > 0 && (
+                <Button
+                  onClick={handleMachineRegSave}
+                  disabled={isSavingMachines}
+                  size="sm"
+                  className="h-8 px-3.5 bg-amber-500 hover:bg-amber-600 text-white shadow-sm gap-1.5 font-bold text-[11px] uppercase tracking-tight shrink-0"
+                >
+                  <Save className="h-3.5 w-3.5" />
+                  <span>{isSavingMachines ? 'Saving...' : 'Save Register'}</span>
+                </Button>
+              )}
             </div>
-
-            {/* Summary badge */}
-            {sitesWithMachines.length > 0 && (
-              <div className="flex items-center gap-1.5 bg-amber-50 border border-amber-100 rounded-full px-3 py-1 ml-1">
-                <Wrench className="h-3 w-3 text-amber-500" />
-                <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider">
-                  {sitesWithMachines.filter(s => {
-                    const e = activeMachineBySite[s.id];
-                    return e && e.activeMachineIds.some(id => (e.machineTypes[id] ?? 'full') !== 'off');
-                  }).length} / {sitesWithMachines.length} Sites Active
-                </span>
-              </div>
-            )}
-
-            {/* Save button */}
-            {sitesWithMachines.length > 0 && (
-              <Button
-                onClick={handleMachineRegSave}
-                disabled={isSavingMachines}
-                size="sm"
-                className="h-9 ml-auto bg-amber-500 hover:bg-amber-600 text-white shadow-sm gap-2 font-bold text-[11px] uppercase tracking-tight"
-              >
-                <Save className="h-3.5 w-3.5" />
-                {isSavingMachines ? 'Saving...' : 'Save Register'}
-              </Button>
-            )}
           </div>
 
           {/* Content area */}
@@ -2854,6 +2944,15 @@ export function Attendance() {
                 <Wrench className="h-10 w-10 text-slate-200" />
                 <p className="text-sm font-medium">No active sites with loggable machines found</p>
                 <p className="text-xs text-slate-400">Only active sites that have equipment assets requiring logging assigned to them appear here.</p>
+              </div>
+            ) : hideInactiveMachineSites && sitesWithMachines.filter(site => {
+                const entry = activeMachineBySite[site.id];
+                return entry && entry.activeMachineIds.some(id => (entry.machineTypes[id] ?? 'full') !== 'off');
+              }).length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-64 gap-3 text-slate-400">
+                <Wrench className="h-10 w-10 text-slate-200" />
+                <p className="text-sm font-medium text-slate-600">No active sites on this date</p>
+                <p className="text-xs text-slate-400">Uncheck "Hide inactive sites" above to view all sites and log equipment.</p>
               </div>
             ) : (
               /* Desktop table */
@@ -3037,7 +3136,11 @@ export function Attendance() {
 
                 {/* Mobile cards */}
                 <div className="sm:hidden space-y-2 p-2">
-                  {sitesWithMachines.map((site, idx) => {
+                  {sitesWithMachines.filter(site => {
+                    if (!hideInactiveMachineSites) return true;
+                    const entry = activeMachineBySite[site.id];
+                    return entry && entry.activeMachineIds.some(id => (entry.machineTypes[id] ?? 'full') !== 'off');
+                  }).map((site, idx) => {
                     const entry: MachineSiteEntry = activeMachineBySite[site.id] ?? { activeMachineIds: [], machineTypes: {}, dieselUsage: {}, dipstickLevels: {}, fullTanks: {}, notes: '', progressPercentage: site.currentProgressPercentage ?? 0 };
                     const nonOffCount = entry.activeMachineIds.filter(id => (entry.machineTypes[id] ?? 'full') !== 'off').length;
                     const isActive = nonOffCount > 0;

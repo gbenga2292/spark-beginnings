@@ -128,93 +128,225 @@ interface DrawingSheetPreviewProps {
   onWidthsChange?: (widths: { logoWidth?: number; companyWidth?: number; metaWidth?: number }) => void;
 }
 
-const LEGEND_ITEMS = [
-  { color: '#0369a1', label: 'Header Pipe (6m)' },
-  { color: '#38bdf8', label: 'Wellpoint Riser' },
-  { color: '#0ea5e9', label: 'Dewatering Pump' },
-  { color: '#f59e0b', label: 'Elbow Connector' },
-  { color: '#10b981', label: 'Tee Connector' },
-  { color: '#eab308', label: 'Suction Hose' },
-  { color: '#2563eb', label: 'Discharge Hose' },
-  { color: '#fca5a5', label: 'Excavation Area' },
-  { color: '#93c5fd', label: 'Site Boundary' },
+interface LegendDef {
+  key: string;
+  label: string;
+  sub: string;
+  renderIcon: (size?: number) => React.ReactNode;
+}
+
+const CAD_LEGEND_DEFS: LegendDef[] = [
+  {
+    key: 'HEADER PIPES',
+    label: 'Header Pipes (6m)',
+    sub: 'DN150 Bauer Quick-Coupled',
+    renderIcon: (size = 18) => (
+      <svg width={size} height={size * 0.6} viewBox="0 0 20 12" className="flex-shrink-0">
+        <line x1="1" y1="6" x2="19" y2="6" stroke="#0284c7" strokeWidth="4.5" strokeLinecap="square" />
+        <line x1="2" y1="6" x2="18" y2="6" stroke="#38bdf8" strokeWidth="2" strokeLinecap="square" />
+        <rect x="0" y="2" width="2.5" height="8" fill="#0369a1" rx="0.5" />
+        <rect x="17.5" y="2" width="2.5" height="8" fill="#0369a1" rx="0.5" />
+      </svg>
+    ),
+  },
+  {
+    key: 'WELL POINTS',
+    label: 'Wellpoint Risers',
+    sub: '1.0m c/c Vacuum Filters',
+    renderIcon: (size = 18) => (
+      <svg width={size} height={size * 0.6} viewBox="0 0 20 12" className="flex-shrink-0">
+        <line x1="10" y1="1" x2="10" y2="11" stroke="#64748b" strokeWidth="1.5" />
+        <circle cx="10" cy="3.5" r="3" fill="#e0f2fe" stroke="#0ea5e9" strokeWidth="1" />
+        <circle cx="10" cy="3.5" r="1.2" fill="#0369a1" />
+        <line x1="8" y1="9" x2="12" y2="9" stroke="#0ea5e9" strokeWidth="1" />
+        <line x1="8" y1="11" x2="12" y2="11" stroke="#0ea5e9" strokeWidth="1" />
+      </svg>
+    ),
+  },
+  {
+    key: 'DEWATERING PUMPS',
+    label: 'Dewatering Pump',
+    sub: '150 m³/h Centrifugal Unit',
+    renderIcon: (size = 18) => (
+      <svg width={size} height={size * 0.6} viewBox="0 0 20 12" className="flex-shrink-0">
+        <rect x="2" y="1" width="16" height="10" fill="#0ea5e9" stroke="#0284c7" strokeWidth="1" rx="1.5" />
+        <rect x="6" y="3" width="8" height="6" fill="#bae6fd" />
+        <rect x="0" y="4" width="2" height="4" fill="#f59e0b" />
+        <rect x="18" y="4" width="2" height="4" fill="#1d4ed8" />
+        <circle cx="10" cy="6" r="1.5" fill="#0369a1" />
+      </svg>
+    ),
+  },
+  {
+    key: 'ELBOW CONNECTORS',
+    label: 'Elbow Connector',
+    sub: '90° Bauer Directional Bend',
+    renderIcon: (size = 18) => (
+      <svg width={size} height={size * 0.6} viewBox="0 0 20 12" className="flex-shrink-0">
+        <path d="M 4 11 L 4 3 L 16 3" fill="none" stroke="#0284c7" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M 4 11 L 4 3 L 16 3" fill="none" stroke="#38bdf8" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+        <rect x="1" y="9" width="4.5" height="2" fill="#f59e0b" />
+        <rect x="14" y="1" width="2" height="4.5" fill="#f59e0b" />
+      </svg>
+    ),
+  },
+  {
+    key: 'TEE CONNECTORS',
+    label: 'Tee Connector',
+    sub: '3-Way Header Branch',
+    renderIcon: (size = 18) => (
+      <svg width={size} height={size * 0.6} viewBox="0 0 20 12" className="flex-shrink-0">
+        <line x1="2" y1="4" x2="18" y2="4" stroke="#0284c7" strokeWidth="3" />
+        <line x1="10" y1="4" x2="10" y2="11" stroke="#0284c7" strokeWidth="3" />
+        <line x1="3" y1="4" x2="17" y2="4" stroke="#38bdf8" strokeWidth="1.2" />
+        <line x1="10" y1="4" x2="10" y2="10" stroke="#38bdf8" strokeWidth="1.2" />
+        <circle cx="10" cy="4" r="1.5" fill="#10b981" />
+      </svg>
+    ),
+  },
+  {
+    key: 'SUCTION HOSES',
+    label: 'Suction Hose',
+    sub: 'Corrugated Flexible Conduit',
+    renderIcon: (size = 18) => (
+      <svg width={size} height={size * 0.6} viewBox="0 0 20 12" className="flex-shrink-0">
+        <line x1="2" y1="6" x2="18" y2="6" stroke="#eab308" strokeWidth="3" strokeDasharray="2.5 1.5" strokeLinecap="round" />
+        <line x1="1" y1="3" x2="1" y2="9" stroke="#a16207" strokeWidth="1.5" />
+        <line x1="19" y1="3" x2="19" y2="9" stroke="#a16207" strokeWidth="1.5" />
+      </svg>
+    ),
+  },
+  {
+    key: 'DISCHARGE HOSES',
+    label: 'Discharge Hose',
+    sub: 'Layflat Reinforced Runoff',
+    renderIcon: (size = 18) => (
+      <svg width={size} height={size * 0.6} viewBox="0 0 20 12" className="flex-shrink-0">
+        <line x1="2" y1="6" x2="18" y2="6" stroke="#f97316" strokeWidth="3" strokeLinecap="square" />
+        <line x1="3" y1="6" x2="17" y2="6" stroke="#ffedd5" strokeWidth="1" strokeDasharray="3 2" />
+        <polyline points="13,4 17,6 13,8" fill="none" stroke="#c2410c" strokeWidth="1.2" />
+      </svg>
+    ),
+  },
+  {
+    key: 'EXCAVATION AREA',
+    label: 'Excavation Pit',
+    sub: 'Formation Boundary & Slope',
+    renderIcon: (size = 18) => (
+      <svg width={size} height={size * 0.6} viewBox="0 0 20 12" className="flex-shrink-0">
+        <rect x="1" y="1" width="18" height="10" fill="rgba(239, 68, 68, 0.12)" stroke="#ef4444" strokeWidth="1.2" strokeDasharray="3 2" />
+        <line x1="4" y1="11" x2="8" y2="1" stroke="#ef4444" strokeWidth="0.8" opacity="0.6" />
+        <line x1="11" y1="11" x2="15" y2="1" stroke="#ef4444" strokeWidth="0.8" opacity="0.6" />
+      </svg>
+    ),
+  },
+  {
+    key: 'SITE BOUNDARY',
+    label: 'Site Boundary',
+    sub: 'Perimeter Project Limits',
+    renderIcon: (size = 18) => (
+      <svg width={size} height={size * 0.6} viewBox="0 0 20 12" className="flex-shrink-0">
+        <line x1="1" y1="6" x2="19" y2="6" stroke="#22c55e" strokeWidth="2" strokeDasharray="4 1.5 1 1.5" />
+        <rect x="0.5" y="3" width="2" height="6" fill="#16a34a" />
+        <rect x="17.5" y="3" width="2" height="6" fill="#16a34a" />
+      </svg>
+    ),
+  },
 ];
 
-/* ─────────────────────────────────────────────────────────────
-   Shared sub-components
-───────────────────────────────────────────────────────────── */
-
-const BOMTable: React.FC<{ bomResults: DewateringSimulationResult; compact?: boolean }> = ({
-  bomResults,
-  compact = false,
-}) => {
-  const rows = [
-    ['Header Pipes (6 m)', bomResults.headers],
-    ['Dewatering Pumps', bomResults.pumps],
-    ['Wellpoints', bomResults.wellpoints],
-    ['Swing-Joint Connectors', bomResults.connectors],
-    ['Bauer Clips (2″)', bomResults.clips],
-    ['Pipe Elbows', bomResults.elbows],
-    ['Pipe Tees', bomResults.tees],
-  ];
-
-  const textSizes = compact
-    ? { heading: 'text-[9px]', row: 'text-[8px]', footer: 'text-[7px]', py: 'py-0.5' }
-    : { heading: 'text-[11px]', row: 'text-[10px]', footer: 'text-[9px]', py: 'py-1' };
+const LegendPanel: React.FC<{ compact?: boolean; activeLegendItems?: string[] }> = ({ compact = false, activeLegendItems }) => {
+  const matched = activeLegendItems && activeLegendItems.length > 0
+    ? CAD_LEGEND_DEFS.filter(item => 
+        activeLegendItems.some(k => k.toUpperCase().includes(item.key) || item.key.includes(k.toUpperCase()))
+      )
+    : CAD_LEGEND_DEFS;
+  const items = matched.length > 0 ? matched : CAD_LEGEND_DEFS;
+  const useTwoCols = items.length > 4;
 
   return (
-    <div className="flex flex-col h-full">
-      <h3
-        className={`${textSizes.heading} font-bold uppercase tracking-wider text-center border-b border-black pb-0.5 mb-1`}
-      >
-        Bill of Materials
-      </h3>
-      <table className="w-full text-left border-collapse">
-        <thead>
-          <tr className={`border-b border-black font-bold ${textSizes.row}`}>
-            <th className="py-0.5">Item</th>
-            <th className="py-0.5 text-right">Qty</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-200">
-          {rows.map(([label, qty]) => (
-            <tr key={String(label)} className={textSizes.row}>
-              <td className={textSizes.py}>{label}</td>
-              <td className={`text-right font-mono font-bold ${textSizes.py}`}>{qty}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      <div className={`mt-auto pt-0.5 ${textSizes.footer} italic text-gray-500 border-t border-gray-300 pt-1`}>
-        Total Pipeline Length: <strong>{bomResults.totalLengthMeters.toFixed(1)} m</strong>
+    <div className="flex flex-col bg-white border border-slate-400 rounded-xs shadow-xs overflow-hidden max-w-[290px]">
+      {/* Precision Minimalist CAD Header */}
+      <div className="bg-slate-900 text-white px-2 py-0.5 flex items-center justify-between border-b border-slate-700 select-none">
+        <span className="text-[8px] font-mono font-bold tracking-wider uppercase text-slate-100 flex items-center gap-1.5">
+          <span className="w-1.5 h-1.5 bg-sky-400 inline-block" />
+          Drawing Legend
+        </span>
+        <span className="text-[6.5px] text-slate-400 font-mono tracking-tighter">BS 8004 / ISO 128</span>
+      </div>
+
+      {/* Symbols List / Grid */}
+      <div className={`p-1.5 ${useTwoCols ? 'grid grid-cols-2 gap-x-2 gap-y-1' : 'space-y-1'}`}>
+        {items.map(item => (
+          <div key={item.key} className="flex items-center gap-1.5 min-w-0 py-0.5">
+            <div className="w-4 h-3 flex items-center justify-center flex-shrink-0">
+              {item.renderIcon(16)}
+            </div>
+            <div className="min-w-0 flex-1 leading-none">
+              <div className="text-[7.5px] font-bold text-slate-900 truncate tracking-tight">
+                {item.label}
+              </div>
+              <div className="text-[6px] text-slate-500 font-mono truncate mt-0.5">
+                {item.sub}
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
 };
 
-const LegendPanel: React.FC<{ compact?: boolean; activeLegendItems?: string[] }> = ({ compact = false, activeLegendItems }) => {
-  const textSize = compact ? 'text-[8px]' : 'text-[10px]';
-  const headingSize = compact ? 'text-[9px]' : 'text-[11px]';
-  const swatchSize = compact ? 'w-2.5 h-2.5' : 'w-3 h-3';
+/* ─────────────────────────────────────────────────────────────
+   Bill of Materials Table
+───────────────────────────────────────────────────────── */
+const BOMTable: React.FC<{ bomResults: DewateringSimulationResult; compact?: boolean }> = ({ bomResults, compact = false }) => {
+  const rows: { label: string; qty: string | number; unit: string }[] = [
+    { label: 'Header Pipes (6m)', qty: bomResults.headers6m, unit: 'No.' },
+    { label: 'Header Pipes (3m)', qty: bomResults.headers3m, unit: 'No.' },
+    { label: 'Vacuum Pump Units', qty: bomResults.pumps, unit: 'No.' },
+    { label: 'Wellpoint Filters', qty: bomResults.wellpoints, unit: 'No.' },
+    { label: 'Swing Joints', qty: bomResults.swingJoints, unit: 'No.' },
+    { label: 'Elbow Connectors', qty: bomResults.elbows, unit: 'No.' },
+    { label: 'Tee Connectors', qty: bomResults.tees, unit: 'No.' },
+    { label: 'End Caps', qty: bomResults.endCaps, unit: 'No.' },
+    { label: 'Bauer Couplings', qty: bomResults.couplings, unit: 'No.' },
+    { label: 'Suction Hoses', qty: bomResults.suctionHoses, unit: 'No.' },
+    { label: 'Discharge Hose', qty: `${bomResults.dischargeHoseMeters.toFixed(1)}`, unit: 'm' },
+    { label: 'Total Header Length', qty: `${bomResults.totalLengthMeters.toFixed(1)}`, unit: 'm' },
+  ].filter(r => Number(r.qty) !== 0 || typeof r.qty === 'string');
+
+  const cellPx = compact ? 'text-[7px]' : 'text-[9px]';
+  const headerPx = compact ? 'text-[7.5px]' : 'text-[10px]';
 
   return (
-    <div className="flex flex-col h-full">
-      <h3
-        className={`${headingSize} font-bold uppercase tracking-wider text-center border-b border-black pb-0.5 mb-1`}
-      >
-        Drawing Legend
-      </h3>
-      <div className={`grid grid-cols-1 gap-y-0.5 ${textSize}`}>
-        {LEGEND_ITEMS.filter(item => !activeLegendItems || activeLegendItems.includes(item.label.toUpperCase())).map(item => (
-          <div key={item.label} className="flex items-center gap-1.5">
-            <span
-              className={`inline-block ${swatchSize} rounded-sm border border-gray-400 flex-shrink-0`}
-              style={{ backgroundColor: item.color }}
-            />
-            <span>{item.label}</span>
-          </div>
-        ))}
+    <div className="flex flex-col bg-white border border-slate-400 rounded-xs shadow-xs overflow-hidden">
+      {/* Header */}
+      <div className="bg-slate-900 text-white px-2 py-0.5 flex items-center justify-between border-b border-slate-700 select-none">
+        <span className={`${headerPx} font-mono font-bold tracking-wider uppercase text-slate-100 flex items-center gap-1.5`}>
+          <span className="w-1.5 h-1.5 bg-amber-400 inline-block" />
+          Bill of Materials
+        </span>
+        <span className="text-[6.5px] text-slate-400 font-mono tracking-tighter">BS EN ISO 4157</span>
       </div>
+      {/* Table */}
+      <table className="w-full border-collapse">
+        <thead>
+          <tr className="bg-slate-100 border-b border-slate-300">
+            <th className={`${cellPx} font-bold text-slate-700 text-left px-1.5 py-0.5 border-r border-slate-300`}>Item</th>
+            <th className={`${cellPx} font-bold text-slate-700 text-center px-1.5 py-0.5 border-r border-slate-300 w-10`}>Qty</th>
+            <th className={`${cellPx} font-bold text-slate-700 text-center px-1.5 py-0.5 w-8`}>Unit</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, i) => (
+            <tr key={row.label} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
+              <td className={`${cellPx} text-slate-800 px-1.5 py-0.5 border-r border-slate-200 leading-tight`}>{row.label}</td>
+              <td className={`${cellPx} font-bold text-slate-900 text-center px-1.5 py-0.5 border-r border-slate-200 tabular-nums`}>{row.qty}</td>
+              <td className={`${cellPx} text-slate-500 text-center px-1.5 py-0.5 font-mono`}>{row.unit}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 };
@@ -558,9 +690,7 @@ const Pure2DSheet: React.FC<DrawingSheetPreviewProps> = ({
                   </div>
                 )}
                 {showLegend && (
-                  <div className="bg-white/95 backdrop-blur-sm border border-gray-400 p-2 shadow-md rounded-sm">
-                    <LegendPanel compact activeLegendItems={activeLegendItems} />
-                  </div>
+                  <LegendPanel compact activeLegendItems={activeLegendItems} />
                 )}
               </div>
             )}

@@ -302,8 +302,8 @@ export function HomePage() {
         dotColor: '#f97316',
         items: [
           { name: 'Simulator', href: '/operations/simulator', icon: HardHat, privKey: 'simulator', privField: 'canView' },
-          { name: 'Logistics Estimator', href: '/operations/estimator', icon: Calculator, privKey: 'simulator', privField: 'canView' },
           { name: 'Dewatering Calculator', href: '/operations/dewatering-calculator', icon: Calculator, privKey: 'simulator', privField: 'canView' },
+          { name: 'Logistics Estimator', href: '/operations/estimator', icon: Calculator, privKey: 'simulator', privField: 'canView' },
         ],
       },
       {

@@ -197,7 +197,7 @@ export function DesktopFloatingCalendar() {
             <motion.div
               initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 16 }} transition={{ duration: 0.25, ease: 'easeOut' }}
-              className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-[#0b0f19] border border-slate-200 dark:border-white/10 text-slate-800 dark:text-white select-auto"
+              className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-[#0b0f19] border border-slate-200 dark:border-white/10 text-slate-800 dark:text-white"
               onClick={e => e.stopPropagation()}
             >
               {/* ── Studio Top Header Bar ── */}

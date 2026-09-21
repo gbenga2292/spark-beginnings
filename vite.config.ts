@@ -45,7 +45,8 @@ export default defineConfig(({mode}) => {
           '**/.temp_fresh_start/**',
           '**/android/**',
           '**/ios/**',
-          '**/dist/**'
+          '**/dist/**',
+          '**/release/**'
         ]
       }
     },
