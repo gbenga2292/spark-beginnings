@@ -9,8 +9,10 @@ import {
   AlertTriangle, Clock, Fuel, Calendar, FileText, Users, Settings2,
   ChevronDown, Sparkles, RefreshCcw, Send, ChevronUp, Filter, CheckCircle2, Plus, Pencil, ChevronRight,
   CheckSquare, ShieldAlert, ShieldCheck, ClipboardList, Package, Truck, X, Phone, Mail, Droplets,
-  PauseCircle, PlayCircle, History, RotateCcw
+  PauseCircle, PlayCircle, History, RotateCcw,
+  Zap, ListPlus, Check, ListTodo,
 } from 'lucide-react';
+
 import { Badge } from '@/src/components/ui/badge';
 import { Button } from '@/src/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/src/components/ui/dialog';
@@ -28,6 +30,14 @@ import { InvoiceDetailDialog } from './InvoiceDetailDialog';
 import { ClientContactsPanel } from './ClientContactsPanel';
 import { TaskDetailSheet } from '@/src/components/tasks/TaskDetailSheet';
 import { AddSubtaskInline } from './Tasks/AddSubtaskInline';
+import { CreateTaskDialog } from './Tasks/CreateTaskDialog';
+import { QuickTaskDialog } from '@/src/components/tasks/QuickTaskDialog';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from '@/src/components/ui/dropdown-menu';
 import { SiteGanttStoryboard } from '@/src/components/sites/SiteGanttStoryboard';
 import { SiteMilestonesCard } from '@/src/components/sites/SiteMilestonesCard';
 import { buildSettlementMap } from '@/src/lib/settlementUtils';
@@ -39,24 +49,35 @@ interface Props {
   site: Site;
   clientSites: Site[];
   onSiteChange: (site: Site) => void;
-  onBack: () => void;
-  onEditSite: (site: Site) => void;
+  onBack?: () => void;
+  onEditSite?: (site: Site) => void;
+}
+
+interface LogEntry {
+  id: string;
+  type: string;
+  timestamp: string;
+  description: string;
+  metadata?: any;
 }
 
 const renderFormattedChatMessage = (content: string) => {
   if (!content) return null;
 
   const renderInlineText = (text: string) => {
-    if (!text) return null;
-    const parts = text.split(/(\*\*.*?\*\*|\*.*?\*)/g);
+    const parts = text.split(/(\*\*[^*]+\*\*|#[^#\s]+)/g);
     return (
       <>
         {parts.map((part, i) => {
-          if (part.startsWith('**') && part.endsWith('**') && part.length >= 4) {
-            return <strong key={i} className="font-extrabold text-slate-900 dark:text-white">{part.slice(2, -2)}</strong>;
+          if (part.startsWith('**') && part.endsWith('**')) {
+            return <strong key={i} className="font-bold text-slate-900 dark:text-white">{part.slice(2, -2)}</strong>;
           }
-          if (part.startsWith('*') && part.endsWith('*') && part.length >= 2 && !part.startsWith('**')) {
-            return <em key={i} className="italic text-blue-600 dark:text-blue-200">{part.slice(1, -1)}</em>;
+          if (part.startsWith('#')) {
+            return (
+              <span key={i} className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-bold bg-blue-50 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 border border-blue-200/60 dark:border-blue-700/50 mx-0.5">
+                {part}
+              </span>
+            );
           }
           const cleanPart = part.replace(/\*\*/g, '').replace(/#/g, '');
           return <span key={i}>{cleanPart}</span>;
@@ -108,7 +129,7 @@ const renderFormattedChatMessage = (content: string) => {
 export function Site360View({ site, clientSites, onSiteChange, onBack, onEditSite }: Props) {
   useAutoCollapseSidebar();
   const { isDark } = useTheme();
-  const { createMainTask, users, addSubtask } = useAppData();
+  const { createMainTask, users, addSubtask, updateSubtask } = useAppData();
   const { user: authUser } = useAuth();
   const currentUser = useUserStore(s => s.users.find(u => u.id === s.currentUserId));
   const allSites = useAppStore(s => s.sites);
@@ -122,21 +143,25 @@ export function Site360View({ site, clientSites, onSiteChange, onBack, onEditSit
     return Array.from(names).sort();
   }, [allSites]);
 
+  // Client sites sorted newest first by default
+  const sortedClientSites = useMemo(() => {
+    return [...(clientSites || [])].sort((a, b) => {
+      const timeA = a.startDate ? new Date(a.startDate).getTime() : (a.created_at ? new Date(a.created_at).getTime() : 0);
+      const timeB = b.startDate ? new Date(b.startDate).getTime() : (b.created_at ? new Date(b.created_at).getTime() : 0);
+      if (timeA !== timeB) return timeB - timeA;
+      return (a.name || '').localeCompare(b.name || '');
+    });
+  }, [clientSites]);
+
   const handleSearchNavigation = (result: any) => {
     navigate(`/client-360?client=${encodeURIComponent(result.clientName)}&tab=${result.tab}`);
   };
 
   const navigate = useNavigate();
   const clientProfiles = useAppStore(s => s.clientProfiles);
-  const [showAddTaskForm, setShowAddTaskForm] = useState(false);
-  const [taskTitle, setTaskTitle] = useState('');
-  const [taskDesc, setTaskDesc] = useState('');
-  const [taskAssignees, setTaskAssignees] = useState<string[]>([]);
-  const [taskDeadline, setTaskDeadline] = useState('');
-  const [taskPriority, setTaskPriority] = useState<'low' | 'medium' | 'high'>('medium');
-  const [taskRequiresApproval, setTaskRequiresApproval] = useState(false);
-  const [taskApprover, setTaskApprover] = useState('');
-  const [isSubmittingTask, setIsSubmittingTask] = useState(false);
+  const [showCreateTaskDialog, setShowCreateTaskDialog] = useState(false);
+  const [showQuickTaskDialog, setShowQuickTaskDialog] = useState(false);
+
 
   const matchingClient = useMemo(() => {
     return clientProfiles?.find(c => c.name?.trim().toLowerCase() === site.client?.trim().toLowerCase());
@@ -264,45 +289,6 @@ export function Site360View({ site, clientSites, onSiteChange, onBack, onEditSit
   }, [site.id]);
 
 
-
-  const handleCreateTaskSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!taskTitle.trim() || isSubmittingTask) return;
-    setIsSubmittingTask(true);
-
-    try {
-      await createMainTask({
-        title: taskTitle.trim(),
-        description: taskDesc.trim() || null,
-        createdBy: authUser?.id,
-        teamId: 'dcel-team',
-        workspaceId: 'dcel-team',
-        assignedTo: taskAssignees.length > 0 ? taskAssignees.join(',') : null,
-        deadline: taskDeadline || null,
-        priority: taskPriority,
-        requiresApproval: taskRequiresApproval,
-        approverId: taskRequiresApproval && taskApprover ? taskApprover : null,
-        clientId: derivedClientId || undefined,
-        siteId: site.id || undefined,
-        is_hr_task: false,
-        skipAutoSubtask: true
-      }, []);
-
-      // Reset form
-      setTaskTitle('');
-      setTaskDesc('');
-      setTaskAssignees([]);
-      setTaskDeadline('');
-      setTaskPriority('medium');
-      setTaskRequiresApproval(false);
-      setTaskApprover('');
-      setShowAddTaskForm(false);
-    } catch (error) {
-      console.error('Failed to create site task:', error);
-    } finally {
-      setIsSubmittingTask(false);
-    }
-  };
 
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [showCommDialog, setShowCommDialog] = useState(false);
@@ -642,9 +628,12 @@ export function Site360View({ site, clientSites, onSiteChange, onBack, onEditSit
       (l.siteId === site.id || l.siteName?.trim() === site.name.trim()) && isWithinFilter(l.date)
     ).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-    // 1. All contacts registered under this client (matches ClientContactsPanel)
+    // 1. All contacts registered under this client (filtered to this site or Principal, matching ClientContactsPanel)
     const allClientContacts = clientContacts.filter(c =>
       c.clientName?.trim().toLowerCase() === (site.client || site.name).trim().toLowerCase()
+    );
+    const siteFilteredContacts = allClientContacts.filter(c =>
+      c.isPrincipal || (c.siteIds || []).includes(site.id)
     );
 
     // 2. Extract any contact names from this site's comm logs not already in the registered list
@@ -657,7 +646,7 @@ export function Site360View({ site, clientSites, onSiteChange, onBack, onEditSit
       id: string; name: string; position?: string; phone?: string; email?: string;
       note?: string; isActive?: boolean; siteIds?: string[]; siteNames?: string[]; isRegistered: boolean;
     }[] = [
-      ...allClientContacts.map(c => ({
+      ...siteFilteredContacts.map(c => ({
         id: c.id,
         name: c.name,
         position: c.position,
@@ -907,12 +896,12 @@ Answer site-specific questions and field progress accurately using this context.
           <select
             value={site.id}
             onChange={e => {
-              const selected = clientSites.find(s => s.id === e.target.value);
+              const selected = sortedClientSites.find(s => s.id === e.target.value);
               if (selected) onSiteChange(selected);
             }}
             className={cn('appearance-none bg-transparent font-bold text-xs pr-5 focus:outline-none cursor-pointer w-full sm:max-w-[150px] truncate', isDark ? 'text-white' : 'text-slate-900')}
           >
-            {clientSites.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+            {sortedClientSites.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
           <ChevronDown className="w-3.5 h-3.5 absolute right-0 pointer-events-none text-slate-400" />
         </div>
@@ -995,10 +984,20 @@ Answer site-specific questions and field progress accurately using this context.
     const taskSubs = subtasks.filter(s => s.mainTaskId === task.id);
     const completed = taskSubs.filter(s => s.status === 'completed').length;
     const isTagged = task.siteId === site.id;
+    const isExpanded = expandedTasks.has(task.id);
+
     return (
-      <div key={task.id} className="py-3 flex flex-col gap-3 border-b border-slate-50 dark:border-slate-800/40 last:border-b-0">
+      <div 
+        key={task.id} 
+        className={cn(
+          "rounded-xl border transition-all duration-200 overflow-hidden",
+          isDark 
+            ? "bg-slate-900/90 border-slate-800 hover:border-slate-700 shadow-sm" 
+            : "bg-white border-slate-200/90 hover:border-blue-300 shadow-xs hover:shadow-sm"
+        )}
+      >
         <div 
-          className="flex justify-between items-start gap-3 cursor-pointer group"
+          className="p-3.5 sm:p-4 flex items-start justify-between gap-3 cursor-pointer group"
           onClick={() => {
             const next = new Set(expandedTasks);
             if (next.has(task.id)) next.delete(task.id);
@@ -1006,89 +1005,168 @@ Answer site-specific questions and field progress accurately using this context.
             setExpandedTasks(next);
           }}
         >
-          <div className="flex-shrink-0 mt-0.5 text-slate-400 group-hover:text-blue-600 transition-colors">
-            {expandedTasks.has(task.id) ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 flex-wrap">
-              <p className={cn(
-                "font-semibold text-sm truncate group-hover:text-blue-600 transition-colors",
-                statusType === 'completed' ? "text-slate-500 line-through" : "text-slate-700 dark:text-slate-200"
-              )}>{task.title}</p>
-              {isTagged && (
-                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 border border-blue-200 dark:border-blue-700 flex items-center gap-1 shrink-0">
-                  <MapPin className="w-2.5 h-2.5" /> Tagged
-                </span>
-              )}
-            </div>
-            {task.deadline && <p className="text-xs text-slate-500 mt-0.5">Due: {new Date(task.deadline).toLocaleDateString('en-GB')}</p>}
-            {taskSubs.length > 0 && (
-              <div className="mt-1.5 flex items-center gap-2">
-                <div className="flex-1 max-w-[120px] h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
-                  <div className={cn(
-                    "h-full rounded-full",
-                    statusType === 'completed' ? "bg-emerald-500" : "bg-blue-500"
-                  )} style={{ width: `${Math.round((completed / taskSubs.length) * 100)}%` }} />
-                </div>
-                <span className="text-[10px] text-slate-500 font-medium">{completed}/{taskSubs.length} done</span>
-              </div>
-            )}
-          </div>
-          <div className="flex flex-col items-end gap-1 shrink-0">
-            {statusType !== 'completed' && task.priority && (
-              <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wider ${
-                task.priority === 'urgent' ? 'bg-red-100 text-red-700 dark:bg-red-950/30 dark:text-red-300' :
-                task.priority === 'high' ? 'bg-orange-100 text-orange-700 dark:bg-orange-950/30 dark:text-orange-300' :
-                task.priority === 'medium' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-950/30 dark:text-yellow-300' :
-                'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'
-              }`}>{task.priority}</span>
-            )}
-            <Badge variant="outline" className={cn(
-              "text-[9px] sm:text-xs px-1.5 sm:px-2.5 whitespace-nowrap uppercase tracking-wider",
-              statusType === 'completed' ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-800/50" :
-              statusType === 'approval' ? "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-800/50" :
-              "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-300 dark:border-blue-800/50"
+          <div className="flex items-start gap-3 min-w-0 flex-1">
+            <div className={cn(
+              "w-6 h-6 rounded-lg flex items-center justify-center shrink-0 mt-0.5 transition-transform duration-200",
+              isExpanded 
+                ? "rotate-90 bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400" 
+                : "text-slate-400 group-hover:text-blue-600 group-hover:bg-slate-50 dark:group-hover:bg-slate-800"
             )}>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </div>
+
+            <div className="min-w-0 flex-1 space-y-1.5">
+              <div className="flex items-center gap-2 flex-wrap">
+                <p className={cn(
+                  "font-semibold text-sm tracking-tight transition-colors group-hover:text-blue-600",
+                  statusType === 'completed' ? "text-slate-400 line-through" : "text-slate-900 dark:text-slate-100"
+                )}>
+                  {task.title}
+                </p>
+
+                {isTagged && (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 border border-blue-200/60 dark:border-blue-800/60 shrink-0">
+                    <MapPin className="w-2.5 h-2.5 text-blue-500" />
+                    <span>This Site</span>
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-3 flex-wrap text-[11px] text-slate-500 dark:text-slate-400">
+                {task.deadline && (
+                  <span className="inline-flex items-center gap-1">
+                    <Calendar className="w-3 h-3 text-slate-400" />
+                    <span>Due {new Date(task.deadline).toLocaleDateString('en-GB')}</span>
+                  </span>
+                )}
+                {task.requestedBy && (
+                  <span className="inline-flex items-center gap-1">
+                    <Users className="w-3 h-3 text-slate-400" />
+                    <span>By {task.requestedBy}</span>
+                  </span>
+                )}
+                {taskSubs.length > 0 && (
+                  <div className="inline-flex items-center gap-1.5 py-0.5 px-2 rounded-md bg-slate-100 dark:bg-slate-800 text-[10px] font-semibold text-slate-700 dark:text-slate-300">
+                    <div className="w-12 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                      <div 
+                        className={cn(
+                          "h-full rounded-full transition-all duration-300",
+                          completed === taskSubs.length ? "bg-emerald-500" : "bg-blue-500"
+                        )} 
+                        style={{ width: `${Math.round((completed / taskSubs.length) * 100)}%` }} 
+                      />
+                    </div>
+                    <span>{completed}/{taskSubs.length} done</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1.5 shrink-0 pt-0.5">
+            {task.priority && (
+              <span className={cn(
+                "text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider",
+                task.priority === 'urgent' ? "bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300" :
+                task.priority === 'high' ? "bg-orange-100 text-orange-700 dark:bg-orange-950/40 dark:text-orange-300" :
+                task.priority === 'medium' ? "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300" :
+                "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+              )}>
+                {task.priority}
+              </span>
+            )}
+            <Badge 
+              variant="outline" 
+              className={cn(
+                "text-[10px] px-2 py-0.5 font-semibold uppercase tracking-wider",
+                statusType === 'completed' ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800/60" :
+                statusType === 'approval' ? "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800/60" :
+                "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800/60"
+              )}
+            >
               {statusType === 'completed' ? 'Completed' : statusType === 'approval' ? 'Approval' : 'Active'}
             </Badge>
           </div>
         </div>
         
+        {/* Expanded Subtasks Checklist */}
         <AnimatePresence initial={false}>
-          {expandedTasks.has(task.id) && (
-            <motion.div
-              initial={{ height: 0, opacity: 0, overflow: "hidden" }}
-              animate={{ height: 'auto', opacity: 1, transitionEnd: { overflow: "visible" } }}
-              exit={{ height: 0, opacity: 0, overflow: "hidden" }}
-              transition={{ duration: 0.2 }}
+          {isExpanded && (
+            <motion.div 
+              initial={{ height: 0, opacity: 0 }} 
+              animate={{ height: 'auto', opacity: 1 }} 
+              exit={{ height: 0, opacity: 0 }} 
+              transition={{ duration: 0.18 }}
+              className="overflow-hidden border-t border-slate-100 dark:border-slate-800/80 bg-slate-50/60 dark:bg-slate-950/40"
             >
-              <div className="pl-7 pr-2 space-y-2 pt-1 pb-2">
+              <div className="p-3 sm:p-4 space-y-1.5">
+                <div className="flex items-center justify-between pb-1 px-1">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                    <ListTodo className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                    <span>Checklist ({completed}/{taskSubs.length} completed)</span>
+                  </span>
+                  <span className="text-[10px] text-slate-400 italic">Click checkbox to complete</span>
+                </div>
+
                 {taskSubs.length === 0 ? (
-                  <p className="text-xs text-slate-500 italic">No subtasks.</p>
+                  <p className="text-xs text-slate-400 italic px-2 py-1">No to-do subtasks logged.</p>
                 ) : (
-                  taskSubs.map(sub => (
-                    <div 
-                      key={sub.id} 
-                      onClick={(e) => { e.stopPropagation(); setOpenSubtaskId(sub.id!); }}
-                      className="flex items-start justify-between gap-3 p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer border border-transparent hover:border-slate-200 dark:hover:border-slate-700 transition-all group/sub"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <p className={`text-[13px] font-medium truncate group-hover/sub:text-blue-600 transition-colors ${sub.status === 'completed' ? 'line-through text-slate-400' : 'text-slate-700 dark:text-slate-300'}`}>
-                          {sub.title}
-                        </p>
+                  taskSubs.map(sub => {
+                    const isDone = sub.status === 'completed';
+                    return (
+                      <div
+                        key={sub.id}
+                        onClick={() => setOpenSubtaskId(sub.id!)}
+                        className={cn(
+                          "flex items-center justify-between gap-3 px-3 py-2 rounded-lg border transition-all cursor-pointer group/item",
+                          isDark 
+                            ? "bg-slate-900 border-slate-800 hover:border-slate-700" 
+                            : "bg-white border-slate-200/70 hover:border-blue-300 shadow-2xs hover:shadow-xs"
+                        )}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const nextStatus = isDone ? 'not_started' : 'completed';
+                              updateSubtask(sub.id!, { status: nextStatus });
+                            }}
+                            className={cn(
+                              "w-4 h-4 rounded-md border flex items-center justify-center transition-all shrink-0 cursor-pointer",
+                              isDone
+                                ? "bg-blue-600 border-blue-600 text-white"
+                                : isDark ? "border-slate-600 hover:border-blue-400 bg-slate-800" : "border-slate-300 hover:border-blue-500 bg-white"
+                            )}
+                            title={isDone ? "Mark incomplete" : "Mark completed"}
+                          >
+                            {isDone && <Check className="w-3 h-3 stroke-[3]" />}
+                          </button>
+                          
+                          <p className={cn(
+                            "text-xs sm:text-[13px] font-medium truncate transition-colors",
+                            isDone 
+                              ? "line-through text-slate-400 dark:text-slate-500" 
+                              : "text-slate-700 dark:text-slate-200 group-hover/item:text-blue-600"
+                          )}>
+                            {sub.title}
+                          </p>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className={cn(
+                            "text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap",
+                            isDone ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200/60" :
+                            sub.status === 'in_progress' ? "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 border border-blue-200/60" :
+                            sub.status === 'pending_approval' ? "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-200/60" :
+                            "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300 border border-slate-200/60"
+                          )}>
+                            {isDone ? 'Completed' : sub.status === 'in_progress' ? 'In Progress' : sub.status === 'pending_approval' ? 'Pending Approval' : 'To Start'}
+                          </span>
+                        </div>
                       </div>
-                      <div className="flex-shrink-0 flex items-center gap-2">
-                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap capitalize ${
-                          sub.status === 'completed' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300' : 
-                          sub.status === 'in_progress' ? 'bg-blue-100 text-blue-700 dark:bg-blue-950/30 dark:text-blue-300' : 
-                          sub.status === 'pending_approval' ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300' : 
-                          'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'
-                        }`}>
-                          {sub.status === 'not_started' ? 'To Start' : sub.status.replace('_', ' ')}
-                        </span>
-                      </div>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
                 
                 <div className="pt-2 border-t border-slate-100 dark:border-slate-800/60 mt-1">
@@ -1949,202 +2027,54 @@ Answer site-specific questions and field progress accurately using this context.
                           </button>
                         ))}
                       </div>
-                      {currentUser?.privileges?.tasks?.canCreateTasks && (
-                        <Button
-                          onClick={() => setShowAddTaskForm(!showAddTaskForm)}
-                          size="sm"
-                          className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg h-7 px-2.5 flex items-center gap-1 text-[11px] font-bold cursor-pointer"
-                        >
-                          <Plus className="w-3 h-3" />
-                          <span>Add Task</span>
-                        </Button>
+                      {currentUser?.privileges?.tasks?.canCreateTasks !== false && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              size="sm"
+                              className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg h-7 px-2.5 flex items-center gap-1 text-[11px] font-bold cursor-pointer"
+                            >
+                              <Plus className="w-3 h-3" />
+                              <span>Add Task</span>
+                              <ChevronDown className="w-3 h-3 opacity-80" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-56 p-1.5 shadow-xl border border-slate-250 dark:border-slate-800">
+                            <DropdownMenuItem
+                              onClick={() => setShowQuickTaskDialog(true)}
+                              className="flex items-start gap-2.5 p-2 rounded-lg cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-950/40 group"
+                            >
+                              <div className="p-1.5 rounded-md bg-blue-100 text-blue-600 dark:bg-blue-900/50 dark:text-blue-400 group-hover:scale-105 transition-transform mt-0.5 shrink-0">
+                                <Zap className="w-3.5 h-3.5 fill-blue-600 dark:fill-blue-400 text-blue-600 dark:text-blue-400" />
+                              </div>
+                              <div className="flex flex-col">
+                                <span className="text-xs font-bold text-slate-800 dark:text-slate-200">Quick Task</span>
+                                <span className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">Fast creation with to-do list</span>
+                              </div>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => setShowCreateTaskDialog(true)}
+                              className="flex items-start gap-2.5 p-2 rounded-lg cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-850 group mt-1"
+                            >
+                              <div className="p-1.5 rounded-md bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300 group-hover:scale-105 transition-transform mt-0.5 shrink-0">
+                                <ListPlus className="w-3.5 h-3.5" />
+                              </div>
+                              <div className="flex flex-col">
+                                <span className="text-xs font-bold text-slate-800 dark:text-slate-200">Detailed Task</span>
+                                <span className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">Full options, budget, approval</span>
+                              </div>
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       )}
                     </div>
                   </div>
 
-                  {/* Inline Task Form */}
-                  {showAddTaskForm && (
-                    <div className="mb-6 p-4 rounded-xl border border-blue-100 dark:border-blue-900/50 bg-blue-50/30 dark:bg-blue-950/10 space-y-4 animate-in slide-in-from-top duration-200">
-                      <div className="flex items-center justify-between">
-                        <h4 className="font-bold text-sm text-blue-950 dark:text-blue-200">Create New Site Task</h4>
-                        <button
-                          type="button"
-                          onClick={() => setShowAddTaskForm(false)}
-                          className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 bg-transparent border-0 cursor-pointer"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      </div>
-
-                      <form onSubmit={handleCreateTaskSubmit} className="space-y-3">
-                        <div>
-                          <label className="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1 uppercase tracking-wider">Task Title *</label>
-                          <input
-                            type="text"
-                            required
-                            placeholder="What needs to be done?"
-                            value={taskTitle}
-                            onChange={e => setTaskTitle(e.target.value)}
-                            className={cn(
-                              "w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500",
-                              isDark ? "bg-slate-800 border-slate-600 text-white placeholder:text-slate-500" : "bg-white border-slate-200 text-slate-800 placeholder:text-slate-400"
-                            )}
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1 uppercase tracking-wider">Description</label>
-                          <textarea
-                            placeholder="Provide details about the task..."
-                            value={taskDesc}
-                            onChange={e => setTaskDesc(e.target.value)}
-                            rows={2}
-                            className={cn(
-                              "w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none",
-                              isDark ? "bg-slate-800 border-slate-600 text-white placeholder:text-slate-500" : "bg-white border-slate-200 text-slate-800 placeholder:text-slate-400"
-                            )}
-                          />
-                        </div>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          <div>
-                            <label className="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1 uppercase tracking-wider">Assignee(s)</label>
-                            <div className={cn(
-                              "w-full rounded-lg border p-1.5 overflow-y-auto h-24 space-y-0.5 focus-within:ring-2 focus-within:ring-blue-500",
-                              isDark ? "bg-slate-800 border-slate-600 text-white" : "bg-white border-slate-200 text-slate-800"
-                            )}>
-                              {users.filter(u => u.isActive !== false).map(u => {
-                                const isChecked = taskAssignees.includes(u.id);
-                                return (
-                                  <label
-                                    key={u.id}
-                                    className="flex items-center justify-between px-2 py-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700/50 cursor-pointer transition-colors text-xs"
-                                  >
-                                    <span>{u.name || u.email}</span>
-                                    <input
-                                      type="checkbox"
-                                      checked={isChecked}
-                                      onChange={() => {
-                                        if (isChecked) {
-                                          setTaskAssignees(taskAssignees.filter(id => id !== u.id));
-                                        } else {
-                                          setTaskAssignees([...taskAssignees, u.id]);
-                                        }
-                                      }}
-                                      className="h-3.5 w-3.5 rounded border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500 cursor-pointer ml-2"
-                                    />
-                                  </label>
-                                );
-                              })}
-                            </div>
-                            <p className="text-[10px] text-slate-400 mt-1">Select one or more assignees.</p>
-                          </div>
-
-                          <div className="space-y-3">
-                            <div>
-                              <label className="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1 uppercase tracking-wider">Deadline</label>
-                              <input
-                                type="date"
-                                value={taskDeadline}
-                                onChange={e => setTaskDeadline(e.target.value)}
-                                className={cn(
-                                  "w-full rounded-lg border px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500",
-                                  isDark ? "bg-slate-800 border-slate-600 text-white" : "bg-white border-slate-200 text-slate-800"
-                                )}
-                              />
-                            </div>
-
-                            <div>
-                              <label className="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1 uppercase tracking-wider">Priority</label>
-                              <div className="flex gap-2">
-                                {(['low', 'medium', 'high'] as const).map(p => (
-                                  <button
-                                    key={p}
-                                    type="button"
-                                    onClick={() => setTaskPriority(p)}
-                                    className={cn(
-                                      "flex-1 py-1.5 px-2 text-xs font-semibold rounded-lg border capitalize transition-all cursor-pointer",
-                                      taskPriority === p
-                                        ? p === 'low'
-                                          ? "bg-slate-100 border-slate-300 text-slate-800 dark:bg-slate-800 dark:border-slate-600 dark:text-white"
-                                          : p === 'medium'
-                                          ? "bg-amber-50 border-amber-300 text-amber-800 dark:bg-amber-950/20 dark:border-amber-800 dark:text-amber-300"
-                                          : "bg-rose-50 border-rose-300 text-rose-800 dark:bg-rose-950/20 dark:border-rose-800 dark:text-rose-300"
-                                        : isDark
-                                        ? "bg-slate-800/40 border-slate-700 text-slate-400 hover:bg-slate-800"
-                                        : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
-                                    )}
-                                  >
-                                    {p}
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="border-t border-slate-100 dark:border-slate-850/80 pt-3">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="checkbox"
-                                id="task-approval-toggle"
-                                checked={taskRequiresApproval}
-                                onChange={e => setTaskRequiresApproval(e.target.checked)}
-                                className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                              />
-                              <label htmlFor="task-approval-toggle" className="text-xs font-semibold text-slate-700 dark:text-slate-300 cursor-pointer">
-                                Requires Completion Approval
-                              </label>
-                            </div>
-
-                            {taskRequiresApproval && (
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs text-slate-500 font-medium">Approver:</span>
-                                  <select
-                                    value={taskApprover}
-                                    onChange={e => setTaskApprover(e.target.value)}
-                                    className={cn(
-                                      "rounded-lg border px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500",
-                                      isDark ? "bg-slate-800 border-slate-600 text-white" : "bg-white border-slate-200 text-slate-800"
-                                    )}
-                                  >
-                                    <option value="">Select User</option>
-                                    {users.filter(u => u.isActive !== false).map(u => (
-                                      <option key={u.id} value={u.id}>{u.name || u.email}</option>
-                                    ))}
-                                  </select>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="flex gap-2 pt-2">
-                          <Button
-                            type="submit"
-                            disabled={isSubmittingTask}
-                            className="bg-blue-600 hover:bg-blue-700 text-white flex-1 rounded-xl h-9 text-xs font-bold"
-                          >
-                            {isSubmittingTask ? 'Creating...' : 'Create Task'}
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => setShowAddTaskForm(false)}
-                            className="rounded-xl h-9 text-xs px-4"
-                          >
-                            Cancel
-                          </Button>
-                        </div>
-                      </form>
-                    </div>
-                  )}
-
                   {/* Task list based on tab */}
                   {taskSubTab === 'pending' && (
-                    <div className="space-y-1">
+                    <div>
                       {data.pendingSiteTasks.length > 0 ? (
-                        <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                        <div className="space-y-2.5">
                           {data.pendingSiteTasks.map(task => renderTaskRow(task, 'pending'))}
                         </div>
                       ) : (
@@ -2158,9 +2088,9 @@ Answer site-specific questions and field progress accurately using this context.
                   )}
 
                   {taskSubTab === 'approval' && (
-                    <div className="space-y-1">
+                    <div>
                       {data.approvalSiteTasks.length > 0 ? (
-                        <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                        <div className="space-y-2.5">
                           {data.approvalSiteTasks.map(task => renderTaskRow(task, 'approval'))}
                         </div>
                       ) : (
@@ -2174,9 +2104,9 @@ Answer site-specific questions and field progress accurately using this context.
                   )}
 
                   {taskSubTab === 'completed' && (
-                    <div className="space-y-1">
+                    <div>
                       {data.completedSiteTasks.length > 0 ? (
-                        <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                        <div className="space-y-2.5">
                           {data.completedSiteTasks.map(task => renderTaskRow(task, 'completed'))}
                         </div>
                       ) : (
@@ -2520,6 +2450,35 @@ Answer site-specific questions and field progress accurately using this context.
           </>
         )}
       </AnimatePresence>
+
+      {showCreateTaskDialog && (
+        <CreateTaskDialog
+          onClose={() => setShowCreateTaskDialog(false)}
+          users={users}
+          currentUserId={currentUser?.id || authUser?.id || ""}
+          teamId={workspaceId || "dcel-team"}
+          workspaceId={workspaceId || "dcel-team"}
+          initialClientId={derivedClientId || ""}
+          initialSiteId={site.id || ""}
+          initialTagToSite={true}
+          isDarkTheme={isDark}
+        />
+      )}
+      {showQuickTaskDialog && (
+        <QuickTaskDialog
+          open={showQuickTaskDialog}
+          onClose={() => setShowQuickTaskDialog(false)}
+          clientName={site.client}
+          clientId={derivedClientId || ""}
+          siteName={site.name}
+          siteId={site.id}
+          users={users}
+          currentUserId={currentUser?.id || authUser?.id || ""}
+          teamId={workspaceId || "dcel-team"}
+          workspaceId={workspaceId || "dcel-team"}
+          isDarkTheme={isDark}
+        />
+      )}
     </div>
   );
 }

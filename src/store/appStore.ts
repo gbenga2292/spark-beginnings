@@ -220,6 +220,8 @@ export interface Site {
   position?: string;
   currentProgressPercentage?: number;
   currentDewateringStage?: DewateringStage;
+  createdAt?: string;
+  created_at?: string;
 }
 
 export interface TaxBracket {

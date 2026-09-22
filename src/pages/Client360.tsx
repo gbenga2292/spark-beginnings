@@ -6,9 +6,12 @@ import {
   Activity, Briefcase, MessagesSquare, RefreshCcw, Filter, Send,
   ShieldAlert, ShieldCheck, Settings2, X, Edit2, ChevronRight, CheckSquare,
   Plus, Trash2, Circle, Eye, MoreVertical, BookOpen, MessageSquare, Pencil,
-  Hourglass, Printer, Download, Globe, Check, RotateCcw, PauseCircle, PlayCircle,
+  Hourglass, Printer, Download, Globe, Check, RotateCcw, PauseCircle, PlayCircle, UserCheck,
+  Zap, ListPlus, User, ListTodo, Archive, Search,
 } from 'lucide-react';
+
 import { toast, showConfirm } from '@/src/components/ui/toast';
+
 import logoImg from '../../logo/logo-2.png';
 import { motion, AnimatePresence } from 'framer-motion';
 import { TaskDetailSheet } from '@/src/components/tasks/TaskDetailSheet';
@@ -22,8 +25,8 @@ import {
   DropdownMenuSeparator,
 } from '@/src/components/ui/dropdown-menu';
 import { useTheme } from '@/src/hooks/useTheme';
-import { cn } from '@/src/lib/utils';
-import { useAppStore, Site, ClientProfile } from '@/src/store/appStore';
+import { cn, generateId } from '@/src/lib/utils';
+import { useAppStore, Site, ClientProfile, ClientContact } from '@/src/store/appStore';
 import { supabase } from '@/src/integrations/supabase/client';
 import { useUserStore } from '@/src/store/userStore';
 import { useAuth } from '@/src/hooks/useAuth';
@@ -35,11 +38,14 @@ import { normalizeDate } from '@/src/lib/dateUtils';
 import { Site360View } from './Site360View';
 import { ClientContactsPanel } from './ClientContactsPanel';
 import { CreateTaskDialog } from './Tasks/CreateTaskDialog';
+import { AddSubtaskInline } from './Tasks/AddSubtaskInline';
+import { QuickTaskDialog } from '@/src/components/tasks/QuickTaskDialog';
 import { InvoiceDetailDialog } from './InvoiceDetailDialog';
 import { GlobalSearch } from '@/src/components/common/GlobalSearch';
 import { ClientSitesTimeline } from '@/src/components/sites/ClientSitesTimeline';
 import { MetricHeroCard } from '@/src/components/ui/MetricHeroCard';
 import { getInvoiceSettlement } from '@/src/lib/settlementUtils';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@/src/components/ui/dialog';
 
 type TabType = 'overview' | 'timeline' | 'contacts' | 'financials' | 'report' | 'operations' | 'activity' | 'tasks' | 'onboarding';
 
@@ -109,6 +115,184 @@ const renderFormattedChatMessage = (content: string) => {
   );
 };
 
+interface InactiveClientsDropdownProps {
+  inactiveClients: string[];
+  sites: Site[];
+  isDark: boolean;
+  onSelectClient: (client: string) => void;
+}
+
+const InactiveClientsDropdown: React.FC<InactiveClientsDropdownProps> = ({
+  inactiveClients,
+  sites,
+  isDark,
+  onSelectClient,
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Close on outside click
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, [isOpen]);
+
+  // Pre-calculate historical site counts for fast O(1) lookup
+  const siteCountMap = useMemo(() => {
+    const map = new Map<string, number>();
+    sites.forEach(s => {
+      if (s.client) {
+        const k = s.client.trim().toLowerCase();
+        map.set(k, (map.get(k) || 0) + 1);
+      }
+    });
+    return map;
+  }, [sites]);
+
+  // Filter clients based on search query
+  const filtered = useMemo(() => {
+    if (!search.trim()) return inactiveClients;
+    const q = search.toLowerCase();
+    return inactiveClients.filter(c => c.toLowerCase().includes(q));
+  }, [inactiveClients, search]);
+
+  if (inactiveClients.length === 0) return null;
+
+  return (
+    <div ref={containerRef} className="relative shrink-0">
+      <Button
+        variant="outline"
+        size="sm"
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setSearch('');
+          setIsOpen(prev => !prev);
+        }}
+        className={cn(
+          "h-8 w-8 p-0 relative flex items-center justify-center border shadow-none rounded-md transition-colors",
+          isOpen
+            ? isDark ? "bg-slate-700 border-slate-500" : "bg-slate-100 border-slate-300"
+            : isDark ? "bg-slate-900 border-slate-700 text-slate-300 hover:bg-slate-800 hover:border-slate-500"
+                     : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300"
+        )}
+        title={`Inactive Clients (${inactiveClients.length})`}
+      >
+        <Archive className="w-3.5 h-3.5 text-slate-400" />
+        <span className={cn(
+          "absolute -top-1.5 -right-1.5 inline-flex items-center justify-center min-w-[16px] h-[16px] rounded-full text-[9px] font-bold px-1 leading-none",
+          isDark ? "bg-slate-600 text-slate-200" : "bg-slate-200 text-slate-600"
+        )}>
+          {inactiveClients.length}
+        </span>
+      </Button>
+
+      {isOpen && (
+        <div className={cn(
+          "absolute right-0 top-full mt-1.5 z-50 w-64 rounded-xl border shadow-xl overflow-hidden animate-in fade-in-50 zoom-in-95 duration-100",
+          isDark ? "bg-slate-900 border-slate-700" : "bg-white border-slate-200"
+        )}>
+          {/* Header */}
+          <div className={cn(
+            "flex items-center gap-2 px-3 py-2.5 border-b",
+            isDark ? "border-slate-700" : "border-slate-100"
+          )}>
+            <Archive className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+            <span className={cn("text-xs font-bold flex-1", isDark ? "text-slate-200" : "text-slate-700")}>
+              Inactive Clients
+            </span>
+            <span className={cn(
+              "text-[10px] font-bold px-1.5 py-0.5 rounded-full",
+              isDark ? "bg-slate-700 text-slate-400" : "bg-slate-100 text-slate-500"
+            )}>
+              {inactiveClients.length}
+            </span>
+          </div>
+
+          {/* Search */}
+          <div className="px-2 pt-2 pb-1">
+            <div className={cn(
+              "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs",
+              isDark
+                ? "bg-slate-800 border-slate-700 focus-within:border-blue-500"
+                : "bg-slate-50 border-slate-200 focus-within:border-blue-300"
+            )}>
+              <Search className="w-3 h-3 text-slate-400 shrink-0" />
+              <input
+                type="text"
+                placeholder="Search..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="bg-transparent outline-none w-full text-xs font-medium placeholder:text-slate-400 text-slate-800 dark:text-slate-100"
+                autoFocus
+              />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => setSearch('')}
+                  className="text-slate-400 hover:text-slate-600 transition-colors"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Client list */}
+          <div className="overflow-y-auto max-h-60 p-1.5">
+            {filtered.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-6 text-slate-400 dark:text-slate-500">
+                <Archive className="w-6 h-6 mb-1 opacity-30" />
+                <p className="text-[11px] font-medium">No matching clients</p>
+              </div>
+            ) : (
+              filtered.map(client => {
+                const count = siteCountMap.get(client.trim().toLowerCase()) || 0;
+                return (
+                  <button
+                    key={client}
+                    type="button"
+                    onClick={() => {
+                      onSelectClient(client);
+                      setIsOpen(false);
+                    }}
+                    className={cn(
+                      "w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-left transition-colors",
+                      isDark ? "hover:bg-slate-800 text-slate-200" : "hover:bg-slate-50 text-slate-800"
+                    )}
+                  >
+                    <div className={cn(
+                      "w-7 h-7 rounded-md flex items-center justify-center shrink-0 font-bold text-xs",
+                      isDark ? "bg-slate-700 text-slate-300" : "bg-slate-100 text-slate-500"
+                    )}>
+                      {client.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold truncate">{client}</p>
+                      <p className="text-[10px] text-slate-400 dark:text-slate-500">
+                        {count > 0
+                          ? `${count} historical site${count !== 1 ? 's' : ''}`
+                          : 'No site history'}
+                      </p>
+                    </div>
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 export function Client360() {
   const { isDark } = useTheme();
   
@@ -121,6 +305,7 @@ export function Client360() {
   const payments = useAppStore(s => s.payments);
   const vatPayments = useAppStore(s => s.vatPayments);
   const clientContacts = useAppStore(s => s.clientContacts);
+  const addClientContact = useAppStore(s => s.addClientContact);
   const commLogs = useAppStore(s => s.commLogs);
   const attendanceRecords = useAppStore(s => s.attendanceRecords);
   const ledgerEntries = useAppStore(s => s.ledgerEntries);
@@ -137,7 +322,7 @@ export function Client360() {
   const addPendingSite = useAppStore(s => s.addPendingSite);
   const dailyJournals = useAppStore(s => s.dailyJournals);
   const siteJournalEntries = useAppStore(s => s.siteJournalEntries);
-  const { mainTasks, subtasks, users } = useAppData();
+  const { mainTasks, subtasks, users, updateSubtask, addSubtask } = useAppData();
   const { dailyMachineLogs, assets, waybills, siteHoldPeriods } = useOperations();
   const navigate = useNavigate();
   const workspaceId = useAppStore(s => (s as any).workspaceId || 'default');
@@ -146,6 +331,16 @@ export function Client360() {
   const [selectedSite, setSelectedSite] = useState<Site | null>(null);
   const [siteEditTarget, setSiteEditTarget] = useState<Site | null>(null);
   const [siteEditForm, setSiteEditForm] = useState<Partial<Site>>({});
+  const [showSiteEditAddContact, setShowSiteEditAddContact] = useState(false);
+  const [siteEditNewContact, setSiteEditNewContact] = useState({
+    name: '',
+    position: '',
+    phone: '',
+    email: '',
+    isPrincipal: false,
+    linkToSite: true,
+  });
+  const [isCustomContactPerson, setIsCustomContactPerson] = useState(false);
   const [showContactsPanel, setShowContactsPanel] = useState(false);
   const [commDialogOpen, setCommDialogOpen] = useState(false);
   const [commForm, setCommForm] = useState({
@@ -169,7 +364,10 @@ export function Client360() {
     description: string;
     clientId?: string;
     siteId?: string;
-  }>({ open: false, title: '', description: '' });
+    tagToSite?: boolean;
+  }>({ open: false, title: '', description: '', tagToSite: true });
+  const [quickTaskOpen, setQuickTaskOpen] = useState(false);
+
 
   // Report Date Filter State
   const [showReportDateModal, setShowReportDateModal] = useState(false);
@@ -340,6 +538,27 @@ export function Client360() {
     });
     return map;
   }, [allClients, sites, pendingSites]);
+
+  // Split clients into active (active+onboarding) and inactive (normal) for the filtered dropdown
+  // Sorted: active clients first (A→Z), then onboarding clients (A→Z)
+  const activeClients = useMemo(() => {
+    const filtered = allClients.filter(c => {
+      const status = clientStatusMap.get(c) || 'normal';
+      return status === 'active' || status === 'onboarding';
+    });
+    return filtered.sort((a, b) => {
+      const statusOrder = { active: 0, onboarding: 1, normal: 2 };
+      const sa = statusOrder[clientStatusMap.get(a) || 'normal'];
+      const sb = statusOrder[clientStatusMap.get(b) || 'normal'];
+      if (sa !== sb) return sa - sb;
+      return a.localeCompare(b);
+    });
+  }, [allClients, clientStatusMap]);
+
+  const inactiveClients = useMemo(() =>
+    allClients.filter(c => (clientStatusMap.get(c) || 'normal') === 'normal'),
+    [allClients, clientStatusMap]
+  );
 
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -964,12 +1183,12 @@ export function Client360() {
 
     if (queryClient && allClients.includes(queryClient) && queryClient !== selectedClient) {
       setRawSelectedClient(queryClient);
-    } else if (!queryClient && allClients.length > 0 && !selectedClient) {
-      const defaultClient = allClients[0];
-      setRawSelectedClient(defaultClient);
+    } else if (!queryClient && !selectedClient) {
+      // Default to the summary view instead of auto-picking the first client
+      setRawSelectedClient('ALL');
       setSearchParams(prev => {
         const next = new URLSearchParams(prev);
-        next.set('client', defaultClient);
+        next.set('client', 'ALL');
         return next;
       }, { replace: true });
     }
@@ -1002,6 +1221,11 @@ export function Client360() {
     return sites.filter(s => {
       if (!s.client || s.client.toUpperCase() === 'DCEL') return false;
       return isModalAll || s.client.trim().toLowerCase() === effectiveFormClient.trim().toLowerCase();
+    }).sort((a, b) => {
+      const timeA = a.startDate ? new Date(a.startDate).getTime() : (a.created_at ? new Date(a.created_at).getTime() : 0);
+      const timeB = b.startDate ? new Date(b.startDate).getTime() : (b.created_at ? new Date(b.created_at).getTime() : 0);
+      if (timeA !== timeB) return timeB - timeA;
+      return (a.name || '').localeCompare(b.name || '');
     });
   }, [sites, effectiveFormClient]);
 
@@ -1293,6 +1517,22 @@ export function Client360() {
     });
   };
 
+  const handleOpenAddTask = (targetSite?: Site | React.MouseEvent) => {
+    const s = (targetSite && 'id' in targetSite && typeof (targetSite as any).id === 'string') ? (targetSite as Site) : selectedSite;
+    const clientNameToMatch = s?.client || selectedClient || '';
+    const matchedClient = clientProfiles.find(
+      c => c.name.trim().toLowerCase() === clientNameToMatch?.trim().toLowerCase() || c.id === clientNameToMatch
+    );
+    setTaskDialog({
+      open: true,
+      title: '',
+      description: '',
+      clientId: matchedClient?.id || (clientNameToMatch && clientNameToMatch !== 'ALL' ? clientNameToMatch : ''),
+      siteId: s?.id || '',
+      tagToSite: true,
+    });
+  };
+
   useEffect(() => {
     if (!commDialogOpen) {
       setIsManualContact(false);
@@ -1378,6 +1618,11 @@ export function Client360() {
       if (!s.client || s.client.toUpperCase() === 'DCEL') return false;
       const matches = isAll || s.client.trim().toLowerCase() === selectedClient.trim().toLowerCase();
       return matches && isSiteActiveInFilter(s);
+    }).sort((a, b) => {
+      const timeA = a.startDate ? new Date(a.startDate).getTime() : (a.created_at ? new Date(a.created_at).getTime() : 0);
+      const timeB = b.startDate ? new Date(b.startDate).getTime() : (b.created_at ? new Date(b.created_at).getTime() : 0);
+      if (timeA !== timeB) return timeB - timeA;
+      return (a.name || '').localeCompare(b.name || '');
     });
   }, [sites, selectedClient, filterMonth, filterYear]);
 
@@ -2193,10 +2438,11 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
         </div>
       )}
 
-      {/* Color-coded Minimalist Client Selector */}
+      {/* Color-coded Minimalist Client Selector — Active Clients only */}
       {(() => {
         const isAll = selectedClient === 'ALL' || selectedClient === 'All Clients';
         const currentStatus = isAll ? 'all' : (clientStatusMap.get(selectedClient) || 'normal');
+        const isInactiveSelected = !isAll && currentStatus === 'normal' && !!selectedClient;
         return (
           <div className={cn(
             "flex items-center gap-1.5 px-2.5 py-1 h-8 rounded-md border shadow-none transition-all shrink-0 order-first md:order-last w-full md:w-auto",
@@ -2206,6 +2452,8 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
               ? (isDark ? "bg-emerald-950/50 border-emerald-800/70" : "bg-emerald-50 border-emerald-200")
               : currentStatus === 'onboarding'
               ? (isDark ? "bg-amber-950/50 border-amber-800/70" : "bg-amber-50 border-amber-200")
+              : isInactiveSelected
+              ? (isDark ? "bg-slate-800/80 border-slate-600" : "bg-slate-50 border-slate-300")
               : (isDark ? "bg-slate-900 border-slate-700 hover:border-blue-500" : "bg-white border-slate-200 hover:border-blue-300")
           )}>
             {isAll ? (
@@ -2215,10 +2463,11 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                 "w-3.5 h-3.5 shrink-0 transition-colors",
                 currentStatus === 'active' ? "text-emerald-600 dark:text-emerald-400" :
                 currentStatus === 'onboarding' ? "text-amber-600 dark:text-amber-400" :
+                isInactiveSelected ? "text-slate-400" :
                 "text-blue-600"
               )} />
             )}
-            
+
             <div className="relative flex items-center w-full">
               <select
                 value={selectedClient}
@@ -2234,8 +2483,8 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                     : (isDark ? "text-white" : "text-slate-900")
                 )}
               >
-                <option 
-                  value="ALL" 
+                <option
+                  value="ALL"
                   className="font-bold text-xs"
                   style={{
                     backgroundColor: isDark ? '#1e1b4b' : '#eef2ff',
@@ -2245,25 +2494,38 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                   🌐 All Clients (Summary)
                 </option>
                 <option disabled value="__DIVIDER__">──────────────────────────</option>
-                {allClients.map(client => {
+                {/* Active & Onboarding clients only */}
+                {activeClients.map(client => {
                   const status = clientStatusMap.get(client) || 'normal';
                   return (
-                    <option 
-                      key={client} 
-                      value={client} 
+                    <option
+                      key={client}
+                      value={client}
                       className="font-semibold text-xs"
                       style={{
-                        backgroundColor: status === 'active' ? (isDark ? '#064e3b' : '#f0fdf4') : status === 'onboarding' ? (isDark ? '#78350f' : '#fffbeb') : (isDark ? '#0f172a' : '#ffffff'),
-                        color: status === 'active' ? (isDark ? '#a7f3d0' : '#065f46') : status === 'onboarding' ? (isDark ? '#fde68a' : '#92400e') : (isDark ? '#f8fafc' : '#0f172a')
+                        backgroundColor: status === 'active' ? (isDark ? '#064e3b' : '#f0fdf4') : (isDark ? '#78350f' : '#fffbeb'),
+                        color: status === 'active' ? (isDark ? '#a7f3d0' : '#065f46') : (isDark ? '#fde68a' : '#92400e')
                       }}
                     >
                       {client}
                     </option>
                   );
                 })}
+                {/* If an inactive client is currently selected (e.g. via URL or search), keep it rendered so the select doesn't lose its value */}
+                {isInactiveSelected && (
+                  <option
+                    value={selectedClient}
+                    style={{
+                      backgroundColor: isDark ? '#1e293b' : '#f8fafc',
+                      color: isDark ? '#94a3b8' : '#64748b'
+                    }}
+                  >
+                    📁 {selectedClient} (Inactive)
+                  </option>
+                )}
                 <option disabled value="__LEGEND_DIVIDER__">──────────────────────────</option>
                 <option disabled value="__LEGEND_KEY__" className="text-[10px] font-semibold" style={{ backgroundColor: isDark ? '#0f172a' : '#f8fafc', color: isDark ? '#94a3b8' : '#475569' }}>
-                  🌐 All Clients  |  🟢 Active Sites  |  🟧 Onboarding
+                  🌐 All  |  🟢 Active  |  🟧 Onboarding
                 </option>
               </select>
               <ChevronDown className={cn(
@@ -2277,6 +2539,14 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
           </div>
         );
       })()}
+
+      {/* Inactive Clients Archive — fast self-contained dropdown */}
+      <InactiveClientsDropdown
+        inactiveClients={inactiveClients}
+        sites={sites}
+        isDark={isDark}
+        onSelectClient={setSelectedClient}
+      />
     </div>
   );
 
@@ -2301,8 +2571,21 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
 
   // ——— Handlers for edit dialogs ———
   const openSiteEdit = (site: Site) => {
-    setSiteEditForm({ ...site });
+    const siteClient = site.client || selectedClient || '';
+    const contactName = (site.mainContactPerson || '').trim().toLowerCase();
+    const matchedContact = clientContacts.find(
+      c => c.clientName.trim().toLowerCase() === siteClient.trim().toLowerCase() &&
+           c.name.trim().toLowerCase() === contactName
+    );
+
+    setSiteEditForm({
+      ...site,
+      contactPhone: site.contactPhone || matchedContact?.phone || '',
+      position: site.position || matchedContact?.position || '',
+    });
     setSiteEditTarget(site);
+    setShowSiteEditAddContact(false);
+    setIsCustomContactPerson(false);
   };
 
   const saveSiteEdit = () => {
@@ -2380,7 +2663,15 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
 
     setSiteEditTarget(null);
     setSiteEditForm({});
+    setShowSiteEditAddContact(false);
+    setIsCustomContactPerson(false);
   };
+
+  const siteClientName = siteEditTarget?.client || selectedClient || '';
+  const siteEditAvailableContacts = useMemo(() => {
+    if (!siteClientName) return [];
+    return clientContacts.filter(c => c.clientName.trim().toLowerCase() === siteClientName.trim().toLowerCase());
+  }, [clientContacts, siteClientName]);
 
   return (
     <>
@@ -4666,199 +4957,346 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
               {activeTab === 'tasks' && (
                 <div className="space-y-4 transition-opacity duration-150">
                   {/* Secondary Tab Switcher */}
-                  <div className="flex border-b border-slate-200 dark:border-slate-800 mb-2 overflow-x-auto style-scroll pb-px gap-1">
-                    {[
-                      { id: 'pending', label: 'Pending / Active', count: clientData.pendingTasks.length, color: 'text-blue-650 bg-blue-50 dark:bg-blue-950/20 dark:text-blue-400', icon: CheckSquare },
-                      { id: 'approval', label: 'Pending Approval', count: clientData.approvalTasks.length, color: 'text-amber-700 bg-amber-50 dark:bg-amber-950/20 dark:text-amber-400', icon: ShieldAlert },
-                      { id: 'completed', label: 'Completed', count: clientData.completedTasks.length, color: 'text-emerald-700 bg-emerald-50 dark:bg-emerald-950/20 dark:text-emerald-400', icon: CheckCircle2 }
-                    ].map(subTab => {
-                      const isActive = taskSubTab === subTab.id;
-                      return (
-                        <button
-                          key={subTab.id}
-                          onClick={() => setTaskSubTab(subTab.id as any)}
-                          className={cn(
-                            "flex items-center gap-2 px-3.5 py-2.5 text-xs sm:text-sm font-bold border-b-2 transition-all relative shrink-0",
-                            isActive
-                              ? "border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400"
-                              : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
-                          )}
-                        >
-                          <subTab.icon className={cn("w-4 h-4", isActive ? "text-blue-600 dark:text-blue-400" : "text-slate-400")} />
-                          <span>{subTab.label}</span>
-                          <span className={cn(
-                            "text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0",
-                            isActive ? subTab.color : "bg-slate-100 text-slate-650 dark:bg-slate-800 dark:text-slate-400"
-                          )}>
-                            {subTab.count}
-                          </span>
-                        </button>
-                      );
-                    })}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 dark:border-slate-800 mb-2 pb-px">
+                    <div className="flex items-center overflow-x-auto style-scroll gap-1 pb-1 sm:pb-0">
+                      {[
+                        { id: 'pending', label: 'Pending / Active', count: clientData.pendingTasks.length, color: 'text-blue-650 bg-blue-50 dark:bg-blue-950/20 dark:text-blue-400', icon: CheckSquare },
+                        { id: 'approval', label: 'Pending Approval', count: clientData.approvalTasks.length, color: 'text-amber-700 bg-amber-50 dark:bg-amber-950/20 dark:text-amber-400', icon: ShieldAlert },
+                        { id: 'completed', label: 'Completed', count: clientData.completedTasks.length, color: 'text-emerald-700 bg-emerald-50 dark:bg-emerald-950/20 dark:text-emerald-400', icon: CheckCircle2 }
+                      ].map(subTab => {
+                        const isActive = taskSubTab === subTab.id;
+                        return (
+                          <button
+                            key={subTab.id}
+                            onClick={() => setTaskSubTab(subTab.id as any)}
+                            className={cn(
+                              "flex items-center gap-2 px-3.5 py-2.5 text-xs sm:text-sm font-bold border-b-2 transition-all relative shrink-0",
+                              isActive
+                                ? "border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400"
+                                : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                            )}
+                          >
+                            <subTab.icon className={cn("w-4 h-4", isActive ? "text-blue-600 dark:text-blue-400" : "text-slate-400")} />
+                            <span>{subTab.label}</span>
+                            <span className={cn(
+                              "text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0",
+                              isActive ? subTab.color : "bg-slate-100 text-slate-650 dark:bg-slate-800 dark:text-slate-400"
+                            )}>
+                              {subTab.count}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {currentUser?.privileges?.tasks?.canCreateTasks !== false && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            size="sm"
+                            className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg h-7 sm:h-8 px-3 flex items-center gap-1.5 text-xs font-bold cursor-pointer shrink-0 shadow-sm self-start sm:self-auto"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>Add Task</span>
+                            <ChevronDown className="w-3 h-3 ml-0.5 opacity-80" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-56 p-1.5 shadow-xl border border-slate-250 dark:border-slate-800">
+                          <DropdownMenuItem
+                            onClick={() => setQuickTaskOpen(true)}
+                            className="flex items-start gap-2.5 p-2 rounded-lg cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-950/40 group"
+                          >
+                            <div className="p-1.5 rounded-md bg-blue-100 text-blue-600 dark:bg-blue-900/50 dark:text-blue-400 group-hover:scale-105 transition-transform mt-0.5 shrink-0">
+                              <Zap className="w-3.5 h-3.5 fill-blue-600 dark:fill-blue-400 text-blue-600 dark:text-blue-400" />
+                            </div>
+                            <div className="flex flex-col">
+                              <span className="text-xs font-bold text-slate-800 dark:text-slate-200">Quick Task</span>
+                              <span className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">Fast creation with to-do list</span>
+                            </div>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => handleOpenAddTask()}
+                            className="flex items-start gap-2.5 p-2 rounded-lg cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-850 group mt-1"
+                          >
+                            <div className="p-1.5 rounded-md bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300 group-hover:scale-105 transition-transform mt-0.5 shrink-0">
+                              <ListPlus className="w-3.5 h-3.5" />
+                            </div>
+                            <div className="flex flex-col">
+                              <span className="text-xs font-bold text-slate-800 dark:text-slate-200">Detailed Task</span>
+                              <span className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">Full options, budget, approval</span>
+                            </div>
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
                   </div>
 
-                  {/* Tab Contents */}
-                  {taskSubTab === 'pending' && (
-                    <div className={cn("p-4 sm:p-6 rounded-2xl border shadow-sm", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
-                      <div className="flex items-center justify-between mb-4">
-                        <h3 className="font-bold text-lg flex items-center gap-2">
-                          <CheckSquare className="w-5 h-5 text-blue-500" /> Pending Tasks ({clientData.pendingTasks.length})
-                        </h3>
-                      </div>
-                      {clientData.pendingTasks.length > 0 ? (
-                        <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                          {clientData.pendingTasks.map(task => {
-                            const taskSubs = subtasks.filter(s => s.mainTaskId === task.id);
-                            const completed = taskSubs.filter(s => s.status === 'completed').length;
-                            const isExpanded = expandedTasks.has(task.id);
-                            return (
-                              <div key={task.id} className="py-3 flex flex-col gap-3 border-b border-slate-50 dark:border-slate-800/40 last:border-b-0">
-                                <div className="flex justify-between items-start gap-3 cursor-pointer group" onClick={() => { const next = new Set(expandedTasks); if (next.has(task.id)) next.delete(task.id); else next.add(task.id); setExpandedTasks(next); }}>
-                                  <div className="flex-shrink-0 mt-0.5 text-slate-400 group-hover:text-blue-500 transition-colors">{isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}</div>
-                                  <div className="min-w-0 flex-1">
-                                    <p className="font-semibold text-sm truncate group-hover:text-blue-600 transition-colors">{task.title}</p>
-                                    {task.deadline && <p className="text-xs text-slate-500 mt-0.5">Due: {new Date(task.deadline).toLocaleDateString('en-GB')}</p>}
-                                    {taskSubs.length > 0 && (<div className="mt-1.5 flex items-center gap-2"><div className="flex-1 max-w-[120px] h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden"><div className="h-full bg-blue-500 rounded-full" style={{ width: `${Math.round((completed / taskSubs.length) * 100)}%` }} /></div><span className="text-[10px] text-slate-500 font-medium">{completed}/{taskSubs.length} done</span></div>)}
-                                  </div>
-                                  <div className="flex flex-col items-end gap-1 shrink-0">
-                                    {task.priority && (<span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wider ${task.priority === 'urgent' ? 'bg-red-100 text-red-700' : task.priority === 'high' ? 'bg-orange-100 text-orange-700' : task.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' : 'bg-slate-100 text-slate-650'}`}>{task.priority}</span>)}
-                                    <Badge variant="outline" className="text-[9px] sm:text-[10px] px-1.5 sm:px-2.5 whitespace-nowrap bg-blue-50/50 text-blue-700 border-blue-200">Active</Badge>
-                                  </div>
-                                </div>
-                                <AnimatePresence initial={false}>
-                                  {isExpanded && (
-                                    <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }} className="overflow-hidden">
-                                      <div className="pl-7 pr-2 space-y-2 pt-1 pb-2">
-                                        {taskSubs.length === 0 ? <p className="text-xs text-slate-500 italic">No subtasks.</p> : taskSubs.map(sub => (
-                                          <div key={sub.id} onClick={(e) => { e.stopPropagation(); setOpenSubtaskId(sub.id!); }} className="flex items-center justify-between gap-3 p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer border border-transparent hover:border-slate-200 dark:hover:border-slate-700 transition-all group/sub">
-                                            <p className={`text-[13px] font-medium truncate group-hover/sub:text-blue-600 transition-colors flex-1 min-w-0 ${sub.status === 'completed' ? 'line-through text-slate-400' : 'text-slate-700 dark:text-slate-300'}`}>{sub.title}</p>
-                                            <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full whitespace-nowrap flex-shrink-0 ml-2 ${sub.status === 'completed' ? 'bg-emerald-100 text-emerald-700' : sub.status === 'in_progress' ? 'bg-blue-100 text-blue-700' : sub.status === 'pending_approval' ? 'bg-amber-100 text-amber-700' : 'bg-slate-150 text-slate-600'}`}>{sub.status === 'not_started' ? 'To Start' : sub.status === 'in_progress' ? 'In Progress' : sub.status === 'pending_approval' ? 'Pending Approval' : 'Completed'}</span>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    </motion.div>
-                                  )}
-                                </AnimatePresence>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <div className="text-center py-12">
-                          <CheckSquare className="w-12 h-12 text-slate-350 mx-auto mb-3 opacity-60" />
-                          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">No pending tasks</h3>
-                          <p className="text-xs text-slate-500 mt-1">There are no active or to-start tasks logged for this client.</p>
-                        </div>
-                      )}
-                    </div>
-                  )}
+                  {/* Render Task Card Helper */}
+                  {(() => {
+                    const renderClientTaskCard = (task: any, statusType: 'pending' | 'approval' | 'completed') => {
+                      const taskSubs = subtasks.filter(s => s.mainTaskId === task.id);
+                      const completed = taskSubs.filter(s => s.status === 'completed').length;
+                      const isExpanded = expandedTasks.has(task.id);
+                      const taggedSite = sites.find(s => s.id === task.siteId);
 
-                  {taskSubTab === 'approval' && (
-                    <div className={cn("p-4 sm:p-6 rounded-2xl border shadow-sm", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
-                      <div className="flex items-center justify-between mb-4">
-                        <h3 className="font-bold text-lg flex items-center gap-2">
-                          <ShieldAlert className="w-5 h-5 text-amber-500" /> Pending Approvals ({clientData.approvalTasks.length})
-                        </h3>
-                      </div>
-                      {clientData.approvalTasks.length > 0 ? (
-                        <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                          {clientData.approvalTasks.map(task => {
-                            const taskSubs = subtasks.filter(s => s.mainTaskId === task.id);
-                            const completed = taskSubs.filter(s => s.status === 'completed').length;
-                            const isExpanded = expandedTasks.has(task.id);
-                            return (
-                              <div key={task.id} className="py-3 flex flex-col gap-3 border-b border-slate-50 dark:border-slate-800/40 last:border-b-0">
-                                <div className="flex justify-between items-start gap-3 cursor-pointer group" onClick={() => { const next = new Set(expandedTasks); if (next.has(task.id)) next.delete(task.id); else next.add(task.id); setExpandedTasks(next); }}>
-                                  <div className="flex-shrink-0 mt-0.5 text-slate-400 group-hover:text-blue-500 transition-colors">{isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}</div>
-                                  <div className="min-w-0 flex-1">
-                                    <p className="font-semibold text-sm truncate group-hover:text-blue-600 transition-colors">{task.title}</p>
-                                    {task.deadline && <p className="text-xs text-slate-500 mt-0.5">Due: {new Date(task.deadline).toLocaleDateString('en-GB')}</p>}
-                                    {taskSubs.length > 0 && (<div className="mt-1.5 flex items-center gap-2"><div className="flex-1 max-w-[120px] h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden"><div className="h-full bg-amber-500 rounded-full" style={{ width: `${Math.round((completed / taskSubs.length) * 100)}%` }} /></div><span className="text-[10px] text-slate-500 font-medium">{completed}/{taskSubs.length} done</span></div>)}
-                                  </div>
-                                  <div className="flex flex-col items-end gap-1 shrink-0">
-                                    {task.priority && (<span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wider ${task.priority === 'urgent' ? 'bg-red-100 text-red-700' : task.priority === 'high' ? 'bg-orange-100 text-orange-700' : task.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' : 'bg-slate-100 text-slate-650'}`}>{task.priority}</span>)}
-                                    <Badge variant="outline" className="text-[9px] sm:text-[10px] px-1.5 sm:px-2.5 whitespace-nowrap bg-amber-50 text-amber-700 border-amber-200">Needs Approval</Badge>
-                                  </div>
-                                </div>
-                                <AnimatePresence initial={false}>
-                                  {isExpanded && (
-                                    <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }} className="overflow-hidden">
-                                      <div className="pl-7 pr-2 space-y-2 pt-1 pb-2">
-                                        {taskSubs.length === 0 ? <p className="text-xs text-slate-500 italic">No subtasks.</p> : taskSubs.map(sub => (
-                                          <div key={sub.id} onClick={(e) => { e.stopPropagation(); setOpenSubtaskId(sub.id!); }} className="flex items-center justify-between gap-3 p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer border border-transparent hover:border-slate-200 dark:hover:border-slate-700 transition-all group/sub">
-                                            <p className={`text-[13px] font-medium truncate group-hover/sub:text-blue-600 transition-colors flex-1 min-w-0 ${sub.status === 'completed' ? 'line-through text-slate-400' : 'text-slate-700 dark:text-slate-300'}`}>{sub.title}</p>
-                                            <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full whitespace-nowrap flex-shrink-0 ml-2 ${sub.status === 'completed' ? 'bg-emerald-100 text-emerald-700' : sub.status === 'in_progress' ? 'bg-blue-100 text-blue-700' : sub.status === 'pending_approval' ? 'bg-amber-100 text-amber-700' : 'bg-slate-150 text-slate-600'}`}>{sub.status === 'not_started' ? 'To Start' : sub.status === 'in_progress' ? 'In Progress' : sub.status === 'pending_approval' ? 'Pending Approval' : 'Completed'}</span>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    </motion.div>
-                                  )}
-                                </AnimatePresence>
+                      return (
+                        <div 
+                          key={task.id} 
+                          className={cn(
+                            "rounded-xl border transition-all duration-200 overflow-hidden",
+                            isDark 
+                              ? "bg-slate-900/90 border-slate-800 hover:border-slate-700 shadow-sm" 
+                              : "bg-white border-slate-200/90 hover:border-blue-300 shadow-xs hover:shadow-sm"
+                          )}
+                        >
+                          <div 
+                            className="p-3.5 sm:p-4 flex items-start justify-between gap-3 cursor-pointer group"
+                            onClick={() => { 
+                              const next = new Set(expandedTasks); 
+                              if (next.has(task.id)) next.delete(task.id); 
+                              else next.add(task.id); 
+                              setExpandedTasks(next); 
+                            }}
+                          >
+                            <div className="flex items-start gap-3 min-w-0 flex-1">
+                              <div className={cn(
+                                "w-6 h-6 rounded-lg flex items-center justify-center shrink-0 mt-0.5 transition-transform duration-200",
+                                isExpanded ? "rotate-90 bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400" : "text-slate-400 group-hover:text-blue-600 group-hover:bg-slate-50 dark:group-hover:bg-slate-800"
+                              )}>
+                                <ChevronRight className="w-3.5 h-3.5" />
                               </div>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <div className="text-center py-12">
-                          <ShieldCheck className="w-12 h-12 text-emerald-400 mx-auto mb-3 opacity-60" />
-                          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">No pending approvals</h3>
-                          <p className="text-xs text-slate-500 mt-1">All review requests are completed or fully resolved.</p>
-                        </div>
-                      )}
-                    </div>
-                  )}
 
-                  {taskSubTab === 'completed' && (
-                    <div className={cn("p-4 sm:p-6 rounded-2xl border shadow-sm", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
-                      <div className="flex items-center justify-between mb-4">
-                        <h3 className="font-bold text-lg flex items-center gap-2">
-                          <CheckCircle2 className="w-5 h-5 text-emerald-500" /> Completed Tasks ({clientData.completedTasks.length})
-                        </h3>
-                      </div>
-                      {clientData.completedTasks.length > 0 ? (
-                        <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                          {clientData.completedTasks.map(task => {
-                            const taskSubs = subtasks.filter(s => s.mainTaskId === task.id);
-                            const completed = taskSubs.filter(s => s.status === 'completed').length;
-                            const isExpanded = expandedTasks.has(task.id);
-                            return (
-                              <div key={task.id} className="py-3 flex flex-col gap-3 border-b border-slate-50 dark:border-slate-800/40 last:border-b-0">
-                                <div className="flex justify-between items-start gap-3 cursor-pointer group" onClick={() => { const next = new Set(expandedTasks); if (next.has(task.id)) next.delete(task.id); else next.add(task.id); setExpandedTasks(next); }}>
-                                  <div className="flex-shrink-0 mt-0.5 text-slate-400 group-hover:text-blue-500 transition-colors">{isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}</div>
-                                  <div className="min-w-0 flex-1">
-                                    <p className="font-semibold text-sm truncate group-hover:text-blue-600 transition-colors text-slate-500 line-through">{task.title}</p>
-                                    {task.deadline && <p className="text-xs text-slate-500 mt-0.5">Due: {new Date(task.deadline).toLocaleDateString('en-GB')}</p>}
-                                    {taskSubs.length > 0 && (<div className="mt-1.5 flex items-center gap-2"><div className="flex-1 max-w-[120px] h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden"><div className="h-full bg-emerald-500 rounded-full" style={{ width: `${Math.round((completed / taskSubs.length) * 100)}%` }} /></div><span className="text-[10px] text-slate-500 font-medium">{completed}/{taskSubs.length} done</span></div>)}
-                                  </div>
-                                  <Badge variant="outline" className="text-[9px] sm:text-[10px] px-1.5 sm:px-2.5 whitespace-nowrap bg-emerald-50 text-emerald-700 border-emerald-200 flex-shrink-0 font-bold">Completed</Badge>
-                                </div>
-                                <AnimatePresence initial={false}>
-                                  {isExpanded && (
-                                    <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }} className="overflow-hidden">
-                                      <div className="pl-7 pr-2 space-y-2 pt-1 pb-2">
-                                        {taskSubs.length === 0 ? <p className="text-xs text-slate-500 italic">No subtasks.</p> : taskSubs.map(sub => (
-                                          <div key={sub.id} onClick={(e) => { e.stopPropagation(); setOpenSubtaskId(sub.id!); }} className="flex items-center justify-between gap-3 p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer border border-transparent hover:border-slate-200 dark:hover:border-slate-700 transition-all group/sub">
-                                            <p className={`text-[13px] font-medium truncate group-hover/sub:text-blue-600 transition-colors flex-1 min-w-0 line-through text-slate-400`}>{sub.title}</p>
-                                            <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full whitespace-nowrap flex-shrink-0 ml-2 bg-emerald-100 text-emerald-700`}>Completed</span>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    </motion.div>
+                              <div className="min-w-0 flex-1 space-y-1.5">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <p className={cn(
+                                    "font-semibold text-sm tracking-tight transition-colors group-hover:text-blue-600",
+                                    statusType === 'completed' ? "text-slate-400 line-through" : "text-slate-900 dark:text-slate-100"
+                                  )}>
+                                    {task.title}
+                                  </p>
+
+                                  {taggedSite && (
+                                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 border border-blue-200/60 dark:border-blue-800/60 shrink-0">
+                                      <MapPin className="w-2.5 h-2.5 text-blue-500" />
+                                      <span className="truncate max-w-[140px]">{taggedSite.name}</span>
+                                    </span>
                                   )}
-                                </AnimatePresence>
+                                </div>
+
+                                <div className="flex items-center gap-3 flex-wrap text-[11px] text-slate-500 dark:text-slate-400">
+                                  {task.deadline && (
+                                    <span className="inline-flex items-center gap-1">
+                                      <Calendar className="w-3 h-3 text-slate-400" />
+                                      <span>Due {new Date(task.deadline).toLocaleDateString('en-GB')}</span>
+                                    </span>
+                                  )}
+                                  {task.requestedBy && (
+                                    <span className="inline-flex items-center gap-1">
+                                      <User className="w-3 h-3 text-slate-400" />
+                                      <span>By {task.requestedBy}</span>
+                                    </span>
+                                  )}
+                                  {taskSubs.length > 0 && (
+                                    <div className="inline-flex items-center gap-1.5 py-0.5 px-2 rounded-md bg-slate-100 dark:bg-slate-800 text-[10px] font-semibold text-slate-700 dark:text-slate-300">
+                                      <div className="w-12 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                                        <div 
+                                          className={cn(
+                                            "h-full rounded-full transition-all duration-300",
+                                            completed === taskSubs.length ? "bg-emerald-500" : "bg-blue-500"
+                                          )} 
+                                          style={{ width: `${Math.round((completed / taskSubs.length) * 100)}%` }} 
+                                        />
+                                      </div>
+                                      <span>{completed}/{taskSubs.length} done</span>
+                                    </div>
+                                  )}
+                                </div>
                               </div>
-                            );
-                          })}
+                            </div>
+
+                            <div className="flex items-center gap-1.5 shrink-0 pt-0.5">
+                              {task.priority && (
+                                <span className={cn(
+                                  "text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider",
+                                  task.priority === 'urgent' ? "bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300" :
+                                  task.priority === 'high' ? "bg-orange-100 text-orange-700 dark:bg-orange-950/40 dark:text-orange-300" :
+                                  task.priority === 'medium' ? "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300" :
+                                  "bg-slate-100 text-slate-650 dark:bg-slate-800 dark:text-slate-350"
+                                )}>
+                                  {task.priority}
+                                </span>
+                              )}
+                              <Badge 
+                                variant="outline" 
+                                className={cn(
+                                  "text-[10px] px-2 py-0.5 font-semibold uppercase tracking-wider",
+                                  statusType === 'completed' ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800/60" :
+                                  statusType === 'approval' ? "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800/60" :
+                                  "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800/60"
+                                )}
+                              >
+                                {statusType === 'completed' ? 'Completed' : statusType === 'approval' ? 'Approval' : 'Active'}
+                              </Badge>
+                            </div>
+                          </div>
+
+                          {/* Expanded Subtasks Checklist */}
+                          <AnimatePresence initial={false}>
+                            {isExpanded && (
+                              <motion.div 
+                                initial={{ height: 0, opacity: 0 }} 
+                                animate={{ height: 'auto', opacity: 1 }} 
+                                exit={{ height: 0, opacity: 0 }} 
+                                transition={{ duration: 0.18 }}
+                                className="overflow-hidden border-t border-slate-100 dark:border-slate-800/80 bg-slate-50/60 dark:bg-slate-950/40"
+                              >
+                                <div className="p-3 sm:p-4 space-y-1.5">
+                                  <div className="flex items-center justify-between pb-1 px-1">
+                                    <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                                      <ListTodo className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                                      <span>Checklist ({completed}/{taskSubs.length} completed)</span>
+                                    </span>
+                                    <span className="text-[10px] text-slate-400 italic">Click checkbox to complete</span>
+                                  </div>
+
+                                  {taskSubs.length === 0 ? (
+                                    <p className="text-xs text-slate-400 italic px-2 py-1">No to-do subtasks logged.</p>
+                                  ) : (
+                                    taskSubs.map(sub => {
+                                      const isDone = sub.status === 'completed';
+                                      return (
+                                        <div
+                                          key={sub.id}
+                                          onClick={() => setOpenSubtaskId(sub.id!)}
+                                          className={cn(
+                                            "flex items-center justify-between gap-3 px-3 py-2 rounded-lg border transition-all cursor-pointer group/item",
+                                            isDark 
+                                              ? "bg-slate-900 border-slate-800 hover:border-slate-700" 
+                                              : "bg-white border-slate-200/70 hover:border-blue-300 shadow-2xs hover:shadow-xs"
+                                          )}
+                                        >
+                                          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                                            <button
+                                              type="button"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                const nextStatus = isDone ? 'not_started' : 'completed';
+                                                updateSubtask(sub.id!, { status: nextStatus });
+                                              }}
+                                              className={cn(
+                                                "w-4 h-4 rounded-md border flex items-center justify-center transition-all shrink-0 cursor-pointer",
+                                                isDone
+                                                  ? "bg-blue-600 border-blue-600 text-white"
+                                                  : isDark ? "border-slate-600 hover:border-blue-400 bg-slate-800" : "border-slate-300 hover:border-blue-500 bg-white"
+                                              )}
+                                              title={isDone ? "Mark incomplete" : "Mark completed"}
+                                            >
+                                              {isDone && <Check className="w-3 h-3 stroke-[3]" />}
+                                            </button>
+                                            
+                                            <p className={cn(
+                                              "text-xs sm:text-[13px] font-medium truncate transition-colors",
+                                              isDone 
+                                                ? "line-through text-slate-400 dark:text-slate-500" 
+                                                : "text-slate-700 dark:text-slate-200 group-hover/item:text-blue-600"
+                                            )}>
+                                              {sub.title}
+                                            </p>
+                                          </div>
+
+                                          <div className="flex items-center gap-2 shrink-0">
+                                            <span className={cn(
+                                              "text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap",
+                                              isDone ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200/60" :
+                                              sub.status === 'in_progress' ? "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 border border-blue-200/60" :
+                                              sub.status === 'pending_approval' ? "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-200/60" :
+                                              "bg-slate-100 text-slate-650 dark:bg-slate-800 dark:text-slate-350 border border-slate-200/60"
+                                            )}>
+                                              {isDone ? 'Completed' : sub.status === 'in_progress' ? 'In Progress' : sub.status === 'pending_approval' ? 'Pending Approval' : 'To Start'}
+                                            </span>
+                                          </div>
+                                        </div>
+                                      );
+                                    })
+                                  )}
+                                  <div className="pt-2 border-t border-slate-100 dark:border-slate-800/60 mt-1">
+                                    <AddSubtaskInline mainTaskId={task.id} users={users} onAdd={sub => addSubtask(sub)} />
+                                  </div>
+                                </div>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
                         </div>
-                      ) : (
-                        <div className="text-center py-12">
-                          <CheckCircle2 className="w-12 h-12 text-slate-300 mx-auto mb-3 opacity-65" />
-                          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">No completed tasks</h3>
-                          <p className="text-xs text-slate-500 mt-1">There are no completed tasks recorded for this client yet.</p>
-                        </div>
-                      )}
-                    </div>
-                  )}
+                      );
+                    };
+
+                    return (
+                      <>
+                        {/* Tab Contents */}
+                        {taskSubTab === 'pending' && (
+                          <div className={cn("p-4 sm:p-6 rounded-2xl border shadow-sm", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
+                            <div className="flex items-center justify-between mb-4">
+                              <h3 className="font-bold text-lg flex items-center gap-2">
+                                <CheckSquare className="w-5 h-5 text-blue-500" /> Pending Tasks ({clientData.pendingTasks.length})
+                              </h3>
+                            </div>
+                            {clientData.pendingTasks.length > 0 ? (
+                              <div className="space-y-2.5">
+                                {clientData.pendingTasks.map(task => renderClientTaskCard(task, 'pending'))}
+                              </div>
+                            ) : (
+                              <div className="text-center py-12">
+                                <CheckSquare className="w-12 h-12 text-slate-350 mx-auto mb-3 opacity-60" />
+                                <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">No pending tasks</h3>
+                                <p className="text-xs text-slate-500 mt-1">There are no active or to-start tasks logged for this client.</p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {taskSubTab === 'approval' && (
+                          <div className={cn("p-4 sm:p-6 rounded-2xl border shadow-sm", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
+                            <div className="flex items-center justify-between mb-4">
+                              <h3 className="font-bold text-lg flex items-center gap-2">
+                                <ShieldAlert className="w-5 h-5 text-amber-500" /> Pending Approvals ({clientData.approvalTasks.length})
+                              </h3>
+                            </div>
+                            {clientData.approvalTasks.length > 0 ? (
+                              <div className="space-y-2.5">
+                                {clientData.approvalTasks.map(task => renderClientTaskCard(task, 'approval'))}
+                              </div>
+                            ) : (
+                              <div className="text-center py-12">
+                                <ShieldCheck className="w-12 h-12 text-emerald-400 mx-auto mb-3 opacity-60" />
+                                <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">No pending approvals</h3>
+                                <p className="text-xs text-slate-500 mt-1">All review requests are completed or fully resolved.</p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {taskSubTab === 'completed' && (
+                          <div className={cn("p-4 sm:p-6 rounded-2xl border shadow-sm", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
+                            <div className="flex items-center justify-between mb-4">
+                              <h3 className="font-bold text-lg flex items-center gap-2">
+                                <CheckCircle2 className="w-5 h-5 text-emerald-500" /> Completed Tasks ({clientData.completedTasks.length})
+                              </h3>
+                            </div>
+                            {clientData.completedTasks.length > 0 ? (
+                              <div className="space-y-2.5">
+                                {clientData.completedTasks.map(task => renderClientTaskCard(task, 'completed'))}
+                              </div>
+                            ) : (
+                              <div className="text-center py-12">
+                                <CheckCircle2 className="w-12 h-12 text-slate-300 mx-auto mb-3 opacity-65" />
+                                <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">No completed tasks</h3>
+                                <p className="text-xs text-slate-500 mt-1">There are no completed tasks recorded for this client yet.</p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
               )}
             </div>
@@ -4928,13 +5366,204 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
 
               {/* Main Contact Person */}
               <div>
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Main Contact Person</label>
-                <input
-                  value={siteEditForm.mainContactPerson || ''}
-                  onChange={e => setSiteEditForm(f => ({ ...f, mainContactPerson: e.target.value }))}
-                  placeholder="e.g. John Doe"
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Main Contact Person</label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowSiteEditAddContact(prev => !prev);
+                      setSiteEditNewContact({
+                        name: '',
+                        position: siteEditForm.position || '',
+                        phone: siteEditForm.contactPhone || '',
+                        email: '',
+                        isPrincipal: false,
+                        linkToSite: true,
+                      });
+                    }}
+                    className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> {showSiteEditAddContact ? 'Close Add Form' : 'Add Contact'}
+                  </button>
+                </div>
+
+                {/* Quick Add Form inside Edit Site modal */}
+                {showSiteEditAddContact && (
+                  <div className={cn('mb-3 p-3.5 rounded-2xl border space-y-2.5 shadow-inner', isDark ? 'bg-slate-800/80 border-slate-700' : 'bg-blue-50/60 border-blue-200')}>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-blue-600 dark:text-blue-400 flex items-center gap-1.5">
+                        <UserCheck className="w-3.5 h-3.5" /> New Contact for {siteClientName || 'Client'}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <span className="text-[11px] font-semibold text-slate-500 block mb-0.5">Name *</span>
+                        <input
+                          value={siteEditNewContact.name}
+                          onChange={e => setSiteEditNewContact(c => ({ ...c, name: e.target.value }))}
+                          placeholder="Contact full name"
+                          className={cn('w-full rounded-lg border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500', isDark ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-200')}
+                        />
+                      </div>
+                      <div>
+                        <span className="text-[11px] font-semibold text-slate-500 block mb-0.5">Position / Role</span>
+                        <input
+                          value={siteEditNewContact.position}
+                          onChange={e => setSiteEditNewContact(c => ({ ...c, position: e.target.value }))}
+                          placeholder="e.g. Site Supervisor"
+                          className={cn('w-full rounded-lg border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500', isDark ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-200')}
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <span className="text-[11px] font-semibold text-slate-500 block mb-0.5">Phone Number</span>
+                        <input
+                          value={siteEditNewContact.phone}
+                          onChange={e => setSiteEditNewContact(c => ({ ...c, phone: e.target.value }))}
+                          placeholder="+234 …"
+                          className={cn('w-full rounded-lg border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500', isDark ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-200')}
+                        />
+                      </div>
+                      <div>
+                        <span className="text-[11px] font-semibold text-slate-500 block mb-0.5">Email (Optional)</span>
+                        <input
+                          value={siteEditNewContact.email}
+                          onChange={e => setSiteEditNewContact(c => ({ ...c, email: e.target.value }))}
+                          placeholder="email@company.com"
+                          className={cn('w-full rounded-lg border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500', isDark ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-200')}
+                        />
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 pt-1">
+                      <label className="flex items-center gap-1.5 text-xs cursor-pointer select-none text-slate-600 dark:text-slate-300">
+                        <input
+                          type="checkbox"
+                          checked={siteEditNewContact.linkToSite}
+                          onChange={e => setSiteEditNewContact(c => ({ ...c, linkToSite: e.target.checked }))}
+                          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        <span>Tag to this site</span>
+                      </label>
+                      <label className="flex items-center gap-1.5 text-xs cursor-pointer select-none text-amber-600 dark:text-amber-400">
+                        <input
+                          type="checkbox"
+                          checked={siteEditNewContact.isPrincipal}
+                          onChange={e => setSiteEditNewContact(c => ({ ...c, isPrincipal: e.target.checked }))}
+                          className="rounded border-slate-300 text-amber-600 focus:ring-amber-500"
+                        />
+                        <span>Principal contact</span>
+                      </label>
+                    </div>
+                    <div className="flex justify-end gap-2 pt-1">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setShowSiteEditAddContact(false)}
+                        className="h-7 text-xs px-2.5"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() => {
+                          if (!siteEditNewContact.name.trim()) {
+                            toast.error('Contact name is required');
+                            return;
+                          }
+                          const newId = generateId();
+                          const created: ClientContact = {
+                            id: newId,
+                            name: siteEditNewContact.name.trim(),
+                            position: siteEditNewContact.position.trim(),
+                            phone: siteEditNewContact.phone.trim(),
+                            email: siteEditNewContact.email.trim(),
+                            note: '',
+                            clientName: siteClientName,
+                            siteIds: siteEditNewContact.linkToSite && siteEditTarget ? [siteEditTarget.id] : [],
+                            siteNames: siteEditNewContact.linkToSite && siteEditTarget ? [siteEditTarget.name] : [],
+                            isActive: true,
+                            isPrincipal: siteEditNewContact.isPrincipal,
+                            createdAt: new Date().toISOString(),
+                            updatedAt: new Date().toISOString(),
+                          };
+                          addClientContact(created);
+                          setSiteEditForm(f => ({
+                            ...f,
+                            mainContactPerson: created.name,
+                            contactPhone: created.phone || f.contactPhone,
+                            position: created.position || f.position,
+                          }));
+                          toast.success(`Added "${created.name}" and selected as contact`);
+                          setShowSiteEditAddContact(false);
+                          setSiteEditNewContact({
+                            name: '',
+                            position: '',
+                            phone: '',
+                            email: '',
+                            isPrincipal: false,
+                            linkToSite: true,
+                          });
+                        }}
+                        className="h-7 text-xs px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg gap-1 font-semibold"
+                      >
+                        <Plus className="w-3 h-3" /> Save & Select
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Dropdown of client contacts */}
+                <select
+                  value={
+                    siteEditAvailableContacts.some(c => c.name.toLowerCase() === (siteEditForm.mainContactPerson || '').toLowerCase())
+                      ? siteEditAvailableContacts.find(c => c.name.toLowerCase() === (siteEditForm.mainContactPerson || '').toLowerCase())?.name || ''
+                      : (siteEditForm.mainContactPerson ? '__custom__' : '')
+                  }
+                  onChange={e => {
+                    const val = e.target.value;
+                    if (val === '__custom__') {
+                      setIsCustomContactPerson(true);
+                    } else if (val === '') {
+                      setIsCustomContactPerson(false);
+                      setSiteEditForm(f => ({ ...f, mainContactPerson: '', contactPhone: '', position: '' }));
+                    } else {
+                      setIsCustomContactPerson(false);
+                      const matched = siteEditAvailableContacts.find(c => c.name === val);
+                      if (matched) {
+                        setSiteEditForm(f => ({
+                          ...f,
+                          mainContactPerson: matched.name,
+                          contactPhone: matched.phone || '',
+                          position: matched.position || '',
+                        }));
+                      }
+                    }
+                  }}
                   className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
-                />
+                >
+                  <option value="">-- Select Contact Person --</option>
+                  {siteEditAvailableContacts.map(c => (
+                    <option key={c.id} value={c.name}>
+                      {c.name} {c.position ? `(${c.position})` : ''} {c.isPrincipal ? '★' : ''}
+                    </option>
+                  ))}
+                  <option value="__custom__">-- Type custom name manually --</option>
+                </select>
+
+                {/* If custom or typed name that is not in the dropdown */}
+                {(isCustomContactPerson || (siteEditForm.mainContactPerson && !siteEditAvailableContacts.some(c => c.name.toLowerCase() === siteEditForm.mainContactPerson?.toLowerCase()))) && (
+                  <div className="mt-2">
+                    <input
+                      value={siteEditForm.mainContactPerson || ''}
+                      onChange={e => setSiteEditForm(f => ({ ...f, mainContactPerson: e.target.value }))}
+                      placeholder="Enter contact person name"
+                      className={cn('w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500', isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200')}
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Contact Phone + Position side by side */}
@@ -5256,6 +5885,23 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
           initialDescription={taskDialog.description}
           initialClientId={taskDialog.clientId}
           initialSiteId={taskDialog.siteId}
+          initialTagToSite={taskDialog.tagToSite ?? true}
+          isDarkTheme={isDark}
+        />
+      )}
+      {quickTaskOpen && (
+        <QuickTaskDialog
+          open={quickTaskOpen}
+          onClose={() => setQuickTaskOpen(false)}
+          clientName={clientProfiles.find(c => c.name.trim().toLowerCase() === selectedClient?.trim().toLowerCase() || c.id === selectedClient)?.name || selectedClient || ''}
+          clientId={clientProfiles.find(c => c.name.trim().toLowerCase() === selectedClient?.trim().toLowerCase() || c.id === selectedClient)?.id || ''}
+          siteName={selectedSite?.name || ''}
+          siteId={selectedSite?.id || ''}
+          users={users}
+          currentUserId={currentUser?.id ?? ""}
+          teamId="dcel-team"
+          workspaceId="dcel-team"
+          isDarkTheme={isDark}
         />
       )}
 

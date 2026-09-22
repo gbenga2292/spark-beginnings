@@ -25,7 +25,7 @@ const isNodeEmpty = (node: any): boolean => {
 };
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { Capacitor, CapacitorHttp } from '@capacitor/core';
-import { Bell, Search, LogOut, Menu, X, User, Settings, ChevronRight, CalendarClock, Users, MapPin, Wallet, FileText, Landmark, Library, UserPlus, ShieldCheck, LayoutDashboard, Clock, AlertCircle, AtSign, ArrowLeft, ArrowUpCircle, RefreshCw, MoreVertical, Sparkles, Blocks, CheckCheck, Check, Volume2, VolumeX } from 'lucide-react';
+import { Bell, Search, LogOut, Menu, X, User, Settings, ChevronRight, CalendarClock, Users, MapPin, Wallet, FileText, Landmark, Library, UserPlus, ShieldCheck, LayoutDashboard, Clock, AlertCircle, AtSign, ArrowLeft, ArrowUpCircle, RefreshCw, MoreVertical, Sparkles, Blocks, CheckCheck, Check, Volume2, VolumeX, Flame } from 'lucide-react';
 import { toast, showConfirm } from '@/src/components/ui/toast';
 import { StatusIndicator } from '@/src/components/offline/StatusIndicator';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -588,6 +588,18 @@ export function Header({ onMenuClick }: HeaderProps) {
           aria-label={voiceEnabled ? 'Mute voice alerts' : 'Enable voice alerts'}
         >
           {voiceEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+        </button>
+
+        {/* Daily Priority & Approvals Briefing Modal Trigger */}
+        <button
+          onClick={() => window.dispatchEvent(new CustomEvent('open-daily-briefing'))}
+          className={`relative h-8 w-8 rounded-lg flex items-center justify-center transition-all ${
+            isDark ? 'text-amber-400 hover:bg-slate-800 hover:text-amber-300' : 'text-amber-600 hover:bg-slate-100 hover:text-amber-700'
+          }`}
+          title="Daily Priority & Approvals Briefing"
+          aria-label="Open Daily Priority & Approvals Briefing"
+        >
+          <Flame className="h-4 w-4 text-amber-500 hover:animate-pulse" />
         </button>
 
         {/* Notification Bell */}

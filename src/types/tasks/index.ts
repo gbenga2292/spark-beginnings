@@ -64,8 +64,9 @@ export interface AppUser {
     phone?: string;
 }
 
-// ─── Task priority ──────────────────────────────────────────────────────────
+// ─── Task priority & Urgency ────────────────────────────────────────────────
 export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent';
+export type TaskUrgency = 'low' | 'medium' | 'high' | 'critical';
 
 // ─── Task hierarchy ───────────────────────────────────────────────────────────
 export type SubTaskStatus = 'not_started' | 'in_progress' | 'pending_approval' | 'completed';
@@ -80,6 +81,7 @@ export interface SubTask {
     assignedTo?: string | null;
     status: SubTaskStatus;
     priority?: TaskPriority;
+    urgency?: TaskUrgency;
     createdAt?: string;
     updatedAt?: string;
     deadline?: string;
@@ -94,6 +96,8 @@ export interface SubTask {
     budgetRequested?: number;
     createdBy?: string;
     is_system?: boolean;
+    requestedByType?: 'DCEL' | 'CLIENT' | string;
+    requestedBy?: string;
 }
 
 export interface MainTask {
@@ -105,6 +109,7 @@ export interface MainTask {
     createdBy: string;
     assignedTo?: string;
     priority?: TaskPriority;
+    urgency?: TaskUrgency;
     isDeleted?: boolean;
     is_project?: boolean;
     is_system?: boolean;
@@ -118,6 +123,20 @@ export interface MainTask {
     siteId?: string;
     hasBudget?: boolean;
     budgetRequested?: number;
+    requestedByType?: 'DCEL' | 'CLIENT' | string;
+    requestedBy?: string;
+}
+
+// ─── Task Time Entries ────────────────────────────────────────────────────────
+export interface TaskTimeEntry {
+    id: string;
+    subtaskId?: string;
+    mainTaskId?: string;
+    userId: string;
+    hours: number;
+    description?: string;
+    date: string;
+    createdAt: string;
 }
 
 // ─── Notifications ────────────────────────────────────────────────────────────

@@ -1,11 +1,14 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Plus, ChevronDown, Clock, RefreshCw, Users, Bell, CheckCircle2, MapPin } from 'lucide-react';
 import { Button } from '@/src/components/ui/button';
 import { useAppData } from '@/src/contexts/AppDataContext';
 import { useAppStore } from '@/src/store/appStore';
-import type { SubTask, SubTaskStatus, MainTask, AppUser, TaskPriority } from "@/src/types/tasks";
+import type { SubTask, SubTaskStatus, MainTask, AppUser, TaskPriority, TaskUrgency } from "@/src/types/tasks";
 import { PRIORITY_ORDER, PRIORITY_CONFIG } from "@/src/components/tasks/TasksShared";
+import { URGENCY_CONFIG } from "@/src/components/tasks/DailyUrgentTasksModal";
+
+const URGENCY_ORDER: TaskUrgency[] = ['low', 'medium', 'high', 'critical'];
 
 interface CreateTaskDialogProps {
   onClose: () => void;
@@ -20,8 +23,11 @@ interface CreateTaskDialogProps {
   initialDescription?: string;
   initialClientId?: string;
   initialSiteId?: string;
+  initialTagToSite?: boolean;
   initialDeadline?: string;
   initialDeadlineTime?: string;
+  initialRequestedByType?: 'DCEL' | 'CLIENT';
+  initialRequestedBy?: string;
   isDarkTheme?: boolean;
 }
 
@@ -38,14 +44,36 @@ export function CreateTaskDialog({
   initialDescription = "",
   initialClientId = "",
   initialSiteId = "",
+  initialTagToSite,
   initialDeadline = "",
   initialDeadlineTime = "",
+  initialRequestedByType,
+  initialRequestedBy = "",
   isDarkTheme = false
 }: CreateTaskDialogProps) {
   const { addReminder, createMainTask } = useAppData();
   const clientProfiles = useAppStore(s => s.clientProfiles);
   const sites = useAppStore(s => s.sites);
+  const employees = useAppStore(s => s.employees);
+  const clientContacts = useAppStore(s => s.clientContacts);
   const activeUsers = users.filter(u => u.isActive !== false);
+
+  // Resolve initial clientId if a client name or ID was passed, or if initialSiteId was passed without initialClientId
+  const resolvedInitialClientId = useMemo(() => {
+    if (initialClientId) {
+      const cl = clientProfiles.find(c => c.id === initialClientId || c.name?.trim().toLowerCase() === initialClientId.trim().toLowerCase());
+      if (cl) return cl.id;
+      return initialClientId;
+    }
+    if (initialSiteId) {
+      const st = sites.find(s => s.id === initialSiteId);
+      if (st) {
+        const cl = clientProfiles.find(c => c.name?.trim().toLowerCase() === st.client?.trim().toLowerCase() || c.id === st.client);
+        if (cl) return cl.id;
+      }
+    }
+    return "";
+  }, [initialClientId, initialSiteId, sites, clientProfiles]);
 
   const [title, setTitle] = useState(initialTitle);
   const [description, setDesc] = useState(initialDescription);
@@ -54,18 +82,86 @@ export function CreateTaskDialog({
   const [deadline, setDeadline] = useState(initialDeadline);
   const [deadlineTime, setDeadlineTime] = useState(initialDeadlineTime);
   const [priority, setPriority] = useState<TaskPriority | undefined>(undefined);
+  const [urgency, setUrgency] = useState<TaskUrgency>('medium');
   const [requiresApproval, setRequiresApproval] = useState(false);
   const [approverId, setApproverId] = useState<string>("");
   const [hasBudget, setHasBudget] = useState(false);
   const [budgetRequested, setBudgetRequested] = useState<number | undefined>(undefined);
   const [isHrTask, setIsHrTask] = useState(isExternalHr ?? false);
-  const [showSubs, setShowSubs] = useState(true);
-  const [subtasks, setSubs] = useState<{ title: string; assignedTo: string[]; deadline: string; deadlineTime: string; priority: TaskPriority | undefined; requiresApproval: boolean; approverId?: string; hasBudget?: boolean; budgetRequested?: number }[]>([]);
+
+  // ── Requested By state (DCEL vs CLIENT) ───────────────────────────────────
+  const [requestedByType, setRequestedByType] = useState<'DCEL' | 'CLIENT'>(
+    initialRequestedByType || (initialClientId ? 'CLIENT' : 'DCEL')
+  );
+  const [requestedBy, setRequestedBy] = useState<string>(initialRequestedBy);
+  const [isCustomRequestedBy, setIsCustomRequestedBy] = useState(false);
+  const [customRequestedBy, setCustomRequestedBy] = useState("");
 
   // ── Tag to Site state ─────────────────────────────────────────────────────
-  const [tagToSite, setTagToSite] = useState(!!(initialClientId || initialSiteId));
-  const [clientId, setClientId] = useState<string>(initialClientId);
+  const [tagToSite, setTagToSite] = useState(
+    initialTagToSite !== undefined ? initialTagToSite : !!(initialClientId || initialSiteId)
+  );
+  const [clientId, setClientId] = useState<string>(resolvedInitialClientId);
   const [siteId, setSiteId] = useState<string>(initialSiteId);
+
+  // Selected client profile and name for filtering client contacts
+  const selectedClient = useMemo(() => {
+    if (!clientId) return null;
+    return clientProfiles.find(c => c.id === clientId || c.name?.trim().toLowerCase() === clientId.trim().toLowerCase()) || null;
+  }, [clientId, clientProfiles]);
+
+  const selectedClientName = selectedClient?.name || clientId;
+
+  // Client contacts strictly for the selected client
+  const clientSpecificContacts = useMemo(() => {
+    if (!selectedClientName) return { siteSpecific: [], otherContacts: [], total: 0 };
+    const cleanClient = selectedClientName.trim().toLowerCase();
+    const forThisClient = clientContacts.filter(c => 
+      c.clientName?.trim().toLowerCase() === cleanClient
+    );
+    
+    // When siteId is chosen, partition into site-linked / principal contacts vs other contacts of this client
+    const siteSpecific = siteId
+      ? forThisClient.filter(c => c.isPrincipal || (c.siteIds || []).includes(siteId))
+      : forThisClient;
+    const otherContacts = siteId
+      ? forThisClient.filter(c => !c.isPrincipal && !(c.siteIds || []).includes(siteId))
+      : [];
+
+    return { siteSpecific, otherContacts, total: forThisClient.length };
+  }, [clientContacts, selectedClientName, siteId]);
+
+  // Office and Field employees for DCEL (excluding offboarded employees unless already selected on this task)
+  const dcelEmployees = useMemo(() => {
+    return employees
+      .filter(e => {
+        const t = (e.staffType || '').toUpperCase();
+        const isStaff = t === 'OFFICE' || t === 'FIELD' || !t || t !== 'NON-EMPLOYEE';
+        if (!isStaff) return false;
+
+        const fullName = `${e.firstname || ''} ${e.surname || ''}`.trim();
+        const isCurrentSelection = (requestedBy && fullName === requestedBy) || (initialRequestedBy && fullName === initialRequestedBy);
+
+        const isTerminated = e.status === 'Terminated';
+        const hasPastEndDate = Boolean(e.endDate && !isNaN(new Date(e.endDate).getTime()) && new Date(e.endDate).getTime() <= Date.now());
+        const isOffboarded = isTerminated || hasPastEndDate;
+
+        // If offboarded, only keep if this employee was already the recorded requester on this task
+        if (isOffboarded && !isCurrentSelection) {
+          return false;
+        }
+
+        return true;
+      })
+      .sort((a, b) => {
+        const nameA = `${a.firstname || ''} ${a.surname || ''}`.trim().toLowerCase();
+        const nameB = `${b.firstname || ''} ${b.surname || ''}`.trim().toLowerCase();
+        return nameA.localeCompare(nameB);
+      });
+  }, [employees, requestedBy, initialRequestedBy]);
+
+  const [showSubs, setShowSubs] = useState(true);
+  const [subtasks, setSubs] = useState<{ title: string; assignedTo: string[]; deadline: string; deadlineTime: string; priority: TaskPriority | undefined; urgency?: TaskUrgency; requiresApproval: boolean; approverId?: string; hasBudget?: boolean; budgetRequested?: number }[]>([]);
 
   // ── Reminder state ────────────────────────────────────────────────────────
   const [enableReminder, setEnableReminder] = useState(false);
@@ -84,7 +180,7 @@ export function CreateTaskDialog({
   const [openMainDropdown, setOpenMainDropdown] = useState(false);
   const [openSubDropdown, setOpenSubDropdown] = useState<number | null>(null);
 
-  const addRow = () => setSubs(p => [...p, { title: "", assignedTo: [], deadline: "", deadlineTime: "", priority: undefined, requiresApproval: false, approverId: "", hasBudget: false, budgetRequested: undefined }]);
+  const addRow = () => setSubs(p => [...p, { title: "", assignedTo: [], deadline: "", deadlineTime: "", priority: undefined, urgency: undefined, requiresApproval: false, approverId: "", hasBudget: false, budgetRequested: undefined }]);
   const removeRow = (i: number) => setSubs(p => p.filter((_, idx) => idx !== i));
   const updateRow = (i: number, k: string, v: any) =>
     setSubs(p => p.map((r, idx) => idx === i ? { ...r, [k]: v } : r));
@@ -105,6 +201,11 @@ export function CreateTaskDialog({
       ? deadlineTime ? `${deadline}T${deadlineTime}` : deadline
       : undefined;
 
+    const effectiveRequestedBy = tagToSite
+      ? (isCustomRequestedBy ? customRequestedBy.trim() : requestedBy.trim())
+      : undefined;
+    const effectiveRequestedByType = tagToSite && effectiveRequestedBy ? requestedByType : undefined;
+
     const finalSubs: any[] = [];
     validSubs.forEach(s => {
       finalSubs.push({
@@ -114,12 +215,15 @@ export function CreateTaskDialog({
         status: (s.requiresApproval ? "pending_approval" : "not_started") as SubTaskStatus,
         deadline: s.deadline ? (s.deadlineTime ? `${s.deadline}T${s.deadlineTime}` : s.deadline) : undefined,
         priority: s.priority,
+        urgency: s.urgency || urgency,
         requiresApproval: s.requiresApproval,
         approverId: s.requiresApproval ? s.approverId : undefined,
         clientId: tagToSite && clientId ? clientId : undefined,
         siteId: tagToSite && siteId ? siteId : undefined,
         hasBudget: s.requiresApproval ? s.hasBudget : undefined,
         budgetRequested: (s.requiresApproval && s.hasBudget) ? s.budgetRequested : undefined,
+        requestedByType: effectiveRequestedByType,
+        requestedBy: effectiveRequestedBy,
       });
     });
 
@@ -135,6 +239,7 @@ export function CreateTaskDialog({
         assignedTo: mainAssignedToStr, 
         deadline: combinedDeadline, 
         priority, 
+        urgency,
         requiresApproval, 
         approverId: requiresApproval ? approverId : undefined,
         hasBudget: requiresApproval ? hasBudget : undefined,
@@ -142,6 +247,8 @@ export function CreateTaskDialog({
         is_hr_task: isHrTask,
         clientId: tagToSite && clientId ? clientId : undefined,
         siteId: tagToSite && siteId ? siteId : undefined,
+        requestedByType: effectiveRequestedByType,
+        requestedBy: effectiveRequestedBy,
         skipAutoSubtask: finalSubs.length > 0
       },
       finalSubs
@@ -328,6 +435,36 @@ export function CreateTaskDialog({
               ))}
             </div>
           </div>
+
+          {/* Urgency Level */}
+          <div>
+            <label className={`block text-xs font-semibold uppercase tracking-wide mb-2 ${
+              isDarkTheme ? "text-white/80" : "text-foreground"
+            }`}>Urgency Level</label>
+            <div className={`flex items-center gap-2 flex-wrap p-1.5 rounded-xl border ${
+              isDarkTheme ? "bg-white/5 border-white/5" : "bg-muted/30 border-border/50"
+            }`}>
+              {URGENCY_ORDER.map(u => {
+                const conf = URGENCY_CONFIG[u];
+                const isSelected = urgency === u;
+                return (
+                  <button
+                    key={u}
+                    type="button"
+                    onClick={() => setUrgency(u)}
+                    className={`flex-1 flex justify-center items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-sm border cursor-pointer ${
+                      isSelected
+                        ? `${conf.badgeCls} ${conf.borderCls} ring-1 ring-primary/20 scale-[1.02]`
+                        : (isDarkTheme ? "border-transparent text-white/50 hover:text-white hover:bg-white/5" : "border-transparent text-muted-foreground hover:text-foreground hover:bg-black/5")
+                    }`}
+                  >
+                    <span className={`w-2 h-2 rounded-full ${conf.dotCls}`} />
+                    {conf.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
           
           <div className="flex flex-col gap-2">
             <label className="flex items-center gap-2 cursor-pointer mt-1">
@@ -457,12 +594,220 @@ export function CreateTaskDialog({
                                <option value="" className={isDarkTheme ? "bg-[#141622]" : ""}>No Site</option>
                                {sites.filter(s => {
                                   const cName = clientProfiles.find(c => c.id === clientId)?.name;
-                                  return s.client === cName || s.client === clientId;
+                                  return (cName && s.client?.trim().toLowerCase() === cName.trim().toLowerCase()) || s.client === clientId || (clientId && (s as any).clientId === clientId);
                                 }).map(s => (
-                                  <option key={s.id} value={s.id} className={isDarkTheme ? "bg-[#141622]" : ""}>{s.name}</option>
+                                   <option key={s.id} value={s.id} className={isDarkTheme ? "bg-[#141622]" : ""}>{s.name}</option>
                                 ))}
                             </select>
                          </div>
+                      </div>
+
+                      {/* Requested By Section — only shows when Tag to Site / Client is active */}
+                      <div className={`px-4 pb-4 pt-3 border-t ${isDarkTheme ? "border-white/10" : "border-border/60"}`}>
+                        <div className="flex items-center justify-between gap-2 mb-2">
+                          <div className="flex items-center gap-1.5">
+                            <Users className={`w-3.5 h-3.5 ${isDarkTheme ? "text-indigo-400" : "text-primary"}`} />
+                            <label className={`text-[10px] font-bold uppercase tracking-wider ${
+                              isDarkTheme ? "text-white/80" : "text-muted-foreground"
+                            }`}>
+                              Requested By
+                            </label>
+                          </div>
+
+                          {/* Toggle DCEL vs CLIENT */}
+                          <div className={`flex items-center p-0.5 rounded-lg border text-xs font-bold ${
+                            isDarkTheme ? "bg-[#141622] border-white/10" : "bg-background border-border shadow-xs"
+                          }`}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setRequestedByType('DCEL');
+                                setRequestedBy('');
+                                setIsCustomRequestedBy(false);
+                                setCustomRequestedBy('');
+                              }}
+                              className={`px-2.5 py-0.5 rounded-md transition-all text-xs font-bold cursor-pointer ${
+                                requestedByType === 'DCEL'
+                                  ? (isDarkTheme ? "bg-indigo-600 text-white shadow-sm" : "bg-primary text-primary-foreground shadow-sm")
+                                  : (isDarkTheme ? "text-white/50 hover:text-white" : "text-muted-foreground hover:text-foreground")
+                              }`}
+                            >
+                              DCEL
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setRequestedByType('CLIENT');
+                                setRequestedBy('');
+                                setIsCustomRequestedBy(false);
+                                setCustomRequestedBy('');
+                              }}
+                              className={`px-2.5 py-0.5 rounded-md transition-all text-xs font-bold cursor-pointer ${
+                                requestedByType === 'CLIENT'
+                                  ? (isDarkTheme ? "bg-indigo-600 text-white shadow-sm" : "bg-primary text-primary-foreground shadow-sm")
+                                  : (isDarkTheme ? "text-white/50 hover:text-white" : "text-muted-foreground hover:text-foreground")
+                              }`}
+                            >
+                              CLIENT
+                            </button>
+                          </div>
+                        </div>
+
+                        {requestedByType === 'DCEL' ? (
+                          <div className="space-y-2">
+                            <select
+                              value={isCustomRequestedBy ? '__CUSTOM__' : requestedBy}
+                              onChange={e => {
+                                const val = e.target.value;
+                                if (val === '__CUSTOM__') {
+                                  setIsCustomRequestedBy(true);
+                                } else {
+                                  setIsCustomRequestedBy(false);
+                                  setRequestedBy(val);
+                                }
+                              }}
+                              className={`w-full px-3 py-2 rounded-xl border text-xs focus:outline-none focus:ring-2 transition-all shadow-sm ${
+                                isDarkTheme
+                                  ? "border-white/10 bg-[#141622] text-white focus:ring-indigo-500/20"
+                                  : "border-border bg-background text-foreground focus:ring-primary/20"
+                              }`}
+                            >
+                              <option value="" className={isDarkTheme ? "bg-[#141622]" : ""}>Choose Field / Office employee...</option>
+                              <optgroup label="Office & Field Employees" className={isDarkTheme ? "bg-[#141622]" : ""}>
+                                {dcelEmployees.map(emp => {
+                                  const name = `${emp.firstname || ''} ${emp.surname || ''}`.trim() || emp.employeeCode || emp.id;
+                                  const role = emp.position || emp.department || '';
+                                  const type = emp.staffType ? `[${emp.staffType}]` : '';
+                                  const isTerminated = emp.status === 'Terminated';
+                                  const hasPastEndDate = Boolean(emp.endDate && !isNaN(new Date(emp.endDate).getTime()) && new Date(emp.endDate).getTime() <= Date.now());
+                                  const isOffboarded = isTerminated || hasPastEndDate;
+                                  const offboardedTag = isOffboarded ? ' [Offboarded]' : '';
+                                  return (
+                                    <option key={emp.id} value={name} className={isDarkTheme ? "bg-[#141622]" : ""}>
+                                      {name}{role ? ` — ${role}` : ''} {type}{offboardedTag}
+                                    </option>
+                                  );
+                                })}
+                              </optgroup>
+                              {dcelEmployees.length === 0 && activeUsers.length > 0 && (
+                                <optgroup label="System Users" className={isDarkTheme ? "bg-[#141622]" : ""}>
+                                  {activeUsers.map(u => (
+                                    <option key={u.id} value={u.name} className={isDarkTheme ? "bg-[#141622]" : ""}>
+                                      {u.name}
+                                    </option>
+                                  ))}
+                                </optgroup>
+                              )}
+                              <option value="__CUSTOM__" className={isDarkTheme ? "bg-[#141622]" : ""}>
+                                + Other (Type custom name...)
+                              </option>
+                            </select>
+
+                            {isCustomRequestedBy && (
+                              <input
+                                type="text"
+                                autoFocus
+                                value={customRequestedBy}
+                                onChange={e => setCustomRequestedBy(e.target.value)}
+                                placeholder="Enter DCEL requester name..."
+                                className={`w-full px-3 py-2 rounded-xl border text-xs focus:outline-none focus:ring-2 transition-all shadow-sm ${
+                                  isDarkTheme
+                                    ? "border-white/10 bg-[#141622] text-white focus:ring-indigo-500/20"
+                                    : "border-border bg-background text-foreground focus:ring-primary/20"
+                                }`}
+                              />
+                            )}
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            <select
+                              value={isCustomRequestedBy ? '__CUSTOM__' : requestedBy}
+                              onChange={e => {
+                                const val = e.target.value;
+                                if (val === '__CUSTOM__') {
+                                  setIsCustomRequestedBy(true);
+                                } else {
+                                  setIsCustomRequestedBy(false);
+                                  setRequestedBy(val);
+                                }
+                              }}
+                              disabled={!selectedClientName}
+                              className={`w-full px-3 py-2 rounded-xl border text-xs focus:outline-none focus:ring-2 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed ${
+                                isDarkTheme
+                                  ? "border-white/10 bg-[#141622] text-white focus:ring-indigo-500/20"
+                                  : "border-border bg-background text-foreground focus:ring-primary/20"
+                              }`}
+                            >
+                              {!selectedClientName ? (
+                                <option value="" disabled className={isDarkTheme ? "bg-[#141622]" : ""}>
+                                  Please select a Client above first...
+                                </option>
+                              ) : clientSpecificContacts.total === 0 ? (
+                                <option value="" disabled className={isDarkTheme ? "bg-[#141622]" : ""}>
+                                  No contacts recorded for {selectedClientName}
+                                </option>
+                              ) : (
+                                <option value="" className={isDarkTheme ? "bg-[#141622]" : ""}>
+                                  Choose contact for {selectedClientName}...
+                                </option>
+                              )}
+
+                              {clientSpecificContacts.siteSpecific.length > 0 && (
+                                <optgroup
+                                  label={siteId ? "Linked to this Site / Principal" : `${selectedClientName} Contacts`}
+                                  className={isDarkTheme ? "bg-[#141622]" : ""}
+                                >
+                                  {clientSpecificContacts.siteSpecific.map(c => {
+                                    const cPos = c.position ? ` — ${c.position}` : '';
+                                    const cStar = c.isPrincipal ? ' ⭐ (Principal)' : '';
+                                    return (
+                                      <option key={c.id} value={c.name} className={isDarkTheme ? "bg-[#141622]" : ""}>
+                                        {c.name}{cPos}{cStar}
+                                      </option>
+                                    );
+                                  })}
+                                </optgroup>
+                              )}
+
+                              {clientSpecificContacts.otherContacts.length > 0 && (
+                                <optgroup
+                                  label={`Other ${selectedClientName} Contacts`}
+                                  className={isDarkTheme ? "bg-[#141622]" : ""}
+                                >
+                                  {clientSpecificContacts.otherContacts.map(c => {
+                                    const cPos = c.position ? ` — ${c.position}` : '';
+                                    return (
+                                      <option key={c.id} value={c.name} className={isDarkTheme ? "bg-[#141622]" : ""}>
+                                        {c.name}{cPos}
+                                      </option>
+                                    );
+                                  })}
+                                </optgroup>
+                              )}
+
+                              {selectedClientName && (
+                                <option value="__CUSTOM__" className={isDarkTheme ? "bg-[#141622]" : ""}>
+                                  + Other (Type custom contact name...)
+                                </option>
+                              )}
+                            </select>
+
+                            {isCustomRequestedBy && (
+                              <input
+                                type="text"
+                                autoFocus
+                                value={customRequestedBy}
+                                onChange={e => setCustomRequestedBy(e.target.value)}
+                                placeholder={`Enter contact name for ${selectedClientName || 'client'}...`}
+                                className={`w-full px-3 py-2 rounded-xl border text-xs focus:outline-none focus:ring-2 transition-all shadow-sm ${
+                                  isDarkTheme
+                                    ? "border-white/10 bg-[#141622] text-white focus:ring-indigo-500/20"
+                                    : "border-border bg-background text-foreground focus:ring-primary/20"
+                                }`}
+                              />
+                            )}
+                          </div>
+                        )}
                       </div>
                    </motion.div>
                 )}

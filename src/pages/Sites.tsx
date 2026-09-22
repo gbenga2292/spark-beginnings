@@ -7,7 +7,7 @@ import { Input } from '@/src/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
 import { Badge } from '@/src/components/ui/badge';
 import { Dialog, DialogFooter } from '@/src/components/ui/dialog';
-import { Search, Plus, MapPin, Building2, X, Save, Pencil, Trash2, Download, Upload, CheckCircle2, Circle, Eye, FileText, MoreVertical, Clock, LayoutGrid, List, ArrowUpDown, ChevronUp, ChevronDown, MessageSquare, BookOpen, Calendar, Phone, Mail, Car, MessageCircle, Users, ArrowLeft, Check, Bell, UserCheck, UserCircle, Briefcase, Sparkles, Edit2, ExternalLink, Paperclip } from 'lucide-react';
+import { Search, Plus, MapPin, Building2, X, Save, Pencil, Trash2, Download, Upload, CheckCircle2, Circle, Eye, FileText, MoreVertical, Clock, LayoutGrid, List, ArrowUpDown, ChevronUp, ChevronDown, MessageSquare, BookOpen, Calendar, Phone, Mail, Car, MessageCircle, Users, ArrowLeft, Check, Bell, UserCheck, UserCircle, Briefcase, Sparkles, Edit2, ExternalLink, Paperclip, CheckSquare } from 'lucide-react';
 import { useAppStore, Site, ClientProfile } from '@/src/store/appStore';
 import { toast, showConfirm } from '@/src/components/ui/toast';
 import { SiteQuestionnaire, SiteAttachment } from '@/src/types/SiteQuestionnaire';
@@ -26,9 +26,11 @@ import { useUserStore } from '@/src/store/userStore';
 import { useAppData } from '@/src/contexts/AppDataContext';
 import { normalizeDate } from '@/src/lib/dateUtils';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
+import { useTheme } from '@/src/hooks/useTheme';
 import { cn } from '../lib/utils';
 import { ClientSummaryGrid } from './ClientSummaryGrid';
 import { ClientContactsPanel } from './ClientContactsPanel';
+import { CreateTaskDialog } from './Tasks/CreateTaskDialog';
 import { buildSettlementMap } from '@/src/lib/settlementUtils';
 
 const EMPTY_FORM = { name: '', client: '', vat: 'No' as 'Yes' | 'No' | 'Add', status: 'Active' as 'Active' | 'Inactive' | 'Ended', startDate: new Date().toISOString().split('T')[0], endDate: '' };
@@ -184,6 +186,8 @@ function ClientSummary() {
         </Table>
         </div>
       </div>
+
+
     </div>
   );
 }
@@ -391,7 +395,29 @@ export function Sites() {
   const setPendingSites = useAppStore((s) => s.setPendingSites);
   const updatePendingSite = useAppStore((s) => s.updatePendingSite);
   const deletePendingSite = useAppStore((s) => s.deletePendingSite);
-  const { mainTasks, createMainTask } = useAppData();
+  const { mainTasks, createMainTask, users } = useAppData();
+  const { isDark } = useTheme();
+
+  const [taskDialog, setTaskDialog] = useState<{
+    open: boolean;
+    clientId: string;
+    siteId: string;
+  }>({
+    open: false,
+    clientId: '',
+    siteId: '',
+  });
+
+  const handleOpenAddTask = (site: Site) => {
+    const matchedClient = clientProfiles.find(
+      c => c.name.trim().toLowerCase() === site.client.trim().toLowerCase() || c.id === site.client
+    );
+    setTaskDialog({
+      open: true,
+      clientId: matchedClient?.id || site.client || '',
+      siteId: site.id,
+    });
+  };
 
   const handleDeleteClient = async (clientName: string) => {
     const nameTrim = clientName.trim();
@@ -488,8 +514,22 @@ export function Sites() {
     toast.success(`Onboarding for "${site.siteName}" deleted.`);
   };
 
-  const [sortField, setSortField] = useState<'client' | 'name' | 'startDate' | 'endDate' | 'status'>('client');
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [sortField, setSortField] = useState<'client' | 'name' | 'startDate' | 'endDate' | 'status'>(() => {
+    try {
+      const cached = localStorage.getItem('sites_sort_field');
+      if (cached && ['client', 'name', 'startDate', 'endDate', 'status'].includes(cached)) {
+        return cached as any;
+      }
+    } catch {}
+    return 'client';
+  });
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>(() => {
+    try {
+      const cached = localStorage.getItem('sites_sort_direction');
+      if (cached === 'asc' || cached === 'desc') return cached;
+    } catch {}
+    return 'asc';
+  });
 
   // URL state for Client Mode
   const urlClientName = searchParams.get('client');
@@ -656,10 +696,18 @@ export function Sites() {
 
   const handleSort = (field: typeof sortField) => {
     if (sortField === field) {
-      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+      const nextDir = sortDirection === 'asc' ? 'desc' : 'asc';
+      setSortDirection(nextDir);
+      try {
+        localStorage.setItem('sites_sort_direction', nextDir);
+      } catch {}
     } else {
       setSortField(field);
       setSortDirection('asc');
+      try {
+        localStorage.setItem('sites_sort_field', field);
+        localStorage.setItem('sites_sort_direction', 'asc');
+      } catch {}
     }
   };
 
@@ -1504,6 +1552,14 @@ export function Sites() {
                                     <BookOpen className="h-4 w-4" />
                                     <span>Site Diary</span>
                                   </DropdownMenuItem>
+
+                                  <DropdownMenuItem 
+                                    onClick={() => handleOpenAddTask(site)}
+                                    className="gap-2 text-indigo-600 focus:text-indigo-700"
+                                  >
+                                    <CheckSquare className="h-4 w-4" />
+                                    <span>Add Task</span>
+                                  </DropdownMenuItem>
   
                                   {canEditSite && (
                                     <DropdownMenuItem 
@@ -1680,6 +1736,14 @@ export function Sites() {
                                   >
                                     <BookOpen className="h-4 w-4" />
                                     <span>Site Diary</span>
+                                  </DropdownMenuItem>
+
+                                  <DropdownMenuItem 
+                                    onClick={() => handleOpenAddTask(site)}
+                                    className="gap-2 text-indigo-600 focus:text-indigo-700"
+                                  >
+                                    <CheckSquare className="h-4 w-4" />
+                                    <span>Add Task</span>
                                   </DropdownMenuItem>
 
                                   {canEditSite && (
@@ -2031,6 +2095,20 @@ export function Sites() {
           name={previewDoc.name}
           caption={previewDoc.caption}
           onClose={() => setPreviewDoc(null)}
+        />
+      )}
+
+      {taskDialog.open && (
+        <CreateTaskDialog
+          onClose={() => setTaskDialog(d => ({ ...d, open: false }))}
+          users={users || []}
+          currentUserId={currentUser?.id ?? ""}
+          teamId="dcel-team"
+          workspaceId="dcel-team"
+          initialClientId={taskDialog.clientId}
+          initialSiteId={taskDialog.siteId}
+          initialTagToSite={true}
+          isDarkTheme={isDark}
         />
       )}
 

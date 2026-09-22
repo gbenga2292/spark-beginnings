@@ -3,7 +3,7 @@ import { supabase } from '@/src/integrations/supabase/client';
 import { useAuth } from '@/src/hooks/useAuth';
 import { toast, showConfirm } from '@/src/components/ui/toast';
 import logoSrc from '../../logo/logo-2.png';
-import type { MainTask, SubTask, TaskComment, AppUser, CommentAttachment } from '@/src/types/tasks';
+import type { MainTask, SubTask, TaskComment, AppUser, CommentAttachment, TaskTimeEntry, TaskUrgency } from '@/src/types/tasks';
 import { useAppStore } from '@/src/store/appStore';
 import { useUserStore } from '@/src/store/userStore';
 import { formatDisplayDate, getISOWeekMondayString, formatWeekLabel, getISOWeekMonday } from '@/src/lib/dateUtils';
@@ -24,6 +24,7 @@ export interface AppDataContextType {
     projects: any[];
     reminders: any[];
     workspaces: any[];
+    timeEntries: TaskTimeEntry[];
     /** High-water mark cursors — keyed by task_id/user_id pair */
     participantStatuses: any[];
     /** Per-message read receipts — keyed by update_id/user_id pair */
@@ -33,6 +34,8 @@ export interface AppDataContextType {
     deleteReminder: (...args: any[]) => Promise<void>;
     toggleReminderActive: (...args: any[]) => Promise<void>;
     snoozeReminder: (id: string, untilDate: string) => Promise<void>;
+    addTimeEntry: (entry: Omit<TaskTimeEntry, 'id' | 'createdAt'>) => Promise<void>;
+    deleteTimeEntry: (id: string) => Promise<void>;
     createProject: (...args: any[]) => Promise<void>;
     createMainTask: (task: any, subs?: any[]) => Promise<any>;
     updateMainTask: (id: string, p: any) => Promise<void>;
@@ -141,6 +144,9 @@ export function mapMainTaskToCamel(m: any) {
         siteId: m.site_id || m.siteId,
         hasBudget: m.has_budget ?? m.hasBudget,
         budgetRequested: m.budget_requested ?? m.budgetRequested,
+        requestedByType: m.requested_by_type || m.requestedByType,
+        requestedBy: m.requested_by || m.requestedBy,
+        urgency: m.urgency,
     };
 }
 
@@ -165,6 +171,23 @@ export function mapSubtaskToCamel(s: any) {
         siteId: s.site_id || s.siteId,
         hasBudget: s.has_budget ?? s.hasBudget,
         budgetRequested: s.budget_requested ?? s.budgetRequested,
+        requestedByType: s.requested_by_type || s.requestedByType,
+        requestedBy: s.requested_by || s.requestedBy,
+        urgency: s.urgency,
+    };
+}
+
+export function mapTimeEntryToCamel(t: any): TaskTimeEntry {
+    if (!t) return t;
+    return {
+        id: t.id,
+        mainTaskId: t.mainTaskId || t.main_task_id,
+        subtaskId: t.subtaskId || t.subtask_id,
+        userId: t.userId || t.user_id,
+        hours: Number(t.hours ?? t.hours_spent ?? 0),
+        description: t.description || '',
+        date: t.date || t.created_at || new Date().toISOString(),
+        createdAt: t.createdAt || t.created_at || new Date().toISOString(),
     };
 }
 
@@ -193,6 +216,14 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
     const [comments, setComments] = useState<any[]>([]);
     const [projects, setProjects] = useState<any[]>([]);
     const [reminders, setReminders] = useState<any[]>([]);
+    const [timeEntries, setTimeEntries] = useState<TaskTimeEntry[]>(() => {
+        try {
+            const local = localStorage.getItem('dcel_task_time_entries_v1');
+            return local ? JSON.parse(local) : [];
+        } catch {
+            return [];
+        }
+    });
     /** High-water mark cursors: task_participant_status rows */
     const [participantStatuses, setParticipantStatuses] = useState<any[]>([]);
     /** Per-message receipts: task_update_receipts rows */
@@ -300,6 +331,14 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                     status: r.status,
                     readAt: r.read_at,
                 })));
+                try {
+                    const { data: teData } = await supabase.from('task_time_entries').select('*').order('created_at', { ascending: false });
+                    if (teData && Array.isArray(teData)) {
+                        const mappedTe = teData.map(mapTimeEntryToCamel);
+                        setTimeEntries(mappedTe);
+                        try { localStorage.setItem('dcel_task_time_entries_v1', JSON.stringify(mappedTe)); } catch {}
+                    }
+                } catch { /* graceful fallback to local storage */ }
                 if (remRes.data) {
                     const mappedRems = remRes.data.map(mapReminderToCamel);
                     setReminders(mappedRems);
@@ -542,9 +581,55 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         syncLocalNotifications();
     }, [reminders, user]);
 
+    // ── Time Tracking callbacks ──────────────────────────────────────────────
+    const addTimeEntry = useCallback(async (entry: Omit<TaskTimeEntry, 'id' | 'createdAt'>) => {
+        const newEntry: TaskTimeEntry = {
+            id: `te-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+            ...entry,
+            createdAt: new Date().toISOString()
+        };
+        setTimeEntries(prev => {
+            const updated = [newEntry, ...prev];
+            try { localStorage.setItem('dcel_task_time_entries_v1', JSON.stringify(updated)); } catch {}
+            return updated;
+        });
+
+        try {
+            await supabase.from('task_time_entries').insert({
+                id: newEntry.id,
+                main_task_id: newEntry.mainTaskId || null,
+                subtask_id: newEntry.subtaskId || null,
+                user_id: newEntry.userId,
+                hours_spent: newEntry.hours,
+                description: newEntry.description || '',
+                date: newEntry.date
+            });
+        } catch (err) {
+            console.warn('Could not persist time entry to Supabase (saved locally):', err);
+        }
+        toast.success('Time logged successfully');
+    }, []);
+
+    const deleteTimeEntry = useCallback(async (id: string) => {
+        setTimeEntries(prev => {
+            const updated = prev.filter(e => e.id !== id);
+            try { localStorage.setItem('dcel_task_time_entries_v1', JSON.stringify(updated)); } catch {}
+            return updated;
+        });
+        try {
+            await supabase.from('task_time_entries').delete().eq('id', id);
+        } catch (err) {
+            console.warn('Could not delete time entry from Supabase:', err);
+        }
+        toast.success('Time entry removed');
+    }, []);
+
     // ── Memoized action callbacks ─────────────────────────────────────────────
     const createMainTask = useCallback(async (task: any, subs: any[] = []) => {
         // --- ROGUE TASK INTERCEPTOR ---
+
+        const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        const safeUuid = (v?: any) => (typeof v === 'string' && UUID_REGEX.test(v.trim())) ? v.trim() : null;
 
         const payload = {
             title: task.title,
@@ -555,14 +640,17 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
             assigned_to: task.assignedTo || null,
             deadline: task.deadline || null,
             priority: task.priority || null,
+            urgency: task.urgency || null,
             is_project: task.is_project || false,
             requires_approval: task.requiresApproval || false,
             approver_id: task.approverId || null,
             is_hr_task: task.is_hr_task || false,
-            client_id: task.clientId || null,
-            site_id: task.siteId || null,
+            client_id: safeUuid(task.clientId),
+            site_id: safeUuid(task.siteId),
             has_budget: task.hasBudget || false,
             budget_requested: task.budgetRequested || null,
+            requested_by_type: task.requestedByType || null,
+            requested_by: task.requestedBy || null,
         };
         const { data, error } = await supabase.from('main_tasks').insert(payload).select().single();
         if (error) {
@@ -587,6 +675,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                     status: task.requiresApproval ? 'pending_approval' : 'not_started',
                     deadline: payload.deadline,
                     priority: payload.priority,
+                    urgency: task.urgency || null,
                     requiresApproval: task.requiresApproval || false,
                     approverId: task.approverId || null,
                     clientId: payload.client_id,
@@ -594,6 +683,8 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                     hasBudget: task.hasBudget || false,
                     budgetRequested: task.budgetRequested || null,
                     workspaceId: payload.workspaceId,
+                    requestedByType: payload.requested_by_type,
+                    requestedBy: payload.requested_by,
                 }];
             }
 
@@ -605,14 +696,17 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                     status: s.status || 'not_started',
                     deadline: s.deadline || null,
                     priority: s.priority || null,
+                    urgency: s.urgency || task.urgency || null,
                     requires_approval: s.requiresApproval || false,
                     approver_id: s.approverId || null,
                     main_task_id: data.id,
-                    client_id: s.clientId || null,
-                    site_id: s.siteId || null,
+                    client_id: safeUuid(s.clientId) || payload.client_id,
+                    site_id: safeUuid(s.siteId) || payload.site_id,
                     has_budget: s.hasBudget || false,
                     budget_requested: s.budgetRequested || null,
                     workspaceId: s.workspaceId || payload.workspaceId || null,
+                    requested_by_type: s.requestedByType || payload.requested_by_type || null,
+                    requested_by: s.requestedBy || payload.requested_by || null,
                 }));
                 const { data: insertedSubs, error: subErr } = await supabase.from('subtasks').insert(subTasksPayload).select();
                 if (subErr) {
@@ -694,6 +788,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         if (p.description !== undefined)        payload.description = p.description ?? null;
         if (p.deadline !== undefined)           payload.deadline = p.deadline ?? null;
         if (p.priority !== undefined)           payload.priority = p.priority ?? null;
+        if (p.urgency !== undefined)            payload.urgency = p.urgency ?? null;
         if (p.assignedTo !== undefined)         payload.assigned_to = p.assignedTo ?? null;
         if (p.teamId !== undefined)             payload.teamId = p.teamId;
         if (p.workspaceId !== undefined)        payload.workspaceId = p.workspaceId;
@@ -707,6 +802,10 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         if (p.isHrTask !== undefined)           payload.is_hr_task = p.isHrTask;
         if (p.clientId !== undefined)           payload.client_id = p.clientId;
         if (p.siteId !== undefined)             payload.site_id = p.siteId;
+        if (p.requestedByType !== undefined)    payload.requested_by_type = p.requestedByType;
+        if (p.requested_by_type !== undefined)  payload.requested_by_type = p.requested_by_type;
+        if (p.requestedBy !== undefined)        payload.requested_by = p.requestedBy;
+        if (p.requested_by !== undefined)       payload.requested_by = p.requested_by;
         const { data, error } = await supabase.from('main_tasks').update(payload).eq('id', id).select().single();
         if (error) {
             console.error('updateMainTask error:', error);
@@ -898,6 +997,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
             status: sub.requiresApproval ? 'pending_approval' : (sub.status || 'not_started'),
             deadline: sub.deadline || null,
             priority: sub.priority || null,
+            urgency: sub.urgency || null,
             requires_approval: sub.requiresApproval || false,
             approver_id: sub.approverId || null,
             main_task_id: sub.mainTaskId,
@@ -906,6 +1006,8 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
             has_budget: sub.hasBudget || false,
             budget_requested: sub.budgetRequested || null,
             workspaceId: sub.workspaceId || null,
+            requested_by_type: sub.requestedByType || sub.requested_by_type || null,
+            requested_by: sub.requestedBy || sub.requested_by || null,
         };
         const { data, error } = await supabase.from('subtasks').insert(payload).select().single();
         if (error) {
@@ -925,10 +1027,11 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         // Whitelist allowed columns for the subtasks table to prevent 400 errors
         const allowedColumns = [
             'title', 'description', 'status', 'assignedTo', 'assigned_to', 
-            'priority', 'deadline', 'main_task_id', 'mainTaskId', 
+            'priority', 'urgency', 'deadline', 'main_task_id', 'mainTaskId', 
             'requires_approval', 'approver_id', 'approvedBy', 'is_deleted', 'deleted_at', 
             'completed_at', 'workspaceId', 'workspace_id', 'client_id', 'clientId', 'site_id', 'siteId',
-            'has_budget', 'budget_requested'
+            'has_budget', 'budget_requested',
+            'requested_by', 'requestedBy', 'requested_by_type', 'requestedByType'
         ];
 
         const payload: any = {};
@@ -937,6 +1040,8 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         Object.keys(p).forEach(key => {
             if (key === 'requiresApproval') {
                 payload.requires_approval = p.requiresApproval;
+            } else if (key === 'urgency') {
+                payload.urgency = p.urgency;
             } else if (key === 'approverId') {
                 payload.approver_id = p.approverId;
             } else if (key === 'clientId') {
@@ -949,6 +1054,10 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                 payload.budget_requested = p.budgetRequested;
             } else if (key === 'workspaceId') {
                 payload.workspaceId = p.workspaceId;
+            } else if (key === 'requestedBy') {
+                payload.requested_by = p.requestedBy;
+            } else if (key === 'requestedByType') {
+                payload.requested_by_type = p.requestedByType;
             } else if (key === 'approved_by' || key === 'approvedBy') {
                 payload.approvedBy = p[key];
             } else if (allowedColumns.includes(key)) {
@@ -1934,11 +2043,14 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         projects,
         reminders,
         workspaces: [{ id: 'dcel-team', name: 'DCEL Team Workspace' }],
+        timeEntries,
         addReminder,
         updateReminder,
         deleteReminder,
         toggleReminderActive,
         snoozeReminder,
+        addTimeEntry,
+        deleteTimeEntry,
         createProject,
         createMainTask,
         updateMainTask,
@@ -1972,7 +2084,8 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         refetchAll: async () => {},
         searchTasksServer,
         importTaskBackupData,
-    }), [mainTasks, subtasks, users, comments, projects, reminders, participantStatuses, updateReceipts,
+    }), [mainTasks, subtasks, users, comments, projects, reminders, timeEntries, participantStatuses, updateReceipts,
+        addTimeEntry, deleteTimeEntry,
         createProject, createMainTask, updateMainTask, deleteMainTask,
         addSubtask, updateSubtask, deleteSubtask, assignSubtask,
         updateSubtaskStatus, approveSubtask, rejectSubtask,
@@ -1998,6 +2111,7 @@ export function useAppData(): AppDataContextType {
             projects: [],
             reminders: [],
             workspaces: [],
+            timeEntries: [],
             participantStatuses: [],
             updateReceipts: [],
             addReminder: async () => {},
@@ -2005,6 +2119,8 @@ export function useAppData(): AppDataContextType {
             deleteReminder: async () => {},
             toggleReminderActive: async () => {},
             snoozeReminder: async () => {},
+            addTimeEntry: async () => {},
+            deleteTimeEntry: async () => {},
             createProject: async () => {},
             createMainTask: async () => ({}),
             updateMainTask: async () => {},

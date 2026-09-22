@@ -41,7 +41,7 @@ interface SiteProjectBar {
   siteObj: Site;
 }
 
-type ZoomScale = 'months' | 'weeks' | 'days';
+type ZoomScale = 'fit' | 'months' | 'weeks' | 'days';
 type DatePreset = 'all' | '30days' | '90days' | '6months' | 'thisYear';
 type SortOrder = 'asc' | 'desc';
 
@@ -54,9 +54,9 @@ export function ClientSitesTimeline({ selectedClient, onOpenSite360 }: Props) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedBar, setSelectedBar] = useState<SiteProjectBar | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [zoomScale, setZoomScale] = useState<ZoomScale>('months');
+  const [zoomScale, setZoomScale] = useState<ZoomScale>('fit');
   const [datePreset, setDatePreset] = useState<DatePreset>('all');
-  const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
+  const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
   const [userZoomSelected, setUserZoomSelected] = useState(false);
   const [viewType, setViewType] = useState<'cards' | 'gantt'>(() => {
     if (typeof window !== 'undefined' && window.innerWidth < 768) {
@@ -324,12 +324,12 @@ export function ClientSitesTimeline({ selectedClient, onOpenSite360 }: Props) {
   // Auto-tune Zoom Scale on initial load if user hasn't explicitly toggled it
   useEffect(() => {
     if (!userZoomSelected) {
-      if (totalDaysSpan <= 45) {
+      if (totalDaysSpan <= 30) {
         setZoomScale('days');
-      } else if (totalDaysSpan <= 180) {
+      } else if (totalDaysSpan <= 90) {
         setZoomScale('weeks');
       } else {
-        setZoomScale('months');
+        setZoomScale('fit');
       }
     }
   }, [totalDaysSpan, userZoomSelected]);
@@ -354,39 +354,38 @@ export function ClientSitesTimeline({ selectedClient, onOpenSite360 }: Props) {
 
   // Calendar Months array
   const calendarMonths = useMemo(() => {
-    if (calendarDays.length === 0) return [];
     const groups: { label: string; year: string; count: number; startIdx: number }[] = [];
-    let currentLabel = '';
+    let currentMonth = '';
     let currentYear = '';
-    let count = 0;
+    let currentCount = 0;
     let startIdx = 0;
 
     calendarDays.forEach((day, idx) => {
-      const label = format(day, 'MMM');
-      const year = format(day, 'yyyy');
-      const full = `${label} ${year}`;
-      if (full !== currentLabel) {
-        if (currentLabel) {
+      const mStr = format(day, 'MMM');
+      const yStr = format(day, 'yyyy');
+      if (mStr !== currentMonth || yStr !== currentYear) {
+        if (currentCount > 0) {
           groups.push({
-            label: currentLabel.split(' ')[0],
+            label: currentMonth,
             year: currentYear,
-            count,
+            count: currentCount,
             startIdx,
           });
         }
-        currentLabel = full;
-        currentYear = year;
-        count = 1;
+        currentMonth = mStr;
+        currentYear = yStr;
+        currentCount = 1;
         startIdx = idx;
       } else {
-        count++;
+        currentCount++;
       }
     });
-    if (count > 0) {
+
+    if (currentCount > 0) {
       groups.push({
-        label: currentLabel.split(' ')[0],
+        label: currentMonth,
         year: currentYear,
-        count,
+        count: currentCount,
         startIdx,
       });
     }
@@ -395,6 +394,9 @@ export function ClientSitesTimeline({ selectedClient, onOpenSite360 }: Props) {
 
   // Dynamic Content Width for horizontal scrolling
   const gridContainerWidth = useMemo(() => {
+    if (zoomScale === 'fit') {
+      return 0;
+    }
     if (zoomScale === 'days') {
       return Math.max(920, calendarDays.length * 36);
     }
@@ -482,17 +484,17 @@ export function ClientSitesTimeline({ selectedClient, onOpenSite360 }: Props) {
         "rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs p-3 space-y-3",
         isFullscreen && "p-2.5 space-y-2 rounded-xl"
       )}>
-        {/* Tier 1: Primary View Switcher & Contextual Tools */}
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        {/* Tier 1: Primary View Switcher & Contextual Tools (Autofit on single row) */}
+        <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-2.5">
           {/* Left: Cards vs Gantt Switcher + Status Chips */}
-          <div className="flex items-center gap-2.5 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap min-w-0">
             {/* View Switcher Toggle */}
-            <div className="inline-flex items-center bg-slate-100 dark:bg-slate-800/80 p-0.5 rounded-xl border border-slate-200/80 dark:border-slate-700/80 text-xs">
+            <div className="inline-flex items-center bg-slate-100 dark:bg-slate-800/80 p-0.5 rounded-xl border border-slate-200/80 dark:border-slate-700/80 text-xs shrink-0">
               <button
                 type="button"
                 onClick={() => setViewType('cards')}
                 className={cn(
-                  "flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold text-xs transition-all cursor-pointer",
+                  "flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-bold text-xs transition-all cursor-pointer",
                   viewType === 'cards'
                     ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs"
                     : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
@@ -505,7 +507,7 @@ export function ClientSitesTimeline({ selectedClient, onOpenSite360 }: Props) {
                 type="button"
                 onClick={() => setViewType('gantt')}
                 className={cn(
-                  "flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold text-xs transition-all cursor-pointer",
+                  "flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-bold text-xs transition-all cursor-pointer",
                   viewType === 'gantt'
                     ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs"
                     : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
@@ -518,24 +520,24 @@ export function ClientSitesTimeline({ selectedClient, onOpenSite360 }: Props) {
 
             {/* KPI Badges */}
             <div className="flex items-center gap-1.5 flex-wrap text-xs">
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold border border-slate-200 dark:border-slate-700">
-                <Building2 className="w-3.5 h-3.5 text-sky-500" />
-                <span>{summary.totalSites} Site{summary.totalSites === 1 ? '' : 's'}</span>
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold text-[11px] border border-slate-200 dark:border-slate-700 whitespace-nowrap">
+                <Building2 className="w-3 h-3 text-sky-500" />
+                <span>{summary.totalSites} Sites</span>
               </span>
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 font-semibold text-xs border border-emerald-500/20">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 font-semibold text-[11px] border border-emerald-500/20 whitespace-nowrap">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                 <span>{summary.activeCount} Active</span>
               </span>
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-500/10 text-slate-600 dark:text-slate-400 font-medium text-xs border border-slate-300/40 dark:border-slate-700">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-slate-500/10 text-slate-600 dark:text-slate-400 font-medium text-[11px] border border-slate-300/40 dark:border-slate-700 whitespace-nowrap">
                 <span>{summary.endedCount} Ended</span>
               </span>
               {summary.totalPumping > 0 && (
-                <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-sky-500/10 text-sky-700 dark:text-sky-300 font-medium text-xs border border-sky-500/20">
+                <span className="hidden xl:inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-sky-500/10 text-sky-700 dark:text-sky-300 font-medium text-[11px] border border-sky-500/20 whitespace-nowrap">
                   <span>{summary.totalPumping}d Pumping</span>
                 </span>
               )}
               {summary.totalDiesel > 0 && (
-                <span className="hidden md:inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-500/10 text-amber-700 dark:text-amber-300 font-medium text-xs border border-amber-500/20">
+                <span className="hidden 2xl:inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-500/10 text-amber-700 dark:text-amber-300 font-medium text-[11px] border border-amber-500/20 whitespace-nowrap">
                   <span>{summary.totalDiesel.toLocaleString()}L Fuel</span>
                 </span>
               )}
@@ -544,12 +546,12 @@ export function ClientSitesTimeline({ selectedClient, onOpenSite360 }: Props) {
 
           {/* Right: Gantt Viewport Tools */}
           {viewType === 'gantt' && (
-            <div className="flex items-center gap-2 flex-wrap ml-auto">
+            <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap shrink-0 ml-auto">
               {/* Preset Selector */}
               <select
                 value={datePreset}
                 onChange={e => setDatePreset(e.target.value as DatePreset)}
-                className="h-8 text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 cursor-pointer focus:outline-none"
+                className="h-7.5 text-xs font-semibold px-2 py-1 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 cursor-pointer focus:outline-none"
               >
                 <option value="all">All-Time</option>
                 <option value="30days">Last 30d</option>
@@ -558,9 +560,9 @@ export function ClientSitesTimeline({ selectedClient, onOpenSite360 }: Props) {
                 <option value="thisYear">This Year</option>
               </select>
 
-              {/* Zoom Scale Segmented Buttons */}
+              {/* Zoom Scale Segmented Buttons with Auto-Fit */}
               <div className="flex items-center bg-slate-100 dark:bg-slate-800/80 p-0.5 rounded-xl border border-slate-200/80 dark:border-slate-700/80 text-xs shrink-0">
-                {(['months', 'weeks', 'days'] as const).map(scale => (
+                {(['fit', 'months', 'weeks', 'days'] as const).map(scale => (
                   <button
                     key={scale}
                     type="button"
@@ -569,13 +571,13 @@ export function ClientSitesTimeline({ selectedClient, onOpenSite360 }: Props) {
                       setUserZoomSelected(true);
                     }}
                     className={cn(
-                      "px-2.5 py-1 rounded-lg font-bold text-[11px] capitalize transition-all cursor-pointer",
+                      "px-2.5 py-1 rounded-lg font-bold text-[11px] capitalize transition-all cursor-pointer whitespace-nowrap",
                       zoomScale === scale
                         ? "bg-gradient-to-r from-sky-500 to-blue-600 text-white shadow-xs"
                         : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
                     )}
                   >
-                    {scale === 'days' ? 'Days' : scale === 'weeks' ? 'Weeks' : 'Months'}
+                    {scale === 'fit' ? 'Auto-Fit' : scale === 'days' ? 'Days' : scale === 'weeks' ? 'Weeks' : 'Months'}
                   </button>
                 ))}
               </div>
@@ -587,7 +589,7 @@ export function ClientSitesTimeline({ selectedClient, onOpenSite360 }: Props) {
                 variant="outline"
                 size="sm"
                 className={cn(
-                  "rounded-lg text-xs gap-1.5 font-bold transition-colors h-8 px-2.5",
+                  "rounded-lg text-xs gap-1.5 font-bold transition-colors h-7.5 px-2.5",
                   isFullscreen
                     ? "bg-amber-500/10 border-amber-500/30 text-amber-700 dark:text-amber-400"
                     : "border-sky-200 dark:border-sky-800 bg-sky-50/80 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 hover:bg-sky-100 dark:hover:bg-sky-900/60 shadow-xs"
@@ -837,7 +839,7 @@ export function ClientSitesTimeline({ selectedClient, onOpenSite360 }: Props) {
           isFullscreen ? "flex-1 min-h-0 h-full" : "max-h-[calc(100vh-230px)] min-h-[420px] sm:min-h-[520px]"
         )}
       >
-        <div style={{ minWidth: `${gridContainerWidth + 240}px` }}>
+        <div style={{ minWidth: zoomScale === 'fit' ? '100%' : `${gridContainerWidth + 240}px` }}>
           
           {/* Sticky Header: Months & Granular Intervals (Fixed at Top) */}
           <div className="grid grid-cols-[240px_1fr] border-b border-slate-200 dark:border-slate-800 sticky top-0 z-30 shadow-xs bg-slate-100 dark:bg-slate-800">
@@ -849,10 +851,10 @@ export function ClientSitesTimeline({ selectedClient, onOpenSite360 }: Props) {
                 </div>
                 <button
                   onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
-                  className="text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 transition-colors p-1 rounded"
-                  title={`Toggle Sort (${sortOrder === 'asc' ? 'Earliest Start First' : 'Newest Start First'})`}
+                  className="text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 transition-colors p-1 rounded cursor-pointer"
+                  title={sortOrder === 'desc' ? 'Sorted by Newest Start Date (click for Earliest first)' : 'Sorted by Earliest Start Date (click for Newest first)'}
                 >
-                  {sortOrder === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-sky-500" /> : <ArrowDown className="w-3.5 h-3.5 text-sky-500" />}
+                  {sortOrder === 'desc' ? <ArrowDown className="w-3.5 h-3.5 text-sky-500" /> : <ArrowUp className="w-3.5 h-3.5 text-sky-500" />}
                 </button>
               </div>
 
@@ -916,10 +918,10 @@ export function ClientSitesTimeline({ selectedClient, onOpenSite360 }: Props) {
                   </div>
                 )}
 
-                {zoomScale === 'months' && (
+                {(zoomScale === 'months' || zoomScale === 'fit') && (
                   <div className="flex text-[10px] font-medium text-slate-400 bg-slate-50 dark:bg-slate-800/60 py-1 px-2">
                     <span className="text-center w-full uppercase font-bold tracking-widest text-[9px]">
-                      Project Duration ({sortOrder === 'asc' ? 'Sorted Chronologically: Earliest ➔ Newest' : 'Sorted: Newest ➔ Earliest'})
+                      {zoomScale === 'fit' ? 'Auto-Fit Timeline' : 'Monthly Timeline'} ({sortOrder === 'asc' ? 'Sorted Chronologically: Earliest ➔ Newest' : 'Sorted: Newest ➔ Earliest'})
                     </span>
                   </div>
                 )}

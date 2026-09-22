@@ -1716,6 +1716,8 @@ export type Database = {
           title: string | null
           updated_at: string | null
           workspaceId: string | null
+          requested_by: string | null
+          requested_by_type: string | null
         }
         Insert: {
           approver_id?: string | null
@@ -1740,6 +1742,8 @@ export type Database = {
           title?: string | null
           updated_at?: string | null
           workspaceId?: string | null
+          requested_by?: string | null
+          requested_by_type?: string | null
         }
         Update: {
           approver_id?: string | null
@@ -1764,6 +1768,8 @@ export type Database = {
           title?: string | null
           updated_at?: string | null
           workspaceId?: string | null
+          requested_by?: string | null
+          requested_by_type?: string | null
         }
         Relationships: [
           {
@@ -3238,6 +3244,8 @@ export type Database = {
           title: string | null
           updated_at: string | null
           workspaceId: string | null
+          requested_by: string | null
+          requested_by_type: string | null
         }
         Insert: {
           approvedBy?: string | null
@@ -3263,6 +3271,8 @@ export type Database = {
           title?: string | null
           updated_at?: string | null
           workspaceId?: string | null
+          requested_by?: string | null
+          requested_by_type?: string | null
         }
         Update: {
           approvedBy?: string | null
@@ -3288,6 +3298,8 @@ export type Database = {
           title?: string | null
           updated_at?: string | null
           workspaceId?: string | null
+          requested_by?: string | null
+          requested_by_type?: string | null
         }
         Relationships: [
           {

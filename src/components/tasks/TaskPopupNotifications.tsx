@@ -205,9 +205,23 @@ export function TaskPopupNotifications() {
   // Track comment IDs processed by real-time so we don't re-process on initial load
   const processedCommentIds = useRef<Set<string>>(new Set());
   const initialised = useRef(false);
+  const remindersInitialised = useRef(false);
+  const mountedAt = useRef(Date.now());
+  const isStartup = useRef(true);
+
+  // Suppress all floating popups during initial startup (user switched to DailyUrgentTasksModal for startup briefing)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      isStartup.current = false;
+    }, 4000);
+    return () => clearTimeout(timer);
+  }, []);
 
   /* ── Helpers ─────────────────────────────────────────────────────────── */
   const pushPopup = useCallback((p: Omit<TaskPopup, 'id' | 'timestamp'> & { dedupeKey?: string; nativeId?: number; skipNative?: boolean }) => {
+    // Strictly suppress popups on initial app open
+    if (isStartup.current) return;
+
     const dedupeKey = p.dedupeKey || `${p.type}-${p.title}-${p.body}`;
     if (shownIds.current.has(dedupeKey)) return;
 
@@ -328,17 +342,33 @@ export function TaskPopupNotifications() {
     }
   }, [comments]);
 
-  /* ── Timer-based: fire reminder popups only when remind_at time arrives ─ */
+  /* ── Mark all existing reminders as already seen on mount to prevent startup popups ─ */
+  useEffect(() => {
+    if (!remindersInitialised.current && reminders.length > 0) {
+      reminders.forEach(rem => {
+        const todayStr = new Date().toISOString().split('T')[0];
+        shownIds.current.add(`rem-popup-${rem.id}`);
+        shownIds.current.add(`inv-rem-${rem.id}-${todayStr}`);
+        if (rem.subtaskId) shownIds.current.add(`assign-sub-${rem.subtaskId}`);
+        if (rem.mainTaskId) shownIds.current.add(`assign-main-${rem.mainTaskId}`);
+      });
+      remindersInitialised.current = true;
+    }
+  }, [reminders]);
+
+  /* ── Timer-based: fire reminder popups only when remind_at time arrives DURING active session ─ */
   useEffect(() => {
     if (!user?.id) return;
     const userId = user.id;
 
     const checkReminders = () => {
+      // Never fire popups while in startup phase (the DailyUrgentTasksModal handles startup briefing)
+      if (isStartup.current) return;
+
       const now = Date.now();
       const dismissedSet = getDismissedPopupKeys(userId);
 
-      // Startup window: only trigger popups for reminders due within the last 15 minutes or now
-      // Any older reminders stay in the Header Notification Bell dropdown and Reminders page
+      // Startup window: only trigger popups for reminders that mature while app is already open
       const RECENT_DUE_WINDOW_MS = 15 * 60 * 1000;
 
       reminders.forEach(rem => {
@@ -361,6 +391,9 @@ export function TaskPopupNotifications() {
           pDate.setHours(9, 0, 0, 0); // 9:00 AM
           popupStartDate = pDate.getTime();
         }
+
+        // Never pop up reminders that matured prior to opening the app
+        if (popupStartDate < mountedAt.current) return;
 
         const diff = now - popupStartDate;
 
@@ -399,8 +432,7 @@ export function TaskPopupNotifications() {
             updateReminder(rem.id, { sendEmail: false });
           }
         } else {
-          // For regular reminders: if it was due longer than RECENT_DUE_WINDOW_MS ago (e.g. from previous days/hours),
-          // don't bombard user with floating toasts on startup — it is already in Notification Center.
+          // For regular reminders: if it was due longer than RECENT_DUE_WINDOW_MS ago, skip
           if (diff > RECENT_DUE_WINDOW_MS) {
             return;
           }
@@ -459,8 +491,7 @@ export function TaskPopupNotifications() {
       });
     };
 
-    // Check immediately and then every 30 seconds
-    checkReminders();
+    // Check periodically during active session, not on initial mount
     const interval = setInterval(checkReminders, 30_000);
     return () => clearInterval(interval);
   }, [user?.id, reminders, pushPopup, mainTasks, currentUser, updateReminder]);

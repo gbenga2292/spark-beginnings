@@ -7,6 +7,7 @@ import { useTheme } from '@/src/hooks/useTheme';
 import { useUserStore } from '@/src/store/userStore';
 import { DesktopFloatingCalendar } from '../tasks/DesktopFloatingCalendar';
 import { TaskPopupNotifications } from '../tasks/TaskPopupNotifications';
+import { DailyUrgentTasksModal } from '../tasks/DailyUrgentTasksModal';
 import { ConnectionBanner } from '@/src/components/offline/ConnectionBanner';
 import { startNetworkMonitor } from '@/src/store/networkStore';
 import { ShieldAlert, RefreshCw, X } from 'lucide-react';
@@ -125,6 +126,7 @@ export function Layout() {
       {/* Global Features */}
       {canViewCalendar && showFloatingCalendar && <DesktopFloatingCalendar />}
       <TaskPopupNotifications />
+      <DailyUrgentTasksModal />
       <CopilotTriggerButton />
     </div>
   );

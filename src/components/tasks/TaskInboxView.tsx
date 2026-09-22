@@ -16,8 +16,10 @@ import {
 } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/src/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/src/components/ui/dropdown-menu";
-import type { SubTask, MainTask, AppUser, SubTaskStatus, CommentAttachment } from "@/src/types/tasks";
+import type { SubTask, MainTask, AppUser, SubTaskStatus, CommentAttachment, TaskUrgency } from "@/src/types/tasks";
 import { AppraisalScoreSheet } from "../evaluations/AppraisalScoreSheet";
+import { TaskTimeTracker } from "./TaskTimeTracker";
+import { URGENCY_CONFIG } from "./DailyUrgentTasksModal";
 
 // ── Status Config ─────────────────────────────────────────────────────────────
 const statusConfig: Record<SubTaskStatus, { label: string; pillClass: string; dotColor: string; icon: any }> = {
@@ -147,7 +149,7 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
   const { user: currentUser } = useAuth();
   const subUser = useUserStore((s) => s.getCurrentUser());
   const { updateEmployee, addEvaluation, updateEvaluation, employees, evaluations } = useAppStore();
-  const { updateSubtaskStatus, postComment, getSubtaskComments, addSubtask, assignSubtask, getMainTaskWorkflow, approveSubtask, rejectSubtask, addReminder, createMainTask } = useAppData();
+  const { updateSubtaskStatus, postComment, getSubtaskComments, addSubtask, assignSubtask, getMainTaskWorkflow, approveSubtask, rejectSubtask, addReminder, createMainTask, updateSubtask } = useAppData();
 
   const [search, setSearch] = useState("");
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
@@ -951,6 +953,27 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
 
                 {/* Meta Fields */}
                 <div className="grid grid-cols-[110px_1fr] gap-y-4 text-sm mb-8 bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+                  {(() => {
+                    const reqBy = (activeSubtask as any).requestedBy || (activeSubtask as any).requested_by || (activeMainTask as any)?.requestedBy || (activeMainTask as any)?.requested_by;
+                    const reqType = (activeSubtask as any).requestedByType || (activeSubtask as any).requested_by_type || (activeMainTask as any)?.requestedByType || (activeMainTask as any)?.requested_by_type || 'DCEL';
+                    if (!reqBy) return null;
+                    return (
+                      <>
+                        <span className="font-semibold text-slate-500 flex items-center">Requested By:</span>
+                        <div className="flex items-center gap-2 font-medium text-slate-800 flex-wrap">
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider ${
+                            reqType === 'CLIENT'
+                              ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                              : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                          }`}>
+                            {reqType}
+                          </span>
+                          <span className="text-xs text-slate-900 font-semibold">{reqBy}</span>
+                        </div>
+                      </>
+                    );
+                  })()}
+
                   <span className="font-semibold text-slate-500 flex items-center">Assigned:</span>
                   <div className="flex items-center gap-2 font-medium text-slate-800 flex-wrap">
                     {activeAssignees.length > 0 ? (
@@ -974,6 +997,40 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
                       <AlertTriangle className="w-3.5 h-3.5 text-orange-500" /> :
                       <div className="w-2 h-2 rounded-full bg-slate-300" />}
                     {activeSubtask.priority || 'Normal'}
+                  </div>
+
+                  <span className="font-semibold text-slate-500 flex items-center">Urgency:</span>
+                  <div className="flex items-center gap-2">
+                    {(() => {
+                      const urg = activeSubtask.urgency || 'medium';
+                      const urgConf = URGENCY_CONFIG[urg] || URGENCY_CONFIG.medium;
+                      return (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <button className={`flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-xs font-bold border transition-all cursor-pointer ${urgConf.badgeCls}`}>
+                              <span className={`w-1.5 h-1.5 rounded-full ${urgConf.dotCls}`} />
+                              {urgConf.label}
+                              <ChevronDown className="w-3 h-3 opacity-60 ml-0.5" />
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="start" className="w-36">
+                            {(['critical', 'high', 'medium', 'low'] as TaskUrgency[]).map(uKey => {
+                              const conf = URGENCY_CONFIG[uKey];
+                              return (
+                                <DropdownMenuItem
+                                  key={uKey}
+                                  onClick={() => updateSubtask(activeSubtask.id!, { urgency: uKey })}
+                                  className="flex items-center gap-2 text-xs font-semibold capitalize cursor-pointer"
+                                >
+                                  <span className={`w-2 h-2 rounded-full ${conf.dotCls}`} />
+                                  {conf.label}
+                                </DropdownMenuItem>
+                              );
+                            })}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      );
+                    })()}
                   </div>
 
                   <span className="font-semibold text-slate-500 flex items-center">Timeline:</span>
@@ -1077,6 +1134,9 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
                     </div>
                   );
                 })()}
+
+                {/* Granular User-by-User Time Tracking Progression */}
+                <TaskTimeTracker taskId={activeSubtask.id!} users={users} className="mb-8" />
 
                 {(() => {
                   const isAdminOrHr = currentUser?.role === 'admin' || currentUser?.role === 'co-admin' || subUser?.department?.toLowerCase() === 'hr' || subUser?.privileges?.tasks?.isExternalHr;

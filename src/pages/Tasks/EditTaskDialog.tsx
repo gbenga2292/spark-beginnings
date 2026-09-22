@@ -1,12 +1,15 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Pencil, ChevronDown, Clock, RefreshCw, Users, Bell, CheckCircle2, MapPin } from 'lucide-react';
 import { Button } from '@/src/components/ui/button';
 import { useAuth } from '@/src/hooks/useAuth';
 import { useAppData } from '@/src/contexts/AppDataContext';
 import { useAppStore } from '@/src/store/appStore';
-import type { MainTask, AppUser, TaskPriority } from "@/src/types/tasks";
+import type { MainTask, AppUser, TaskPriority, TaskUrgency } from "@/src/types/tasks";
 import { PRIORITY_ORDER, PRIORITY_CONFIG } from "@/src/components/tasks/TasksShared";
+import { URGENCY_CONFIG } from "@/src/components/tasks/DailyUrgentTasksModal";
+
+const URGENCY_ORDER: TaskUrgency[] = ['low', 'medium', 'high', 'critical'];
 
 interface EditTaskDialogProps {
   task: MainTask;
@@ -18,6 +21,8 @@ interface EditTaskDialogProps {
 export function EditTaskDialog({ task, users, onClose, onSave }: EditTaskDialogProps) {
   const clientProfiles = useAppStore(s => s.clientProfiles);
   const sites = useAppStore(s => s.sites);
+  const employees = useAppStore(s => s.employees);
+  const clientContacts = useAppStore(s => s.clientContacts);
 
   const [title, setTitle] = useState(task.title);
   const [description, setDesc] = useState(task.description ?? "");
@@ -26,6 +31,7 @@ export function EditTaskDialog({ task, users, onClose, onSave }: EditTaskDialogP
   );
   const [deadline, setDeadline] = useState(task.deadline ?? "");
   const [priority, setPriority] = useState<TaskPriority | undefined>(task.priority);
+  const [urgency, setUrgency] = useState<TaskUrgency>(task.urgency || 'medium');
   const [requiresApproval, setRequiresApproval] = useState(task.requiresApproval ?? false);
   const [approverId, setApproverId] = useState(task.approverId || '');
   const [hasBudget, setHasBudget] = useState(task.hasBudget ?? false);
@@ -38,6 +44,90 @@ export function EditTaskDialog({ task, users, onClose, onSave }: EditTaskDialogP
   const [clientId, setClientId] = useState(task.clientId || '');
   const [siteId, setSiteId] = useState(task.siteId || '');
 
+  // ── Requested By state (DCEL vs CLIENT) ───────────────────────────────────
+  const initialRequestedBy = (task as any).requestedBy || (task as any).requested_by || '';
+  const initialRequestedByType = (task as any).requestedByType || (task as any).requested_by_type || (task.clientId ? 'CLIENT' : 'DCEL');
+
+  const [requestedByType, setRequestedByType] = useState<'DCEL' | 'CLIENT'>(initialRequestedByType);
+  const [requestedBy, setRequestedBy] = useState<string>(initialRequestedBy);
+
+  const [isCustomRequestedBy, setIsCustomRequestedBy] = useState(() => {
+    if (!initialRequestedBy) return false;
+    if (initialRequestedByType === 'DCEL') {
+      const match = employees.some(e => `${e.firstname || ''} ${e.surname || ''}`.trim().toLowerCase() === initialRequestedBy.trim().toLowerCase());
+      return !match;
+    } else {
+      const match = clientContacts.some(c => c.name?.trim().toLowerCase() === initialRequestedBy.trim().toLowerCase());
+      return !match;
+    }
+  });
+  const [customRequestedBy, setCustomRequestedBy] = useState(() => {
+    if (!initialRequestedBy) return "";
+    if (initialRequestedByType === 'DCEL') {
+      const match = employees.some(e => `${e.firstname || ''} ${e.surname || ''}`.trim().toLowerCase() === initialRequestedBy.trim().toLowerCase());
+      return match ? "" : initialRequestedBy;
+    } else {
+      const match = clientContacts.some(c => c.name?.trim().toLowerCase() === initialRequestedBy.trim().toLowerCase());
+      return match ? "" : initialRequestedBy;
+    }
+  });
+
+  // Selected client profile and name for filtering client contacts
+  const selectedClient = useMemo(() => {
+    if (!clientId) return null;
+    return clientProfiles.find(c => c.id === clientId || c.name?.trim().toLowerCase() === clientId.trim().toLowerCase()) || null;
+  }, [clientId, clientProfiles]);
+
+  const selectedClientName = selectedClient?.name || clientId;
+
+  // Client contacts strictly for the selected client
+  const clientSpecificContacts = useMemo(() => {
+    if (!selectedClientName) return { siteSpecific: [], otherContacts: [], total: 0 };
+    const cleanClient = selectedClientName.trim().toLowerCase();
+    const forThisClient = clientContacts.filter(c => 
+      c.clientName?.trim().toLowerCase() === cleanClient
+    );
+    
+    // When siteId is chosen, partition into site-linked / principal contacts vs other contacts of this client
+    const siteSpecific = siteId
+      ? forThisClient.filter(c => c.isPrincipal || (c.siteIds || []).includes(siteId))
+      : forThisClient;
+    const otherContacts = siteId
+      ? forThisClient.filter(c => !c.isPrincipal && !(c.siteIds || []).includes(siteId))
+      : [];
+
+    return { siteSpecific, otherContacts, total: forThisClient.length };
+  }, [clientContacts, selectedClientName, siteId]);
+
+  // Office and Field employees for DCEL (excluding offboarded employees unless already selected on this task)
+  const dcelEmployees = useMemo(() => {
+    return employees
+      .filter(e => {
+        const t = (e.staffType || '').toUpperCase();
+        const isStaff = t === 'OFFICE' || t === 'FIELD' || !t || t !== 'NON-EMPLOYEE';
+        if (!isStaff) return false;
+
+        const fullName = `${e.firstname || ''} ${e.surname || ''}`.trim();
+        const isCurrentSelection = (requestedBy && fullName === requestedBy) || (initialRequestedBy && fullName === initialRequestedBy);
+
+        const isTerminated = e.status === 'Terminated';
+        const hasPastEndDate = Boolean(e.endDate && !isNaN(new Date(e.endDate).getTime()) && new Date(e.endDate).getTime() <= Date.now());
+        const isOffboarded = isTerminated || hasPastEndDate;
+
+        // If offboarded, only keep if this employee was already the recorded requester on this task
+        if (isOffboarded && !isCurrentSelection) {
+          return false;
+        }
+
+        return true;
+      })
+      .sort((a, b) => {
+        const nameA = `${a.firstname || ''} ${a.surname || ''}`.trim().toLowerCase();
+        const nameB = `${b.firstname || ''} ${b.surname || ''}`.trim().toLowerCase();
+        return nameA.localeCompare(nameB);
+      });
+  }, [employees, requestedBy, initialRequestedBy]);
+
   const isProj = !!task.is_project;
   const label = isProj ? "Project" : "Task";
 
@@ -45,12 +135,16 @@ export function EditTaskDialog({ task, users, onClose, onSave }: EditTaskDialogP
     e.preventDefault();
     if (!title.trim()) return;
     const assignedToStr = assignedTo.length > 0 ? assignedTo.join(',') : undefined;
+    const effectiveRequestedBy = (tagToSite && (isCustomRequestedBy ? customRequestedBy.trim() : requestedBy.trim())) || null;
+    const effectiveRequestedByType = (tagToSite && effectiveRequestedBy) ? requestedByType : null;
+
     onSave({ 
       title: title.trim(), 
       description: description.trim(), 
       assignedTo: assignedToStr, 
       deadline: deadline || undefined, 
       priority, 
+      urgency,
       requiresApproval, 
       approverId: requiresApproval ? approverId : undefined,
       hasBudget: requiresApproval ? hasBudget : undefined,
@@ -58,6 +152,8 @@ export function EditTaskDialog({ task, users, onClose, onSave }: EditTaskDialogP
       is_hr_task: isHrTask,
       clientId: tagToSite && clientId ? clientId : null,
       siteId: tagToSite && siteId ? siteId : null,
+      requestedByType: effectiveRequestedByType as any,
+      requestedBy: effectiveRequestedBy as any,
     });
   };
 
@@ -194,6 +290,32 @@ export function EditTaskDialog({ task, users, onClose, onSave }: EditTaskDialogP
             </div>
           </div>
 
+          {/* Urgency Level */}
+          <div>
+            <label className="block text-xs font-semibold text-foreground uppercase tracking-wide mb-2">Urgency Level</label>
+            <div className="grid grid-cols-4 gap-2 bg-muted/30 p-1.5 rounded-xl border border-border/50">
+              {URGENCY_ORDER.map(u => {
+                const conf = URGENCY_CONFIG[u];
+                const isSelected = urgency === u;
+                return (
+                  <button
+                    key={u}
+                    type="button"
+                    onClick={() => setUrgency(u)}
+                    className={`flex flex-col items-center gap-1 py-2 rounded-xl border text-[11px] font-semibold transition-all cursor-pointer ${
+                      isSelected
+                        ? `${conf.badgeCls} ${conf.borderCls} shadow-sm scale-105 ring-1 ring-primary/20`
+                        : 'border-border bg-muted text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    <span className={`w-2 h-2 rounded-full ${conf.dotCls}`} />
+                    {conf.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           <div className="bg-muted/20 p-4 rounded-xl border border-border/50 space-y-3 mt-1">
             <label className="flex items-center gap-2 cursor-pointer group">
               <input type="checkbox" checked={requiresApproval} onChange={e => setRequiresApproval(e.target.checked)}
@@ -289,6 +411,192 @@ export function EditTaskDialog({ task, users, onClose, onSave }: EditTaskDialogP
                                ))}
                             </select>
                          </div>
+                      </div>
+
+                      {/* Requested By Section — only shows when Tag to Site / Client is active */}
+                      <div className="px-4 pb-4 pt-3 border-t border-border/60">
+                        <div className="flex items-center justify-between gap-2 mb-2">
+                          <div className="flex items-center gap-1.5">
+                            <Users className="w-3.5 h-3.5 text-primary" />
+                            <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                              Requested By
+                            </label>
+                          </div>
+
+                          {/* Toggle DCEL vs CLIENT */}
+                          <div className="flex items-center p-0.5 rounded-lg border border-border bg-background shadow-xs text-xs font-bold">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setRequestedByType('DCEL');
+                                setRequestedBy('');
+                                setIsCustomRequestedBy(false);
+                                setCustomRequestedBy('');
+                              }}
+                              className={`px-2.5 py-0.5 rounded-md transition-all text-xs font-bold cursor-pointer ${
+                                requestedByType === 'DCEL'
+                                  ? "bg-primary text-primary-foreground shadow-sm"
+                                  : "text-muted-foreground hover:text-foreground"
+                              }`}
+                            >
+                              DCEL
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setRequestedByType('CLIENT');
+                                setRequestedBy('');
+                                setIsCustomRequestedBy(false);
+                                setCustomRequestedBy('');
+                              }}
+                              className={`px-2.5 py-0.5 rounded-md transition-all text-xs font-bold cursor-pointer ${
+                                requestedByType === 'CLIENT'
+                                  ? "bg-primary text-primary-foreground shadow-sm"
+                                  : "text-muted-foreground hover:text-foreground"
+                              }`}
+                            >
+                              CLIENT
+                            </button>
+                          </div>
+                        </div>
+
+                        {requestedByType === 'DCEL' ? (
+                          <div className="space-y-2">
+                            <select
+                              value={isCustomRequestedBy ? '__CUSTOM__' : requestedBy}
+                              onChange={e => {
+                                const val = e.target.value;
+                                if (val === '__CUSTOM__') {
+                                  setIsCustomRequestedBy(true);
+                                } else {
+                                  setIsCustomRequestedBy(false);
+                                  setRequestedBy(val);
+                                }
+                              }}
+                              className="w-full px-3 py-2 rounded-xl border border-border bg-background text-foreground text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all shadow-sm"
+                            >
+                              <option value="">Choose Field / Office employee...</option>
+                              <optgroup label="Office & Field Employees">
+                                {dcelEmployees.map(emp => {
+                                  const name = `${emp.firstname || ''} ${emp.surname || ''}`.trim() || emp.employeeCode || emp.id;
+                                  const role = emp.position || emp.department || '';
+                                  const type = emp.staffType ? `[${emp.staffType}]` : '';
+                                  const isTerminated = emp.status === 'Terminated';
+                                  const hasPastEndDate = Boolean(emp.endDate && !isNaN(new Date(emp.endDate).getTime()) && new Date(emp.endDate).getTime() <= Date.now());
+                                  const isOffboarded = isTerminated || hasPastEndDate;
+                                  const offboardedTag = isOffboarded ? ' [Offboarded]' : '';
+                                  return (
+                                    <option key={emp.id} value={name}>
+                                      {name}{role ? ` — ${role}` : ''} {type}{offboardedTag}
+                                    </option>
+                                  );
+                                })}
+                              </optgroup>
+                              {dcelEmployees.length === 0 && users.length > 0 && (
+                                <optgroup label="System Users">
+                                  {users.filter(u => u.isActive !== false).map(u => (
+                                    <option key={u.id} value={u.name}>
+                                      {u.name}
+                                    </option>
+                                  ))}
+                                </optgroup>
+                              )}
+                              <option value="__CUSTOM__">
+                                + Other (Type custom name...)
+                              </option>
+                            </select>
+
+                            {isCustomRequestedBy && (
+                              <input
+                                type="text"
+                                autoFocus
+                                value={customRequestedBy}
+                                onChange={e => setCustomRequestedBy(e.target.value)}
+                                placeholder="Enter DCEL requester name..."
+                                className="w-full px-3 py-2 rounded-xl border border-border bg-background text-foreground text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all shadow-sm"
+                              />
+                            )}
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            <select
+                              value={isCustomRequestedBy ? '__CUSTOM__' : requestedBy}
+                              onChange={e => {
+                                const val = e.target.value;
+                                if (val === '__CUSTOM__') {
+                                  setIsCustomRequestedBy(true);
+                                } else {
+                                  setIsCustomRequestedBy(false);
+                                  setRequestedBy(val);
+                                }
+                              }}
+                              disabled={!selectedClientName}
+                              className="w-full px-3 py-2 rounded-xl border border-border bg-background text-foreground text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              {!selectedClientName ? (
+                                <option value="" disabled>
+                                  Please select a Client above first...
+                                </option>
+                              ) : clientSpecificContacts.total === 0 ? (
+                                <option value="" disabled>
+                                  No contacts recorded for {selectedClientName}
+                                </option>
+                              ) : (
+                                <option value="">
+                                  Choose contact for {selectedClientName}...
+                                </option>
+                              )}
+
+                              {clientSpecificContacts.siteSpecific.length > 0 && (
+                                <optgroup
+                                  label={siteId ? "Linked to this Site / Principal" : `${selectedClientName} Contacts`}
+                                >
+                                  {clientSpecificContacts.siteSpecific.map(c => {
+                                    const cPos = c.position ? ` — ${c.position}` : '';
+                                    const cStar = c.isPrincipal ? ' ⭐ (Principal)' : '';
+                                    return (
+                                      <option key={c.id} value={c.name}>
+                                        {c.name}{cPos}{cStar}
+                                      </option>
+                                    );
+                                  })}
+                                </optgroup>
+                              )}
+
+                              {clientSpecificContacts.otherContacts.length > 0 && (
+                                <optgroup
+                                  label={`Other ${selectedClientName} Contacts`}
+                                >
+                                  {clientSpecificContacts.otherContacts.map(c => {
+                                    const cPos = c.position ? ` — ${c.position}` : '';
+                                    return (
+                                      <option key={c.id} value={c.name}>
+                                        {c.name}{cPos}
+                                      </option>
+                                    );
+                                  })}
+                                </optgroup>
+                              )}
+
+                              {selectedClientName && (
+                                <option value="__CUSTOM__">
+                                  + Other (Type custom contact name...)
+                                </option>
+                              )}
+                            </select>
+
+                            {isCustomRequestedBy && (
+                              <input
+                                type="text"
+                                autoFocus
+                                value={customRequestedBy}
+                                onChange={e => setCustomRequestedBy(e.target.value)}
+                                placeholder="Enter client contact name..."
+                                className="w-full px-3 py-2 rounded-xl border border-border bg-background text-foreground text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all shadow-sm"
+                              />
+                            )}
+                          </div>
+                        )}
                       </div>
                    </motion.div>
                 )}
